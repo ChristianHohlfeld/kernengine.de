@@ -2959,6 +2959,12 @@ class Emit:
                 if mine is not None and mine != entry and self.u.alike(mine, entry):
                     return lt[5:-1]
         try:
+            if k == "MemberExpr" and kids(b) and b.get("name") == "first":
+                # (the key of an entry of a map - `auto& [key, value]`, it->first -: of the type the map holds its keys
+                # in - an Int64 for a u64 the compiler names `unsigned long` -, not read through an Int)
+                e = self.keyed_entry(self.entry_of(kids(b)[0]) or kids(b)[0])
+                if e is not None:
+                    return self.rows(e[0])[2]
             if k == "MemberExpr" and kids(b) and not self.is_this(kids(b)[0]):
                 e = self.entry_of(kids(b)[0])
                 st = self.tp(e if e is not None else kids(b)[0])
@@ -3408,6 +3414,51 @@ class Emit:
         d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) or b.get("referencedDecl", {})
         return self.text_buffer(d) if d.get("kind") == "VarDecl" and d.get("id") in self.names else None
 
+    WIDE = W64 + ("long", "long long", "unsigned long", "unsigned long long")
+
+    def bits64(self, x):
+        """A u64/i64 under casts that keep its 64 bits (`static_cast<long long>(cx)` of an i64): the value the
+        Blueprint holds as an Int64, with all 64 bits - None: not one (an Int is exact to 2^53 only)."""
+        y = bare(x)
+        while self.ctype(y) not in W64:
+            if self.ctype(y) not in self.WIDE or y.get("kind") not in CAST or not kids(y):
+                return None
+            y = bare(kids(y)[-1])
+        return y
+
+    def format_values(self, fmt, args, kinds):
+        """The format and the values Format Text takes for a printf format and its arguments. A u64/i64 that an
+        integer conversion writes goes in as the text of its 64 bits - Int64 to Text Signed (d i), Int64 to Text (u),
+        Int64 to Hex (x) - at a %s of the same width and the same `-` (the digits are the same; printf pads a
+        number and a text alike); another flag, a precision or another conversion of one: Wait."""
+        out, values, at, k = [], [], 0, 0
+        while at < len(fmt):
+            if fmt[at] != "%":
+                out.append(fmt[at])
+                at += 1
+                continue
+            m = re.match(r"%([-+ 0#]*)(\d*)(?:\.(\d*))?(hh|h|ll|l|j|z|t)?([diuxXocsfFeEgG%])", fmt[at:])
+            spec = m.group(0)
+            if m.group(5) != "%":
+                x, t = args[k], kinds[k]
+                k += 1
+                w = self.bits64(x) if t == "Int" else None
+                if w is None:
+                    values.append(self.ex(x, t))
+                else:
+                    node = {"d": "int64_text_signed", "i": "int64_text_signed", "u": "int64_text", "x": "int64_text_hex"}.get(m.group(5))
+                    if node is None or set(m.group(1)) - {"-"} or m.group(3) is not None or m.group(4) in ("h", "hh"):
+                        raise Wait("a 64-bit number in a format Int64 to Text does not write so (a flag, a precision, X, o, c)")
+                    spec = f"%{m.group(1)}{m.group(2)}s"
+                    # (the text in a variable of its own: Format Text reads its values where they lie, and the
+                    # text a node gives is a temporary - in the class it would be gone before it is read)
+                    digits = self.temp("digits", "Text")
+                    self.hoist([f"{digits} = {node}({self.ex(w, 'Int64')});"])
+                    values.append(digits)
+            out.append(spec)
+            at += m.end()
+        return "".join(out), values
+
     @staticmethod
     def format_kinds(fmt):
         """The types of the values a printf format takes (logic::format): Int, Float or Text each - None:
@@ -3455,7 +3506,8 @@ class Emit:
             raise Wait("a format Format Text does not know (d i u x X o c s f e g, flags, width, precision)")
         if len(kinds) != len(a) - 3:
             raise Wait("a format whose conversions are not its values")
-        values = [self.ex(x, t) for x, t in zip(a[3:], kinds)]
+        fmt, values = self.format_values(fmt.decode("latin-1") if isinstance(fmt, bytes) else fmt, a[3:], kinds)
+        fmt = fmt.encode("latin-1")
         b = a[0]
         while b.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(b):
             b = kids(b)[0]
@@ -3482,7 +3534,7 @@ class Emit:
             raise Wait("a format Format Text does not know (d i u x X o c s f e g, flags, width, precision)")
         if len(kinds) != len(a) - 1:
             raise Wait("a format whose conversions are not its values")
-        values = [self.ex(x, t) for x, t in zip(a[1:], kinds)]
+        fmt, values = self.format_values(fmt, a[1:], kinds)
         self.f.pure = False   # (a step: the log gets a line)
         return self.take_pre() + [f"debug_print(text_format<{text_literal(fmt.encode('latin-1'))}>({', '.join(['-1'] + values)}), false);"]
 
@@ -4475,7 +4527,8 @@ class Emit:
         i = bare(inc) if inc else {}
         counting = (v is not None and NUMBER.get(self.ctype(v)) == "Int" and v.get("init") and c.get("kind") == "BinaryOperator" and c.get("opcode") in ("<", "<=")
                     and self.refers(kids(c)[0], v["id"]) and i.get("kind") == "UnaryOperator" and i.get("opcode") == "++" and self.refers(kids(i)[0], v["id"])
-                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break)
+                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break
+                    and not self.asks_engine(kids(c)[1]))
         if counting:
             node = self.u.next_node
             self.u.next_node += 1
@@ -4497,6 +4550,18 @@ class Emit:
         loop = self.enter_loop(body)
         lines = self.loop_body(loop, [body], self.effect_stmt(inc) if inc else None)
         return out + self.loop_lines(condition, cond_pre, lines, loop)
+
+    def asks_engine(self, n):
+        """Does this expression call a function only the engine can do (Api.declared_only)? C++ works out the
+        condition of a loop before every round: a bound that asks the engine (`c < server_->max_clients()`)
+        is asked every round - the engine sees each call -, so it is no bound a counting loop works out once."""
+        tree = self.tree
+        for x in walk(n):
+            for i in (x.get("referencedDecl", {}).get("id"), x.get("referencedMemberDecl")):
+                e = tree.decl.get(i) if i else None
+                if e is not None and (e["id"] in self.u.engine_calls or self.u.api().declared_only(e)):
+                    return True
+        return False
 
     def effect_stmt(self, n):
         saved, self.pre = self.pre, []
@@ -5298,9 +5363,10 @@ class Emit:
             a, b = kids(n)
             op = n["opcode"][:-1]
             ta = self.tp(a)
-            if op == "+" and self.plain_variable(a) and ta in ("Float", "Int"):
+            computed = n.get("type", {}) if "computeResultType" not in n else n["computeResultType"]
+            if op == "+" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT and self.u.clean(qtype({"type": computed})) == self.ctype(a)):
                 return [f"{self.lvalue(a)} += {self.ex(b, ta)};"]
-            synth = {"kind": "BinaryOperator", "opcode": op, "type": n.get("type", {}) if "computeResultType" not in n else n["computeResultType"], "inner": [a, b]}
+            synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": op, "type": computed, "inner": [a, b]})
             lines = self.store(a, lambda t: self.ex(synth, t))
             if synth.get("_w64"):
                 n["_w64"] = True
@@ -5308,10 +5374,12 @@ class Emit:
         if k == "UnaryOperator" and n.get("opcode") in ("++", "--"):
             a = kids(n)[0]
             ta = self.tp(a)
-            if n["opcode"] == "++" and self.plain_variable(a) and ta in ("Float", "Int"):
+            if n["opcode"] == "++" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT):
                 return [f"{self.lvalue(a)} += {'1' if ta == 'Int' else '1.0'};"]
             one = {"kind": "IntegerLiteral", "value": "1", "type": {"qualType": "int"}}
-            synth = {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": a.get("type", {}), "inner": [a, one]}
+            # (x++ is x += 1: a type smaller than int counts as an int, the sum goes back into x's type - a u16 at 65535 + 1 is 0)
+            computed = {"qualType": "int"} if self.ctype(a) in self.PROMOTED else a.get("type", {})
+            synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": computed, "inner": [a, one]})
             lines = self.store(a, lambda t: self.ex(synth, t))
             if synth.get("_w64"):
                 n["_w64"] = True
@@ -7365,6 +7433,24 @@ class Emit:
         if n.get("kind") == "CallExpr" and callee_name(n) == "move" and "&&" in by:
             n["_taken"] = True
 
+    # whole numbers a Blueprint's Int holds as C++ computes them (`x += 1` is x + 1): int (past its end C++ leaves it
+    # open) and the 64-bit ones; the others wrap around at their size
+    UNCUT = frozenset(("int", "long", "long long", "unsigned long", "unsigned long long"))
+    PROMOTED = frozenset(("bool", "char", "signed char", "unsigned char", "short", "unsigned short"))
+
+    def held_as(self, a, synth):
+        """`a op= b` and `++a` computed in the type C++ computes them in: the result converted back to a's whole-number
+        type where that keeps less of it (C++ [expr.ass]: E1 = E1 op E2, the value converted to E1's type)."""
+        have, want = self.u.clean(qtype(synth)), self.ctype(a)
+        if have == want or NUMBER.get(have) != "Int" or NUMBER.get(want) != "Int":
+            return synth
+        try:
+            if self.narrow("x", have, want, None) == "x":
+                return synth
+        except Wait:
+            pass   # (a conversion the formula does not know: the cast says so where it is written)
+        return {"kind": "ImplicitCastExpr", "castKind": "IntegralCast", "type": a.get("type", {}), "inner": [synth]}
+
     def plain_variable(self, n):
         n = bare(n)
         return n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in self.names and re.fullmatch(r"\w+", self.names[n["referencedDecl"]["id"]]) is not None
@@ -7685,7 +7771,13 @@ class Emit:
         if got is not None and self.writable(got[0]):
             return [], got[0], []
         tmp = self.temp("t", t)
-        return [f"{tmp} = {self.ex(n, t)};"], tmp, self.store(n, self.typed(tmp, t))
+        before = [f"{tmp} = {self.ex(n, t)};"]
+        # (storing it back runs after the change: what the store does before it - `m[key] = v` takes the value
+        # first, `put = t` - belongs there too, not with the steps before the statement, where t is not read yet)
+        held, self.pre = self.pre, []
+        after = self.store(n, self.typed(tmp, t))
+        after, self.pre = self.pre + after, held
+        return before, tmp, after
 
     def typed(self, text, have):
         """A value for store: the text, converted to the type the place has."""
@@ -9004,8 +9096,9 @@ class Emit:
                 c = self.ctype(a[0])
                 fmt = {"int": "%d", "short": "%d", "signed char": "%d", "char": "%d", "unsigned int": "%u", "unsigned short": "%u", "unsigned char": "%u",
                        "long": "%lld", "long long": "%lld", "unsigned long": "%llu", "unsigned long long": "%llu", "float": "%f", "double": "%f"}.get(c)
-                if c in ("whole64u", "whole64s"):   # (a u64, an i64: the decimal of its bits)
-                    return f"int64_text{'' if c == 'whole64u' else '_signed'}({self.ex(a[0], 'Int64')})", "Text"
+                w = self.bits64(a[0])
+                if w is not None:   # (a u64, an i64, also under a cast that keeps its 64 bits: the decimal of its bits, as the type says)
+                    return f"int64_text{'_signed' if c in ('whole64s', 'long', 'long long') else ''}({self.ex(w, 'Int64')})", "Text"
                 if fmt is None:
                     raise Wait(f"std::to_string of a {c}")
                 return f'text_format<"{fmt}">(-1, {self.ex(a[0], "Float" if fmt == "%f" else "Int")})', "Text"
@@ -9932,7 +10025,25 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
   static T none;
   none = T{};
   return none;
-}"""
+}
+// p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
+// any other is marked (C++ leaves it open) and stands at p - a range up to it is empty, nothing is read there.
+template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  const long long k = static_cast<long long>(n);
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + k;
+    if (e >= 0 && e <= static_cast<long long>((b - a) / sizeof(T))) return p + k;
+    converted::open_read();
+    return p;
+  }
+  if (p != nullptr || k == 0) return p + k;
+  converted::open_read();
+  return p;
+}
+template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }"""
 WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -10028,6 +10139,9 @@ class TestWriter:
     def widen_code(text):
         text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
         text = re.sub(r"\bfloat\b", "double", text)
+        # (what sscanf reads into a place that is now the test's number - a float as double, a component as
+        # Num32: as the C type its conversion says, then given to the place - converted::scan_c)
+        text = re.sub(r"(?<![\w:.>])(?:::)?(?:std::)?sscanf\s*\(", "converted::scan_c(", text)
         text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
         text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
         return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
@@ -10098,7 +10212,23 @@ class TestWriter:
             while i.get("kind") in CAST and kids(i):
                 i = bare(kids(i)[-1])
             ref = self.tree.decl.get((i.get("referencedDecl") or {}).get("id")) if i.get("kind") == "DeclRefExpr" else None
-            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))))):
+            def fixed(v):
+                """A `const` variable is a constant place only where its value is one: constexpr, or set by what
+                no call reads (`const i32 t = L.gov.tier();` is a value of the run, whatever its type says -
+                game_look.cpp:228; its place in kTier is checked like any other)."""
+                if v.get("constexpr"):
+                    return True
+                todo = list(kids(v))
+                while todo:
+                    x = todo.pop()
+                    if x.get("kind") in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr", "MemberExpr", "CXXThisExpr", "ArraySubscriptExpr"):
+                        return False
+                    r = (x.get("referencedDecl") or {}) if x.get("kind") == "DeclRefExpr" else {}
+                    if r.get("kind") == "ParmVarDecl" or (r.get("kind") == "VarDecl" and not (self.tree.decl.get(r.get("id")) or {}).get("constexpr")):
+                        return False   # (a parameter, a variable that is no constant: a value of the run)
+                    todo += kids(x)
+                return True
+            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))) and fixed(ref))):
                 return False
             try:
                 at = Const(self.u).number(i)
@@ -10249,6 +10379,15 @@ class TestWriter:
                 (a, b), (xa, xb) = span(n), span(ks[0])
                 swap(a, xa, "*", "converted_pointed(")
                 edits.append((b, 0, -depth, b, ", 0)"))
+                self.pointed = True
+            elif k == "BinaryOperator" and n.get("opcode") in ("+", "-") and len(ks) == 2 and "*" in qtype(ks[0]) and into_list(ks[0]):
+                # a place further on in a list a pointer points into (`values + n`, the end of what a call of the
+                # library reads - `insert(end, values, values + n)`): in the list or just past its end, as C++
+                # defines it; beyond, C++ leaves it open - the call is marked (converted_pointed_end)
+                (a, b), (la, lb), (ra, rb) = span(n), span(ks[0]), span(ks[1])
+                edits.append((a, 2, depth, a, "converted_pointed_end("))
+                swap(lb, ra, n["opcode"], ", " if n["opcode"] == "+" else ", -(")
+                edits.append((b, 0, -depth, b, ")" if n["opcode"] == "+" else "))"))
                 self.pointed = True
             elif k == "ArraySubscriptExpr" or name == "operator[]":
                 base, index = ks[-2:]
@@ -10839,8 +10978,8 @@ class TestWriter:
             return self.wrap(f"{arrays[f]}({obj}.{f}.begin(), {obj}.{f}.end())" if f in viewed or f in standard else f"converted::array_list({obj}.{f})" if f in arrays else f"{obj}.{f}", spelled.get(f, ""))
         lines += ["  return s;", "}"]
         lines.append(f"[[maybe_unused]] static converted::Value arg(const {t}& s) {{ return converted::Value::structure({{{', '.join(f'arg({of(f)})' for f, _ in fields)}}}); }}")
-        lines.append(f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
-                     + "".join(f" && same({of(f, 'want')}, (*got.rows)[{i}])" for i, (f, _) in enumerate(fields)) + "; }")
+        lines.append(f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ return converted::rows_of(got, {len(fields)})"
+                     + "".join(f" && converted::at_place(same({of(f, 'want')}, (*got.rows)[{i}]), \".{f}\")" for i, (f, _) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {t}& s) {{ return " + " && ".join(f"defined({of(f)})" for f, _ in fields) + "; }")
         lines.append(f"[[maybe_unused]] static std::string text(const {t}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({of(f)})" for f, _ in fields) + ' + "}"; }')
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
@@ -10901,7 +11040,7 @@ class TestWriter:
                         missing.append(f"{variable} ({w})")
                         continue
                     values.append(f'{{"{variable}", arg({of("s.")})}}')
-                    checks.append(f"same({of('w.s->')}, (*got.rows)[{len(checks)}])")
+                    checks.append(f"converted::at_place(same({of('w.s->')}, (*got.rows)[{len(checks)}]), \".{variable}\")")
                     fine.append(f"defined({of('w.s->')})")
                     texts.append(f'"{variable} = " + text({of("w.s->")})')
                 # what the state keeps besides its fields (Unit.state_static): a variable of a file at the level of a
@@ -10937,7 +11076,7 @@ class TestWriter:
                         continue
                     shown = self.wrap(held, spelled)
                     values.append(f'{{"{variable}", arg({shown})}}')
-                    checks.append(f"same({shown}, (*got.rows)[{len(checks)}])")
+                    checks.append(f"converted::at_place(same({shown}, (*got.rows)[{len(checks)}]), \".{variable}\")")
                     fine.append(f"defined({shown})")
                     texts.append(f'"{variable} = " + text({shown})')
                 if missing:   # (every variable is set and compared: one the test has no values of, and it cannot compare any)
@@ -10948,7 +11087,7 @@ class TestWriter:
                     f"  auto s = std::make_unique<{t}>();", *draws, "  return s;", "}",
                     f"[[maybe_unused]] static converted::Variables {info['variables']}(const {t}& s) {{ return {{{', '.join(values)}}}; }}",
                     f"struct {info['struct']} {{ const {t}* s; }};",
-                    f"[[maybe_unused]] static bool same(const {info['struct']}& w, const converted::Value& got) {{ return got.rows && got.rows->size() == {n}" + "".join(f" && {x}" for x in checks) + "; }",
+                    f"[[maybe_unused]] static bool same(const {info['struct']}& w, const converted::Value& got) {{ return converted::rows_of(got, {n})" + "".join(f" && {x}" for x in checks) + "; }",
                     f"[[maybe_unused]] static bool defined(const {info['struct']}& w) {{ return " + (" && ".join(fine) or "true") + "; }",
                     f"[[maybe_unused]] static std::string text(const {info['struct']}& w) {{ return std::string(\"{{\")" + "".join(f" + {'\", \" + ' if i else ''}{x}" for i, x in enumerate(texts)) + " + \"}\"; }"]
                 self.state_info = info
@@ -10961,8 +11100,8 @@ class TestWriter:
     def plain_struct(self, name, fields):
         """A struct of the test itself (what a call gives and changes), with what the comparison needs."""
         lines = [f"struct {name} {{ " + " ".join(f"{t} {f};" for f, t in fields) + " };"]
-        lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
-                     + "".join(f" && same({self.wrap(f'want.{f}', t)}, (*got.rows)[{i}])" for i, (f, t) in enumerate(fields)) + "; }")
+        lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return converted::rows_of(got, {len(fields)})"
+                     + "".join(f" && converted::at_place(same({self.wrap(f'want.{f}', t)}, (*got.rows)[{i}]), \".{f}\")" for i, (f, t) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"defined(s.{f})" for f, t in fields) + "; }")
         lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"text(s.{f})" for f, t in fields) + ' + "}"; }')
         return lines
@@ -11712,6 +11851,23 @@ class TestWriter:
             elif owner:
                 want_record(owner)
             todo.append(("function", d))
+        def take_const(place, piece):
+            """A statement that declares constants of another file: once, as far as the farthest of its pieces
+            reaches (see `statement_of`) - the text of each is the statement's from its start."""
+            same = next((p for p, x in G.foreign.items() if x.get("statement") == piece["statement"]), None)
+            if same is None:
+                G.foreign[place] = piece
+                return
+            other = G.foreign[same]
+            far, near = (other, piece) if other["reach"] >= piece["reach"] else (piece, other)
+            # (what both name of it, in one order: the test hands the piece on as it took it, and the tests that take
+            # it from each other must come to the same piece - whichever of them had which first)
+            merged = {**far, **{k: sorted({repr(x): x for x in [*far.get(k, ()), *near.get(k, ())]}.values(), key=repr) for k in ("names", "pairs", "actors")}}
+            if far is other:
+                G.foreign[same] = merged
+            else:
+                del G.foreign[same]
+                G.foreign[place] = merged
         def take(i):
             """A function whose body stands in another source file: the pieces its test holds, as the test of
             that file hands them on."""
@@ -11730,7 +11886,9 @@ class TestWriter:
                     continue
                 d = self.at(place)
                 if d is None:   # (not in this file's reach: the piece as the other file's test has it)
-                    if kind not in ("member", "inside", "engine") or (kind == "engine" and piece.get("stand_in")):
+                    if kind == "const" and piece.get("statement"):
+                        take_const(place, piece)
+                    elif kind not in ("member", "inside", "engine") or (kind == "engine" and piece.get("stand_in")):
                         G.foreign[place] = piece   # (a function of the engine this file does not see: the other test's stand-in of it)
                 elif kind in ("function", "inside", "freed"):
                     want_function(d["id"])
@@ -11899,6 +12057,13 @@ class TestWriter:
                   and v["_at"][1] <= a and re.fullmatch(r"\s*,\s*", raw[v["_at"][1]:a])]
         return self.statement_start(before[0]) if before else a
 
+    def statement_of(self, d):
+        """Of the piece of a constant another file's test takes: the statement it is (its file, where it begins)
+        and how far its text reaches. Two tests may hand on one statement as far as different constants of it
+        (`const Vec3 kOlive{...}, kSand{...};` - one needs kOlive, one kSand): the test that takes both has
+        it once, as far as the farther (`take_const`)."""
+        return {"statement": [os.path.abspath(d["_file"]), self.statement_start(d)], "reach": d["_at"][1]}
+
     def statement_text(self, file, a, b, records):
         """The text of a statement that declares variables, from a to b - without the definition of a class
         it holds that the test compiles along (`struct AimTarget { ... } g_aim;`): that class is a piece of
@@ -12033,6 +12198,15 @@ class TestWriter:
             closures[f.key] = order
         return closures, pieces
 
+    @staticmethod
+    def file_home(path):
+        """What the pieces of one source file are told apart by in the test that takes them (their namespace
+        `<it>_local`, the names they give each other): the file's own name - mp_rules.cpp: mp_rules_cpp. Not the
+        Blueprint's: a file whose functions stand in two Blueprints (a part of `Game` and a library - mp_rules.cpp:
+        Game/mp_rules_cpp, mp_rules_cpp) has one namespace without a name, and what one of them names of it
+        (g_rules) the other may hand on."""
+        return re.sub(r"\W", "_", os.path.basename(path))
+
     def items(self, G):
         """What `gather` gathered, as pieces another file's test takes: [(place, piece)] in the order they
         stand. A piece: its kind, its text as this test has it (its places guarded, not yet made the
@@ -12043,7 +12217,7 @@ class TestWriter:
         such pieces by that namespace)."""
         u, tree = self.u, self.tree
         main = os.path.abspath(tree.path)
-        home = u.job.replace("/", "__")   # (a part of a Blueprint: Game__game_net_cpp)
+        home = self.file_home(main)
         within = f"{home}_local"
         decls = [tree.records[q] for q in sorted(G.records)]
         def here(d):
@@ -12095,8 +12269,9 @@ class TestWriter:
                     t = tree.template_of.get(rid) or tree.decl.get(rid)
                     if t is None or not here(t) or not namespace_level(t) or t.get("kind") not in ("FunctionDecl", "FunctionTemplateDecl", "VarDecl", "EnumConstantDecl") or not own(t):
                         continue
-                    if t.get("kind") == "EnumConstantDecl":
-                        e = tree.enums.get(t.get("_enum", ""))
+                    named_enum = t.get("kind") == "EnumConstantDecl" and "_enum" in t   # (a value of an enum without a name: by its own name, where it stands)
+                    if named_enum:
+                        e = tree.enums.get(t["_enum"])
                         if e is None or not namespace_level(e):
                             continue
                         said = (t["name"], e.get("name"))
@@ -12105,7 +12280,7 @@ class TestWriter:
                     a = n.get("_at", (None,))[0]
                     word = re.match(r"[A-Za-z_]\w*", raw[a:a + 256]) if a is not None else None
                     if word and word.group(0) in said and not raw[max(0, a - 64):a].rstrip().endswith(("::", ".", "->")):
-                        scope = tree.scope_of.get((tree.enums[t["_enum"]] if t.get("kind") == "EnumConstantDecl" else t)["id"], "")
+                        scope = tree.scope_of.get((tree.enums[t["_enum"]] if named_enum else t)["id"], "")
                         edits.append((a, 3, 0, a, "::".join(self.local_path(scope, within)) + "::"))
                 if c.get("kind") == "CompoundStmt" and raw[c["_at"][0]:c["_at"][0] + 1] == "{":
                     named = set(re.findall(r"[A-Za-z_]\w*", raw[c["_at"][0]:c["_at"][1]]))
@@ -12168,7 +12343,7 @@ class TestWriter:
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
-            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs,
+            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs, **self.statement_of(d),
                     "actors": ["::".join(self.local_path(tree.scope_of.get(x["id"], ""), local_of(x)) + [x["name"]]) for x in said if self.actor_blueprint(qtype(x))]})
         for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
@@ -12359,10 +12534,8 @@ class TestWriter:
             try:
                 params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
                 decl_lines, names, types = [], [], []
-                # (what the Blueprint is given is said before the call: the drawn values are then handed over to
-                # it - moved, as a value that may only be moved (std::unique_ptr) must be - and what the call
-                # made of them is compared)
-                moved = set()
+                # (what the Blueprint is given is said before the call: the drawn values are then handed to run by
+                # reference - see `run` - and what the call made of them is compared)
                 static = d.get("storageClass") == "static" or tree.decl.get(d.get("previousDecl"), {}).get("storageClass") == "static"
                 if f.state:
                     # a function of the Blueprint of a state: called on an object of the class whose fields that are
@@ -12378,7 +12551,6 @@ class TestWriter:
                 if owner and f.self_type is not None and not f.ctor and not static:
                     types.append(self.names[owner])
                     decl_lines.append(f"{types[-1]} a0 = {self.helpers(owner)}(draw);")
-                    moved.add("a0")
                     names.append("a0")
                 first = len(names)
                 held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
@@ -12409,8 +12581,6 @@ class TestWriter:
                         continue
                     types.append(self.spell(qtype(p)))
                     decl_lines.append(f"{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
-                    if not types[-1].startswith("const ") and not types[-1].endswith("&"):
-                        moved.add(f"a{len(names)}")
                     names.append(f"a{len(names)}")
                 self.said = ()
                 if held_lists:
@@ -12469,7 +12639,7 @@ class TestWriter:
                     give = f"{'auto r = ' if f.value is not None else ''}{counted}; return Out_{f.name}{{{', '.join(f'std::move({parts[src_]})' if src_ != "state" else parts[src_] for _, _, src_ in f.out_fields)}}};"
                 else:
                     src_ = f.out_fields[0][2]
-                    give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_]};"
+                    give = f"return {counted};" if src_ == "result" else f"{counted}; return {parts[src_] if src_ == 'state' else f'std::move({parts[src_]})'};"   # (run's values are the test's: handed back moved, as they are)
                     want_type = types[0] if src_ == "self" else "" if src_ == "state" else self.spell(ret) if src_ == "result" else types[src_[1]]
             except Wait as w:
                 skipped.append((f, str(w)))
@@ -12493,7 +12663,11 @@ class TestWriter:
                 "    converted::Draw draw;   // (every function its own arguments, the same in every run)",
                 *([f"    std::unique_ptr<{state['object']}> s;   // (the object of the state: drawn for every call)"] if f.state else []),
                 *([f"    std::unique_ptr<{state['object']}> made_state;   // (the one its constructor makes: compared after the call)"] if state_made else []),
-                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' for t, n in zip(types, names))}) {{ {give} }};",
+                # (run takes the drawn values by reference: what the call does not take over stays the test's and ends
+                # after the comparison, outside what is recorded of the call - a destructor of the test's own copy,
+                # ~RoadBuilder of the object a method is called on, is no call of C++'s; what the function takes by
+                # value it takes from them itself, as C++ hands it over - see `handed`)
+                f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' if t.endswith('&') else f'[[maybe_unused]] {t}& {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
                 *[f"      {x}" for x in decl_lines],
                 f"      const std::vector<converted::Value> given = {{{given_args}}};   // (what the Blueprint is given: before the call)",
@@ -12504,7 +12678,10 @@ class TestWriter:
                 "      converted::may_bail(true);",
                 "      bp.before_source();   // (the Blueprints of the actors it calls, as they started)",
                 # (what the source gave, kept: as the Blueprint holds it, a view of it may be what is compared)
-                f"      const auto made = run({', '.join(f'std::move({n})' if n in moved else n for n in names)});",
+                # (on zeroed memory: what C++ leaves open in what the call makes is the Blueprint's zero - converted::Zeroed)
+                "      converted::zero_stack();",
+                f"      const converted::Zeroed<decltype(run({', '.join(names)}))> held([&] {{ return run({', '.join(names)}); }});",
+                "      const auto& made = held.get();",
                 *(["      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)"] if any(f.get("place") for f in u.engine_calls.values()) else []),
                 f"      const auto& want = {self.wrap('made', want_type)};" if self.wrap('made', want_type) != 'made' else "      const auto& want = made;",
                 "      converted::g_can_bail = false;",
@@ -12821,6 +12998,9 @@ class TestWriter:
             n = len([x for x in os.listdir(os.environ["TEST_KEEP"]) if x.startswith(f"test_{stem}.")])
             shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
         r = subprocess.run([os.environ.get("CXX", "g++"), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
+                            # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
+                            # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
+                            "-Wno-missing-field-initializers",
                             *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
         errors = []
         if r.returncode != 0:
@@ -13514,6 +13694,18 @@ def main(argv):
         # what they are given, and that changes back)
         state = (tuple(sorted(asks.items())), tuple(sorted(given.items())))
         if state in met:
+            # (what goes round: per Blueprint, the functions whose outcome differs between what it gave - written or the reason
+            # it waits -, and what of its exports differs: the finding to look for the cause with)
+            for u in sorted(new):
+                seen = gave[u]
+                for a, b in zip(seen, seen[1:]):
+                    ta, tb = a[0], b[0]
+                    moved = [f"{tb.get(k, ta.get(k))['cpp']}: {ta[k]['wait'] or 'written' if k in ta else 'absent'} -> {tb[k]['wait'] or 'written' if k in tb else 'absent'}"
+                             for k in sorted(set(ta) | set(tb)) if (ta.get(k) or {}).get("wait") != (tb.get(k) or {}).get("wait") or (k in ta) != (k in tb)]
+                    ea, eb = a[1], b[1]
+                    exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
+                                for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
+                    print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
             raise SystemExit("these Blueprints give, round after round, what they gave before (what one writes takes from the other what "
                              "it writes): " + ", ".join(sorted(new)))
         met.add(state)

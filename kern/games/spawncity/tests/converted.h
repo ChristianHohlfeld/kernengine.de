@@ -354,6 +354,10 @@ template <class Make> auto draw_list(Draw& draw, Make make) {
   if constexpr (std::is_arithmetic_v<decltype(make())>) {
     if (draw.below(5) == 0) n = 300 + draw.below(300);
   }
+  // (as long as it is, no room to spare: a list the class is given from a Value is that, and a function that
+  // appends - put_i32 into the bytes - asks for memory where the class does; spare room on the source's side
+  // only would hide that ask - a cost line that is the test's, not the class's)
+  out.reserve(n);
   for (; n > 0; --n) out.push_back(make());
   return out;
 }
@@ -675,80 +679,126 @@ template <class T> Value arg(const std::vector<T>& v) {
   }
 }
 
+// ---- where a result differs: the first place, named (only when a call differs - Tally::take compares again
+// with g_where_on; a comparison gives the same with it or without: these only write down where it failed) ----
+inline bool g_where_on = false;
+inline std::string g_where, g_where_leaf;
+/// A step into a value (a field `.x`, an entry `[3]`): where an inner place differed, its step goes before it.
+inline bool at_place(bool ok, const std::string& step) {
+  if (!ok && g_where_on) g_where = step + g_where;
+  return ok;
+}
+/// The place itself that differs: what the source has there and what the Blueprint has (the first one only).
+template <class W, class G> bool differ_at(W&& want, G&& got) {
+  if (g_where_on && g_where_leaf.empty()) g_where_leaf = "the source " + want() + ", the Blueprint " + got();
+  return false;
+}
+inline bool lengths(std::size_t want, std::size_t got) {
+  return want == got || differ_at([&] { return std::to_string(want) + " entries"; }, [&] { return std::to_string(got); });
+}
+inline bool rows_of(const Value& got, std::size_t n) {
+  return (got.rows && got.rows->size() == n) ||
+         differ_at([&] { return std::to_string(n) + " parts"; }, [&] { return got.rows ? std::to_string(got.rows->size()) : std::string("no parts"); });
+}
+inline std::string exact(f64 x) { char b[40]; std::snprintf(b, sizeof b, "%.17g", x); return b; }
+
 // ---- is what the Blueprint gives exactly what the source gives? ----
 // (Numbers by their bits: 0.0 and -0.0 are two results.)
 inline bool same_bits(f64 a, f64 b) { return std::bit_cast<kern::u64>(a) == std::bit_cast<kern::u64>(b); }
-inline bool same(f64 want, const Value& got) { return same_bits(want, got.as_number()); }
-inline bool same(f32 want, const Value& got) { return same_bits(static_cast<f64>(want), got.as_number()); }
-inline bool same(bool want, const Value& got) { return got.as_bool() == want; }
+inline bool same(f64 want, const Value& got) { return same_bits(want, got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); }); }
+inline bool same(f32 want, const Value& got) {
+  return same_bits(static_cast<f64>(want), got.as_number()) || differ_at([&] { return exact(want); }, [&] { return exact(got.as_number()); });
+}
+inline bool same(bool want, const Value& got) {
+  return got.as_bool() == want || differ_at([&] { return std::string(want ? "true" : "false"); }, [&] { return std::string(got.as_bool() ? "true" : "false"); });
+}
 inline bool same(Vec3 want, const Value& got) {
   const Vec3 v = got.as_vector();
-  return same_bits(want.x, v.x) && same_bits(want.y, v.y) && same_bits(want.z, v.z);
+  return at_place(same_bits(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
+         at_place(same_bits(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y") &&
+         at_place(same_bits(want.z, v.z) || differ_at([&] { return exact(want.z); }, [&] { return exact(v.z); }), ".z");
 }
 inline bool same(Vec2 want, const Value& got) {
   const Vec3 v = got.as_vector();
-  return same_bits(want.x, v.x) && same_bits(want.y, v.y);
+  return at_place(same_bits(want.x, v.x) || differ_at([&] { return exact(want.x); }, [&] { return exact(v.x); }), ".x") &&
+         at_place(same_bits(want.y, v.y) || differ_at([&] { return exact(want.y); }, [&] { return exact(v.y); }), ".y");
 }
-inline bool same(Whole want, const Value& got) { return got.type == kern::logic::PinType::int64 && static_cast<unsigned long long>(got.i) == want.v; }
+inline bool same(Whole want, const Value& got) {
+  return (got.type == kern::logic::PinType::int64 && static_cast<unsigned long long>(got.i) == want.v) ||
+         differ_at([&] { return std::to_string(want.v); },
+                   [&] { return std::to_string(static_cast<unsigned long long>(got.i)) + (got.type == kern::logic::PinType::int64 ? "" : " (not an Int64)"); });
+}
 inline bool same(wide::Vec3 want, const Value& got) { return same(kern::Vec3(want), got); }
 inline bool same(wide::Vec2 want, const Value& got) { return same(kern::Vec2(want), got); }
-inline bool same(const EngineObject* want, const Value& got) { return got.as_int() == (want ? want->kern_handle : 0); }
-inline bool same(const EngineObject& want, const Value& got) { return got.as_int() == want.kern_handle; }
+inline bool same(const EngineObject* want, const Value& got) {
+  return got.as_int() == (want ? want->kern_handle : 0) ||
+         differ_at([&] { return "object " + std::to_string(want ? want->kern_handle : 0); }, [&] { return "object " + std::to_string(got.as_int()); });
+}
+inline bool same(const EngineObject& want, const Value& got) { return same(&want, got); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 bool same(const std::unique_ptr<T>& want, const Value& got) { return same(static_cast<const EngineObject*>(want.get()), got); }
-inline bool same(const char* want, const Value& got) { return got.as_text() == (want ? want : ""); }
-inline bool same(const std::string& want, const Value& got) { return got.as_text() == want; }
-inline bool same(std::string_view want, const Value& got) { return got.as_text() == want; }
+inline bool same(std::string_view want, const Value& got) {
+  return got.as_text() == want || differ_at([&] { return "\"" + std::string(want) + "\""; }, [&] { return "\"" + std::string(got.as_text()) + "\""; });
+}
+inline bool same(const char* want, const Value& got) { return same(std::string_view(want ? want : ""), got); }
+inline bool same(const std::string& want, const Value& got) { return same(std::string_view(want), got); }
 template <class T>
   requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
-bool same(T want, const Value& got) { return got.as_int() == static_cast<kern::i64>(want); }
+bool same(T want, const Value& got) {
+  return got.as_int() == static_cast<kern::i64>(want) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want)); }, [&] { return std::to_string(got.as_int()); });
+}
 template <class E>
   requires std::is_enum_v<E>
-bool same(E want, const Value& got) { return got.i == static_cast<kern::i64>(want); }
+bool same(E want, const Value& got) {
+  return got.i == static_cast<kern::i64>(want) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want)); }, [&] { return std::to_string(got.i); });
+}
 template <class A, class B> bool same(const std::pair<A, B>& want, const Value& got) {
-  return got.rows && got.rows->size() == 2 && same(want.first, (*got.rows)[0]) && same(want.second, (*got.rows)[1]);
+  return rows_of(got, 2) && at_place(same(want.first, (*got.rows)[0]), ".first") && at_place(same(want.second, (*got.rows)[1]), ".second");
 }
 template <class T> bool same(const std::vector<T>& want, const Value& got) {
   if constexpr (std::is_same_v<T, bool>) {
     const auto& g = got.items<bool>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (g[i] != want[i]) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(static_cast<bool>(want[i]), Value::boolean(g[i])), "[" + std::to_string(i) + "]")) return false;
     return true;
   } else if constexpr (std::is_floating_point_v<T>) {
     const auto& g = got.items<f64>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (!same_bits(static_cast<f64>(want[i]), g[i])) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(static_cast<f64>(want[i]), Value::number(g[i])), "[" + std::to_string(i) + "]")) return false;
     return true;
   } else if constexpr (std::is_integral_v<T> || std::is_enum_v<T>) {
     const auto& g = got.items<kern::i64>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (g[i] != static_cast<kern::i64>(want[i])) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i)
+      if (!at_place(g[i] == static_cast<kern::i64>(want[i]) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want[i])); }, [&] { return std::to_string(g[i]); }), "[" + std::to_string(i) + "]"))
+        return false;
     return true;
   } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
     const auto& g = got.items<std::string>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (g[i] != want[i]) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(std::string_view(want[i]), Value::text(std::string(g[i]))), "[" + std::to_string(i) + "]")) return false;
     return true;
   } else if constexpr (std::is_same_v<T, Vec3> || std::is_same_v<T, Vec2> || std::is_same_v<T, wide::Vec3> || std::is_same_v<T, wide::Vec2>) {
     const auto& g = got.items<Vec3>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (!same(want[i], Value::vector(g[i]))) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(want[i], Value::vector(g[i])), "[" + std::to_string(i) + "]")) return false;
     return true;
   } else if constexpr (std::is_same_v<T, Whole>) {   // (a List<Int64>)
     const auto& g = got.items<kern::logic::Int64>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (g[i].bits != want[i].v) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i)
+      if (!at_place(g[i].bits == want[i].v || differ_at([&] { return std::to_string(want[i].v); }, [&] { return std::to_string(g[i].bits); }), "[" + std::to_string(i) + "]")) return false;
     return true;
   } else if constexpr (is_list<T> || is_box<T>) {
     const auto& g = got.items<Value>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (!g[i].rows || g[i].rows->size() != 1 || !same(want[i], (*g[i].rows)[0])) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(rows_of(g[i], 1) && same(want[i], (*g[i].rows)[0]), "[" + std::to_string(i) + "]")) return false;
     return true;
   } else {
     const auto& g = got.items<Value>();
-    if (g.size() != want.size()) return false;
-    for (std::size_t i = 0; i < want.size(); ++i) if (!same(want[i], g[i])) return false;
+    if (!lengths(want.size(), g.size())) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (!at_place(same(want[i], g[i]), "[" + std::to_string(i) + "]")) return false;
     return true;
   }
 }
@@ -977,6 +1027,72 @@ void take(std::unique_ptr<T>& to, const Value& v) {
   else to = std::make_unique<T>(owned(*engine_object<T>(v.as_int())));
 }
 template <class T> void take(std::vector<T>& to, const Value& v);
+/// A view of a list the source holds (kern::Span - what Renderer::meshes() gives): of the list, kept for it
+/// (as a text the source holds by a view, see take of a std::string_view).
+/// sscanf of the source, its places the test's (a float the test holds as a double or a Num32): each value is
+/// read as the C type its conversion says (%f: float, %lf: double, %llu: unsigned long long ...) and then given
+/// to its place - what the source reads, as many as it reads (EOF before the first, as sscanf).
+template <class A> int scan_one(const char*& p, const std::string& head, char conv, const std::string& len, A* out) {
+  int used = 0, r = 0;
+  const std::string f = head + "%n";
+  auto into = [&](auto tmp) {
+    r = std::sscanf(p, f.c_str(), &tmp, &used);
+    if constexpr (std::is_arithmetic_v<A> || std::is_same_v<A, wide::Num32>) { if (r == 1) *out = static_cast<A>(tmp); }
+  };
+  if (conv == 's' || conv == 'c' || conv == '[') {
+    if constexpr (std::is_same_v<A, char>) r = std::sscanf(p, f.c_str(), out, &used);
+  } else if (conv == 'f' || conv == 'e' || conv == 'g' || conv == 'a') {
+    if (len == "l") into(double{}); else if (len == "L") into((long double){}); else into(float{});
+  } else if (conv == 'd' || conv == 'i') {
+    if (len == "hh") into((signed char){}); else if (len == "h") into(short{}); else if (len == "l") into(long{}); else if (len == "ll") into((long long){}); else into(int{});
+  } else {
+    if (len == "hh") into((unsigned char){}); else if (len == "h") into((unsigned short){}); else if (len == "l") into((unsigned long){}); else if (len == "ll") into((unsigned long long){}); else into(unsigned{});
+  }
+  if (r == 1) p += used;
+  return r;
+}
+template <class... A> int scan_c(const char* s, const char* fmt, A*... out) {
+  // the format, one piece per value: what stands before its conversion (text, %%, %*...) and the conversion
+  std::vector<std::string> heads, lens;
+  std::vector<char> convs;
+  std::string head;
+  for (const char* c = fmt; *c;) {
+    if (*c != '%') { head += *c++; continue; }
+    const char* at = c++;
+    if (*c == '%') { head += "%%"; ++c; continue; }
+    const bool skip = *c == '*';
+    if (skip) ++c;
+    while (*c >= '0' && *c <= '9') ++c;
+    std::string len;
+    while (*c == 'h' || *c == 'l' || *c == 'L' || *c == 'j' || *c == 'z' || *c == 't') len += *c++;
+    if (*c == '[') { ++c; if (*c == ']') ++c; while (*c && *c != ']') ++c; }
+    const char conv = *c;
+    if (*c) ++c;
+    head.append(at, c);
+    if (skip) continue;
+    heads.push_back(head), lens.push_back(len), convs.push_back(conv == ']' ? '[' : conv);
+    head.clear();
+  }
+  const char* p = s;
+  int count = 0;
+  std::size_t i = 0;
+  bool going = true;
+  auto step = [&](auto* o) {
+    if (!going || i >= heads.size()) { going = false; return; }
+    const int r = scan_one(p, heads[i], convs[i], lens[i], o);
+    ++i;
+    if (r == 1) ++count;
+    else { going = false; if (count == 0 && r == EOF) count = EOF; }
+  };
+  (step(out), ...);
+  return count;
+}
+template <class T> void take(kern::Span<T>& to, const Value& v) {
+  static std::deque<std::vector<std::remove_const_t<T>>> kept;
+  kept.emplace_back();
+  take(kept.back(), v);
+  to = kern::Span<T>(kept.back().data(), kept.back().size());
+}
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
@@ -1129,6 +1245,32 @@ inline constexpr int kCalls = 300;
 // What makes the arguments and takes the results is outside on both sides.
 inline long g_source_asks = 0, g_class_asks = 0;
 inline cost::Trace g_source_trace, g_class_trace;   // (from where they asked: kept for the function SC_COST_WHERE names - cost.h)
+// ---- what C++ leaves open in an object: what nothing sets (a member without an initializer, `i32 on;`) ----
+// Its value is indeterminate - C++ does not say it; the Blueprint starts every value at the zero of its type.
+// The source's call runs on zeroed memory - its stack below the test (zero_stack), what it gives in zeroed
+// room (Zeroed), what it asks the allocator for zeroed (test_main.cpp) -: then what C++ leaves open is that
+// zero, which is one of the values C++ allows there. Nothing C++ sets changes: a value set overwrites it.
+[[gnu::noinline]] inline void zero_stack() {
+  unsigned char room[1 << 16];
+  std::memset(room, 0, sizeof room);
+  asm volatile("" : : "r"(room) : "memory");   // (written, as if read: not left out)
+}
+/// What the source's call gives, made in zeroed room (C++17: the value a call gives is made right there).
+template <class T> class Zeroed {
+ public:
+  template <class F> explicit Zeroed(F&& make) {
+    std::memset(room_, 0, sizeof room_);
+    made_ = ::new (static_cast<void*>(room_)) T(make());
+  }
+  ~Zeroed() { made_->~T(); }
+  Zeroed(const Zeroed&) = delete;
+  Zeroed& operator=(const Zeroed&) = delete;
+  const T& get() const { return *made_; }
+ private:
+  alignas(T) unsigned char room_[sizeof(T)];
+  T* made_ = nullptr;
+};
+
 /// The source's own call, counted: from where it begins until it has returned what it gives.
 template <class Call> decltype(auto) counted(Call&& call) {
   struct Ends {
@@ -1459,9 +1601,21 @@ struct Tally {
       if (class_asks - source_asks > most_class - with_source) most_class = class_asks, with_source = source_asks;
     }
     if (ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0])) return;
-    if (++wrong <= 3)
+    if (++wrong <= 3) {
       std::printf("  %s(%s): the source gives %s, the Blueprint %s (interpreter) and %s (class)\n", function, describe().c_str(), text(want).c_str(),
                   !both ? "(not run)" : ia && a.size() == 1 ? shown(a[0]).c_str() : "nothing", ib && b.size() == 1 ? shown(b[0]).c_str() : "nothing");
+      // the first place that differs, named: compared once more, writing down where (g_where_on)
+      const auto where = [&](const Value& got) {
+        g_where_on = true;
+        g_where.clear();
+        g_where_leaf.clear();
+        const bool equal = same(want, got);
+        g_where_on = false;
+        return equal ? std::string("the same") : g_where_leaf.empty() ? std::string("(no place named)") : "at " + (g_where.empty() ? std::string("the whole") : g_where) + ": " + g_where_leaf;
+      };
+      if (both && ia && a.size() == 1) std::printf("    first difference (interpreter) %s\n", where(a[0]).c_str());
+      if (ib && b.size() == 1) std::printf("    first difference (class) %s\n", where(b[0]).c_str());
+    }
   }
   /// A call the source was given up in (open_read): counted with those it has nothing to compare for.
   void given_up() { ++outside; }
@@ -1492,7 +1646,7 @@ inline bool g_open = false;
 inline std::jmp_buf g_bail;
 /// (What a call that is given up had on the heap stays there: the leak check does not count what the
 /// source allocates while it may be given up.)
-#if defined(__SANITIZE_ADDRESS__)
+#if defined(SC_ASAN)
 extern "C" void __lsan_disable();
 extern "C" void __lsan_enable();
 inline void may_bail(bool on) { on ? __lsan_disable() : __lsan_enable(); }
