@@ -1,0 +1,80 @@
+    CityStream::ready_at (14): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::feed_terrain (12): road_is_water() is defined in another file
+    CityStream::finish_features (61): road_is_water() is defined in another file
+    CityStream::select_cells (62): written
+    CityStream::drop_cell (10): written
+    CityStream::upload (15): written
+    CityStream::begin_roads (17): a member of Int is set
+    CityStream::relay (13): it calls CityStream::begin_roads(), which waits
+    CityStream::update_collision (54): written
+    CityStream::build_near (19): written
+    CityStream::building_shape (50): written
+    CityStream::damage_building (30): written
+    CityStream::damage_list (6): written
+    CityStream::damage_of (6): written
+    CityStream::merge_damage (44): written
+    CityStream::clear_damage (16): written
+    CityStream::begin_cells (22): buildings_input() is defined in another file
+    CityStream::finish_cells (44): chunk_count() is defined in another file
+    CityStream::work (110): read_features() is defined in another file
+    CityStream::update (85): it calls CityStream::request_around(), which waits
+    CityStream::step_time (4): written
+    CityStream::walls_near (32): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::building_at (18): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::street_point (19): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::buildings_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::ready_tiles (6): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::areas_near (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    CityStream::recollide (5): written
+    CityStream::exclude_building (13): written
+    CityStream::exclusion_done (1): written
+world_marks_cpp                10 /   15 functions      271 /    376 lines
+    ragged (1): written
+    Marks::ring_put_Scorch (5): written
+    Marks::ring_put_WallMark (5): written
+    Marks::clear (14): written
+    Marks::blast (22): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Marks::add_soot (32): written
+    Marks::add_breach (44): written
+    Marks::spawn_rubble (33): written
+    fh (1): written
+    facade_glass (24): written
+    Marks::bullet (23): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Marks::update (13): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Marks::prune_walls (22): its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+    Marks::rebuild (112): written
+    Marks::draw (25): set_mesh() is defined in another file
+
+155 of 204 functions of the program are written as Blueprints (1531 of 3083 lines), and 12 of the engine's headers that they call: 20 Blueprints - 4 of source files, 0 of states, 16 of headers and of shapes
+155 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-probe-153935-13439/pt/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     4 (   254)   a call on the Blueprint of the actor Traffic, which the level does not have
+     7 (   186)   unproject() is defined in another file
+    11 (   182)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a MemberExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     1 (   117)   it calls MeshData::push_extra(), which waits
+     1 (   110)   read_features() is defined in another file
+     1 (    91)   the type value_type
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    81)   it calls Terrain::plan_windows(), which waits
+     2 (    73)   road_is_water() is defined in another file
+     4 (    67)   list: erase()
+     1 (    50)   it calls GeoProjector::init(), which waits
+     1 (    44)   chunk_count() is defined in another file
+     1 (    36)   it calls Terrain::image_bounds(), which waits
+     2 (    33)   it calls CityStream::remove(), which waits
+     1 (    25)   set_mesh() is defined in another file
+     1 (    22)   buildings_input() is defined in another file
+     1 (    19)   its test cannot compare it yet (it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, written by a macro (a ImplicitCastExpr at nowhere in the source): C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is)
+     1 (    17)   a member of Int is set
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    13)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for ‘operator==’ (operand types are ‘const converted_terrain_cpp::Terrain::CraterRec’ and ‘const converted_terrain_cpp::Terrain::CraterRec’))
+     1 (     9)   tile_input() is defined in another file
+     1 (     9)   tile_lonlat() is defined in another file
+     1 (     8)   a variable of the Blueprint of the actor Traffic, which the level does not have
+     1 (     7)   an object of the engine (HeightSampler) given back by value (C++ moves it to the caller)
+     1 (     1)   the Blueprint of the actor Traffic, which the level does not have
+
+real	4m45,970s
+user	8m15,701s
+sys	0m29,961s
