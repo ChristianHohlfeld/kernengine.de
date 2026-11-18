@@ -13615,6 +13615,7 @@ def main(argv):
     # there are only so many functions. Rounds that do not go round never come to this: what they write stays as it was.
     fell = collections.defaultdict(dict)    # a Blueprint -> its functions that were written and wait now: key -> (the round, why)
     held = {}                               # a Blueprint -> its functions that wait for good: key -> why
+    visited = collections.defaultdict(list) # a Blueprint -> (the round, the version it gave then), round by round
 
     def asked_of(u, needs):
         """What a Blueprint is given, told by what it is made of: its files, the functions to write, and which
@@ -13645,6 +13646,19 @@ def main(argv):
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
             # (of those that fell in the rounds that went round - since the round that began from this state)
+            for u in sorted(new):
+                # (what it gave in the rounds that went round: of two versions one after the other, what differs - the values)
+                ring = [v for at, v in visited[u] if at >= met[state]]
+                for a, b in sorted({(x, y) for x, y in zip(ring, ring[1:]) if x != y}):
+                    (ta, ea), (tb, eb) = gave[u][a], gave[u][b]
+                    for k in sorted(set(ta) | set(tb)):
+                        if ta.get(k) != tb.get(k):
+                            print(f"goes round: {u}: v{a} -> v{b}: table {k}: {repr(ta.get(k))[:600]} -> {repr(tb.get(k))[:600]}", flush=True)
+                    for i, (da, db) in enumerate(zip(ea, eb)):
+                        if isinstance(da, dict) and isinstance(db, dict):
+                            for k in sorted(set(da) | set(db), key=str):
+                                if da.get(k) != db.get(k):
+                                    print(f"goes round: {u}: v{a} -> v{b}: exports[{i}] {k}: {repr(da.get(k))[:900]} -> {repr(db.get(k))[:900]}", flush=True)
             more = {u: {k: why for k, (at, why) in sorted(fell[u].items()) if at >= met[state] and k not in held.get(u, {})} for u in sorted(new)}
             if any(more.values()):
                 for u, ks in more.items():
@@ -13681,6 +13695,7 @@ def main(argv):
             if value not in gave[u]:
                 gave[u].append(value)
             version[u] = gave[u].index(value)
+            visited[u].append((rounds, version[u]))
         for u in now:
             # What it would call of a Blueprint that has no such function written: that Blueprint is one it calls
             # (the plan may not have known it, or not the call) - and of a header of the engine, one more
