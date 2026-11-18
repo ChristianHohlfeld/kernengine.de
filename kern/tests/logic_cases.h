@@ -1007,6 +1007,10 @@ inline const std::vector<Case>& cases() {
        R"kg(],[3,"item",31,"a"],[4,"item",31,"b"],[31,"result",32,"a"],[32,"result",30,"item"],[27,"then",30,"exec"],[3,"item",34,"a"],[4,"item",34,"b"],[34,"result",35,"a"],[35,"result",33,"item"],[30,"then",33,)kg"
        R"kg("exec"],[3,"item",37,"a"],[4,"item",37,"b"],[37,"result",38,"a"],[38,"result",36,"item"],[33,"then",36,"exec"],[3,"item",40,"a"],[4,"item",40,"b"],[40,"result",41,"a"],[41,"result",39,"item"],[36,"the)kg"
        R"kg(n",39,"exec"],[3,"item",43,"a"],[4,"item",43,"b"],[43,"result",44,"a"],[44,"result",42,"item"],[39,"then",42,"exec"]]})kg"},
+      // A value for %s that is not a Text (what int64.text* give, long enough to be held on the heap): the class
+      // hands Format Text a view of that value itself, which lives until the call ends (BlueprintCore::format_arg).
+      {"format_text_of_value",
+       R"kg({"variables":[{"name":"X","type":"int64","value":"18364758544493064720"},{"name":"T","type":"text","value":""}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"X"}},{"id":3,"type":"int64.text_signed"},{"id":4,"type":"int64.text"},{"id":5,"type":"int64.text_hex"},{"id":6,"type":"text.format","params":{"format":"%s|%s|%s|%s"},"values":{"most":-1}},{"id":7,"type":"var.set","params":{"variable":"T"}}],"links":[[1,"then",7,"exec"],[2,"value",3,"a"],[2,"value",4,"a"],[2,"value",5,"a"],[3,"result",6,"v0"],[4,"result",6,"v1"],[5,"result",6,"v2"],[3,"result",6,"v3"],[6,"result",7,"value"]]})kg"},
       // Append into the variable it reads (NodeDef::takes_first: in the class text_append(std::move(T), ...) appends where T's
       // characters are) - with the index, with T itself (T + T: T as it was), and T into U.
       {"append_in_place",

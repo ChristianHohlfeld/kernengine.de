@@ -580,6 +580,10 @@ struct BlueprintCore : logic::PureNodes {
   static logic::format::Arg format_arg(Int v) { return logic::format::arg(static_cast<i64>(v)); }
   static logic::format::Arg format_arg(Float v) { return logic::format::arg(v); }
   static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
+  /// (a text that is no Text - what int64_text, int64_text_signed ... give: a view of that value itself, which
+  /// lives until text_format ends; made into a Text first, the view would be of a Text that is gone)
+  static logic::format::Arg format_arg(const std::string& v) { return logic::format::arg(std::string_view(v)); }
+  static logic::format::Arg format_arg(std::string_view v) { return logic::format::arg(v); }
 
   // ---- enums ----
   // An enum the Blueprint declares with KERN_ENUM; the nodes' setting "Enum" is the type:
