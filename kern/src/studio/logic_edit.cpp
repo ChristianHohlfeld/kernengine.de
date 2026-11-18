@@ -986,6 +986,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     for (const auto& d : lib.all()) {
       if (!variable_step(*d) || d->type.rfind("list.", 0) != 0) continue;
       if (d->type == "list.copy_bytes" ? !numbers : v.count != 0) continue;
+      if (d->type == "list.insert_text" && v.type != logic::PinType::integer_list) continue;   // (the bytes of a text go into whole numbers)
       logic::Node named;
       named.type = d->type;
       named.set_param("variable", v.name);
