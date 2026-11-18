@@ -18,7 +18,7 @@ set -u
 A="$(cd "$(dirname "$0")" && pwd)"; J=~/spawncity-jobs
 # Im Arbeitsspeicher rechnen, wo es geht (/dev/shm: Klon, Zwischendateien, Objekte - nichts davon geht über die Platte).
 [ -d /dev/shm ] && [ -w /dev/shm ] && J="/dev/shm/spawncity-jobs-$(id -un)"; REPO=https://github.com/ChristianHohlfeld/kernengine.de
-N="$(nproc)"; SLOTS="${SLOTS:-6}"; mkdir -p "$J" "$A/.done"
+N="$(nproc)"; SLOTS="${SLOTS:-14}"   # (Aufträge zugleich; jeder rechnet mit N/6 Kernen - die meisten nutzen wenige); mkdir -p "$J" "$A/.done"
 me="$(sha256sum "$0" | cut -c1-16)"
 # Eine Schleife zur Zeit: wer die Sperre nicht bekommt, hört auf (eine zweite, die gestartet wird, während die erste
 # in einem alten vollen Lauf steckt, übernimmt; die erste endet, sobald sie sich ersetzen will).
@@ -37,9 +37,11 @@ run_job() {  # name
   local name="$1" kind ref rest W jobs
   read -r kind ref rest < "$A/jobs/$name"
   W="$J/$name"; rm -rf "$W"
-  git clone -q "$REPO" "$W" 2>/dev/null && cd "$W" && git checkout -q --detach "$ref" 2>/dev/null || { echo "$name: Stand $ref nicht gefunden"; return; }
+  # Ein Spiegel des Repos im Arbeitsspeicher: jeder Auftrag holt nur das Neue und klont lokal (Sekunden statt Minuten).
+  ( flock 7; [ -d "$J/.spiegel.git" ] || git clone -q --mirror "$REPO" "$J/.spiegel.git"; git -C "$J/.spiegel.git" fetch -q --prune origin ) 7> "$J/.spiegel.lock"
+  git clone -q "$J/.spiegel.git" "$W" 2>/dev/null && cd "$W" && git remote set-url origin "$REPO" && git checkout -q --detach "$ref" 2>/dev/null || { echo "$name: Stand $ref nicht gefunden"; return; }
   local SHA; SHA="$(git rev-parse --short HEAD)"
-  jobs=$(( N / SLOTS )); [ "$kind" = voll ] && jobs=$(( N * 2 / 3 ))
+  jobs=$(( N / 6 )); [ "$kind" = voll ] && jobs=$(( N * 2 / 3 ))
   export KERN_JOBS="$jobs" TMPDIR="$W/tmp" SC_TEST_OUT="$W/tmp/sc-tests"; mkdir -p "$TMPDIR" mag-log
   echo "$name: $kind auf $SHA ($ref), $jobs Kerne, Start $(date '+%F %T')" > mag-log/when
   echo "werkzeuge: clang=${CLANGXX:-FEHLT} ($("${CLANGXX:-false}" --version 2>/dev/null | head -1)) c++=$(command -v c++ || echo FEHLT) ($(c++ --version 2>/dev/null | head -1)) python=$(python3 --version 2>&1) PATH=$PATH" >> mag-log/when
@@ -77,14 +79,14 @@ run_job() {  # name
 while [ ! -e "$A/STOP" ]; do
   git -C "$A" pull -q --ff-only origin mag/auftrag 2>/dev/null || true
   if [ "$(sha256sum "$A/lauf2.sh" | cut -c1-16)" != "$me" ]; then   # (neue Fassung: nichts Neues annehmen, auslaufen lassen, ersetzen)
-    echo "$(date '+%F %T') neue Fassung, warte auf $(jobs -rp | wc -l) laufende"; wait; exec bash "$A/lauf2.sh"; fi
+    echo "$(date '+%F %T') neue Fassung ($(jobs -rp | wc -l) Aufträge laufen weiter)"; exec bash "$A/lauf2.sh"; fi   # (die laufenden halten die Sperre nicht)
   for f in "$A"/jobs/*; do
     [ -f "$f" ] || continue; name="$(basename "$f")"; [ -e "$A/.done/$name" ] && continue
     read -r kind _ < "$f"
     running="$(jobs -rp | wc -l)"
     [ "$running" -lt "$SLOTS" ] || break
     touch "$A/.done/$name"; echo "$(date '+%F %T') $name: $(head -1 "$f")"
-    run_job "$name" &   # (auch ein voller Lauf hält die Warteschlange nicht auf: die Proben laufen daneben)
+    run_job "$name" 8>&- &   # (auch ein voller Lauf hält die Warteschlange nicht auf: die Proben laufen daneben)
   done
   sleep 20
 done
