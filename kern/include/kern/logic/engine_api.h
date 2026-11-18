@@ -20,9 +20,12 @@
 // The table is written from the headers by tools/engine_api.py (engine_api.gen.cpp), and so are
 // the functions of a Blueprint's class (engine_nodes.gen.h).
 //
-// Every tier calls a function of the engine through one door: logic::Host::engine(function, in,
-// out). The game binds the engine there (kern/logic/engine_host.h: call_engine, the real function of
-// every node); a test binds a stand-in (EngineStandIn) or the engine itself.
+// The interpreter and the JIT call a function of the engine through one door: logic::Host::engine(
+// function, in, out). The game binds the engine there (kern/logic/engine_host.h: call_engine, the real
+// function of every node); a test binds a stand-in (EngineStandIn) or the engine itself. A Blueprint's
+// class - the exported game - calls the function itself, typed, where its host gives it the engine's
+// objects (kern/logic/engine_direct.h), and through the same door where it does not (a test with a
+// stand-in). Both do the same: the tool writes both from this table.
 #pragma once
 
 #include <string>

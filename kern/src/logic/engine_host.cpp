@@ -115,8 +115,7 @@ bool call_engine(EngineObjects& objects, std::string_view function, const std::v
     objects.error = "this build has no function " + std::string(function);
     return false;
   }
-  objects.error.clear();
-  objects.let_go();
+  objects.begin_call();
   return f(objects, in, out);
 }
 
