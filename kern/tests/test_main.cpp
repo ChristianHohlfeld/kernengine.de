@@ -2031,6 +2031,9 @@ TEST(logic_formulas) {
   // copysign: the size of one with the sign bit of the other - also of -0 (where sign() says 0)
   CHECK(value("copysign(2, -1)") == -2 && value("copysign(-2, 1)") == 2 && value("copysign(1, -0)") == -1 && value("copysign(1, 0)") == 1 && value("sign(-0)") == 0);
   CHECK(std::signbit(value("copysign(0, -5)")) && !std::signbit(value("copysign(-0, 5)")));
+  // remainder: IEEE 754's - x - n * y, n the whole number nearest x / y (of two, the even one); by 0 it is 0
+  CHECK(value("remainder(370, 360)") == 10 && value("remainder(190, 360)") == -170 && value("remainder(180, 360)") == 180 && value("remainder(540, 360)") == -180);
+  CHECK(value("remainder(-190, 360)") == 170 && value("remainder(5.5, 2)") == -0.5 && value("remainder(7, 0)") == 0 && std::signbit(value("remainder(-720, 360)")));
   // whole numbers as a machine has them: bits, and arithmetic that wraps around at 32 bit
   CHECK(value("band(12, 10)") == 8 && value("bor(12, 10)") == 14 && value("bxor(12, 10)") == 6 && value("band(-1, 255)") == 255);
   CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 0);

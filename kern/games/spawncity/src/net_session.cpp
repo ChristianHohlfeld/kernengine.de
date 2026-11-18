@@ -378,13 +378,13 @@ void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<Sw
     p.owner = owner;
     p.serial = serial;
   }
-  const u64 mark = 1ull << (part & 63);
+  const u64 mark = u64{1} << (part & 63);
   if (p.have[part >> 6] & mark) return;  // (twice)
   p.have[part >> 6] |= mark;
   p.units.insert(p.units.end(), units.begin(), units.end());
   if (last) p.last = part;
   if (p.last < 0) return;
-  for (int k = 0; k <= p.last; ++k) if (!(p.have[k >> 6] & (1ull << (k & 63)))) return;
+  for (int k = 0; k <= p.last; ++k) if (!(p.have[k >> 6] & (u64{1} << (k & 63)))) return;
   swarms_.push_back({owner, std::move(p.units)});
   p.units.clear();
   p.last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)

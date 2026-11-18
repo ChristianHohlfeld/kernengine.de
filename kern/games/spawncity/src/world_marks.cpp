@@ -249,11 +249,14 @@ void Marks::prune_walls(const CityStream& city) {
       if (w.top >= m.c.z - 0.15f && w.base <= m.c.z + 0.5f) return false;
     return true;
   };
-  for (std::vector<WallMark>* v : {&soots_, &breaches_, &cracks_}) {
-    const std::size_t before = v->size();
-    v->erase(std::remove_if(v->begin(), v->end(), gone), v->end());
-    if (v->size() != before) dirty_ = true;
-  }
+  auto prune = [&](std::vector<WallMark>& v) {
+    const std::size_t before = v.size();
+    v.erase(std::remove_if(v.begin(), v.end(), gone), v.end());
+    if (v.size() != before) dirty_ = true;
+  };
+  prune(soots_);
+  prune(breaches_);
+  prune(cracks_);
   soot_cursor_ = std::min<u32>(soot_cursor_, static_cast<u32>(soots_.size()));
   breach_cursor_ = std::min<u32>(breach_cursor_, static_cast<u32>(breaches_.size()));
   crack_cursor_ = std::min<u32>(crack_cursor_, static_cast<u32>(cracks_.size()));

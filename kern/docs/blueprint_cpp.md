@@ -1213,6 +1213,11 @@ dieselben Funktionen von `kern::math`.
 ist −1, wo `sign(-0)` 0 sagt): `std::copysign`, eine Operation auf dem Vorzeichenbit, in jeder Stufe
 dieselbe (im JIT `f64.copysign` von WebAssembly). Als Knoten heißt sie Copy Sign (`math_copysign`). Der
 Konverter schreibt `std::copysign` und `copysignf` damit.
+`remainder(a, b)` ist der Rest nach IEEE 754: `a − n · b`, mit `n` der ganzen Zahl, die `a / b` am
+nächsten liegt (von zweien die gerade) – `std::remainder`, exakt (das Ergebnis ist immer eine Zahl, die
+ein `double` hält), also auf jeder Plattform dieselben Bits; ist es 0, hat es das Vorzeichen von `a`.
+Durch 0 ergibt es 0, wie `mod`. Damit wird ein Winkel auf −180 … 180 gebracht (`remainder(w, 360)`);
+der Konverter schreibt `std::remainder` und `remainderf` damit.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
 

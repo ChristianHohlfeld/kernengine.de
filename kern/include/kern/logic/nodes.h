@@ -47,6 +47,10 @@ namespace math {
 inline constexpr f64 pi = 3.14159265358979323846;
 inline f64 div(f64 a, f64 b) { return b != 0 ? a / b : 0; }
 inline f64 mod(f64 a, f64 b) { return b != 0 ? std::fmod(a, b) : 0; }
+/// IEEE 754's remainder: a - n * b with n the whole number nearest to a / b (of two, the even one) -
+/// std::remainder, exact (the result is always a number a double holds), so the same bits on every
+/// platform; its sign where it is 0 is a's. By 0 it gives 0, as mod.
+inline f64 remainder(f64 a, f64 b) { return b != 0 ? std::remainder(a, b) : 0; }
 inline f64 pow(f64 a, f64 b) { return dm::pow(a, b); }
 inline f64 min(f64 a, f64 b) { return min_of(a, b); }
 inline f64 max(f64 a, f64 b) { return max_of(a, b); }

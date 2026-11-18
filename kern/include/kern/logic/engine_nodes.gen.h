@@ -212,6 +212,8 @@ template <class Core> struct EngineNodesOf : Core {
   void engine_clear_error() { this->kern_engine("engine.clear_error", {}, {}); }
   /// Monotonic milliseconds (performance.now() in the browser).
   Float engine_now_ms() const { return from_value<Float>(this->kern_engine("engine.now_ms", {}, {PinType::number})[0].converted(pin_type_of<Float>())); }
+  /// The wall clock: whole milliseconds since 1970-01-01 00:00 UTC (Date.now() in the browser) - a time several machines agree on (a shared round, a time of day); for measuring durations, now_ms.
+  Float engine_wall_ms() const { return from_value<Float>(this->kern_engine("engine.wall_ms", {}, {PinType::number})[0].converted(pin_type_of<Float>())); }
   /// Queues a job; returns its id (> 0).
   void engine_jobs_submit(Int kind, const List<Int>& input) { this->kern_engine("engine.jobs.submit", {to_value(kind), to_value(input)}, {PinType::integer}); }
   template <class KernNode> void engine_jobs_submit(KernNode& kern_n, Int kind, const List<Int>& input) { const std::vector<Value> kern_out = this->kern_engine("engine.jobs.submit", {to_value(kind), to_value(input)}, {PinType::integer}); kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]); }

@@ -673,7 +673,7 @@ std::vector<std::string> structs_in(const StructType& s, const Graph& g);
 ///                && ||                      a ? b : c
 ///   functions    min max clamp(x, lo, hi) abs sign copysign(x, s) floor ceil round trunc sqrt pow(x, y) exp log
 ///                sin cos tan asin acos atan atan2(y, x) - in radians; rad(degrees) deg(radians)
-///                lerp(a, b, t)
+///                lerp(a, b, t) remainder(x, y) (IEEE 754's: x - n * y, n the whole number nearest x / y)
 ///   constants    pi
 /// Dividing by 0 gives 0 (as the Divide node); the root and the logarithm of a negative number
 /// are those of 0 and of nothing (0).

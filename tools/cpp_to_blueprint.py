@@ -116,7 +116,7 @@ constinit const_cast continue co_await co_return co_yield decltype default delet
 int long mutable namespace new noexcept not not_eq nullptr operator or or_eq private protected public register reinterpret_cast requires return short signed sizeof static
 static_assert static_cast struct switch template this thread_local throw true try typedef typeid typename union unsigned using virtual void volatile wchar_t while xor xor_eq
 Bool Int Float Vector Text Actor List loop machine entry detached kern""".split())
-FORMULA_WORDS = set("min max clamp abs sign copysign floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
+FORMULA_WORDS = set("min max clamp abs sign copysign remainder floor ceil round trunc sqrt pow exp log sin cos tan asin acos atan atan2 rad deg lerp div mod pi band bor bxor shl shr wrap32 wrap32s mul32 single".split())
 # What nothing of a Blueprint is called: a word of C++ or of the notation, a function of a formula, a node
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).
@@ -156,7 +156,7 @@ MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "
         "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
         "truncf": "trunc", "pow": "pow", "powf": "pow", "exp": "exp", "expf": "exp", "log": "log", "logf": "log", "sin": "sin", "sinf": "sin", "cos": "cos", "cosf": "cos", "tan": "tan",
         "tanf": "tan", "asin": "asin", "acos": "acos", "atan": "atan", "atan2": "atan2", "atan2f": "atan2", "fmod": "mod", "fmodf": "mod", "clamp": "clamp",
-        "copysign": "copysign", "copysignf": "copysign"}
+        "copysign": "copysign", "copysignf": "copysign", "remainder": "remainder", "remainderf": "remainder"}
 
 
 VECTOR_FUNCTIONS = ("length", "dot", "cross", "distance", "normalize", "lerp", "length_sq", "distance_sq", "finite", "min_of", "max_of", "clamp", "hex_color", "vmin", "vmax")
@@ -402,9 +402,9 @@ def kids(n):
 # the struct Whole64 (tools/blueprint_whole64.h). The compiler's tree says how a type is spelled (its
 # "qualType") next to what it is (its "desugaredQualType", where size_t and u64 are the same): where the
 # spelling names one of those, the spelling is the type - unless it also names something only the other
-# says (a list's value_type, auto).
+# says (a list's value_type - which the compiler may also name without its class -, auto).
 WHOLE64 = re.compile(r"(?<![\w:])(?:kern::|std::|sc::)?(u64|i64|uint64_t|int64_t)\b")
-UNSPELLED = re.compile(r"::(?:value_type|reference|const_reference|size_type|difference_type|key_type|mapped_type|element_type|iterator|const_iterator|pointer)\b|\bauto\b|\bdecltype\b|\btypename\b|__")
+UNSPELLED = re.compile(r"(?<![\w])(?:value_type|reference|const_reference|size_type|difference_type|key_type|mapped_type|element_type|iterator|const_iterator|pointer)\b|\bauto\b|\bdecltype\b|\btypename\b|__")
 
 
 def qtype(n):
@@ -1376,6 +1376,28 @@ class Unit:
             self.declare(name, f"  KERN_STRUCT({name}) {{ {a} first = {self.zero(a)}; {b} second = {self.zero(b)}; }};", None, [self.part(a), self.part(b)])
         return self.structs[key]
 
+    def alike(self, a, b):
+        """Are these the Blueprint types of one C++ type - the same but where one says Int64 and the other Int?
+        A whole number of 64 bits is an Int64 where the program spells it u64 or i64; where the compiler works
+        a type out (a part of a std::pair<u64, u32>, what a template gives, a cast to const) it names it
+        unsigned long, as size_t - the place the value comes from or goes to says which it is."""
+        return a is not None and b is not None and self.shape64(a) == self.shape64(b)
+
+    def shape64(self, t):
+        """A Blueprint type with Int for every Int64 - of the pairs and rows the converter makes, by their parts."""
+        if t == "Int64":
+            return "Int"
+        pair = next((k for k, n_ in self.structs.items() if n_ == t and isinstance(k, tuple) and k[0] == "pair"), None)
+        if pair is not None:
+            return f"pair<{self.shape64(pair[1])}, {self.shape64(pair[2])}>"
+        if t in self.rows:
+            m = re.search(r"_(\d+)_row$", t)
+            return f"row{m.group(1) if m else ''}<{self.shape64(self.rows[t])}>"
+        m = re.match(r"(List|Map|Set|Fixed)<(.*)>$", t)
+        if m:
+            return f"{m.group(1)}<{', '.join(self.shape64(x) for x in template_args(t))}>"
+        return t
+
     def api(self):
         if self.engine is None:
             self.engine = Api(self.tree, self)
@@ -1503,7 +1525,7 @@ class Unit:
         if m:
             return f"List<{self.entry(template_args(t)[0])}>"
         # (T[3][2] is 3 entries of T[2]: the first length is the outer one)
-        m = re.match(r"std::array<(.+), (\d+)>$", t) or re.match(r"(.+?)\s*\[(\d*)\]((?:\s*\[\d*\])*)$", t)
+        m = re.match(r"std::array<(.+), (\d+)[uUlL]*>$", t) or re.match(r"(.+?)\s*\[(\d*)\]((?:\s*\[\d*\])*)$", t)   # (its length as the compiler writes it: 12UL)
         if m and m.lastindex == 3 and m.group(3):
             return f"List<{self.entry(m.group(1) + m.group(3))}>"
         if m:
@@ -1666,11 +1688,49 @@ class Unit:
                      [self.part(t) for _, t, _, _ in fields])
         return name
 
+    def moved_from(self, q, at=()):
+        """What stays in a value of the program's class `q` when it is moved out of (std::move into a
+        constructor or an assignment that takes it): the paths of its fields - by their names in the struct -
+        that keep what they held. A class whose moves are C++'s own (it declares no copy, move or destructor
+        of its own) moves field by field: a number, a flag, an enum's value, a vector stay as they were (their
+        move is a copy), a struct of the program as its own fields do, a std::vector, a kern::Map or Set and
+        an owned value (std::unique_ptr) are empty - what C++ leaves of them. Anything else (a std::string, an
+        optional, a class with moves of its own) C++ leaves open: Wait."""
+        rec = self.tree.records.get(q)
+        if rec is None:
+            raise Wait("what stays where a value was moved out of (std::move): its class is not known here")
+        last = q.split("::")[-1]
+        def of_itself(c):   # (one parameter, a reference to the class itself: a copy or a move)
+            ps = [x for x in kids(c) if x.get("kind") == "ParmVarDecl"]
+            return len(ps) == 1 and "&" in qtype(ps[0]) and self.clean(qtype(ps[0])).split("::")[-1] == last
+        for c in kids(rec):
+            if c.get("isImplicit"):
+                continue
+            k = c.get("kind")
+            special = k == "CXXDestructorDecl" or (k == "CXXConstructorDecl" and of_itself(c)) or (k == "CXXMethodDecl" and c.get("name") == "operator=")
+            if special:   # (one it declares, even = default, is no longer C++'s own move field by field: a destructor or a copy of its own leave it none)
+                raise Wait(f"what stays where a value was moved out of (std::move): {q.split('::')[-1]} moves as it says itself")
+        st = self.struct(q)
+        keep = []
+        fds = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        for (fname, ft, _, _), fd in zip(self.struct_fields[st], fds):
+            c = self.clean(qtype(fd))
+            path = at + (fname,)
+            if ft in ("Float", "Int", "Bool", "Int64", "Vector") or ft in self.enum_values:
+                keep.append(path)   # (a number's move is a copy)
+            elif re.match(r"std::(vector|unique_ptr)<|kern::(Map|Set)<", c):
+                continue            # (empty)
+            elif ft in self.struct_fields and self.find_type(c) in self.tree.records:
+                keep += self.moved_from(self.find_type(c), path)
+            else:
+                raise Wait(f"what stays where a value was moved out of (std::move): C++ leaves it open, but for a list (its field {fd.get('name')})")
+        return keep
+
     def entries(self, raw):
         """How many entries a list of fixed length has (`f32 m[16]`, std::array<u8, 32>); None: a list of any length."""
         c = self.clean(raw)
         # (T[3][2] has 3 entries, each a T[2]: the first length is the outer one)
-        m = re.match(r"std::array<.*,\s*(\d+)U?L?L?>$", c) or re.match(r"[^\[]*\[(\d+)\](?:\s*\[\d+\])*$", c)
+        m = re.match(r"std::array<.*,\s*(\d+)[uUlL]*>$", c) or re.match(r"[^\[]*\[(\d+)\](?:\s*\[\d+\])*$", c)
         return int(m.group(1)) if m else None
 
     def zero(self, t):
@@ -2721,6 +2781,31 @@ class Emit:
             return b["_bt"]
         if k == "DeclRefExpr" and b.get("referencedDecl", {}).get("id") in self.types:
             return self.types[b["referencedDecl"]["id"]]
+        if k == "ImplicitCastExpr" and b.get("castKind") in ("NoOp", "LValueToRValue") and kids(b):
+            # (a cast that only makes a value const or reads it is of the type of what it casts: the compiler
+            # names its type without the names the program gave it - kern::Set<unsigned long> for the
+            # kern::Set<u64> it reads -, the place it reads says what it holds)
+            inner = self.tp_or_none(kids(b)[0])
+            if inner is not None:
+                try:
+                    mine = self.u.btype(qtype(b))
+                except Wait:
+                    mine = None
+                if mine is not None and self.u.alike(mine, inner):
+                    return inner
+        if (k == "CXXOperatorCallExpr" and callee_name(b) == "operator[]" or k == "ArraySubscriptExpr") and len(kids(b)) >= 2:
+            # (an entry of a list is of the type of the list's entries - the compiler names it value_type, without
+            # the names the program gave it)
+            base = kids(b)[-2]
+            lt = self.tp_or_none(base) if self.keyed(base) is None else None
+            if lt is not None and lt.startswith("List<"):
+                try:
+                    mine = self.u.btype(qtype(b))
+                except Wait:
+                    mine = None
+                entry = self.u.rows.get(lt[5:-1], lt[5:-1])
+                if mine is not None and mine != entry and self.u.alike(mine, entry):
+                    return lt[5:-1]
         try:
             if k == "MemberExpr" and kids(b) and not self.is_this(kids(b)[0]):
                 e = self.entry_of(kids(b)[0])
@@ -2878,6 +2963,8 @@ class Emit:
             by_ref = "&" in raw and "&&" not in raw and not u.object_of(raw)
             const = bool(re.search(r"\bconst\b", raw))
             kind = "ref" if by_ref and not const else "const" if by_ref and (t in u.struct_fields or t.startswith("List<") or t == "Text") else ""
+            if not by_ref and t.startswith("List<") and p["id"] not in assigned and re.match(r"(?:const\s+)?(?:kern::)?Span<\s*const\s", raw.strip()):
+                kind = "const"   # (a view of a list to read - kern::Span<const T> - is that list, read where it stands: nothing is copied)
             name = u.fresh(p.get("name") or f"arg{len(f.params) + 1}", self.taken)
             self.taken.add(name)
             if kind == "ref":
@@ -4972,6 +5059,21 @@ class Emit:
                 return [f"{tmp} = {self.ex(a, t)};"] + self.store(a, lambda want: self.ex(b, want)) + self.store(b, self.typed(tmp, t))
             if name in ("sort", "stable_sort") and not self.own(ref.get("id")):
                 return self.sorted_list(name, kids(n)[1:])
+            if name == "erase_if" and len(kids(n)) == 3 and not self.own(ref.get("id")):
+                # std::erase_if(v, f) (C++20): v.erase(std::remove_if(v.begin(), v.end(), f), v.end()), as the
+                # library writes it
+                l0 = kids(n)[1]
+                lt = self.tp(l0)
+                if not lt.startswith("List<") or not self.ctype(l0).startswith("std::vector<"):
+                    raise Wait(f"algorithm: std::erase_if of a {lt}")
+                pre, got = self.lazily(lambda: self.spot(l0))
+                if got is None or pre:
+                    raise Wait("algorithm: std::erase_if in a list that is no place of the function")
+                it = lt[5:-1]
+                before, lv, after = self.variable_of(l0, lt)
+                return before + self.kept_where(l0, lv, it, "0", f"list_length<{it}>({lv})", kids(n)[2], "erase_if") + after
+            if name == "stable_partition" and len(kids(n)) == 4 and not self.own(ref.get("id")):
+                return self.partitioned(kids(n)[1:])
             if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")) and self.byte_places(kids(n)[1:3]) is not None:
                 return self.moved_bytes(name, kids(n)[1:])
             if name in ("memmove", "memcpy") and len(kids(n)) == 4 and not self.own(ref.get("id")):
@@ -6115,6 +6217,11 @@ class Emit:
             if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend", "data") and not kids(b)[1:] and (self.tp_or_none(base) or "").startswith("List<"):
                 lt = self.tp(base)
                 return base, ("0" if "begin" in m["name"] or m["name"] == "data" else f"list_length<{lt[5:-1]}>({self.ex(base, lt)})")
+            if base is not None and not self.is_this(base) and m.get("name") in ("begin", "cbegin", "end", "cend") and not kids(b)[1:] and self.keyed(base):
+                # (an iterator into a map or a set: the place of its entry - the end is the length)
+                kind, _ = self.keyed(base)
+                lt, row, _, _ = self.rows(base)
+                return base, ("0" if "begin" in m["name"] else f"{kind}_length<{row}>({self.ex(base, lt)})")
         if k == "MemberExpr" and b.get("name") == "data" and kids(b) and not b.get("isArrow") and re.match(r"(?:kern::)?Span<", self.ctype(kids(b)[0])):
             # (a view of a list - kern::Span - is the list: its data is the place of its first entry)
             return kids(b)[0], "0"
@@ -6403,11 +6510,11 @@ class Emit:
         before, lv, after = self.variable_of(lst, lt)
         return before + [f"list_sort<{order}>({'*this, ' if order != 'nullptr' else ''}{lv});"] + after
 
-    def first_match(self, name, a):
+    def first_match(self, name, a, ends=False):
         """std::find(first, last, x) / std::find_if(first, last, f) / std::find_if_not: the place of the first
         entry from first on that is x / that f holds for / does not - last when there is none, as C++ gives
         it. The entries are read where they stand, from first on, and f runs for each until one matches -
-        as often as in C++, in the same order."""
+        as often as in C++, in the same order. (`ends`: the place and the variable that holds last.)"""
         l0, lt, first, last = self.range_of(name, a[0], a[1])
         it = lt[5:-1]
         cpp = self.entry_cpp(l0)
@@ -6431,7 +6538,75 @@ class Emit:
         more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
         self.hoist(lines + [f"{at} = {first};", f"{end} = {last};", f"{go} = {more};", f"while (loop({go})) {{", *["  " + ln for ln in pre],
                             f"  if ({hit}) {{", f"    {go} = false;", "  } else {", f"    {at} += 1;", f"    {go} = {more};", "  }", "}"])
-        return at
+        return (at, end) if ends else at
+
+    def any_match(self, name, a):
+        """std::any_of / std::none_of / std::all_of(first, last, f): whether f holds for an entry / for none /
+        for all - as the library has them: none_of is find_if(first, last, f) == last, any_of its opposite,
+        all_of find_if_not(first, last, f) == last. f runs for each entry until the answer is known."""
+        at, end = self.first_match("find_if_not" if name == "all_of" else "find_if", a, ends=True)
+        reached = f'math_compare<"==">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        return (f"logic_not({reached})" if name == "any_of" else reached), "Bool"
+
+    def count_match(self, name, a):
+        """std::count_if(first, last, f): for how many entries f holds - f runs once for every entry, in
+        their order, as C++ goes through them."""
+        l0, lt, first, last = self.range_of(name, a[0], a[1])
+        it = lt[5:-1]
+        g, given, lines = self.function_value(name, a[2])
+        count, at, end = self.temp("count", "Int"), self.temp("at", "Int"), self.temp("end", "Int")
+        def test():
+            got = self.invoke(g, given + [self.at_place(l0, at, it)])
+            if got[1] != "Bool":
+                raise Wait(f"algorithm: std::{name} with a function that gives no Bool")
+            return got[0]
+        pre, hit = self.lazily(test)
+        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        self.hoist(lines + [f"{count} = 0;", f"{at} = {first};", f"{end} = {last};", f"while (loop({more})) {{", *["  " + ln for ln in pre],
+                            f"  if ({hit}) {{", f"    {count} += 1;", "  }", f"  {at} += 1;", "}"])
+        return count, "Int"
+
+    def partitioned(self, a):
+        """std::stable_partition(first, last, f): the entries f holds for first, then the others - each part in
+        the order it had -, as libstdc++ goes: f runs once for every entry, in their order. std::find_if_not
+        finds the first one it does not hold for; when there is one, the entries from there on that it does
+        not hold for wait in a list of their own - asked for once, as long as the rest of the range (C++'s
+        temporary buffer) - while those it holds for go to the next place of the first part; then they come
+        behind it. Every entry is handed on (a Take), none is copied."""
+        if len(a) != 3:
+            raise Wait(f"algorithm: std::stable_partition with {len(a)} arguments")
+        l0, lt, first, last = self.range_of("stable_partition", a[0], a[1])
+        it = lt[5:-1]
+        g, given, lines = self.function_value("stable_partition", a[2])
+        before, lv, after = self.variable_of(l0, lt)
+        at, end, go, kept, rest = self.temp("at", "Int"), self.temp("end", "Int"), self.temp("go", "Bool"), self.temp("kept", "Int"), self.temp("rest", lt)
+        def test():
+            got = self.invoke(g, given + [self.at_place(l0, at, it)])
+            if got[1] != "Bool":
+                raise Wait("algorithm: std::stable_partition with a function that gives no Bool")
+            return got[0]
+        pre1, holds1 = self.lazily(test)
+        pre2, holds2 = self.lazily(test)
+        node = self.u.next_node
+        self.u.next_node += 1
+        self.u.members.append(f"  struct {{ {it} value = {self.u.zero(it)}; }} n{node};")
+        more = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", end)})'
+        def back(i):
+            return [f"var_take(n{node}, {rest}[{i}]);", f"{lv}[{self.whole_math('+', kept, i)}] = n{node}.value;"]
+        return before + lines + [
+            f"{at} = {first};", f"{end} = {last};", f"{go} = {more};",
+            f"while (loop({go})) {{", *["  " + ln for ln in pre1], f"  if ({holds1}) {{", f"    {at} += 1;", f"    {go} = {more};", "  } else {", f"    {go} = false;", "  }", "}",
+            f"if ({more}) {{",
+            f"  {rest} = {lt}{{}};",
+            f"  list_reserve({rest}, {self.whole_math('-', end, at)});",
+            f"  var_take(n{node}, {lv}[{at}]);", f"  list_add({rest}, n{node}.value);",
+            f"  {kept} = {at};", f"  {at} += 1;",
+            f"  while (loop({more})) {{", *["    " + ln for ln in pre2],
+            f"    if ({holds2}) {{", f"      var_take(n{node}, {lv}[{at}]);", f"      {lv}[{kept}] = n{node}.value;", f"      {kept} += 1;",
+            "    } else {", f"      var_take(n{node}, {lv}[{at}]);", f"      list_add({rest}, n{node}.value);", "    }",
+            f"    {at} += 1;", "  }",
+            *["  " + ln for ln in self.count_loop("0", self.whole_math("-", f"list_length<{it}>({rest})", "1"), back)],
+            "}"] + after
 
     def extreme(self, name, a):
         """std::min_element / std::max_element(first, last[, less]): the place of the first smallest / first
@@ -6462,7 +6637,12 @@ class Emit:
         here = self.spot(base)
         if not self.same_list(l0, base) or here is None or here[0] != lv or end != at_end or at_end != f"list_length<{it}>({self.ex(base, lt)})":
             raise Wait("algorithm: std::remove_if of a range that does not reach the end of its list")
-        g, given, lines = self.function_value("remove_if", a[2])
+        return self.kept_where(l0, lv, it, first, end, a[2])
+
+    def kept_where(self, l0, lv, it, first, end, fn, name="remove_if"):
+        """The steps of remove_if over the places first..end of the list `l0` (its variable `lv`), with the
+        function `fn`: the entries it does not hold for stay, in their order, and the list ends after them."""
+        g, given, lines = self.function_value(name, fn)
         read, kept, stop = self.temp("at", "Int"), self.temp("kept", "Int"), self.temp("end", "Int")
         pre, gone = self.lazily(lambda: self.invoke(g, given + [self.at_place(l0, read, it)])[0])
         node = self.u.next_node
@@ -6704,6 +6884,12 @@ class Emit:
     def spot_held(self, n):
         b = self.unwrap(n)
         k = b.get("kind")
+        if k == "CXXConstructExpr" and re.match(r"(?:kern::)?Span<", self.ctype(b)):
+            # (a view of a whole list - kern::Span made of it - is that list: its place)
+            a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
+            if len(a) == 1:
+                got = self.spot_held(a[0])
+                return got if got is not None and got[1] == self.tp_or_none(b) else None
         if k == "_Text" and b.get("_place"):   # (a place the converter has named itself: the map a loop goes through)
             return b["_text"], b["_type"]
         if k == "DeclRefExpr":
@@ -7075,6 +7261,9 @@ class Emit:
             if want in self.u.enum_numbers:
                 index = f"list_find<Int>({self.u.enum_numbers[want]}, {index})"
             return f"enum_from_index<{want}>({index}).value"
+        if want in self.u.enum_values and have in self.u.enum_values:
+            # (an enum's value as one of another enum - static_cast<B>(a): the one with its number)
+            return self.conv(self.conv(text, have, "Int"), "Int", want)
         if want in self.u.rows and have == self.u.rows[want]:
             return f"struct_make<{want}>({text})"
         if have in self.u.rows and want == self.u.rows[have]:
@@ -7089,6 +7278,14 @@ class Emit:
 
     def ex(self, n, want=None):
         """An expression as a value of the notation, of the type `want` when one is given."""
+        b = bare(n)
+        if want is not None and b.get("kind") in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "InitListExpr") and "_bt" not in b and (want in self.u.struct_fields or want.startswith(("List<", "Map<", "Set<"))):
+            # a value made here, of the type it is made for (the entry of a list of std::pair<f32, u64> that
+            # push_back is given - its type, as the compiler names it, is std::pair<float, unsigned long>):
+            # made as that, each part converted to what it is there, as C++ converts it
+            made = self.tp_or_none(b)
+            if made is not None and made != want and self.u.alike(made, want):
+                n = dict(b, _bt=want)
         text, have = self.value(n)
         return self.conv(text, have, want)
 
@@ -7129,7 +7326,7 @@ class Emit:
         if name in ("clamp", "clampf"):
             return count == 3
         if name in MATH:
-            return count == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2}.get(MATH[name], 1)
+            return count == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2, "remainder": 2}.get(MATH[name], 1)
         if name in ("hypot", "ldexp", "ldexpf"):
             return count == 2
         if name == "lerp":
@@ -7640,7 +7837,7 @@ class Emit:
                     inner = [self.ex(x, "Float") for x in kids(b)[1:]]
                     return self.leaf(None, leaves, f"kern::formula([](Float v, Float lo, Float hi) -> Float {{ return v < lo ? lo : (hi < v ? hi : v); }}, {', '.join(inner)})")
                 return f"({v} < {lo} ? {lo} : ({hi} < {v} ? {hi} : {v}))"
-            if name in MATH and len(args) == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2}.get(MATH[name], 1):
+            if name in MATH and len(args) == {"min": 2, "max": 2, "pow": 2, "atan2": 2, "mod": 2, "copysign": 2, "remainder": 2}.get(MATH[name], 1):
                 return f"kern::math::{MATH[name]}({', '.join(args)})"
             if name == "hypot" and len(args) == 2:
                 return f"kern::math::sqrt(({args[0]} * {args[0]}) + ({args[1]} * {args[1]}))"
@@ -8047,6 +8244,21 @@ class Emit:
                 # object, what a reference names: a list (std::vector) is empty there afterwards. Of anything
                 # else C++ leaves open what stays.
                 lt = self.tp(a[0])
+                if lt in u.struct_fields and lt not in u.rows and u.find_type(self.ctype(a[0])) in self.tree.records:
+                    # a struct of the program: taken, and what C++ leaves of it put back where it was (Unit.moved_from)
+                    keep = u.moved_from(u.find_type(self.ctype(a[0])))
+                    got = self.spot(a[0])
+                    if got is None or got[1] != lt or not self.writable(got[0]):
+                        raise Wait("what stays where a value was moved out of (std::move): a value that is no place")
+                    taken = self.taken_out(a[0], lt)
+                    lines = []
+                    for path in keep:
+                        read, t = taken, lt
+                        for f in path:
+                            read, t = f"struct_break<{t}>({read}).{f}", next(ft for fn, ft, _, _ in u.struct_fields[t] if fn == f)
+                        lines.append(f"{got[0]}.{'.'.join(path)} = {read};")
+                    self.hoist(lines)
+                    return taken, lt
                 if not (lt.startswith("List<") and self.ctype(a[0]).startswith("std::vector<")):
                     raise Wait("what stays where a value was moved out of (std::move): C++ leaves it open, but for a list")
                 return self.taken_out(a[0], lt), lt
@@ -8094,9 +8306,13 @@ class Emit:
                 return self.first_match(name, a), "Int"
             if name in ("min_element", "max_element") and len(a) in (2, 3) and self.is_iter(b):
                 return self.extreme(name, a), "Int"
+            if name in ("any_of", "none_of", "all_of") and len(a) == 3:
+                return self.any_match(name, a)
+            if name == "count_if" and len(a) == 3:
+                return self.count_match(name, a)
             if name in ("sort", "stable_sort"):
                 raise Wait(ORDER_WAIT.format(name))
-            if name in ("sort", "stable_sort", "remove_if", "find", "find_if", "unique", "any_of", "all_of", "count_if", "swap", "fill", "reverse", "accumulate", "lower_bound", "upper_bound"):
+            if name in ("sort", "stable_sort", "remove_if", "find", "find_if", "unique", "any_of", "all_of", "none_of", "count_if", "swap", "fill", "reverse", "accumulate", "lower_bound", "upper_bound", "erase_if", "stable_partition"):
                 raise Wait(f"algorithm: std::{name}")
             if name in ("memcpy", "memset", "memcmp"):
                 raise Wait("raw memory (memcpy / memset)")
@@ -8297,6 +8513,10 @@ class Emit:
             if b.get("kind") != "InitListExpr":
                 if len(a) == 1 and self.tp(a[0]) == t:
                     return self.ex(a[0], t), t
+                if len(a) == 1 and self.u.alike(self.tp_or_none(a[0]), t) and self.u.clean(self.ctype(a[0])).replace("std::", "") == self.u.clean(self.ctype(b)).replace("std::", ""):
+                    # a copy of a value of the same C++ type, which the compiler names without the names the program
+                    # gave it (const value_type for a std::pair<u64, u32>): of the type of what it copies
+                    return self.value(a[0])
                 q = next((x for x, n_ in u.structs.items() if n_ == t), None)
                 rec = self.tree.records.get(q, {})
                 want = b.get("ctorType", {}).get("qualType")
@@ -8341,8 +8561,10 @@ class Emit:
                 vals, fixed = said
                 if fixed <= 16:
                     return self.made_list(vals + [u.zero(it)] * (fixed - len(vals)), t), t
+                # (every entry set where it stands - those it does not write zero, as C++ makes them: also when
+                # the place was used before, in an earlier pass of a loop)
                 made = self.temp("made", t, fixed)
-                self.hoist([f"{made} = {self.made_list(vals, t)};"])
+                self.hoist([f"{made}[{i}] = {v};" for i, v in enumerate(vals + [u.zero(it)] * (fixed - len(vals)))])
                 return made, t
             if not a:
                 return t + "{}", t
@@ -8350,7 +8572,11 @@ class Emit:
                 items = a if b.get("kind") == "InitListExpr" else kids(bare(a[0]) if bare(a[0]).get("kind") == "InitListExpr" else bare(kids(bare(a[0]))[0]))
                 vals = [self.ex(x, it) for x in items]
                 if len(vals) > 16:
-                    raise Wait("a list made of more than 16 values")
+                    # (more than a Make List takes: the list asked for once, as long as it is - as C++ makes a
+                    # std::vector of a list in braces -, then each value added in its order)
+                    made = self.temp("made", t)
+                    self.hoist([f"{made} = {t}{{}};", f"list_reserve({made}, {len(vals)});"] + [f"list_add({made}, {v});" for v in vals])
+                    return made, t
                 return f'list_make<{it}, "{len(vals)}">({", ".join(vals)})', t
             if len(a) == 1 and self.tp_or_none(a[0]) == t:
                 return self.ex(a[0], t), t
@@ -8383,6 +8609,8 @@ class Emit:
                 # std::vector<T>(first, last): the entries of a list from one place to another
                 (s0, first), (s1, last) = self.place(a[0]), self.place(a[1])
                 st = self.tp(s0)
+                if st.startswith(("Map<", "Set<")) and self.same_list(s0, s1):
+                    return self.listed(s0, st, first, last, t), t
                 if not self.same_list(s0, s1) or st != t:
                     raise Wait("a list made of a range of another type")
                 if self.whole_list(a[0], a[1]):
@@ -8395,7 +8623,48 @@ class Emit:
                            + self.count_loop(i0, i1, lambda i: [f"list_add({made}, list_get<{it}>({src}, {i}));"]))
                 return made, t
             raise Wait("a list made by a constructor")
+        if t.startswith(("Map<", "Set<")):
+            if not a:
+                return t + "{}", t   # (empty)
+            if len(a) == 1 and self.tp_or_none(a[0]) == t:
+                return self.ex(a[0], t), t   # (a copy of one: what C++ copies)
+            if t.startswith("Set<") and len(a) == 2 and self.is_iter(a[0]):
+                # kern::Set<K>(first, last): every key of a range of a list put in, one after the other - as its
+                # constructor does (nothing asked for in advance)
+                (s0, first), (s1, last) = self.place(a[0]), self.place(a[1])
+                st, kt = self.tp(s0), t[4:-1]
+                if not self.same_list(s0, s1) or not st.startswith("List<") or not (st[5:-1] == kt or self.u.alike(st[5:-1], kt)):
+                    raise Wait("a set made of a range of another type")
+                src = self.place_arg(s0, st, "const", [])
+                made, i0, i1, node = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int"), self.keyed_node()
+                self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};"]
+                           + self.count_loop(i0, i1, lambda i: [f"set_add({node}, {made}, {self.conv(f'list_get<{st[5:-1]}>({src}, {i})', st[5:-1], kt)});"]))
+                return made, t
+            raise Wait(f"a {t.split('<')[0].lower()} made of other arguments")
         raise Wait(f"a {t} made here")
+
+    def listed(self, s0, st, first, last, t):
+        """std::vector<T>(first, last) of a range of a map or a set: its entries from one place to another, in
+        their order - of a map each a pair of its key and value (std::pair<K, V>), of a set its keys. As C++ makes
+        it: the list asked for once, as long as the range, then each entry put in."""
+        it = t[5:-1]
+        kind = "map" if st.startswith("Map<") else "set"
+        _, row, kt, vt = self.rows(s0)
+        src = self.place_arg(s0, st, "const", [])
+        if kind == "map":
+            fields = self.u.struct_fields.get(it)
+            if not fields or len(fields) != 2 or not (self.u.alike(fields[0][1], kt) and self.u.alike(fields[1][1], vt)):
+                raise Wait("a list made of a range of another type")
+            entry = lambda i: f"struct_make<{it}>({self.conv(f'map_key_at<{row}>({src}, {i})', kt, fields[0][1])}, {self.conv(f'{src}[{i}]', vt, fields[1][1])})"
+        else:
+            if not self.u.alike(it, kt):
+                raise Wait("a list made of a range of another type")
+            entry = lambda i: self.conv(f"set_key_at<{row}>({src}, {i})", kt, it)
+        made, i0, i1 = self.temp("made", t), self.temp("first", "Int"), self.temp("last", "Int")
+        self.hoist([f"{made} = {t}{{}};", f"{i0} = {first};", f"{i1} = {self.whole_math('-', last, '1')};",
+                    f"list_reserve({made}, {self.whole_math('+', self.whole_math('-', i1, i0), '1')});"]
+                   + self.count_loop(i0, i1, lambda i: [f"list_add({made}, {entry(i)});"]))
+        return made
 
     def member_call(self, b):
         m = callee(b)
@@ -8853,7 +9122,7 @@ class Api:
 # ---- the test: the Blueprint next to its source ------------------------------------------------------
 WIDE_MATH = {"sin": "kern::math::sin", "cos": "kern::math::cos", "tan": "kern::math::tan", "asin": "kern::math::asin", "acos": "kern::math::acos", "atan": "kern::math::atan",
              "atan2": "kern::math::atan2", "exp": "kern::math::exp", "log": "kern::math::log", "pow": "kern::math::pow", "sqrt": "kern::math::sqrt", "fmod": "kern::math::mod",
-             "copysign": "kern::math::copysign", "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
+             "copysign": "kern::math::copysign", "remainder": "kern::math::remainder", "hypot": "hypot_bp", "tanh": "tanh_bp", "sinh": "sinh_bp", "cosh": "cosh_bp", "asinh": "asinh_bp", "log2": "log2_bp", "log10": "log10_bp", "cbrt": "cbrt_bp", "ldexp": "ldexp_bp"}
 # What a test needs where the source reads through a pointer into a list (Unit.pointed): the lists the test
 # handed it, so that an entry through such a pointer is checked against its list as converted::at checks one -
 # outside it the call is marked (C++ leaves open what it reads there). A pointer into nothing the test handed
@@ -9202,7 +9471,9 @@ class TestWriter:
                 edits.append((a, 2, depth, a, "converted::at("))
                 swap(token_at(bb, ia, "[", a), ia, "[", ", ")
                 swap(ib, b, "]", ")")
-            elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))) and not KEYED_KERN.match(self.u.clean(qtype(kids(ks[0])[0]))):
+            elif (k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0])
+                  and re.match(r"(const )?std::(vector|array)<", self.u.clean(qtype(kids(ks[0])[0])))):
+                # (an entry of a list of the library - not a function of the program that is called at())
                 base = kids(ks[0])[0]
                 if ks[0].get("isArrow") or base.get("kind") == "CXXThisExpr":
                     raise Wait("an entry by a pointer")
@@ -9221,7 +9492,8 @@ class TestWriter:
                 edits.append((ca, 2, depth, ca, f"converted::fits<{target}>("))
                 edits.append((cb, 0, -depth, cb, ")"))
             elif (k in ("CXXStaticCastExpr", "CStyleCastExpr", "CXXFunctionalCastExpr") and ks and n.get("castKind") == "IntegralCast"
-                  and self.u.find_type(self.u.clean(qtype(n))) in self.tree.enums and NUMBER.get(self.u.clean(qtype(ks[-1]))) == "Int"):
+                  and self.u.find_type(self.u.clean(qtype(n))) in self.tree.enums
+                  and (NUMBER.get(self.u.clean(qtype(ks[-1]))) == "Int" or self.u.find_type(self.u.clean(qtype(ks[-1]))) in self.tree.enums)):
                 # a whole number as a value of an enum that has no such value
                 ca, cb = span(ks[-1])
                 valid = ", ".join(str(v) for _, v in enum_numbers(self.tree.enums[self.u.find_type(self.u.clean(qtype(n)))]))
