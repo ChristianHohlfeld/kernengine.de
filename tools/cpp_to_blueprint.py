@@ -1338,6 +1338,13 @@ class Unit:
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ").replace("(anonymous namespace)::", "")
         return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|uint8_t|uint16_t|uint32_t|int8_t|int16_t|int32_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
 
+    def scope_for(self, d):
+        """Where the names of a function's declaration are looked up (find_type): in its class for a method -
+        also one defined outside it (`void Field::rebuild(const std::vector<Spot>& spots)`: Spot is
+        Field::Spot, as C++ looks a name up after the class is named) -, else in its namespace."""
+        owner = self.tree.owner.get(d["id"])
+        return owner + "::" if owner else self.tree.scope_of.get(d["id"])
+
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
         if self.lookup_scope and not t.startswith("::"):
@@ -2213,7 +2220,7 @@ class Unit:
             if d["id"] in getattr(self, "barred", {}):
                 raise Wait(self.barred[d["id"]])
             outer, self.local_scope = self.local_scope, self.tree.local_scope(d)
-            looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
+            looked, self.lookup_scope = self.lookup_scope, self.scope_for(d)
             try:
                 Emit(self, f).run()
             finally:
@@ -2271,7 +2278,7 @@ class Unit:
                 # the types it takes and gives are this Blueprint's too now: as this file's compiler sees them
                 # (they are the same types - a type is converted the same wherever it is seen)
                 seen = []
-                looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
+                looked, self.lookup_scope = self.lookup_scope, self.scope_for(d)
                 try:
                     if f.self_type is not None:
                         mine = self.struct(self.tree.owner.get(d["id"]))
@@ -9077,7 +9084,7 @@ class Api:
         """The node of a declared function of the engine: a dict - or Wait, when its types have no place. (Its
         types' names are looked up as C++ looks them up where it is declared: `Shape` in kern::game is
         kern::game::Shape, also where kern::physics has a Shape of its own.)"""
-        looked, self.u.lookup_scope = self.u.lookup_scope, self.tree.scope_of.get(d["id"]) or self.u.lookup_scope
+        looked, self.u.lookup_scope = self.u.lookup_scope, self.u.scope_for(d) or self.u.lookup_scope
         try:
             return self.function1(d)
         finally:
@@ -11397,10 +11404,13 @@ class TestWriter:
             if v.get("name") and self.actor_blueprint(qtype(v)) and self.inside(v, [tree.records[q] for q in sorted(G.records)]) is None:
                 bindings.append("::".join(classes_of(tree.scope_of.get(first["id"], "")) + [v["name"]]))
         bindings += [name for p in G.foreign.values() for name in p.get("actors", ())]
+        looked = u.lookup_scope
         for f in u.order:
             d = f.decl
             if f.lifted:
                 continue   # (a local function: in the source of the function it stands in, compared with it)
+            # (the types it takes are looked up where its declaration stands, as the converter read them: in its class)
+            u.lookup_scope = u.scope_for(d)
             owner = tree.owner.get(d["id"])
             free = G.freed.get(d["id"], (None,))[0]
             if free:
@@ -11568,6 +11578,7 @@ class TestWriter:
                 + (f", &vars, {'true' if f.mutates else 'false'}" if f.state else "") + ");",
                 "    }",
                 "  }"])))
+        u.lookup_scope = looked
         if not cases:
             return None, skipped
         system, own = ["#include <cfenv>", "#include <cmath>", "#include <cstdio>", "#include <string>", "#include <type_traits>", "#include <vector>"], []
