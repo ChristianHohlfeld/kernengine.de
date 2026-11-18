@@ -529,10 +529,34 @@ template <class T> T* engine_object(long long handle) {
 /// itself (SC_ENGINE=real: sc::real_engine), the source's objects of the engine in that call.
 inline kern::logic::EngineStandIn g_source_engine;
 inline kern::logic::EngineObjects g_source_objects;
+/// What the test asked the engine while it drew the arguments of a call (SC_ENGINE=real): the objects C++ has
+/// there - a Client made with its transport, as the source makes it - are made in the engine itself, and every
+/// side of the comparison begins with them: the Blueprint's sides make them again, the same calls in the same
+/// order (Blueprint::before_call). (Without it the engine knew no object at a handle the source holds, and
+/// refused every call on it - Session_connected: 6000 of 6000.)
+inline bool g_setting_up = false;
+inline std::vector<std::pair<std::string, std::vector<Value>>> g_setup;
+struct Setup {
+  Setup() {
+    g_setup.clear();
+    if (real_engine()) fresh_engine(g_source_objects);
+    g_setting_up = true;
+  }
+  ~Setup() { g_setting_up = false; }
+  Setup(const Setup&) = delete;
+  Setup& operator=(const Setup&) = delete;
+};
+inline void replay_setup(kern::logic::EngineObjects& objects) {
+  for (const auto& [function, in] : g_setup) {
+    std::vector<Value> out;
+    (void)kern::logic::call_engine(objects, function, in, out);
+  }
+}
 inline std::vector<Value> engine_call(const char* function, const std::vector<Value>& in) {
   std::vector<Value> out;
   if (const kern::logic::EngineFunction* f = kern::logic::engine_function(function))
     for (const kern::logic::EnginePin& p : f->outputs) out.push_back(Value::zero(p.type));
+  if (g_setting_up && real_engine()) g_setup.emplace_back(function, in);
   test_engine(g_source_engine, g_source_objects, function, in, out);
   return out;
 }
@@ -1386,7 +1410,10 @@ struct Blueprint {
   const std::vector<std::string>& calls(bool in_class) { return (in_class ? compiled : interpreted)->host.stand_in.calls; }
   void before_call(bool in_class) {
     (in_class ? compiled : interpreted)->host.stand_in.calls.clear();
-    if (real_engine()) fresh_engine((in_class ? compiled : interpreted)->host.objects);
+    if (real_engine()) {
+      fresh_engine((in_class ? compiled : interpreted)->host.objects);
+      replay_setup((in_class ? compiled : interpreted)->host.objects);   // (the objects the arguments hold: see Setup)
+    }
     (in_class ? compiled_actors : interpreted_actors).restore();
   }
   /// The actors' variables after the calls: the same in the source's runtime and in the Blueprint's.
@@ -1890,7 +1917,11 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
-    if (real_engine()) fresh_engine(g_source_objects);
+    if (g_setting_up) {
+      g_setting_up = false;   // (the objects the drawing made stay: the call begins with them - see Setup)
+    } else if (real_engine()) {
+      fresh_engine(g_source_objects);
+    }
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }
 };

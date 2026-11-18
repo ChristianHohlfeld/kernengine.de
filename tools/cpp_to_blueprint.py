@@ -990,6 +990,10 @@ class Tree:
                 r = self.decl.get(o["parentDeclContextId"])
                 if r is not None and r.get("_q"):
                     self.owner[o["id"]] = r["_q"]
+                    # (a method defined outside its class - `void Field::rebuild(const std::vector<Spot>&)` -
+                    # stands in its class as its declaration there: C++ looks its names up in the class -
+                    # `Spot` is Field::Spot, not another Spot of the namespace)
+                    self.scope_of[o["id"]] = r["_q"] + "::"
 
 
 def enum_underlying(values):
@@ -12603,6 +12607,7 @@ class TestWriter:
                 # value it takes from them itself, as C++ hands it over - see `handed`)
                 f"    const auto run = [&]({', '.join(f'[[maybe_unused]] const {t}& {n}' if n in held_lists else f'[[maybe_unused]] {t} {n}' if t.endswith('&') else f'[[maybe_unused]] {t}& {n}' for t, n in zip(types, names))}) {{ {give} }};",
                 "    for (int i = 0; tally.more(i); ++i) {",
+                "      const converted::Setup setup;   // (what drawing makes of the engine, every side begins with it)",
                 *[f"      {x}" for x in decl_lines],
                 f"      const std::vector<converted::Value> given = {{{given_args}}};   // (what the Blueprint is given: before the call)",
                 *([f"      const converted::Variables vars = {state['variables']}(*s);   // (and the variables of its state)"] if f.state else []),
