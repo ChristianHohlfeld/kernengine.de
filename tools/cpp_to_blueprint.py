@@ -114,6 +114,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import traceback
 
 ROOT = os.environ.get("KERN_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -760,17 +761,25 @@ class Tree:
         namespace does not give it (the runs agree on the addresses of their nodes, but not always on every one:
         fc::FirmwareRuntime::step calls hwcontract::decode_icm42688_registers) - the one function of that name and
         type there is: under that address too."""
+        # (the same for a constant of a namespace - `kern::kMaxExtensionAttributes`: the one variable of that name and
+        # type that stands outside every class and function)
         by_sig = collections.defaultdict(list)
         for d in self.decl.values():
             if d.get("kind") in ("FunctionDecl", "CXXMethodDecl") and d.get("name"):
                 by_sig[(d["kind"], d["name"], qtype(d))].append(d)
-        missing = {}
+            elif d.get("kind") == "VarDecl" and d.get("name") and d["id"] not in self.owner and self.scope_of.get(d["id"], "").rstrip(":") not in self.records:   # (no local yet: see take_locals)
+                by_sig[(d["kind"], d["name"], qtype(d))].append(d)
+        missing, here = {}, set()
         for dumps in [self.dumps, *[ds for _, ds in self.more], self.engine]:
             for o in dumps:
                 for n in walk(o):
+                    if n.get("kind") == "VarDecl" and n.get("id"):
+                        here.add(n["id"])   # (a variable a dump declares - a local one too: it is no other's)
                     r = n.get("referencedDecl")
-                    if r and r.get("id") and r.get("kind") in ("FunctionDecl", "CXXMethodDecl") and r["id"] not in self.decl and r.get("name"):
+                    if r and r.get("id") and r.get("kind") in ("FunctionDecl", "CXXMethodDecl", "VarDecl") and r["id"] not in self.decl and r.get("name"):
                         missing[r["id"]] = (r["kind"], r["name"], qtype(r))
+        for rid in here:
+            missing.pop(rid, None)
         for rid, sig in missing.items():
             same = {self.body.get(d["id"], d)["id"]: d for d in by_sig.get(sig, ())}
             if len(same) == 1:
@@ -2288,6 +2297,11 @@ class Unit:
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
+            if os.environ.get("WHY") and re.search(os.environ["WHY"], f.cpp):
+                # (to look at: where in this tool the reason was found - its last steps, innermost first)
+                at = (getattr(Emit, "looked_at", None) or {}).get("_at", (None, None))[0]
+                line = f"line {self.tree.text(f.file).count(chr(10), 0, at) + 1} of the source; " if at is not None and f.file else ""
+                f.wait += " [" + line + " < ".join(f"{t.name}:{t.lineno}" for t in reversed(traceback.extract_tb(w.__traceback__)[-10:])) + "]"
             # (what it had begun to declare stays known - a function written on the way may use it; the
             # Blueprint's text has only the declarations its functions use: see text)
             raise
@@ -2996,6 +3010,18 @@ class Emit:
         if d.get("variadic"):
             raise Wait("a variadic function")
         ret = qtype(d).split("(")[0].strip()
+        if UNSPELLED.search(ret) and not ret.endswith("&") and "*" not in ret:
+            # a value of a type the compiler names only as the library does (a lambda that returns an entry of a
+            # list gives a `value_type`): what its return gives says what that is - the same type in every return
+            def returns(n):
+                for c in kids(n):
+                    if c.get("kind") == "ReturnStmt" and kids(c):
+                        yield c
+                    elif c.get("kind") != "LambdaExpr":
+                        yield from returns(c)
+            given = next(returns(d), None)
+            if given is not None and qtype(kids(given)[0]) and not UNSPELLED.search(qtype(kids(given)[0])):
+                ret = qtype(kids(given)[0]).strip()
         f.value = u.btype(ret) if d.get("kind") != "CXXConstructorDecl" else None
         if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
@@ -3305,6 +3331,23 @@ class Emit:
                 i = self.root(t)
                 if i is not None:
                     out.add(i)
+        # (a reference the body declares to a part of another variable - `i32& v = corner[at];` -: what changes
+        # through it changes that variable)
+        named = {}
+        for n in walk(body):
+            if n.get("kind") == "VarDecl" and n.get("init") and kids(n):
+                raw = qtype(n)
+                if raw.rstrip().endswith("&") and not raw.rstrip().endswith("&&") and not re.search(r"\bconst\b", raw):
+                    i = self.root(kids(n)[-1])
+                    if i is not None and i != n["id"]:
+                        named[n["id"]] = i
+        grew = True
+        while grew:
+            grew = False
+            for v, i in named.items():
+                if v in out and i not in out:
+                    out.add(i)
+                    grew = True
         return out
 
     # ---- text formatted into a buffer ----
@@ -4033,7 +4076,9 @@ class Emit:
         ones after it down, so the one taken out is the one that ends -; clear() of a kern::Map or kern::Set
         ends its entries from the last to the first (kern/core/map.h); push_back(std::move(x)) and
         emplace_back(std::move(x)) take x into the list - it is empty where it was (a Take), nothing is copied
-        and nothing ends."""
+        and nothing ends; emplace(key, std::move(x)) and try_emplace(key, std::move(x)) of a kern::Map take x into
+        the key's new entry - only where the key is new: where it is there, nothing changes and x keeps what it
+        holds (kern/core/map.h try_emplace)."""
         base = kids(callee(n))[0] if kids(callee(n)) else {}
         c = self.u.clean(re.sub(r"\*\s*(const)?\s*$", "", qtype(base)))
         args = [x for x in kids(n)[1:] if x.get("kind") != "CXXDefaultArgExpr"]
@@ -4041,12 +4086,18 @@ class Emit:
             return name == "pop_back" or len(args) == 1
         if name == "clear":
             return bool(KEYED_KERN.match(c))
+        if name in ("emplace", "try_emplace") and len(args) == 2 and KEYED_KERN.match(c):
+            return self.moved_value(args[1])
         if name in ("push_back", "emplace_back") and len(args) == 1:
-            a = self.unwrap(args[0])
-            while a.get("kind") in ("MaterializeTemporaryExpr", "ImplicitCastExpr") and len(kids(a)) == 1:
-                a = self.unwrap(kids(a)[0])
-            return a.get("kind") == "CallExpr" and callee_name(a) == "move" and len(kids(a)) == 2
+            return self.moved_value(args[0])
         return False
+
+    def moved_value(self, n):
+        """Is this argument std::move(x) - a value handed on, empty where it was?"""
+        a = self.unwrap(n)
+        while a.get("kind") in ("MaterializeTemporaryExpr", "ImplicitCastExpr") and len(kids(a)) == 1:
+            a = self.unwrap(kids(a)[0])
+        return a.get("kind") == "CallExpr" and callee_name(a) == "move" and len(kids(a)) == 2
 
     def ended_entry(self, h, place):
         """The steps that end an entry of a list or map at `place` as C++ ends it (h: what ends with it)."""
@@ -4063,7 +4114,7 @@ class Emit:
         """The steps that end every entry of a list or map at `lv`, from the last to the first."""
         count, at = self.temp("count", "Int"), self.temp("at", "Int")
         last = self.whole_math("-", count, "1")
-        return [f"{count} = kern::to<Int>({kind}_length<{row}>({lv}));",
+        return [f"{count} = {kind}_length<{row}>({lv});",   # (Length gives an Int)
                 *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
     def block_of(self, stmts):
@@ -4086,6 +4137,13 @@ class Emit:
                 break
         return out, False
 
+    def continues(self, s):
+        """Does a statement end with continue - in a switch in a loop, a case that goes on with the loop's next round
+        (it falls through to no other case)?"""
+        while s.get("kind") == "CompoundStmt" and kids(s):
+            s = kids(s)[-1]
+        return s.get("kind") == "ContinueStmt"
+
     def ends(self, stmts):
         """Does a list of statements always return?"""
         for s in stmts:
@@ -4106,6 +4164,7 @@ class Emit:
         """The lines of one statement, and whether the path ends there."""
         saved, self.pre = self.pre, []
         self.serial += 1
+        Emit.looked_at = s   # (WHY: the statement a reason was found in)
         try:
             lines, ends = self.stmt1(s)
             return self.pre + lines, ends
@@ -4987,8 +5046,23 @@ class Emit:
             got = self.spot(src)
         finally:
             held, self.frozen = self.frozen, None
+        braced = self.unwrap(src)
         if got is not None and got[1] == lt:
             place = got[0]
+        elif not keyed and braced.get("kind") == "CXXStdInitializerListExpr" and kids(braced) and self.unwrap(kids(braced)[0]).get("kind") == "InitListExpr" \
+                and 0 < len(kids(self.unwrap(kids(braced)[0]))) <= 16:
+            # for (T x : {a, b, c}): the values in braces are a list of that fixed length, which lies where it
+            # stands (as the array C++ makes of them: nothing is asked for) - each worked out once, in their order
+            del self.pre[mark:]
+            vals = []
+            held = []
+            for x in kids(self.unwrap(kids(braced)[0])):
+                pre, text = self.lazily(lambda: self.ex(x, it))
+                item = self.temp("item", it)
+                held += pre + [f"{item} = {text};"]
+                vals.append(item)
+            place = self.temp("items", lt, len(vals))
+            held.append(f"{place} = {self.made_list(vals, lt)};")
         else:
             del self.pre[mark:]
             place = self.temp("list", lt)
@@ -5077,7 +5151,7 @@ class Emit:
                     closed = True
                     break
                 body_stmts.append(x)
-                if self.ends([x]):
+                if self.ends([x]) or self.continues(x):
                     closed = True
                     break
             if not closed and (labels, stmts) is not (cases[-1][0], cases[-1][1]) and cases[-1] is not None and labels is not cases[-1][0]:
@@ -6332,6 +6406,14 @@ class Emit:
                     raise Wait(f"{name}() of a map with other arguments")
             key = self.temp("key", kt)
             lines = [f"{key} = {self.ex(key_node, kt)};"]
+            if kind == "map" and value is not None and name in ("emplace", "try_emplace") and self.entry_life(self.ctype(base)) is not None:
+                # a value that ends something, moved in (entries_change): taken only where the key is new - where it
+                # is there, nothing changes and what was to be moved in keeps what it holds (kern::Map::try_emplace)
+                steps, text = self.lazily(value)
+                before, lv, after = self.variable_of(base, lt)
+                n = self.keyed_node()
+                return (lines + before + [f"map_add({n}, {lv}, {key});", f"if ({n}.added) {{", *["  " + x for x in steps], f"  {lv}[{n}.index] = {text};", "}"] + after,
+                        f"{n}.index", f"{n}.added")
             held = None
             if kind == "map" and value is not None:
                 held = self.temp("value", vt)
@@ -6695,6 +6777,8 @@ class Emit:
             return None
 
     def same_list(self, a, b):
+        if a.get("kind") == "_Text" or b.get("kind") == "_Text":   # (a pointer into a list: the list it points into)
+            return a.get("kind") == b.get("kind") and a["_text"] == b["_text"]
         return re.sub(r"\s+", "", self.tree.source(self.unwrap(a))) == re.sub(r"\s+", "", self.tree.source(self.unwrap(b))) != ""
 
     def count_loop(self, first, last, body):
@@ -6789,9 +6873,24 @@ class Emit:
                 if self.whole_list(args[1], args[2]) or (n is not None and first.strip() == "0" and last.strip() in (str(n), f"{n}.0")):
                     # the whole list, in one go (one request for memory, as in C++)
                     return lines + [f"list_append({lv}, {self.ex(s0, st)});" if end else f"list_insert_list({lv}, {p}, {self.ex(s0, st)});"]
-                src = self.temp("from", st)
+                # a part of another list: read where it stands when it is a place (nothing is copied, as in C++)
+                held = s0["_text"] if s0.get("kind") == "_Text" else None
+                if held is None:
+                    pre, got = self.lazily(lambda: self.spot(s0))
+                    held = got[0] if got is not None and not pre else None
+                src = held
+                if src is None:
+                    src = self.temp("from", st)
+                    lines.append(f"{src} = {self.ex(s0, st)};")
                 a, b = self.temp("first", "Int"), self.temp("last", "Int")
-                lines += [f"{src} = {self.ex(s0, st)};", f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
+                lines += [f"{a} = {first};", f"{b} = {self.whole_math('-', last, '1')};"]
+                if end:
+                    # at the end, in one go (one request for memory at most, as in C++): the list that much
+                    # longer (Set Length), then each new entry set where it stands
+                    n0 = self.temp("length", "Int")
+                    lines += [f"{n0} = list_length<{it}>({lv});",
+                              f"list_resize({lv}, {self.whole_math('+', n0, self.whole_math('+', self.whole_math('-', b, a), '1'))}, {self.u.zero(it)});"]
+                    return lines + self.count_loop(a, b, lambda i: [f"{lv}[{self.whole_math('+', n0, self.whole_math('-', i, a))}] = list_get<{it}>({src}, {i});"])
                 return lines + self.count_loop(a, b, lambda i: [put(f"list_get<{it}>({src}, {i})", self.whole_math("-", i, a))])
             one = self.unwrap(args[1])
             if one.get("kind") in ("CXXStdInitializerListExpr", "InitListExpr"):
@@ -9356,7 +9455,7 @@ class Emit:
 # Not the engine a game calls: the Blueprint language itself, the engine's own helpers.
 ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
 # Functions that give something and change something (the rule below would call them values).
-ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take"}
+ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
 # bits, as C++ has them; a list of them a List<Int64>)
 ENGINE_PIN = {"Bool": "boolean", "Int": "integer", "Float": "number", "Vector": "vector", "Text": "text", "Int64": "int64"}
@@ -10942,8 +11041,13 @@ class TestWriter:
         function. (Their declarations where the engine's header has them, their definitions after the helpers
         of the test's structs.)"""
         u, tree = self.u, self.tree
-        by_class, free = collections.defaultdict(list), []
+        by_class, free, had = collections.defaultdict(list), [], set()
         for f in [*u.engine_calls.values(), *(f for i, f in self.more_engine.items() if i not in u.engine_calls)]:
+            # (one stand-in a node: a function the dumps declare more than once - each header a source includes is
+            # dumped with it - is the same function of the engine, called from here or there)
+            if f["type"] in had:
+                continue
+            had.add(f["type"])
             d = f["decl"]
             owner = tree.owner.get(d["id"])
             if f.get("role") in ("make", "release"):
@@ -12182,6 +12286,9 @@ class TestWriter:
             if f.indexes and d["id"] in unguarded:
                 skipped.append((f, f"it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, {unguarded[d['id']]}: C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is"))
                 continue
+            # (the types the case spells - of its parameters, of what it gives - are the ones C++ finds where the
+            # function is declared: `Reader` in a method of mvt's Reader is that one, also where wire has a Reader)
+            looked, self.u.lookup_scope = self.u.lookup_scope, tree.scope_of.get(d["id"]) or self.u.lookup_scope
             try:
                 params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
                 decl_lines, names, types = [], [], []
@@ -12300,6 +12407,8 @@ class TestWriter:
             except Wait as w:
                 skipped.append((f, str(w)))
                 continue
+            finally:
+                self.u.lookup_scope = looked
             # where the Blueprint's call has what is compared: what it returns, then what it made of its
             # reference inputs that are not const, in their order (Instance::call)
             # (of a function of the Blueprint of a state: then its variables, as converted::Tally reads them)
