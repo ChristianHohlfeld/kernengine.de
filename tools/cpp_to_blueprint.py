@@ -10073,6 +10073,9 @@ class TestWriter:
     def widen_code(text):
         text = re.sub(r"(?<![\w.])((?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?)[fF]\b", lambda m: m.group(1) if re.search(r"[.eE]", m.group(1)) else m.group(1) + ".0", text)
         text = re.sub(r"\bfloat\b", "double", text)
+        # (what sscanf reads into a place that is now the test's number - a float as double, a component as
+        # Num32: as the C type its conversion says, then given to the place - converted::scan_c)
+        text = re.sub(r"(?<![\w:.>])(?:::)?(?:std::)?sscanf\s*\(", "converted::scan_c(", text)
         text = re.sub(r"\b(?:std::)?(u?)int64_t\b", lambda m: "u64" if m.group(1) else "i64", text)
         text = re.sub(r"\b(?:" + ENGINE + r"::)?dm::(" + "|".join(WIDE_MATH) + r")\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)   # (the engine's own functions of numbers: the formula's)
         return re.sub(r"\bstd::(" + "|".join(WIDE_MATH) + r")f?\s*\(", lambda m: WIDE_MATH[m.group(1)] + "(", text)
@@ -11760,6 +11763,23 @@ class TestWriter:
             elif owner:
                 want_record(owner)
             todo.append(("function", d))
+        def take_const(place, piece):
+            """A statement that declares constants of another file: once, as far as the farthest of its pieces
+            reaches (see `statement_of`) - the text of each is the statement's from its start."""
+            same = next((p for p, x in G.foreign.items() if x.get("statement") == piece["statement"]), None)
+            if same is None:
+                G.foreign[place] = piece
+                return
+            other = G.foreign[same]
+            far, near = (other, piece) if other["reach"] >= piece["reach"] else (piece, other)
+            # (what both name of it, in one order: the test hands the piece on as it took it, and the tests that take
+            # it from each other must come to the same piece - whichever of them had which first)
+            merged = {**far, **{k: sorted({repr(x): x for x in [*far.get(k, ()), *near.get(k, ())]}.values(), key=repr) for k in ("names", "pairs", "actors")}}
+            if far is other:
+                G.foreign[same] = merged
+            else:
+                del G.foreign[same]
+                G.foreign[place] = merged
         def take(i):
             """A function whose body stands in another source file: the pieces its test holds, as the test of
             that file hands them on."""
@@ -11778,7 +11798,9 @@ class TestWriter:
                     continue
                 d = self.at(place)
                 if d is None:   # (not in this file's reach: the piece as the other file's test has it)
-                    if kind not in ("member", "inside", "engine") or (kind == "engine" and piece.get("stand_in")):
+                    if kind == "const" and piece.get("statement"):
+                        take_const(place, piece)
+                    elif kind not in ("member", "inside", "engine") or (kind == "engine" and piece.get("stand_in")):
                         G.foreign[place] = piece   # (a function of the engine this file does not see: the other test's stand-in of it)
                 elif kind in ("function", "inside", "freed"):
                     want_function(d["id"])
@@ -11947,6 +11969,13 @@ class TestWriter:
                   and v["_at"][1] <= a and re.fullmatch(r"\s*,\s*", raw[v["_at"][1]:a])]
         return self.statement_start(before[0]) if before else a
 
+    def statement_of(self, d):
+        """Of the piece of a constant another file's test takes: the statement it is (its file, where it begins)
+        and how far its text reaches. Two tests may hand on one statement as far as different constants of it
+        (`const Vec3 kOlive{...}, kSand{...};` - one needs kOlive, one kSand): the test that takes both has
+        it once, as far as the farther (`take_const`)."""
+        return {"statement": [os.path.abspath(d["_file"]), self.statement_start(d)], "reach": d["_at"][1]}
+
     def statement_text(self, file, a, b, records):
         """The text of a statement that declares variables, from a to b - without the definition of a class
         it holds that the test compiles along (`struct AimTarget { ... } g_aim;`): that class is a piece of
@@ -12081,6 +12110,15 @@ class TestWriter:
             closures[f.key] = order
         return closures, pieces
 
+    @staticmethod
+    def file_home(path):
+        """What the pieces of one source file are told apart by in the test that takes them (their namespace
+        `<it>_local`, the names they give each other): the file's own name - mp_rules.cpp: mp_rules_cpp. Not the
+        Blueprint's: a file whose functions stand in two Blueprints (a part of `Game` and a library - mp_rules.cpp:
+        Game/mp_rules_cpp, mp_rules_cpp) has one namespace without a name, and what one of them names of it
+        (g_rules) the other may hand on."""
+        return re.sub(r"\W", "_", os.path.basename(path))
+
     def items(self, G):
         """What `gather` gathered, as pieces another file's test takes: [(place, piece)] in the order they
         stand. A piece: its kind, its text as this test has it (its places guarded, not yet made the
@@ -12091,7 +12129,7 @@ class TestWriter:
         such pieces by that namespace)."""
         u, tree = self.u, self.tree
         main = os.path.abspath(tree.path)
-        home = u.job.replace("/", "__")   # (a part of a Blueprint: Game__game_net_cpp)
+        home = self.file_home(main)
         within = f"{home}_local"
         decls = [tree.records[q] for q in sorted(G.records)]
         def here(d):
@@ -12143,8 +12181,9 @@ class TestWriter:
                     t = tree.template_of.get(rid) or tree.decl.get(rid)
                     if t is None or not here(t) or not namespace_level(t) or t.get("kind") not in ("FunctionDecl", "FunctionTemplateDecl", "VarDecl", "EnumConstantDecl") or not own(t):
                         continue
-                    if t.get("kind") == "EnumConstantDecl":
-                        e = tree.enums.get(t.get("_enum", ""))
+                    named_enum = t.get("kind") == "EnumConstantDecl" and "_enum" in t   # (a value of an enum without a name: by its own name, where it stands)
+                    if named_enum:
+                        e = tree.enums.get(t["_enum"])
                         if e is None or not namespace_level(e):
                             continue
                         said = (t["name"], e.get("name"))
@@ -12153,7 +12192,7 @@ class TestWriter:
                     a = n.get("_at", (None,))[0]
                     word = re.match(r"[A-Za-z_]\w*", raw[a:a + 256]) if a is not None else None
                     if word and word.group(0) in said and not raw[max(0, a - 64):a].rstrip().endswith(("::", ".", "->")):
-                        scope = tree.scope_of.get((tree.enums[t["_enum"]] if t.get("kind") == "EnumConstantDecl" else t)["id"], "")
+                        scope = tree.scope_of.get((tree.enums[t["_enum"]] if named_enum else t)["id"], "")
                         edits.append((a, 3, 0, a, "::".join(self.local_path(scope, within)) + "::"))
                 if c.get("kind") == "CompoundStmt" and raw[c["_at"][0]:c["_at"][0] + 1] == "{":
                     named = set(re.findall(r"[A-Za-z_]\w*", raw[c["_at"][0]:c["_at"][1]]))
@@ -12216,7 +12255,7 @@ class TestWriter:
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
-            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs,
+            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs, **self.statement_of(d),
                     "actors": ["::".join(self.local_path(tree.scope_of.get(x["id"], ""), local_of(x)) + [x["name"]]) for x in said if self.actor_blueprint(qtype(x))]})
         for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
@@ -12870,6 +12909,9 @@ class TestWriter:
             n = len([x for x in os.listdir(os.environ["TEST_KEEP"]) if x.startswith(f"test_{stem}.")])
             shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
         r = subprocess.run([os.environ.get("CXX", "g++"), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
+                            # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
+                            # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
+                            "-Wno-missing-field-initializers",
                             *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
         errors = []
         if r.returncode != 0:
