@@ -20,7 +20,9 @@
 
 #include <bit>
 #include <climits>
+#include <concepts>
 #include <cstring>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -31,6 +33,7 @@
 
 #include "converted.h"
 #include "kern/core/fields.h"
+#include "kern/core/map.h"
 
 namespace sc::lowered {
 
@@ -51,6 +54,31 @@ template <class T> struct is_span : std::false_type {};
 template <class T> struct is_span<kern::Span<T>> : std::true_type {};
 template <class T> struct is_optional : std::false_type {};
 template <class T> struct is_optional<std::optional<T>> : std::true_type {};
+template <class T> struct is_pair : std::false_type {};
+template <class A, class B> struct is_pair<std::pair<A, B>> : std::true_type {};
+template <class T> struct is_map : std::false_type {};
+template <class K, class V, class H> struct is_map<kern::Map<K, V, H>> : std::true_type {};
+template <class T> struct is_set : std::false_type {};
+template <class K, class H> struct is_set<kern::Set<K, H>> : std::true_type {};
+template <class T> struct is_owned : std::false_type {};
+template <class T, class D> struct is_owned<std::unique_ptr<T, D>> : std::true_type {};
+/// An object held from outside - by a pointer or owned (std::unique_ptr): the engine's physics world, a server.
+template <class T> inline constexpr bool is_held = (std::is_pointer_v<T> && std::is_class_v<std::remove_cv_t<std::remove_pointer_t<T>>>) || is_owned<T>::value;
+/// The class of the object such a value holds.
+template <class T> using Pointee = std::remove_cv_t<std::remove_reference_t<decltype(*std::declval<T&>())>>;
+/// The call the test is at (Tally::more counts): what the test makes for one call lives until the next begins.
+inline unsigned long long g_call = 0;
+/// An object the test makes for a pointer of this call to point at - by its constructor, each side its own.
+template <class T> T* made() {
+  static std::vector<std::unique_ptr<T>> all;
+  static unsigned long long of = 0;
+  if (of != g_call) {
+    all.clear();
+    of = g_call;
+  }
+  all.push_back(std::make_unique<T>());
+  return all.back().get();
+}
 template <class T> inline constexpr bool is_vec =
     std::is_same_v<T, kern::Vec2> || std::is_same_v<T, kern::Vec3> || std::is_same_v<T, kern::Vec4> || std::is_same_v<T, kern::Quat>;
 template <class T> inline constexpr bool is_text = std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>;
@@ -99,14 +127,57 @@ template <class T> void draw(Draw& d, T& x) {
   } else if constexpr (is_optional<U>::value) {
     if (d.flag()) x = drawn<typename U::value_type>(d);
     else x.reset();
+  } else if constexpr (is_pair<U>::value) {
+    draw(d, x.first);
+    draw(d, x.second);
+  } else if constexpr (is_map<U>::value) {
+    // (a map: a few entries, in the order their keys are drawn - a key drawn twice is one entry. Made as carry
+    // makes the other side's: a new map with room for just its entries - the two then ask for memory alike)
+    U all;
+    for (u32 n = d.below(5); n > 0; --n) {
+      auto key = drawn<typename U::key_type>(d);
+      all.try_emplace(std::move(key), drawn<typename U::mapped_type>(d));
+    }
+    x = U{};
+    x.reserve(all.size());
+    for (std::size_t k = 0; k < all.size(); ++k) x.try_emplace(all.key_at(k), std::move(all.value_at(k)));
+  } else if constexpr (is_set<U>::value) {
+    U all;
+    for (u32 n = d.below(5); n > 0; --n) all.insert(drawn<typename U::key_type>(d));
+    x = U{};
+    x.reserve(all.size());
+    for (std::size_t k = 0; k < all.size(); ++k) x.insert(all.key_at(k));
+  } else if constexpr (is_held<U>) {
+    // an object held from outside (a pointer, a std::unique_ptr): one the test makes, each side its own - drawn
+    // where the test can draw its class, else as its constructor makes it. Never none: a function that is handed
+    // such an object by a pointer reads it. (A class only its own constructor's arguments make - a server on a
+    // transport - the test cannot make: none, on both sides.) The test says so once.
+    using O = Pointee<U>;
+    if constexpr (std::is_default_constructible_v<O>) {
+      static const bool said = (std::printf("  note: %s: an object held by a pointer: one the test makes, each side its own (never none)\n", __PRETTY_FUNCTION__), true);
+      (void)said;
+      if constexpr (is_owned<U>::value) {
+        x = std::make_unique<O>();
+        draw(d, *x);
+      } else {
+        O* made_here = made<O>();
+        draw(d, *made_here);
+        x = made_here;
+      }
+    } else {
+      static const bool said = (std::printf("  note: %s: an object held by a pointer that the test cannot make: none (null) on both sides\n", __PRETTY_FUNCTION__), true);
+      (void)said;
+      x = nullptr;
+    }
   } else if constexpr (HasFields<U>) {
     std::apply([&](auto&... f) { (draw(d, f), ...); }, fields(x));
   } else if constexpr (std::is_default_constructible_v<U> && std::is_class_v<U>) {
-    // a class of another file that keeps what it holds to itself (the engine's kern::FootprintStream): made by
-    // its constructor - the test says so once
+    // a class of another file that keeps what it holds to itself (the engine's kern::FootprintStream, the game's
+    // CityStream): made by its constructor - the test says so once. (One that cannot be assigned stays as the
+    // test made it right before: by its constructor.)
     static const bool said = (std::printf("  note: %s: made by its constructor, not drawn (it keeps what it holds to itself)\n", __PRETTY_FUNCTION__), true);
     (void)said;
-    x = U{};
+    if constexpr (std::is_move_assignable_v<U>) x = U{};
   } else {
     static_assert(sizeof(U) == 0, "a value the test cannot draw");
   }
@@ -141,8 +212,49 @@ template <class A, class B> void carry(const A& a, B& b) {
   } else if constexpr (is_optional<X>::value && is_optional<Y>::value) {
     if (a) carry(*a, b.emplace());
     else b.reset();
+  } else if constexpr (is_pair<X>::value && is_pair<Y>::value) {
+    carry(a.first, b.first);
+    carry(a.second, b.second);
+  } else if constexpr (is_map<X>::value && is_map<Y>::value) {
+    b = Y{};
+    b.reserve(a.size());
+    for (std::size_t k = 0; k < a.size(); ++k) {
+      typename Y::key_type key{};
+      typename Y::mapped_type value{};
+      carry(a.key_at(k), key);
+      carry(a.value_at(k), value);
+      b.try_emplace(std::move(key), std::move(value));
+    }
+  } else if constexpr (is_set<X>::value && is_set<Y>::value) {
+    b = Y{};
+    b.reserve(a.size());
+    for (std::size_t k = 0; k < a.size(); ++k) {
+      typename Y::key_type key{};
+      const typename X::key_type from = a.key_at(k);
+      carry(from, key);
+      b.insert(std::move(key));
+    }
+  } else if constexpr (is_held<X> && is_held<Y>) {
+    // (the other side's own object, with what the first side's holds: see draw)
+    using O = Pointee<Y>;
+    if (a == nullptr) {
+      b = nullptr;
+    } else if constexpr (std::is_default_constructible_v<O>) {
+      if constexpr (is_owned<Y>::value) {
+        b = std::make_unique<O>();
+        carry(*a, *b);
+      } else {
+        O* made_here = made<O>();
+        carry(*a, *made_here);
+        b = made_here;
+      }
+    } else {
+      b = nullptr;
+    }
   } else if constexpr (std::is_same_v<X, Y> && std::is_class_v<X> && !HasFields<X> && std::is_copy_assignable_v<X>) {
     b = a;   // (a class that keeps what it holds to itself: the same type on both sides)
+  } else if constexpr (std::is_same_v<X, Y> && std::is_class_v<X> && !HasFields<X> && std::is_default_constructible_v<X>) {
+    // (one that cannot be copied - it holds objects of the engine: each side has its own, as its constructor made it)
   } else if constexpr (HasFields<X> && HasFields<Y>) {
     auto from = fields(a);
     auto to = fields(b);
@@ -192,11 +304,38 @@ template <class A, class B> bool same(const A& a, const B& b) {
     return true;
   } else if constexpr (is_optional<X>::value && is_optional<Y>::value) {
     return a.has_value() == b.has_value() && (!a || same(*a, *b));
+  } else if constexpr (is_pair<X>::value && is_pair<Y>::value) {
+    return same(a.first, b.first) && same(a.second, b.second);
+  } else if constexpr (is_map<X>::value && is_map<Y>::value) {
+    // (the entries in their order: a map is gone through in the order its keys came)
+    if (a.size() != b.size()) return false;
+    for (std::size_t k = 0; k < a.size(); ++k)
+      if (!same(a.key_at(k), b.key_at(k)) || !same(a.value_at(k), b.value_at(k))) return false;
+    return true;
+  } else if constexpr (is_set<X>::value && is_set<Y>::value) {
+    if (a.size() != b.size()) return false;
+    for (std::size_t k = 0; k < a.size(); ++k) {
+      const typename X::key_type ka = a.key_at(k);
+      const typename Y::key_type kb = b.key_at(k);
+      if (!same(ka, kb)) return false;
+    }
+    return true;
+  } else if constexpr (is_held<X> && is_held<Y>) {
+    // (whether each side holds an object, and what the two objects hold)
+    return (a == nullptr) == (b == nullptr) && (a == nullptr || same(*a, *b));
   } else if constexpr (HasFields<X> && HasFields<Y>) {
     auto fa = fields(a);
     auto fb = fields(b);
     if constexpr (std::tuple_size_v<decltype(fa)> != std::tuple_size_v<decltype(fb)>) return false;
     else return [&]<std::size_t... I>(std::index_sequence<I...>) { return (same(std::get<I>(fa), std::get<I>(fb)) && ...); }(std::make_index_sequence<std::tuple_size_v<decltype(fa)>>{});
+  } else if constexpr (std::is_same_v<X, Y> && std::is_class_v<X> && requires { { a == b } -> std::convertible_to<bool>; }) {
+    return a == b;   // (a class that keeps what it holds to itself and says itself when two are the same)
+  } else if constexpr (std::is_same_v<X, Y> && std::is_class_v<X>) {
+    // a class of another file that keeps what it holds to itself and has no == (the engine's physics world, the
+    // game's CityStream): what a call left in it is not compared - the test says so once
+    static const bool said = (std::printf("  note: %s: what it holds is its own - not compared\n", __PRETTY_FUNCTION__), true);
+    (void)said;
+    return true;
   } else {
     static_assert(sizeof(X) == 0, "a value the test cannot compare");
   }
@@ -392,7 +531,10 @@ struct Tally {
   int compared = 0, outside = 0, wrong = 0, costlier = 0;
   long most_new = 0, with_old = 0;
   explicit Tally(std::string f) : function(std::move(f)) {}
-  bool more(int tried) const { return compared < kCalls && tried < kCalls * 20; }
+  bool more(int tried) const {
+    ++g_call;   // (a new call: what the test made for the last one - made() - is gone)
+    return compared < kCalls && tried < kCalls * 20;
+  }
   /// One call: whether both sides said what they give (`defined`), what differs (empty: nothing), how often each
   /// asked for memory.
   void take(bool defined, const std::string& differs, long old_asks, long new_asks, int call) {
