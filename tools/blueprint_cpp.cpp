@@ -4,6 +4,12 @@
 //   tools/blueprint_cpp.sh --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]
 //                                                        (the other way: Blueprints from their C++ texts)
 //   tools/blueprint_cpp.sh --node-names                  (the names the nodes have in a Blueprint's C++)
+//   tools/blueprint_cpp.sh --classes <level.klevel> <out.h> <actor> [<actor> ...]
+//                                                        (only the classes of these actors' Blueprints and of the
+//                                                        libraries they use, without glue (only how their structs are
+//                                                        held as values), named in the namespace
+//                                                        `blueprints`: what a program that calls them directly, or a
+//                                                        measurement of them (tools/blueprint_bench.sh), compiles)
 //   tools/blueprint_cpp.sh --formula "tan(0.5)"          (what a formula without inputs gives, with every bit)
 //
 // For every Blueprint of the level - the level's own and each actor's - that a C++ compiler can
@@ -184,8 +190,15 @@ int main(int argc, char** argv) {
     std::printf("%a\n", f.evaluate(nullptr, 0));
     return 0;
   }
+  // --classes: only these actors' Blueprints and the libraries they use, as classes without glue
+  std::set<std::string> only;
+  const bool classes_only = argc >= 5 && std::string(argv[1]) == "--classes";
+  if (classes_only) {
+    for (int k = 4; k < argc; ++k) only.insert(argv[k]);
+    argv += 1, argc -= 1;
+  }
   if (argc < 3 || std::string(argv[1]) == "--apply") {
-    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp>\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
+    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp>\n       blueprint_cpp --classes <level.klevel> <out.h> <actor> [<actor> ...]\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
     return 2;
   }
   std::string text, why;
@@ -231,6 +244,24 @@ int main(int argc, char** argv) {
       if (h.owner != "the level" && h.name == name) return &h.g;
     return nullptr;
   };
+  if (classes_only) {  // (the actors asked for and, through `uses`, every library they need)
+    for (std::vector<std::string> todo(only.begin(), only.end()); !todo.empty();) {
+      const std::string next = todo.back();
+      todo.pop_back();
+      const logic::Graph* g = all(next);
+      if (!g) {
+        std::fprintf(stderr, "%s: no actor %s with a Blueprint\n", argv[1], next.c_str());
+        return 1;
+      }
+      for (const std::string& used : g->uses)
+        if (only.insert(used).second) todo.push_back(used);
+    }
+    std::erase_if(held, [&](const Held& h) { return h.owner == "the level" || !only.count(h.name); });
+    out = "// Generated from " + name + " by tools/blueprint_cpp --classes - do not edit: the classes of Blueprints of the\n"
+          "// level (kern/docs/blueprint_cpp.md), without glue, named in the namespace blueprints.\n"
+          "#pragma once\n#include \"kern/logic/blueprint.h\"\n";
+  }
+  std::string aliases;  // (--classes: every class by its name)
   std::map<std::string, std::string> classes_of;  // a library that is written: its class, with its namespace
   std::set<u64> written;
   int classes = 0;
@@ -257,6 +288,10 @@ int main(int argc, char** argv) {
     // (with its libraries it is one graph: what runs, and what the rules that follow calls judge)
     logic::Graph whole;
     if (!logic::native_ready(g, &why) || !logic::link(g, all, whole, &why) || !logic::native_ready(whole, &why)) {
+      if (classes_only) {
+        std::fprintf(stderr, "%s: the Blueprint of %s has no class: %s\n", argv[1], owner.c_str(), why.c_str());
+        return 1;
+      }
       out += ": runs in the interpreter -\n// " + why + "\n";
       continue;
     }
@@ -278,18 +313,20 @@ int main(int argc, char** argv) {
     char space[48];
     std::snprintf(space, sizeof space, "kern_blueprint_%016llx", static_cast<unsigned long long>(key));
     if (g.library) classes_of[h.name] = std::string("::") + space + "::" + cls;
+    if (classes_only) aliases += "using " + cls + " = ::" + space + "::" + cls + ";\n";
     if (!written.insert(key).second) {
       out += ": the same Blueprint as one above.\n";
       continue;
     }
     std::string code, glue;
-    if (!logic::to_cpp(g, cls, code, &error) || !logic::native_glue(g, cls, glue, &error, logic::library(), space, all)) {
+    if (!logic::to_cpp(g, cls, code, &error) || !logic::native_glue(g, cls, glue, &error, logic::library(), space, all, classes_only)) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
       return 1;
     }
     out += std::string("\nnamespace ") + space + " {\n\n" + uses + (uses.empty() ? "" : "\n") + code + "\n" + glue + "\n}  // namespace " + space + "\n";
     ++classes;
   }
+  if (classes_only) out += "\nnamespace blueprints {\n" + aliases + "}  // namespace blueprints\n";
   std::string before;
   if (!read_file(argv[2], before) || before != out) {
     FILE* f = std::fopen(argv[2], "wb");
