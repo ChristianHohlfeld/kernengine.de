@@ -775,6 +775,8 @@ struct NodeDef {
   bool loop = false;     // a loop: exec output 0 is its body (run again and again), output 1 follows it
   bool memory = false;   // keeps something between runs (a loop's index, Do Once, a Delay's wait, Random's
                          // sequence): in C++ the node has a member. A value with memory is new on every read.
+  bool takes_first = false;  // a value whose first input it takes over where nothing reads that any more (Append: in a
+                             // Blueprint's C++ Text&& - `O = text_append(std::move(O), x, "")` appends where O's characters are)
   bool first_entry_only = false;  // only its first exec input can lead on to an exec output; the others
                          // (Reset, Open, Close, Stop) change what the node keeps, and the path ends there
   int now_outputs = 0;   // latent: its first exec outputs that run with the call itself, not after a wait

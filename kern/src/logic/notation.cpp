@@ -1379,6 +1379,27 @@ struct Writer {
     }
     return reads == 1 && !needed_after(entry, name)[static_cast<std::size_t>(x)];
   }
+  /// Does the value `x` (a node that takes its first input over: NodeDef::takes_first) take over
+  /// the variable its first input reads? Where the one step that reads `x` sets that same
+  /// variable, as a whole, to what `x` gives - `O = text_append(std::move(O), x, "")`: nothing
+  /// reads the old value after `x` has it (the step sets it anew at once; what `x`'s other inputs
+  /// read is read before - and an input that is O itself is O as it was, text_append sees to it).
+  bool taken_first(int x, int k) {
+    const Info& X = at(x);
+    if (!X.def->takes_first || X.named || X.data_in.empty() || X.data_in[0] != k) return false;
+    const int got = X.src[static_cast<std::size_t>(k)].first;
+    if (got < 0 || at(got).named || at(got).def->type != "var.get" || !at(got).node->param("path").empty()) return false;
+    int reader = -1, readers = 0, got_readers = 0;
+    for (int i = 0; i < static_cast<int>(s.n.size()); ++i)
+      for (const auto& from : at(i).src) {
+        if (from.first == x) reader = i, ++readers;
+        if (from.first == got) ++got_readers;
+      }
+    if (readers != 1 || got_readers != 1) return false;
+    const Info& Y = at(reader);
+    return !Y.pure && Y.def->type == "var.set" && Y.node->param("path").empty() && Y.node->param("variable") == at(got).node->param("variable") &&
+           Y.node->param("scope") == at(got).node->param("scope");
+  }
   /// Is what the input `k` of the step `x` reads needed by nothing once `x` has it? Then the text
   /// hands it over - std::move(Points), as C++ writes it (the graph has nothing to say for it:
   /// the wire is the same wire):
@@ -1390,7 +1411,8 @@ struct Writer {
   /// nothing over.
   bool hands_over(int x, int k) {
     const Info& X = at(x);
-    if (X.pure || X.event || X.form == Form::loop_while) return false;
+    if (X.pure) return taken_first(x, k);
+    if (X.event || X.form == Form::loop_while) return false;
     return last_use(x, k) || from_step_before(x, k);
   }
   /// What input `k` of the step `x` is given: its value, handed over where `hands_over` says so.

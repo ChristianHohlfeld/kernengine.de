@@ -1824,8 +1824,12 @@ void add_math(Library& lib) {
   lib.add(pure("vector.lerp", "Lerp Vector", "Vector", {data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3), data("alpha", "Alpha", K::number, 0.5)}, vector, of(&P::vector_lerp), "",
                "interpolate"));
   // Text.
-  lib.add(pure("text.append", "Append", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, ""), data("c", "C", K::text, "")}, data("result", "", K::text), of(&P::text_append),
-               "Joins texts (numbers and vectors convert)", "concat string join format"));
+  {
+    NodeDef d = pure("text.append", "Append", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, ""), data("c", "C", K::text, "")}, data("result", "", K::text),
+                     of(&P::text_append), "Joins texts (numbers and vectors convert)", "concat string join format");
+    d.takes_first = true;
+    lib.add(d);
+  }
   lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_equal)));
   lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, boolean, of(&P::text_contains)));
   lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, integer, of(&P::text_length)));

@@ -854,6 +854,11 @@ LeerenResult Leeren() {
     Runde liest, wird kopiert; was jede Runde erst neu setzt, wird übergeben. Jeder Aufruf hat
     seine lokalen Variablen für sich (in der Klasse sind es die von C++), darum ist das allein
     eine Frage der Schritte dieses Aufrufs.
+  - **die Variable, die ein Wert als ersten Eingang liest und die der eine Schritt, der diesen Wert liest,
+    als Ganzes auf ihn setzt** – bei einem Knoten, der das von sich sagt (`NodeDef::takes_first`: Append):
+    `O = text_append(std::move(O), x, "");` hängt dort an, wo O seine Zeichen hat. Den alten Wert liest danach
+    nichts mehr (der Schritt setzt O sofort neu); was die anderen Eingänge lesen, ist vorher gelesen, und ist
+    ein anderer Eingang O selbst (`text_append(std::move(O), O, "")`), nimmt text_append O, wie es war.
   - **was der Schritt direkt davor gab** (`n4.punkte`), wenn dieser Eingang es als einziger liest.
     „Direkt davor“: ein einfacher Schritt, dessen einer Weg zu diesem Schritt führt, und kein
     anderer Weg führt hierher – der Schritt läuft genau einmal nach jedem seiner Läufe, und
