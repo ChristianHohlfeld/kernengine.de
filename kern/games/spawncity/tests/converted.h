@@ -969,6 +969,14 @@ void take(std::unique_ptr<T>& to, const Value& v) {
   else to = std::make_unique<T>(owned(*engine_object<T>(v.as_int())));
 }
 template <class T> void take(std::vector<T>& to, const Value& v);
+/// A view of a list the source holds (kern::Span - what Renderer::meshes() gives): of the list, kept for it
+/// (as a text the source holds by a view, see take of a std::string_view).
+template <class T> void take(kern::Span<T>& to, const Value& v) {
+  static std::deque<std::vector<std::remove_const_t<T>>> kept;
+  kept.emplace_back();
+  take(kept.back(), v);
+  to = kern::Span<T>(kept.back().data(), kept.back().size());
+}
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
