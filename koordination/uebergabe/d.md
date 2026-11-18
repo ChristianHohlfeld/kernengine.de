@@ -151,12 +151,53 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
    self->shots())`) und Einträge `F@get` (= c<k>) / `F@set` in kCalls. Erzeugt in src/game/engine_calls.gen.cpp,
    src/geo/engine_calls.gen.cpp; Syntax g++ -Werror ✓. Noch von niemandem gerufen. engine_nodes.gen.h und
    engine_case.gen.h sind unverändert (Platz-Knoten dort noch wie bisher: Kopie).
-3. [ ] Interpreter: Root::bound, Spot-Wurzel, read/write über @get/@set, d.run speichert die Eingänge (Punkt 4).
-4. [ ] Klasse: EngineObjects-Generation, ev::Place + generierte Proxys, engine_nodes.gen.h (Punkt 5).
-5. [ ] Schreibweise (kern/src/logic/notation.cpp: Lesen von `n12.result…` als Platz, Schreiben), check()
-   (Punkt 3), Palette.
-6. [ ] Tests, nativer Fall, Doku (Punkt 8).
+3. [x] Interpreter (6310a9e, Syntax ✓): Graph::Root::bound + `bound_function(g, n, &binder)` (logic.h/.cpp), Spot::bound
+   (Index des CNode), Instance::bound_now/read/write (@get → value_at/change_at → @set; @get scheitert: Null des Typs, Schreiben
+   ins Leere, kein @set), Context::bind (Ausgang hält Value::structure(in) ohne Konversion), engine_api.cpp d.run bindet bei
+   f.place; ungebunden = in {0}. EngineStandIn::places (Schlüssel engine_call_shown(F, in); @get/@set nicht aufgezeichnet;
+   Anfangswert aus answer(shape) mit Saat aus "F@get"+Schlüssel). JIT: var_slot("") = -1 → Interpreter.
+4. [~] Klasse (64cb433, nur Header-Syntax ✓, NIE instanziiert – erst ein nativer Fall/Engine-Test zeigt Fehler):
+   EngineObjects::generation() (++ in end/clear/place). engine_direct.h: RefCore<Tag,C,B> (kern_at = C der Engine ODER
+   kern_own = eigener Eintrag des Blueprint-Typs B; kern_door: Kopie durch die Tür, wrote() = @set), PlaceOps<D,…>
+   (operator B, operator= gibt B wie das Set des Interpreters, +=, -=, [] mit eigenem Eintrag daneben), Ref, Field<D,…,Cm,Bm>
+   (Feld per Namen, schaut beim Nennen über D::ref() nach – damit sieht jede Nennung die Generation), Place<P,B>
+   (kern_bind, ref(): direkt mit Generationsprüfung, sonst object_of neu + engine_failed(P::get); ohne Objekte: @get in
+   eine B-Kopie (own-Modus) + @set nach jeder Änderung), concept NamesPlace, ev::list_add/insert/remove_at/remove(B-Vergleich)/
+   clear/resize/append/take. blueprint.h: Überladungen list_length/add/insert/remove_at/remove/clear/resize/append und
+   var_take (die alten var_take mit requires !NamesPlace). engine_api.py: struct P_<Knoten> (Object, C, Tag, pin, get,
+   set, at()), `template <class B> using <Knoten>_place = ev::Place<P_<Knoten>, B>;` in EngineNodesOf, KernNode-Fassung
+   bindet; S_<Struktur>::Fields<D,C,B> (Blueprint-Feldname n, C-Feld c). Offen: list_append reserviert genau size+n
+   (C++-insert wächst je nach Bibliothek anders – prüfen/klären).
+5. [~] Schreibweise (64cb433, Syntax ✓, ungetestet): Writer place_text → `n<b>.result…`, member_text → `<Knoten>_place<Typ>
+   result = {};`; Reader: bound_named/bound_ahead, root_here/naming → {"bound", id}; gelesen als Wert, als Anweisung
+   `n12.result… = v;`/`+=`, in `n5.value = (n12.result… = v);`, als Platz-Argument der Schritte (Vorlese-Schleife ~Z. 2967 und
+   variable_args). OFFEN: check()-Regeln (in logic.cpp check() vor `return out;` ~Z. 2229 einfügen: bound nur auf Knoten mit
+   Pfad-Parameter und gültigem bound_function; keine Drähte vom Platz-Ausgang; kein `<input>.bound`; Dominanz: BFS über
+   Exec-Drähte von allen Wurzeln ohne den Binder darf den Nutzer (bei Get: die Exec-Knoten, die ihn transitiv lesen) nicht
+   erreichen; vom Binder zum Nutzer kein latenter Knoten (NodeDef::latent)), Palette (logic_edit.cpp).
+   check() ✓ (2250736, Syntax ✓): Regeln am Ende von check() in logic.cpp. Palette offen.
+6. [ ] Tests, nativer Fall, Doku (Punkt 8). Erst hier zeigt sich, ob Place/Ref/Field instanziierbar sind: zuerst einen
+   kleinen nativen Fall (shots: binden, list_add, [i].to setzen, lesen, Länge; Release während gebunden) bauen und lokal
+   mit wasi-sdk (Abschnitt C) übersetzen, dann Engine-Suite auf mag.
 7. [ ] Stellvertreter (Punkt 6) und Konverter (Punkt 7); vorher Engine-Teil auf mag beweisen und melden.
+
+### Stand Nachfolger 3 (18.11., 23:00)
+- Merge work-zusammen: d6869e1. Schritt 4/5/6 gebaut, lokal belegt: c0d6d24 (Leser/Schreiber-Fix für `_place`-Member, Pins
+  gebundener Knoten beim Lesen, blueprint.h-Lesefunktionen auf Plätzen, case_text mit Plätzen, nativer Fall EnginePlaces,
+  Engine-Test engine_places_class_names_the_engines_list, Fall mit jedem Knoten), 42c86fe Palette, 62d0978 Doku, cf8786c E7.
+- Lokaler Harness in $S/d/: build.sh (Logik als Objekte; `H=harness3 ./build.sh` für andere Hauptdateien), `harness <text.cpp> Läufe…`
+  (lesen, check, Fixpunkt gegen .back, Interpreter/JIT gegen Stellvertreter, schreibt <text>.class.cpp mit Glue), build2.sh +
+  `harness2 <text.cpp> Läufe…` (Klasse mit hineinübersetzt, geo-Engine: Interpreter-Tür gegen Klasse direkt). eplaces.cpp = Text des
+  nativen Falls. wasi-sdk fehlt in dieser Sitzung → libc++ nur CI „build“.
+- Beweis: mag work-d-engine-223942-31317 (holen), CI 44403776223 (c0d6d24); danach neuer CI-Lauf auf dem letzten Stand.
+- E7 umgesetzt (cf8786c). Schritt 7 gebaut (e02ea24): Konverter engine(as_place)/engine_place (spot_held, `auto& r =`), self.bound
+  (is_local/writable); TestWriter.stand_in-Zweig f["place"] → converted::engine_place<T, Shape>; converted.h OpenPlace/places_set/
+  places_get/places_close (engine_call setzt vorher zurück, liest danach neu); rule_blueprint.h test_engine: @get/@set nicht aufgezeichnet.
+  Beleg läuft: mag work-d-vergleich-231118-18156 (game_weapons.cpp + game.cpp: world_->shots().push_back).
+- Befund k (Array `T name[N]`): 50832229 (auf work-zusammen e9eec02) BEREIT ZUM MERGEN, Beleg work-d-vergleich-225255-10477; in work-d als ddb54b7.
+- Engine-Suite work-d-engine-223942-31317 wartete um 23:10 noch auf mag (rechnet den Stand bei Start); CI 44403776223 (c0d6d24): build ✓.
+- Nächstes: Ergebnis des vergleich lesen (ob die Funktionen mit shots() jetzt „written“ und in beiden Durchgängen ok sind); Engine-Suite
+  holen; danach neuen CI-Lauf auf dem letzten Stand; BEREIT ZUM MERGEN „Platz der Engine“ erst mit Suite rc=0 + CI grün.
 
 ## C. Wo der Code steht (gelesen, spart Suche)
 - Plätze: `Graph::root_of` (kern/src/logic/logic.cpp ~864), `path_of` (~909), `place_of` (~958); `Graph::Root`

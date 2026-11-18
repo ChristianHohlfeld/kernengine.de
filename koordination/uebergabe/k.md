@@ -81,3 +81,48 @@
 - Wandzeit ≈ Summe über die Runden der jeweils langsamsten Einheit. Dauert ein Game-Teil allein lange (Baum per clang bei jeder Umwandlung neu, bis zu 400 g++-Runden im Test), bleibt das die Grenze. Mögliche spätere Verbesserung: den Baum je Einheit über die Runden halten (ein Prozess je Einheit). Das ist innerhalb eines Laufs erlaubt, vorher aber den Speicher auf mag prüfen.
 - PYTHONHASHSEED ist je Lauf zufällig. Die Worker werden geforkt und teilen ihn. Hängt Unit/TestWriter irgendwo an der Reihenfolge eines Mengen-Durchlaufs, unterscheiden sich zwei Läufe unabhängig vom Ablauf. Weicht der 8/40-Vergleich ab, zuerst dort suchen; das wäre dann ein Befund für die anderen Pakete.
 - Nicht in den Ablauf gehören (Reihenfolge-Lauf der Teststücke): „Teststücke einzeln parallel übersetzen“ geht nicht. Ein Test ist eine Übersetzungseinheit, und die g++-Runden in TestWriter.write hängen voneinander ab.
+
+# NEUER AUFTRAG (ab 22:25): Regeln des Konverters, die die Spiel-Suite rot machen
+Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eigene Commits). Arbeitsliste: PAKET3_k.md Nachtrag 22:25.
+
+## Regeln des Konverters (Befunde und Fixe)
+- **Gruppe 4 flak_cell (combat_rules.cpp:239):** `snprintf("%lld", static_cast<long long>(cy))` eines i64: ging über
+  `int64_to_int` in Format Text (Int, genau bis 2^53). Fix 2a6ef5b3: `bits64(x)` (u64/i64 unter Casts, die 64 Bit behalten) +
+  `format_values`: an %s gleicher Breite/`-` den Text der Bits (int64_text_signed d/i, int64_text u, int64_text_hex x);
+  andere Flags/Präzision/X/o/c → Wait. std::to_string ebenso. Gilt in `formatted` (snprintf) und `logged` (fprintf).
+- **Gruppe 7 Drone_step:** Die Abweichung steckt in `fw_.last_navigation_sequence_` (u16): Quelltext 20268, Klasse 85804 (= +65536).
+  Ursache: `nav_seq_++` (u16, drone.cpp:322) wurde `wrap32(nav_seq_ + 1)` – ++ rechnete im Typ von x statt in int mit
+  Rückwandlung. Ebenso nahm `x op= y` das Ergebnis ohne Rückwandlung in den Typ von x, und der schnelle Weg `x += 1` galt
+  auch für u32/u16/u8. Fix 2a6ef5b3: `held_as(a, synth)` (Rechenart wie C++, IntegralCast zurück, wo narrow etwas abschneidet);
+  `x += …` direkt nur für UNCUT = int, long, long long, unsigned long(long).
+- **Gruppe 5 Car_new:** keine Regel des Konverters – `struct Applied { Vec3 p, f; i32 on; }; Applied applied_[6];` ohne
+  Initialisierer: `Car(s)` lässt `on` unbestimmt (Quelltext 8 = Speicherrest, Blueprint 0). Der Test vergleicht einen Wert,
+  den C++ offen lässt → BEFUND FÜR t1 (stand/k.md).
+- Beleg-Auftrag für 4+7: work-k-vergleich-222911-25281 (combat_rules.cpp, drone.cpp auf 2a6ef5b3).
+- Kleinstfall-Ordner: /tmp/k_mini (src/mini.cpp; Aufruf: cpp_to_blueprint.py --convert sc --texts … -I kern/include -Isrc -- src/mini.cpp, unter flock).
+- 12e3da24: der Text eines Int64 im Format steht in einer eigenen Variable (`digits = int64_text_signed(cx);`) – die Klasse
+  las sonst einen vergangenen Temporär-Text (ASan in 222911-25281).
+- **Gruppe 6 CityStream_upload:** `t.cell_ids[key].push_back(id)` – variable_of (Kopie ändern, zurückschreiben): store für
+  `m[key] = v` hebt `put = t_2` in self.pre → stand VOR `t_2 = m[key]`. Fix 20cb5259: Hebungen des Zurückschreibens kommen in die
+  Zeilen danach. feed_terrain ist im Lauf 222045 nicht geschrieben.
+- E3-C (p): keine Konverterregel – Wertliterale schreiben feste Felder als List (Sprache); die Klasse fordert dafür Speicher an → BEFUND d/p.
+- Beleg-Auftrag für 12e3da24 + 20cb5259 (+2a6ef5b3): work-k-vergleich-224717-8097 (combat_rules, drone, city_stream).
+- Danach: Liste aus „alle“ (ergebnis-work-zusammen-voll-203000-750-alle-212005-5593), Regeln des Konverters.
+- **Belegt (work-k-vergleich-224717-8097):** G4, G6, G7 – BEREIT ZUM MERGEN 20cb5259 gemeldet.
+- **buildings_near (u64-Schlüssel):** `[k, t]` über kern::Map<u64,…>: `.first` hatte tp Int (Compiler: `const unsigned long`).
+  Fix fa3dc97d: held_type gibt für `.first` eines keyed_entry den Schlüsseltyp (rows()[2]). Beleg: work-k-vergleich-230203-14801
+  (city_stream, destruction auf ad36eee9 = mit work-zusammen c6e4c1cf, t1s Testrahmen mit Ortsangaben).
+- **Destruction_collapse/fracture:** Argument-Reihenfolge (GCC rechts→links) – ENTSCHEIDUNG NÖTIG in stand/k.md; nicht umgebaut.
+- **12e3da24** zurücknehmen, sobald ps Fix (format_arg für std::string in kern/include/kern/logic/blueprint.h) in work-zusammen ist.
+- Hilfsskript für alte Ausgaben ohne Ortsangabe: /tmp/k_diff.py <zeile.txt> (erste abweichende Zahl, Quelle gegen Blueprint).
+- **E9 (Koordinator):** Reihenfolge, die C++ offen lässt = die von clang (von links). Absenkung destruction.cpp 90ecf01f + Differenztest;
+  grün nur mit clang (wartet auf t1s run_tests-Umstellung). **Später (nach grüner Suite):** allgemeine Absicherung im Konverter – ein Aufruf
+  mit mehr als einem wirkenden Argument wartet („C++ leaves open in which order the arguments …“); braucht Wirkungsanalyse (Lambda mit
+  Referenz-Fang wie `tint` zählt).
+- **E13:** ganze Spiel-Suite mit clang (t1). 90ecf01f dann zurücknehmen (eigener Commit), nachdem vergleich destruction.cpp unter clang
+  sauber ist. Destruction_blast 1/161 ist dieselbe Ursache (pieces_[1].size). Kleinstfälle in $S/k/.
+- Offen: 12e3da24 zurücknehmen, sobald ps text_format-Fix in work-zusammen ist; Liste des vollen Laufs work-zusammen-voll-232247-24031
+  für meine Dateien (city_stream, destruction, combat_*, drone, car, Firmware-Einheiten; Game-Dateien hat Paket g).
+- c32f607b: Diagnose im Ablauf für pendelnde Blueprints (goes round: …). Lauf 232247-24031 endete mit Pendeln von 30 Game-Einheiten.
+- Stand 23:58: work-k = c32f607b (enthält work-zusammen 5a445af8). Gemergt in work-zusammen: 20cb5259 (G4/G6/G7), fa3dc97d.
+  Nicht melden: 90ecf01f (E13). Offen: siehe stand/k.md „WARTET AUF“.

@@ -1,4 +1,9 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 00:00 **work-zusammen = e4aa2e8d** (+ g c4d4544b: eine Schleife, deren Grenze die Engine fragt, ist keine Zählschleife – Beleg `work-g1-vergleich-232903-26675`;
+  + k c32f607b: der Ablauf nennt, was im Kreis geht). **k ist beendet** (Lauf zu Ende; offen bei k: 12e3da24 zurück nach ps Fix, 90ecf01f zurück nach clang,
+  Liste seiner Dateien – Nachfolger, sobald ein gültiger Lauf eine Liste gibt). **g übernimmt das Pendeln ganz** (Ursache combat_hud/g_fun + der Ablauf darf nicht pendeln).
+  Der volle Lauf 232247 ist abgebrochen (seine Suite auf ungültigem Level hätte niemand genutzt); statt dessen rechnet **nur die Konvertierung mit Diagnose**:
+  `konvert origin/work-zusammen 37` – sie zeigt je Einheit, was wechselt („goes round: …“).
 - 23:55 **Der volle Lauf `work-zusammen-voll-232247-24031` (5a445af8): `convert rc=1` (23:50, 27 min) – der Ablauf pendelt.** Ab Runde 9 geben 30 Game-Einheiten Runde
   für Runde, was sie vorher gaben („what one writes takes from the other what it writes“), bis zur Sicherung in Runde 16. Einzige Meldung davor (Runde 10):
   `Game::combat_hud()` „was written and waits now“ – sein Test übersetzt nicht: „‘combat::Fun’ has no member named ‘multiplier’ – ‘g_fun’ is not a member of
