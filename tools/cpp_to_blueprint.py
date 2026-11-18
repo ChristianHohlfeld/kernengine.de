@@ -2932,6 +2932,7 @@ class Emit:
             owner = self.tree.owner.get(d["id"])
             if owner is None:
                 raise Wait("a constructor of a class that is not known here")
+            self.no_handle_object(owner)
             try:
                 f.self_type = u.struct(owner)
             except Wait as w:
@@ -2949,6 +2950,7 @@ class Emit:
             owner = self.tree.owner.get(d["id"])
             if owner is None:
                 raise Wait("the state of its object (its class is not known here)")
+            self.no_handle_object(owner)
             try:
                 f.self_type = u.struct(owner)
             except Wait as w:
@@ -3781,6 +3783,14 @@ class Emit:
                          "resize assign swap reserve shrink_to_fit extract merge fill splice remove remove_if unique sort rehash".split())
     ALGORITHMS = frozenset("swap iter_swap sort stable_sort partial_sort nth_element remove remove_if unique reverse rotate erase erase_if fill fill_n copy copy_n copy_if "
                            "copy_backward move move_backward shuffle partition stable_partition exchange generate generate_n transform replace replace_if".split())
+
+    def no_handle_object(self, owner):
+        """A method or a constructor of a class of the engine that is an object with a life of its own (a
+        `class`: json::Value, the renderer) has no struct as its object: everywhere else in the Blueprint a
+        value of that class is a handle (Unit.object_of) - what the engine does with it is its node. One that
+        is no node (of the engine's own helpers, ENGINE_SKIP) the Blueprint does not have: Wait."""
+        if self.u.engine_object(owner):
+            raise Wait(f"a function of {owner.split('::')[-1]}, an object of the engine (a handle in a Blueprint), that is no node of it")
 
     def lifetimes(self, d):
         """What C++ does with something that ends (an object of the engine, a value that holds one - Unit.held_life)
@@ -11126,6 +11136,24 @@ class TestWriter:
                   and v["_at"][1] <= a and re.fullmatch(r"\s*,\s*", raw[v["_at"][1]:a])]
         return self.statement_start(before[0]) if before else a
 
+    def statement_text(self, file, a, b, records):
+        """The text of a statement that declares variables, from a to b - without the definition of a class
+        it holds that the test compiles along (`struct AimTarget { ... } g_aim;`): that class is a piece of
+        its own, before it, and the statement names it (`AimTarget g_aim;`) - said twice, it would be
+        defined twice."""
+        out, at = "", a
+        inner = sorted((r for r in self.tree.records.values() if r.get("_file") == file and r.get("completeDefinition") and r.get("name")
+                        and r.get("_at", (None, None))[1] is not None and a <= r["_at"][0] and r["_at"][1] <= b and r.get("_q")
+                        and self.compiled_top(r["_q"], records)), key=lambda r: r["_at"][0])
+        raw = self.tree.text(file)
+        for r in inner:
+            ra, rb = r["_at"]
+            if ra < at:
+                continue   # (inside one that is cut already)
+            out += self.cut(file, at, ra) + r["name"] + "\n" * raw[ra:rb].count("\n")
+            at = rb
+        return out + self.cut(file, at, b)
+
     def const_pieces(self, consts, decls, records, local_of=lambda d: None):
         """The constants as the test has them: their own text. (Several declared in one statement - `constexpr
         f32 kA = 1, kB = 2` - are that statement as far as its last one that is needed.) [(the declaration
@@ -11150,7 +11178,7 @@ class TestWriter:
             first = d
             while first.get("previousDecl") in tree.decl:
                 first = tree.decl[first["previousDecl"]]
-            text = tree.said(self.cut(d["_file"], key[1], d["_at"][1])) + ";"
+            text = tree.said(self.statement_text(d["_file"], key[1], d["_at"][1], records)) + ";"
             if d.get("storageClass") == "extern" and not d.get("init") and d["id"] not in tree.body:
                 # a variable of the program another file defines: the test's own (the test sets and compares it)
                 text = re.sub(r"^\s*extern\s+", "", text, count=1)
