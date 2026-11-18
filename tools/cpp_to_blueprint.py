@@ -13624,6 +13624,18 @@ def main(argv):
         # what they are given, and that changes back)
         state = (tuple(sorted(asks.items())), tuple(sorted(given.items())))
         if state in met:
+            # (what goes round: per Blueprint, the functions whose outcome differs between what it gave - written or the reason
+            # it waits -, and what of its exports differs: the finding to look for the cause with)
+            for u in sorted(new):
+                seen = gave[u]
+                for a, b in zip(seen, seen[1:]):
+                    ta, tb = a[0], b[0]
+                    moved = [f"{tb.get(k, ta.get(k))['cpp']}: {ta[k]['wait'] or 'written' if k in ta else 'absent'} -> {tb[k]['wait'] or 'written' if k in tb else 'absent'}"
+                             for k in sorted(set(ta) | set(tb)) if (ta.get(k) or {}).get("wait") != (tb.get(k) or {}).get("wait") or (k in ta) != (k in tb)]
+                    ea, eb = a[1], b[1]
+                    exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
+                                for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
+                    print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
             raise SystemExit("these Blueprints give, round after round, what they gave before (what one writes takes from the other what "
                              "it writes): " + ", ".join(sorted(new)))
         met.add(state)
