@@ -663,3 +663,17 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   44 s statt eines Laufs. Mit der berichtigten Erklärung nimmt das Level alle 156 Texte des Laufs 195003 an: hinter diesem Lesefehler liegt auf diesem Stand kein weiterer.
 - Läuft: `work-zusammen-voll-203000-750` (8874e79). Erwartet: `convert rc=0` gegen 20:55, Spiel-Suite gegen 21:15 – die erste Bit-für-Bit-Suite seit dem 14.11.
 - Basislauf `work-voll-162644-5528` (90b5ab8): convert rc=1, suite rc=1, engine rc=1 (R129, vor dem Fix von d) – nur noch als Liste für 90b5ab8 brauchbar.
+
+### 16.11 Stand 21:10 – gültiger voller Lauf, Agenten wieder gestartet
+- **`work-zusammen-voll-203000-750` auf 8874e79: `convert rc=0` (20:53) – der erste gültige Lauf seit dem 14.11.** Konvertierung 22m43.
+  „1632 of 1844 functions of the program are written as Blueprints (18813 of 30978 lines), and 28 of the engine's headers that they call: 156 Blueprints – 70 of
+  source files, 1 of states, 85 of headers and of shapes“; „1589 functions of the Blueprints are compared with their source, bit for bit, by the tests in
+  tests/converted … 5 give nothing“. 118 Funktionen „its test cannot compare it yet“, 9 Rückfälle. Zum Vergleich f8 (14.11.): 1.368 / 1.817, 11.996 / 30.741
+  Zeilen, 1.324 verglichen. Die Spiel-Suite dieses Laufs (der erste ausgeführte Bit-für-Bit-Vergleich) rechnete um 21:10 noch.
+- Chris, 21:05: **„Start“** (für d, p, t1, t2, k). Gestartet 21:08 als neue Agenten (Opus 5.5, mittlere Stufe; die gestoppten lassen sich nicht fortsetzen):
+  **t2** (Arbeitsliste: die 118 + 9), **t1** (zuerst: Auswertung der Spiel-Suite als Arbeitsliste für alle; dann seine Gründe und die Lücke gegen die echte
+  Engine), **p** (Vorgängerarbeit im Worktree sichern, Messwerkzeug, Ursachen, Behebung nach E1), **d** (Platz der Engine, Schritte 3–7). **k nicht gestartet:**
+  sein Beweis (8 gegen 40 Kerne byteweise gleich, zwei Stände) ist erbracht, sein Ablauf steht in work-zusammen und hat die Konvertierung von ~60 auf 23 min gebracht.
+- **Neuer Takt (PAKET_COMMON3.md, Nachtrag 21:10):** Basis für alle ist `origin/work-zusammen`; Agenten beheben und belegen mit Proben und melden „BEREIT ZUM MERGEN“
+  in ihrer Stand-Datei; den vollen Lauf rechnet der Koordinator auf dem zusammengeführten Stand und bringt ihn nach `work`, wenn er grün ist.
+- Noch nicht wieder gestartet (brauchen Chris' Wort): g1, g2, f1, f2; angehalten: c (nach d), s5 (nach p).
