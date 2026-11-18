@@ -727,6 +727,7 @@ struct PinDef {
   json::Value def;       // default literal (data inputs)
   bool hidden = false;   // not drawn (advanced)
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
+  u32 count = 0;         // a list of a fixed length: that many entries (a field's, a function's pin: TypeRef::count)
 };
 
 struct ParamDef {

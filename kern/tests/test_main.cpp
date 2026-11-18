@@ -5270,6 +5270,11 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "an input of a formula of whole numbers is an Int");
   refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, kern::to<Float>(Count)));"), "an Int as it is: no kern::to");
   refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
+  // (a list of a fixed length written out on an input says the input's length: Fixed<Float, 3> for a field of three)
+  for (const char* wrong : {"Fixed<Float, 4>{1.5}", "Fixed<Float, 2>{1.5}"})
+    refused("  KERN_STRUCT(Trio) { Fixed<Float, 3> m = Fixed<Float, 3>{}; Int k = 0; };\n  Trio P = Trio{Fixed<Float, 3>{}, 0};\n" +
+                in_event(std::string("    P = struct_make<Trio>(") + wrong + ", 7);"),
+            "\"m\" of struct_make is Fixed<Float, 3>, this is Fixed<Float, ");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 1.0; } n1;\n  void Unused() {"), "starts empty");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 0.0; } n77;\n  void Unused() {"), "n77 names no node");
   refused("  Float Heat = 1.0;", "the variable Heat is declared twice");

@@ -346,6 +346,11 @@ void on1(Actor actor, Float value, Text text) {
 ### Listen fester Länge
 
 Ein **Platz** kann als Liste fester Länge deklariert sein: Er hat immer genau so viele Einträge.
+Ein Wert, der an einem **Eingang** steht, dessen Typ eine Liste fester Länge ist (das Feld einer Struktur bei Make Struct,
+der Eingang einer Funktion), wird ebenso mit seinem Typ geschrieben: `struct_make<Trio>(Fixed<Float, 3>{1.5, -2.0}, 7)` – die
+Länge ist die des Eingangs (`PinDef::count`, aus dem Typ des Felds bzw. des Eingangs). Der Leser lehnt eine andere Länge ab;
+`List<Float>{…}` dort liest er wie bisher (dieselben Einträge, der Rest null). In C++ fordert das keinen Speicher an.
+
 In C++ ist `Fixed<Float, 16>` ein `std::array` – es liegt dort, wo es steht, und fordert keinen
 Speicher an (eine `List` ist ein `std::vector`: Jede hat ihren eigenen Speicher). Damit kostet
 eine Matrix im Blueprint, was sie im C++ kostet.

@@ -104,6 +104,7 @@ TypeRef setting_type(const Node& n, const Graph& g, bool lists) {
 PinDef typed_pin(std::string id, std::string label, const TypeRef& t, json::Value def = {}) {
   PinDef p = data(std::move(id), std::move(label), t.type, std::move(def));
   p.of = t.of;
+  p.count = t.count;
   return p;
 }
 /// What a pin of type `t` holds when nothing is typed in (a struct: its fields' defaults).
@@ -2073,7 +2074,7 @@ void add_functions(Library& lib) {
       if (which == 0 || which == 2)
         for (const FunctionPin& p : f->inputs) {
           if (!p.ref) {
-            (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value, false, p.of});
+            (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value, false, p.of, p.count});
             continue;
           }
           if (which != 2) continue;
@@ -2082,7 +2083,7 @@ void add_functions(Library& lib) {
             in.push_back({ref_key(p.name, path_pin(k)), p.name + (entries > 1 ? " index " + std::to_string(k + 1) : std::string(" index")), PinType::integer, json::Value(0), false, {}});
         }
       if (which == 1 || which == 2)
-        for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value, false, p.of});
+        for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value, false, p.of, p.count});
     };
   };
   auto named = [](const char* prefix) {

@@ -1135,7 +1135,8 @@ struct Writer {
     const Info& X = at(x);
     const PinDef& p = X.in[static_cast<std::size_t>(k)];
     const json::Value* typed = X.node->value(p.id);
-    return literal(Value::from_json(typed ? *typed : p.def, p.type, s.g, p.of), p.of, s.g);
+    // (a value for a list of a fixed length is written with its type - Fixed<Float, 3>{...}, as for a place)
+    return literal(Value::from_json(typed ? *typed : p.def, p.type, s.g, p.of), TypeRef{p.type, p.of, p.count}, s.g);
   }
 
   /// What input `k` of `x` is given, as an expression standing in the body `c`.
@@ -2002,6 +2003,7 @@ struct Reader {
     bool cast = false;
     PinType to = PinType::number;
     std::string of;     // a value written out: of which enum (when it is an enum's)
+    u32 count = 0;      // a value written out: a list of a fixed length (Fixed<T, N>{...}), N
     std::size_t tok = 0;
     bool root = false;  // the expression is one new value node (what a name can be given to)
     std::size_t moved = 0;  // std::move(value): the token it stands at, plus one
@@ -3154,6 +3156,10 @@ struct Reader {
     if (src.cast) return fail(src.tok, "a value written out needs no kern::to: write the " + cpp_type(want) + " itself");
     Value v = src.value;
     if (v.type == PinType::integer && pin.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
+    // (a list of a fixed length says its length: the input's - Fixed<fc_PT1, 3>{...} for a field of three)
+    if (src.count && src.count != pin.count)
+      return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(TypeRef{pin.type, pin.of, pin.count}) + ", this is " +
+                               cpp_type(TypeRef{v.type, src.of, src.count}));
     if (v.type != pin.type || src.of != pin.of)
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
@@ -3231,7 +3237,7 @@ struct Reader {
     s.tok = p;
     if (failed()) return s;
     Value v;
-    if (literal_here(v, &s.of)) {
+    if (literal_here(v, &s.of, &s.count)) {
       s.literal = true;
       s.value = v;
       return s;
@@ -3408,7 +3414,10 @@ struct Reader {
     if (!expect(")", "(one value per input of the formula)")) return s;
     if (whole) {
       // (every input a wire from an Int - what the graph has where the text says Int)
-      if (data_wires.size() - wires_before != names.size()) { fail(tok, "every input of a formula of whole numbers is an Int that is read (no number written out)"); return s; }
+      // (count the wires into this formula only: an argument may make wires of its own - p[kern::to<Int>(...)])
+      std::size_t into = 0;
+      for (std::size_t w = wires_before; w < data_wires.size(); ++w) into += data_wires[w].to == node;
+      if (into != names.size()) { fail(tok, "every input of a formula of whole numbers is an Int that is read (no number written out)"); return s; }
       whole_formulas.push_back(node);
     }
     s.node = node;
