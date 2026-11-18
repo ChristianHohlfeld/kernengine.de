@@ -1587,7 +1587,7 @@ inline bool g_open = false;
 inline std::jmp_buf g_bail;
 /// (What a call that is given up had on the heap stays there: the leak check does not count what the
 /// source allocates while it may be given up.)
-#if defined(__SANITIZE_ADDRESS__)
+#if defined(SC_ASAN)
 extern "C" void __lsan_disable();
 extern "C" void __lsan_enable();
 inline void may_bail(bool on) { on ? __lsan_disable() : __lsan_enable(); }

@@ -10165,7 +10165,23 @@ class TestWriter:
             while i.get("kind") in CAST and kids(i):
                 i = bare(kids(i)[-1])
             ref = self.tree.decl.get((i.get("referencedDecl") or {}).get("id")) if i.get("kind") == "DeclRefExpr" else None
-            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))))):
+            def fixed(v):
+                """A `const` variable is a constant place only where its value is one: constexpr, or set by what
+                no call reads (`const i32 t = L.gov.tier();` is a value of the run, whatever its type says -
+                game_look.cpp:228; its place in kTier is checked like any other)."""
+                if v.get("constexpr"):
+                    return True
+                todo = list(kids(v))
+                while todo:
+                    x = todo.pop()
+                    if x.get("kind") in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr", "MemberExpr", "CXXThisExpr", "ArraySubscriptExpr"):
+                        return False
+                    r = (x.get("referencedDecl") or {}) if x.get("kind") == "DeclRefExpr" else {}
+                    if r.get("kind") == "ParmVarDecl" or (r.get("kind") == "VarDecl" and not (self.tree.decl.get(r.get("id")) or {}).get("constexpr")):
+                        return False   # (a parameter, a variable that is no constant: a value of the run)
+                    todo += kids(x)
+                return True
+            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))) and fixed(ref))):
                 return False
             try:
                 at = Const(self.u).number(i)
