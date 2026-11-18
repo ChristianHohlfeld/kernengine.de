@@ -2220,6 +2220,91 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   }
   // A Blueprint is its C++ as well: what that cannot say (names C++ cannot write, a Return off its
   // function's path, a random value read twice ...) is an error of the graph.
+  // Places of the engine (setting "bound", kern/docs/blueprint_cpp.md "Plätze der Engine"): the place is the output
+  // of the node that bound it, and it is bound as long as C++ would hold the reference - within the run of the
+  // chain the node ran in. So: no wire reads that output (a wire would be a copy, the class reads the place); every
+  // way from where a chain starts to a node that names the place goes through the node that binds it; and no
+  // latent node (a Delay, a wait) lies between them.
+  {
+    std::unordered_map<u32, std::vector<u32>> next;  // exec wires
+    std::unordered_map<u32, int> into;               // exec wires into a node
+    std::unordered_map<u32, std::vector<u32>> readers;  // data wires: who reads a node's outputs
+    for (const Link& l : g.links) {
+      const auto it = pins.find(l.from);
+      bool exec = false;
+      if (it != pins.end())
+        for (const PinDef& pd : it->second.second) exec = exec || (pd.id == l.out && pd.type == PinType::exec);
+      if (exec) next[l.from].push_back(l.to), ++into[l.to];
+      else readers[l.from].push_back(l.to);
+    }
+    auto is_exec = [&](u32 id) {
+      const Node* n = g.find(id);
+      const NodeDef* d = n ? lib.find(n->type) : nullptr;
+      return d && d->kind != NodeKind::pure;
+    };
+    for (const Node& n : g.nodes) {
+      for (const auto& [key, value] : n.params)
+        if (key.size() > 6 && key.ends_with(".bound") && !value.empty()) err(n.id, lib.title(n) + ": a place of the engine is not given to a function as a reference");
+      if (const EngineFunction* f = engine_function(n.type); f && f->place)
+        for (const Link& l : g.links)
+          if (l.from == n.id && l.out == f->outputs[0].id) err(l.to, lib.title(n) + ": its output \"" + l.out + "\" is a place of the engine - read it with a node that names the place (bound " + std::to_string(n.id) + "), not through a wire");
+      if (n.param("bound").empty()) continue;
+      const Node* binder = nullptr;
+      const NodeDef* d = lib.find(n.type);
+      bool has_path = false;
+      if (d) for (const ParamDef& pd : d->params) has_path = has_path || pd.kind == ParamDef::Kind::path;
+      if (!bound_function(g, n, &binder) || !has_path || !n.param("variable").empty()) {
+        err(n.id, lib.title(n) + ": \"bound\" names no node that binds a place of the engine (" + n.param("bound") + "), or this node names no place");
+        continue;
+      }
+      // where the place is used: the node itself (a step), or the steps that read it (a value)
+      std::vector<u32> users, todo{n.id};
+      std::set<u32> seen;
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (!seen.insert(x).second) continue;
+        if (is_exec(x)) { users.push_back(x); continue; }
+        for (u32 r : readers[x]) todo.push_back(r);
+      }
+      // reached from where a chain starts without the binder?
+      std::set<u32> reach;
+      for (const Node& m : g.nodes)
+        if (m.id != binder->id && is_exec(m.id) && !into.count(m.id)) todo.push_back(m.id);
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (x == binder->id || !reach.insert(x).second) continue;
+        for (u32 y : next[x]) todo.push_back(y);
+      }
+      // reached from the binder only past a latent node?
+      std::set<u32> late;
+      for (u32 y : next[binder->id]) todo.push_back(y);
+      std::set<u32> walked;
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (x == binder->id || !walked.insert(x).second) continue;
+        const Node* xn = g.find(x);
+        const NodeDef* xd = xn ? lib.find(xn->type) : nullptr;
+        if (xd && xd->latent)
+          for (u32 y : next[x]) late.insert(y);
+        for (u32 y : next[x]) todo.push_back(y);
+      }
+      for (u32 y : std::vector<u32>(late.begin(), late.end())) todo.push_back(y);
+      std::set<u32> after_wait;
+      while (!todo.empty()) {
+        const u32 x = todo.back();
+        todo.pop_back();
+        if (x == binder->id || !after_wait.insert(x).second) continue;
+        for (u32 y : next[x]) todo.push_back(y);
+      }
+      for (u32 u : users) {
+        if (reach.count(u)) err(u, lib.title(n) + ": the place n" + n.param("bound") + " bound may not be bound here - every way to this node goes through the node that binds it (" + lib.title(*binder) + "), in the same chain");
+        else if (after_wait.count(u)) err(u, lib.title(n) + ": the place n" + n.param("bound") + " bound is not bound after a wait (a latent node between the node that binds it and this one)");
+      }
+    }
+  }
   bool errors = false;
   for (const Issue& i : out) errors = errors || i.error;
   if (!errors) {
