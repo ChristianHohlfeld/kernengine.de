@@ -1,6 +1,6 @@
 # Übergabe: SpawnCity auf Kern – vollständige Konvertierung in Blueprints
 
-Stand: Mittwoch, 18.11.2026, ca. 17:30 Uhr (Europe/Berlin). Geschrieben vom Koordinator der Sitzung
+Stand: Mittwoch, 18.11.2026, 17:25 Uhr (Europe/Berlin). Geschrieben vom Koordinator der Sitzung
 `session_01K2YidUPFTJShcS1fG6cZzJ` für den Koordinator der nächsten Sitzung. Diese Datei und der Ordner,
 in dem sie liegt (Branch `koordination` im Repo), sind **alles**, was die neue Sitzung von der alten hat –
 der Arbeitsordner der alten Sitzung (Scratchpad, lokale Worktrees, laufende Agenten) ist weg.
@@ -301,7 +301,12 @@ Konflikte, die beim Zusammenführen kommen: „break mitten im switch-Fall“ st
    C++ offen), `std::initializer_list` als Argument, `app`-Knoten nicht in den Spieltests gebunden,
    `Runtime::instances` (std::function-Feld), Dateien mit nur deklarierten Engine-Typen
    (`kern::Renderer`). Jeder davon braucht Antwort (a) oder (b) – „wartet“ ist kein Endzustand.
-7. **Kontingent:** am 18.11. um 17:08 waren 31 % des Wochenlimits verbraucht (Reset war 13:00). Am 15.11.
+7. **Kosten (Speicher):** Die Klasse darf nie öfter Speicher anfordern als der Quelltext; der Test zählt, und
+   `cost:`-Zeilen in der Ausgabe der Spiel-Suite sind Fehler, sobald die Liste leer sein soll. Der Prüfer auf mag
+   fand am 15.11. auf `266887f` noch 101 `cost:`-Zeilen (Gruppen A–F: Zweig `mag/ergebnis`, Ordner `266887f…`,
+   `kosten_ursachen.md`). Seitdem nicht neu gezählt – im nächsten vollen Lauf `grep -c 'cost:' suite.log` ansehen;
+   jede Zeile ist ein offener Punkt für „fertig“ (Abschnitt 1, Punkt 4 gilt für Speicher **und** Zeit).
+8. **Kontingent:** am 18.11. um 17:08 waren 31 % des Wochenlimits verbraucht (Reset war 13:00). Am 15.11.
    hat das Limit alle Agenten drei Tage gestoppt. Chris nach einer Stunde nach der Prozentzahl fragen und
    die Zahl der Agenten danach richten (bei ~8 %/h auf vier zurück: t1, t2, k, p).
 
@@ -412,8 +417,9 @@ Nach jedem Schritt: `BLUEPRINTS.md` (Stand-Absatz) nachführen, pushen.
 
 Letzte Commits (alles gepusht): `work-g1 7d1d656`, `work-g2 ffa277f`, `work-f1 3903052`, `work-f2 687b163`,
 `work-t1 c7c49ed`, `work-t2 a546621`, `work-k e5f2bf1`, `work-p 04f1a57`, `work-s5 e749453`,
-`work-d 30f63e4` (= in `work`; vom Folgeauftrag „Platz der Engine“ war bei Übergabe nichts gepusht – Stand und
-bestätigter Entwurf mit Auflagen in `uebergabe/d.md`), `work-c`: kein Commit (nur Entwurf, `uebergabe/c.md`),
+`work-d edae85f` (ein Commit über `work`: „Zwischenstand: Plätze der Engine – der Generator erkennt sie, die Tür
+kann sie lesen und setzen“, unbewiesen; Stand, Schrittliste und bestätigter Entwurf in `uebergabe/d.md` – die Datei ist
+von 16:59, der Agent hat sie beim Sitzungswechsel nicht mehr fortgeschrieben; die Auflagen stehen in Abschnitt 4.5), `work-c`: kein Commit (nur Entwurf, `uebergabe/c.md`),
 `work-r fde4b9f`.
 
 **Wichtig – fast nichts davon ist durch einen Lauf bewiesen.** mag hat von 15:39 bis 16:52 keinen Auftrag
