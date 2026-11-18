@@ -7347,6 +7347,10 @@ class Emit:
                 v = self.ex(a[0], "Vector")
                 return (f'math_compare<"==">(kern::formula([](Float x, Float y, Float z) -> Float {{ return (x - x) + (y - y) + (z - z); }}, '
                         f"vector_break({v}).x, vector_break({v}).y, vector_break({v}).z), 0.0)"), "Bool"
+            if name in ("size", "ssize") and len(a) == 1 and (self.tp(a[0]).startswith("List<") or self.tp(a[0]) == "Text"):
+                # std::size of a list, an array (a list of a fixed length) or a text: how many entries it has
+                t = self.tp(a[0])
+                return (f"list_length<{t[5:-1]}>({self.ex(a[0], t)})" if t != "Text" else f"text_length({self.ex(a[0], t)})"), "Int"
             if name == "move" and len(a) == 1 and self.is_box(a[0]):
                 # what is moved out of an owned value is gone there
                 lt = self.tp(a[0])
@@ -8226,6 +8230,8 @@ class TestWriter:
         # pieces its test holds, and the pieces by their places
         self.closures, self.pieces = unit.world.closures or {}, unit.world.pieces or {}
         self.more_engine, self.more_objects = {}, set()   # what those pieces call and hold of the engine
+        self.held_locals = None    # the ids of the variables declared in the functions the test holds the source of (state_helpers)
+        self.free_stand_ins = {}   # a free function of the engine the test has a stand-in of -> (its declaration, its definition, its pair) - see items
 
     # ---- the source, with a Blueprint's numbers ----
     QUOTED = re.compile(r'''(R"([^()\\\s]{0,16})\((?:.|\n)*?\)\2"|"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])+'|//[^\n]*|/\*(?:.|\n)*?\*/)''')
@@ -8301,6 +8307,14 @@ class TestWriter:
             if raw[a:b].strip() != token:
                 raise Wait("written by a macro")
             edits.append((a, 1, 0, b, text))
+        def token_at(at, upto, token, lo):
+            """Where `token` begins that stands right before `upto` in a node beginning at `lo`: after the base, as
+            a rule (at) - where the base is a name for a place written out elsewhere (Emit.dissolve: `rs[i]` of
+            `const auto& rs = net_.remotes();`), its own span is there: then the token is found where it is."""
+            if raw[at:upto].strip() == token:
+                return at
+            p = raw.rfind(token[0], lo, upto)
+            return p if p >= 0 and raw[p:upto].strip() == token else at
         def whole(n):
             c = self.u.clean(qtype(n))
             return NUMBER.get(c) == "Int" or self.u.find_type(c) in self.tree.enums
@@ -8437,6 +8451,16 @@ class TestWriter:
                 for c in ks[-1:]:
                     visit(c, depth + 1)
                 return
+            if k == "CXXOperatorCallExpr" and len(ks) == 2:
+                callee = bare(ks[0])
+                while callee.get("kind") == "ImplicitCastExpr" and kids(callee):
+                    callee = bare(kids(callee)[0])
+                if (callee.get("referencedDecl") or {}).get("name") in ("operator*", "operator->") and re.match(r"(?:const\s+)?std::(?:unique_ptr|optional)<", self.u.clean(qtype(ks[1]))):
+                    # what may be there or not, read where it is (`*p`, `p->x`): one that holds nothing C++ leaves
+                    # open - the call is given up (converted::present)
+                    xa, xb = span(ks[1])
+                    edits.append((xa, 2, depth, xa, "converted::present("))
+                    edits.append((xb, 0, -depth, xb, ")"))
             name = None
             if k == "CXXOperatorCallExpr" and len(ks) == 3:
                 callee = bare(ks[0])
@@ -8453,7 +8477,7 @@ class TestWriter:
                 # an entry through a pointer into a list (Unit.pointed): checked against the list the test handed it
                 (a, b), (ba, bb), (ia, ib) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted_pointed("))
-                swap(bb, ia, "[", ", ")
+                swap(token_at(bb, ia, "[", a), ia, "[", ", ")
                 swap(ib, b, "]", ")")
                 self.pointed = True
             elif k == "UnaryOperator" and n.get("opcode") == "*" and ks and into_list(ks[0]):
@@ -8470,7 +8494,7 @@ class TestWriter:
                     raise Wait("an entry of a list whose length stands in another file")
                 (a, b), (ba, bb), (ia, ib) = span(n), span(base), span(index)
                 edits.append((a, 2, depth, a, "converted::at("))
-                swap(bb, ia, "[", ", ")
+                swap(token_at(bb, ia, "[", a), ia, "[", ", ")
                 swap(ib, b, "]", ")")
             elif k == "CXXMemberCallExpr" and ks and ks[0].get("kind") == "MemberExpr" and ks[0].get("name") in ("at", "front", "back") and kids(ks[0]) and not KEYED.match(self.u.clean(qtype(kids(ks[0])[0]))) and not KEYED_KERN.match(self.u.clean(qtype(kids(ks[0])[0]))):
                 base = kids(ks[0])[0]
@@ -8480,10 +8504,10 @@ class TestWriter:
                 edits.append((a, 2, depth, a, f"converted::{ks[0]['name']}("))
                 if ks[0]["name"] == "at" and len(ks) == 2:
                     ia, ib = span(ks[1])
-                    swap(bb, ia, ".at(", ", ")
+                    swap(token_at(bb, ia, ".at(", a), ia, ".at(", ", ")
                     swap(ib, b, ")", ")")
                 else:
-                    swap(bb, b, f".{ks[0]['name']}()", ")")
+                    swap(token_at(bb, b, f".{ks[0]['name']}()", a), b, f".{ks[0]['name']}()", ")")
             elif n.get("castKind") == "FloatingToIntegral" and ks and self.u.clean(qtype(n)) in Const.BITS:
                 # a number as a whole number of a type that does not hold it
                 ca, cb = span(ks[-1])
@@ -8514,9 +8538,9 @@ class TestWriter:
                 (a, b), (ba, bb) = span(n), span(base)
                 edits.append((a, 2, depth, a, f"converted::{ks[0]['name']}("))
                 if len(ks) > 1:
-                    swap(bb, span(ks[1])[0], f".{ks[0]['name']}(", ", ")
+                    swap(token_at(bb, span(ks[1])[0], f".{ks[0]['name']}(", a), span(ks[1])[0], f".{ks[0]['name']}(", ", ")
                 else:
-                    swap(bb, b, f".{ks[0]['name']}()", ")")
+                    swap(token_at(bb, b, f".{ks[0]['name']}()", a), b, f".{ks[0]['name']}()", ")")
             elif k == "CallExpr" and callee_name(n) in ("snprintf", "sprintf", "printf", "fprintf") and len(ks) > 2:
                 # a number formatted as text: a 32-bit one goes as the double it is promoted to (in the test a
                 # vector's component is converted::wide::Num32 - one that is not a number goes nowhere as such)
@@ -8598,10 +8622,12 @@ class TestWriter:
         """The guards of all the functions the test holds the source of (a function with a place the test
         cannot guard: said, by its declaration's id - see `write`)."""
         self.edits, unguarded, done = {}, {}, set()
+        self.kept = {}
         for d in self.held(decls):
             if d["id"] in done:
                 continue
             done.add(d["id"])
+            self.edits.setdefault(d["_file"], []).extend(self.kept_edits(d))
             try:
                 file, edits = self.guard(d)
                 self.edits.setdefault(file, []).extend(edits)
@@ -8611,12 +8637,80 @@ class TestWriter:
             self.edits[file] = self.in_turn(edits)
         return unguarded
 
+    def kept_edits(self, d):
+        """What a function of the Blueprint of a state keeps from one call to the next (`static int last_tick = 0;`)
+        is a variable of that Blueprint (Unit.state_static) - the test sets and compares it like the others. In the
+        test's source it stands outside the function, in the namespace the function stands in (`hoisted`), and the
+        function names it where its declaration stood (`auto& last_tick = kept_...;`). That is the same C++: a
+        static local variable that starts at a constant (the only kind the Blueprint has) is made before anything
+        runs, as one of a namespace is; it is one variable, kept from one call to the next, in both places. (A
+        function defined in its class: its text is the class's - it is not hoisted, and the test has no values of
+        it.) The edits; self.kept: the declaration's id -> (the name in the test, the function, the declaration)."""
+        u, tree = self.u, self.tree
+        if u.state is None or not (tree.owner.get(d["id"]) == u.state or function_key(tree, d) in u.world.state_functions):
+            return []
+        owner = tree.records.get(tree.owner.get(d["id"]) or "")
+        if owner is not None and owner.get("_file") == d.get("_file") and owner.get("_at", (None, None))[1] is not None and owner["_at"][0] <= d["_at"][0] < owner["_at"][1]:
+            return []
+        raw, edits = tree.text(d["_file"]), []
+        for s in walk(d):
+            vs = kids(s) if s.get("kind") == "DeclStmt" else []
+            if not vs or not all(v.get("kind") == "VarDecl" and v.get("storageClass") == "static" and v["id"] in u.state_statics for v in vs):
+                continue
+            a, b = s.get("_at", (None, None))
+            if a is None or b is None or s.get("_file", d["_file"]) != d["_file"] or not raw[a:b].lstrip().startswith("static"):
+                continue   # (written by a macro: as it stands - the test has no values of it)
+            if raw[b - 1:b] != ";":
+                m = re.match(r"\s*;", raw[b:])
+                if not m:
+                    continue
+                b += m.end()
+            said = []
+            for v in vs:
+                name = "kept_" + sane_name(self.u.cpp_name(d).replace("::", "_") + "_" + (v.get("name") or "kept"))
+                while name in {n for n, _, _ in self.kept.values()}:
+                    name += "_"
+                self.kept[v["id"]] = (name, d, v)
+                said.append(f"auto& {v.get('name')} = {name};")
+            edits.append((a, -1, 0, b, " ".join(said)))
+        return edits
+
+    def hoisted(self, v):
+        """The text of a variable a function keeps (see kept_edits) where the test has it: before the function,
+        in its namespaces - `static <type> <name> = <what it starts at>;` (the type as the test spells it, or as
+        the source does where the test has no values of it)."""
+        name, d, _ = self.kept[v["id"]]
+        raw = self.tree.text(v["_file"])
+        a, b = v["_at"]
+        at = (v.get("loc") or {}).get("offset")   # (where its name stands - in `static bool a = false, b = false;` b's too)
+        if at is None or not a <= at < b or raw[at:at + len(v.get("name") or "?")] != v.get("name"):
+            m = list(re.finditer(r"\b" + re.escape(v.get("name") or "?") + r"\b", raw[a:b]))
+            at = a + m[-1].start() if m else b
+        init = self.tree.said(raw[at + len(v.get("name") or ""):b]) if at < b else ""
+        scope = (self.tree.owner.get(d["id"]) or "") + "::" if self.tree.owner.get(d["id"]) else self.tree.scope_of.get(d["id"], "")
+        try:
+            spelled = self.spell(self.in_scope(qtype(v), scope.rstrip(":")))
+        except Wait:
+            spelled = qtype(v)
+        return self.in_spaces(d, f"static {spelled} {name}{init};")
+
+    def kept_held(self, i):
+        """How the test names a variable a function keeps (see kept_edits) - None: its source does not hold it."""
+        if i not in self.kept:
+            return None
+        name, d, _ = self.kept[i]
+        if d["id"] not in self.whole.functions:
+            return None
+        return "::".join(self.spaces_of(self.tree.scope_of.get(d["id"], "")) + [name])
+
     @staticmethod
     def in_turn(edits):
         """Changes of a file in the order of the file (a place two functions share - never - or one inside the
         other's: the outer one stays)."""
         kept, at = [], 0
-        for e in sorted(dict.fromkeys(edits), key=lambda e: e[:3]):
+        # (at one place, what is put in before what is put in place of a piece: `quot(` before `sizeof c` becomes
+        # `std::size_t{120}`)
+        for e in sorted(dict.fromkeys(edits), key=lambda e: (e[0], e[3] > e[0], e[1], e[2])):
             if e[0] >= at:
                 kept.append(e)
                 at = max(at, e[3])
@@ -9018,15 +9112,24 @@ class TestWriter:
                 # method keeps in itself (static in its body) no code outside the method reaches
                 for i, (variable, _) in self.u.state_statics.items():
                     v = self.tree.decl.get(i) or {}
-                    if self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
-                        missing.append(f"{variable} (kept in the body of a method - static there: the test does not reach it from outside)")
+                    if i in self.kept:   # (kept by a function in its body: before it in the test's source - see kept_edits)
+                        held = self.kept_held(i)
+                        if held is None:
+                            continue   # (not held by the source the test holds)
+                    elif self.in_function(v) or v.get("storageClass") == "static" and v.get("isStaticLocal") or not v.get("name"):
+                        if self.held_locals is None:
+                            self.held_locals = {x.get("id") for f in self.whole.functions.values() for x in walk(f) if x.get("kind") == "VarDecl"}
+                        if i not in self.held_locals:
+                            continue   # (kept by a function the test does not hold the source of: nothing it holds touches it)
+                        missing.append(f"{variable} (kept in the body of a function defined in its class: the test does not reach it from outside)")
                         continue
-                    if i not in self.whole.consts:
+                    elif i not in self.whole.consts:
                         continue   # (not named by the source the test holds)
-                    first = v
-                    while first.get("previousDecl") in self.tree.decl:
-                        first = self.tree.decl[first["previousDecl"]]
-                    held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
+                    else:
+                        first = v
+                        while first.get("previousDecl") in self.tree.decl:
+                            first = self.tree.decl[first["previousDecl"]]
+                        held = "::".join(self.classes_of(self.tree.scope_of.get(first["id"], "")) + [v["name"]])
                     try:
                         spelled = self.spell(qtype(v))
                         draws.append(f"  {held} = {self.draw(qtype(v))};")
@@ -9271,6 +9374,7 @@ class TestWriter:
             chunks.append((tree.place(d), ("engine", d["id"]), "".join(f"struct {n}; " for n in named) + head + a + tail))
             defs.append((("engine", d["id"]), head + b + tail))
             pairs.append(("::" + tree.scope_of.get(d["id"], "") + d["name"], "::".join(spaces + [d["name"]])))
+            self.free_stand_ins[d["id"]] = (chunks[-1][2], defs[-1][1], pairs[-1])
         if os.environ.get("STAND_INS"):
             for _, key, text in chunks:
                 sys.stderr.write(f"{key}: {text}\n")
@@ -9661,8 +9765,8 @@ class TestWriter:
                     continue
                 d = self.at(place)
                 if d is None:   # (not in this file's reach: the piece as the other file's test has it)
-                    if kind not in ("member", "inside", "engine"):
-                        G.foreign[place] = piece
+                    if kind not in ("member", "inside", "engine") or (kind == "engine" and piece.get("stand_in")):
+                        G.foreign[place] = piece   # (a function of the engine this file does not see: the other test's stand-in of it)
                 elif kind in ("function", "inside", "freed"):
                     want_function(d["id"])
                 elif kind == "template":
@@ -9855,6 +9959,8 @@ class TestWriter:
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
+                if (scope or "").startswith(ENGINE + "::logic::"):
+                    continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather)
                 # (one in a class the test compiles along stands in its text; one in a class it does not has the
                 # namespace of the class's name - in_classes)
                 if o.get("_at", (None, None))[0] is None or o["_at"][1] is None or self.inside(o, decls) is not None or self.in_function(o):
@@ -10046,10 +10152,22 @@ class TestWriter:
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
         for o, text, pair in aliases:
             put(o, {"kind": "alias", "text": text, "pairs": [pair]})
+        # a method declared in its class here whose body another file's test handed on: that it is a member, for
+        # the test that takes these pieces (its class's text holds the declaration) - and of a class this tree does
+        # not have either, the place of the member in the piece of the file that has it
+        for i in sorted(G.kept):
+            d = tree.decl.get(i)
+            if d is not None and d.get("_file") and d.get("_at", (None, None))[1] is not None:
+                put(d, {"kind": "member"})
+        for place in sorted(G.wanted, key=str):
+            if self.pieces.get(place, {}).get("kind") == "member" and self.at(place) is None:
+                out.append(((-1, 0), place, self.pieces[place]))
         # what of the engine the pieces call and hold: the test that takes them has its own stand-ins
         for d in self.engine_called(G).values():
             if d.get("_at", (None, None))[1] is not None:
-                out.append(((-1, 0), self.ident(d), {"kind": "engine"}))
+                # (of a free function: its stand-in as this test has it - for a test whose file does not see its header)
+                said = self.free_stand_ins.get(d["id"])
+                out.append(((-1, 0), self.ident(d), {"kind": "engine", **({"stand_in": [said[0], said[1]], "pairs": [said[2]]} if said else {})}))
         words = set(re.findall(r"[A-Za-z_]\w*", "\n".join([*sources, *(p.get("text", "") for _, _, p in out)])))
         for q in sorted(u.objects_seen | G.objects):
             if q.split("::")[-1] in words:
@@ -10126,14 +10244,17 @@ class TestWriter:
                 self.object_enums[owner].append("  " + self.piece(tree.enums[q]) + ";")
                 in_objects.add(q)
         enum_chunks = [(tree.place(tree.enums[q]), ("enum", q), self.enum_text(q)) for q in sorted(enums) if q not in in_objects]
-        const_chunks, said_consts = [], set()
-        for d, text, _, named in self.const_pieces(G.consts, decls, records):
+        const_chunks, said_consts, const_gives = [], set(), {}
+        # (in the order they stand: of two that say the same - the program and the engine both say what pi is -
+        # the first is said, where what follows it can use it)
+        for d, text, _, named in sorted(self.const_pieces(G.consts, decls, records), key=lambda c: tree.place(c[0])):
             pairs += named
             if self.widen(text) not in said_consts:   # (the program and the engine both say what pi is: once)
                 said_consts.add(self.widen(text))
                 const_chunks.append((tree.place(d), ("const", f"{os.path.basename(d['_file'])}:{d['_at'][0]}"), text))
+                const_gives[const_chunks[-1][1]] = [a for a, *_ in named]   # (what it declares: no `using` of it before it)
         # the enums without a name whose values the source names: their own text, like a constant's
-        for d, text, named in self.unnamed_pieces(G.unnamed, decls, records):
+        for d, text, named in sorted(self.unnamed_pieces(G.unnamed, decls, records), key=lambda c: tree.place(c[0])):
             pairs += named
             if self.widen(text) not in said_consts:
                 said_consts.add(self.widen(text))
@@ -10148,6 +10269,9 @@ class TestWriter:
             if self.inside(d, decls) is not None:
                 continue   # (declared in its class with its body: there)
             fn_chunks.append((tree.place(d), ("function", d["id"]), self.in_spaces(d, self.piece(d))))
+            for k, (i, (_, fd, v)) in enumerate(x for x in self.kept.items() if x[1][1]["id"] == d["id"]):
+                at = tree.place(d)   # (what it keeps: before it - see kept_edits)
+                fn_chunks.append(((at[0], at[1] - 0.5, k), ("kept", i), self.hoisted(v)))
             if tree.owner.get(d["id"]) is None and d.get("name"):
                 first = d
                 while first.get("previousDecl") in tree.decl:
@@ -10170,7 +10294,8 @@ class TestWriter:
                 if self.widen(piece["text"]) in said_consts:
                     continue
                 said_consts.add(self.widen(piece["text"]))
-            foreign_chunks.append(((first[0], first[1] - 0.5, i), ("foreign", place), None))
+            # (the stand-in of a function of the engine this file does not see: before the pieces that call it)
+            foreign_chunks.append(((first[0], first[1] - (0.75 if piece["kind"] == "engine" else 0.5), i), ("foreign", place), None))
         # The Blueprints of the level's actors the source calls on them (kern::logic::ActorBlueprint): the test runs
         # them (converted::Blueprint, RuleBlueprint) - for the source, bound to the objects it calls them by, and
         # for the Blueprint beside it, where actor_find finds them (the host's find_actor); the engine is the
@@ -10391,16 +10516,20 @@ class TestWriter:
                 except Wait:
                     pass
         object_chunks, object_defs = self.stand_ins(pairs)
+        for place, piece in G.foreign.items():   # (the stand-ins other tests hand on: defined with this test's own)
+            if piece["kind"] == "engine":
+                pairs += [tuple(x) for x in piece.get("pairs", ())]
+                object_defs.append((("foreign", place), piece["stand_in"][1]))
         rename = self.renamer(pairs)
         wide = lambda text: rename(self.widen(text))
         # the pieces of other files: named as there - a file's own names first, see `exports`
-        outer = [pair for p in G.foreign.values() if not p["local"] for pair in p["pairs"]]
+        outer = [pair for p in G.foreign.values() if not p.get("local") for pair in p.get("pairs", ())]
         named_spaces = [tuple(s) for p in G.foreign.values() for s in p.get("spaces", ())]
         renamers = {}
         def wide_of(piece):
             h = piece.get("home")
             if h not in renamers:
-                mine = [pair for p in G.foreign.values() if p["local"] and p.get("home") == h for pair in p["pairs"]] if h else []
+                mine = [pair for p in G.foreign.values() if p.get("local") and p.get("home") == h for pair in p.get("pairs", ())] if h else []
                 renamers[h] = self.renamer([*mine, *pairs, *outer], named_spaces)
             return lambda text: renamers[h](self.widen(text))
         # a name of the program or the engine that is still written out in full: not the test's own
@@ -10455,6 +10584,9 @@ class TestWriter:
                 if key[0] == "foreign":
                     piece = G.foreign[key[1]]
                     there = wide_of(piece)   # (a piece of another file alone stands in its namespace: its text says so - see `items`)
+                    if piece["kind"] == "engine":
+                        add(key, wide(piece["stand_in"][0]))
+                        continue
                     if piece["kind"] != "record":
                         add(key, self.with_usings(there(piece["text"]), piece.get("usings", ()), there, () if piece["kind"] not in ("enum", "alias") else set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", piece["text"])),
                                                   [a for a, _ in piece.get("pairs", ())]))
@@ -10473,7 +10605,7 @@ class TestWriter:
                 if key[0] != "record":
                     own_names = set(re.findall(r"\b(?:enum\s+(?:class\s+|struct\s+)?|using\s+)(\w+)", text)) if key[0] in ("enum", "alias") else ()
                     d = tree.decl.get(key[1]) if key[0] == "function" and isinstance(key[1], str) else None
-                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else ()
+                    gives = [self.absolute_of(d, d["name"])] if d is not None and d.get("name") else const_gives.get(key, ())
                     add(key, self.with_usings(wide(text), tu_usings, wide, own_names, gives) if key[0] not in ("object", "engine") else wide(text))
                     continue
                 q = key[1]
@@ -10727,11 +10859,15 @@ def survey_one(job):
             continue
         if tree.owner.get(d["id"]) == ENGINE + "::logic::ActorBlueprint":
             continue   # (no function of a Blueprint: its calls are nodes - own_function)
-        calls, shares = set(), False
+        calls, shares, keeps = set(), False, []
         params_of.update({p["id"]: (function_key(tree, d), k) for k, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl")})
         for n in walk(d):
             if n.get("kind") == "DeclRefExpr" and (n.get("referencedDecl") or {}).get("kind") == "VarDecl" and not shares:
                 shares = shared_variable(tree, tree.decl.get(n["referencedDecl"]["id"]))
+            if n.get("kind") == "VarDecl" and n.get("storageClass") == "static" and not n.get("constexpr") and not re.search(r"\bconst\b", qtype(n)):
+                # (what it keeps from one call to the next - `static int last = 0;` - the program has once, as it has
+                # a variable of a namespace: a variable of its one object, unless it is that object - main)
+                keeps.append((os.path.abspath(n.get("_file") or "?"), n.get("_at", (None,))[0]))
             if n.get("kind") in ("CallExpr", "CXXMemberCallExpr"):
                 c = callee(n)
                 rid = (c.get("referencedDecl") or {}).get("id") or c.get("referencedMemberDecl")
@@ -10764,7 +10900,7 @@ def survey_one(job):
                 calls.add(function_key(tree, t))
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
-                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "shares": shares, "free": d.get("kind") == "FunctionDecl" and not tree.owner.get(d["id"]),
+                          "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "shares": shares, "keeps": keeps, "free": d.get("kind") == "FunctionDecl" and not tree.owner.get(d["id"]),
                           "defaulted": defaulted_maker(d)})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
     statics, made = objects_made(tree)
@@ -11165,7 +11301,10 @@ def main(argv):
         for k, f in functions.items():
             for c in f["calls"]:
                 callers[c].add(k)
-        kept = {k for k, f in functions.items() if f.get("shares") and f.get("free") and world.program(f["file"])}
+        # (a static local variable is kept by the program as a variable of a namespace is - but the one object
+        # of the state itself, `static Game g;`, is the Blueprint)
+        itself = {tuple(p) for r in surveys for q, places in r["statics"].items() if q in world.states for p in places}
+        kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))) and f.get("free") and world.program(f["file"])}
         todo = list(kept)
         while todo:
             for k in callers.get(todo.pop(), ()):

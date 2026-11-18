@@ -530,6 +530,11 @@ inline Value arg(const EngineObject& object) { return Value::integer(object.kern
 template <class T> inline constexpr bool is_list = false;
 template <class T> inline constexpr bool is_list<std::vector<T>> = true;
 template <class T, std::size_t N> inline constexpr bool is_list<std::array<T, N>> = true;   // (a list of a fixed length: a list)
+/// What may be there or not (std::unique_ptr of a value of the program, std::optional): in the Blueprint a list
+/// of no entry or one - in a list, a list inside a list: a struct that holds it (see arg_one).
+template <class T> inline constexpr bool is_box = false;
+template <class T> inline constexpr bool is_box<std::unique_ptr<T>> = !std::is_base_of_v<EngineObject, T>;
+template <class T> inline constexpr bool is_box<std::optional<T>> = true;
 template <class T> Value arg(const std::vector<T>& v);
 template <class T> bool same(const std::vector<T>& want, const Value& got);
 template <class T> bool defined(const std::vector<T>& v);
@@ -629,7 +634,12 @@ template <class T> Value arg(const std::vector<T>& v) {
     std::vector<Vec3> out;
     for (const kern::Vec2 x : v) out.push_back({x.x, x.y, 0});
     return Value::of(std::move(out));
-  } else if constexpr (is_list<T>) {   // (a list inside a list: a struct that holds it, as the Blueprint has it)
+  } else if constexpr (std::is_same_v<T, Whole>) {   // (64-bit patterns: a List<Int64>, as the Blueprint holds it)
+    std::vector<kern::logic::Int64> out;
+    out.reserve(v.size());
+    for (const Whole& x : v) out.push_back(kern::logic::Int64{x.v});
+    return Value::of(std::move(out));
+  } else if constexpr (is_list<T> || is_box<T>) {   // (a list inside a list: a struct that holds it, as the Blueprint has it)
     std::vector<Value> out;
     for (const T& x : v) out.push_back(Value::structure({arg(x)}));
     return Value::structures(std::move(out));
@@ -700,7 +710,12 @@ template <class T> bool same(const std::vector<T>& want, const Value& got) {
     if (g.size() != want.size()) return false;
     for (std::size_t i = 0; i < want.size(); ++i) if (!same(want[i], Value::vector(g[i]))) return false;
     return true;
-  } else if constexpr (is_list<T>) {
+  } else if constexpr (std::is_same_v<T, Whole>) {   // (a List<Int64>)
+    const auto& g = got.items<kern::logic::Int64>();
+    if (g.size() != want.size()) return false;
+    for (std::size_t i = 0; i < want.size(); ++i) if (g[i].bits != want[i].v) return false;
+    return true;
+  } else if constexpr (is_list<T> || is_box<T>) {
     const auto& g = got.items<Value>();
     if (g.size() != want.size()) return false;
     for (std::size_t i = 0; i < want.size(); ++i) if (!g[i].rows || g[i].rows->size() != 1 || !same(want[i], (*g[i].rows)[0])) return false;
@@ -949,7 +964,7 @@ template <class S> struct Take<std::vector<S>> {
     target.clear();
     for (std::size_t k = 0; k < v.size(); ++k) {
       T item = quiet<T>();
-      if constexpr (is_list<S>) {   // (a list inside a list: a struct that holds it, as the Blueprint has it)
+      if constexpr (is_list<S> || is_box<S>) {   // (a list inside a list: a struct that holds it, as the Blueprint has it)
         const Value row = v.item(k);
         if (row.rows && row.rows->size() == 1) Take<S>::to(item, (*row.rows)[0]);
       } else {
@@ -1239,10 +1254,19 @@ inline bool changeable(const kern::logic::Instance& inst, const char* name) {
   const kern::logic::Variable* v = inst.graph().variable(name);
   return v && !v->constant;
 }
-/// The Blueprint's variables set to the source's: false - one of them does not take its value.
+/// The Blueprint's variables set to the source's: false - one of them does not take its value. (A value that
+/// is not one of the variable's type - a field of another type somewhere in it - the Blueprint would hold as
+/// the type's default: that is no value it takes.)
+inline const char* g_untaken = "";   // (the variable that did not take its value)
 inline bool set_state(kern::logic::Instance& inst, const Variables& vars) {
-  for (const auto& [name, value] : vars)
-    if (changeable(inst, name) && !inst.set(name, value)) return false;
+  for (const auto& [name, value] : vars) {
+    if (!changeable(inst, name)) continue;
+    const kern::logic::Variable* v = inst.graph().variable(name);
+    if (!kern::logic::is_value_of(value, kern::logic::TypeRef{v->type, v->of, v->count}, inst.graph()) || !inst.set(name, value)) {
+      g_untaken = name;
+      return false;
+    }
+  }
   return true;
 }
 /// The variables after a call, as a struct of them in their order. Where the Blueprint has no such
@@ -1289,7 +1313,7 @@ struct Tally {
     if (left || !defined(want)) { ++outside; return; }
     if (state && !(set_state(*bp.native, *state) && set_state(*bp.interp, *state))) {
       ++compared;
-      if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object\n", function, describe().c_str());
+      if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object (%s)\n", function, describe().c_str(), g_untaken);
       return;
     }
     const auto parts = [&](std::vector<Value>& given) {
@@ -1399,6 +1423,20 @@ inline void open_read() {
     g_can_bail = false;
     std::longjmp(g_bail, 1);
   }
+}
+
+/// What a std::unique_ptr or a std::optional holds, where the source reads it (`*p`, `p->x`): of one that holds
+/// nothing C++ says nothing - the call is given up, as one that reads outside a list for ever (g_bail): it
+/// is not compared. (In the Blueprint it is a list of no entry or one, its entry read where it stands.)
+template <class P> P&& present(P&& p) {
+  if (!p) {
+    g_open = true;
+    if (g_can_bail) {
+      g_can_bail = false;
+      std::longjmp(g_bail, 1);
+    }
+  }
+  return std::forward<P>(p);
 }
 
 /// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
