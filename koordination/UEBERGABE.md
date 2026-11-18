@@ -534,12 +534,15 @@ dem Paket-Zweig). CI-Lauf `44341582015` (work `90b5ab8`): determinism und native
   der Koordinator setzt sie mit der Antwort fort.
 
 ### 16.2 Schritt 1 – Bestandsaufnahme (Stand 18.11., 17:35)
-- **CI-Lauf 44341582015** (`work` 90b5ab8): determinism, build, native, input **grün**; native-spawncity **rot** (erwartet: Level/Tests von f8); e2e lief um 17:32 noch.
+- **CI-Lauf 44341582015** (`work` 90b5ab8), abgeschlossen: determinism, build, native, input, e2e **grün**; native-spawncity **rot** (erwartet: Level/Tests von f8);
+  deploy übersprungen.
 - **mag:** die Schleife mit 14 Plätzen und Spiegel greift seit **17:25:38** (zehn Starts in sieben Sekunden). Manche Aufträge zeigen ihren Ergebnis-Zweig erst am Ende
   (der Push beim Start geht bei vielen gleichzeitigen Starts teils verloren) – „kein Zweig“ heißt nicht „läuft nicht“.
-- **Der volle Lauf `work-voll-162644-5528` war um 17:35 noch nicht gestartet** (er steht alphabetisch am Ende der Schlange; vor ihm starteten u. a. die zwei
-  `konvert`-Läufe von k um 17:28:55, die Suiten von s5 um 17:30/17:31). Er rechnet `origin/work` zum Zeitpunkt seines Starts – **bis er gestartet ist, wird nichts
-  auf `work` gepusht**, damit sein Ergebnis auf dem heutigen `work` (90b5ab8) steht und per cherry-pick übernommen werden darf.
+- **Der volle Lauf `work-voll-162644-5528` ist um 17:38:59 gestartet, auf 90b5ab8 (= `work`), 37 Kerne** (er stand alphabetisch am Ende der Schlange; neben ihm
+  laufen u. a. vier `konvert`-Läufe von k, die Suiten von s5, die t2-Probe über alle Quelltexte). Erwartet: Konvertierung ~1 h+, dann Spiel-Suite, dann
+  Engine-Suite (die wird wegen F1 rot sein). **Bis sein Ergebnis übernommen ist, wird nichts auf `work` gepusht** – sonst liefe er nicht mehr „auf dem Stand, der
+  heute `work` ist“ (Abschnitt 10, Schritt 1). Übernahme: `git ls-remote origin 'refs/heads/mag/ergebnis-work-voll-162644-5528'`; `when` muss `convert rc=0`
+  nennen und convert.log Funktionen; dann den Commit „… – Level und Tests der Blueprints“ per cherry-pick nach `work`, pushen, `gh workflow run ci.yml --ref work`.
 - Aus der Schlange genommen (Commit 3595a93 auf `mag/auftrag`): fünf Proben von work-t1 (vor dem Leser-Fix, laut t1 überholt) und die Zeitmessung work-k-zeit.
 - **Befund F1 – die Engine-Suite ist auf dem Stand von `work` auf mag ROT** (drei Läufe auf 30f63e4, Baum identisch mit 90b5ab8: `work-d-engine-154346-16923`,
   `-161602-25272`, `-163138-9400`, je `engine rc=1`): 54.323 Checks der Unit-Tests ohne Fehler, dann `blueprint_native_test`: „Engine on the engine itself, the
@@ -563,3 +566,27 @@ dem Paket-Zweig). CI-Lauf `44341582015` (work `90b5ab8`): determinism und native
 - **E3 (Paket k):** PAKET3_k.md, Nachtrag 17:50. Der Koordinator vergleicht die zwei laufenden `konvert`-Ergebnisse selbst; vor dem Mergen origin/work einmischen
   und den Beweis auf dem eingemischten Stand wiederholen, gegen den gültigen vollen Lauf „nichts verloren“.
 - **Start der Agenten (Schritt 2):** siehe 16.4 – wer gestartet ist und wer bewusst noch nicht.
+
+### 16.4 Schritt 2 – Agenten (gestartet 18.11., 17:40; alle Opus 5.5, mittlere Stufe; Worktrees `/home/claude/w-<paket>`)
+| Paket | erster Auftrag in dieser Sitzung | endet mit |
+|---|---|---|
+| **d** | ZUERST Befund F1 (R129, Engine-Suite rot) – Fix in eigenen Commits, Beweis: Engine-Suite zweimal grün + CI; dann Platz der Engine ab Schritt 3/7; Antwort zu `Mixer::bus`, `TextureDesc::rgba` | „BEREIT ZUM MERGEN (Engine-Suite)“ in stand/d.md, arbeitet weiter |
+| **p** | Messwerkzeug, vollständige Ursachenliste, Behebung nach E1 Punkt 3 (Text unverändert), Entwurf für alles, was die Schreibweise ändert; Zeit-Test | Tabelle vorher/nachher; ggf. „ENTSCHEIDUNG NÖTIG“ (Schreibweise) |
+| **t1** | origin/work einmischen, abgebrochene Nachweise auf mag (gebündelt), Rest der drei Gründe, Prüfung „beidseitig gescheiterte Aufrufe gelten als gleich“ (9.2), voller Lauf als Abschlussbeweis | „BEREIT ZUM MERGEN“ mit Zahlen gegen den Basislauf |
+| **t2** | Probe über alle Quelltexte (läuft seit 17:33 auf a546621) auswerten, drei Hypothesen, set_craters-`operator==` (von f2), frame_uniforms/Renderer (von f1), voller Lauf als Abschlussbeweis | wie t1 |
+| **k** | origin/work einmischen (getan: 3dd3338), 8 gegen 40 Kerne byteweise – auf e5f2bf1 (läuft) und auf dem eingemischten Stand (läuft seit 17:41), „nichts verloren“ gegen den Basislauf | „BEREIT ZUM MERGEN“ mit vier Auftragsnamen und Dauer |
+| **g1** | Probe über alle game*.cpp auswerten, eigene Gründe als Konverterfähigkeit, Absenkungen nur vorbereiten; Beschreibung für den Entwurf „Events des Programms/build_level“ (Stufe 6) | Tabelle je Funktion; „BEREIT ZUM MERGEN (Konverter-Teil)“ |
+| **g2** | Probe über alle game*.cpp auswerten, ungeklärte Gründe („a pointer“, „list: erase()“), minimap_json-Absenkung auf gleiche Kosten prüfen, traffic_make_near-Annahme belegen | wie g1 |
+| **f1** | origin/work einmischen, Differenztests grün (`spiel … lowered`), Probe über alle acht Quelltexte, ungeprüfte Regeln aus 3903052 | „BEREIT ZUM MERGEN“ mit Paaren/Aufrufen |
+| **f2** | ZUERST test_main.cpp:4796 (687b163 übersetzt nicht), Lists Equal für Strukturen in jeder Stufe bewiesen, Proben auswerten, Differenztests grün | wie f1 |
+Bewusst **nicht** gestartet: **c** (Entwurf bestätigt, baut nach d – engine_api.py), **s5** (wartet auf p), **r** (bei der CLI auf mag; `mag/differenztest`
+zuletzt 3c536af, 17:00, noch kein BERICHT.md). Die agentIds dieser Sitzung stehen in `/home/claude/agenten.txt` (nicht im Repo).
+Kontingent: Chris um 17:38 um die Prozentzahl gebeten (jetzt und nach einer Stunde); bei ~8 %/h zurück auf d, p, t1, t2, k.
+
+### 16.5 Was der Koordinator als Nächstes tut (Reihenfolge)
+1. Ergebnis von `work-voll-162644-5528` abwarten → Summenzeilen, `suite`/`engine` rc, `cost:`-Zeilen → Commit 1 nach `work`, pushen, CI (Schritt 1 fertig); die neuen
+   Zahlen in Abschnitt 5 und in BLUEPRINTS.md (Stand-Absatz) nachführen.
+2. Stand-Dateien lesen (`$S/stand/*.md`: „BEREIT ZUM MERGEN“, „ENTSCHEIDUNG NÖTIG“, „BEFUND FÜR …“), Befunde weitergeben, Entscheidungen treffen.
+3. Mergen nach Abschnitt 10, Schritt 3 (sechs Bedingungen) – zuerst der Fix von d (F1), dann k, dann t1/t2, dann g/f; danach `voll origin/work`.
+4. Entwurf „Events des Programms / build_level“ (Stufe 6) anfordern, sobald g1 die Beschreibung geliefert hat; c starten, sobald d fertig ist; s5, sobald p die
+   Ursachen behoben hat.

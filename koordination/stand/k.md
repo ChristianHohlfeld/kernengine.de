@@ -1,5 +1,5 @@
-# Paket k – Stand
-- in Arbeit: work-k e5f2bf1 – Ablauf in Runden (eindeutig, Fixpunkt), Meldung "was written and waits now".
-- lokal bewiesen (klein): rules/spawn_guard/wanted alt vs. neu: Level, tests, texts, Log (ohne Ablaufzeilen) gleich.
-- wartet auf mag: konvert origin/work-k 8 und 40 (Beweis eindeutig), Probe work-k-probe-162316-2567, Basislauf work-voll-153849.
-- übergeben: siehe uebergabe/k.md (e5f2bf1)
+# Paket k – Stand (Nachfolger, neue Sitzung)
+- A fertig: origin/work (90b5ab8) in work-k eingemischt → 3dd3338 (gepusht), py_compile grün.
+- B wartet: work-k-konvert-165842-30470 (8) / work-k-konvert-165847-30555 (40), beide auf e5f2bf1, laufen seit 17:28:55.
+- C abgelegt 17:41 auf 3dd3338: work-k-konvert-174058-4191 (8 Kerne), work-k-konvert-174111-4316 (40 Kerne).
+- D wartet auf Basislauf work-voll-162644-5528 (90b5ab8, läuft seit 17:38:59).
