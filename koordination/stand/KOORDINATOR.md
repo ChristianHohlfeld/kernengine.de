@@ -1,4 +1,7 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 23:13 **work-zusammen = HEAD nach Merge work-d 50832229** (Array-Parameter fester Länge: `inertia[6]` liest 6 Zahlen; Beleg `work-d-vergleich-225255-10477`,
+  converted_rigid_spec in beiden Durchgängen ok). Der volle Lauf `work-zusammen-voll-230430-15353` wartete noch und nimmt diesen Stand (mag löst den Stand beim Start auf).
+  d: E7 umgesetzt (cf8786c), Schritt 7 gebaut (e02ea24, unbewiesen), CI build auf c0d6d24 grün, Engine-Suite wartet auf mag.
 - 23:05 **work-zusammen = 946303c2** (+ t1 a48ae637, + k 20cb5259). **Voller Lauf abgelegt: `work-zusammen-voll-230430-15353`** (startet, sobald die laufenden
   Aufträge bis auf einen kleinen fertig sind; bis dahin nimmt die Warteschlange nichts Neues an). Alle: vor dem nächsten Vergleich `git merge origin/work-zusammen`.
   · **Entscheidung E9 (Reihenfolge, die C++ offen lässt):** destruction.cpp:191/194 – zwei Argumente eines Aufrufs ziehen aus demselben rng; GCC (der Test) rechnet

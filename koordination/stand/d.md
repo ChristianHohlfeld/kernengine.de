@@ -86,3 +86,8 @@
   Generator neu (physics/game engine_calls.gen.cpp, engine_nodes.gen.h). Beleg: mag `work-d-vergleich-225255-10477` (src/drone.cpp →
   converted_rigid_spec), läuft. engine_api.py (für c): Prüfung der festen Länge bei Zeiger-Eingängen.
 - Schritt 7 (Konverter + Stellvertreter der Quelle) gebaut: e02ea24, unbewiesen (Probe/vergleich über game_events.cpp o. ä. folgt).
+
+## BEREIT ZUM MERGEN: 50832229 (Array-Parameter fester Länge, Befund k) – Beleg work-d-vergleich-225255-10477
+- Eltern: work-zusammen e9eec02, enthält nur den Fix (cherry-pick oder merge sauber). mag `vergleich origin/work-d src/drone.cpp` auf ddb54b72:
+  convert rc=0, bau rc=0; **converted_rigid_spec ok in beiden Durchgängen** (Stellvertreter und SC_ENGINE=real; vorher 300 of 300 calls differ).
+  Übrig: converted_drone_cpp „Drone_step: 1 of 5 calls differ“ in beiden – das ist G7 von k (u16-Rückwandlung, 2a6ef5b3, nur auf work-k), nicht dieser Fix.

@@ -54,7 +54,7 @@
   work-k-vergleich-222911-25281, converted_combat_rules_cpp (flak_cell). Allgemeine Behebung: `format_arg(const std::string& v)`
   → `arg(std::string_view(v))` (der Temporär-String lebt als Argument von text_format bis zu dessen Ende).
 
-## ENTSCHEIDUNG NÖTIG: Destruction_collapse 7/25, Destruction_fracture 11/20 / 12/28 (Lauf 222045-20677)
+## (entschieden: E9 – (b) ja, (a) später) Destruction_collapse 7/25, Destruction_fracture 11/20 / 12/28 (Lauf 222045-20677)
 - Befund: Interpreter = Klasse ≠ Quelltext, erste Stelle: `pieces_[k].size` (x und z), p und v gleich. Ursache ist **keine Regel**:
   destruction.cpp:191/194 `launch({…}, {s.len * rng.range(0.85f, 1), 0.45f, band * rng.range(0.8f, 1)}, s.yaw, tint(0.18f));`
   – zwei Argumente ziehen aus demselben `rng` (size über rng.range, tint über rng.unit). In welcher Reihenfolge C++ die Argumente
@@ -68,3 +68,9 @@
   denn die heutige Quelle hat unter GCC ein anderes Ergebnis. Die Entscheidung, welches Verhalten gilt, liegt beim Koordinator/Chris.
   Ich schlage (a) + (b) vor: (a) macht jede solche Stelle sichtbar, (b) legt die Reihenfolge des Originals fest (Differenztest mit
   clang als Bezug oder als dokumentierte Ausnahme – das braucht eure Entscheidung).
+
+## E9 umgesetzt: 90ecf01f – Absenkung destruction.cpp (Argumentreihenfolge, clang = von links)
+- fracture: size/Farbe bzw. at/size/yaw/Farbe vor launch benannt; in launch vx, vy, up. Differenztest tests/lowered/test_destruction_lowered.cpp
+  (1 Paar: Destruction::fracture). Kleinstfall /tmp/k_order/order.cpp: clang++ alt = neu, g++ alt ≠ neu.
+- WARTET AUF: t1s Umstellung (tests/lowered mit clang) – dann Differenztest grün belegen, erst dann BEREIT ZUM MERGEN für 90ecf01f.
+  Danach `vergleich` über destruction.cpp (unter GCC sollten collapse/fracture dann gleich sein).
