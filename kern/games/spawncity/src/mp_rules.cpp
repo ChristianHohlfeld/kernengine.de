@@ -36,6 +36,9 @@ bool bind(kern::logic::Runtime& logic) {
   return runs;
 }
 const std::vector<u32>& palette() { return g_palette; }
+f64 spawn_protect_ms() { return g_rules.get<f64>("SpawnProtectMs"); }
+f64 ballot_ms() { return g_rules.get<f64>("BallotMs"); }
+f32 voice_radius() { return static_cast<f32>(g_rules.get<f64>("VoiceRadius")); }
 
 namespace {
 f64 fmin2(f64 a, f64 b) { return a < b ? a : b; }

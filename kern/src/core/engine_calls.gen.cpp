@@ -98,15 +98,30 @@ bool c10(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.jobs.take_queued: kern::jobs::take_queued
+// engine.jobs.set_threads: kern::jobs::set_threads
 bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto a0 = ev::blank<std::remove_cvref_t<bool>>();
+  ev::take<ev::Bool>(o, in, 0, a0);
+  kern::jobs::set_threads(std::move(a0));
+  return true;
+}
+
+// engine.jobs.threads: kern::jobs::threads
+bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  decltype(auto) r = kern::jobs::threads();
+  ev::give<ev::Bool>(o, out, 0, r);
+  return true;
+}
+
+// engine.jobs.take_queued: kern::jobs::take_queued
+bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::jobs::take_queued();
   ev::give<ev::List<ev::Int>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.run: kern::jobs::run
-bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 0, a0);
   std::vector<unsigned char> a1;
@@ -119,7 +134,7 @@ bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.jobs.done: kern::jobs::done
-bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 0, a0);
   std::vector<unsigned char> a1;
@@ -140,9 +155,11 @@ const EngineCall kCalls[] = {
     {"engine.jobs.pending", &c8},
     {"engine.jobs.set_external", &c9},
     {"engine.jobs.external", &c10},
-    {"engine.jobs.take_queued", &c11},
-    {"engine.jobs.run", &c12},
-    {"engine.jobs.done", &c13},
+    {"engine.jobs.set_threads", &c11},
+    {"engine.jobs.threads", &c12},
+    {"engine.jobs.take_queued", &c13},
+    {"engine.jobs.run", &c14},
+    {"engine.jobs.done", &c15},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

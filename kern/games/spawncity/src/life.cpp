@@ -22,9 +22,9 @@ constexpr f32 kNear = 22, kFar = 95, kDespawn = 150, kSpookPlayer = 4.2f, kSpook
 // jogger_chain.mjs
 constexpr u32 kRunners = 10;
 constexpr f32 kGap = 1.35f, kSpeed = 2.9f, kChainLife = 95, kFirst = 60, kEveryMin = 170, kEveryMax = 280, kStreakWindow = 12;
-const char* kCalls[6][2] = {{"Wer l\xc3\xa4uft mit?", "Wir laufen mit!"}, {"Links, rechts, links!", "Wir sind nicht zu bremsen!"},
-                            {"Eins, zwei, drei, vier!", "Die Stra\xc3\x9f" "e geh\xc3\xb6rt uns hier!"}, {"Wie weit noch?", "Bis zum See und weiter!"},
-                            {"Was wollen wir?", "Kilometer!"}, {"Schneller?", "Immer schneller!"}};
+const char* const kCalls[6][2] = {{"Wer l\xc3\xa4uft mit?", "Wir laufen mit!"}, {"Links, rechts, links!", "Wir sind nicht zu bremsen!"},
+                                  {"Eins, zwei, drei, vier!", "Die Stra\xc3\x9f" "e geh\xc3\xb6rt uns hier!"}, {"Wie weit noch?", "Bis zum See und weiter!"},
+                                  {"Was wollen wir?", "Kilometer!"}, {"Schneller?", "Immer schneller!"}};
 // street_voices.mjs
 constexpr f32 kMaxHear = 38, kShoutGap = 1.4f, kSourceGap = 6, kHonkGap = 1.2f, kBubble = 2.1f;
 struct Lines { std::string_view mood; std::string_view lines[6]; u32 n; };
@@ -667,11 +667,16 @@ void Life::update_pigeons(f32 dt, f32 now, const LifeView& view, const CityStrea
     if (!f.air) {
       const f32 dp = dist2d(me, f.at);
       if (dp < kSpookPlayer + 2.4f && view.player_speed > 0.3f) spook(f, me, now, rng, view, city, out);
-      else if (const Vec3* mate = [&]() -> const Vec3* { for (const Vec3& m : view.mates) if (dist2d(Vec2{m.x, m.y}, f.at) < kSpookPlayer + 1.4f) return &m; return nullptr; }())
-        spook(f, {mate->x, mate->y}, now, rng, view, city, out);  // a mate walking up to them (host: his flocks are everybody's)
-      else
-        for (const LifeCar& c : view.cars)
-          if (std::hypot(c.position.x - f.at.x, c.position.y - f.at.y) < kSpookCar && kern::length(c.velocity) > 2) { spook(f, {c.position.x, c.position.y}, now, rng, view, city, out); break; }
+      else {
+        std::size_t mate = view.mates.size();   // (the first mate near them, or none)
+        for (std::size_t i = 0; i < view.mates.size(); ++i)
+          if (dist2d(Vec2{view.mates[i].x, view.mates[i].y}, f.at) < kSpookPlayer + 1.4f) { mate = i; break; }
+        if (mate < view.mates.size())
+          spook(f, {view.mates[mate].x, view.mates[mate].y}, now, rng, view, city, out);  // a mate walking up to them (host: his flocks are everybody's)
+        else
+          for (const LifeCar& c : view.cars)
+            if (std::hypot(c.position.x - f.at.x, c.position.y - f.at.y) < kSpookCar && kern::length(c.velocity) > 2) { spook(f, {c.position.x, c.position.y}, now, rng, view, city, out); break; }
+      }
       if (!f.air && now > f.next_flight) spook(f, f.at + Vec2{rng.range(-1, 1), rng.range(-1, 1)}, now, rng, view, city, out);
       if (!f.air && now > f.coo_at) {
         f.coo_at = now + rng.range(3.5f, 11);

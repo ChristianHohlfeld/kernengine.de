@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../src/rules.h"
+#include "kern/core/json.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
 #include "kern/logic/logic.h"
@@ -32,15 +33,49 @@ inline void fresh_engine(kern::logic::EngineObjects& objects) {
   objects.clear();
   objects.on_missing(kern::logic::engine_make_default);
 }
+/// How many calls of the engine itself (real_engine) were refused since the call being compared began
+/// (converted::Watch sets it to zero; a call of the source in which one was is not compared - Tally::take).
+inline long g_engine_refused = 0;
 /// One call of the engine on one side: written down in `kept`, answered by the stand-in or the engine.
 inline bool test_engine(kern::logic::EngineStandIn& kept, kern::logic::EngineObjects& objects, std::string_view function, const std::vector<kern::logic::Value>& in,
                         std::vector<kern::logic::Value>& out) {
   if (!real_engine()) return kept.engine(function, in, out);
   if (!kern::logic::engine_function(function)) return false;
   kept.calls.push_back(kern::logic::engine_call_shown(function, in));
-  kern::logic::call_engine(objects, function, in, out);   // (a call that fails leaves the zeros, on every side alike)
+  // A call the engine refuses (no object of its class at a handle, a list shorter than its count) gives
+  // nothing: its record says so - a side on which it is refused and one on which it is not differ there.
+  if (!kern::logic::call_engine(objects, function, in, out)) {
+    ++g_engine_refused;
+    kept.calls.back() += " - refused";
+  }
   return true;
 }
+
+}  // namespace sc
+
+namespace sc::rules {
+/// The Blueprint of the level's actor `actor`, read from the level file's text (false: no such actor, or it
+/// has none - `error` says why). The game itself reads the level as a whole (Game::build_level); only the
+/// tests ask for one actor's Blueprint.
+inline bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::string& error) {
+  kern::json::Value doc;
+  std::string why;
+  if (!kern::json::parse(level_text(), doc, &why)) {
+    error = "the level file: " + why;
+    return false;
+  }
+  for (const kern::json::Value& a : doc["actors"].items()) {
+    if (a["name"].as_string() != actor) continue;
+    const kern::json::Value& graph = a["components"]["logic"];  // (an actor's Blueprint is one of its components)
+    if (!graph.is_object()) break;
+    return kern::logic::graph_from_json(graph, out, &error);
+  }
+  error = "the level has no actor \"" + std::string(actor) + "\" with a Blueprint";
+  return false;
+}
+}  // namespace sc::rules
+
+namespace sc {
 
 /// The Blueprint of an actor of the level, read once for all the tests (null: the level has none of
 /// that name, and `error` says so).

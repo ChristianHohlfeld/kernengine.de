@@ -609,7 +609,7 @@ void add_lists(Library& lib) {
     const TypeRef e = item_type(n, g);
     for (std::vector<PinDef>* pins : {&in, &out})
       for (PinDef& p : *pins) {
-        if (p.id == "list") { retype(p, {list_of(e.type), e.of}, g); p.def = json::Value::array(); }
+        if (p.id == "list" || p.id == "other") { retype(p, {list_of(e.type), e.of}, g); p.def = json::Value::array(); }
         if (p.id == "item") retype(p, e, g);
       }
   };
@@ -698,6 +698,24 @@ void add_lists(Library& lib) {
     lib.add(std::move(d));
   }
 
+  {
+    // Lists Equal: what C++ writes as `a == b` of two std::vector of one type (logic::list::equal)
+    NodeDef d = make("list.equal", "Lists Equal", "Lists", NodeKind::pure,
+                     "Do the two lists hold the same items in the same order - as many, and each equal to the one at its place?", "same compare identical == != array");
+    d.params = {type_param(false)};
+    d.inputs = {data("list", "List", PinType::number_list), data("other", "Other", PinType::number_list)};
+    d.outputs = {data("result", "Result", PinType::boolean)};
+    d.shape = typed;
+    d.run = [](Context& c) {
+      const Value items = c.in(std::size_t{0}), other = c.in(std::size_t{1});
+      with_items(element_of(c.input(0).type), [&](auto type) {
+        using T = typename decltype(type)::type;
+        c.out(std::size_t{0}, Value::boolean(list::equal(items.template items<T>(), other.template items<T>())));
+      });
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
   // ---- steps: they change a list variable (the setting Variable) ----
   auto of_variable = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
     Variable named;

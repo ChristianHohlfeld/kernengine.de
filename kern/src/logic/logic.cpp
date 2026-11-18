@@ -779,7 +779,9 @@ bool Value::operator==(const Value& o) const {
     if (is_list(type) || is_list(o.type) || is_keyed(type) || is_keyed(o.type)) return false;
     return as_number() == o.as_number();
   }
-  if (is_keyed(type)) return size() == o.size() && (size() == 0 || entries == o.entries || *entries == *o.entries);  // (the same entries in the same order)
+  // (the same entries in the same order. Two values that share what they hold are compared like any two: a NaN
+  // in them equals nothing, not even itself - as the == of a Blueprint's class says)
+  if (is_keyed(type)) return size() == o.size() && (size() == 0 || *entries == *o.entries);
   switch (type) {
     case PinType::boolean: return b == o.b;
     case PinType::integer: return i == o.i;
@@ -795,7 +797,7 @@ bool Value::operator==(const Value& o) const {
     // structs: every field equal; lists of them: the same structs in the same order
     const std::size_t count = rows ? rows->size() : 0;
     if (count != (o.rows ? o.rows->size() : 0)) return false;
-    return count == 0 || rows == o.rows || *rows == *o.rows;
+    return count == 0 || *rows == *o.rows;   // (field by field, also of two that share their fields: see above)
   }
   if (!is_list(type)) return true;
   if (size() != o.size()) return false;  // lists: the same items in the same order

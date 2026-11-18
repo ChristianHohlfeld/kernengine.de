@@ -671,13 +671,14 @@ void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
       return;
     }
     case kRespawn: {
-      const f64 until = now_ms() + mp::kSpawnProtectMs;
+      const f64 protect_ms = mp::spawn_protect_ms();
+      const f64 until = now_ms() + protect_ms;
       bool found = false;
       for (auto& [s, u] : protected_) if (s == from) { u = until; found = true; }
       if (!found) protected_.push_back({from, until});
       std::vector<u8> w;
       wire::put_u8(w, from);
-      wire::put_f32(w, static_cast<f32>(mp::kSpawnProtectMs));
+      wire::put_f32(w, static_cast<f32>(protect_ms));
       to_all(kReliable, kProtect, w, kNobody);
       return;
     }
@@ -702,14 +703,15 @@ void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
       if (!r.ok || v.data.size() < 4 || v.data.size() > 800) return;
       // Only mates in range hear it (proximity_voice.mjs transmit), unless "everywhere".
       const Vec3 at = focus_of(from);
-      if (from != self_slot_ && (v.everywhere || kern::length(focus_of(self_slot_) - at) <= mp::kVoiceRadius)) voice_.push_back(v);
+      const f32 radius = mp::voice_radius();
+      if (from != self_slot_ && (v.everywhere || kern::length(focus_of(self_slot_) - at) <= radius)) voice_.push_back(v);
       std::vector<u8> bytes;
       wire::put_u8(bytes, from);
       wire::put_u32(bytes, v.seq);
       wire::put_u8(bytes, static_cast<u8>(v.everywhere));
       wire::put_bytes(bytes, v.data);
       for (const Remote& x : remotes_)
-        if (x.state.slot != from && (v.everywhere || kern::length(focus_of(x.state.slot) - at) <= mp::kVoiceRadius)) to_client(x.state.slot, kUnreliable, kVoice, bytes);
+        if (x.state.slot != from && (v.everywhere || kern::length(focus_of(x.state.slot) - at) <= radius)) to_client(x.state.slot, kUnreliable, kVoice, bytes);
       return;
     }
     case kPropose: {
@@ -837,7 +839,7 @@ void Session::deliver(u16 type, const std::vector<u8>& d) {
       const u8 n = r.get_u8(d);
       for (u8 i = 0; i < n && r.ok; ++i) b.members.push_back(r.get_u8(d));
       if (!r.ok || b.members != roster()) return;  // a different roster: the vote is not ours
-      b.expires_ms = now_ms() + mp::kBallotMs;
+      b.expires_ms = now_ms() + mp::ballot_ms();
       remote_ballot_ = b;
       vote_text_ = std::string("FRIENDLY FIRE: ") + (b.value ? "EIN" : "AUS") + "? Deine Stimme fehlt";
       return;

@@ -540,6 +540,17 @@ template <class T> i64 find(const std::vector<T>& items, const std::type_identit
   return -1;
 }
 template <class T> bool contains(const std::vector<T>& items, const std::type_identity_t<T>& item) { return find(items, item) >= 0; }
+/// Do two lists hold the same items in the same order: as many, and each equal to the one at its place -
+/// the == of two std::vector of one type. (Read where they stand: comparing copies nothing.)
+template <class T> bool equal(const std::vector<T>& a, const std::vector<T>& b) {
+  if (a.size() != b.size()) return false;
+  for (std::size_t k = 0; k < a.size(); ++k) {
+    const T& x = a[k];
+    const T& y = b[k];
+    if (!(x == y)) return false;
+  }
+  return true;
+}
 /// Adds `item` at the end; its index.
 template <class T> i64 add(std::vector<T>& items, std::type_identity_t<T> item) {
   items.push_back(std::move(item));

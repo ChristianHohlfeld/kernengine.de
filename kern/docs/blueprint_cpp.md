@@ -214,7 +214,7 @@ KERN_LAYOUT(Demo) {
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – an einem Platz genauso: `Held.Damage = wert;`, `Scores[i] = wert;`, `Cars[i].Speed += wert;`; wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
 | Take Variable | `var_take(Punkte);` – der Platz ist das Argument, eine Variable oder ein Platz in ihr (`var_take(Cars[i].Wheels);`); wird sein Ergebnis gelesen: `var_take(n7, Punkte);` und `n7.value`. Gibt, was am Platz steht, und lässt dort den leeren Wert des Typs (siehe „Übergeben statt kopieren“) |
 | Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve, Copy Bytes) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index`. Copy Bytes nennt die Zahlen beider Listen als Einstellungen: `list_copy_bytes<"u8", "f32">(Out, 0, Grid, 0, n);` (siehe „Die Bytes eines Werts“) |
-| Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
+| Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Lists Equal, Make List) | `list_get<Float>(Scores, 0)`, `list_equal<Int>(Members, Roster)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
 | Schritt, der eine Map oder ein Set ändert (Set at Key, Add Key, Remove Key, Remove Index, Clear, Reserve) | `map_set(Cells, key, wert);`, `set_add(Seen, key);` – der Platz ist das erste Argument; wird sein Ergebnis gelesen: `map_add(n7, Cells, key);` und `n7.added`, `n7.index` (siehe „Maps und Sets“) |
 | Wert-Knoten auf einer Map oder einem Set (Length, Has Key, Key At, Find) | `map_find<Int, Float>(Scores, 7).value`, `set_contains<Text>(Words, "a")` – die Einstellungen „Key“ und „Value“ sind die Typen der Schlüssel und Werte |
 | Rechnen mit 64 Bit (Int64 Add, Divide Unsigned, Shift Right, Less Unsigned …) | `int64_add(a, b)`, `int64_div_unsigned(a, b)`, `int64_less(a, b)` – was die 64 Bit bedeuten, sagt der Knoten (siehe „Int64“) |
@@ -318,6 +318,16 @@ void on1(Actor actor, Float value, Text text) {
   waren), `list_reserve(Scores, 64);` (Platz vorhalten: Nichts, was man lesen kann, ändert sich –
   die Liste wächst danach so weit, ohne noch einmal Speicher anzufordern). Eine Schleife aus
   einzelnen Add wächst mehrmals; darum gibt es diese Schritte.
+- **Vergleichen.** Lists Equal sagt, ob zwei Listen eines Typs dasselbe halten: gleich viele Einträge,
+  und jeder gleich dem an seiner Stelle – `list_equal<Int>(Members, Roster)`, in C++ das `==` zweier
+  `std::vector` (`a != b` ist `logic_not(list_equal<Int>(a, b))`). Verglichen wird wie bei Contains
+  und Find Item: Zahlen nach ihrem Wert (ein NaN gleicht nichts), Strukturen Feld für Feld. Gelesen
+  wird, wo die Listen stehen – der Vergleich kopiert nichts; eine Liste fester Länge passt wie jede.
+  Eine Liste von Strukturen schreibt der Konverter so, wenn das `==` der Struktur in C++ dasselbe sagt:
+  `= default`, oder von Hand jedes Feld genau einmal, in der Reihenfolge der Deklaration, mit `&&`
+  verbunden (`return x == o.x && y == o.y;`), und jedes Feld selbst so vergleichbar (Zahlen, Flags,
+  Aufzählungen, Texte als `std::string`, Vektoren, Listen und Strukturen davon). Ein anderes `==` ist
+  das eigene der Struktur und wartet.
 - **Ordnen.** Sort List bringt eine Liste an ihrem Platz in eine Reihenfolge, stabil (gleiche Einträge
   behalten ihre): `list_sort<nullptr>(Scores);` nach der eigenen Ordnung der Einträge (Zahlen, ganze
   Zahlen, Flags, Texte, Werte von Aufzählungen, Int64 nach den Bits als `u64`), oder
@@ -1189,7 +1199,12 @@ selbst“).
   einen Wert sagt. Geprüft: der native Fall „Engine“ spielt seine Aufrufe auf Objekten ein
   weiteres Mal auf der Engine selbst – der Interpreter durch die Tür, die Klasse direkt, jede
   Variable gleich, und die Klasse nicht ein Mal durch die Tür (`kern/tests/blueprint_native.h`,
-  `native_show.h`); `engine_calls_class_calls_the_engine_itself` vergleicht dieselbe Klasse mit und
+  `native_show.h`); seine freien Funktionen ebenso, dreimal (Tür, Klasse, Tür), jedes Mal in einem eigenen
+  Prozess, der vom selben Zustand der Engine ausgeht (die Nummer des nächsten Jobs, ihr letzter Fehler …), und
+  mit den Jobs der Engine auf dem Frame-Thread (`kern::jobs::set_threads(false)`: wann ein Job läuft, legen die
+  Aufrufe fest) – alle drei geben dasselbe, Zeichen für Zeichen; nur was eine Uhr gibt, ist nicht zweimal
+  dasselbe: Eine Funktion, die eine Uhr liest, sagt es in ihrem Header (`KERN_CLOCK f64 now_ms();`), die
+  Tabelle hat es (`EngineFunction::clock`), und der Test vergleicht die Variablen nicht, die aus ihr kommen; `engine_calls_class_calls_the_engine_itself` vergleicht dieselbe Klasse mit und
   ohne Objekte und mit C++ selbst, `engine_calls_class_asks_for_no_memory` zählt die
   Speicheranforderungen (`kern/tests/test_main.cpp`). Ein Build, der Klassen bindet, bindet die
   Teile der Engine, deren Funktionen sie rufen (ein Knoten, den keine Klasse ruft, braucht nichts).

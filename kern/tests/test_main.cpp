@@ -3473,6 +3473,17 @@ TEST(logic_tier_cases_interpreter) {
             scores.item(scores.size() - 2).field(0)->as_text() == "x");
       CHECK(shown.size() > 2 && shown[0] == 'y' && shown.find("[1, 1, 2, 3.5]") != std::string::npos && inst->get("Names").as_text() == "[a, b, c]");
     }
+    if (std::string(c.name) == "lists_equal") {
+      // A and B the same until Go adds to B; the texts against a list made on the spot (the same, then another
+      // last item); an empty list against an input nothing is wired to
+      CHECK(inst->get("Same").as_bool() && !inst->get("After").as_bool() && inst->get("SameWords").as_bool() && !inst->get("Other").as_bool() && inst->get("Empty").as_bool());
+      CHECK(inst->get("B").as_text() == "[1, 2, 3, 0, 2, 4, 5, 5, 1]");
+    }
+    if (std::string(c.name) == "lists_equal_structs") {
+      // the same lists; a number of a struct in a list in an item, a field's struct, a shorter list; a NaN deep inside
+      CHECK(inst->get("Same").as_bool() && !inst->get("Deep").as_bool() && !inst->get("Short").as_bool() && !inst->get("Field").as_bool());
+      CHECK(!inst->get("NanSelf").as_bool() && inst->get("N").size() == 6 && std::isnan(inst->get("N").item(0).field(1)->field(1)->as_number()));
+    }
     if (std::string(c.name) == "text_format") {
       // the last Go: value 1, no text - as snprintf writes it ("%s" of three bytes at most: "abc")
       char want[64];
@@ -4722,6 +4733,8 @@ inline constexpr char kName[] = "a name that is longer than fifteen characters";
 struct B : kern::Blueprint {
   KERN_ENUM(Mode, Closed, Open);
   KERN_STRUCT(Spec) { Text Name = kName; Float Mass = 1.0; };
+  KERN_STRUCT(Part) { Vector At = Vector{0.0, 0.0, 0.0}; List<Float> Loads = List<Float>{}; };
+  KERN_STRUCT(Rig) { Text Name = ""; Part Core = Part{Vector{0.0, 0.0, 0.0}, List<Float>{}}; List<Part> Parts = List<Part>{}; };
   Text Title = kTitle;
   Spec Car = Spec{kName, 2.0};
   struct NameResult { Text out = ""; };
@@ -4779,6 +4792,28 @@ TEST(logic_text_of_the_program) {
   // as values of the interpreter and back; a list of texts; everything prints
   const kern::List<Text> names{"x", kName, "z"};
   CHECK(B::list_find<Text>(names, "z") == 2 && B::list_contains<Text>(names, kName) && B::list_get<Text>(names, 7) == "");
+  CHECK(B::list_equal<Text>(names, names) && B::list_equal<Text>(names, kern::List<Text>{"x", kName, "z"}) && !B::list_equal<Text>(names, kern::List<Text>{"x", kName}) &&
+        !B::list_equal<Text>(names, kern::List<Text>{"x", kName, "y"}) && B::list_equal<Text>(kern::List<Text>{}, kern::List<Text>{}));
+  // Lists Equal of structs: field by field, as C++'s == of a struct that compares each of its fields - a NaN in
+  // one equals nothing, not even itself; a struct with a struct, a list of numbers and a list of structs as
+  // fields is compared through all of them. (In the interpreter, the JIT and the class against each other:
+  // the tier case lists_equal_structs.)
+  {
+    const kern::List<B::Spec> specs{B::Spec{kName, 2.0}, B::Spec{"x", 3.0}}, nan_specs{B::Spec{kName, std::nan("")}};
+    CHECK(B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.0}}) && !B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.5}}) &&
+          !B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"y", 3.0}}) && !B::list_equal<B::Spec>(nan_specs, nan_specs));
+    auto rig = [](Text name, f32 x, f64 load, f64 inner) {
+      return B::Rig{name, B::Part{B::Vector{x, 1.0, 2.0}, B::List<B::Float>{load, 2.0}}, B::List<B::Part>{B::Part{B::Vector{0.0, 0.0, 1.0}, B::List<B::Float>{inner}}, B::Part{}}};
+    };
+    const kern::List<B::Rig> rigs{rig("a", 1.0, 0.5, 3.0), rig(kName, -0.0, 1.5, 4.0)};
+    CHECK(B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.5, 3.0), rig(kName, 0.0, 1.5, 4.0)}));  // (-0 == 0, as C++ says)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.5, 3.0), rig(kName, -0.0, 1.5, 4.5)}));  // (a number in a list in a struct in a list)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.75, 3.0), rig(kName, -0.0, 1.5, 4.0)}));  // (a list in the struct field)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 2.0, 0.5, 3.0), rig(kName, -0.0, 1.5, 4.0)}));  // (the vector in the struct field)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.5, 3.0)}) && B::list_equal<B::Rig>(kern::List<B::Rig>{}, kern::List<B::Rig>{}));
+    const kern::List<B::Rig> deep_nan{rig("n", 1.0, 0.5, std::nan(""))};
+    CHECK(!B::list_equal<B::Rig>(deep_nan, deep_nan) && !(deep_nan[0] == deep_nan[0]) && rigs[1] == rig(kName, -0.0, 1.5, 4.0));
+  }
   const logic::Value v = logic::to_value(names);
   CHECK(v.type == logic::PinType::text_list && v.size() == 3 && v.item(1).as_text() == kName);
   const kern::List<Text> back = logic::from_value<kern::List<Text>>(v);
@@ -12230,6 +12265,10 @@ TEST(studio_logic_structs) {
   CHECK(offered(pal, "struct.break", "struct", "Weapon") && offered(pal, "logic.select", "type", "Weapon") && offered(pal, "value.reroute", "type", "Weapon") && offered(pal, "var.set", "variable", "Held"));
   CHECK(offered(pal, "list.contains", "type", "Weapon") && offered(pal, "list.add", "variable", "Rack") && !offered(pal, "struct.break", "struct", "Aim") && !offered(pal, "struct.make") && !offered(pal, "var.set", "variable", "Last"));
   CHECK(!offered(pal, "math.add") && !offered(pal, "debug.print"));
+  // from a list of a struct's type: the list nodes of that type, Lists Equal among them
+  from.set("node", added("var.get", R"({"variable":"Rack"})"));
+  pal = cmd({{"cmd", "logicPalette"}, {"query", ""}, {"from", from}});
+  CHECK(offered(pal, "list.equal", "type", "Weapon") && offered(pal, "list.contains", "type", "Weapon") && offered(pal, "list.length", "type", "Weapon"));
 
   auto pin = [&](u32 node, const char* id, bool output) {
     const json::Value st = f.s->state();

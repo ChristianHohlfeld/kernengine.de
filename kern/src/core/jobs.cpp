@@ -30,6 +30,7 @@ struct State {
   bool external = false;
   std::vector<u8> handout;
 #if !defined(__wasm__)
+  bool threaded = true;                  // the jobs run on the threads (set_threads)
   std::mutex mutex;
   std::condition_variable wake;
   std::vector<std::thread> threads;
@@ -92,7 +93,7 @@ void worker_loop() {
 }
 void ensure_threads() {
   State& s = S();
-  if (!s.threads.empty()) return;
+  if (!s.threaded || !s.threads.empty()) return;
   const u32 n = std::clamp<u32>(std::thread::hardware_concurrency() > 2 ? std::thread::hardware_concurrency() - 1 : 1, 1, 4);
   for (u32 i = 0; i < n; ++i) s.threads.emplace_back(worker_loop);
 }
@@ -154,8 +155,10 @@ void cancel(u32 id) {
 }
 
 void pump(f64 budget_ms) {
-#if defined(__wasm__)
   State& s = S();
+#if !defined(__wasm__)
+  if (s.threaded) return;  // the threads run them (none run while it is off: here is the only thread with jobs)
+#endif
   if (s.external) return;
   const f64 end = now_ms() + budget_ms;
   while (!s.queue.empty()) {
@@ -165,11 +168,8 @@ void pump(f64 budget_ms) {
     if (it == s.jobs.end()) continue;
     if (it->second.cancelled) { s.jobs.erase(it); continue; }
     execute(it->second);
-    if (now_ms() > end) break;
+    if (now_ms() >= end) break;   // (a budget of 0: one job)
   }
-#else
-  (void)budget_ms;  // threads run them
-#endif
 }
 
 u32 pending() {
@@ -185,8 +185,40 @@ u32 pending() {
 void set_external(bool on) { S().external = on; }
 bool external() { return S().external; }
 
+void set_threads(bool on) {
+#if !defined(__wasm__)
+  State& s = S();
+  std::vector<std::thread> stopped;
+  {
+    std::lock_guard<std::mutex> lock(s.mutex);
+    if (s.threaded == on) return;
+    s.threaded = on;
+    if (on) return;  // (they start with the next job)
+    s.stopping = true;
+    stopped.swap(s.threads);
+  }
+  s.wake.notify_all();
+  for (std::thread& t : stopped) t.join();  // (each finishes the job it runs)
+  std::lock_guard<std::mutex> lock(s.mutex);
+  s.stopping = false;
+#else
+  (void)on;
+#endif
+}
+
+bool threads() {
+#if !defined(__wasm__)
+  return S().threaded;
+#else
+  return false;
+#endif
+}
+
 const std::vector<u8>& take_queued() {
   State& s = S();
+#if !defined(__wasm__)
+  std::lock_guard<std::mutex> lock(s.mutex);  // (the threads take from the same queue)
+#endif
   s.handout.clear();
   put_u32(s.handout, 0);
   u32 count = 0;
@@ -216,6 +248,9 @@ void run(u32 kind, Span<const u8> input, std::vector<u8>& output) {
 
 void done(u32 id, Span<const u8> output) {
   State& s = S();
+#if !defined(__wasm__)
+  std::lock_guard<std::mutex> lock(s.mutex);
+#endif
   auto it = s.jobs.find(id);
   if (it == s.jobs.end()) return;
   if (it->second.cancelled) { s.jobs.erase(it); return; }

@@ -85,7 +85,7 @@ def table_text(api, functions):
             return "{" + ", ".join(out) + "}"
         lines.append(f"      {{{c_text(f['type'])}, {c_text(f['cpp'])}, {c_text(f['label'])}, {c_text(f['category'])}, {c_text(f['help'])}, {'true' if f['value'] else 'false'},")
         lines.append(f"       {pins(f['ins'])},")
-        lines.append(f"       {pins(f['outs'])}}},")
+        lines.append(f"       {pins(f['outs'])}" + (f", {'true' if f.get('place') else 'false'}, true" if f.get("clock") else ", true" if f.get("place") else "") + "},")
     lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
     return "\n".join(lines)
 
@@ -724,6 +724,15 @@ class Calls:
                 bodies.append(f"bool c{k}(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {{")
                 bodies += ["  " + x for x in lines]
                 bodies += ["}", ""]
+                if f.get("place"):
+                    # a place of the engine, for the interpreter and a class without the engine's objects: read through
+                    # <node>@get (what the node gives: the place, as a value), changed through <node>@set (the value it
+                    # has then, put in its place)
+                    pin, _, q = f["ins"][0]
+                    bodies += [f"// {f['type']}@set: what stands at the place {f['cpp']} gives",
+                               f"bool c{k}_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {{",
+                               f"  auto* self = ev::object<{q}>(o, in, 0, {c_text(pin)});", "  if (!self) return false;",
+                               f"  ev::take<{self.tag(f['outs'][0][1], need)}>(o, in, 1, self->{f['decl']['name']}());", "  return true;", "}", ""]
                 if f.get("role") == "make" and all(c2b.kids(p) for p in c2b.kids(f["decl"]) if p.get("kind") == "ParmVarDecl"):
                     q = f["class"]
                     if not any(m[0] == q for m in makers):
@@ -733,7 +742,8 @@ class Calls:
                     *[f'#include "{h}"' for h in sorted(headers)], '#include "kern/logic/engine_host.h"', "",
                     "namespace kern::logic {", "namespace {", "", "namespace ev = engine_values;", "",
                     *self.types_text(need), "", *bodies,
-                    "const EngineCall kCalls[] = {", *[f'    {{"{f["type"]}", &c{k}}},' for k, f in enumerate(fs)], "};",
+                    "const EngineCall kCalls[] = {", *[f'    {{"{f["type"]}", &c{k}}},' for k, f in enumerate(fs)],
+                    *[f'    {{"{f["type"]}@get", &c{k}}},\n    {{"{f["type"]}@set", &c{k}_set}},' for k, f in enumerate(fs) if f.get("place")], "};",
                     "const EngineCalls kAll(kCalls, std::size(kCalls));"]
             if makers:
                 text += ["", "const EngineMaker kMakers[] = {", *[f"    {m}," for _, m in makers], "};", "const EngineMakers kAllMakers(kMakers, std::size(kMakers));"]
@@ -778,7 +788,7 @@ def main(argv):
     assert len(set(types)) == len(types), [t for t in types if types.count(t) > 1]
     if "--list" in argv:
         for f in functions:
-            print(("value " if f["value"] else "step  ") + f["type"] + "(" + ", ".join(f"{bt} {n}" for n, bt, _ in f["ins"]) + ")" + (" -> " + ", ".join(f"{bt} {n}" for n, bt, _ in f["outs"]) if f["outs"] else ""))
+            print(("value " if f["value"] else "place " if f.get("place") else "step  ") + f["type"] + "(" + ", ".join(f"{bt} {n}" for n, bt, _ in f["ins"]) + ")" + (" -> " + ", ".join(f"{bt} {n}" for n, bt, _ in f["outs"]) if f["outs"] else ""))
         print()
         for name, why in waiting:
             print(f"no node: {name}: {why}")
