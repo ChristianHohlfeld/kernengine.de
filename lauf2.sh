@@ -19,6 +19,9 @@ A="$(cd "$(dirname "$0")" && pwd)"; J=~/spawncity-jobs
 [ -d /dev/shm ] && [ -w /dev/shm ] && J="/dev/shm/spawncity-jobs-$(id -un)"; REPO=https://github.com/ChristianHohlfeld/kernengine.de
 N="$(nproc)"; SLOTS="${SLOTS:-6}"; mkdir -p "$J" "$A/.done"
 me="$(sha256sum "$0" | cut -c1-16)"
+# Eine Schleife zur Zeit: wer die Sperre nicht bekommt, hört auf (eine zweite, die gestartet wird, während die erste
+# in einem alten vollen Lauf steckt, übernimmt; die erste endet, sobald sie sich ersetzen will).
+exec 8> "$A/.schleife.lock"; flock -n 8 || { echo "$(date '+%F %T') eine andere Schleife läuft schon – diese endet"; exit 0; }
 G="git -c user.name=mag -c user.email=mag@localhost"
 # clang++: der Konverter liest die Quelltexte mit clang (CLANGXX). Gesucht wird, was da ist - nichts wird installiert.
 find_clang() {
