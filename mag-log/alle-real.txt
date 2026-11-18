@@ -1,0 +1,13 @@
+ok   converted_blueprint_call
+ok   converted_combat_rules_cpp
+ok   converted_common
+ok   converted_controls
+ok   converted_controls_cpp
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_nostr_cpp
+ok   converted_qr_code
+ok   converted_qr_code_cpp
+ok   converted_settings
+ok   converted_settings_cpp
+--- 12 ok, 0 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 12 Tests; cost: 40, note: 19
