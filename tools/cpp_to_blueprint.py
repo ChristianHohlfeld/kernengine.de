@@ -1320,6 +1320,12 @@ class Unit:
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ").replace("(anonymous namespace)::", "")
         return re.sub(r"(?<![\w:])(?:kern::|std::)?(f32|f64|i8|i16|i32|i64|u8|u16|u32|u64|uint64_t|int64_t|uint8_t|uint16_t|uint32_t|int8_t|int16_t|int32_t|usize|Vec2|Vec3|Vec4|Quat|Mat4|size_t)\b", lambda m: ALIAS[m.group(1)], t)
 
+    def looked_from(self, d):
+        """Where C++ looks up the names a function's declaration and body spell: the namespace or class it stands
+        in - a method's is its class, also where it is defined outside it (`bool Game::f(Spot& out)`: Game::Spot)."""
+        own = self.tree.owner.get(d["id"])
+        return own + "::" if own else self.tree.scope_of.get(d["id"])
+
     def find_type(self, t):
         """The program's record or enum a type name means (its qualified name), or None."""
         if self.lookup_scope and not t.startswith("::"):
@@ -2195,7 +2201,7 @@ class Unit:
             if d["id"] in getattr(self, "barred", {}):
                 raise Wait(self.barred[d["id"]])
             outer, self.local_scope = self.local_scope, self.tree.local_scope(d)
-            looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
+            looked, self.lookup_scope = self.lookup_scope, self.looked_from(d)
             try:
                 Emit(self, f).run()
             finally:
@@ -2253,7 +2259,7 @@ class Unit:
                 # the types it takes and gives are this Blueprint's too now: as this file's compiler sees them
                 # (they are the same types - a type is converted the same wherever it is seen)
                 seen = []
-                looked, self.lookup_scope = self.lookup_scope, self.tree.scope_of.get(d["id"])
+                looked, self.lookup_scope = self.lookup_scope, self.looked_from(d)
                 try:
                     if f.self_type is not None:
                         mine = self.struct(self.tree.owner.get(d["id"]))
@@ -3112,7 +3118,8 @@ class Emit:
 
     def is_this(self, n):
         n = bare(n)
-        while n.get("kind") in ("ImplicitCastExpr",) and kids(n):
+        # (const_cast<T*>(this) is this: a Blueprint's function reads and changes its object as it is written)
+        while n.get("kind") in ("ImplicitCastExpr", "CXXConstCastExpr") and kids(n):
             n = bare(kids(n)[0])
         if n.get("kind") == "UnaryOperator" and n.get("opcode") == "*" and kids(n):
             return self.is_this(kids(n)[0])
