@@ -1,0 +1,11 @@
+FAIL converted_drone_cpp
+ok   converted_Arondight45_DroneFC_Core
+ok   converted_Arondight45_FirmwareRuntime
+ok   converted_Arondight45_HardwareSensors
+ok   converted_Arondight45_StateControl
+ok   converted_common
+ok   converted_drone
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_rigid_spec
+--- 9 ok, 1 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 10 Tests; cost: 11, note: 6

@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1218:23: warning: variable ‘a1’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1218 |       const long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
+      |                       ^~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1238:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1238 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1260:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1260 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1279:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1279 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1298:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1298 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1319:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1319 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1338:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1338 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1357:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1357 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1376:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1376 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1398:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1398 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1418:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1418 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1443:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1443 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1462:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1462 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1485:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1485 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1504:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1504 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1522:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1522 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1541:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1541 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1563:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1563 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1583:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1583 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1603:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1603 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1625:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1625 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1645:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1645 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1664:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1664 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1683:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1683 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-225255-10477/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1702:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 1702 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+0 tests, 0 checks, 0 failures
+
+real	5m46,502s
+user	30m55,813s
+sys	1m17,121s
