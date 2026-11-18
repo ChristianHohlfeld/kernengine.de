@@ -353,6 +353,31 @@ def unit_order(path, flags):
     return out
 
 
+# The length of an array a type names by an expression (`std::array<ClipId, static_cast<u32>(Sound::kCount)>`)
+# is the number the compiler works out. It says so wherever it names the type of a value (there it writes the
+# type out: std::array<unsigned int, 18>), not behind a reference (`...& clips`): what the spelling means is
+# taken from where it is said - {the type as spelled: the type written out; None where the compiler has said
+# two things of one spelling}. Read by Unit.clean.
+SAID_ARRAYS = {}
+
+
+def spelled_length(t):
+    """Is this the name of a std::array whose length is not a number written out?"""
+    if not t.startswith("std::array<") or not t.endswith(">"):
+        return False
+    args = template_args(t)
+    return len(args) == 2 and not re.fullmatch(r"\d+[uUlL]*", args[1])
+
+
+def note_array(spelled, written):
+    spelled = re.sub(r"^(?:const\s+)?(.*?)(?:\s*&)*$", r"\1", spelled.strip())
+    written = re.sub(r"^(?:const\s+)?(.*?)(?:\s*&)*$", r"\1", written.strip())
+    if not spelled_length(spelled) or not written.startswith("std::array<") or spelled_length(written):
+        return
+    if SAID_ARRAYS.setdefault(spelled, written) != written:
+        SAID_ARRAYS[spelled] = None
+
+
 def annotate(o, st):
     """Every place of the tree gets the file it is in (clang names a file only where it changes)."""
     if isinstance(o, list):
@@ -361,6 +386,8 @@ def annotate(o, st):
         return
     if not isinstance(o, dict):
         return
+    if "desugaredQualType" in o and "std::array<" in o.get("qualType", ""):
+        note_array(o["qualType"], o["desugaredQualType"])
     if "offset" in o and "kind" not in o:
         if "file" in o:
             st["file"] = o["file"]
@@ -1306,6 +1333,10 @@ class Unit:
 
     # ---- types ----
     def clean(self, t):
+        if SAID_ARRAYS and "std::array<" in t:   # (an array's length written as an expression: SAID_ARRAYS)
+            for spelled, written in SAID_ARRAYS.items():
+                if written and spelled in t:
+                    t = t.replace(spelled, written)
         if "enum at " in t:   # (a place of an enum without a name holds a number of its underlying type)
             t = re.sub(r"(?:(?:[A-Za-z_]\w*|\(anonymous namespace\))::)*(\((?:unnamed|anonymous) enum at [^)]*\))", lambda m: self.tree.unnamed.get(m.group(1), m.group(0)), t)
         t = re.sub(r"\b(const|volatile|struct|class|enum)\b", " ", t).replace("&&", " ").replace("&", " ")
