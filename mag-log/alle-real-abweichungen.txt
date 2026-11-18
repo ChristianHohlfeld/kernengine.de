@@ -1,0 +1,40 @@
+compared >= 20 || long_calls | key: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_color_of: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_connected: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_focus_of: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_host_lost: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_host: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_hp_of: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_index_of: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_join: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_origin: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_protected_now: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_remote_index: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_roster: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_status: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_stop: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | Session_successor: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | web_audio_state: only 0 calls could be compared (in 6000 the source left the numbers)
+native && std::string(native->tier()) == "native C++" | Game runs as its C++ class (it runs: interpreter)
+wrong == 0 | CityStream_feed_terrain: 7 of 49 calls differ
+wrong == 0 | CityStream_feed_terrain: 7 of 52 calls differ
+wrong == 0 | create_body: 198 of 198 calls differ
+wrong == 0 | Drone_step: 1 of 5 calls differ
+wrong == 0 | event_json: 2 of 5 calls differ
+wrong == 0 | flak_cell: 76 of 88 calls differ
+wrong == 0 | FurnishIndex_add_ring: 44 of 84 calls differ
+wrong == 0 | FurnishIndex_add_ring: 64 of 136 calls differ
+wrong == 0 | FurnishIndex_add_seg: 41 of 44 calls differ
+wrong == 0 | FurnishIndex_add_seg: 69 of 75 calls differ
+wrong == 0 | gaps_barricade_doors: 3 of 20 calls differ
+wrong == 0 | gaps_barricade_doors: 3 of 23 calls differ
+wrong == 0 | gaps_barricades_draw: 2 of 22 calls differ
+wrong == 0 | Mat4_perspective: 300 of 300 calls differ
+wrong == 0 | projection_matrix: 62 of 300 calls differ
+wrong == 0 | Terrain_add_water_polygon: 2 of 68 calls differ
+wrong == 0 | Terrain_add_water_polygon: 3 of 69 calls differ
+wrong == 0 | Terrain_add_waterway: 1 of 25 calls differ
+wrong == 0 | Terrain_plan_images: 39 of 300 calls differ
+wrong == 0 | Terrain_set_corridors: 1 of 32 calls differ
+wrong == 0 | Terrain_set_water_cell: 300 of 300 calls differ
+wrong == 0 | TrafficRules_limit: 37 of 170 calls differ

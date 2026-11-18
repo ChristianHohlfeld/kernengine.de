@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2821:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2821 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2843:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2843 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2862:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2862 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2881:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2881 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2900:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2900 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2920:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2920 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2940:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2940 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2960:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2960 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:2983:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 2983 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3003:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3003 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3025:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3025 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3044:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3044 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3063:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3063 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3082:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3082 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3101:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3101 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3123:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3123 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3143:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3143 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3165:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3165 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3185:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3185 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3205:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3205 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3226:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3226 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3247:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3247 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3268:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3268 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3290:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3290 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+/dev/shm/spawncity-jobs-chris/ergebnis-work-zusammen-voll-203000-750-alle-212005-5593/kern/games/spawncity/tests/converted/test_terrain_cpp.cpp:3311:14: warning: variable ‘i’ might be clobbered by ‘longjmp’ or ‘vfork’ [-Wclobbered]
+ 3311 |     for (int i = 0; tally.more(i); ++i) {
+      |              ^
+0 tests, 0 checks, 0 failures
+
+real	14m48,662s
+user	268m43,112s
+sys	6m13,454s
