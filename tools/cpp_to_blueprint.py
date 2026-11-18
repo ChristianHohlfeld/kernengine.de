@@ -2958,6 +2958,12 @@ class Emit:
                 if mine is not None and mine != entry and self.u.alike(mine, entry):
                     return lt[5:-1]
         try:
+            if k == "MemberExpr" and kids(b) and b.get("name") == "first":
+                # (the key of an entry of a map - `auto& [key, value]`, it->first -: of the type the map holds its keys
+                # in - an Int64 for a u64 the compiler names `unsigned long` -, not read through an Int)
+                e = self.keyed_entry(self.entry_of(kids(b)[0]) or kids(b)[0])
+                if e is not None:
+                    return self.rows(e[0])[2]
             if k == "MemberExpr" and kids(b) and not self.is_this(kids(b)[0]):
                 e = self.entry_of(kids(b)[0])
                 st = self.tp(e if e is not None else kids(b)[0])
