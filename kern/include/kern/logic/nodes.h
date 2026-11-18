@@ -43,6 +43,8 @@ template <std::size_t N> struct Setting {
   constexpr std::string_view view() const { return {text, N - 1}; }
 };
 
+namespace logic { struct Whole; }
+
 /// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
 namespace math {
 inline constexpr f64 pi = 3.14159265358979323846;
@@ -89,6 +91,7 @@ inline i64 bits_of(f64 a) {
   if (!(a == a)) return 0;
   return a > 0 ? std::numeric_limits<i64>::max() : std::numeric_limits<i64>::min();
 }
+inline i64 bits_of(const logic::Whole& a);  // (an Int: as the double it is - below, where Whole is)
 /// The whole number one of these functions gives (band bor bxor shl shr wrap32 wrap32s mul32):
 /// it stands for the double static_cast<f64>(v) - that is what it is everywhere a number is
 /// asked for. Handed on to another of these functions, the number is taken as it is where that
@@ -103,7 +106,7 @@ inline i64 bits_of(Exact a) {
   return a.v >= -exact && a.v <= exact ? a.v : bits_of(static_cast<f64>(a.v));
 }
 /// (what these functions take: a number, or the whole number another of them gave)
-template <class T> concept Bits = std::same_as<T, Exact> || std::is_arithmetic_v<T>;
+template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || std::is_arithmetic_v<T>;
 template <Bits A, Bits B> inline Exact band(A a, B b) { return {bits_of(a) & bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bor(A a, B b) { return {bits_of(a) | bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bxor(A a, B b) { return {bits_of(a) ^ bits_of(b)}; }
@@ -131,6 +134,9 @@ struct Whole {
   i64 v = 0;
   constexpr Whole() = default;
   constexpr Whole(i64 x) : v(normal(x)) {}       // NOLINT (implicit: an i64 is one)
+  /// (what a formula of whole numbers gives as an Int: the number its double holds as an Int -
+  /// whole(double(v)), which is normal(v): -> Int in a formula of whole numbers)
+  constexpr Whole(math::Exact x) : v(normal(x.v)) {}  // NOLINT
   constexpr operator i64() const { return v; }   // NOLINT
   Whole& operator+=(Whole amount) {
     v = whole_add(v, amount.v);
@@ -138,6 +144,13 @@ struct Whole {
   }
   u64 hash() const { return KeyHash<i64>{}(v); }  // (a key of a Map, a Set)
 };
+}  // namespace logic
+namespace math {
+/// An Int handed to band ... mul32 (a formula of whole numbers): its bits are those of the double
+/// it is (bits_of(double(v))) - as Exact's, without the way through the double.
+inline i64 bits_of(const logic::Whole& a) { return bits_of(Exact{a.v}); }
+}  // namespace math
+namespace logic {
 
 /// `Text` in a Blueprint's C++. A text written out in the program - "abc": a value typed into a
 /// pin, the default of a variable or of a field - is part of the program: a Text made of it
@@ -2559,6 +2572,7 @@ template <> struct To<Whole> : To<i64> {
     r.v = whole(v);
     return r;
   }
+  static Whole from(math::Exact v) { return Whole(v); }  // (a formula of whole numbers: whole(double(v)) is normal(v))
 };
 template <> struct To<f64> {
   static f64 from(bool v) { return v ? 1 : 0; }
@@ -2575,10 +2589,12 @@ template <> struct To<Vec3> {
 };
 template <> struct To<std::string> {
   template <class S> static std::string from(const S& v) { return to_value(v).as_text(); }  // (everything prints, as the interpreter prints it)
+  static std::string from(math::Exact v) { return from(static_cast<f64>(v)); }
 };
 template <> struct To<Text> {
   static Text from(const Text& v) { return v; }
   template <class S> static Text from(const S& v) { return Text(to_value(v).as_text()); }  // (everything prints, as the interpreter prints it)
+  static Text from(math::Exact v) { return from(static_cast<f64>(v)); }
 };
 template <> struct To<ActorHandle> {
   static ActorHandle from(ActorHandle v) { return v; }

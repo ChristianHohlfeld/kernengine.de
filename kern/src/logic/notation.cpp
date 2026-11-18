@@ -1139,7 +1139,7 @@ struct Writer {
   }
 
   /// What input `k` of `x` is given, as an expression standing in the body `c`.
-  std::string value(int x, int k, int c) {
+  std::string value(int x, int k, int c, bool convert = true) {
     const auto [from, o] = at(x).src[static_cast<std::size_t>(k)];
     if (from < 0) return literal_of(x, k);
     const PinDef pin = at(from).out[static_cast<std::size_t>(o)];
@@ -1155,7 +1155,17 @@ struct Writer {
       e = "n" + id(from) + "." + pin.id;
     }
     const PinType want = at(x).in[static_cast<std::size_t>(k)].type;
-    return pin.type == want ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
+    return pin.type == want || !convert ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
+  }
+  /// Is the formula `x` written as a formula of whole numbers - [](Int a) -> Int (Formula::whole,
+  /// and every input a wire from an Int)?
+  bool whole_formula(int x, const Formula& f) {
+    if (!f.whole()) return false;
+    for (int k : at(x).data_in) {
+      const auto [from, o] = at(x).src[static_cast<std::size_t>(k)];
+      if (from < 0 || at(from).out[static_cast<std::size_t>(o)].type != PinType::integer) return false;
+    }
+    return true;
   }
 
   /// The place a node names, as C++ writes it: its variable and from there its path - a field
@@ -1435,10 +1445,15 @@ struct Writer {
     if (t == "math.formula") {
       const std::string text = at(x).node->param("formula", "a + b");
       const Formula& f = Formula::cached(text);
+      // (a formula of whole numbers whose inputs are Ints: Int in, Int out - the same value, docs/blueprint_cpp.md "Formeln")
+      const bool whole = whole_formula(x, f);
+      const std::string type = whole ? "Int " : "Float ";
       std::string lambda = "[](";
-      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += (i ? ", Float " : "Float ") + f.inputs()[i];
-      lambda += ") -> Float { return " + f.cpp() + "; }";
-      const std::string args = inputs(x, c, {lambda});
+      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += (i ? ", " : "") + type + f.inputs()[i];
+      lambda += ") -> " + type + "{ return " + f.cpp() + "; }";
+      if (!whole) return "kern::formula(" + inputs(x, c, {lambda}) + ")";
+      std::string args = lambda;
+      for (int k : at(x).data_in) args += ", " + value(x, k, c, false);
       return "kern::formula(" + args + ")";
     }
     std::vector<std::string> head;
@@ -1970,6 +1985,7 @@ struct Reader {
     std::size_t moved = 0;  // std::move(value): the token it stands at, plus one
   };
   struct DataWire { int to; std::string in; Src from; };
+  std::vector<int> whole_formulas;  // (the formulas read as formulas of whole numbers: their inputs are Ints, as they are)
   struct ExecWire { int from; std::string out; int to; u32 to_id; std::string in; std::size_t tok; };
   /// An exec output that waits for its wire. node < 0 (kGone): a path that has ended in the graph
   /// where C++ would go on with the next statement (after a wait, a Sequence, go<id>()).
@@ -3325,13 +3341,18 @@ struct Reader {
     s.tok = tok;
     std::vector<std::string> names;
     if (!expect("(") || !expect("[") || !expect("]") || !expect("(")) return s;
+    // (Float inputs and a Float - or, a formula of whole numbers, Int inputs and an Int: Formula::whole)
+    const bool whole = is("Int");
+    const char* type = whole ? "Int" : "Float";
     while (!is(")")) {
       std::string nm;
-      if (!expect("Float", "(a formula's inputs are Float)") || !word(nm, "the input's name")) return s;
+      if (!expect(type, whole ? "(the inputs of a formula of whole numbers are Int, every one)" : "(a formula's inputs are Float)") || !word(nm, "the input's name")) return s;
       names.push_back(nm);
       if (!accept(",")) break;
     }
-    if (!expect(")") || !expect("->") || !expect("Float") || !expect("{") || !expect("return")) return s;
+    if (!expect(")") || !expect("->") || !expect(type, whole ? "(a formula with Int inputs gives an Int)" : "(a formula with Float inputs gives a Float)") || !expect("{") ||
+        !expect("return"))
+      return s;
     const std::size_t from = peek().begin;
     int depth = 0;
     while (peek().kind != Tok::end && !(depth == 0 && (is(";") || is("}")))) {
@@ -3351,12 +3372,23 @@ struct Reader {
       fail(tok, "the formula reads (" + want + "): the lambda's parameters are exactly these, in this order");
       return s;
     }
+    if (whole && !f.whole()) {
+      fail(body_tok, "Int inputs and an Int are a formula of whole numbers: one whose value is a whole number by band, bor, bxor, shl, shr, wrap32, wrap32s or mul32 "
+                     "and that reads each input only as an argument of one of them - this one is a formula of Floats: [](Float ...) -> Float");
+      return s;
+    }
     const int node = make("math.formula", tok, {{"formula", f.text()}});
     if (node < 0) return s;
     Args a{*this};
     a.first = false;  // (the lambda was the first argument)
+    const std::size_t wires_before = data_wires.size();
     if (!args_of(node, a, "this formula")) return s;
     if (!expect(")", "(one value per input of the formula)")) return s;
+    if (whole) {
+      // (every input a wire from an Int - what the graph has where the text says Int)
+      if (data_wires.size() - wires_before != names.size()) { fail(tok, "every input of a formula of whole numbers is an Int that is read (no number written out)"); return s; }
+      whole_formulas.push_back(node);
+    }
     s.node = node;
     s.root = true;
     return s;
@@ -4332,6 +4364,13 @@ struct Reader {
       if (!in) continue;
       const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
       const std::string need = cpp_type(to_type), have = cpp_type(from_type);
+      if (std::find(whole_formulas.begin(), whole_formulas.end(), w.to) != whole_formulas.end()) {
+        // (an Int into the Float input of the formula - the wire's own conversion, which the class does not write)
+        if (w.from.cast) return fail(w.from.tok, "an input of a formula of whole numbers is an Int as it is: no kern::to");
+        if (from_type.type != PinType::integer) return fail(w.from.tok, "this is " + have + ", an input of a formula of whole numbers is an Int");
+        g.links.push_back({f.node.id, out_pin->id, to.node.id, in->id});
+        continue;
+      }
       if (w.from.cast) {
         if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (from_type == to_type ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
         if (from_type == to_type) return fail(w.from.tok, "the value is " + need + " already: no kern::to");

@@ -20,7 +20,10 @@ enum Code : u8 {
   kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32, kSingle, kRemainder,
 };
 
-struct Fn { const char* name; Code code; u8 args; };
+// whole: what the function gives is a whole number for any numbers it is given, and it takes them as
+// whole numbers (cut toward zero, kern::math::bits_of) - a formula made of such functions can be a
+// formula of whole numbers in a Blueprint's C++ (Formula::whole)
+struct Fn { const char* name; Code code; u8 args; bool whole = false; };
 constexpr Fn kFunctions[] = {
     {"min", kMin, 2},     {"max", kMax, 2},     {"clamp", kClamp, 3}, {"abs", kAbs, 1},     {"sign", kSign, 1},   {"floor", kFloor, 1}, {"ceil", kCeil, 1},
     {"round", kRound, 1}, {"trunc", kTrunc, 1}, {"sqrt", kSqrt, 1},   {"pow", kPow, 2},     {"exp", kExp, 1},     {"log", kLog, 1},     {"sin", kSin, 1},
@@ -28,8 +31,8 @@ constexpr Fn kFunctions[] = {
     {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},     {"copysign", kCopysign, 2},
     {"remainder", kRemainder, 2},
     // whole numbers as a machine has them: their bits, and arithmetic that wraps around at 32 bit
-    {"band", kBand, 2},   {"bor", kBor, 2},     {"bxor", kBxor, 2},   {"shl", kShl, 2},     {"shr", kShr, 2},     {"wrap32", kWrap32, 1}, {"wrap32s", kWrap32s, 1},
-    {"mul32", kMul32, 2}, {"single", kSingle, 1},
+    {"band", kBand, 2, true}, {"bor", kBor, 2, true}, {"bxor", kBxor, 2, true}, {"shl", kShl, 2, true}, {"shr", kShr, 2, true},
+    {"wrap32", kWrap32, 1, true}, {"wrap32s", kWrap32s, 1, true}, {"mul32", kMul32, 2, true}, {"single", kSingle, 1},
 };
 constexpr f64 kPi = math::pi;
 constexpr int kMaxStack = 48;
@@ -334,6 +337,20 @@ std::string Formula::print(int t, int outer, bool cpp) const {
   }
   const bool call_form = cpp && (n.code == kPow || n.code == kDiv || n.code == kMod);
   return mine < outer && !call_form ? "(" + s + ")" : s;
+}
+
+bool Formula::whole() const {
+  if (!ok() || inputs_.empty()) return false;
+  auto whole_fn = [](u8 code) {
+    for (const Fn& x : kFunctions) if (x.code == code) return x.whole;
+    return false;
+  };
+  if (!whole_fn(tree_[static_cast<std::size_t>(root_)].code)) return false;
+  // (every input is an argument of such a function itself - nowhere else is it read)
+  for (const Term& n : tree_)
+    for (int child : {n.a, n.b, n.c})
+      if (child >= 0 && tree_[static_cast<std::size_t>(child)].code == kInput && !whole_fn(n.code)) return false;
+  return true;
 }
 
 std::string Formula::text() const { return ok() ? print(root_, 0, false) : std::string(); }
