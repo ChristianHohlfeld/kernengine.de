@@ -6,6 +6,7 @@
 # Jede Datei jobs/<name> ist ein Auftrag, erste Zeile:
 #   voll <git-ref>                      Konvertierung des ganzen Spiels, Spiel-Suite, Engine-Suite
 #   probe <git-ref> <quelle> [...]      Konverter nur über diese Quelltexte (relativ zu kern/games/spawncity)
+#   konvert <git-ref> <kerne>          nur die Konvertierung des ganzen Spiels mit genau so vielen Kernen (Ergebnis wie voll, Commit 1)
 #   engine <git-ref> [filter]           nur die Engine-Suite
 #   spiel <git-ref> [filter]            nur die Spiel-Suite (ohne neue Konvertierung)
 # Ergebnis: Branch mag/ergebnis-<name> (bei "voll": Commit 1 = Level und Tests, Commit 2 = Protokolle in mag-log/;
@@ -53,6 +54,13 @@ run_job() {  # name
       ( time kern/tests/run.sh ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" >> mag-log/when
       git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
       $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints" || true ;;
+    konvert)   # konvert <git-ref> <kerne>: nur die Konvertierung des ganzen Spiels, mit genau so vielen Kernen
+      export KERN_JOBS="${rest%% *}"; echo "kerne: $KERN_JOBS" >> mag-log/when
+      ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted -- \
+          $(ls kern/games/spawncity/src/*.cpp | sed 's|kern/games/spawncity/||' | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
+      echo "convert rc=$? $(date '+%T')" >> mag-log/when
+      git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
+      $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints ($KERN_JOBS Kerne)" || true ;;
     probe)
       mkdir -p "$W/pt/converted" && cp kern/games/spawncity/tests/*.h "$W/pt/"   # (der Test-Schreiber sucht <test>/../converted.h)
       ( cd kern/games/spawncity && time FUNCTIONS=1 TEST_ERRORS=1 $conv --test "$W/pt/converted" --texts "$W/mag-log/texts" -- $rest ) > mag-log/convert.log 2>&1
