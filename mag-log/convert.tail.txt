@@ -1,0 +1,80 @@
+    Field::all (1): a name for a place - written where it is called
+    Field::reset_broken (1): written
+    Field::broken (1): written
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+rigid_spec                      3 /    3 functions       51 /     51 lines
+    capsule_between (14): written
+    create_body (29): written
+    box_inertia (8): written
+lamps_cpp                       6 /   16 functions       53 /    137 lines
+    worse (5): a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("Worse", std::tie(worse), state, to)]  @12730>12353>12186>2244>3108>3631>4025>4059>4272>5191>5677
+    grid_key (1): written
+    bind (1): the Blueprint of the actor Lamps, which the level does not have  [g_rules.bind(logic)]  @12730>12353>12186>2244>3108>3631>4025>4059>4208>7391>7694>8786>5577
+    pole_radius (1): a variable of the Blueprint of the actor Lamps, which the level does not have  [g_rules.get<f64>("PoleRadius")]  @12353>12186>2244>3108>3631>4025>4059>4208>7391>7525>7525>7694>8784>5541
+    cell_key (1): written
+    Field::place_road (26): written
+    Field::rebuild (16): a member of Int  [s.x]  @4084>3631>4025>4059>4272>5104>7163>5104>7391>7692>8598>7391>7525>7602
+    Field::reground (4): it calls CityStream::ground_height(), which waits  [city.ground_height(l.foot.x, l.foot.y)]  @4059>4227>3631>4025>4059>4272>5006>7206>5006>7391>7694>8795>2211>2317
+    Field::near (15): written
+    Field::set_state (6): it calls worse(), which waits  [worse(lamps_[static_cast<std::size_t>(i)].state, state)]  @2244>3108>3631>4025>4059>4225>7395>7391>7606>7395>7391>7688>8283>2217
+    Field::set (5): written
+    Field::broken_list (5): written
+    Field::merge_broken (8): it calls worse(), which waits  [worse(was == broken_.end() ? 0 : was->second, state)]  @2244>3108>3631>4025>4059>4225>7395>7391>7606>7395>7391>7688>8283>2217
+    Field::shot (15): a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("ShotAt", std::tie(hit, along), a, b, Vec3{l.head.x, l.head.y, l.foot.z + kHeadZ}, l.state)]  @4059>4253>4869>4301>3631>4025>4059>4084>3631>4025>4059>4272>5191>5677
+    Field::blast (15): a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("BlastReach", std::tie(blast_reach), decimal(radius))]  @12730>12353>12186>2244>3108>3631>4025>4059>4272>5191>5677
+    Field::car (13): a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("CarFate", std::tie(hit, h.topple, h.impulse, h.clang), l.foot, l.state, pos, decimal(yaw), v, decimal(hl), decimal(hw), decimal(m))]  @4059>4253>4869>4301>3631>4025>4059>4084>3631>4025>4059>4272>5191>5677
+terrain                         8 /    9 functions       11 /     12 lines
+--- car_cpp: without the function operator=: ‘Front’ does not name a type
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file  [elevation(x, y)]  @4025>4059>4208>7391>7512>7777>7884>7966>7796>7391>7694>8795>2211>2264
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+car_cpp                        15 /   15 functions      414 /    414 lines
+    tyre (12): written
+    steer_torque_at (1): written
+    CarSpec::bus (17): written
+    Car::rigid_spec (23): written
+    Car::reset (7): written
+    Car::wheel_speed (5): written
+    suspension_tuning (5): written
+    Car::attach (92): written
+    Car::detach (12): written
+    Car::place (13): written
+    Car::ensure_rig (16): written
+    Car::push (5): written
+    Car::reapply (13): written
+    Car::step (171): written
+    ai_drive (22): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+89 of 101 functions of the program are written as Blueprints (631 of 717 lines), and 5 of the engine's headers that they call: 15 Blueprints - 2 of source files, 0 of states, 13 of headers and of shapes
+79 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-f2-dbg-probe-154003-14537/pt/converted - each once, in the Blueprint it stands in; 1 give nothing
+
+what the others wait for: functions (lines)
+     1 (    16)   a member of Int  [s.x]  @4084>3631>4025>4059>4272>5104>7163>5104>7391>7692>8598>7391>7525>7602
+     1 (    15)   a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("ShotAt", std::tie(hit, along), a, b, Vec3{l.head.x, l.head.y, l.foot.z + kHeadZ}, l.state)]  @4059>4253>4869>4301>3631>4025>4059>4084>3631>4025>4059>4272>5191>5677
+     1 (    15)   a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("BlastReach", std::tie(blast_reach), decimal(radius))]  @12730>12353>12186>2244>3108>3631>4025>4059>4272>5191>5677
+     1 (    13)   a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("CarFate", std::tie(hit, h.topple, h.impulse, h.clang), l.foot, l.state, pos, decimal(yaw), v, decimal(hl), decimal(hw), decimal(m))]  @4059>4253>4869>4301>3631>4025>4059>4084>3631>4025>4059>4272>5191>5677
+     1 (     8)   it calls worse(), which waits  [worse(was == broken_.end() ? 0 : was->second, state)]  @2244>3108>3631>4025>4059>4225>7395>7391>7606>7395>7391>7688>8283>2217
+     1 (     6)   it calls worse(), which waits  [worse(lamps_[static_cast<std::size_t>(i)].state, state)]  @2244>3108>3631>4025>4059>4225>7395>7391>7606>7395>7391>7688>8283>2217
+     1 (     5)   a call on the Blueprint of the actor Lamps, which the level does not have  [g_rules.call("Worse", std::tie(worse), state, to)]  @12730>12353>12186>2244>3108>3631>4025>4059>4272>5191>5677
+     1 (     4)   it calls CityStream::ground_height(), which waits  [city.ground_height(l.foot.x, l.foot.y)]  @4059>4227>3631>4025>4059>4272>5006>7206>5006>7391>7694>8795>2211>2317
+     1 (     1)   height() is defined in another file  [terrain_.height(x, y)]  @12730>12353>12186>2244>3108>3631>4025>4059>4208>7391>7694>8795>2211>2264
+     1 (     1)   the Blueprint of the actor Lamps, which the level does not have  [g_rules.bind(logic)]  @12730>12353>12186>2244>3108>3631>4025>4059>4208>7391>7694>8786>5577
+     1 (     1)   a variable of the Blueprint of the actor Lamps, which the level does not have  [g_rules.get<f64>("PoleRadius")]  @12353>12186>2244>3108>3631>4025>4059>4208>7391>7525>7525>7694>8784>5541
+     1 (     1)   elevation() is defined in another file  [elevation(x, y)]  @4025>4059>4208>7391>7512>7777>7884>7966>7796>7391>7694>8795>2211>2264
+
+real	3m0,837s
+user	5m20,068s
+sys	0m19,593s
