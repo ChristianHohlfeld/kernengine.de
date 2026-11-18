@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # probe.sh <tag> <src...>   (run in kern/games/spawncity of the worktree)
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 tag=$1; shift
 cd /home/claude/w-g1/kern/games/spawncity || exit 1
 D=$S/g1/$tag; rm -rf $D; mkdir -p $D/t/converted $S/shared-tmp

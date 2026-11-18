@@ -1,6 +1,6 @@
 #!/bin/bash
 # run.sh <out-dir> units...   (in kern/games/spawncity)
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 out=$1; shift
 for u in "$@"; do
   TMPDIR=$S/shared-tmp nice python3 ../../../tools/source_diff.py --base origin/main --test $out -I../../include -I../../third_party/box3d/include -Isrc -- src/$u > $S/r/log/${u}.log 2>&1

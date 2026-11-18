@@ -1,4 +1,4 @@
-Paket „p“ (Leistung der exportierten Klasse). Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz (Nachträge 15:40 mag, 16:20, 16:50), dann
+Paket „p“ (Leistung der exportierten Klasse). Lies zuerst $S/PAKET_COMMON3.md (S=/home/claude/kernengine.de/koordination) ganz (Nachträge 15:40 mag, 16:20, 16:50), dann
 kern/docs/blueprint_cpp.md ganz und in kern/games/spawncity/BLUEPRINTS.md „Der Weg ab hier“ (Grundsatz: jeder Baustein „kostet in der Klasse,
 was das C++ kostet, das er darstellt“; „Der Beweis je Schritt: … Zeit im Export-Build“). Zweig work-p, Worktree /home/claude/w-p.
 
@@ -26,3 +26,31 @@ tools/blueprint_cpp.cpp, kern/src/logic/notation.cpp, kern/include/kern/logic/no
 5. Danach: die Zeit wird Teil des Beweises (ein Test, der fehlschlägt, wenn eine Klasse langsamer ist als ihr Quelltext, mit einer Schwelle,
    die das Rauschen der Maschine deckt – begründe die Schwelle; so, dass CI ihn tragen kann).
 Melde dich beim Koordinator (SendMessage an main) mit der Ursachenliste nach Schritt 2, bevor du behebst.
+
+## Nachtrag 17:50 (neuer Koordinator) – Entscheidung E1 zur Ursachenliste deines Vorgängers ($S/uebergabe/p.md)
+1. **Ein C++ je Blueprint bleibt.** Die exportierte Klasse ist und bleibt Wort für Wort der Text von `to_cpp` (BLUEPRINTS.md Stufe 1: „Ein Blueprint hat genau
+   ein C++ – seine Klasse“). „Nur die Klasse anders erzeugen“ scheidet aus – es gibt keinen zweiten Erzeuger und keinen Text, den der Leser nicht zurückliest.
+2. **Die Bedeutung bleibt:** Zahlen 64 Bit, kein Float32, kein neuer Zahlentyp; `Int` ist, was `logic::normal`/`whole` festlegen (exakt bis 2^53, sonst wie double,
+   nie über die Enden). Schneller rechnen ja – etwas anderes ausrechnen nie, für keinen Wert (auch nicht NaN, ±0, ±2^53, die Enden von i64).
+3. **Ohne Rückfrage, in dieser Reihenfolge** (alles in blueprint.h/nodes.h/logic.h, der Text bleibt gleich; nach jedem Schritt messen):
+   a. Ursache 3 (`math_compare` löst den Operator zur Übersetzungszeit auf, `if constexpr` – dieselben Ausdrücke),
+   b. Ursache 2 (`kern::to<Int>`/`whole`/`normal` werden eingebettet),
+   c. Ursache 1, soweit der Text bleibt: der geprüfte ganzzahlige Weg **in der Umsetzung der Formel-Funktionen** (`kern::math::band/bor/bxor/shl/shr/wrap32/wrap32s/
+      mul32`, dazu +, −, ×, Vergleich auf ganzen Zahlen) – etwa über einen Werttyp „exakte ganze Zahl“, den diese Funktionen einander reichen (zu `Float` wird er erst,
+      wo ein Float gebraucht wird) und über Überladungen von `kern::to`/`kern::formula`, die ihn durchreichen; er rechnet in i64, solange jeder Operand und jedes
+      Zwischenergebnis in ±2^53 liegt, und nimmt sonst genau die heutige Formel. Bit für Bit dasselbe ist dann eine Eigenschaft der Umsetzung, die der Engine-Test
+      über die Ränder beweist (jede dieser Funktionen, Klasse gegen Interpreter: 0, ±1, ±(2^31), ±(2^32), ±(2^53−1), ±2^53, ±(2^53+2), die Enden von i64, NaN, ±∞, −0).
+   d. Ursachen 4–6 nur als Straffung ohne Bedeutungsänderung (der Wächter zählt weiter je Durchlauf an einer Stelle und stoppt in jeder Stufe beim selben Durchlauf;
+      die Prüfung „neben der Liste“ fällt nur weg, wo der Generator am Graphen beweist, dass der Index in der Liste liegt – und dann steht das im Text, s. 4).
+4. **Nur mit Entwurf an mich, vor dem Bau:** alles, was die **Schreibweise** ändert (was `to_cpp` schreibt und `from_cpp` liest) – etwa eine Formel mit
+   ganzzahligen Ein-/Ausgängen (`[](Int z) -> Int`), ein am Graphen bewiesener Index, ein Bereich. Das wäre Antwort (a): ein Baustein der Sprache – allgemein, in jeder
+   Stufe mit derselben Bedeutung (Interpreter/JIT rechnen, was sie heute rechnen), Knoten/Einstellung, `check()`, Leser, Fixpunkt-Tests, Doku, Editor, Konverter.
+   Der Entwurf nennt: was genau im Text steht, was es in jeder Stufe bedeutet, warum es für jeden Wert dasselbe gibt, was es gemessen bringt (nach 3a–d), was es
+   an Graph/Editor/Konverter kostet. Liefere ihn, sobald die Messung nach 3 zeigt, wie viel an der Float-Grenze der Formel (hinein `kern::to<Float>`, heraus
+   `kern::to<Int>`) hängen bleibt.
+5. **Zuerst messen** (Schritt 1 des Auftrags ist offen): das Messwerkzeug über 20–30 Funktionen verschiedener Art (ganze Zahlen, Float/Vektor, Strukturen, Listen,
+   Text, Maps, Int64, Aufrufe über Bibliotheken) im Release-Bau des Spiels (clang, `-O3 -flto=thin -DNDEBUG -ffp-contract=off -fno-exceptions -fno-rtti`), und die
+   Ursachenliste für diese Arten vervollständigen (dein Vorgänger hat nur qr encode profiliert). Die vollständige Liste mit Anteilen kommt in `$S/stand/p.md` und
+   in deinen Bericht. `tools/blueprint_cpp.sh --classes` (04f1a57) ist ungetestet und berührt dieselbe Datei wie work-s5 (d5132bc): prüfe es, halte es klein.
+6. **Beweis:** Engine-Suite samt nativer Stufe und Spiel-Suite auf mag (zur roten Engine-Suite auf `work` siehe PAKET_COMMON3.md, Nachtrag 17:45, Punkt 9),
+   Messung vorher/nachher je Funktion; danach der Zeit-Test (Schritt 5 des Auftrags) – begründete Schwelle, CI-tauglich.

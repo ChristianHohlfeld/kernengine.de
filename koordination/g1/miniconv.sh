@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # miniconv.sh <name...>: --convert with tests of src/<name>.cpp in $S/g1/mini; texts in mini/texts, tests in mini/tests/converted
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 G=/home/claude/w-g1/kern/games/spawncity
 cd $S/g1/mini || exit 1
 rm -rf tests texts; mkdir -p tests/converted

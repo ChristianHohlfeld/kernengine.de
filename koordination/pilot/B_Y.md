@@ -5,7 +5,7 @@
   Umschreiben der Quelle (Commit 97d2c05 auf work-values): Vorlagen put<T>/Reader::get<T>/array<T> durch
   je Zahlentyp eine Funktion ersetzt (wire::put_u8/i32/u32/f32/f64, neu I32/put_i32/get_i32 in wire.h;
   put_f32s/u32s/f64s; Reader über kern::Span mit get_u8 … get_f64, f32s/u32s/f64s). Patch:
-  /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/values/city_jobs_B.patch.
+  /home/claude/kernengine.de/koordination/values/city_jobs_B.patch.
 - Dazu im Konverter (allgemein, nicht nur city_jobs): ein Parameter kern::Span<const T> ist eine
   const-Referenz auf die Liste (vorher eine Kopie je Aufruf), eine Sicht auf eine ganze Liste
   (Span(vector)) ist deren Platz (Commit 94ee77c).
@@ -25,4 +25,4 @@ work-values 31e466b ff., mit der umgeschriebenen Quelle aus dem Patch):
 - Berührte Dateien: kern/games/spawncity/src/city_jobs.cpp, src/wire.h (I32, put_i32, get_i32);
   tools/cpp_to_blueprint.py (Span<const T> als const-Referenz, Sicht auf ganze Liste = deren Platz). Engine: nichts.
 - Die Änderung an city_jobs.cpp ist jetzt auf work-values zurückgenommen (gehört P); der Weg liegt als Patch in
-  /tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad/values/city_jobs_B.patch.
+  /home/claude/kernengine.de/koordination/values/city_jobs_B.patch.

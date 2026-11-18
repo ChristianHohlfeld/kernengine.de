@@ -1,4 +1,4 @@
-Paket „s5“ (Stufe 5: Umschalten – der Mechanismus, an den ersten Dateien). Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz, samt Nachtrag 15:40 (mag),
+Paket „s5“ (Stufe 5: Umschalten – der Mechanismus, an den ersten Dateien). Lies zuerst $S/PAKET_COMMON3.md (S=/home/claude/kernengine.de/koordination) ganz, samt Nachtrag 15:40 (mag),
 dann in kern/games/spawncity/BLUEPRINTS.md „5 – Umschalten“, „6 – Das Projekt laden“, „Regeln für jeden Schritt“ und kern/docs/blueprint_cpp.md.
 Zweig work-s5, Worktree /home/claude/w-s5.
 

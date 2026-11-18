@@ -19,7 +19,7 @@ anfordert als der Quelltext.
 stehen in `$S/p_fixed_convert.log` (Zeilen `    Klasse::funktion (Zeilen): <Grund>`, darüber eine Zeile
 mit dem Einheiten-Namen; am Ende die Zusammenfassung „what the others wait for").
 
-**Werkzeuge** (`S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad`):
+**Werkzeuge** (`S=/home/claude/kernengine.de/koordination`):
 - `$S/why_struct.py`: zeigt jedes Feld einer Klasse ohne Blueprint-Typ mit Grund (Aufruf in FORK_RULES.md).
 - Konverter-Probelauf auf wenigen Dateien (Aufruf in FORK_RULES.md).
 

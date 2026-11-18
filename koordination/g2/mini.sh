@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # mini.sh: the converter on the small program in g2/mini (fast check of a general rule)
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 G=/home/claude/w-g2/kern/games/spawncity
 D=$S/g2/mini; rm -rf $D/tests $D/texts; mkdir -p $D/tests/converted $S/shared-tmp
 cd $D

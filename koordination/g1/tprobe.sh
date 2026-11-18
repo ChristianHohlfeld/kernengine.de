@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # tprobe.sh <tag> <trace-substrings> <src...>: converter probe (<=3 files) with trace of the named Waits, run in kern/games/spawncity of w-g1
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 tag=$1; want=$2; shift 2
 cd /home/claude/w-g1/kern/games/spawncity || exit 1
 D=$S/g1/$tag; rm -rf $D; mkdir -p $D/t/converted $S/shared-tmp

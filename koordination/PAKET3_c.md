@@ -1,4 +1,4 @@
-Paket „c“ (Rückrufe der Engine in das Programm). Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz (alle Nachträge), dann kern/docs/blueprint_cpp.md
+Paket „c“ (Rückrufe der Engine in das Programm). Lies zuerst $S/PAKET_COMMON3.md (S=/home/claude/kernengine.de/koordination) ganz (alle Nachträge), dann kern/docs/blueprint_cpp.md
 ganz und in kern/games/spawncity/BLUEPRINTS.md „Der Weg ab hier“ (Schritt 8: „… Rückrufe der Engine als Events …“). Zweig work-c, Worktree /home/claude/w-c.
 
 Befund (Paket f1): Wo die Engine eine Funktion des Programms ruft, wartet der Konverter, und eine Absenkung gleicher Kosten gibt es nicht:
@@ -25,3 +25,20 @@ Auftrag: die allgemeine Fähigkeit „die Engine ruft eine Funktion eines Bluepr
 3. Konverter: schreibt die Stellen des Spiels damit (klein, lokal, eigene Funktionen). Die Spiel-Quelle bleibt unverändert, außer du brauchst
    eine Absenkung – die gehört dann f1 (city_stream, terrain): melde sie.
 4. Beweis: Engine-Suite und Spiel-Suite auf mag grün; die betroffenen Funktionen geschrieben und im Test verglichen (auch SC_ENGINE=real).
+
+## Nachtrag 17:50 (neuer Koordinator) – Entscheidung E2 zum Entwurf ($S/uebergabe/c.md)
+**Der Entwurf ist bestätigt** – `Callback<R(A…)>` als Wert fester Gestalt (eine zur Übersetzungszeit feste Funktion + höchstens ein gebundener Platz als
+const-Referenz), nur die Engine ruft ihn, er nennt nur eine Funktion, die nichts vom Blueprint braucht; Knoten „Make Callback“, Text `callback<&Lib::fn>(platz)`;
+Klasse: Thunk + `void*` (Kosten wie heute); Interpreter/JIT: Trampolin auf `Runtime::call_static`; Lebensdauer an das Objekt der Engine bzw. den Aufruf gebunden.
+Auflagen:
+1. **Der Beweis muss den Rückruf wirklich vergleichen:** Der Stellvertreter ruft jeden Callback, den ein Knoten bekommt, und **was der Callback gibt, geht in die
+   Aufzeichnung** (und in die gewürfelte Antwort des Knotens) ein – auf allen drei Seiten (Quelltext, Interpreter, Klasse). Nicht nur mit Nullen: mit Eingängen,
+   die der Stellvertreter aus dem Aufruf würfelt, mehrmals. Mit SC_ENGINE=real ruft die Engine selbst.
+2. **Behaltene Rückrufe** (RoadBuilder::begin behält, step() ruft): der Stellvertreter ruft sie auch bei den späteren Knoten desselben Objekts, die laut Tabelle
+   rufen dürfen – sonst wird der behaltene Weg nie verglichen. Die Tabelle sagt je Funktion „behält“/„ruft während des Aufrufs“ aus dem Header, nicht aus einer Liste.
+3. Zu deinen drei Fragen: (1) `register_node` (game.cpp) ist kein Rückrufwert – einverstanden. Es wird **keine** Konverter-Regel, die an NodeDef hängt. Wie ein
+   Programm einen Handler eines Events der Engine erklärt (im Blueprint `KERN_EVENT(onN, event_tick)`), ist eine eigene Frage der Stufe 6 zusammen mit `build_level`
+   (das Level steht in der Level-Datei): dafür kommt ein eigener Entwurf, nicht in Paket c. (2) Jobs als **Teil 2**: die Erklärung `KERN_JOB(kind, &Lib::fn);`
+   einer Bibliothek ist bestätigt – mit dem Nachweis, dass Klasse (Threads/Worker) und Interpreter/JIT (`pump` auf dem Frame-Thread) dieselben Bytes geben und der
+   CI-Job determinism grün bleibt. (3) Reihenfolge: **erst Paket d fertig (Platz der Engine), dann baust du** – engine_api.py hat einen Besitzer zur Zeit.
+Bis d fertig ist, bleibt Paket c angehalten; begin_roads, relay, update, finish_features (city_stream) und Terrain::sampler bleiben unverändert.

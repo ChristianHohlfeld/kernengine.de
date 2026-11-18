@@ -1,4 +1,4 @@
-Paket „k“ (die Kette). Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz, samt Nachtrag 15:40 (mag). Zweig work-k, Worktree /home/claude/w-k.
+Paket „k“ (die Kette). Lies zuerst $S/PAKET_COMMON3.md (S=/home/claude/kernengine.de/koordination) ganz, samt Nachtrag 15:40 (mag). Zweig work-k, Worktree /home/claude/w-k.
 
 Befund (18.11., 16:07, mag mit 56 Threads): Im vollen Lauf wandelt tools/cpp_to_blueprint.py die Einheiten in der Reihenfolge ihrer Aufrufe um
 (main: „the Blueprints, each after those it calls“ – ready/running/done, cut_calls, „call each other: X goes first“, „again“). Die rund 40
@@ -36,3 +36,12 @@ Beweis: zwei volle Läufe desselben Stands mit verschiedener Kernzahl (lauf2.sh 
 setze KERN_JOBS im Auftrag nicht – bitte den Koordinator um eine Auftragsart mit fester Kernzahl, oder rechne den kleinen Lauf hier lokal unter
 flock $S/heavy.lock mit KERN_JOBS=2 nach $S/final.sh) → byteweise gleich; und gegenüber dem Basislauf (mag/ergebnis-work-voll-153849-*,
 sobald fertig) ist keine Funktion verloren (jede dort geschriebene ist geschrieben; mehr dürfen es sein – liste sie). Dauer vorher/nachher.
+
+## Nachtrag 17:50 (neuer Koordinator) – Entscheidung E3
+Die beiden Beweisläufe deines Vorgängers laufen seit 17:28:55 auf mag, beide auf e5f2bf1: `work-k-konvert-165842-30470` (8 Kerne) und
+`work-k-konvert-165847-30555` (40 Kerne); dazu `work-k-probe-162316-2567`. Der Koordinator vergleicht die ersten Commits der beiden Ergebnis-Zweige selbst und gibt
+dir das Ergebnis mit. Vor dem Mergen: (1) origin/work in work-k einmischen (Merge-Commit; work ist 9 Commits weiter), (2) auf dem eingemischten Stand der Beweis
+neu: `konvert` mit 8 und mit 40 Kernen byteweise gleich (Level, tests/converted; convert.log bis auf Runden-/Zeitzeilen), (3) gegen den gültigen vollen Lauf auf
+`work` (der Koordinator nennt dir den Ergebnis-Zweig) ist keine Funktion verloren – was mehr geschrieben ist, listest du; (4) jede Zeile
+„was written and waits now“ ist ein Befund am Inhalt: mit Einheit, Funktion, Grund nach `$S/stand/k.md` unter „BEFUND FÜR <paket der Datei>“; (5) Dauer vorher/nachher.
+Greift die Sicherung (ein Gesamtstand kehrt wieder), ist das ein Befund mit Namen, kein vorgesehener Ausgang. Monotonie wird nicht erzwungen.

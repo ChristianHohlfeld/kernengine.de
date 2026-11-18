@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The engine's objects for the tests of this package (as run_tests.sh builds them: sanitizers on); the lock is taken per batch of files.
 set -u
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 K=/home/claude/w-g1/kern; G=$K/games/spawncity; O=$S/g1/obj
 mkdir -p $O
 batch=$O/batch.sh; n=0

@@ -2,7 +2,7 @@
 # minirun.sh: the converted tests of $S/g1/mini (after miniconv.sh), built without sanitizers and run - the engine's
 # sources they need compiled here (objects kept in mini/eobj), everything under the lock once.
 set -u
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 W=/home/claude/w-g1; kern=$W/kern; game=$kern/games/spawncity; M=$S/g1/mini; B=$M/build; E=$M/eobj
 mkdir -p $B $E
 python3 $game/tools/embed_level.py $M/l.klevel $B/level_data.cpp

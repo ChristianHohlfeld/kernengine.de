@@ -1,6 +1,6 @@
 # Übergabe Paket p (Leistung der exportierten Klasse) – 18.11.2026, ca. 17:20
 
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 Zweig `work-p` (von origin/work 90b5ab8), Worktree `/home/claude/w-p`, letzter Commit `04f1a57` (gepusht).
 Auftrag: $S/PAKET3_p.md, Regeln: $S/PAKET_COMMON3.md (samt Nachträgen 15:40, 16:20, 16:50, 17:10 „sparsam“).
 

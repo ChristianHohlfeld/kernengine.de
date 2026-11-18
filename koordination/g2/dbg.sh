@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # dbg.sh <tag> <src...> : lokaler Konverter-Lauf mit Wait-Positionen (where.py), unter heavy2.lock
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 tag=$1; shift
 D=$S/g2/dbg-$tag; rm -rf $D; mkdir -p $D $S/shared-tmp
 cd /home/claude/w-g2/kern/games/spawncity || exit 1

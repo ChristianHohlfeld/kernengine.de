@@ -1,4 +1,4 @@
-Paket „r“ (rückwirkender Differenztest). Lies zuerst $S/PAKET_COMMON3.md (S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad) ganz, samt Nachtrag 15:40 (mag); dann den Kopf von
+Paket „r“ (rückwirkender Differenztest). Lies zuerst $S/PAKET_COMMON3.md (S=/home/claude/kernengine.de/koordination) ganz, samt Nachtrag 15:40 (mag); dann den Kopf von
 tools/source_diff.py und kern/games/spawncity/tests/lowered/. Zweig work-r, Worktree /home/claude/w-r.
 
 Ziel: Für jede Datei unter kern/games/spawncity/src/, die sich zwischen origin/main und origin/work geändert hat

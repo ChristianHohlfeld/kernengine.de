@@ -6,6 +6,7 @@ in dem sie liegt (Branch `koordination` im Repo), sind **alles**, was die neue S
 der Arbeitsordner der alten Sitzung (Scratchpad, lokale Worktrees, laufende Agenten) ist weg.
 
 **Lies diese Datei ganz. Dann die Dateien, die Abschnitt 13 nennt. Erst dann handle.**
+**Abschnitt 16 (am Ende) schreibt den Stand fort – was dort steht, gilt vor den Abschnitten 5–10 und 15, wo es abweicht.**
 Antworte Chris auf Deutsch. Keine Aufwandsschätzungen in Entwickler-Tagen. Seine E-Mail-Adresse ist privat.
 
 ---
@@ -360,8 +361,11 @@ Nach jedem Schritt: `BLUEPRINTS.md` (Stand-Absatz) nachführen, pushen.
    `/home/claude/kw` (so nennen ihn die Aufträge), Zweig `work`. Fetch-Regeln aus Abschnitt 6 setzen.
 2. `git fetch origin koordination` und den Ordner `koordination/` in das Scratchpad der neuen Sitzung
    kopieren – das ist das neue `S`. In `PAKET_COMMON3.md`, `PAKET3_*.md`, `mag.sh`, `final.sh` den alten
-   Pfad `/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad` durch das neue `S`
-   ersetzen (`grep -rl` + `sed`). Ordner `uebergabe/`, `stand/`, `mag/` dort belassen bzw. anlegen.
+   Pfad von `S` (seit der Sitzung vom Abend des 18.11.: `/home/claude/kernengine.de/koordination`, davor
+   `/tmp/claude-0/-home-claude/87277680-…/scratchpad`) durch das neue `S` ersetzen (`grep -rl` + `sed`).
+   Ordner `uebergabe/`, `stand/`, `mag/` dort belassen bzw. anlegen. **Seit dem Abend des 18.11. ist `S` der
+   Ordner `koordination/` des ausgecheckten Zweigs `koordination` selbst** (Abschnitt 16) – eine neue Sitzung, die
+   das Repo wieder nach `/home/claude/kernengine.de` klont und dort `koordination` auscheckt, muss nichts ersetzen.
 3. Worktree für die Warteschlange: `git -C /home/claude/kw worktree add $S/magjob origin/mag/auftrag` und
    dort `git checkout -B mag/auftrag origin/mag/auftrag` (mag.sh pusht von dort). Test:
    `$S/mag.sh probe origin/work src/settings.cpp src/game.cpp` (ein paar Minuten).
@@ -510,3 +514,52 @@ Datei. Der Lauf endet nur sicher, solange die Umwandlung monoton ist (nicht erzw
 Fassung der Schleife (`fe843e4`: 14 zugleich, Spiegel) greift danach. Viele wartende Proben sind von Agenten,
 die es nicht mehr gibt – ihre Ergebnisse sind trotzdem brauchbar (Zweig `mag/ergebnis-<name>`, Name beginnt mit
 dem Paket-Zweig). CI-Lauf `44341582015` (work `90b5ab8`): determinism und native grün, Rest lief noch.
+
+---
+
+## 16. Fortschreibung – Sitzung `session_012NJs7i46AnXdFpunu1X3k9` (Koordinator ab 18.11.2026, 17:22)
+
+### 16.1 Wie diese Sitzung aufgesetzt ist (ersetzt Abschnitt 11, soweit es abweicht)
+- Klon: `/home/claude/kernengine.de` (vollständig, nicht flach; Fetch-Regeln für `mag/*`, `work-*`, `work`, `koordination` gesetzt), ausgecheckt ist der Zweig
+  **`koordination`** – der Ordner `koordination/` darin **ist `S`** (`/home/claude/kernengine.de/koordination`). Was Agenten nach `$S/stand`, `$S/uebergabe`
+  schreiben, ist damit sofort versionierbar: `git -C /home/claude/kernengine.de add koordination && commit && push origin koordination`.
+  Nicht versioniert (`.git/info/exclude`): `koordination/mag/` (geholte mag-Protokolle), `magjob/`, `final/`, `shared-tmp/`, `*.lock`.
+- `/home/claude/kw`: Worktree auf `work` (nur der Koordinator). `$S/magjob`: Worktree auf `mag/auftrag` (mag.sh pusht von dort).
+  Agenten: `/home/claude/w-<paket>` auf `work-<paket>` (PAKET_COMMON3.md, „Nachtrag 17:45 – NEUE SITZUNG“ – dort steht alles, was ein Agent dieser Sitzung wissen muss).
+- `mag.sh` ist neu gefasst: holt das Ergebnis unter seinem eigenen Namen (die alte Fassung las `FETCH_HEAD` – bei mehreren Aufrufen zugleich konnte ein Agent das
+  Ergebnis eines anderen bekommen), legt mit Wiederholung ab, kennt `MAG_NOWAIT=1`, `holen <name>`, `warten <name> [min]`, `stand`.
+  Ein Vordergrund-Befehl der Sitzung endet nach 10 Minuten – darum `warten` in Stücken.
+- Der Git-Zugang der Sitzung lässt nur 2 Übertragungen zugleich zu (HTTP 429 → warten, wiederholen).
+- Agenten haben in dieser Sitzung **keinen Rückkanal** während der Arbeit: sie schreiben nach `$S/stand/<paket>.md` und enden mit Frage/„BEREIT ZUM MERGEN“/Bericht;
+  der Koordinator setzt sie mit der Antwort fort.
+
+### 16.2 Schritt 1 – Bestandsaufnahme (Stand 18.11., 17:35)
+- **CI-Lauf 44341582015** (`work` 90b5ab8): determinism, build, native, input **grün**; native-spawncity **rot** (erwartet: Level/Tests von f8); e2e lief um 17:32 noch.
+- **mag:** die Schleife mit 14 Plätzen und Spiegel greift seit **17:25:38** (zehn Starts in sieben Sekunden). Manche Aufträge zeigen ihren Ergebnis-Zweig erst am Ende
+  (der Push beim Start geht bei vielen gleichzeitigen Starts teils verloren) – „kein Zweig“ heißt nicht „läuft nicht“.
+- **Der volle Lauf `work-voll-162644-5528` war um 17:35 noch nicht gestartet** (er steht alphabetisch am Ende der Schlange; vor ihm starteten u. a. die zwei
+  `konvert`-Läufe von k um 17:28:55, die Suiten von s5 um 17:30/17:31). Er rechnet `origin/work` zum Zeitpunkt seines Starts – **bis er gestartet ist, wird nichts
+  auf `work` gepusht**, damit sein Ergebnis auf dem heutigen `work` (90b5ab8) steht und per cherry-pick übernommen werden darf.
+- Aus der Schlange genommen (Commit 3595a93 auf `mag/auftrag`): fünf Proben von work-t1 (vor dem Leser-Fix, laut t1 überholt) und die Zeitmessung work-k-zeit.
+- **Befund F1 – die Engine-Suite ist auf dem Stand von `work` auf mag ROT** (drei Läufe auf 30f63e4, Baum identisch mit 90b5ab8: `work-d-engine-154346-16923`,
+  `-161602-25272`, `-163138-9400`, je `engine rc=1`): 54.323 Checks der Unit-Tests ohne Fehler, dann `blueprint_native_test`: „Engine on the engine itself, the
+  class calling the engine itself: after Free1: R129=[1, 0, 0, 0, 2, 0, …] (16 Einträge) – through the door: R129=[0, 0, 0, 0]“. In CI galt R129
+  (jobs_take_queued) als nicht wiederholbar und wurde nicht verglichen (darum dort grün). **Paket d, Teil 1, ist damit nicht bewiesen** – Auftrag an d: PAKET3_d.md,
+  Nachtrag 17:50 (zuerst das). Zum Vergleich: `work-f1-engine-153945-13867` auf 0b58333 (vor Paket d) ist grün (54.370 Checks, native Stufe ok, 32m47).
+- **Spiel-Suite auf dem Stand von `work`** (`work-d-spiel-154354-17035`, rc=1, 21 min): bricht wie erwartet im Vergleich `converted_car` ab (`Car_new` – Level von f8
+  gegen heutige Quelle); bis dahin 7 `cost:`-Zeilen (Firmware `*_reset`/`*_new`, `CarSpec_car`). Sagt über den heutigen Konverter nichts.
+- `work-f1-spiel-153945-13864` (rc=123, auf 0b58333, also die alten, nie übersetzten Differenztests): übersetzt nicht (`source_diff.h`: „a value the test cannot
+  compare/carry/draw“, city_stream/interiors: `Tile`, `LifeArt`) – wie in f1s Übergabe beschrieben; gilt nicht für 3903052.
+
+### 16.3 Entscheidungen des neuen Koordinators (18.11., 17:50) – bindend, bis Chris anders entscheidet
+- **E1 (Paket p):** PAKET3_p.md, Nachtrag 17:50. Kern: Die Klasse bleibt Wort für Wort `to_cpp` (ein C++ je Blueprint, kein zweiter Erzeuger). Die Bedeutung
+  bleibt (64 Bit, `Int` wie `normal`/`whole`). Ohne Rückfrage: `math_compare` zur Übersetzungszeit, `kern::to<Int>` eingebettet, der geprüfte ganzzahlige Weg
+  **in der Umsetzung der Formel-Funktionen** (Text unverändert, Ränder im Engine-Test bewiesen), Straffungen ohne Bedeutungsänderung. Jede Änderung der
+  **Schreibweise** (z. B. Formel mit ganzzahligen Ein-/Ausgängen, am Graphen bewiesener Index) nur nach Entwurf – das wäre ein Baustein der Sprache (Antwort a).
+  Zuerst das Messwerkzeug und die vollständige Ursachenliste (bisher nur qr encode).
+- **E2 (Paket c):** PAKET3_c.md, Nachtrag 17:50. Entwurf `Callback<R(A…)>` **bestätigt** mit zwei Auflagen (der Stellvertreter vergleicht, was der Rückruf gibt –
+  mit gewürfelten Eingängen, auch für behaltene Rückrufe). `register_node`: kein Rückruf, **keine** NodeDef-Regel im Konverter – eigener Entwurf „Events des
+  Programms“ zusammen mit `build_level` (Stufe 6). Jobs (`KERN_JOB(kind, &Lib::fn);`) als Teil 2 bestätigt, mit Determinismus-Nachweis. Gebaut wird **nach** Paket d.
+- **E3 (Paket k):** PAKET3_k.md, Nachtrag 17:50. Der Koordinator vergleicht die zwei laufenden `konvert`-Ergebnisse selbst; vor dem Mergen origin/work einmischen
+  und den Beweis auf dem eingemischten Stand wiederholen, gegen den gültigen vollen Lauf „nichts verloren“.
+- **Start der Agenten (Schritt 2):** siehe 16.4 – wer gestartet ist und wer bewusst noch nicht.

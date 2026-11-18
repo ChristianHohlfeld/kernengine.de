@@ -1,7 +1,7 @@
 # Gemeinsam für die Pakete der Runde „Alles“ (18.11.2026)
 
 Chris (18.11., 13:42): „All. WE need all.“ – vollständige Konvertierung und Prüfung, kein „wartet“.
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 
 Lies zuerst, ganz: $S/ANSATZ.md, dann in kern/games/spawncity/BLUEPRINTS.md den Abschnitt „Der Weg ab hier“
 mit **„Kursprüfung 18.11.2026“** (bindend), $S/FORK_RULES.md. Dann dein Paket.
@@ -24,11 +24,10 @@ mit **„Kursprüfung 18.11.2026“** (bindend), $S/FORK_RULES.md. Dann dein Pak
    Gewalt/Passanten: nicht ändern.
 
 ## Arbeitsweise
-- Worktree: `git -C /home/claude/kw fetch -q origin && git -C /home/claude/kw worktree add /home/claude/w-<paket> -b work-<paket> origin/work`.
+- Worktree: siehe „Nachtrag 17:45 – NEUE SITZUNG“, Punkt 1 (der Zweig work-<paket> besteht; früher: `worktree add … -b work-<paket> origin/work`).
   Nur auf deinen Zweig pushen (nie main/work, kein Force-Push). Kleine Commits, jeden fertigen Teil pushen.
   Commit-Nachrichten deutsch, am Ende:
-    Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>
-    Claude-Session: https://claude.ai/code/session_01K2YidUPFTJShcS1fG6cZzJ
+    (siehe „Nachtrag 17:45“, Punkt 6)
 - Stand der Liste: $S/final/f9/convert.log (Schlusslauf f9 auf work 5dcd9eb, 18.11.): je Einheit jede Funktion
   mit „written“ oder ihrem Grund. $S/f9_roots.txt: die Grundursachen. Dein Paket nennt deine Funktionen.
   Folgefehler („it calls X, which waits“, „… is not written“) verschwinden mit ihrer Ursache – prüfe am Ende
@@ -74,3 +73,48 @@ Liste in einer Liste, dem eine ganze Liste zugewiesen wird) und 3b355c4 (Leser: 
   Arbeit / wartet worauf). Eine Nachricht an main nur noch für: (a) eine Entscheidung, die du brauchst, (b) „bereit zum Mergen“ mit Beweis,
   (c) einen Befund, der andere Pakete betrifft. Kein Zwischenbericht sonst.
 - An der Strenge wird nichts gespart: jeder Beweis bleibt (bitgleich, Differenztest, Suiten) – er wird von mag gerechnet, nicht von dir begründet.
+
+## Nachtrag 17:45 – NEUE SITZUNG (gilt vor allem Früheren, wo es sich widerspricht)
+Die Sitzung, in der die Nachträge oben geschrieben wurden, ist beendet; ihr Arbeitsordner, ihre Worktrees und ihre laufenden Agenten sind weg.
+Du bist der **Nachfolger** auf deinem Paket in einer neuen Sitzung. Was bleibt: GitHub (dein Zweig `work-<paket>`), dieser Ordner `$S`
+(= /home/claude/kernengine.de/koordination, der Ordner `koordination/` des Zweigs `koordination`) und die Übergabe deines Vorgängers `$S/uebergabe/<paket>.md`.
+1. **Worktree neu anlegen** (der Zweig besteht – NICHT von origin/work neu abzweigen):
+   `git -C /home/claude/kw fetch -q origin; git -C /home/claude/kw worktree add /home/claude/w-<paket> -B work-<paket> origin/work-<paket>`
+   Arbeite nur dort. /home/claude/kw (Zweig work, Koordinator) und /home/claude/kernengine.de änderst du nicht. Der Klon ist vollständig (kein flacher Klon).
+2. **Lies zuerst, ganz:** `$S/ANSATZ.md`, diese Datei, `$S/PAKET3_<paket>.md` (samt Nachträgen), `$S/uebergabe/<paket>.md`,
+   `git -C /home/claude/w-<paket> log --stat origin/work..HEAD` (jede Nachricht ganz), in BLUEPRINTS.md „Der Weg ab hier“ samt „Kursprüfung 18.11.2026“.
+   Was der Vorgänger gelöst hat, löst du nicht noch einmal; was er „unbewiesen“ nennt, prüfst du, bevor du darauf baust.
+3. **Pfade des Vorgängers:** `$S/mag/<name>/` (alte mag-Ergebnisse) und seine Hilfsordner `$S/<paket>/…` gibt es nur noch, soweit sie in `$S` liegen
+   (g1, g2, k, p, r, s5, pilot). Jedes frühere mag-Ergebnis holst du neu: `$S/mag.sh holen <name>` (der Name steht in der Übergabe; `$S/mag.sh stand` listet alle).
+   `$S/final/f9/convert.log` ist wieder da (aus f9_convert.log.xz).
+4. **mag (Proben und Suiten rechnet mag, nicht diese Maschine – hier 2 Kerne für alle):**
+   - ablegen und warten in einem Zug nur, wenn es < 9 Minuten dauert (ein Vordergrund-Befehl endet nach 10 Minuten). Sonst:
+     `MAG_NOWAIT=1 $S/mag.sh probe origin/work-<paket> src/a.cpp …` → gibt den Namen; dann `$S/mag.sh warten <name>` (wartet bis 9 Minuten; „läuft noch“ → noch einmal),
+     oder zwischendurch weiterarbeiten und später `$S/mag.sh holen <name>`. Kein eigenes Schleifen-Abfragen mit git.
+   - Arten: `probe <ref> <quellen…>` (Minuten; mit allen game*.cpp oder allen Quelltexten bis ~1 h), `spiel <ref> [filter]` (~20 min), `engine <ref> [filter]` (~35 min),
+     `konvert <ref> <kerne>` und `voll <ref>` nur nach Absprache mit dem Koordinator (je ~1 h+, mag ist voll).
+   - mag rechnet den Stand des Zweigs **zum Zeitpunkt des Starts** des Auftrags, nicht des Ablegens: erst pushen, dann ablegen; `mag-log/when` nennt den Commit.
+   - Bündeln: eine Probe je Hypothese, mehrere Korrekturen in einer Probe. Lokal nur Syntax je Datei (`-fsyntax-only`) und Kleinstfälle; lokale Konverter-Proben
+     (≤3 Quelltexte, KERN_JOBS=1, `flock $S/heavy2.lock` bzw. `heavy3.lock`) nur, wenn mag nichts annimmt.
+5. **Git-Zugang der Sitzung:** höchstens 2 Übertragungen zugleich für alle Agenten zusammen. Scheitert fetch/push mit HTTP 429 („too many concurrent transfers“),
+   mit „cannot lock ref“ oder „index.lock“: 5–10 s warten, wiederholen (bis zu sechsmal) – nie umgehen, nie aufgeben. Pushen: `git push -u origin work-<paket>`
+   (nie main, nie work, kein Force-Push). Vor einem Merge von origin/work in deinen Zweig: `git fetch origin`; Merge-Commit, kein Rebase.
+6. **Commit-Ende:** die Attributionszeilen, die deine eigene Sitzung dir vorgibt; gibt sie dir keine vor:
+   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>` und `Claude-Session: https://claude.ai/code/session_012NJs7i46AnXdFpunu1X3k9`.
+7. **Stand und Meldungen:** Schreibe deinen Stand laufend nach `$S/stand/<paket>.md` (kurz: fertig+bewiesen mit Beweis / in Arbeit / wartet worauf) und halte
+   `$S/uebergabe/<paket>.md` so aktuell, dass ein Nachfolger jederzeit übernehmen kann (Erkenntnisse über Ursachen ausschreiben). Der Koordinator liest beides.
+   Du hast keinen Rückkanal während der Arbeit: **Brauchst du eine Entscheidung**, die über dein Paket hinausgeht, oder scheiterst du zweimal am selben Grund –
+   bring den Stand in einen übersetzbaren Zustand, pushe, schreibe die Frage mit allem, was der Koordinator zum Entscheiden braucht, nach `$S/stand/<paket>.md`
+   unter „ENTSCHEIDUNG NÖTIG“ und beende deinen Lauf mit genau dieser Frage als Bericht. Der Koordinator setzt dich mit der Antwort fort (dein Kontext bleibt).
+   Arbeite aber vorher alles ab, was die Frage nicht berührt. Ebenso endest du mit „BEREIT ZUM MERGEN“ (mit Beweis: mag-Auftrag/CI, Zahlen) oder mit dem Bericht laut
+   „Arbeitsweise“. Befunde für andere Pakete: in `$S/stand/<paket>.md` unter „BEFUND FÜR <paket>“ und im Bericht.
+8. **Spawne keine weiteren Agenten.** Antworte und berichte auf Deutsch, knapp. „Sparsam arbeiten“ (Nachtrag 17:10) gilt weiter; an der Strenge wird nichts gespart.
+9. **Bekannt bei Sitzungsbeginn (18.11., 17:30):**
+   - Seit dem 14.11. gibt es keinen gültigen vollen Lauf; Level und tests/converted auf `work` sind von f8 und passen nicht zu den Quellen – darum ist die
+     Spiel-Suite auf `work` rot (bricht bei converted_car ab; mag `work-d-spiel-154354-17035`). Der volle Lauf auf `work` (90b5ab8) ist auf mag eingereiht
+     (`work-voll-162644-5528`); der Koordinator bringt sein Ergebnis nach `work` und sagt Bescheid. `work-voll-153849-12713` ist ein abgebrochener Lauf (nie verwenden).
+   - **Die Engine-Suite ist auf dem Stand von `work` (90b5ab8 = 30f63e4) auf mag ROT** (dreimal gleich): `blueprint_native_test`, Fall „Engine on the engine itself“,
+     R129 (jobs_take_queued) – Klasse `[1,0,0,0,2,0,…]` (16 Einträge), durch die Tür `[0,0,0,0]`. In CI galt R129 als „nicht zweimal gleich durch die Tür“ und wurde
+     nicht verglichen; auf mag (56 Threads) ist die Tür wiederholbar und die Klasse weicht ab. Paket d behebt das als Erstes. Bis dahin: eine Engine-Suite deines
+     Zweigs, die NUR daran scheitert, ist für dein Paket kein Fehler – nenne es im Bericht so; jede andere Abweichung ist deine.
+   - „Geschrieben und verglichen“ in einer Probe heißt nur: der Test übersetzt. Bit für Bit geprüft wird in der Spiel-Suite (`spiel`).

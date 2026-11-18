@@ -4,7 +4,7 @@ Auftrag von Chris: „Nimm mehr Agenten, mach es heute fertig. Egal wie, ohne Ko
 Shortcuts, keine Hacks." / „alles fertig schreiben, ohne jedes Mal zu testen … Tests am Ende, wenn
 alles fertig ist" / „Fortschritt immer pushen regelmäßig".
 
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 
 ## Wo du arbeitest
 - Nur in deinem eigenen Worktree `/home/claude/w-<paket>`. Lege ihn als Erstes an:
@@ -16,7 +16,7 @@ S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
 - Kleine Commits, **nach jedem sinnvollen Teil pushen**: `git push -u origin work-<paket>`.
   Nie auf main oder work pushen, kein Force-Push. Jede Commit-Nachricht endet mit
   `Co-Authored-By: Claude Fable 5.2 <noreply@anthropic.com>` und
-  `Claude-Session: https://claude.ai/code/session_01K2YidUPFTJShcS1fG6cZzJ`.
+  `Claude-Session: https://claude.ai/code/session_012NJs7i46AnXdFpunu1X3k9`.
 - Eigene Hilfsdateien nur unter `$S/<paket>/`.
 
 ## Schreibphase: keine Prüfläufe

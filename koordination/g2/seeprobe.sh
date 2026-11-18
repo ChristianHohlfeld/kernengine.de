@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # seeprobe.sh <tag> <src files...>: the diagnosis (see.py) on these sources, under the lock
-S=/tmp/claude-0/-home-claude/87277680-b1fd-5493-af97-2573ffd436c2/scratchpad
+S=/home/claude/kernengine.de/koordination
 tag=$1; shift
 D=$S/g2/see-$tag; rm -rf $D; mkdir -p $D/t/converted $S/shared-tmp
 cd /home/claude/w-g2/kern/games/spawncity
