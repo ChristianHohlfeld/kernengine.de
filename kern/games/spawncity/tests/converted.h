@@ -28,6 +28,7 @@
 #include <initializer_list>
 #include <list>
 #include <map>
+#include <functional>
 #include <memory>
 #include <new>
 #include <optional>
@@ -525,7 +526,14 @@ template <class T> T* engine_object(long long handle) {
 /// itself (SC_ENGINE=real: sc::real_engine), the source's objects of the engine in that call.
 inline kern::logic::EngineStandIn g_source_engine;
 inline kern::logic::EngineObjects g_source_objects;
+/// (the places of the engine the source holds: set back before every call of the engine, read again after it - below)
+inline void places_set();
+inline void places_get();
 inline std::vector<Value> engine_call(const char* function, const std::vector<Value>& in) {
+  places_set();
+  struct Again {
+    ~Again() { places_get(); }
+  } again;
   std::vector<Value> out;
   if (const kern::logic::EngineFunction* f = kern::logic::engine_function(function))
     for (const kern::logic::EnginePin& p : f->outputs) out.push_back(Value::zero(p.type));
@@ -1148,6 +1156,57 @@ inline void class_runs(bool begins) {
 /// own helpers).
 template <class T> Value value_of(const T& x) { return arg(x); }
 
+/// A place of the engine the source holds (`std::vector<ShotEvent>& shots() { return shots_; }`: kern/docs/blueprint_cpp.md,
+/// "Plätze der Engine"). The stand-in of the source's engine object gives a reference to a copy the test keeps: read
+/// from the engine ("<function>@get") when the source calls the function, set back ("<function>@set") before each
+/// further call of the engine and when the source's function returns (places_close), read again after each call - so
+/// the engine sees what the source wrote where the Blueprint, which sets the place with every change, has written it.
+/// Neither is a call of the source (the stand-in and test_engine do not write them down); only the function is.
+struct OpenPlace {
+  std::function<void()> get, set;
+};
+inline std::vector<OpenPlace> g_places;
+inline bool g_places_busy = false;   // (while they are read or set: no other place is)
+inline void places_set() {
+  if (g_places_busy) return;
+  g_places_busy = true;
+  for (OpenPlace& p : g_places) p.set();
+  g_places_busy = false;
+}
+inline void places_get() {
+  if (g_places_busy) return;
+  g_places_busy = true;
+  for (OpenPlace& p : g_places) p.get();
+  g_places_busy = false;
+}
+/// The source's function returned: its places are set back, and it holds none.
+inline void places_close() {
+  places_set();
+  g_places.clear();
+}
+template <class T, class Shape> T& engine_place(const char* function, const std::vector<Value>& in) {
+  (void)engine_call(function, in);
+  const auto kept = std::make_shared<T>(quiet<T>());
+  const std::string get = std::string(function) + "@get", set = std::string(function) + "@set";
+  const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
+  const kern::logic::TypeRef type{f ? f->outputs[0].type : kern::logic::PinType::exec, f && f->outputs[0].of ? f->outputs[0].of : ""};
+  OpenPlace p;
+  p.get = [kept, get, in, type] {
+    std::vector<Value> out{Value::zero(type.type)};
+    if (test_engine(g_source_engine, g_source_objects, get, in, out)) take_as<Shape>(*kept, out[0]);
+  };
+  p.set = [kept, set, in] {
+    std::vector<Value> with = in, none;
+    with.push_back(value_of(*kept));
+    test_engine(g_source_engine, g_source_objects, set, with, none);
+  };
+  g_places_busy = true;
+  p.get();
+  g_places_busy = false;
+  g_places.push_back(std::move(p));
+  return *kept;
+}
+
 /// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
 /// entry for entry.)
 inline bool same_value(const Value& a, const Value& b) {
@@ -1730,6 +1789,7 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
+    g_places.clear();
     if (real_engine()) fresh_engine(g_source_objects);
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }

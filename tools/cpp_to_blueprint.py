@@ -2889,6 +2889,7 @@ class Emit:
         self.scopes = []      # per block being written: the objects of the engine made in it, (local, class) - released where it ends
         self.types = {}       # decl id -> its Blueprint type
         self.locals = []      # (name, type): declared at the top of the body
+        self.bound = set()    # the nodes of the engine that bind a place of the engine (n12): a place starts at their output
         self.lengths = {}     # the local variables that are lists of a fixed length (name -> length)
         self.taken = set()
         self.index = {}       # decl id of a loop's counter -> "n12.index"
@@ -4260,6 +4261,14 @@ class Emit:
                         out += self.take_pre()
                     continue
                 raw = qtype(v)
+                if "&" in raw and not re.search(r"\bconst\b", raw) and kids(v) and v.get("init"):
+                    # (auto& r = world_->shots(); - a place of the engine, bound once: r names it)
+                    held = self.unwrap(kids(v)[-1])
+                    bound = self.engine_place(held) if held.get("kind") == "CXXMemberCallExpr" else None
+                    if bound is not None:
+                        self.names[v["id"]], self.types[v["id"]] = bound
+                        out += self.take_pre()
+                        continue
                 if ("&" in raw and not re.search(r"\bconst\b", raw) and not self.u.object_of(raw)) or self.u.clean(raw) == "std::_Bit_reference":
                     raise Wait("a reference to something it changes")
                 wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
@@ -6031,10 +6040,12 @@ class Emit:
             return self.ex(b, bt)
         raise Wait("data handed to the engine in another shape")
 
-    def engine(self, d, obj, args):
+    def engine(self, d, obj, args, as_place=False):
         """A call of a function of the engine: its node. Every call is a step of its own before the statement
         it stands in - it runs once, where C++ calls it. Gives (the steps, the text and the type of what the
-        call returns - or None, None)."""
+        call returns - or None, None). A function that gives a place of the engine (EngineFunction::place,
+        kern/docs/blueprint_cpp.md "Plätze der Engine") binds it: `as_place` - the text is the place (n12.result),
+        else what is there now, read."""
         u = self.u
         try:
             f = u.api().function(d)
@@ -6113,6 +6124,15 @@ class Emit:
             return first + [f"{fn}({', '.join(texts)});"], None, None
         node = u.next_node
         u.next_node += 1
+        if f.get("place"):
+            (o, bt, _), = outs
+            u.members.append(f"  struct {{ {fn}_place<{bt}> {o} = {{}}; }} n{node};")
+            self.bound.add(f"n{node}")
+            lines = first + [f"{fn}({', '.join([f'n{node}'] + texts)});"]
+            if as_place:
+                return lines, f"n{node}.{o}", bt
+            tmp = self.temp(d["name"], bt)
+            return lines + [f"{tmp} = n{node}.{o};"], tmp, bt
         u.members.append("  struct { " + " ".join(f"{bt} {o} = {u.zero(bt)};" for o, bt, _ in outs) + f" }} n{node};")
         lines, got = first + [f"{fn}({', '.join([f'n{node}'] + texts)});"], (None, None)
         for o, bt, _ in outs:
@@ -7375,13 +7395,13 @@ class Emit:
     def is_local(self, name):
         """Is this a name a place can start at in the function being written: one of its variables or one of
         its inputs (not what a node gives)?"""
-        return any(name == n for n, _ in self.locals) or any(name == n for n, _ in self.f.params) or (self.f.state and self.u.is_state_variable(name))
+        return name in self.bound or any(name == n for n, _ in self.locals) or any(name == n for n, _ in self.f.params) or (self.f.state and self.u.is_state_variable(name))
 
     def writable(self, place):
         """Can this place be changed: does it start at a variable of the function or at a reference input
         that is not const? (An input by value and a const reference are read.)"""
         root = re.match(r"\w+", place).group(0)
-        return (any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
+        return (root in self.bound or any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
                 or (self.f.state and self.u.is_state_variable(root)))   # (a variable of the Blueprint: C++ said whether the method may change it)
 
     def place_arg(self, n, t, kind, after, fixed=None, raising=False):
@@ -7521,9 +7541,36 @@ class Emit:
             return got[0] + ".items", self.u.rows[got[1]]
         return got
 
+    def engine_place(self, b):
+        """`world_->shots()` where a place is named (push_back on it, an entry of it set): the node binds the place
+        before the statement, once - (its text n12.result, its type) -, or None where the call gives no place of
+        the engine."""
+        if b.get("kind") != "CXXMemberCallExpr" or not kids(b) or kids(b)[0].get("kind") != "MemberExpr":
+            return None
+        m = kids(b)[0]
+        d = self.engine_decl(m.get("referencedMemberDecl"))
+        if d is None:
+            return None
+        try:
+            f = self.u.api().function(d)
+        except Wait:
+            return None
+        if not f.get("place"):
+            return None
+        cached = b.get("_bound")
+        if cached is not None and cached[0] is self.writing and cached[1] == self.serial:
+            return cached[2]
+        lines, text, bt = self.engine(d, kids(m)[0] if kids(m) else None, [x for x in kids(b)[1:]], as_place=True)
+        self.hoist(lines)
+        b["_bound"] = (self.writing, self.serial, (text, bt))
+        return text, bt
+
     def spot_held(self, n):
         b = self.unwrap(n)
         k = b.get("kind")
+        bound = self.engine_place(b)
+        if bound is not None:
+            return bound
         if k == "CXXConstructExpr" and re.match(r"(?:kern::)?Span<", self.ctype(b)):
             # (a view of a whole list - kern::Span made of it - is that list: its place)
             a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
@@ -10979,6 +11026,12 @@ class TestWriter:
         ret = "void" if ret_raw == "void" else self.spell(ret_raw)
         if ret_raw != "void" and not self.u.object_of(ret_raw):
             self.result_ok(ret_raw)
+        if f.get("place"):
+            # (a place of the engine: a reference to what the test keeps of it - converted::engine_place)
+            held = re.sub(r"\s*&$", "", ret)
+            const = " const" if cls and qtype(d).rstrip().endswith("const") else ""
+            return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
+                    f'inline {ret} {cls + "::" if cls else ""}{d["name"]}({", ".join(a for a, _ in params)}){const} {{ return converted::engine_place<{held}, {shape(held)}>("{f["type"]}", {{{", ".join(values)}}}); }}')
         # (its own names begin with kern_: a parameter may be called `out` or `result` - hull_mesh's)
         body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
         k = 0
@@ -12442,6 +12495,7 @@ class TestWriter:
                 "      bp.before_source();   // (the Blueprints of the actors it calls, as they started)",
                 # (what the source gave, kept: as the Blueprint holds it, a view of it may be what is compared)
                 f"      const auto made = run({', '.join(f'std::move({n})' if n in moved else n for n in names)});",
+                *(["      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)"] if any(f.get("place") for f in u.engine_calls.values()) else []),
                 f"      const auto& want = {self.wrap('made', want_type)};" if self.wrap('made', want_type) != 'made' else "      const auto& want = made;",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
