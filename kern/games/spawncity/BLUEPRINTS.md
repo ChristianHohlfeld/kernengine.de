@@ -526,6 +526,27 @@ der Konverter um die Ersatzform kürzer, alles wird neu gewandelt, verglichen un
 Was unten zu `Whole64`, zu „Maps und Sets sind Listen“ und zu Methoden auf einem Objekt steht,
 beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 
+**Kursprüfung 18.11.2026.** Der Weg oben gilt unverändert; geprüft gegen den ganzen Verlauf (313
+Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
+
+1. **Die Zahlen der Sprache bleiben 64 Bit** (Stufe 3, „Entschieden“). Ein zweiter Zahlentyp in
+   32 Bit, am 15.11. erwogen, wird nicht gebaut: Das Maß ist spawncity.de, das in 64 Bit rechnet,
+   nicht der C++-Port dazwischen. Der Vergleichstest bindet den Blueprint an den Quelltext in den
+   Zahlen der Sprache; beim Umschalten (Stufe 5) rechnet die Datei, was das Original rechnet.
+2. **Antwort (b) – Umschreiben in den Teilsatz („Absenkung“) – braucht den Beweis, nicht die
+   Begründung.** `tools/source_diff.py` hält die Datei, wie sie vor dem Umschreiben stand, und wie
+   sie jetzt steht, in einem Test (`tests/lowered/`), ruft jedes Paar von Funktionen mit demselben
+   gewürfelten Zustand und vergleicht Bit für Bit – Rückgabe, jeden Parameter, das Objekt, den
+   Zustand der Datei – und zählt, dass die neue Fassung nie öfter Speicher anfordert. Das gilt für
+   jede Umschreibung, auch rückwirkend für die seit `main` (zuerst bewiesen: `settings`,
+   `city_jobs`, 32 Paare). Eine Umschreibung ohne diesen Test wird nicht gemergt.
+3. **Eine Datei, ein Auftrag.** Zwei Pakete haben dieselben Stellen zweimal verschieden
+   umgeschrieben (`settings`, `update_scores`, `toss_`). Aufträge werden nach Dateien des Spiels
+   geschnitten, nicht nach Gründen des Konverters; der Konverter bekommt nur, was allgemein ist.
+
+Der Vergleich gegen die Engine selbst (nicht nur gegen ihren Stellvertreter) läuft seit 15.11. im
+Test mit (`SC_ENGINE=real`).
+
 **Stand 14.11.2026, 23:35 (Schlusslauf auf `work`).** 1.360 von 1.817 Funktionen des Programms
 (11.947 von 30.758 Zeilen) stehen als Blueprints im Level – 155 Blueprints (70 von Quelldateien,
 `Game` als ein Zustand, 84 von Headern und Formen); 1.316 Funktionen vergleicht der Test Bit für Bit
