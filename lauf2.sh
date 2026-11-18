@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# SpawnCity auf mag, gesteuert über GitHub (Branch mag/auftrag) – Fassung 2: eine Warteschlange.
+#   starten:  touch ~/spawncity-auftrag/STOP; sleep 90; rm ~/spawncity-auftrag/STOP
+#             nohup bash ~/spawncity-auftrag/lauf2.sh > ~/spawncity-auftrag2.log 2>&1 &
+#   beenden:  touch ~/spawncity-auftrag/STOP
+# Jede Datei jobs/<name> ist ein Auftrag, erste Zeile:
+#   voll <git-ref>                      Konvertierung des ganzen Spiels, Spiel-Suite, Engine-Suite
+#   probe <git-ref> <quelle> [...]      Konverter nur über diese Quelltexte (relativ zu kern/games/spawncity)
+#   engine <git-ref> [filter]           nur die Engine-Suite
+#   spiel <git-ref> [filter]            nur die Spiel-Suite (ohne neue Konvertierung)
+# Ergebnis: Branch mag/ergebnis-<name> (bei "voll": Commit 1 = Level und Tests, Commit 2 = Protokolle in mag-log/;
+# sonst nur die Protokolle). Beim Start jedes Auftrags erscheint mag/ergebnis-<name> schon mit mag-log/when.
+# Bis zu $SLOTS Aufträge laufen zugleich (ein "voll" allein mit allen Kernen). Pusht nie auf main/work, erzwingt
+# nichts, installiert nichts; jeder Auftrag rechnet in ~/spawncity-jobs/<name> und räumt den Ordner danach weg.
+# Die Schleife ersetzt sich selbst, wenn diese Datei auf dem Branch neuer ist.
+set -u
+A="$(cd "$(dirname "$0")" && pwd)"; J=~/spawncity-jobs; REPO=https://github.com/ChristianHohlfeld/kernengine.de
+N="$(nproc)"; SLOTS="${SLOTS:-6}"; mkdir -p "$J" "$A/.done"
+me="$(sha256sum "$0" | cut -c1-16)"
+G="git -c user.name=mag -c user.email=mag@localhost"
+run_job() {  # name
+  local name="$1" kind ref rest W jobs
+  read -r kind ref rest < "$A/jobs/$name"
+  W="$J/$name"; rm -rf "$W"
+  git clone -q "$REPO" "$W" 2>/dev/null && cd "$W" && git checkout -q --detach "$ref" 2>/dev/null || { echo "$name: Stand $ref nicht gefunden"; return; }
+  local SHA; SHA="$(git rev-parse --short HEAD)"
+  jobs="$N"; [ "$kind" = voll ] || jobs=$(( N / SLOTS ))
+  export KERN_JOBS="$jobs" TMPDIR="$W/tmp" SC_TEST_OUT="$W/tmp/sc-tests"; mkdir -p "$TMPDIR" mag-log
+  echo "$name: $kind auf $SHA ($ref), $jobs Kerne, Start $(date '+%F %T')" > mag-log/when
+  git checkout -q -B "mag/ergebnis-$name"; git add -f mag-log; $G commit -q -m "mag: $name gestartet ($kind auf $SHA)"; git push -q origin "mag/ergebnis-$name" 2>/dev/null
+  local conv="python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract -I../../include -I../../third_party/box3d/include -Isrc"
+  case "$kind" in
+    voll)
+      ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted -- \
+          $(cd kern/games/spawncity 2>/dev/null; ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
+      echo "convert rc=$? $(date '+%T')" >> mag-log/when
+      ( time kern/games/spawncity/tests/run_tests.sh ) > mag-log/suite.log 2>&1; echo "suite rc=$? $(date '+%T')" >> mag-log/when
+      ( time kern/tests/run.sh ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" >> mag-log/when
+      git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
+      $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints" || true ;;
+    probe)
+      ( cd kern/games/spawncity && mkdir -p "$W/probe-test" && time FUNCTIONS=1 $conv --test "$W/probe-test" --texts "$W/mag-log/texts" -- $rest ) > mag-log/convert.log 2>&1
+      echo "convert rc=$? $(date '+%T')" >> mag-log/when ;;
+    engine) ( time kern/tests/run.sh $rest ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" >> mag-log/when ;;
+    spiel)  ( time kern/games/spawncity/tests/run_tests.sh $rest ) > mag-log/suite.log 2>&1; echo "suite rc=$? $(date '+%T')" >> mag-log/when ;;
+    *) echo "unbekannte Art $kind" >> mag-log/when ;;
+  esac
+  for f in mag-log/*.log; do [ -f "$f" ] && tail -80 "$f" > "${f%.log}.tail.txt"; done
+  xz -9 -T0 mag-log/*.log 2>/dev/null; git add -f mag-log
+  $G commit -q -m "mag: Protokolle von $name auf $SHA"; git push -q origin "mag/ergebnis-$name" || echo "$name: Push fehlgeschlagen"
+  cd "$A"; rm -rf "$W"; echo "$(date '+%F %T') $name fertig"
+}
+while [ ! -e "$A/STOP" ]; do
+  git -C "$A" pull -q --ff-only origin mag/auftrag 2>/dev/null || true
+  if [ "$(sha256sum "$A/lauf2.sh" | cut -c1-16)" != "$me" ] && [ -z "$(jobs -rp)" ]; then echo "$(date '+%F %T') neue Fassung"; exec bash "$A/lauf2.sh"; fi
+  for f in "$A"/jobs/*; do
+    [ -f "$f" ] || continue; name="$(basename "$f")"; [ -e "$A/.done/$name" ] && continue
+    read -r kind _ < "$f"
+    running="$(jobs -rp | wc -l)"
+    if [ "$kind" = voll ]; then [ "$running" -eq 0 ] || break; else [ "$running" -lt "$SLOTS" ] || break; fi
+    touch "$A/.done/$name"; echo "$(date '+%F %T') $name: $(head -1 "$f")"
+    if [ "$kind" = voll ]; then run_job "$name"; else run_job "$name" & fi
+  done
+  sleep 20
+done
+wait; echo "$(date '+%F %T') beendet (STOP)"
