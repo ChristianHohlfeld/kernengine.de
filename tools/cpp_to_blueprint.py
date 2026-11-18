@@ -10812,8 +10812,8 @@ class TestWriter:
             return self.wrap(f"{arrays[f]}({obj}.{f}.begin(), {obj}.{f}.end())" if f in viewed or f in standard else f"converted::array_list({obj}.{f})" if f in arrays else f"{obj}.{f}", spelled.get(f, ""))
         lines += ["  return s;", "}"]
         lines.append(f"[[maybe_unused]] static converted::Value arg(const {t}& s) {{ return converted::Value::structure({{{', '.join(f'arg({of(f)})' for f, _ in fields)}}}); }}")
-        lines.append(f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
-                     + "".join(f" && same({of(f, 'want')}, (*got.rows)[{i}])" for i, (f, _) in enumerate(fields)) + "; }")
+        lines.append(f"[[maybe_unused]] static bool same(const {t}& want, const converted::Value& got) {{ return converted::rows_of(got, {len(fields)})"
+                     + "".join(f" && converted::at_place(same({of(f, 'want')}, (*got.rows)[{i}]), \".{f}\")" for i, (f, _) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {t}& s) {{ return " + " && ".join(f"defined({of(f)})" for f, _ in fields) + "; }")
         lines.append(f"[[maybe_unused]] static std::string text(const {t}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({of(f)})" for f, _ in fields) + ' + "}"; }')
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
@@ -10874,7 +10874,7 @@ class TestWriter:
                         missing.append(f"{variable} ({w})")
                         continue
                     values.append(f'{{"{variable}", arg({of("s.")})}}')
-                    checks.append(f"same({of('w.s->')}, (*got.rows)[{len(checks)}])")
+                    checks.append(f"converted::at_place(same({of('w.s->')}, (*got.rows)[{len(checks)}]), \".{variable}\")")
                     fine.append(f"defined({of('w.s->')})")
                     texts.append(f'"{variable} = " + text({of("w.s->")})')
                 # what the state keeps besides its fields (Unit.state_static): a variable of a file at the level of a
@@ -10910,7 +10910,7 @@ class TestWriter:
                         continue
                     shown = self.wrap(held, spelled)
                     values.append(f'{{"{variable}", arg({shown})}}')
-                    checks.append(f"same({shown}, (*got.rows)[{len(checks)}])")
+                    checks.append(f"converted::at_place(same({shown}, (*got.rows)[{len(checks)}]), \".{variable}\")")
                     fine.append(f"defined({shown})")
                     texts.append(f'"{variable} = " + text({shown})')
                 if missing:   # (every variable is set and compared: one the test has no values of, and it cannot compare any)
@@ -10921,7 +10921,7 @@ class TestWriter:
                     f"  auto s = std::make_unique<{t}>();", *draws, "  return s;", "}",
                     f"[[maybe_unused]] static converted::Variables {info['variables']}(const {t}& s) {{ return {{{', '.join(values)}}}; }}",
                     f"struct {info['struct']} {{ const {t}* s; }};",
-                    f"[[maybe_unused]] static bool same(const {info['struct']}& w, const converted::Value& got) {{ return got.rows && got.rows->size() == {n}" + "".join(f" && {x}" for x in checks) + "; }",
+                    f"[[maybe_unused]] static bool same(const {info['struct']}& w, const converted::Value& got) {{ return converted::rows_of(got, {n})" + "".join(f" && {x}" for x in checks) + "; }",
                     f"[[maybe_unused]] static bool defined(const {info['struct']}& w) {{ return " + (" && ".join(fine) or "true") + "; }",
                     f"[[maybe_unused]] static std::string text(const {info['struct']}& w) {{ return std::string(\"{{\")" + "".join(f" + {'\", \" + ' if i else ''}{x}" for i, x in enumerate(texts)) + " + \"}\"; }"]
                 self.state_info = info
@@ -10934,8 +10934,8 @@ class TestWriter:
     def plain_struct(self, name, fields):
         """A struct of the test itself (what a call gives and changes), with what the comparison needs."""
         lines = [f"struct {name} {{ " + " ".join(f"{t} {f};" for f, t in fields) + " };"]
-        lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return got.rows && got.rows->size() == {len(fields)}"
-                     + "".join(f" && same({self.wrap(f'want.{f}', t)}, (*got.rows)[{i}])" for i, (f, t) in enumerate(fields)) + "; }")
+        lines.append(f"[[maybe_unused]] static bool same(const {name}& want, const converted::Value& got) {{ return converted::rows_of(got, {len(fields)})"
+                     + "".join(f" && converted::at_place(same({self.wrap(f'want.{f}', t)}, (*got.rows)[{i}]), \".{f}\")" for i, (f, t) in enumerate(fields)) + "; }")
         lines.append(f"[[maybe_unused]] static bool defined(const {name}& s) {{ return " + " && ".join(f"defined({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"defined(s.{f})" for f, t in fields) + "; }")
         lines.append(f"[[maybe_unused]] static std::string text(const {name}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text({self.wrap(f's.{f}', t)})" if t.startswith("std::array<") else f"text(s.{f})" for f, t in fields) + ' + "}"; }')
         return lines
