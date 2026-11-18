@@ -1,8 +1,20 @@
-# Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 22:25
+# Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 22:50
 
-Zweig work-p, letzter Commit 133bb742 (gepusht; origin/work-zusammen 8844531a eingemischt, f647f5e0).
-IN ARBEIT / WARTET AUF mag: `work-p-engine-212302-7164` (a–c, 7aacebf), `work-p-engine-221509-17831` + `work-p-probe-221512-17868` (E2.1, 2416329).
-Entscheidungen 21:50 (PAKET3_p.md) umgesetzt: E2.1 (95ada08, 2416329), E2.2 (e7538f1), Zeit-Test (133bb74). Offen: E3-A (Aufrufweg), Beweise.
+Zweig work-p, letzter Commit 34c48761 (gepusht; origin/work-zusammen e9eec025 eingemischt).
+WARTET AUF mag (vom Vorgänger, auf 2416329): `work-p-engine-221509-17831`, `work-p-probe-221512-17868`. Danach EIN `vergleich` auf dem Kopf
+(deckt E2.1, E2.2 und E2.1 Schritt 2 zusammen), dann `engine` auf dem Kopf, CI.
+
+## E2.1 Schritt 2 (+, −, ×) – gebaut c064f234, lokal geprüft, auf mag UNBEWIESEN
+- formula.cpp `kWholeOperators` (+, −, × neben der Funktionstabelle); `Formula::whole`: ein Eingang darf auch Operand von +,−,× sein, deren Wert als
+  ganze Zahl gelesen wird; diese bekommen nur Eingänge, Zahlen, ganzzahlige Funktionen, einander. Wurzel bleibt ganzzahlige Funktion.
+- nodes.h `logic::Sum<Op,A,B>` (faul): als f64 genau die doubles der Formel; an band…mul32: i64, wo jede Zahl/jedes Zwischenergebnis ganz und ≤ 2^53, sonst
+  bits_of des doubles. Operatoren nur, wo eine Seite Int oder Sum ist (Float-Formeln unberührt; Exact⊕Exact bleibt double).
+- Lokal ($S/p/chk, runcase.cpp, chk3, chk2): Fall formula_whole_arith Klasse == Interpreter (md5 gleich, 120 kB), Fixpunkt gleich (auch whole_ints,
+  bits_edges, append_in_place), 10 Lesefehler-Tests richtig. classes.h aller Bench-Klassen übersetzt.
+- Messung ($S/p/nach_e21s2.txt, Bestzeiten): sha256 12,80 → 6,62; rng_next 2,18 → 1,66; rng_unit 1,75 → 1,81 (Rauschen); sonst unverändert.
+  mulm (8×) und ring_area (3,4×) hängen NICHT an +,−,× in Bit-Formeln: mulm = Int64-Knoten (int64_add/of_int/low), `i - 1.0` als Float-Formel an der
+  Wurzel, Schleifenwächter, Fixed-Zugriff; ring_area = Wächter, Listenprüfung, `i += 1` über whole_add, Vergleich `(i<0)!=(n<0)?…` als Float-Formel.
+  → Block D bzw. ein weiterer Schreibweise-Schritt (Wurzel +,−,× / Vergleich mit Int-Ergebnis – bräuchte Bedingung „Ausgang geht nur in Int“ am Graphen).
 
 ## BEREIT ZUM MERGEN (Teil 1: Messwerkzeug + 3a–c) – Stand 7aacebfb
 - Commits: f50c07d (Messwerkzeug), 16c059c (math_compare/bits_of/whole/To<Whole>/Exact), 7aacebf (Engine-Fall formula_bits_edges); Merge-Basis 8874e79.

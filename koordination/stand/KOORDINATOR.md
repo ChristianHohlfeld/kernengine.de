@@ -1,4 +1,18 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 22:55 **Erste Ergebnisse von `vergleich` – die Auftragsart läuft (16 min für zwei Quelltexte unter Last):**
+  · `work-zusammen-engine-213241-11183` **rc=0** (Engine-Suite auf 8844531a mit ds Count<Per>-Fix).
+  · `work-zusammen-vergleich-222045-20677` (destruction, city_stream auf 8844531a): Destruction_tear und CityStream_building_shape weichen nicht mehr ab (earcut-Fix
+    wirkt); es bleiben Destruction_collapse 7/25, Destruction_fracture 11/20 bzw. 12/28, CityStream_upload 29/243 → k.
+    **BEFUND FÜR t1:** die Tests von destruction und city_stream enden in beiden Durchgängen mit LeakSanitizer (19 bzw. 84 MB, Vektoren der Quelltext-Kopie nie
+    zerstört) → rc=1, die Suite wäre rot.
+  · **Verlorenes Ausgabe-Ende:** LeakSanitizer beendet den Prozess (_exit), bevor stdout geleert ist – in eine Datei ging der letzte Puffer verloren (FAIL-Zeile,
+    Summenzeile, letzte Abweichungen). **lauf2.sh febe6fc8:** Einzelläufe schreiben über ein Terminal (script), neue Zeilen LECK / ABBRUCH / ZEIT in alle.txt.
+    **Ergebnisse von `vergleich`/`alle`, die vor 22:48 gestartet sind, können am Ende unvollständig sein.** Der alte Lauf „alle“ (212005) ist abgebrochen, neu:
+    `ergebnis-work-zusammen-voll-203000-750-alle-224816-8576`.
+  · k: G7 (Drone_step) in beiden Durchgängen sauber; G6 CityStream_upload behoben (20cb5259: `m[key].push_back` schrieb den alten Inhalt zurück); Beleg gebündelt
+    `work-k-vergleich-224717-8097`. **BEFUND FÜR p (von k):** use-after-free in `text_format` der Klasse (liest einen vorläufigen Text) – k umgeht es vorläufig im
+    Konverter (12e3da24), der Fix gehört in die Klasse. **BEFUND FÜR d (von k):** `inertia[6]` bei create_body/set_mass_data wird als 1 Zahl aufgezeichnet
+    (create_body 300/300). **E3-C** ist keine Konverter-Regel: Wertliterale eines Fixed schreiben List, die Klasse fordert Speicher an → p. Alle gemeldet.
 - 22:45 Zweiter Neustart des Servers hinter der Sitzung (~22:43): t1, t2, k, d, p abgebrochen und aus ihrem Verlauf fortgesetzt. mag und CI liefen weiter.
 - 22:57 **Entscheidung E7 (d):** `list_append` auf einem Platz der Engine wächst wie `insert` der Bibliothek (`list.insert(end, n, blank<C>())`, dann
   `Direct::from` je Eintrag) – dieselbe Regel wie für Blueprint-Listen (insert_items) und den Quelltext; keine eigene Reserve-Regel am Platz. Bedingungen: Werte in

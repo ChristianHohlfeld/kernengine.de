@@ -73,3 +73,9 @@
 - Vorschlag: auf einem Platz `list.insert(list.end(), n, blank<C>())` (Füll-Einfügen: dieselbe Wachstumsregel der Bibliothek wie
   das Bereichs-Einfügen, in libstdc++ und libc++), danach jeden neuen Eintrag mit Direct::from setzen – eine Anforderung wie C++,
   dieselbe Kapazität danach, innere Listen je Eintrag wie beim Kopieren. Konform (kein Proxy-Iterator). Nicht umgesetzt – wartet auf Antwort.
+- E7 (Antwort Koordinator: JA) umgesetzt: **cf8786c** – list_append am Platz = insert(end, n, blank) + Direct::from; andere
+  Listenschritte am Platz rufen schon dieselben logic::list-Funktionen (add/insert/remove_at/resize) – keine weitere Angleichung nötig.
+  Nativer Fall EnginePlaces hat Lauf „Append“ (zweiter Platz auf dieselbe Liste).
+- Weitere Commits: 42c86fe Palette („Places of the Engine“, Editor-Test), 62d0978 Doku. mag `work-d-engine-223942-31317` wartet noch
+  (rechnet den Stand bei Start, also ≥ cf8786c); CI 44403776223 auf c0d6d24 läuft.
+- Offen: Schritt 7 (Stellvertreter im Quelltext-Test, Konverter-Regel).
