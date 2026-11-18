@@ -11,6 +11,7 @@
 #include <charconv>
 #include <cmath>
 #include <compare>
+#include <concepts>
 #include <cstddef>
 #include <cstdlib>
 #include <deque>
@@ -84,21 +85,41 @@ inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }
 // the one a signed 32-bit number holds; mul32 is the product of two 32-bit numbers as 32 bits
 // hold it (their full product does not fit a formula's number exactly).
 inline i64 bits_of(f64 a) {
+  if (std::fabs(a) < 9223372036854775808.0) [[likely]] return static_cast<i64>(a);  // (one test for what is inside; not a number fails it)
   if (!(a == a)) return 0;
-  if (a >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
-  if (a <= -9223372036854775808.0) return std::numeric_limits<i64>::min();
-  return static_cast<i64>(a);
+  return a > 0 ? std::numeric_limits<i64>::max() : std::numeric_limits<i64>::min();
 }
-inline f64 band(f64 a, f64 b) { return static_cast<f64>(bits_of(a) & bits_of(b)); }
-inline f64 bor(f64 a, f64 b) { return static_cast<f64>(bits_of(a) | bits_of(b)); }
-inline f64 bxor(f64 a, f64 b) { return static_cast<f64>(bits_of(a) ^ bits_of(b)); }
-inline f64 shl(f64 a, f64 n) { return n >= 0 && n < 64 ? static_cast<f64>(static_cast<i64>(static_cast<u64>(bits_of(a)) << static_cast<int>(n))) : 0; }
-inline f64 shr(f64 a, f64 n) { return n >= 0 && n < 64 ? static_cast<f64>(bits_of(a) >> static_cast<int>(n)) : (bits_of(a) < 0 ? -1 : 0); }
-inline f64 wrap32(f64 a) { return static_cast<f64>(static_cast<u32>(static_cast<u64>(bits_of(a)))); }
-inline f64 wrap32s(f64 a) { return static_cast<f64>(static_cast<i32>(static_cast<u32>(static_cast<u64>(bits_of(a))))); }
+/// The whole number one of these functions gives (band bor bxor shl shr wrap32 wrap32s mul32):
+/// it stands for the double static_cast<f64>(v) - that is what it is everywhere a number is
+/// asked for. Handed on to another of these functions, the number is taken as it is where that
+/// double holds it exactly (|v| <= 2^53: bits_of of the double gives v), and as bits_of of the
+/// double anywhere else: the same bits as through the double, without the way through it.
+struct Exact {
+  i64 v;
+  constexpr operator f64() const { return static_cast<f64>(v); }  // NOLINT (implicit: it is that number)
+};
+inline i64 bits_of(Exact a) {
+  constexpr i64 exact = i64{1} << 53;
+  return a.v >= -exact && a.v <= exact ? a.v : bits_of(static_cast<f64>(a.v));
+}
+/// (what these functions take: a number, or the whole number another of them gave)
+template <class T> concept Bits = std::same_as<T, Exact> || std::is_arithmetic_v<T>;
+template <Bits A, Bits B> inline Exact band(A a, B b) { return {bits_of(a) & bits_of(b)}; }
+template <Bits A, Bits B> inline Exact bor(A a, B b) { return {bits_of(a) | bits_of(b)}; }
+template <Bits A, Bits B> inline Exact bxor(A a, B b) { return {bits_of(a) ^ bits_of(b)}; }
+template <Bits A, Bits N> inline Exact shl(A a, N n) {
+  const f64 m = static_cast<f64>(n);
+  return {m >= 0 && m < 64 ? static_cast<i64>(static_cast<u64>(bits_of(a)) << static_cast<int>(m)) : 0};
+}
+template <Bits A, Bits N> inline Exact shr(A a, N n) {
+  const f64 m = static_cast<f64>(n);
+  return {m >= 0 && m < 64 ? bits_of(a) >> static_cast<int>(m) : (bits_of(a) < 0 ? -1 : 0)};
+}
+template <Bits A> inline Exact wrap32(A a) { return {static_cast<i64>(static_cast<u32>(static_cast<u64>(bits_of(a))))}; }
+template <Bits A> inline Exact wrap32s(A a) { return {static_cast<i64>(static_cast<i32>(static_cast<u32>(static_cast<u64>(bits_of(a)))))}; }
 /// The number as a 32-bit float holds it (a formula's single): what a vector's component is.
 inline f64 single(f64 a) { return static_cast<f64>(static_cast<f32>(a)); }
-inline f64 mul32(f64 a, f64 b) { return static_cast<f64>(static_cast<u32>(static_cast<u32>(static_cast<u64>(bits_of(a))) * static_cast<u32>(static_cast<u64>(bits_of(b))))); }
+template <Bits A, Bits B> inline Exact mul32(A a, B b) { return {static_cast<i64>(static_cast<u32>(static_cast<u32>(static_cast<u64>(bits_of(a))) * static_cast<u32>(static_cast<u64>(bits_of(b)))))}; }
 }  // namespace math
 
 namespace logic {
@@ -2528,7 +2549,17 @@ template <> struct To<i64> {
   static i64 from(i64 v) { return v; }
   static i64 from(f64 v) { return whole(v); }
 };
-template <> struct To<Whole> : To<i64> {};
+template <> struct To<Whole> : To<i64> {
+  using To<i64>::from;
+  // (a number made whole is already as a Blueprint holds it: whole gives a number within 2^53, a
+  // number above 2^53 - which a double holds exactly, and logic::normal leaves - or one of Int's
+  // ends; so logic::normal, which Whole(i64) applies, is left out - the same Int, without the detour)
+  static Whole from(f64 v) {
+    Whole r;
+    r.v = whole(v);
+    return r;
+  }
+};
 template <> struct To<f64> {
   static f64 from(bool v) { return v ? 1 : 0; }
   static f64 from(i64 v) { return static_cast<f64>(v); }
