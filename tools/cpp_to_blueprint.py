@@ -458,8 +458,11 @@ def bound_type(v):
 
 
 def kids(n):
-    """The parts of a node (without the comments and attributes that stand with a declaration)."""
-    return [c for c in n.get("inner", []) or [] if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
+    """The parts of a node (without the comments and attributes that stand with a declaration). An array written
+    out with fewer values than it has entries (`f32 a[20] = {x, 2}`): the compiler's tree names what fills the
+    rest first, under "array_filler", and the values written after it - the values are the parts."""
+    inner = n.get("inner") or (n.get("array_filler") or [])[1:]
+    return [c for c in inner if isinstance(c, dict) and c.get("kind") and not c["kind"].endswith("Comment") and not c["kind"].endswith("Attr")]
 
 
 # A 64-bit whole number the program spells u64, i64, uint64_t or int64_t is a bit pattern: in a Blueprint
@@ -1646,6 +1649,8 @@ class Unit:
         m = re.match(r"std::array<(.+), (\d+)[uUlL]*>$", t) or re.match(r"(.+?)\s*\[(\d*)\]((?:\s*\[\d*\])*)$", t)   # (its length as the compiler writes it: 12UL)
         if m and m.lastindex == 3 and m.group(3):
             return f"List<{self.entry(m.group(1) + m.group(3))}>"
+        if m and re.fullmatch(r"char\s*\*", m.group(1).strip()) and re.match(r"\s*const\s+char\b", raw):
+            return "List<Text>"   # (an array of texts written out: const char* names[4] - each entry a text, as a const char* is)
         if m:
             return f"List<{self.entry(m.group(1))}>"
         if t.startswith("std::unique_ptr<") or t.startswith("std::optional<"):
@@ -3197,7 +3202,8 @@ class Emit:
 
     def is_this(self, n):
         n = bare(n)
-        while n.get("kind") in ("ImplicitCastExpr",) and kids(n):
+        # (const_cast<T*>(this) is this: a Blueprint's function reads and changes its object as it is written)
+        while n.get("kind") in ("ImplicitCastExpr", "CXXConstCastExpr") and kids(n):
             n = bare(kids(n)[0])
         if n.get("kind") == "UnaryOperator" and n.get("opcode") == "*" and kids(n):
             return self.is_this(kids(n)[0])
@@ -3770,8 +3776,6 @@ class Emit:
 
     def made_by(self, q, c):
         """A value of the program's class `q` made by its own constructor `c` without arguments (its defaults for all)."""
-        if c["id"] not in self.tree.body:
-            raise Wait(f"a {q.split('::')[-1]} made by a constructor that is defined in another file")
         return self.invoke(self.u.function(c["id"]), [{"kind": "CXXDefaultArgExpr"} for p in kids(c) if p.get("kind") == "ParmVarDecl"])[0]
 
     def finished(self, t, q, text, inits=None):
@@ -4237,8 +4241,14 @@ class Emit:
                 elif init is not None:
                     # (an array written out: its place - declared with its length - is set to what is written)
                     said = self.written_array(init, self.types[v['id']]) if name in self.lengths else None
-                    text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
-                    out += self.take_pre() + [f"{name} = {text};"]
+                    if said and len(said[0]) > 16:
+                        # (more than a Make List takes: every entry set where it stands - those it does not write
+                        # zero, as C++ makes them: also when the place was used before, in an earlier pass of a loop)
+                        vals = said[0] + [self.u.zero(self.types[v['id']][5:-1])] * (said[1] - len(said[0]))
+                        out += self.take_pre() + [f"{name}[{i}] = {x};" for i, x in enumerate(vals)]
+                    else:
+                        text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
+                        out += self.take_pre() + [f"{name} = {text};"]
                     c = self.ctype(v)
                     if ITERATOR.match(c) or REVERSE_ITERATOR.match(c):
                         self.note_home(v["id"], init)
@@ -5075,6 +5085,11 @@ class Emit:
             ends = self.ends(body_stmts)
             all_end = all_end and ends
             out_cases.append((labels, body_stmts, ends))
+        # (a break in the middle of a case: case_block - the flag belongs to the case that has it)
+        return self.switch_cases(sel, st, out_cases, all_end)
+
+    def switch_cases(self, sel, st, out_cases, all_end):
+        """The lines of a switch whose cases are known ([labels], statements, whether it always returns)."""
         has_default = any(None in labels for labels, _, _ in out_cases)
         if st in self.u.enum_values:
             value = self.ex(sel, st)
@@ -6209,7 +6224,7 @@ class Emit:
             if b.get("kind") == "MemberExpr" and (self.is_this(kids(b)[0]) or not b.get("isArrow")):
                 b = self.unwrap(kids(b)[0])
                 continue
-            if b.get("kind") == "MemberExpr" and b.get("isArrow") and kids(b) and self.is_box(kids(b)[0]):
+            if b.get("kind") == "MemberExpr" and b.get("isArrow") and kids(b) and (self.is_box(kids(b)[0]) or self.box(kids(b)[0]) is not None):
                 b = self.unwrap(kids(b)[0])   # (p->list: the list in what an owned value holds - its one entry)
                 continue
             if self.box(b) is not None:   # (*p: what an owned value holds - named as p is)
@@ -7558,8 +7573,6 @@ class Emit:
         if not arg_nodes and q is not None and u.own_default_ctor(q) is None:
             return self.finished(t, q, u.zero(t))   # (C++'s own constructor: the defaults, and what C++ makes of the fields)
         if len(fits) == 1:
-            if fits[0]["id"] not in self.tree.body:
-                raise Wait(f"a {t} made by a constructor that is defined in another file")
             return self.invoke(u.function(fits[0]["id"]), arg_nodes)[0]
         if ctors and arg_nodes:
             raise Wait(f"a {t} made by a constructor")
@@ -9101,8 +9114,6 @@ class Emit:
                     if c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and qtype(c) == want or (c.get("kind") == "CXXConstructorDecl" and not c.get("isImplicit") and c.get("type", {}).get("qualType") == want):
                         if not a and q is not None and u.own_default_ctor(q) is None:
                             break   # (C++'s own - `= default`: what it makes is made here)
-                        if c["id"] not in self.tree.body:
-                            raise Wait(f"a {t} made by a constructor that is defined in another file")
                         return self.invoke(u.function(c["id"]), kids(b))
                 if a:
                     raise Wait(f"a {t} made by a constructor")

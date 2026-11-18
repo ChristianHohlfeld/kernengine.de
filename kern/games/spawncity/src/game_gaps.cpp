@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
-#include <tuple>
 
 #include "game.h"
 #include "kern/audio/synth.h"
@@ -620,6 +619,24 @@ void Game::gaps_sirens(f32 dt) {
     if (dd < 0 || l < dd) dd = l;
   }
   const bool silent = ui_.paused || !ui_.settings.on(Opt::audio_on);
+  // one of a siren's two loops (bright / dull): played at its share of the level, stopped while the siren is off
+  auto loop_to = [&](bool on, kern::audio::ClipId clip, kern::audio::VoiceId& voice, f32 vol, f32 pitch) {
+    if (!on) {
+      if (voice) { mixer_.stop(voice, 0.1f); voice = 0; }
+      return;
+    }
+    if (!voice || !mixer_.playing(voice)) {
+      kern::audio::PlayParams p;
+      p.loop = true;
+      p.volume = vol;
+      p.pitch = pitch;
+      p.bus = kern::audio::Bus::sfx;
+      voice = mixer_.play(clip, p);
+    } else {
+      mixer_.set_volume(voice, vol);
+      mixer_.set_pitch(voice, clampf(pitch, 0.05f, 8));
+    }
+  };
   auto drive = [&](gaps::SirenVoice& v, f32 d, f32 base, f32& level, kern::audio::ClipId bright, kern::audio::ClipId dull, kern::audio::VoiceId& vb,
                    kern::audio::VoiceId& vd, f32 pitch_hz, f32 f0, f32 pitch_tau) {
     // level(): fxVolume / 72 is the effects bus volume; the gain is set relative to it
@@ -630,20 +647,9 @@ void Game::gaps_sirens(f32 dt) {
     const f32 w = d >= 0 ? (gaps::siren_cutoff(d) - 900) / (5200 - 900) : 1;
     const f32 pitch = pitch_hz / f0 * v.doppler;
     (void)pitch_tau;
-    for (auto [clip, voice, vol] : {std::tuple<kern::audio::ClipId, kern::audio::VoiceId*, f32>{bright, &vb, level * w}, {dull, &vd, level * (1 - w)}}) {
-      if (!on) { if (*voice) { mixer_.stop(*voice, 0.1f); *voice = 0; } continue; }
-      if (!*voice || !mixer_.playing(*voice)) {
-        kern::audio::PlayParams p;
-        p.loop = true;
-        p.volume = vol;
-        p.pitch = pitch;
-        p.bus = kern::audio::Bus::sfx;
-        *voice = mixer_.play(clip, p);
-      } else {
-        mixer_.set_volume(*voice, vol);
-        mixer_.set_pitch(*voice, clampf(pitch, 0.05f, 8));
-      }
-    }
+    const f32 bright_vol = level * w, dull_vol = level * (1 - w);
+    loop_to(on, bright, vb, bright_vol, pitch);
+    loop_to(on, dull, vd, dull_vol, pitch);
   };
   drive(g.car, dc, gaps::car_gain(), g.car_level, g.horn, g.horn_dull, g.v_horn, g.v_horn_dull, gaps::horn_hz(g.clock), gaps::horn_low(), 0.014f);
   drive(g.drone, dd, gaps::drone_gain(), g.drone_level, g.whoop, g.whoop_dull, g.v_whoop, g.v_whoop_dull, gaps::whoop_hz(g.clock), gaps::whoop_base(), 0.03f);
@@ -690,14 +696,12 @@ void Game::gaps_jet_audio(f32 dt) {
   const Vec3 L = mode_ == Mode::foot ? player_position() : cam_.eye;  // listenerPos
   const bool silent = ui_.paused || !ui_.settings.on(Opt::audio_on);
   for (const FighterJet& j : combat_.jets) {
-    GapsState::JetVoice* v = nullptr;
-    for (GapsState::JetVoice& q : g.jet_voices)
-      if (q.t0 == j.t0 && q.x == j.x && q.y0 == j.y0) { v = &q; break; }
-    if (!v) {
-      g.jet_voices.push_back({j.x, j.y0, j.z, j.t0, gaps::unit_hash(++g.jet_voice_count * 2654435761u), 0, 0, false});
-      v = &g.jet_voices.back();
-    }
-    v->alive = true;
+    std::size_t at = g.jet_voices.size();  // (its place in jet_voices; none yet: the end, where a new one goes)
+    for (std::size_t q = 0; q < g.jet_voices.size(); ++q)
+      if (g.jet_voices[q].t0 == j.t0 && g.jet_voices[q].x == j.x && g.jet_voices[q].y0 == j.y0) { at = q; break; }
+    if (at == g.jet_voices.size()) g.jet_voices.push_back({j.x, j.y0, j.z, j.t0, gaps::unit_hash(++g.jet_voice_count * 2654435761u), 0, 0, false});
+    GapsState::JetVoice& v = g.jet_voices[at];
+    v.alive = true;
     // retarded time: the sound we hear now left the jet when |p(te) - L| = c (now - te)
     f32 te = now;
     Vec3 p;
@@ -709,21 +713,25 @@ void Game::gaps_jet_audio(f32 dt) {
     const bool started = te >= j.t0 - 1.5f;
     const f32 gain = silent || !started ? 0 : std::fmin(1.8f, std::pow(85 / d, 1.35f)) * 0.9f * 0.85f;
     const f32 cutoff = std::fmin(9000.0f, 900 + 60000 / d), w = clampf((cutoff - 900) / (9000 - 900), 0, 1);
-    const f32 rate_k = doppler * (0.92f + v->pitch * 0.16f);
-    for (auto [clip, voice, vol] : {std::tuple<kern::audio::ClipId, kern::audio::VoiceId*, f32>{g.jet_roar, &v->bright, gain * w}, {g.jet_roar_dull, &v->dull, gain * (1 - w)}}) {
-      if (!*voice || !mixer_.playing(*voice)) {
+    const f32 rate_k = doppler * (0.92f + v.pitch * 0.16f);
+    // its two loops (roar / dull), each at its share of the gain
+    auto loop_to = [&](kern::audio::ClipId clip, kern::audio::VoiceId& voice, f32 vol) {
+      if (!voice || !mixer_.playing(voice)) {
         kern::audio::PlayParams pp;
         pp.loop = true;
         pp.volume = vol;
         pp.pitch = rate_k;
         pp.bus = kern::audio::Bus::sfx;
-        pp.start = v->pitch * 3;  // src.start(0, random * 3)
-        *voice = mixer_.play(clip, pp);
+        pp.start = v.pitch * 3;  // src.start(0, random * 3)
+        voice = mixer_.play(clip, pp);
       } else {
-        mixer_.set_volume(*voice, vol, 0.05f);
-        mixer_.set_pitch(*voice, clampf(rate_k, 0.05f, 8));
+        mixer_.set_volume(voice, vol, 0.05f);
+        mixer_.set_pitch(voice, clampf(rate_k, 0.05f, 8));
       }
-    }
+    };
+    const f32 bright_vol = gain * w, dull_vol = gain * (1 - w);
+    loop_to(g.jet_roar, v.bright, bright_vol);
+    loop_to(g.jet_roar_dull, v.dull, dull_vol);
   }
   // stopJetVoice: fade 0.3 s when the jet is gone
   for (GapsState::JetVoice& v : g.jet_voices)
