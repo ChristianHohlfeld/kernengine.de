@@ -39,6 +39,18 @@
   Abweichung, 0 LECK** – Terrain_run_job (geschrieben, 300 Aufrufe) gegen die Engine gleich (vorher 35/237 j.id). Game::audio_init dort nicht geschrieben (Teil fehlt) →
   `work-d-belege3-vergleich-110539-22562` mit den Quellen von t2s Beleg (game, game_equipment, sound_fx, game_details, equipment, combat_audio). Danach Engine-Suite.
 
+- **Beleg 12:10:** `work-d-belege3-vergleich-110539-22562` (game, game_equipment, sound_fx, game_details, equipment, combat_audio): Game::audio_init/ui_audio_init geschrieben;
+  audio_init gegen den Stellvertreter 1/20 (vorher 8/20), gegen die Engine 0. Die eine übrige ist anderer Art: „call 122 – the source asks
+  engine.sound_bank.request(0, "sc:shot0"), the Blueprint nothing more (191 and 121 calls)“ – der Blueprint endet vor combat_audio_init (BEFUND FÜR t2/k, nicht die Form).
+  Sonst: number_at 14/300 (t1), converted_game_details_cpp real (bekannt). Engine-Suite läuft: `work-d-belege3-engine-120959-12020`.
+- work-d = **fa753bcb** (work-zusammen 6998a56e eingemischt: Konflikt logic.h/.cpp – bound_now und lengths_on (e) beide behalten; + belege3; Generator neu). Syntax ✓.
+
+## BEREIT ZUM MERGEN (d, 12:56): work-d-belege3 3c10e298 = work-d-opt cbed8b27 (2226dbe9 + Testfix) + work-d-jobs a12da91a auf work-zusammen 18526372
+- Belege: `work-d-belege3-vergleich-101159-615` (terrain, city_stream, game: 48/48 beide Durchgänge, Terrain_run_job gegen die Engine gleich – vorher j.id),
+  `work-d-belege3-vergleich-110539-22562` (audio_init: Engine 0, Stellvertreter 1/20 statt 8/20 – Rest anderer Art, s. o.), Engine-Suite
+  `work-d-belege3-engine-121830-13658` rc=0 (54673 checks, 0 failures; jobs_reset_begins_again, engine_stand_in_one_or_none ok).
+- Beim Mischen: Generator neu (engine_api.gen.cpp, engine_case.gen.h). Zwei Merge-Commits (3c10e298, 275d3ddf) haben den Standardtext ohne Attribution.
+
 ## BEREIT ZUM MERGEN (d, 08:30): work-d-uhr 4b7074b1 – Beleg work-d-uhr-vergleich-075109-9150
 - Ein Commit auf work-zusammen 821208ac, nur Testrahmen (rule_blueprint.h sc::Clocks + test_engine; converted.h Watch eine Zeile). Keine Engine-Änderung → keine Engine-Suite nötig.
 - In work-d eingemischt (e757c565; Konflikte mit dem Platz der Engine: @get/@set-Zeile + g_places.clear() behalten).

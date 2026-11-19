@@ -1,5 +1,26 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+
+
+## BEREIT ZUM MERGEN: 62229851 (E20 Schritte 1+2: U8 … I32 – Sprache, Leser/Schreiber, Interpreter, JIT, Klasse, Editor, Doku) – Belege (13:25)
+- Commits: 31d75912 (Schritt 1), 15c8ad52 (Schritt 2: Klasse logic::Sized<T>, Fall fixed_widths), 1d4cdd6e (Meldungserwartung Map),
+  62229851 (e2e: Typwahl +6 Breiten).
+- Engine-Suite `work-p-engine-121704-13222` auf 1d4cdd6e: engine rc=0, 54627 checks, 0 failures; blueprint_native_test ok (62 Blueprints,
+  darin fixed_widths: Klasse == Interpreter); logic_fixed_widths ok.
+- CI 44519073809 auf 62229851: native, build (Logic JIT == Interpreter über alle logic_cases, darin fixed_widths), determinism, input grün;
+  e2e rot NUR an den 3 Stellen, die work-zusammen f0450061 genauso hat (game_equipment_cpp/sound_fx_cpp „cannot convert int to int64“,
+  „Play runs them as machine code“) – nicht von p. native-spawncity lief noch.
+- Lokal: Interpreter-Ergebnis von fixed_widths = Python-Modell der C++-Regeln, 316 von 316 Werten.
+- Kein vergleich nötig: Konverter und Spiel unberührt (Schritt 4 macht u32-Quellen zu U32 – dort konvert+vergleich).
+- Zeit-Test: 24 von 29 über 1,10 (f32-Spalte), 23 von 29 (64-Bit-Spalte) – unverändert und nicht neu gemessen: kein Klassentext ändert sich,
+  solange der Konverter keine Breite schreibt (Schritt 4).
+
+## E20 Schritt 1 gebaut: 31d75912 (Sprache, Leser/Schreiber, Interpreter) – Belege laufen (12:02)
+- Breite am Platz wie Fixed: TypeRef::of neben integer ("u8"…"i32"), Text U8…I32; Draht = Int; Speichern wickelt (fitted, Add, hold);
+  JIT erzeugt Set/Add fester Breite nicht selbst. × braucht keinen neuen Knoten (mul32). Lokal: logic_fixed_widths grün (bad=0).
+- Belege: engine `work-p-engine-120146-7563`, CI https://github.com/ChristianHohlfeld/kernengine.de/actions/runs/44511064433 (JIT).
+- Nächst: Schritt 2 Klasse (U8…I32 in nodes.h/blueprint.h), logic_cases, Editor, Doku.
+
 ## 11:45: 1831e165 gemergt (work-zusammen 0cb3f6b6); (b) und E20 entschieden – Bauplan in uebergabe/p.md, Nachfolger nötig (Kontext erschöpft)
 
 ## (gemergt) BEREIT ZUM MERGEN: 1831e165 (Punkt 2, Int-Formeln ganz) – Belege (11:35)

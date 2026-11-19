@@ -68,3 +68,9 @@ code (170 compiled)“. Nicht von e. (Job 135460440782.)
   Kreis-Funktionen warteten nun an „what it calls stands in another source file, whose test does not hand its source on“ (wieder ein Kreis: die
   Quelle des Gerufenen kommt erst, wenn er geschrieben ist) → 34d65edd (angelehnt: diese Prüfung entfällt; der Rufer wird neu umgewandelt, sobald
   der Gerufene geschrieben ist). Neuer Lauf work-e-tramp-konvert-104550-13876. CI 44495706968 auf 3e879f14: native grün.
+- 13:05: work-e-tramp hat origin/work-zusammen a7313813 (enthält 0cb3f6b6) eingemischt → 14bc9740 (Konflikt k E18 in call_function gelöst: Prüfung
+  gehaltener Listen in enter_call/leave_call). CI 44510939911: native GRÜN, „Logic JIT: all cases match“ (Beleg c).
+- konvert work-e-tramp-konvert-104550-13876 (34d65edd): rc=0, 1.752/1.878; die Kreis-Funktionen sind nun GESCHRIEBEN, aber ihre Tests übersetzen
+  nicht („use of undeclared identifier 'explosion'/'combat_blast'“: der Test einer Datei braucht die Quelle der Gerufenen aus der anderen, die erst
+  weitergereicht wird, wenn deren Test vergleicht – wieder ein Kreis, 72 „went round“). Behoben im Ablauf (convert_unit: Exporte jedes Versuchs)
+  → neuer konvert.

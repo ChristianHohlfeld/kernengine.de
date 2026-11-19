@@ -89,3 +89,26 @@ Die Glue jeder Klasse (tools/blueprint_cpp.cpp) meldet je nicht-latenter Funktio
 Schlüssel Blueprint+Name). func_call_on<"Name">(actor, …) (blueprint.h) sucht ihn einmal je Aufrufstelle (static) und ruft direkt, wenn die
 Instanz des Ziels als Klasse läuft (NativeBlueprint) und die Signatur passt; sonst der heutige Weg über Value. Bedeutung gleich: NativeBlueprint::call
 ruft heute genau diese Methode nach dem Umwandeln. Beleg: Engine-Suite; vergleich src/controls.cpp src/combat_rules.cpp – cost-Zeilen weg.
+
+## Nachfolger 4 (19.11., ab ~11:50) – E20
+- Schritt 1 = 31d75912 (Sprache, Leser/Schreiber, Interpreter, JIT-Rückfall), Schritt 2 = 15c8ad52 (Klasse logic::Sized<T>, Fall
+  fixed_widths, Web-Editor, Doku). Entscheidung (selbst): Breite am PLATZ wie Fixed – TypeRef::of neben integer ("u8"…"i32"),
+  Draht = Int; kern::to<U8> verboten (kern::to<Int>); Add = untere Bits der u64-Summe; × = mul32 (kein neuer Knoten);
+  Map ohne Breiten; List<U8> liest der Leser, check() lehnt ab („noch kein Typ“) bis Schritt 3.
+- Lokal: /home/claude/p-tmp/w20/run.sh [quellen…] (synchronisiert body.inc → test_main TEST(logic_fixed_widths), baut w);
+  case/mk (Text→Klasse/JSON), case/run (Interpreter-Ergebnis), Python-Modell im Verlauf (316 Werte gleich).
+- Belege: engine work-p-engine-120146-7563 (startete nach 15c8ad52 → deckt beide), CI 44511064433 (31d7), 44511958238 (15c8).
+- Nächst: Schritt 3 List<U8> (Listenknoten wickeln beim Speichern: add/insert/set/fill/resize/copy_bytes; type_choices mit
+  Breiten für Listen-Einstellungen; Klasse List<Sized<u8>> – Entry<T>/Held<vector<Sized>>/Bytes-Knoten), Schritt 4 Konverter,
+  Schritt 5 Schleife mit lokalem Wächter, dann (b).
+- 13:25: Schritte 1+2 belegt (stand/p.md „BEREIT ZUM MERGEN: 62229851“). Wichtig für Schritt 3 (List<U8>), gelesen, nicht gebaut:
+  * fits(): int_list ↔ u8_list passen NICHT (in C++ List<U8> ≠ List<Int>). Folge: die Bytes-Knoten (text.of_bytes, list.copy_bytes,
+    struct.bytes/of_bytes, list.insert_text …) haben Pins K::integer_list – sie müssen Listen jeder Breite nehmen (Pin-Gestalt nach dem
+    Draht oder Einstellung „type“ mit u8_list), und ihre Klassen-Funktionen (blueprint.h list_copy_bytes, BytesNumber, Items<…>) als
+    Vorlage über das Element (Whole oder Sized<T>). Das ist der eigentliche Bytes-Gewinn (wire_*, mvt_read_geometry).
+  * Speichern in eine Liste fester Breite: Platz-Typ über g.place_of(c.node(), named) → declared(named); wickeln in list.add,
+    list.insert (Einzelwert), list.make mit type u8, list.resize-Füllwert, list.insert_text, copy_bytes; ganze Listen über fitted (fit
+    wickelt schon Listen). Context::out NICHT allgemein wickeln (O(n) je Get).
+  * type_choices(): Breiten anbieten (nicht bei keys_only/enums_only/structs_only), with_lists → „u8_list“; check(): Fehler „noch kein
+    Typ“ (logic.cpp width_ok) entfernen; logic.mjs typeOptions: Listen der Breiten wieder zulassen; e2e-Zahlen dann +6.
+  * Klasse: List<U8> = logic::List<Sized<u8>> – detail::Entry<Sized<T>>, Held<std::vector<Sized<T>>>, to_value(vector<Sized>), list_type_of.

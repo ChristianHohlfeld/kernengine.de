@@ -174,3 +174,30 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
 - E18 (Koordinator 09:55: Weg A) – ENTSCHEIDUNG NÖTIG zur Form in der Klasse (V1 Prüfung im Text um den Aufruf / V2 in jeder Listenoperation), siehe stand/k.md.
   Erkenntnisse: Interpreter Instance::call(places) logic.cpp ~2590 (Spot = Schlüssel + Pfad, je Zugriff neu aufgelöst); JIT ruft func.call über die
   C++-Funktion des Knotens (keine eigene Arbeit); Klasse = Text der Notation (call_args notation.cpp ~1425), Listenoperationen über logic::list::* (nodes.h).
+
+# NACHFOLGER 4 (19.11., ab 11:55) – Destruktoren, Wartelisten-Regeln, ctl_strike_confirm
+- Commits (work-k): cd69e381 Destruktor mit Rumpf (ends_itself) = Funktion `<Klasse>_end` (Tree.body, survey, convert_unit, wanted_name;
+  Emit.run wie Methode; keine out_fields → „it gives nothing“, verglichen im Test der Funktion, die den Wert beendet); Emit.own_end ruft ihn in
+  ended_parts/state_ended vor den Feldern. moved_from: Destruktor ohne Kopie/Verschiebung → std::move kopiert (alles bleibt).
+  39ddc452 Const.inlined ohne constexpr (nur Konstanten gelesen) → `const Vec3 kWall = rgb(…)` (Interiors::build).
+  8c91947d Unit.lambda_vars: benanntes Lambda als Prädikat in einem anderen Lambda (Marks::update/prune_walls); Gefangenes wird weitergegeben.
+  fb37e05e Function.asks_engine (Tabelle "engine"): ein Aufruf, der die Engine fragt, ist unter cond_depth ein Hoists → chosen/either
+  (ctl_strike_confirm: logic_select rief body() dreimal). bb6da523 `(x = v)` als Wert: Schritt davor, Wert = x. aa24c1f0 goto vorwärts:
+  labels_of/block_steps, Schalter to_<marke>, goto_live je Block. 928b7571 TestWriter.gather/want_record: Destruktor einer gehaltenen Klasse
+  wird mitgehalten (sonst fehlt ~Ragdolls in der Testkopie → Game::stop 8/20). 1e523e83 Merge work-zusammen (13:00).
+- Kleinstfälle: /tmp/k_dt (Destruktor), /tmp/k_rgb, /tmp/k_rm, /tmp/k_sel, /tmp/k_as, /tmp/k_go. Lokal mit Test: das Test-Verzeichnis muss im Spielordner
+  liegen (tests/converted_kX); TEST_KEEP=1 legt einen Ordner „1“ im Spielordner an – danach löschen.
+- Belegt: 123309-19335 (53/53): Interiors::build, Game::stop, ~Ragdolls. Läuft: 131110-451 (controls, vr, weapons, world_marks, city_stream, game.cpp).
+- Befunde: audio_init → d (Stellvertreter: sound_bank.make gibt 0); draw_combat → t1 (+0.5, wie draw_events).
+- Offen, untersucht, nicht gebaut:
+  * Decoder::step (mvt.cpp): `Layer& layer = tile_.layers.back();` – named places kennen .back()/.front() nicht. Ersatz durch den Aufruf bei jeder
+    Verwendung stimmt nur, solange die Liste ihre Länge behält; dazwischen ändert `++feature_`/read_feature Felder von this → Index beim Binden
+    halten (wie picks), dafür einen gehobenen Index-Knoten bauen.
+  * handle_shots (world_->shots()), run_buildings (BuildingBuilder::chunks()): Platz der Engine → d.
+  * hud_json: `for (char& c : s) … c = ' '` braucht einen Knoten „Code setzen“ in Text (alle Stufen) – Sprache.
+  * GeoProjector::init: kern::fail ist variadisch → Engine-Knoten fail(Text) + format_values; Engine/Sprache (d).
+  * „a pointer“: gaps_draw `for (Part* p : {&g.disc, &g.ember})` (Schleife über Plätze ausrollen), gaps_jet_audio (Zeiger in Liste, find-or-append),
+    look_view_models/look_command (kern::Mesh* der Engine → Handle, d), Writer::end_layer (reinterpret_cast<const u8*>(&v.n) → Bytes eines f64).
+  * List.g (worldsync_update): `Game* g` in einer lokalen Struktur = Zeiger auf das eine Objekt des Zustands; Methoden der Struktur greifen auf den
+    Zustand zu. Feat.pts (minimap_json): Zeiger auf fremde Liste – ohne Kopie nicht abbildbar.
+  * gaps_sirens: tuple mit Zeiger; swarm_update: find_if auf r.units mit r = swarms_[key] (spot mit pre); extract: Lambda mit auto.

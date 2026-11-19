@@ -1,5 +1,39 @@
 # Paket k – Stand
 
+## Nachfolger 4 (ab 11:55, work-k = work-zusammen 6998a56e + eigene Commits)
+- cd69e381 Destruktor mit Rumpf = Funktion <Klasse>_end, in ended_parts/state_ended vor den Feldern gerufen; moved_from: Klasse mit
+  Destruktor und ohne Kopie/Verschiebung → std::move kopiert. Vergleich work-k-vergleich-120450-8326 (car, ragdoll, game_world,
+  game_traffic, game_life, game.cpp): ~Car/~Ragdolls geschrieben; Game::stop jetzt geschrieben → 8/20 abweichend (Blueprint ruft
+  Ragdolls_end mit world_ ≠ 0 und 37–137 Engine-Aufrufen, die Quelle keinen: ihr Ragdolls::world_ (kern::physics::World*) bzw. dolls_
+  im gezogenen Zustand) – Ursache wird geprüft (lokaler Test). step_world/step_tow/life_update/draw_vehicles warten in der Probe an fehlenden Teilen.
+- 39ddc452 rgb-Konstanten (Interiors::build): Const.inlined auch ohne constexpr, nur Konstanten gelesen. Kleinstfall /tmp/k_rgb.
+- 8c91947d remove_if mit benanntem Lambda (Marks::update/prune_walls). Kleinstfall /tmp/k_rm.
+- fb37e05e ctl_strike_confirm (Vorrang 12:32): Aufruf, der die Engine fragt, nur im gewählten Zweig (asks_engine → Hoists → chosen).
+- draw_combat 1/20: erste Abweichung +0.5 in einer Matrix (0.4319 Quelle / 0.9319 Blueprint) – dasselbe Muster wie draw_events
+  (Pfosten der Tore, combat_rules_g_gates nicht gezogen) → BEFUND FÜR t1 (siehe unten draw_events), draw_combat ruft draw_events.
+- work-k-vergleich-123309-19335 (fb37e05e; game_controls, interiors, world_marks, game_life, ragdoll, game.cpp): 53/53 ok in beiden
+  Durchgängen (cost 12, wie zuvor). Geschrieben UND verglichen: Interiors::build (306), Game::stop, ~Ragdolls. Nicht geschrieben in der
+  Probe: ctl_strike_confirm (vr_hand_ray fehlt), Marks::update/prune_walls (walls_near fehlt), life_update.
+- bb6da523 Zuweisung als Wert (vr_melee), aa24c1f0 goto vorwärts (update_projectiles), 928b7571 Test hält Destruktor einer gehaltenen
+  Klasse (Ursache der Abweichung Game::stop 8/20 in 120450: die Testkopie von Ragdolls hatte ~Ragdolls nicht), 1e523e83 Merge work-zusammen.
+- Beleg läuft: work-k-vergleich-131110-451 (game_controls, game_vr, game_weapons, world_marks, city_stream, game.cpp auf 1e523e83).
+
+## BEREIT ZUM MERGEN: 39ddc452 (+ cd69e381) – Beleg work-k-vergleich-123309-19335
+- Interiors::build (306 Zeilen) geschrieben und verglichen, Game::stop/~Ragdolls geschrieben und verglichen; 53/53 in beiden Durchgängen.
+  (Die Stufen danach – 8c91947d…1e523e83 – belegt erst 131110-451.)
+
+### BEFUND FÜR d (13:05) – audio_init 1/20 (work-d-belege3-vergleich-110539-22562)
+- Die Quelle ruft engine.sound_bank.request(0, "sc:shot0") – Handle 0: der Stellvertreter gibt für engine.sound_bank.make (nach
+  mixer.init(0, 64) = true) das Handle 0. In C++ ist bank_ = std::make_unique<SoundBank>(mixer_) nie leer; der Blueprint prüft
+  `!bank_` als Handle == 0 und kehrt in combat_audio_init zurück (121 statt 191 Aufrufe). Kein Konverterfehler: ein make des
+  Stellvertreters (und der Engine) darf für ein gemachtes Objekt nie 0 geben – sonst ist ein besessenes Objekt der Engine nicht
+  von „keins“ zu unterscheiden.
+
+### BEFUND FÜR t1 (13:05) – draw_combat 1/20 (Suite 100601)
+- Erste Abweichung in update_instances: Wert 0.4319 (Quelle) / 0.9319 (Blueprint), +0.5 – dasselbe Muster wie draw_events (Pfosten der
+  Tore, h/2 bei leerer combat_rules_g_gates); draw_combat ruft draw_events. Siehe BEFUND FÜR t1 (07:35).
+
+
 ## Nachfolger 3 (ab 07:30, work-k auf work-zusammen 821208ac)
 
 ## BEREIT ZUM MERGEN: 977e515b (E18: 26e4c7c7 Sprache + b622d9a8 Konverter, eingemischt work-zusammen 0cb3f6b6) – Beleg CI 44496602788 + work-k-vergleich-105013-14336
