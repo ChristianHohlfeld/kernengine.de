@@ -3871,14 +3871,16 @@ class Emit:
             if c.get("kind") != "DeclRefExpr":
                 return None
             i = c.get("referencedDecl", {}).get("id")
+        elif self.is_local_call(n) and self.u.lambdas[c["referencedDecl"]["id"]].get("place") is not None:
+            i = c["referencedDecl"]["id"]   # (a local function that names a place: local_function)
         else:
             return None
-        d = self.tree.body.get(i) if i else None
+        d = (self.u.lambdas.get(i) or {}).get("place") or (self.tree.body.get(i) if i else None)
         e = self.u.place_named(d)
         if e is None or d["id"] in inside:
             return None
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
-        args = kids(n)[1:]
+        args = kids(n)[2:] if n.get("kind") == "CXXOperatorCallExpr" else kids(n)[1:]
         if len(args) != len(params) or any(a.get("kind") == "CXXDefaultArgExpr" for a in args):
             return None
         by = {p["id"]: a for p, a in zip(params, args)}
@@ -3928,7 +3930,7 @@ class Emit:
         `T& x = a.b[i];` makes x a name for a.b[i] (name_references). The call stays with the node (`_call`)
         for the test: its source calls the function, as the program does (walk_source)."""
         for n in list(walk(node)):
-            if n.get("kind") not in ("CallExpr", "CXXMemberCallExpr") or n.get("_call") is not None:
+            if n.get("kind") not in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr") or n.get("_call") is not None:
                 continue
             place = self.placed(n)
             if place is not None:
@@ -6416,6 +6418,19 @@ class Emit:
                     take(i, node, is_changed)
         if not by_ref and any(c for _, _, c in free):
             raise Wait("a local function that changes its own copy of what it captured (mutable)")
+        spelled = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", qtype(method))   # (`auto (i32) const -> f32 &`: what it gives, first)
+        named = dict(method, _file=method.get("_file") or lam.get("_file", ""),   # (where it stands: the lambda's file)
+                     type={"qualType": f"{spelled.group(2)} {spelled.group(1)}" if spelled else qtype(method)})
+        if by_ref and u.place_named(named) is not None:
+            # A local function that names a place (`auto at = [&](i32 i, i32 j) -> f32& { return d[j * W + i]; };`):
+            # as with a function of the program that does (Unit.place_named), every call is written out as that
+            # place - `at(i, j) = x` sets d[j * W + i] (placed). What it names it reads where it is called: captured
+            # by reference, that is what the lambda reads then.
+            u.lambdas[method["id"]] = {"free": free, "args": [], "snapshots": False, "place": named}
+            if v.get("id"):
+                u.lambda_vars[v["id"]] = lam
+            self.dissolve(self.f.decl)   # (its calls, which follow: the place - see dissolve)
+            return []
         lines, args, params = [], [], []
         for entry in free:
             if self.types.get(entry[0]) == "Text" and re.fullmatch(r"(?:const\s+)?char\s*\[\d+\]", re.sub(r"\s*&+\s*$", "", qtype(entry[1]))):
@@ -6457,6 +6472,8 @@ class Emit:
     def local_call(self, n):
         """A call of a local function: (text, type) of what it gives, as `invoke` has it."""
         info = self.u.lambdas[callee(n)["referencedDecl"]["id"]]
+        if info.get("place") is not None:
+            raise Wait(f"{self.u.cpp_name(info['place'])}(): {self.u.PLACE}")
         return self.invoke(self.u.function(callee(n)["referencedDecl"]["id"]), info["args"] + kids(n)[2:])
 
     def is_local_call(self, n):
