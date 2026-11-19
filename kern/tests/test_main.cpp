@@ -3973,7 +3973,8 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
       case PinType::actor: return logic::Value::actor(3);
       case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
-      case PinType::integer_list: return logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993});
+      case PinType::integer_list:  // (of a width: numbers it holds - a List<U8> holds no -7)
+        return of.empty() ? logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993}) : logic::Value::of(std::vector<i64>{7, 0, 127});
       case PinType::number_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
       case PinType::vector_list: return logic::Value::of(std::vector<Vec3>{{1, -2, 3.5f}, {0, 0, 0}});
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
