@@ -14406,7 +14406,8 @@ def main(argv):
             raise SystemExit(f"the header {classes[0]} of the Blueprints the program calls as their classes is not to be had (tools/blueprint_cpp.sh): " + (r.stderr or r.stdout).strip()[:2000])
         for d in sorted({os.path.dirname(os.path.abspath(f)) for f in files}):
             left = os.path.join(d, os.path.basename(classes[0]))
-            if os.path.exists(left) and open(left, encoding="utf-8").read() != open(header, encoding="utf-8").read():
+            # (the same, but for its first line: which file of the level it was written from - a copy of the level is the same level)
+            if os.path.exists(left) and open(left, encoding="utf-8").read().split("\n", 1)[1:] != open(header, encoding="utf-8").read().split("\n", 1)[1:]:
                 raise SystemExit(f"{left} was written from another state of the level than {level} (the build writes it again)")
         flags.insert(0, "-I" + made)
     workers = max(1, min(len(files), int(os.environ.get("KERN_JOBS") or os.cpu_count() or 1)))
