@@ -1156,6 +1156,11 @@ template <class T> void take(kern::Span<T>& to, const Value& v) {
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 /// Numbers the engine gives at a place of its own (`const f64* RoadStream::data()`): the test keeps those its stand-in
 /// answers, and the source reads them where the pointer points - as long as the test runs.
+/// How many numbers there are where a pointer the test took (take of a const T*) points - none for any other pointer.
+inline std::map<const void*, std::size_t>& rooms() {
+  static std::map<const void*, std::size_t> r;
+  return r;
+}
 template <class T>
   requires std::is_arithmetic_v<T>
 void take(const T*& to, const Value& v) {
@@ -1163,6 +1168,14 @@ void take(const T*& to, const Value& v) {
   kept.emplace_back();
   take(kept.back(), v);
   to = kept.back().data();
+  rooms()[to] = kept.back().size();
+}
+/// As many entries as a count says, from a pointer the source hands the engine: where the pointer is one the test took
+/// from the stand-in (data() of an object of the engine), no more than are there - the stand-in answers its size()
+/// on its own; the engine's stand-in, too, gets no more than the list the Blueprint hands it holds.
+template <class T> std::size_t room(const T* p, std::size_t count) {
+  const auto it = rooms().find(static_cast<const void*>(p));
+  return it == rooms().end() ? count : std::min(count, it->second);
 }
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }

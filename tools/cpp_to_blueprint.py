@@ -12378,7 +12378,9 @@ class TestWriter:
                 per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
                 counted = per is not None   # (only the type says it - no name is read)
                 fixed = declared_length(self.tree, p)   # (an array of a fixed length: so many)
-                data = (f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else
+                # (counted: as many as the count says - of numbers the test took from the stand-in itself, no more than it has:
+                # what is there - the stand-in answers data() and size() each on its own; converted::room)
+                data = (f"std::vector<{inner}>({name}, {name} + converted::room({name}, {per} * static_cast<std::size_t>({after['name']})))" if counted else
                         f"({name} ? std::vector<{inner}>({name}, {name} + {fixed}) : std::vector<{inner}>{{}})" if fixed else
                         f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})")
                 params.append((f"const {inner}* {name}", default))
