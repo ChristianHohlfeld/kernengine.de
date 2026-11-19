@@ -1,0 +1,80 @@
+  cost: WorldLook_set: in 300 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 0)
+  cost: WorldLook_release: in 300 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: WorldLook_step: in 300 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: ReleaseLatch_step: in 300 of 300 calls the class asks for memory more often than the source (up to 10 times instead of 2)
+  cost: GrenadeCook_pull: in 300 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: GrenadeCook_release: in 300 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: GrenadeCook_step: in 300 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: GrenadeCook_left: in 300 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: hint_line: in 196 of 300 calls the class asks for memory more often than the source (up to 11 times instead of 1)
+ok   converted_controls_cpp
+ok   converted_destruction
+  cost: Destruction_merge_points: in 15 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+  cost: Destruction_tear: in 92 of 222 calls the class asks for memory more often than the source (up to 41 times instead of 38)
+  cost: Destruction_collapse: in 2 of 67 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+  cost: Destruction_blast: in 37 of 300 calls the class asks for memory more often than the source (up to 826 times instead of 616)
+  note: Destruction_draw: 3 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 22 ms - is not run in the interpreter)
+  note: Destruction_reset: 1 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 28 ms - is not run in the interpreter)
+ok   converted_destruction_cpp
+ok   converted_drone
+  note: Drone_step: 11 of 13 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 3392 ms - is not run in the interpreter)
+  cost: Drone_step: in 1 of 13 calls the class asks for memory more often than the source (up to 123 times instead of 118)
+  note: Drone_step: 13 calls compared (they take 23 s; of a function whose calls take less, twenty at least are)
+ok   converted_drone_cpp
+  cost: MeshData_push_extra: in 32 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 1)
+ok   converted_engine_geo_mesh_data
+ok   converted_engine_geo_roads
+  Mat4_perspective(-0.76476199259780975, -5.504547119140625, 1, 0.46358296169367613): the source gives {[0.45171243682975548, 0, 0, 0, 0, -2.4864723928312222, 0, 0, 0, 0, 2.7284423446256927, -1, 0, 0, 1.7284423446256925, 1]}, the Blueprint {[0.45171243682975548, 0, 0, 0, 0, -2.4864723928312222, 0, 0, 0, 0, 2.7284423446256927, -1, 0, 0, 1.7284423446256925, 0]} (interpreter) and {[0.45171243682975548, 0, 0, 0, 0, -2.4864723928312222, 0, 0, 0, 0, 2.7284423446256927, -1, 0, 0, 1.7284423446256925, 0]} (class)
+    first difference (interpreter) at .m[15]: the source 1, the Blueprint 0
+    first difference (class) at .m[15]: the source 1, the Blueprint 0
+  Mat4_perspective(-1, 41.497566223144531, 0.096914626769919243, -1.21): the source gives {[-0.044110724755986534, 0, 0, 0, 0, -1.830487721712452, 0, 0, 0, 0, -0.85168942976872664, -1, 0, 0, -0.17945578997984074, 1]}, the Blueprint {[-0.044110724755986534, 0, 0, 0, 0, -1.830487721712452, 0, 0, 0, 0, -0.85168942976872664, -1, 0, 0, -0.17945578997984074, 0]} (interpreter) and {[-0.044110724755986534, 0, 0, 0, 0, -1.830487721712452, 0, 0, 0, 0, -0.85168942976872664, -1, 0, 0, -0.17945578997984074, 0]} (class)
+    first difference (interpreter) at .m[15]: the source 1, the Blueprint 0
+    first difference (class) at .m[15]: the source 1, the Blueprint 0
+  Mat4_perspective(0.84261373283739927, 1.4099999999999999, -1.1399999999999999, 8.5): the source gives {[1.5825821155570527, 0, 0, 0, 0, 2.2314407829354441, 0, 0, 0, 0, -0.76348547717842319, -1, 0, 0, 2.0103734439834025, 1]}, the Blueprint {[1.5825821155570527, 0, 0, 0, 0, 2.2314407829354441, 0, 0, 0, 0, -0.76348547717842319, -1, 0, 0, 2.0103734439834025, 0]} (interpreter) and {[1.5825821155570527, 0, 0, 0, 0, 2.2314407829354441, 0, 0, 0, 0, -0.76348547717842319, -1, 0, 0, 2.0103734439834025, 0]} (class)
+    first difference (interpreter) at .m[15]: the source 1, the Blueprint 0
+    first difference (class) at .m[15]: the source 1, the Blueprint 0
+  check failed /dev/shm/spawncity-jobs-chris/work-zusammen-voll-055004-6649/kern/games/spawncity/tests/converted/../converted.h:1576: wrong == 0 | Mat4_perspective: 300 of 300 calls differ
+  projection_matrix({{-1, 9.5, -0.28313148}, {-0.972184181, 1.77999997, -1.80999994}, {0.351504773, 37.2686615, -0.879802465}, 849.2657470703125, 1.72, 1.52, false, 0, false, {[-0.86588418483734131, 1, 0.059999999999999998, 0, -0.43799018859863281, 0.89000000000000001, 28.629486083984375, 0.67446641002753005, 0.80000000000000004, -1, 1, 0.84683230181716573, 1.5800000000000001, 26.846923828125, 0.80362635987719966, 0.63721621036529541]}}, 193.72850036621094): the source gives {[0.0090601795515938468, 0, 0, 0, 0, 1.7552149975788853, 0, 0, 0, 0, 16.200000000000003, -1, 0, 0, 26.144000000000002, 1]}, the Blueprint {[0.0090601795515938468, 0, 0, 0, 0, 1.7552149975788853, 0, 0, 0, 0, 16.200000000000003, -1, 0, 0, 26.144000000000002, 0]} (interpreter) and {[0.0090601795515938468, 0, 0, 0, 0, 1.7552149975788853, 0, 0, 0, 0, 16.200000000000003, -1, 0, 0, 26.144000000000002, 0]} (class)
+    first difference (interpreter) at .m[15]: the source 1, the Blueprint 0
+    first difference (class) at .m[15]: the source 1, the Blueprint 0
+  projection_matrix({{-0.409999996, 0.534191966, -1.89999998}, {0.169734046, 0.637797117, 0.0399999991}, {-45.6368675, 0.409999996, -7.5}, 4.9698905944824219, 0.86929669595082748, 115.96810913085938, false, 0.60311437437559967, false, {[-0.77813112735748291, 0.036004191866486783, -0.50712740421295166, -8.5, 362.02346801757812, 401.68701171875, 1, 12.983119964599609, -1.1399999999999999, 0.93784046173095703, 0.89177589996247708, -8, -9.5, 158.82963562011719, -25.14796257019043, -1.5800000000000001]}}, -1.3100000000000001): the source gives {[0.99041451059166519, 0, 0, 0, 0, -1.2974430088750815, 0, 0, 0, 0, -1.0151052244164975, -1, 0, 0, -1.7517243135785119, 1]}, the Blueprint {[0.99041451059166519, 0, 0, 0, 0, -1.2974430088750815, 0, 0, 0, 0, -1.0151052244164975, -1, 0, 0, -1.7517243135785119, 0]} (interpreter) and {[0.99041451059166519, 0, 0, 0, 0, -1.2974430088750815, 0, 0, 0, 0, -1.0151052244164975, -1, 0, 0, -1.7517243135785119, 0]} (class)
+    first difference (interpreter) at .m[15]: the source 1, the Blueprint 0
+    first difference (class) at .m[15]: the source 1, the Blueprint 0
+  projection_matrix({{244.827271, 0.222317368, 0.0584618375}, {1.96000004, -0.400000006, -47.3083076}, {-1.83000004, -1, 1.64999998}, 225.90965270996094, -0.34999999999999998, 1, false, 981.95159912109375, false, {[0.34204683364059019, 0.98933887481689453, 0.42538713095773595, 0.87156426906585693, 0.066620045104256273, 0.84100217533682808, 0, 0, 0.34000000000000002, 0, -31.849098205566406, -2.5, 19.437370300292969, 0.32600192698429309, 0, -2]}}, -0.91630236436753265): the source gives {[7.6061405786760465, 0, 0, 0, 0, -6.9695245959526941, 0, 0, 0, 0, -0.48148148148148145, -1, 0, 0, 0.51851851851851849, 1]}, the Blueprint {[7.6061405786760465, 0, 0, 0, 0, -6.9695245959526941, 0, 0, 0, 0, -0.48148148148148145, -1, 0, 0, 0.51851851851851849, 0]} (interpreter) and {[7.6061405786760465, 0, 0, 0, 0, -6.9695245959526941, 0, 0, 0, 0, -0.48148148148148145, -1, 0, 0, 0.51851851851851849, 0]} (class)
+    first difference (interpreter) at .m[15]: the source 1, the Blueprint 0
+    first difference (class) at .m[15]: the source 1, the Blueprint 0
+  check failed /dev/shm/spawncity-jobs-chris/work-zusammen-voll-055004-6649/kern/games/spawncity/tests/converted/../converted.h:1576: wrong == 0 | projection_matrix: 62 of 300 calls differ
+FAIL converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_equipment
+  cost: Jetpack_ignite: in 300 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: Jetpack_update: in 300 of 300 calls the class asks for memory more often than the source (up to 5 times instead of 0)
+  cost: FlightLog_json: in 287 of 300 calls the class asks for memory more often than the source (up to 28 times instead of 10)
+  cost: prog_of: in 1 of 300 calls the class asks for memory more often than the source (up to 4 times instead of 0)
+  cost: MusicSynth_step: in 104 of 104 calls the class asks for memory more often than the source (up to 3 times instead of 0)
+  cost: MusicSynth_render_add: in 10 of 61 calls the class asks for memory more often than the source (up to 99 times instead of 0)
+ok   converted_equipment_cpp
+ok   converted_facades
+  cost: Facades_attributes: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_facades_cpp
+ok   converted_game_barricades_cpp
+  cost: bind_sandbox: in 300 of 300 calls the class asks for memory more often than the source (up to 17 times instead of 15)
+  cost: enemy_spec: in 1 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: bind_fun: in 300 of 300 calls the class asks for memory more often than the source (up to 46 times instead of 43)
+  cost: contract: in 1 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+  cost: bind_race: in 300 of 300 calls the class asks for memory more often than the source (up to 58 times instead of 0)
+  cost: gate: in 1 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+ok   converted_Game__combat_rules_cpp
+ok   converted_game_controls_cpp
+ok   converted_game
+ok   converted_game_cpp
+ok   converted_game_destruction_sync_cpp
+ok   converted_game_details_cpp
+  note: render_loop: 24 of 300 calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to 31 ms - is not run in the interpreter)
+  cost: render_loop: in 248 of 300 calls the class asks for memory more often than the source (up to 260 times instead of 253)
+ok   converted_game_equipment_cpp
+ok   converted_game_events_cpp
+ok   converted_game_foot_rounds_cpp
+  cost: osfx: in 2 of 38 calls the class asks for memory more often than the source (up to 2 times instead of 1)
+  cost: web_audio_state: in 7 of 24 calls the class asks for memory more often than the source (up to 72 times instead of 67)
+ok   converted_Game__game_audio_web_cpp

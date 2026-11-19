@@ -1,0 +1,80 @@
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_gaps_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_controls_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_jet_seats_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_world_traffic_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_town_sync_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_mp_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_equipment_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_spawn_guard_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_net_session_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_combat_detail_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    cell (1): written
+    TrafficRules::rebuild (142): written
+    TrafficRules::near (12): written
+    TrafficRules::bind (1): written
+    TrafficRules::take_laws (8): written
+    TrafficRules::light (6): written
+    TrafficRules::pursuit (32): written
+    TrafficRules::gap_speed (20): written
+    TrafficRules::limit (86): written
+
+1707 of 1844 functions of the program are written as Blueprints (22249 of 30978 lines), and 28 of the engine's headers that they call: 156 Blueprints - 70 of source files, 1 of states, 85 of headers and of shapes
+1664 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 5 give nothing
+
+what the others wait for: functions (lines)
+    33 (  1682)   the engine's now_ms() (its node is another one in the engine: its pins differ)
+    11 (   948)   it calls Game::ctl_strike_confirm(), which waits
+     8 (   811)   an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+     6 (   483)   the engine's shots() (its node is another one in the engine: its pins differ)
+     5 (   344)   a pointer
+     1 (   306)   a vector constant written as CallExpr
+     5 (   268)   the end of a Car runs its destructor ~Car(), which is not written yet
+     4 (   259)   it calls Game::hit_scan(), which waits
+     3 (   235)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     2 (   220)   Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+     4 (   210)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_military_cpp)
+     1 (   182)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_life_cpp)
+     3 (   168)   a member of Int is set
+     1 (   155)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_gaps_cpp)
+     1 (   136)   a loop that changes the characters of a text
+     2 (   127)   it calls Game::explosion(), which waits
+     1 (   120)   a function value (lambda / std::function) of another shape: a lambda with auto inputs
+     2 (   118)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_events_cpp)
+     1 (   117)   build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+     1 (   111)   it calls register_node(), which waits
+     2 (   109)   a reference to something it changes
+     1 (   104)   algorithm: std::find_if in a list that is no place of the function
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    99)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_traffic_cpp)
+     1 (    86)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_weapons_cpp)
+     2 (    86)   it calls GeoProjector::init(), which waits
+     1 (    81)   it calls Game::step_heli(), which waits
+     1 (    81)   an assignment inside an expression
+     2 (    77)   Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_town_cpp)
+     3 (    74)   algorithm: std::remove_if with a function value that is no lambda
+     1 (    72)   the struct Feat (its field pts: a pointer)
+     1 (    65)   it calls Game::step_cop(), which waits
+     1 (    61)   GotoStmt
+     1 (    60)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_details_cpp)
+     1 (    58)   tuple / variant
+     1 (    55)   it calls Interiors::activate(), which waits
+     1 (    52)   it calls Game::life_epoch(), which waits
+     2 (    51)   the engine's sound_cues() (its node is another one in the engine: its pins differ)
+     1 (    49)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_swarm_cpp)
+     1 (    47)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+
+real	28m49,522s
+user	438m1,094s
+sys	15m48,134s
