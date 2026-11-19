@@ -11307,7 +11307,7 @@ class TestWriter:
         for q in sorted(objects):
             name = self.object_name(q)
             pairs.append((self.absolute(q), name))
-            decls, made = [], False
+            decls, made, makes = [], False, False
             for f in by_class.get(q, []):
                 try:
                     a, b = self.stand_in_life(f, name) if f.get("role") else self.stand_in(f, name)
@@ -11316,6 +11316,7 @@ class TestWriter:
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
                 # (a constructor that needs no arguments - none, or a default for each - is the one C++ makes it by)
                 made = made or (f.get("role") == "make" and all(kids(p) for p in kids(f["decl"]) if p.get("kind") == "ParmVarDecl"))
+                makes = makes or f.get("role") == "make"
                 if "  " + a in decls:
                     continue   # (the one function, which the source and a piece of another file name by two declarations of it)
                 decls.append("  " + a)
@@ -11323,7 +11324,9 @@ class TestWriter:
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
-            inherit = [f"  using {self.object_name(b)}::{self.object_name(b)};" for b in self.engine_bases(q)] or ["  using converted::EngineObject::EngineObject;"]
+            # (EngineObject's constructor of any arguments is for a class whose stand-in has none of its own: beside one
+            # it would be the better match - `kern::LightPool(n, 96)` with an int took it, and no light_pool.make was asked)
+            inherit = [f"  using {self.object_name(b)}::{self.object_name(b)};" for b in self.engine_bases(q)] or ([] if makes else ["  using converted::EngineObject::EngineObject;"])
             ends = next((f for f in by_class.get(q, []) if f.get("role") == "release"), None)
             if ends is not None:
                 # (its own destructor would leave it without moves: moved, what it owns goes with it - EngineObject.

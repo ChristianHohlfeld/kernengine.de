@@ -1643,14 +1643,31 @@ template <class E> E none_entry() {
     return E{};
   }
 }
+template <class T, class U> void copy_entry(T& to, const U& from) {
+  if constexpr (std::is_array_v<T>) {
+    for (std::size_t k = 0; k < std::extent_v<T>; ++k) copy_entry(to[k], from[k]);
+  } else {
+    to = from;
+  }
+}
 template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   using R = decltype(c[0]);
   const long long n = static_cast<long long>(entries(c)), k = static_cast<long long>(i);
   if (k >= 0 && k < n) return c[static_cast<std::size_t>(k)];
   open_read();
   if constexpr (std::is_reference_v<R>) {
-    static std::remove_cvref_t<R> none;   // (an entry that is an array - T[3][2] - too: every entry of it none_entry)
-    fill_array(none, [] { return none_entry<std::remove_all_extents_t<std::remove_cvref_t<R>>>(); });
+    // (an entry that is an array - T[3][2] - too: every entry of it none_entry). Of a list that has entries: a copy of its
+    // first one - also an entry of a struct with a C text in it (perf::Tier::name of `kTier[t]`) is then one the source
+    // can go on with; what is written to it is not the list's.
+    using E = std::remove_cvref_t<R>;
+    static E none;
+    if constexpr (std::is_copy_assignable_v<std::remove_all_extents_t<E>>) {
+      if (n > 0) {
+        copy_entry(none, c[0]);
+        return none;
+      }
+    }
+    fill_array(none, [] { return none_entry<std::remove_all_extents_t<E>>(); });
     return none;
   } else {
     static std::vector<bool> none(1);
