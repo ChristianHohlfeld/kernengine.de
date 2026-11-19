@@ -1180,7 +1180,8 @@ ein Knoten (`tools/engine_api.py` liest die Header der Engine und schreibt die T
 ist `engine.world.cast_ray`, im Text `engine_world_cast_ray(world, from, to …)`. Interpreter und
 JIT rufen ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertreter
 `logic::EngineStandIn`, der aus der Form jedes Ausgangs antwortet – gleich in jeder Stufe – oder
-die Engine selbst. Die Klasse ruft die Funktion der Engine selbst (unten: „In der Klasse der Aufruf
+die Engine selbst. Eine Liste in der Form hat 0 bis 2 Einträge; eine Liste fester Länge – ein Feld,
+das in C++ ein Array ist (`f32 m[16]` von `Mat4`: Form `{[16n]}`) – genau so viele, wie C++ hält. Die Klasse ruft die Funktion der Engine selbst (unten: „In der Klasse der Aufruf
 selbst“).
 
 - **In der Klasse der Aufruf selbst** (`kern/logic/engine_direct.h`): Gibt der Host der Klasse die
