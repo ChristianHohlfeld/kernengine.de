@@ -37,7 +37,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "Callback", "callback", "loop", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -92,6 +92,13 @@ std::string width_of_cpp(std::string_view name) {
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
+  if (t.type == PinType::callback) {  // (Callback<Float(Float, Float)>, Callback<void(Int)>)
+    const TypeRef r = callback_result(t);
+    std::string s = "Callback<" + (r.type == PinType::exec ? std::string("void") : cpp_type(r)) + "(";
+    const std::vector<TypeRef> in = callback_inputs(t);
+    for (std::size_t k = 0; k < in.size(); ++k) s += (k ? ", " : "") + cpp_type(in[k]);
+    return s + ")>";
+  }
   // (a map, a set: Map<Int, List<Weapon>>, Set<Text>)
   if (t.type == PinType::map) return "Map<" + cpp_type(key_type(t)) + ", " + cpp_type(value_type(t)) + ">";
   if (t.type == PinType::set) return "Set<" + cpp_type(key_type(t)) + ">";
@@ -205,6 +212,7 @@ std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std
   return r + "}";
 }
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
+  if (v.type == PinType::callback) return cpp_type(TypeRef{PinType::callback, of}) + "{}";  // (unbound: what a place of one holds until it is set)
   if (is_keyed(v.type)) {
     // a map: Map<Int, Float>{{1, 2.5}, {3, 4.0}} - its entries in their order; a set: Set<Int>{1, 3}
     const TypeRef t{v.type, of}, key = key_type(t), value = v.type == PinType::map ? value_type(t) : TypeRef{};
@@ -1189,7 +1197,7 @@ struct Shape {
     for (int i : by_id) {
       const Info& x = at(i);
       const std::string& t = x.def->type;
-      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure" || t == "func.call_on")
+      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure" || t == "func.call_on" || t == "func.callback")
         if (!function_of(i)) return fail(title(i) + " names a function that is not there", i);
       bool names_variable = false;
       for (const ParamDef& pd : x.def->params) names_variable = names_variable || pd.kind == ParamDef::Kind::variable;
@@ -1210,7 +1218,7 @@ struct Shape {
                             "runs - not after a wait (Delay), not in an event or another function, and paths that meet before it must all come from one Branch or Switch",
                         i);
         }
-      } else if (const std::string scope = x.node->param("scope"); !scope.empty() && (t == "func.call" || t == "func.pure")) {
+      } else if (const std::string scope = x.node->param("scope"); !scope.empty() && (t == "func.call" || t == "func.pure" || t == "func.callback")) {
         // A call that names places of a function - its local variables, its inputs - stands on a
         // path of that function, like a node of one of its local variables.
         const int where = place_of(i);
@@ -1652,6 +1660,13 @@ struct Writer {
     if (t == "func.pure") {
       const std::string args = call_args(x, c);
       return at(x).node->param("function") + "(" + args + ")";
+    }
+    if (t == "func.callback") {
+      // callback<&Terrain_lib::height_at>(self): the function, by its class, and the place its first input binds
+      const std::string fn = at(x).node->param("function");
+      const Function* f = s.g.function(fn);
+      const std::string place = f && !f->inputs.empty() && f->inputs[0].ref ? place_text(x, c, ref_key(f->inputs[0].name, "")) : std::string();
+      return "callback<&" + (fn.find("::") != std::string::npos ? fn : cls_ + "::" + fn) + ">(" + place + ")";
     }
     if (t == "math.formula") {
       const std::string text = at(x).node->param("formula", "a + b");
@@ -2444,6 +2459,14 @@ struct Reader {
   bool literal_here(Value& v, std::string* of = nullptr, u32* count = nullptr) {
     const Tok& t = peek();
     if (of) of->clear();
+    if (t.kind == Tok::id && t.s == "Callback" && is("<", 1)) {
+      // Callback<Float(Float, Float)>{}: unbound - the one Callback a text writes out
+      TypeRef c;
+      if (!type_here(c) || !expect("{", "(an unbound Callback is " + cpp_type(c) + "{})") || !expect("}")) return true;
+      v = Value::zero(PinType::callback);
+      if (of) *of = c.of;
+      return true;
+    }
     if (t.kind == Tok::id && is("{", 1) && g.structure(t.s)) {
       // Weapon{"Knife", Kind::Melee, 25.0}: a value for every field, in their order
       const StructType s = *g.structure(t.s);
@@ -2625,6 +2648,25 @@ struct Reader {
       t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
       t.of = toks[p++].s;
       return true;
+    }
+    if (is("Callback") && is("<", 1)) {
+      // Callback<Float(Float, Float)>: a function of a library the engine calls (Make Callback), its signature -
+      // what it gives (void: nothing) and what it is handed: Bools, Ints, Floats, Vectors, Int64s
+      const std::size_t at = p;
+      p += 2;
+      TypeRef r{PinType::exec, {}};
+      if (!accept("void") && (!type_here(r) || !callback_type_ok(r.type) || r.count)) return fail(at + 2, "a Callback gives a Bool, an Int, a Float, a Vector, an Int64 or nothing: Callback<Float(Float, Float)>, Callback<void(Int)>");
+      if (!expect("(")) return false;
+      std::vector<TypeRef> in;
+      while (!is(")")) {
+        if (!in.empty() && !expect(",")) return false;
+        TypeRef a;
+        if (!type_here(a) || !callback_type_ok(a.type) || a.count) return fail(p, "the engine hands a Callback Bools, Ints, Floats, Vectors and Int64s");
+        in.push_back(a);
+      }
+      ++p;
+      t = {PinType::callback, callback_of(r, in)};
+      return expect(">");
     }
     if ((is("Map") || is("Set")) && is("<", 1)) {
       // Map<Int, Float>: values under keys; Set<Int>: keys - in the order the keys came. A key is a
@@ -3075,7 +3117,7 @@ struct Reader {
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
-        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set")) && is("<", 1)) || (peek(1).kind == Tok::id && !numbered(peek(1).s, "n") && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set") || is("Callback")) && is("<", 1)) || (peek(1).kind == Tok::id && !numbered(peek(1).s, "n") && (is("=", 2) || is(";", 2)))) && type_here(type);) {
           FunctionPin l;
           l.type = type.type;
           l.of = type.of;
@@ -3362,7 +3404,7 @@ struct Reader {
     std::vector<int> r;
     const Made& m = made[static_cast<std::size_t>(node)];
     const bool place = names_place(*m.def);  // (the indices of its path stand in the place, not among its values)
-    const bool call = m.def->type == "func.call" || m.def->type == "func.pure";  // (so do those of the places a call names: "<input>.path0")
+    const bool call = m.def->type == "func.call" || m.def->type == "func.pure" || m.def->type == "func.callback";  // (so do those of the places a call names: "<input>.path0")
     for (std::size_t k = 0; k < m.in.size(); ++k)
       if (m.in[k].type != PinType::exec && !(place && is_path_pin(m.in[k].id)) && !(call && m.in[k].id.find('.') != std::string::npos)) r.push_back(static_cast<int>(k));
     return r;
@@ -3554,6 +3596,41 @@ struct Reader {
           s.pin = pd.id;
           return s;
         }
+    }
+    if (t.s == "callback" && is("<")) {
+      // callback<&Lib::fn>(place): Make Callback - a function of a library the engine calls; the place binds its
+      // first input where that is a const reference
+      p += 1;
+      std::string owner, fn, more;
+      if (!expect("&", "(callback<&Library::function>(place))") || !word(owner, "a library")) return s;
+      if (const std::size_t at = owner.find("::"); at != std::string::npos) {  // (a name with its library, read as one: Ground::height)
+        fn = owner.substr(at + 2);
+        owner = owner.substr(0, at);
+      } else if (!expect("::") || !word(fn, "a function of " + owner)) {
+        return s;
+      }
+      while (accept("::")) {
+        if (!word(more, "a function")) return s;
+        fn += "::" + more;
+      }
+      const std::string fname = owner == name ? fn : owner + "::" + fn;
+      const Function* f = g.function(fname);
+      if (!f) { fail(s.tok, "callback<&" + owner + "::" + fn + ">: no such function"); return s; }
+      if (!expect(">") || !is("(")) { expect("("); return s; }
+      std::vector<std::pair<std::string, std::string>> params{{"function", fname}};
+      const bool bound = !f->inputs.empty() && f->inputs[0].ref;
+      if (bound && !ref_places(*f, 1, params)) return s;
+      ++p;
+      const int node = make("func.callback", s.tok, std::move(params));
+      if (node < 0) return s;
+      if (bound) {
+        ++p;  // (the variable's name)
+        if (!place_rest(node, ref_key(f->inputs[0].name, ""))) return s;
+      }
+      if (!expect(")", "(a Callback binds one place: callback<&" + owner + "::" + fn + ">(" + (bound ? f->inputs[0].name : std::string()) + "))")) return s;
+      s.node = node;
+      s.root = true;
+      return s;
     }
     if (const Function* f = g.function(t.s)) {
       const std::string fname = f->name;
@@ -5118,6 +5195,13 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     auto inner = [&](const TypeRef& x) { return x.type == PinType::integer ? std::string("kern::logic::Whole") : type_in(x.type, x.of, owner); };
     if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
     if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
+    if (t == PinType::callback) {  // (kern::logic::Callback<kern::f64(kern::f64, kern::f64)>)
+      const TypeRef r = callback_result({t, of});
+      std::string c = "kern::logic::Callback<" + (r.type == PinType::exec ? std::string("void") : inner(r)) + "(";
+      const std::vector<TypeRef> in = callback_inputs({t, of});
+      for (std::size_t k = 0; k < in.size(); ++k) c += (k ? ", " : "") + inner(in[k]);
+      return c + ")>";
+    }
     if (t == PinType::integer_list && width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
     return is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
@@ -5159,7 +5243,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
-      if (is_keyed(f.type.type)) return type_in(f.type.type, f.type.of, rooted);
+      if (is_keyed(f.type.type) || f.type.type == PinType::callback) return type_in(f.type.type, f.type.of, rooted);
       if (is_list(f.type.type) && has_width(f.type)) return type_in(f.type.type, f.type.of, rooted);  // (a List<U8> ...: its items of that width)
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;

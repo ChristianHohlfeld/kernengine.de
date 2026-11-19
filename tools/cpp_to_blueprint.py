@@ -1112,6 +1112,43 @@ def count_per(t):
     return int(m.group(1)) if m else None
 
 
+CALLBACK_VALUES = ("Bool", "Int", "Float", "Vector", "Int64")   # (what the engine hands a Callback and what it gives: values C++ passes as values)
+CALLBACK_PIN = {"Bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Int64": "int64"}
+
+
+def split_top(text):
+    """The parts of a list of types at its top level: "f64, std::pair<a, b>" -> ["f64", "std::pair<a, b>"]."""
+    out, depth, cur = [], 0, ""
+    for ch in text:
+        if ch in "<([":
+            depth += 1
+        elif ch in ">)]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
+    return out
+
+
+def callback_parts(bt):
+    """A Callback's Blueprint type "Callback<Float(Float, Float)>": (its result - None: it gives nothing -, its inputs);
+    None for any other type."""
+    m = re.fullmatch(r"Callback<(\w+)\((.*)\)>", bt or "")
+    if not m:
+        return None
+    return (None if m.group(1) == "void" else m.group(1)), split_top(m.group(2))
+
+
+def callback_of(bt):
+    """What TypeRef::of says of a Callback (kern/include/kern/logic/logic.h, callback_of): "float(float,float)"."""
+    r, a = callback_parts(bt)
+    return (CALLBACK_PIN[r] if r else "") + "(" + ",".join(CALLBACK_PIN[x] for x in a) + ")"
+
+
 def template_args(t):
     """The arguments of a template type's name: "std::pair<int, std::vector<float>>" -> ["int", "std::vector<float>"]."""
     a, b = t.find("<"), t.rfind(">")
@@ -1432,6 +1469,7 @@ class Unit:
         self.next_node = 10 + (self.world.part_numbers.get(self.job, 0) << 20)
         self.enum_aliases = {}      # (enum, a value's name) -> the earlier value of the same number it is
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
+        self.generic = {}           # a specialization of a lambda with auto inputs (its id) -> (variable, lambda, record, it) (Emit.instance)
         self.lambda_vars = {}   # (a local function's variable -> its lambda: `auto gone = [&](...) {...};`, named where an algorithm is given it)
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
@@ -1671,12 +1709,66 @@ class Unit:
         self.objects_seen.add(q)
         return q
 
+    def callback_record(self, q):
+        """The record `q` as a Callback: a struct of the engine of exactly a pointer to a function that takes a void* in
+        front and that void* (kern::HeightSampler: fn, user - the function the engine calls and what it hands it) - its
+        Blueprint type "Callback<Float(Float, Float)>"; None for any other record."""
+        rec = self.tree.records.get(q)
+        if rec is None or not q.startswith(ENGINE + "::"):
+            return None
+        fields = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        if len(fields) != 2:
+            return None
+        fn, user = (re.sub(r"\s+", " ", qtype(c).strip()) for c in fields)
+        m = re.fullmatch(r"(.+?)\s*\(\s*\*\s*\)\s*\((.*)\)", fn)
+        if not m or user.replace(" ", "") != "void*":
+            return None
+        args = split_top(m.group(2))
+        if not args or args[0].replace(" ", "") != "void*":
+            return None
+        return self.callback_sig(m.group(1), args[1:], same=True)
+
+    def callback_sig(self, result, args, same=False):
+        """The Callback of a C++ signature: its result and its inputs, each a value C++ hands over as a value (Bool, Int,
+        Float, Vector, Int64). `same`: the engine calls the class's thunk itself (a function pointer, no std::function
+        between) - then each is the type the class has for it: bool, f64, Vec3 (an Int of the class is a Whole)."""
+        def one(raw):
+            t = self.clean(raw)
+            if t == "void":
+                return "void"
+            bt = self.btype(raw)
+            if bt not in CALLBACK_VALUES:
+                raise Wait(f"a callback that is handed or gives a {bt} (a Callback: Bool, Int, Float, Vector, Int64)")
+            if same and (bt in ("Int", "Int64") or (bt == "Float" and t not in ("double", "f64", "kern::f64")) or (bt == "Vector" and t != "kern::Vec3")):
+                raise Wait(f"a callback through a function pointer that is handed or gives a {t} (the class's thunk has f64, bool, Vec3)")
+            return bt
+        r = one(result)
+        ins = [one(a) for a in args if a.strip() not in ("", "void")]
+        if "void" in ins:
+            raise Wait("a callback handed nothing (void)")
+        return f"Callback<{r}({', '.join(ins)})>"
+
+    def callback_type(self, raw):
+        """The Callback a C++ type is: std::function<R(A...)>, or a struct of the engine that is one (callback_record).
+        None: no such type."""
+        t = self.clean(raw)
+        m = re.fullmatch(r"std::function<(.+?)\s*\((.*)\)>", t)
+        if m:
+            return self.callback_sig(m.group(1), split_top(m.group(2)))
+        try:
+            q = self.find_type(t) if t.startswith(ENGINE + "::") else None
+        except Wait:
+            q = None
+        return self.callback_record(q) if q else None
+
     def engine_object(self, q):
         """Is the class `q` of the engine an object with a life of its own (a handle in a Blueprint), not
         plain data? A `class` is one (its state is its own: the engine's convention), and so is a struct
         that cannot be a struct of the Blueprint (a pointer in it, a field without a Blueprint type).
-        Api.opaque asks the same."""
+        Api.opaque asks the same. (A struct that is a Callback is a value: callback_record.)"""
         if not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+            return False
+        if self.callback_record(q):
             return False
         rec = self.tree.records[q]
         if rec.get("tagUsed") == "class":
@@ -1710,7 +1802,8 @@ class Unit:
                 text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
             except OSError:
                 text = ""
-            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
+            # (what a pin names: a struct or an enum - a word -, or a Callback's signature - "float(float,float)")
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "([\w(),]*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
             # (an entry may end with what the engine says of the node beyond its pins - `place`, `clock`, written only
             # where one is set: `{...outputs...}, true},` - the pins are the same node; read without them, the last
             # output was taken for the end of the entry and every such node "differed")
@@ -1727,6 +1820,9 @@ class Unit:
             # said here, where the type still says that what its entries point at is not changed)
             inner = re.sub(r"\[\d*\]\s*$", "", raw.strip(), count=1).strip()
             return f"List<{self.element(self.btype(inner), self.entries(inner))}>"
+        cb = self.callback_type(raw) if "*" not in re.sub(r"<.*>|\(.*\)", "", raw) else None
+        if cb:
+            return cb
         if self.object_of(raw):
             return "Int"
         t = self.clean(raw)
@@ -2049,8 +2145,8 @@ class Unit:
             return ZERO[t]
         if re.match(r"Fixed<(.+), (\d+)>$", t):   # (a list of a fixed length: what its text does not say is zero)
             return t + "{}"
-        if t.startswith(("List<", "Map<", "Set<")):
-            return t + "{}"
+        if t.startswith(("List<", "Map<", "Set<", "Callback<")):
+            return t + "{}"   # (a Callback: unbound)
         if t in self.enum_values:
             return f"{t}::{self.enum_values[t][0]}"
         if t in self.struct_fields:
@@ -2886,6 +2982,10 @@ class Const:
         c = callee(n)
         d = self.unit.tree.body.get(c.get("referencedDecl", {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
         if d is None or d.get("kind") != "FunctionDecl":
+            return None
+        if self.unit.tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm::"):
+            # (the engine's functions of numbers - `std::tan` of the program, which the dumps join to `kern::dm::tan`
+            # by its name and type (join_dumps): a function of a formula by its name, not the library they call)
             return None
         body = next((x for x in kids(d) if x.get("kind") == "CompoundStmt"), None)
         stmts = kids(body) if body is not None else []
@@ -3892,14 +3992,16 @@ class Emit:
             if c.get("kind") != "DeclRefExpr":
                 return None
             i = c.get("referencedDecl", {}).get("id")
+        elif self.is_local_call(n) and self.u.lambdas.get(c["referencedDecl"]["id"], {}).get("place") is not None:
+            i = c["referencedDecl"]["id"]   # (a local function that names a place: local_function)
         else:
             return None
-        d = self.tree.body.get(i) if i else None
+        d = (self.u.lambdas.get(i) or {}).get("place") or (self.tree.body.get(i) if i else None)
         e = self.u.place_named(d)
         if e is None or d["id"] in inside:
             return None
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
-        args = kids(n)[1:]
+        args = kids(n)[2:] if n.get("kind") == "CXXOperatorCallExpr" else kids(n)[1:]
         if len(args) != len(params) or any(a.get("kind") == "CXXDefaultArgExpr" for a in args):
             return None
         by = {p["id"]: a for p, a in zip(params, args)}
@@ -3949,7 +4051,7 @@ class Emit:
         `T& x = a.b[i];` makes x a name for a.b[i] (name_references). The call stays with the node (`_call`)
         for the test: its source calls the function, as the program does (walk_source)."""
         for n in list(walk(node)):
-            if n.get("kind") not in ("CallExpr", "CXXMemberCallExpr") or n.get("_call") is not None:
+            if n.get("kind") not in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr") or n.get("_call") is not None:
                 continue
             place = self.placed(n)
             if place is not None:
@@ -3959,6 +4061,72 @@ class Emit:
                 n["_call"] = call
 
     # ---- statements ----
+    def either_place(self, stmts, i):
+        """`T& r = c ? a : b;` - a name for one of two places, which the condition chooses where r is bound: what
+        follows in the block, once with r as a and once with r as b, the condition choosing which (an if, where
+        the reference is bound - C++ works out c there, once). The places themselves must be where they are
+        whatever follows does: a variable, a member of one or of the object (a name for a place stands for that
+        place - name_references). The new statements of the block; None: no such reference."""
+        s = stmts[i]
+        if s.get("kind") != "DeclStmt" or len(kids(s)) != 1:
+            return None
+        v = kids(s)[0]
+        raw = qtype(v)
+        if v.get("kind") != "VarDecl" or "&" not in raw or "&&" in raw or self.init_of(v) is None:
+            return None
+        init = bare(self.unwrap(self.init_of(v)))
+        while init.get("kind") == "ParenExpr" and kids(init):
+            init = bare(kids(init)[0])
+        if init.get("kind") != "ConditionalOperator" or len(kids(init)) != 3 or init.get("valueCategory") != "lvalue":
+            return None
+        def fixed(x):   # (a place whose address nothing that follows can change)
+            x = bare(x)
+            k = x.get("kind")
+            if k in ("ImplicitCastExpr", "ParenExpr") and kids(x) and x.get("castKind") in (None, "NoOp"):
+                return fixed(kids(x)[0])
+            if k == "DeclRefExpr":
+                return (x.get("referencedDecl") or {}).get("kind") in ("VarDecl", "ParmVarDecl")   # (a variable stays where it is; a reference is not bound again)
+            if k == "MemberExpr" and kids(x):
+                if x.get("isArrow") and bare(kids(x)[0]).get("kind") != "CXXThisExpr":
+                    return fixed(kids(x)[0]) and not self.reads(kids(x)[0]) & changed   # (through a pointer nothing after changes)
+                return True if x.get("isArrow") else fixed(kids(x)[0])
+            if (k == "CXXOperatorCallExpr" and callee_name(x) in ("operator*", "operator->") and len(kids(x)) == 2) or (k == "UnaryOperator" and x.get("opcode") == "*" and kids(x)):
+                held = kids(x)[-1]   # (what an owned value or a pointer holds - `*gaps_`: as long as nothing after sets it)
+                return fixed(held) and not self.reads(held) & changed
+            return k == "CXXThisExpr"
+        cond, a, b = kids(init)
+        rest = stmts[i + 1:]
+        changed = self.assigned({"kind": "CompoundStmt", "inner": rest})
+        if not (fixed(a) and fixed(b)):
+            return None
+        for x in (y for r in rest for y in walk(r)):
+            if x.get("kind") == "LabelStmt":
+                return None   # (a goto into what follows: the copies would have the label twice)
+            if x.get("kind") == "LambdaExpr" and any((y.get("referencedDecl") or {}).get("id") == v["id"] for y in walk(x)):
+                return None   # (captured by a lambda: what it captures is r itself)
+        def branch(n, arm):
+            body = copy.deepcopy({"kind": "CompoundStmt", "inner": rest})
+            ids = {x["id"]: f"{x['id']}_or{n}" for x in walk(body) if x.get("kind", "").endswith("Decl") and "id" in x}
+            for x in walk(body):   # (what follows declares: its own in each)
+                if x.get("id") in ids:
+                    x["id"] = ids[x["id"]]
+                    self.tree.decl[x["id"]] = x
+                r = x.get("referencedDecl")
+                if r and r.get("id") in ids:
+                    x["referencedDecl"] = {**r, "id": ids[r["id"]]}
+                for key in ("declId", "targetLabelDeclId"):
+                    if x.get(key) in ids:
+                        x[key] = ids[x[key]]
+            for x in list(walk(body)):
+                if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == v["id"]:
+                    put = copy.deepcopy(arm)
+                    x.clear()
+                    x.update(put)
+            return body
+        choice = {"kind": "IfStmt", "hasElse": True, **{k: s[k] for k in ("_at", "_file", "range", "loc") if k in s},
+                  "inner": [copy.deepcopy(cond), branch(0, a), branch(1, b)]}
+        return stmts[:i] + [choice]
+
     def name_references(self, stmts, i):
         """`T& x = a.b[i];` - a name for a place: in what follows, x is written out as a.b[i]. (A const
         reference is a copy of the value as long as what it names does not change while it lives.)"""
@@ -4611,10 +4779,17 @@ class Emit:
             s = stmts[i]
             if not isinstance(self.named_places, set):
                 self.named_places = set()
-            self.name_references(stmts, i)
+            chosen = self.either_place(stmts, i)
+            if chosen is not None:
+                stmts, s = chosen, chosen[i]
+            before, self.pre = self.pre, []
+            try:
+                self.name_references(stmts, i)
+            finally:
+                bound, self.pre = self.pre, before   # (what binding a name works out - the row of m[key]: there, before the statement)
             self.rest_stmts = stmts[i + 1:]   # (what follows the statement in its block: see bytes_pointer)
             lines, ends = self.stmt(s)
-            out += lines
+            out += bound + lines
             if ends:
                 return out, True
             if s.get("kind") in ("BreakStmt", "ContinueStmt"):
@@ -5965,6 +6140,8 @@ class Emit:
             return self.entry_pointer_set(self.unwrap(kids(n)[0])["referencedDecl"]["id"], kids(n)[1])   # (a pointer to an entry is given one, or none)
         if k == "BinaryOperator" and n.get("opcode") == "=" and self.asked_or_none(kids(n)[0]) is not None:
             return self.text_or_none_set(self.unwrap(kids(n)[0])["referencedDecl"], kids(n)[1])   # (a text or none is given one, or none)
+        if k == "BinaryOperator" and n.get("opcode") == "=" and (done := self.callback_field_set(*kids(n))) is not None:
+            return done
         if k == "BinaryOperator" and n.get("opcode") == "=":
             a, b = kids(n)
             inner = self.unwrap(b)
@@ -6406,9 +6583,19 @@ class Emit:
         method = next((c for c in kids(rec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
         body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
         if body is None:
-            # (a lambda with auto inputs is a template: a function for each type it is called with - one that takes
-            # functions is one for each function it is given; the language has no function values)
-            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+            # A lambda with auto inputs is a template: a function for each type it is called with - one that takes a
+            # lambda, one for each lambda it is given (each its own type). The compiler has made each that is called
+            # (the specializations of its operator()): each is a local function of its own, made where it is called
+            # (local_call), the lambda it is given standing for its input (the language has no function values).
+            tmpl = next((c for c in kids(rec or {}) if c.get("kind") == "FunctionTemplateDecl" and c.get("name") == "operator()"), None)
+            made = [c for c in kids(tmpl or {}) if c.get("kind") == "CXXMethodDecl"][1:]
+            uses_this_ = any(uses_this(c) for c in made)
+            if not made or not all(any(x.get("kind") == "CompoundStmt" for x in kids(c)) for c in made) \
+                    or not all("&" in qtype(c) or (uses_this_ and qtype(c).rstrip().endswith("*")) for c in kids(rec) if c.get("kind") == "FieldDecl"):
+                raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+            for c in made:
+                u.generic[c["id"]] = (v, lam, rec, c)
+            return []
         fields = [qtype(c) for c in kids(rec) if c.get("kind") == "FieldDecl"]
         this_used = uses_this(body)
         values = [t for t in fields if not (this_used and t.rstrip().endswith("*") and "&" not in t)]
@@ -6443,6 +6630,19 @@ class Emit:
                     take(i, node, is_changed)
         if not by_ref and any(c for _, _, c in free):
             raise Wait("a local function that changes its own copy of what it captured (mutable)")
+        spelled = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", qtype(method))   # (`auto (i32) const -> f32 &`: what it gives, first)
+        named = dict(method, _file=method.get("_file") or lam.get("_file", ""),   # (where it stands: the lambda's file)
+                     type={"qualType": f"{spelled.group(2)} {spelled.group(1)}" if spelled else qtype(method)})
+        if by_ref and u.place_named(named) is not None:
+            # A local function that names a place (`auto at = [&](i32 i, i32 j) -> f32& { return d[j * W + i]; };`):
+            # as with a function of the program that does (Unit.place_named), every call is written out as that
+            # place - `at(i, j) = x` sets d[j * W + i] (placed). What it names it reads where it is called: captured
+            # by reference, that is what the lambda reads then.
+            u.lambdas[method["id"]] = {"free": free, "args": [], "snapshots": False, "place": named}
+            if v.get("id"):
+                u.lambda_vars[v["id"]] = lam
+            self.dissolve(self.f.decl)   # (its calls, which follow: the place - see dissolve)
+            return []
         lines, args, params = [], [], []
         for entry in free:
             if self.types.get(entry[0]) == "Text" and re.fullmatch(r"(?:const\s+)?char\s*\[\d+\]", re.sub(r"\s*&+\s*$", "", qtype(entry[1]))):
@@ -6481,13 +6681,192 @@ class Emit:
         g.lifted = True
         return lines
 
+    def callback_lambda(self, lam, want):
+        """A lambda where a Callback is wanted (ro.deformed = [this](f64 x, f64 y, f64 r) { ... }): a function of the
+        Blueprint made of its body - its object (`this`), a const reference, its first input -, and the Callback of it,
+        bound to that object: callback<&Lib::fn>(self). It captures nothing but its object: the engine calls it when and
+        as often as it wants, and what it reads is its object where it stands. (A Blueprint that keeps something has no
+        Callback of its own functions: a Callback names a function of a library.)"""
+        u, tree = self.u, self.tree
+        rec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), None)
+        method = next((c for c in kids(rec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
+        body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
+        if body is None:
+            raise Wait("a Callback of a lambda with auto inputs")
+        this_used = uses_this(body)
+        if any(not (this_used and qtype(c).rstrip().endswith("*") and "&" not in qtype(c)) for c in kids(rec) if c.get("kind") == "FieldDecl"):
+            raise Wait("a Callback of a lambda that captures more than its object (this)")
+        if u.state is not None:
+            raise Wait("a Callback in a Blueprint that keeps something (a Callback names a function of a library)")
+        if this_used and self.f.self_type is None:
+            raise Wait("a Callback of a lambda that uses an object outside a method")
+        outer = self.f.decl
+        raw_type = qtype(method)
+        trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
+        if trailing:
+            raw_type = f"{trailing.group(2)} {trailing.group(1)}"
+        if this_used:
+            raw_type = re.sub(r"\s*\bconst\s*$", "", raw_type) + " const"   # (it reads its object: a const reference)
+        synth = {"id": method["id"], "_mine": True, "kind": "CXXMethodDecl" if this_used else "FunctionDecl", "name": f"{outer.get('name', 'f')}_callback",
+                 "type": {"qualType": raw_type}, "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)),
+                 "inner": [c for c in kids(method) if c.get("kind") == "ParmVarDecl"] + [body]}
+        tree.body[method["id"]] = synth
+        tree.scope_of[method["id"]] = tree.scope_of.get(outer["id"], "")
+        if this_used:
+            tree.owner[method["id"]] = tree.owner.get(outer["id"])
+        g = u.function(method["id"])
+        g.lifted = True
+        if not g.pure:
+            raise Wait(f"a Callback of a lambda that changes something ({g.name})")
+        takes = [t for i, (_, t) in enumerate(g.params) if not (this_used and i == 0)]
+        made = f"Callback<{g.value or 'void'}({', '.join(takes)})>"
+        if made != want:
+            raise Wait(f"a lambda that is {made} where a {want} is wanted")
+        self.f.calls.append(g)
+        name = g.name if "::" in g.name else f"{u.name}::{g.name}"
+        return f"callback<&{name}>({self.self_name if this_used else ''})", want
+
+    def callback_field_set(self, a, b):
+        """A Callback set field by field, as C++ sets the struct of the engine that is one (callback_record: the
+        pointer to a function and the void* it hands it): `s.user = const_cast<Terrain*>(this);` names the place
+        (the function's object), `s.fn = [](void* u, f64 x, f64 y) { return static_cast<const Terrain*>(u)->height(...); };`
+        the function - a lambda that captures nothing and reads its void* as that object. Then s is
+        callback<&Lib::fn>(self): the lambda a function of the Blueprint whose first input is the object, a const
+        reference. None: no such assignment."""
+        m = self.unwrap(a)
+        if m.get("kind") != "MemberExpr" or m.get("isArrow") or not kids(m):
+            return None
+        var = self.unwrap(kids(m)[0])
+        if var.get("kind") != "DeclRefExpr":
+            return None
+        q = None
+        try:
+            q = self.u.find_type(self.u.clean(self.ctype(var)))
+        except Wait:
+            return None
+        cb = self.u.callback_record(q) if q else None
+        if not cb:
+            return None
+        rec = self.tree.records[q]
+        fn_field, user_field = [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        vid = var["referencedDecl"]["id"]
+        places = self.__dict__.setdefault("callback_places", {})
+        if m.get("name") == user_field:
+            obj = self.unwrap(b)
+            while obj.get("kind") in CAST + ("CXXConstCastExpr", "ParenExpr") and kids(obj):
+                obj = self.unwrap(kids(obj)[0])
+            if obj.get("kind") != "CXXThisExpr" or self.f.self_type is None:
+                raise Wait("a Callback's void* that is not the object of its function (this)")
+            places[vid] = self.tree.owner.get(self.f.decl["id"])
+            return []
+        if m.get("name") != fn_field:
+            return None
+        if vid not in places:
+            raise Wait("a Callback's function set before its void* (the place it is handed)")
+        lam = self.lambda_of(b)
+        x = self.unwrap(b)
+        while lam is None and x.get("kind") in CAST + ("CXXMemberCallExpr", "MemberExpr", "MaterializeTemporaryExpr", "ParenExpr") and kids(x):
+            # (a lambda that captures nothing, as the pointer to a function C++ makes of it: its conversion)
+            x = self.unwrap(kids(x)[0] if x.get("kind") != "CXXMemberCallExpr" else (kids(callee(x)) or [{}])[0])
+            lam = x if x.get("kind") == "LambdaExpr" else None
+        if lam is None:
+            raise Wait("a Callback's function that is no lambda")
+        owner = places[vid]
+        lrec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), None)
+        method = next((c for c in kids(lrec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
+        body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
+        params = [c for c in kids(method or {}) if c.get("kind") == "ParmVarDecl"]
+        if body is None or not params or any(c.get("kind") == "FieldDecl" for c in kids(lrec)) or qtype(params[0]).replace(" ", "") != "void*":
+            raise Wait("a Callback's function that captures something or takes no void* first")
+        pid = params[0]["id"]
+        obj_type = {"qualType": "const " + owner}
+        body = copy.deepcopy(body)
+        def is_place(x):
+            x = self.unwrap(x)
+            if x.get("kind") not in CAST + ("CXXConstCastExpr", "CXXReinterpretCastExpr") or not kids(x):
+                return False
+            inner = self.unwrap(kids(x)[0])
+            return inner.get("kind") == "DeclRefExpr" and (inner.get("referencedDecl") or {}).get("id") == pid
+        def place_ref():
+            return {"kind": "DeclRefExpr", "type": dict(obj_type), "valueCategory": "lvalue", "referencedDecl": {"id": pid, "kind": "ParmVarDecl", "name": params[0].get("name", "u"), "type": dict(obj_type)}}
+        def mend(x):
+            for i, c in enumerate(x.get("inner", []) or []):
+                if c.get("kind") == "MemberExpr" and c.get("isArrow") and kids(c) and is_place(kids(c)[0]):
+                    c["isArrow"] = False
+                    c["inner"][0] = place_ref()
+                elif c.get("kind") == "UnaryOperator" and c.get("opcode") == "*" and kids(c) and is_place(kids(c)[0]):
+                    x["inner"][i] = c = place_ref()
+                mend(c)
+        mend(body)
+        if any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == pid and x.get("type", {}).get("qualType") != obj_type["qualType"] for x in walk(body)):
+            raise Wait("a Callback's void* read otherwise than as its object (static_cast<const T*>(u)->...)")
+        first = dict(params[0], type={"qualType": "const " + owner + " &"})
+        outer = self.f.decl
+        raw_type = qtype(method)
+        trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
+        if trailing:
+            raw_type = f"{trailing.group(2)} {trailing.group(1)}"
+        raw_type = re.sub(r"\(\s*void\s*\*\s*,?", "(const " + owner + " &" + ("," if len(params) > 1 else ""), raw_type, count=1)
+        synth = {"id": method["id"], "_mine": True, "kind": "FunctionDecl", "name": f"{outer.get('name', 'f')}_callback", "type": {"qualType": re.sub(r"\s*\bconst\s*$", "", raw_type)},
+                 "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)), "inner": [first] + params[1:] + [body]}
+        if self.u.state is not None:
+            raise Wait("a Callback in a Blueprint that keeps something (a Callback names a function of a library)")
+        self.tree.body[method["id"]] = synth
+        self.tree.scope_of[method["id"]] = self.tree.scope_of.get(outer["id"], "")
+        g = self.u.function(method["id"])
+        g.lifted = True
+        if not g.pure:
+            raise Wait(f"a Callback of a lambda that changes something ({g.name})")
+        made = f"Callback<{g.value or 'void'}({', '.join(t for _, t in g.params[1:])})>"
+        if made != cb:
+            raise Wait(f"a lambda that is {made} where a {cb} is wanted")
+        self.f.calls.append(g)
+        name = g.name if "::" in g.name else f"{self.u.name}::{g.name}"
+        return self.store(var, lambda t: f"callback<&{name}>({self.self_name})")
+
     def local_call(self, n):
         """A call of a local function: (text, type) of what it gives, as `invoke` has it."""
-        info = self.u.lambdas[callee(n)["referencedDecl"]["id"]]
-        return self.invoke(self.u.function(callee(n)["referencedDecl"]["id"]), info["args"] + kids(n)[2:])
+        cid = callee(n)["referencedDecl"]["id"]
+        if cid not in self.u.lambdas:
+            self.instance(n, cid)
+        info = self.u.lambdas[cid]
+        if info.get("place") is not None:
+            raise Wait(f"{self.u.cpp_name(info['place'])}(): {self.u.PLACE}")
+        given = [a for k, a in enumerate(kids(n)[2:]) if k not in info.get("drop", ())]
+        return self.invoke(self.u.function(cid), info["args"] + given)
+
+    def instance(self, n, cid):
+        """A call of a lambda with auto inputs (local_function): the specialization the compiler made for it becomes a
+        local function - the lambdas it is given (each a local function of its own, made here) are no inputs of it:
+        where it calls one, that one is called."""
+        v, lam, rec, spec = self.u.generic[cid]
+        params = [p for p in kids(spec) if p.get("kind") == "ParmVarDecl"]
+        args = kids(n)[2:]
+        body = next(c for c in kids(spec) if c.get("kind") == "CompoundStmt")
+        drop = {k for k, p in enumerate(params) if "(lambda at " in qtype(p)}
+        if len(args) != len(params):
+            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+        for k in sorted(drop):
+            given = self.lambda_of(args[k])
+            pid = params[k]["id"]
+            refs = [x for x in walk(body) if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == pid]
+            called = [x for x in walk(body) if x.get("kind") == "CXXOperatorCallExpr" and callee_name(x) == "operator()" and len(kids(x)) > 1
+                      and (bare(self.unwrap(kids(x)[1])).get("referencedDecl") or {}).get("id") == pid]
+            if given is None or len(refs) != len(called):
+                raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs that is given a function value")
+            if self.local_function({"name": f"{v.get('name', 'local')}_{params[k].get('name', 'f')}"}, given):
+                raise Wait("a local function that calls one that captures by value")   # (its copies are made where it is given)
+        t = qtype(spec)
+        kept = [p for k, p in enumerate(params) if k not in drop]
+        one = dict(spec, inner=kept + [body], type={"qualType": f"{t[:t.index('(')].strip()} ({', '.join(qtype(p) for p in kept)}){' const' if t.rstrip().endswith('const') else ''}"})
+        made = dict(lam, inner=[dict(rec, inner=[c for c in kids(rec) if c.get("kind") == "FieldDecl"] + [one])])
+        if self.local_function({"name": v.get("name", "local")}, made):
+            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+        self.u.lambdas[cid]["drop"] = drop
 
     def is_local_call(self, n):
-        return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
+        return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and (callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
+                                                                                            or callee(n).get("referencedDecl", {}).get("id") in self.u.generic)
 
     # ---- a function of the Blueprint of an actor of the level: Call on Actor ----
     def on_actor(self, n):
@@ -6726,6 +7105,9 @@ class Emit:
             if b.get("kind") == "CXXMemberCallExpr":
                 if callee(b).get("name") != "data" or not kids(callee(b)):
                     break
+                if self.u.object_of(self.ctype(kids(callee(b))[0])):
+                    # (the data of an object of the engine - kern::RoadStream::data() -: its own node, the list it gives)
+                    return self.ex(b, bt)
                 b = self.unwrap(kids(callee(b))[0])
             elif len(kids(b)) == 1:
                 b = self.unwrap(kids(b)[0])
@@ -8726,6 +9108,8 @@ class Emit:
     def ex(self, n, want=None):
         """An expression as a value of the notation, of the type `want` when one is given."""
         b = bare(n)
+        if callback_parts(want) and self.lambda_of(n) is not None:
+            return self.callback_lambda(self.lambda_of(n), want)[0]
         if want is not None and b.get("kind") in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "InitListExpr") and "_bt" not in b and (want in self.u.struct_fields or want.startswith(("List<", "Map<", "Set<"))):
             # a value made here, of the type it is made for (the entry of a list of std::pair<f32, u64> that
             # push_back is given - its type, as the compiler names it, is std::pair<float, unsigned long>):
@@ -10199,6 +10583,10 @@ class Emit:
                            + self.count_loop(i0, i1, lambda i: [f"set_add({node}, {made}, {self.conv(f'list_get<{st[5:-1]}>({src}, {i})', st[5:-1], kt)});"]))
                 return made, t
             raise Wait(f"a {t.split('<')[0].lower()} made of other arguments")
+        if callback_parts(t) and all(x.get("kind") in ("ImplicitValueInitExpr", "CXXDefaultInitExpr") for x in a):
+            return t + "{}", t   # (a Callback as C++ makes it without arguments - also `HeightSampler{}`, its fields zero: unbound)
+        if callback_parts(t) and len(a) == 1 and self.tp_or_none(a[0]) == t:
+            return self.ex(a[0], t), t   # (a copy of one: the same function and place, as C++ copies them)
         raise Wait(f"a {t} made here")
 
     def listed(self, s0, st, first, last, t):
@@ -10419,6 +10807,8 @@ class Api:
             return ENGINE_PIN[bt], ""
         if bt in WIDTHS:   # (an entry of a list of a fixed width: List<U8> is an int list of "u8")
             return "integer", bt.lower()
+        if callback_parts(bt):
+            return "callback", callback_of(bt)
         if bt in self.u.enum_values:
             return "enumeration", bt
         if bt in self.u.struct_fields:
@@ -10437,6 +10827,9 @@ class Api:
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in ENGINE_PIN or bt in WIDTHS:
             return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[wire(bt)]
+        if callback_parts(bt):   # (c, what it gives - none: nothing -, and in brackets what it is handed: cn(nn))
+            r, a = callback_parts(bt)
+            return "c" + (self.shape(r) if r else "") + "(" + "".join(self.shape(x) for x in a) + ")"
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:
@@ -10990,6 +11383,11 @@ class TestWriter:
             return NUMBER.get(c) == "Int" or self.u.find_type(c) in self.tree.enums
         def wide(n):
             return self.u.clean(qtype(n)) in ("long", "unsigned long", "long long", "unsigned long long")
+        def narrow(n):
+            """A sum, difference or product computed as an int (i32, and what is promoted to it): C++ leaves open what it
+            gives outside the range (signed overflow) - the test computes it exactly and marks the call there."""
+            computed = n.get("computeResultType") if n.get("kind") == "CompoundAssignOperator" and n.get("computeResultType") else n.get("type", {})
+            return self.u.clean(qtype({"type": computed})) == "int"
         def fixed(n):
             n = bare(n)
             while n.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and kids(n):
@@ -11328,14 +11726,21 @@ class TestWriter:
                 else:
                     swap(a, xa, n["opcode"], f"converted::{name}(")
                     edits.append((b, 0, -depth, b, ")"))
-            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and wide(n) and whole(ks[0]) and whole(ks[1]):
-                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign)
+            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and (wide(n) or narrow(n)) and whole(ks[0]) and whole(ks[1]):
+                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign);
+                # an int: C++ leaves open what it gives outside its range (converted.h kept_narrow)
                 op = n["opcode"]
                 (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted::" + {"+": "plus", "-": "minus", "*": "times"}[op.rstrip("=")] + ("_to(" if op.endswith("=") else "(")))
                 swap(xb, ya, op, ", ")
                 edits.append((b, 0, -depth, b, ")"))
-            elif k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1 and wide(ks[0]):
+            elif (k == "UnaryOperator" and n.get("opcode") == "-" and len(ks) == 1 and not n.get("_w64") and whole(n) and whole(ks[0])
+                  and self.u.clean(qtype(n)) in ("int", "long", "long long") and not fixed(ks[0])):
+                # the negation of the least number of a signed type: C++ leaves open what it gives (converted.h neg)
+                (a, b), (xa, xb) = span(n), span(ks[0])
+                swap(a, xa, "-", "converted::neg(")
+                edits.append((b, 0, -depth, b, ")"))
+            elif k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1 and (wide(ks[0]) or self.u.clean(qtype(ks[0])) == "int"):
                 (a, b), (xa, xb) = span(n), span(ks[0])
                 name = ("post_" if n.get("isPostfix") else "pre_") + ("inc" if n["opcode"] == "++" else "dec")
                 if n.get("isPostfix"):
@@ -11597,6 +12002,11 @@ class TestWriter:
         if m:   # (a view of a list: of entries the test keeps - converted::kept_span; as constant as the source says)
             const, inner = self.span_of(raw, m.group(1))
             return f"converted::wide::Span<{const}{self.spell(inner)}>"
+        m = re.fullmatch(r"const\s+(.+?)\s*\*\s*(?:const)?", raw.strip())
+        if m and self.u.clean(m.group(1)) in ("float", "double", "long double", *NUMBER):
+            # (numbers the engine gives at a place of its own - RoadStream::data(): the test keeps the ones its stand-in
+            # answers and points at them, converted::take of a const T*)
+            return f"const {self.spell(m.group(1))}*"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
         if count_per(c) is not None:
@@ -11631,6 +12041,9 @@ class TestWriter:
         if m:   # (what may be there or not - in the Blueprint a list of no entry or one; a list in braces: the drawn list, see converted::listed)
             inner = self.spell(template_args(c)[0])
             return f"std::vector<{inner}>" if m.group(1) == "initializer_list" else f"std::{m.group(1)}<{inner}>"
+        m = re.fullmatch(r"std::function<(.+?)\s*\((.*)\)>", c)
+        if m:   # (a callback: the test's own values in it - converted.h, "callbacks")
+            return f"std::function<{self.spell(m.group(1)) if m.group(1).strip() != 'void' else 'void'}({', '.join(self.spell(a) for a in split_top(m.group(2)) if a.strip())})>"
         q = self.record_named(c)
         if q in self.tree.enums:
             if q not in self.enum_names:
@@ -11725,6 +12138,11 @@ class TestWriter:
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return f"draw.said_c_word({self.said_list()})" if self.said else "draw.c_word()"
+        cq = self.u.find_type(c)
+        if c.startswith("std::function<") or (cq in self.tree.records and self.u.callback_record(cq)):
+            # a callback (std::function, or a struct of the engine that is one - fn and user): none, or one of a few plain
+            # functions of its inputs (converted::draw_callback); arg, same, take of it are converted.h's
+            return f"converted::draw_callback<{self.spell(raw)}>(draw)"
         q = self.u.object_of(raw)
         if q:   # (an object of the engine: one of a few the test keeps, by its handle)
             one = f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
@@ -11805,7 +12223,7 @@ class TestWriter:
             return [c]
         for part in parts(c):
             q = self.u.find_type(part)
-            if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2"):
+            if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2") and not self.u.callback_record(q):   # (a callback: converted.h's)
                 self.helpers(q)
 
     def helpers(self, q):

@@ -930,6 +930,57 @@ template <class K> Value to_value(const Set<K>& s) {
   return r;
 }
 
+/// A Callback in a Blueprint's C++ (Callback<Float(Float, Float)>, Make Callback: callback<&Lib::fn>(place)): a
+/// function the engine calls and the place it is bound to - two words, as a function pointer with its void* is
+/// (kern::HeightSampler). fn is a thunk that calls the library's function on that place; none: unbound (a call
+/// gives the zero of R).
+template <class S> struct Callback;
+template <class R, class... A> struct Callback<R(A...)> {
+  R (*fn)(void*, A...) = nullptr;
+  void* place = nullptr;
+  /// (bound or not - as the interpreter's value says: what it calls, a call says. A Blueprint does not compare one;
+  /// a struct that holds one is equal field by field)
+  friend bool operator==(const Callback& x, const Callback& y) { return !x.fn == !y.fn; }
+  R operator()(A... a) const {
+    if constexpr (std::is_void_v<R>) {
+      if (fn) fn(place, a...);
+    } else {
+      return fn ? fn(place, a...) : R{};
+    }
+  }
+};
+namespace detail {
+template <class S> inline constexpr bool is_callback = false;
+template <class S> inline constexpr bool is_callback<Callback<S>> = true;
+/// A Callback of a Blueprint's class as a value (the door to the engine, a stand-in in a test): calls the thunk
+/// with the values made into its C++ types.
+template <class R, class... A> struct NativeCallable final : Callable {
+  Callback<R(A...)> held;
+  explicit NativeCallable(Callback<R(A...)> c) : held(c) {}
+  static constexpr char kind = 0;
+  const void* native_kind() const override { return &kind; }
+  bool call(std::span<const Value> args, Value& result) const override { return call(args, result, std::index_sequence_for<A...>{}); }
+  template <std::size_t... I> bool call(std::span<const Value> args, Value& result, std::index_sequence<I...>) const {
+    if (!held.fn) return false;
+    if constexpr (std::is_void_v<R>) held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...);
+    else result = to_value(held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...));
+    return true;
+  }
+};
+template <class R, class... A> struct Held<Callback<R(A...)>> {
+  static constexpr PinType type = PinType::callback;
+  /// (one the class made, back as it was; one the interpreter made calls the Blueprint there - in a class it is
+  /// unbound: a Callback goes from a Blueprint to the engine, not from one tier into another)
+  static Callback<R(A...)> from(const Value& v) {
+    if (v.call && v.call->native_kind() == &NativeCallable<R, A...>::kind) return static_cast<const NativeCallable<R, A...>&>(*v.call).held;
+    return {};
+  }
+};
+}  // namespace detail
+template <class R, class... A> Value to_value(const Callback<R(A...)>& c) {
+  return Value::callback(c.fn ? std::make_shared<detail::NativeCallable<R, A...>>(c) : nullptr);
+}
+
 /// What the nodes of a map do - on a Map of a Blueprint's class and on the interpreter's entries
 /// (MapEntries) alike: the same steps on the same container.
 namespace map {
@@ -2357,6 +2408,7 @@ template <detail::NativeStruct S> void native_set(S& variable, const Value& v) {
 inline void native_set(Int64& variable, const Value& v) { variable = from_value<Int64>(v.converted(PinType::int64)); }
 template <class K, class V> void native_set(Map<K, V>& variable, const Value& v) { variable = from_value<Map<K, V>>(v.converted(pin_type_of<Map<K, V>>())); }
 template <class K> void native_set(Set<K>& variable, const Value& v) { variable = from_value<Set<K>>(v.converted(pin_type_of<Set<K>>())); }
+template <class R, class... A> void native_set(Callback<R(A...)>& variable, const Value& v) { variable = from_value<Callback<R(A...)>>(v); }
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a

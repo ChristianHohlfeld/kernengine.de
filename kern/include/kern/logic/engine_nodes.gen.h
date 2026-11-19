@@ -109,6 +109,7 @@ struct S_RenderParams;
 struct S_RenderStats;
 struct S_RendererOptions;
 struct S_Rgb;
+struct S_RoadOptions;
 struct S_ShaderSource;
 struct S_ShadowOptions;
 struct S_SkyAtmosphere;
@@ -339,6 +340,11 @@ struct S_Rgb {
   template <class B> static void from(EngineObjects& o, const B& b, kern::Rgb& x) { const auto& [f0, f1, f2] = b; ev::Direct<ev::Float>::from(o, f0, x.r); ev::Direct<ev::Float>::from(o, f1, x.g); ev::Direct<ev::Float>::from(o, f2, x.b); }
   template <class B> static B make(EngineObjects& o, const kern::Rgb& x) { B b{ev::made<ev::Float>(o, x.r), ev::made<ev::Float>(o, x.g), ev::made<ev::Float>(o, x.b)}; [[maybe_unused]] const auto& [f0, f1, f2] = b; return b; }
   template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.r); ev::Direct<ev::Float>::pass(o, x.g); ev::Direct<ev::Float>::pass(o, x.b); }
+};
+struct S_RoadOptions {
+  template <class B> static void from(EngineObjects& o, const B& b, kern::RoadOptions& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17] = b; ev::Direct<ev::Float>::from(o, f0, x.center_x); ev::Direct<ev::Float>::from(o, f1, x.center_y); ev::Direct<ev::Float>::from(o, f2, x.radius); ev::Direct<ev::Float>::from(o, f3, x.chunk_size); ev::Direct<ev::Float>::from(o, f4, x.segment_length); ev::Direct<ev::Float>::from(o, f5, x.curb_extra); ev::Direct<ev::Float>::from(o, f6, x.curb_z); ev::Direct<ev::Float>::from(o, f7, x.surface_z); ev::Direct<ev::Float>::from(o, f8, x.marking_z); ev::Direct<ev::Float>::from(o, f9, x.marking_width); ev::Direct<ev::Float>::from(o, f10, x.dash_start); ev::Direct<ev::Float>::from(o, f11, x.dash_length); ev::Direct<ev::Float>::from(o, f12, x.dash_period); ev::Direct<ev::Float>::from(o, f13, x.uv_scale); ev::Direct<ev::Struct<S_Rgb>>::from(o, f14, x.curb_color); ev::Direct<ev::List<ev::Struct<S_Rgb>>>::from(o, f15, x.palette); ev::Direct<ev::Callback<ev::Bool(ev::Float, ev::Float, ev::Float)>>::from(o, f16, x.deformed); ev::Direct<ev::Float>::from(o, f17, x.fine_step); }
+  template <class B> static B make(EngineObjects& o, const kern::RoadOptions& x) { B b{ev::made<ev::Float>(o, x.center_x), ev::made<ev::Float>(o, x.center_y), ev::made<ev::Float>(o, x.radius), ev::made<ev::Float>(o, x.chunk_size), ev::made<ev::Float>(o, x.segment_length), ev::made<ev::Float>(o, x.curb_extra), ev::made<ev::Float>(o, x.curb_z), ev::made<ev::Float>(o, x.surface_z), ev::made<ev::Float>(o, x.marking_z), ev::made<ev::Float>(o, x.marking_width), ev::made<ev::Float>(o, x.dash_start), ev::made<ev::Float>(o, x.dash_length), ev::made<ev::Float>(o, x.dash_period), ev::made<ev::Float>(o, x.uv_scale), ev::made<ev::Struct<S_Rgb>>(o, x.curb_color), ev::made<ev::List<ev::Struct<S_Rgb>>>(o, x.palette), ev::made<ev::Callback<ev::Bool(ev::Float, ev::Float, ev::Float)>>(o, x.deformed), ev::made<ev::Float>(o, x.fine_step)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13, f14, f15, f16, f17] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.center_x); ev::Direct<ev::Float>::pass(o, x.center_y); ev::Direct<ev::Float>::pass(o, x.radius); ev::Direct<ev::Float>::pass(o, x.chunk_size); ev::Direct<ev::Float>::pass(o, x.segment_length); ev::Direct<ev::Float>::pass(o, x.curb_extra); ev::Direct<ev::Float>::pass(o, x.curb_z); ev::Direct<ev::Float>::pass(o, x.surface_z); ev::Direct<ev::Float>::pass(o, x.marking_z); ev::Direct<ev::Float>::pass(o, x.marking_width); ev::Direct<ev::Float>::pass(o, x.dash_start); ev::Direct<ev::Float>::pass(o, x.dash_length); ev::Direct<ev::Float>::pass(o, x.dash_period); ev::Direct<ev::Float>::pass(o, x.uv_scale); ev::Direct<ev::Struct<S_Rgb>>::pass(o, x.curb_color); ev::Direct<ev::List<ev::Struct<S_Rgb>>>::pass(o, x.palette); ev::Direct<ev::Callback<ev::Bool(ev::Float, ev::Float, ev::Float)>>::pass(o, x.deformed); ev::Direct<ev::Float>::pass(o, x.fine_step); }
 };
 struct S_ShaderSource {
   template <class B> static void from(EngineObjects& o, const B& b, kern::ShaderSource& x) { const auto& [f0, f1] = b; ev::Direct<ev::Text>::from(o, f0, x.vertex); ev::Direct<ev::Text>::from(o, f1, x.fragment); }
@@ -7332,7 +7338,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.primitives.append", {to_value(dst), to_value(src), to_value(m)}, {PinType::structure});
     kern_n.dst = from_value<std::remove_cvref_t<decltype(kern_n.dst)>>(kern_out[0]);
   }
-  void engine_road_builder_begin(Int road_builder, const List<Float>& stream, Int length, Int options, Int heights) {
+  template <class T1, class T2> void engine_road_builder_begin(Int road_builder, const List<Float>& stream, Int length, const T1& options, const T2& heights) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::RoadBuilder>(*kern_o, static_cast<::kern::i64>(road_builder), "road_builder");
@@ -7340,18 +7346,17 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
-      kern::RoadOptions* const kern_a2 = ::kern::logic::engine_values::object_of<kern::RoadOptions>(*kern_o, static_cast<::kern::i64>(options), "options");
-      if (!kern_a2) { this->kern_engine_failed("engine.road_builder.begin"); return; }
-      kern::HeightSampler* const kern_a3 = ::kern::logic::engine_values::object_of<kern::HeightSampler>(*kern_o, static_cast<::kern::i64>(heights), "heights");
-      if (!kern_a3) { this->kern_engine_failed("engine.road_builder.begin"); return; }
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RoadOptions>, std::remove_cvref_t<kern::RoadOptions const&>>(*kern_o, options);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a3);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.road_builder.begin"); return; } }
-      decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), *kern_a2, *kern_a3);
+      decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2, std::move(kern_a3));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
     this->kern_engine("engine.road_builder.begin", {to_value(road_builder), to_value(stream), to_value(length), to_value(options), to_value(heights)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_road_builder_begin(KernNode& kern_n, Int road_builder, const List<Float>& stream, Int length, Int options, Int heights) {
+  template <class KernNode, class T1, class T2> void engine_road_builder_begin(KernNode& kern_n, Int road_builder, const List<Float>& stream, Int length, const T1& options, const T2& heights) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::RoadBuilder>(*kern_o, static_cast<::kern::i64>(road_builder), "road_builder");
@@ -7359,12 +7364,11 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
-      kern::RoadOptions* const kern_a2 = ::kern::logic::engine_values::object_of<kern::RoadOptions>(*kern_o, static_cast<::kern::i64>(options), "options");
-      if (!kern_a2) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; }
-      kern::HeightSampler* const kern_a3 = ::kern::logic::engine_values::object_of<kern::HeightSampler>(*kern_o, static_cast<::kern::i64>(heights), "heights");
-      if (!kern_a3) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; }
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RoadOptions>, std::remove_cvref_t<kern::RoadOptions const&>>(*kern_o, options);
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a3);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; } }
-      decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), *kern_a2, *kern_a3);
+      decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2, std::move(kern_a3));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
@@ -7504,7 +7508,7 @@ template <class Core> struct EngineNodesOf : Core {
     return from_value<Int>(this->kern_engine("engine.road_stream.size", {to_value(road_stream)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   /// Regular-grid terrain tile with one vertex per height node (cells x cells quads, both halves split along the SW-NE diagonal). Normals from central differences of the neighbouring nodes. Writes an indexed mesh.
-  template <class T1, class T2> void engine_build_terrain_tile(Float x0, Float y0, Float step, Int cells, const T1& albedo, Int heights, const T2& out) {
+  template <class T1, class T2, class T3> void engine_build_terrain_tile(Float x0, Float y0, Float step, Int cells, const T1& albedo, const T2& heights, const T3& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
@@ -7517,13 +7521,13 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, cells, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Rgb>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Rgb>>::from(*kern_o, albedo, kern_a4);
-      kern::HeightSampler* const kern_a5 = ::kern::logic::engine_values::object_of<kern::HeightSampler>(*kern_o, static_cast<::kern::i64>(heights), "heights");
-      if (!kern_a5) { this->kern_engine_failed("engine.build_terrain_tile"); return; }
+      auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a5);
       auto kern_a6 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, out, kern_a6);
       auto kern_a7 = ::kern::logic::engine_values::blank<double>();
       auto kern_a8 = ::kern::logic::engine_values::blank<double>();
-      decltype(auto) kern_r = kern::build_terrain_tile(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), *kern_a5, kern_a6, &kern_a7, &kern_a8);
+      decltype(auto) kern_r = kern::build_terrain_tile(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5), kern_a6, &kern_a7, &kern_a8);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::pass(*kern_o, kern_a6);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::pass(*kern_o, kern_a7);
@@ -7532,7 +7536,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.build_terrain_tile", {to_value(x0), to_value(y0), to_value(step), to_value(cells), to_value(albedo), to_value(heights), to_value(out)}, {PinType::boolean, PinType::structure, PinType::number, PinType::number});
   }
-  template <class KernNode, class T1, class T2> void engine_build_terrain_tile(KernNode& kern_n, Float x0, Float y0, Float step, Int cells, const T1& albedo, Int heights, const T2& out) {
+  template <class KernNode, class T1, class T2, class T3> void engine_build_terrain_tile(KernNode& kern_n, Float x0, Float y0, Float step, Int cells, const T1& albedo, const T2& heights, const T3& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
@@ -7545,13 +7549,13 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, cells, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Rgb>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Rgb>>::from(*kern_o, albedo, kern_a4);
-      kern::HeightSampler* const kern_a5 = ::kern::logic::engine_values::object_of<kern::HeightSampler>(*kern_o, static_cast<::kern::i64>(heights), "heights");
-      if (!kern_a5) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.min_height); ::kern::logic::engine_values::none(kern_n.max_height); this->kern_engine_failed("engine.build_terrain_tile"); return; }
+      auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a5);
       auto kern_a6 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, out, kern_a6);
       auto kern_a7 = ::kern::logic::engine_values::blank<double>();
       auto kern_a8 = ::kern::logic::engine_values::blank<double>();
-      decltype(auto) kern_r = kern::build_terrain_tile(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), *kern_a5, kern_a6, &kern_a7, &kern_a8);
+      decltype(auto) kern_r = kern::build_terrain_tile(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5), kern_a6, &kern_a7, &kern_a8);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a6);
       kern_n.min_height = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<std::remove_cvref_t<decltype(kern_n.min_height)>>(*kern_o, kern_a7);
@@ -13606,33 +13610,6 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.footprint_stream.release", {to_value(footprint_stream)}, {});
   }
-  /// Makes a HeightSampler of the engine: its handle (the host keeps it until it is released).
-  void engine_height_sampler_make() {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      (void)kern_o->own<kern::HeightSampler>(std::unique_ptr<kern::HeightSampler>(new kern::HeightSampler()));
-      return;
-    }
-    this->kern_engine("engine.height_sampler.make", {}, {PinType::integer});
-  }
-  template <class KernNode> void engine_height_sampler_make(KernNode& kern_n) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::HeightSampler>(std::unique_ptr<kern::HeightSampler>(new kern::HeightSampler())));
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.height_sampler.make", {}, {PinType::integer});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-  }
-  /// Ends the HeightSampler (its destructor): the handle is none after it.
-  void engine_height_sampler_release(Int height_sampler) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      if (!kern_o->release<kern::HeightSampler>(static_cast<::kern::i64>(height_sampler))) { kern_o->error = "the handle names no HeightSampler that was made"; { this->kern_engine_failed("engine.height_sampler.release"); return; } }
-      return;
-    }
-    this->kern_engine("engine.height_sampler.release", {to_value(height_sampler)}, {});
-  }
   /// Makes a Input of the engine: its handle (the host keeps it until it is released).
   void engine_input_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13829,33 +13806,6 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.road_builder.release", {to_value(road_builder)}, {});
-  }
-  /// Makes a RoadOptions of the engine: its handle (the host keeps it until it is released).
-  void engine_road_options_make() {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      (void)kern_o->own<kern::RoadOptions>(std::unique_ptr<kern::RoadOptions>(new kern::RoadOptions()));
-      return;
-    }
-    this->kern_engine("engine.road_options.make", {}, {PinType::integer});
-  }
-  template <class KernNode> void engine_road_options_make(KernNode& kern_n) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::RoadOptions>(std::unique_ptr<kern::RoadOptions>(new kern::RoadOptions())));
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.road_options.make", {}, {PinType::integer});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
-  }
-  /// Ends the RoadOptions (its destructor): the handle is none after it.
-  void engine_road_options_release(Int road_options) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      if (!kern_o->release<kern::RoadOptions>(static_cast<::kern::i64>(road_options))) { kern_o->error = "the handle names no RoadOptions that was made"; { this->kern_engine_failed("engine.road_options.release"); return; } }
-      return;
-    }
-    this->kern_engine("engine.road_options.release", {to_value(road_options)}, {});
   }
   /// Makes a RoadStream of the engine: its handle (the host keeps it until it is released).
   void engine_road_stream_make() {

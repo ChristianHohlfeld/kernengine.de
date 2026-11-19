@@ -33,6 +33,12 @@ inline std::string native_show(const kern::logic::Value& v) {
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "#%llu", static_cast<unsigned long long>(v.a)); return b;
     case PinType::enumeration: std::snprintf(b, sizeof b, "~%lld", static_cast<long long>(v.i)); return b;  // (its place among its enum's values)
+    case PinType::callback: {  // (called, as the engine would: with 1.5, -2.25, 4 - what it gives, as above)
+      if (!v.call) return "unbound";
+      const kern::logic::Value args[] = {kern::logic::Value::number(1.5), kern::logic::Value::number(-2.25), kern::logic::Value::number(4)};
+      kern::logic::Value got;
+      return v.call->call(args, got) ? "callback->" + native_show(got) : "unbound";
+    }
     case PinType::structure: {  // its fields, each as above
       std::string r = "{";
       for (std::size_t k = 0, n = v.fields(); k < n; ++k) r += (k ? ", " : "") + native_show(*v.field(k));

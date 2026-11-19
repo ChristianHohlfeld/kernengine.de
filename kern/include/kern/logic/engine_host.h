@@ -28,6 +28,7 @@
 
 #include <array>
 #include <bit>
+#include <functional>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -130,9 +131,32 @@ class EngineObjects {
     return r;
   }
   void let_go() { held_.clear(); }
+
+  /// A Callback a call hands the engine (Conv of a Callback): what the C++ value the engine gets points at - these
+  /// objects and the Callable it calls. It stays for the call; given to a method of an object of the engine (the
+  /// call's first input is its handle), with that object - the last one each such call handed it -, until the
+  /// object ends (call_engine: kept_by).
+  struct Handed {
+    EngineObjects* objects = nullptr;
+    std::shared_ptr<const Callable> call;
+  };
+  const Handed* hand(std::shared_ptr<const Callable> call) {
+    calling_.push_back(std::make_shared<Handed>(Handed{this, std::move(call)}));
+    return calling_.back().get();
+  }
+  /// The Callbacks the call that just ran handed the engine stay with the object `handle` (the n-th of `function`
+  /// in place of the one before it).
+  void kept_by(i64 handle, std::string_view function) {
+    if (calling_.empty()) return;
+    if (!entries_.count(handle)) return;  // (no object: they stay for the call only)
+    auto& mine = kept_[handle];
+    for (std::size_t k = 0; k < calling_.size(); ++k) mine[std::string(function) + "#" + std::to_string(k)] = calling_[k];
+    calling_.clear();
+  }
   /// A call begins: nothing has failed yet, and what the call before was given to look at is let go.
   void begin_call() {
     error.clear();
+    calling_.clear();
     let_go();
   }
 
@@ -161,6 +185,8 @@ class EngineObjects {
   Missing missing_ = nullptr;
   std::unordered_set<std::string> texts_;
   std::vector<std::shared_ptr<void>> held_;
+  std::vector<std::shared_ptr<Handed>> calling_;  // (the Callbacks of the call being made)
+  std::unordered_map<i64, std::unordered_map<std::string, std::shared_ptr<Handed>>> kept_;  // (with their object)
 };
 
 /// The call of one node of the engine (written by tools/engine_api.py).
@@ -220,6 +246,9 @@ template <class L> struct Row {};
 template <class A, class B> struct Pair {};
 /// An object of the engine: its handle.
 struct Handle {};
+/// A Callback (Callback<Float(Float, Float)>: the tags of its result and its inputs) - in C++ a struct of a pointer
+/// to a function with a void* in front and that void* (kern::HeightSampler), or a std::function.
+template <class S> struct Callback {};
 
 template <class Tag> struct Conv;
 
@@ -580,6 +609,62 @@ template <class X> struct Written {
     room.resize(n);
     return true;
   }
+};
+
+namespace callback_detail {
+template <class C> struct Function;  // (std::function<R(A...)>: its result and its inputs)
+template <class CR, class... CA> struct Function<std::function<CR(CA...)>> {
+  template <class RT, class... AT> static std::function<CR(CA...)> made(EngineObjects& o, std::shared_ptr<const Callable> call) {
+    return [&o, call = std::move(call)](CA... a) -> CR {
+      const std::array<Value, sizeof...(CA)> args{Conv<AT>::to(o, a)...};
+      Value r;
+      call->call(args, r);
+      if constexpr (!std::is_void_v<CR>) {
+        CR c = blank<CR>();
+        Conv<RT>::from(o, r, c);
+        return c;
+      }
+    };
+  }
+};
+template <class F> struct Thunk;  // (the function the engine calls through the pointer: the Handed is its void*)
+template <class CR, class... CA> struct Thunk<CR (*)(void*, CA...)> {
+  template <class RT, class... AT> static CR call(void* u, CA... a) {
+    const EngineObjects::Handed& h = *static_cast<const EngineObjects::Handed*>(u);
+    const std::array<Value, sizeof...(CA)> args{Conv<AT>::to(*h.objects, a)...};
+    Value r;
+    h.call->call(args, r);
+    if constexpr (!std::is_void_v<CR>) {
+      CR c = blank<CR>();
+      Conv<RT>::from(*h.objects, r, c);
+      return c;
+    }
+  }
+};
+template <class C> inline constexpr bool is_function = false;
+template <class S> inline constexpr bool is_function<std::function<S>> = true;
+}  // namespace callback_detail
+/// A Callback the engine takes: it calls what the value calls (the interpreter, the JIT, a class through the door). An
+/// unbound one is the engine's own nothing (a null pointer, an empty std::function).
+template <class R, class... A> struct Conv<Callback<R(A...)>> {
+  template <class C> static void from(EngineObjects& o, const Value& v, C& c) {
+    if constexpr (callback_detail::is_function<C>) {
+      if (v.call) c = callback_detail::Function<C>::template made<R, A...>(o, v.call);
+      else c = nullptr;
+    } else {
+      auto& [fn, user] = c;  // (the pointer to the function first, then what it is handed)
+      static_assert(std::is_pointer_v<std::remove_cvref_t<decltype(fn)>> && std::is_same_v<std::remove_cvref_t<decltype(user)>, void*>, "a Callback pin of something else than a function pointer with its void*");
+      if (!v.call) {
+        fn = nullptr;
+        user = nullptr;
+        return;
+      }
+      fn = &callback_detail::Thunk<std::remove_cvref_t<decltype(fn)>>::template call<R, A...>;
+      user = const_cast<EngineObjects::Handed*>(o.hand(v.call));
+    }
+  }
+  /// (a Callback the engine gives: none a Blueprint calls - unbound)
+  template <class C> static Value to(EngineObjects&, const C&) { return Value::callback(nullptr); }
 };
 
 }  // namespace engine_values
