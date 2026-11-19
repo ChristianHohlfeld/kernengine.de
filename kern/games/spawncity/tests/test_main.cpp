@@ -5,7 +5,7 @@
 //   kern/games/spawncity/tests/run_tests.sh
 //   spawncity_tests [part]          the tests whose name has `part` in it (all of them without it)
 //   spawncity_tests --name <n>...   exactly the tests named so, each once (a whole name; one that is no test's: FAIL)
-//   SC_TEST_JOBS=<n>                up to n tests at once (the output as one by one, in the order of the tests)
+//   SC_TEST_JOBS=<n>                up to n tests at once (else KERN_JOBS, else the cores; the output as one by one, in the order of the tests)
 #include <cerrno>
 #include <chrono>
 #include <cstdio>
@@ -15,6 +15,7 @@
 #include <string>
 #include <vector>
 
+#include <sys/resource.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -227,18 +228,19 @@ int main(int argc, char** argv) {
   // test's FAIL, and the tests after it still run - a run shows every test's result, not the first crash's.
   // (Lines go out as they are written: what a crashing test printed before is in the log.)
   std::setvbuf(stdout, nullptr, _IOLBF, 0);
-  // SC_TEST_JOBS=n: up to n tests at once (run_tests.sh: KERN_JOBS). Each test's lines go to a file of its own and
-  // come out as one piece, in the order of the tests, when it has ended - the output is the same as one by one.
-  // Without it (or 1): one by one, every line as it is written.
-  const char* jobs_text = std::getenv("SC_TEST_JOBS");
-  const int jobs = jobs_text && std::atoi(jobs_text) > 1 ? std::atoi(jobs_text) : 1;
+  // Up to SC_TEST_JOBS tests at once - else KERN_JOBS, else as many as the machine has cores. Each test's lines go to a
+  // file of its own and come out as one piece, in the order of the tests, when it has ended - the output is the same as
+  // one by one. One test (or SC_TEST_JOBS=1): every line as it is written (a test stopped from outside shows how far it came).
+  const auto jobs_of = [](const char* name) { const char* t = std::getenv(name); return t ? std::atoi(t) : 0; };
+  int jobs = jobs_of("SC_TEST_JOBS") > 0 ? jobs_of("SC_TEST_JOBS") : jobs_of("KERN_JOBS") > 0 ? jobs_of("KERN_JOBS") : static_cast<int>(sysconf(_SC_NPROCESSORS_ONLN));
+  if (jobs < 1 || todo.size() <= 1) jobs = 1;
   struct Run {
     const sct::Case* c = nullptr;
     pid_t child = -1;
     int counts_fd = -1;
     std::FILE* out = nullptr;   // (the test's lines, when tests run at once)
     std::chrono::steady_clock::time_point began;
-    double seconds = 0;
+    double seconds = 0, cpu = 0;   // (the wall clock and the CPU time of its process: shown, nothing depends on them)
     int status = 0, counts[2] = {0, 0};
     std::size_t got = 0;
     bool ended = false;
@@ -275,7 +277,10 @@ int main(int argc, char** argv) {
     if (r.child < 0) { close(r.counts_fd); r.counts_fd = -1; r.ended = true; }
   };
   // Its counts (written before it ends), and how it ended.
-  const auto end = [&](Run& r, int status) {
+  double cpu_all = 0;
+  const auto end = [&](Run& r, int status, const rusage& used) {
+    r.cpu = static_cast<double>(used.ru_utime.tv_sec + used.ru_stime.tv_sec) + static_cast<double>(used.ru_utime.tv_usec + used.ru_stime.tv_usec) / 1e6;
+    cpu_all += r.cpu;
     while (r.counts_fd >= 0 && r.got < sizeof r.counts) {
       const ssize_t n = read(r.counts_fd, reinterpret_cast<char*>(r.counts) + r.got, sizeof r.counts - r.got);
       if (n <= 0) break;
@@ -301,18 +306,17 @@ int main(int argc, char** argv) {
     }
     ++ran;
     const sct::Case& c = *r.c;
-    std::printf("  time: %s: %.1f s\n", c.name, r.seconds);
     sct::checks += r.counts[0];
     sct::failures += r.counts[1];
     const int status = r.status;
     if (r.child < 0 || r.got != sizeof r.counts || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
       ++sct::failures;
       if (r.child < 0) std::printf("FAIL %s (no process)\n", c.name);
-      else if (WIFSIGNALED(status)) std::printf("FAIL %s (crashed: signal %d)\n", c.name, WTERMSIG(status));
-      else std::printf("FAIL %s (ended with %d)\n", c.name, WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+      else if (WIFSIGNALED(status)) std::printf("FAIL %s (crashed: signal %d; %.1f s, CPU %.1f s)\n", c.name, WTERMSIG(status), r.seconds, r.cpu);
+      else std::printf("FAIL %s (ended with %d; %.1f s, CPU %.1f s)\n", c.name, WIFEXITED(status) ? WEXITSTATUS(status) : -1, r.seconds, r.cpu);
       return;
     }
-    std::printf("%s %s\n", r.counts[1] == 0 ? "ok  " : "FAIL", c.name);
+    std::printf("%s %s (%.1f s, CPU %.1f s)\n", r.counts[1] == 0 ? "ok  " : "FAIL", c.name, r.seconds, r.cpu);
   };
   for (std::size_t k = 0; k < todo.size(); ++k) runs[k].c = todo[k];
   std::size_t next = 0, shown = 0, running = 0;
@@ -324,20 +328,21 @@ int main(int argc, char** argv) {
     }
     if (running > 0) {
       int status = 0;
-      const pid_t done = waitpid(jobs > 1 ? -1 : runs[next - 1].child, &status, 0);
+      rusage used{};
+      const pid_t done = wait4(jobs > 1 ? -1 : runs[next - 1].child, &status, 0, &used);
       if (done < 0 && errno != EINTR) {   // (no child left to wait for: what still runs is lost - said as an end with 99)
         for (std::size_t k = shown; k < next; ++k)
-          if (!runs[k].ended) end(runs[k], 99 << 8);
+          if (!runs[k].ended) end(runs[k], 99 << 8, rusage{});
         running = 0;
       }
       for (std::size_t k = shown; k < next; ++k)
         if (done > 0 && !runs[k].ended && runs[k].child == done) {
-          end(runs[k], status);
+          end(runs[k], status, used);
           --running;
         }
     }
     while (shown < next && runs[shown].ended) said(runs[shown++]);
   }
-  std::printf("%d tests, %d checks, %d failures\n", ran, sct::checks, sct::failures);
+  std::printf("%d tests, %d checks, %d failures (CPU of the tests %.1f s, %d at once)\n", ran, sct::checks, sct::failures, cpu_all, jobs);
   return sct::failures ? 1 : 0;
 }

@@ -76,8 +76,7 @@ cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 # (every test runs, whatever an earlier one gave - see test_main.cpp; the run's result is that of all of it)
-# Up to KERN_JOBS tests at once (SC_TEST_JOBS: each in its own process, its lines as one piece in the order of the tests).
-export SC_TEST_JOBS="${SC_TEST_JOBS:-${KERN_JOBS:-$(nproc)}}"
+# (up to KERN_JOBS tests at once, else as many as there are cores - test_main.cpp; each in its own process, its lines as one piece in the order of the tests)
 rc=0
 "$out/spawncity_tests" "$@" || rc=1
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
