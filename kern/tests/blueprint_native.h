@@ -1657,6 +1657,7 @@ inline std::string cpp_type(PinType t, const std::string& of = {}, const std::st
     auto part = [&](const logic::TypeRef& p) { return p.type == PinType::integer ? std::string("kern::logic::Whole") : cpp_type(p.type, p.of, owner); };
     return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
   }
+  if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
