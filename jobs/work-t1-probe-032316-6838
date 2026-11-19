@@ -1,0 +1,1 @@
+probe origin/work-t1 src/car.cpp src/combat_rules.cpp src/game_events.cpp src/combat_art.cpp src/game_military.cpp src/game.cpp
