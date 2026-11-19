@@ -1,0 +1,80 @@
+ 68848 |     Bool body_valid_5 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:68858:10: warning: unused variable 'body_valid_7' [-Wunused-variable]
+ 68858 |     Bool body_valid_7 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:68863:10: warning: unused variable 'body_valid_9' [-Wunused-variable]
+ 68863 |     Bool body_valid_9 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:69694:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 69694 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:69703:10: warning: unused variable 'body_valid_3' [-Wunused-variable]
+ 69703 |     Bool body_valid_3 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:69706:18: warning: unused variable 'pose_2' [-Wunused-variable]
+ 69706 |     physics_Pose pose_2 = physics_Pose{Vector{0.0, 0.0, 0.0}, Quat{0.0, 0.0, 0.0, 1.0}};
+       |                  ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:69710:10: warning: unused variable 'body_valid_5' [-Wunused-variable]
+ 69710 |     Bool body_valid_5 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:69721:10: warning: unused variable 'body_valid_7' [-Wunused-variable]
+ 69721 |     Bool body_valid_7 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70024:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 70024 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70027:10: warning: unused variable 'body_valid_3' [-Wunused-variable]
+ 70027 |     Bool body_valid_3 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70084:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 70084 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70088:10: warning: unused variable 'body_valid_3' [-Wunused-variable]
+ 70088 |     Bool body_valid_3 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70162:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 70162 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70165:10: warning: unused variable 'body_valid_3' [-Wunused-variable]
+ 70165 |     Bool body_valid_3 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70166:10: warning: unused variable 'body_valid_4' [-Wunused-variable]
+ 70166 |     Bool body_valid_4 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70167:10: warning: unused variable 'both_2' [-Wunused-variable]
+ 70167 |     Bool both_2 = false;
+       |          ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70168:10: warning: unused variable 'body_valid_5' [-Wunused-variable]
+ 70168 |     Bool body_valid_5 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70346:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 70346 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:70374:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 70374 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/src/level_blueprints.cpp:90719:22: warning: unused variable 'body_type' [-Wunused-variable]
+ 90719 |     physics_BodyType body_type = physics_BodyType::fixed;
+       |                      ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-k-vergleich-175551-12446/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+3 warnings generated.
+65 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	6m55,196s
+user	35m35,547s
+sys	0m50,758s
