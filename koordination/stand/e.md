@@ -42,3 +42,13 @@ Entwurf und Begründung: siehe Bericht an main (Handback), gleichlautend unten n
   Stapel über Zelle + Wachsen, Call Function als Rahmen. Schritt 5 Konverter (6ee40d65): Rekursion im Teil, Anlehnen über Teile, pin_circles.
 - CI 44483698325 auf 4352dd1f: **Logic JIT: alle 47 Fälle Interpreter = JIT** (auch recursion_direct/through/deep/endless); JIT 178× schneller als
   Interpreter wie zuvor. native rot nur an zwei alten Erwartungen (Fact-Verbot, gekürzter Fehlertext) → 26212023. native-spawncity/e2e/input liefen noch.
+
+## 10:05
+- vergleich work-e-vergleich-094554-24308 auf fa063fd3 (car, drone, city_stream; 19 Tests): Stellvertreter 19/19 ok, 0 Abweichungen;
+  echte Engine 18/19 – converted_city_stream_cpp mit CityStream_select_cells/step_time/take_requests/update_collision, dieselben vier wie im
+  Grundlagen-Lauf ergebnis-work-zusammen-voll-070328-32111-alle-080335-20196 (nicht von e). cost-Zeilen: keine Funktion neu gegenüber der Grundlage.
+- Fehler gefunden und behoben (fa063fd3): Schleifenzustand nur lokal, wenn nur ihr Rumpf ihn liest (FirstAbove liest den Index nach Completed).
+- CI 44490407612 auf work-e-tramp ae2a3583 (Schritte 1–5): native GRÜN (alle Engine-Fälle, auch blueprint_native_test mit den Rekursions-Fällen
+  in der Klasse), build mit „Logic JIT: all cases match“. e2e rot in work-e und tramp gleich: game_equipment_cpp/sound_fx_cpp „cannot convert int
+  to int64 (voice)“ – Basis-CI auf work-zusammen f0450061 (44492893907) läuft zum Gegenprüfen.
+- konvert work-e-tramp-konvert-100402-29913 abgelegt (Schritt 5).

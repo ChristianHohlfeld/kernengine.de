@@ -7,6 +7,18 @@ die Bench; die Engine-Suite baut sie nicht – dennoch einmal). Erst dann „BER
 Entschieden (Koordinator 07:55/08:10/08:45): E17 JA (gebaut), Punkt 2 JA (bauen), Punkt 3 JA (bauen); Entwurf 4 (feste Breiten) bei Chris – NICHT bauen.
 Paket e (E16) besitzt „wo der Wert eines Schritts steht“ (nNN als Mitglied) – nicht anfassen; nach seinem Merge neu messen.
 
+## Nachfolger 3 (19.11., ab 09:40)
+- work-zusammen e32ba575 eingemischt (vorgespult). **Punkt 2 gebaut: 1831e165** (gepusht) – Stand und Zahlen: stand/p.md „Punkt 2“.
+  Regel: formula.cpp `int_input(k)`, `whole_result()`, `result_sum()`, Hilfe `whole_operand` (logic.h privat). Schreiber `formula_types`
+  (notation.cpp, statt whole_formula), Leser `formula()` mit `ints`, `int_inputs` (Knoten, Eingang) und `int_sums` (Leser-Prüfung in wires()).
+  Klasse: `Whole(const Sum&)` (nodes.h, nach Sum definiert). Wichtig: +,−,× zwischen nur Exact/Zahlen ist ein double (kein Sum) – darum verlangt
+  whole_result bei einer Operator-Wurzel einen Eingang darin (sonst würde double→i64→Whole still abschneiden).
+  Lokaler Prüfer (ohne Suite): /home/claude/p-tmp/chk (chk.cpp: Fixpunkt aller logic_cases + Leser-Fälle aus test_main; sem.cpp: Lambdas gegen
+  Formula::evaluate über alle Paare). Bau: Objekte in chk/o, unter heavy3, ~1 min.
+- Belege offen: engine `work-p-engine-095126-25407`; danach vergleich über src/qr_code.cpp src/nostr.cpp src/settings.cpp src/mvt.cpp.
+- **Punkt 3 nicht gebaut:** der geplante getypte Einstieg greift bei den cost-Aufrufen nie (Ziel = Level-Actor mit eigenen Struct-/Enum-Typen,
+  andere Feldnamen) – Befund und zwei Wege in stand/p.md „Punkt 3“, Entscheidung beim Koordinator.
+
 ## Werkzeuge
 - $S/p/rb.sh <runden> [fall…]: Bench mit den Headern des Worktrees neu bauen, ohne neue Klassen (CL=classes-Ordner, Vorgabe $S/p/b4;
   TESTS=Tests-Ordner, Vorgabe $S/p/conv = tests/converted von 055004; RD=Bauordner; XF=-g). Nach Dateiumbenennungen $RD/o löschen.

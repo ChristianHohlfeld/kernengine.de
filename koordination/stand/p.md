@@ -1,5 +1,27 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+## Punkt 2 (Int-Formeln ganz) gebaut: 1831e165 (auf work-zusammen e32ba575) – Beleg läuft (10:00)
+- Formula::int_input(k) / whole_result() / result_sum() (formula.cpp, eine Regel am Ausdruck); Schreiber/Leser je Eingang Int oder Float, -> Int nur
+  wo alle Int und whole_result (bei +,−,× an der Wurzel: jeder Leser Int); Klasse: Whole(Sum). Engine-Fall formula_int_sums; Leser-Fälle in test_main;
+  Doku blueprint_cpp.md „Formeln“. Lokal: Fixpunkt über alle logic_cases gleich, Leser-Fälle wie erwartet, Lambdas gegen Formula::evaluate bitgleich.
+- Zeit-Test ($S/p/p2_1.txt, Klassen neu, Level/Tests 055004, gleich/gleich64 29/29 „=“): **24 von 29 über 1,10 (f32-Spalte), 23 von 29 (64-Bit-Spalte)**
+  (vorher 25/23). min/min64: qr_encode 4,96→3,36/2,60, gf_mul 3,46→2,82/2,81, rs 5,09→3,30/2,58, get_u32 3,89→2,97/2,69, read_geometry 2,51→2,03/1,18,
+  ring_area 3,44→3,21/1,17, from_hex 5,09→4,79/4,75, sha256 6,64→6,14/6,49, mulm 6,08→6,20/3,49 (Rauschen).
+- Beleg: engine `work-p-engine-095126-25407` (läuft), danach EIN vergleich über src/qr_code.cpp src/nostr.cpp src/settings.cpp src/mvt.cpp.
+
+## Punkt 3 (getypter Einstieg func_call_on) – NICHT gebaut, Befund (10:00)
+Die cost-Zeilen (GrenadeCook_pull u. a. in controls_cpp, Fun_multiplier … in combat_rules_cpp) kommen aus Struktur-Argumenten/-Ergebnissen. Ziel ist
+der Blueprint des Level-Actors „Controls“ (actors[7]) mit EIGENEN Typen: struct Cook {Carry, RegenAt, …}, enum DeviceEvent – der Aufrufer hat
+controls_Cook {carry, regen_at, …}, controls_Devices_Event. Die C++-Signaturen sind nie gleich; ein Einstieg „wo die Signatur passt“ greift genau
+bei diesen Aufrufen nicht (bei Float/Int/Bool-Aufrufen gibt es heute schon keine Anforderung). Die Bedeutung heute = Umwandlung über Value nach
+Stelle (Held::from: gleiche Feldzahl und je Feld is_value, sonst Vorgabe; Enum nach Index; Ergebnis über from_outside des Aufrufers).
+Was es bräuchte (Entscheidung): (a) Einstieg mit „Gestalt“ statt Typ – Schlüssel = Gestalt der Signatur (Struktur → Tupel der Feld-Gestalten nach
+Stelle über structs::fields, Enum → Index samt Zahl der Werte), Aufrufer wandelt in die Gestalt, Ziel daraus in seine Typen; jede Regel der
+Value-Umwandlung (Feldtypen, Enum außerhalb, from_outside) muss dort Bit für Bit nachgebaut und am Rand bewiesen werden; oder (b) Value hält eine
+Struktur beim Aufruf ohne Heap (Felder in einem std::array der Aufrufstelle, „geliehen“; Ergebnis-Plätze vorgeformt nach den erklärten Ausgängen,
+das Ziel schreibt Feld für Feld hinein) – Bedeutung unverändert, weil derselbe Weg über Value läuft, nur ohne make_shared/vector.
+Empfehlung: (b) – kleiner, dieselbe Umwandlung, wirkt auch für Interpreter/JIT-Ziele.
+
 ## BEREIT ZUM MERGEN: 9c315bf2 (50e21923 Text::Appending + 9c315bf2 E17 Zeit-Test) – Belege (09:40)
 - Engine-Suite `work-p-engine-075125-9242` auf 50e21923: engine rc=0, blueprint_native_test ok (60 Blueprints, 14102 Aufrufe – darin append_in_place),
   game_native_test ok.

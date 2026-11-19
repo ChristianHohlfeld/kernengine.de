@@ -2,6 +2,31 @@
 
 ## Nachfolger 3 (ab 07:30, work-k auf work-zusammen 821208ac)
 
+## ENTSCHEIDUNG NÖTIG (10:05) – E18 (A): wie erfährt die KLASSE von einem gehaltenen Eintrag?
+- Interpreter: Instance::call mit `places` (logic.cpp ~2590) kann vor dem Aufruf je Liste beliebiger Länge auf dem Weg des Platzes Länge (und Identität des
+  Speichers) merken und danach vergleichen → Fehler. JIT: ruft für func.call die C++-Funktion des Knotens (codegen.cpp: nur Fluss/Zahlen inline) → bekommt
+  dieselbe Prüfung ohne eigenen Code. Leser places_ok: den Abbruch (notation.cpp ~875) durch „erlaubt, geprüft“ ersetzen.
+- Die Klasse ist der Text der Notation, übersetzt gegen blueprint.h: der Aufruf ist `f(a[i])` mit `T&` – an der Aufrufstelle gibt es nichts, das prüft.
+  V1 (Vorschlag): der Schreiber setzt um genau solche Aufrufe (Funktion mit raises, Platz durch eine Liste beliebiger Länge) eine Prüfung in den Text,
+  z. B. `{ const kern::logic::Held held_1(a); f(a[i]); held_1.after(); }` (Länge + data() vorher/nachher → festgelegter Fehler); from_cpp erkennt die Form
+  und liest denselben Graphen (keine neue Knotenart, Rundreise bleibt). Kosten nur an diesen Aufrufen (zwei Vergleiche). Wie E18: Prüfung NACH dem Aufruf –
+  dazwischen greift die Klasse wie C++ in freigegebenen Speicher (ASan meldet das im Test).
+  V2: jede Listenoperation (logic::list::add/insert/remove/clear/resize/reserve, Set einer ganzen Liste) prüft gegen eine Liste gerade gehaltener Listen →
+  Fehler schon beim Ändern (vor jedem toten Zugriff). Braucht die Anmeldung an der Aufrufstelle trotzdem (also auch V1-Text) und kostet in JEDER Klasse bei
+  JEDER Listenänderung einen Sprung – gegen die Leistungsregel.
+- Offen dazu: „Speicher“ zwischen den Stufen gleich? Interpreter-Listen (vector<Value>) und Klassen-Listen (vector<T>) wachsen gleich (Elemente), aber
+  reserve/Zuweisung können abweichen. Vorschlag: Kriterium Länge in allen Stufen, data() zusätzlich nur in der Klasse; weicht eine Stufe ab, zeigt es der
+  Vergleich (nie still gleich).
+- Umfang V1: notation.cpp (Schreiber call_args, Leser), blueprint.h (Held), logic.cpp (Instance::call), places_ok, Fälle in kern/tests (bleibt / Länge ändert /
+  Map / besessener Wert), docs/blueprint_cpp.md, dann der Konverter (place_arg: raising-Zweig weg). Paket e: ich fasse in logic.cpp nur Instance::call an.
+
+## BEREIT ZUM MERGEN: 3878258a (4e72f8b4 Terrain_run_job + ed63dca3 Reihenfolge der Argumente + 3878258a) – Beleg work-k-vergleich-081204-23050, 091538-11174
+- 081204 (game_net, net_session, combat_rules, game_events, terrain, game.cpp): Stellvertreter 58/58 ok – converted_terrain_cpp ok, Terrain::run_job geschrieben
+  und verglichen (vorher 13/300 bzw. im Einzel-Lauf 074913 8/184); Engine 57/58 – nur Terrain_run_job über j.id der echten Engine (BEFUND FÜR d).
+- 091538 (+ mp_art, combat_art): alle rc=0, 54/54 in beiden Durchgängen, kein Rückschritt durch ed63dca3.
+- mp_hud_json selbst war in beiden Proben nicht geschrieben (fehlende Teile der Kette: mp_local_ready → mp_art, dann safe_mobile_marker_point → mp_rules);
+  Beleg mit ganzer Kette: work-k-vergleich-095224-26050 (läuft). Sonst zeigt es der volle Lauf.
+
 | Abweichung | Ursache | Commit | Beleg | Stand |
 |---|---|---|---|---|
 | mp_hud_json 7/20 (Stellv.), 4/20 (Engine): "connected" Quelle false / Blueprint true; gegen die Engine „source asks server.running, Blueprint server.connected_clients“ | Reihenfolge: ein Argument mit Schritten (`esc(net_.status())` → `a_2 = Session_status(net_)` gehoben) lief vor den Argumenten links davon (hosting(), connected() standen in der Anweisung) – status() ruft connected() und die Engine | ed63dca3 (operand: Eingänge von Aufrufen des Programms/der Engine/Formaten von links; Links-Stehendes, das die Schritte sehen/ändern können oder das selbst ruft, wird vorher gehalten) | 081204-23050: mp_hud_json NICHT geschrieben (Probe: mp_local_ready → MpLocal::init in mp_art.cpp fehlte); neu work-k-vergleich-091538-11174 (+mp_art, combat_art) | gebaut |
