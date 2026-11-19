@@ -145,8 +145,8 @@ struct Mat4 {
 };
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
@@ -225,7 +225,7 @@ struct Ragdolls {
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -237,7 +237,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Joint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Joint& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -251,7 +251,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -263,7 +263,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[1]), ".rotation"); }
 [[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
@@ -279,7 +279,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Colors& s) { return converted::Value::structure({arg(s.shirt), arg(s.pants), arg(s.skin), arg(s.hair), arg(s.cap), arg(s.vest)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Colors& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.shirt, (*got.rows)[0]) && same(want.pants, (*got.rows)[1]) && same(want.skin, (*got.rows)[2]) && same(want.hair, (*got.rows)[3]) && same(want.cap, (*got.rows)[4]) && same(want.vest, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls::Colors& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.shirt, (*got.rows)[0]), ".shirt") && converted::at_place(same(want.pants, (*got.rows)[1]), ".pants") && converted::at_place(same(want.skin, (*got.rows)[2]), ".skin") && converted::at_place(same(want.hair, (*got.rows)[3]), ".hair") && converted::at_place(same(want.cap, (*got.rows)[4]), ".cap") && converted::at_place(same(want.vest, (*got.rows)[5]), ".vest"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Colors& s) { return defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.hair) && defined(s.cap) && defined(s.vest); }
 [[maybe_unused]] static std::string text(const Ragdolls::Colors& s) { return std::string("{") + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.hair) + ", " + text(s.cap) + ", " + text(s.vest) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Colors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Vec3>(s.shirt, (*v.rows)[0]); converted::take_as<Vec3>(s.pants, (*v.rows)[1]); converted::take_as<Vec3>(s.skin, (*v.rows)[2]); converted::take_as<Vec3>(s.hair, (*v.rows)[3]); converted::take_as<bool>(s.cap, (*v.rows)[4]); converted::take_as<bool>(s.vest, (*v.rows)[5]); }
@@ -304,7 +304,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Doll& s) { return converted::Value::structure({arg(s.active), arg(s.recover), arg(s.getting_up), arg(converted::shaped<converted::Whole>(s.key)), arg(converted::array_list(s.bodies)), arg(converted::array_list(s.joints)), arg(converted::array_list(s.pose)), arg(converted::array_list(s.from)), arg(converted::array_list(s.stand)), arg(s.colors), arg(s.born), arg(s.settled), arg(s.getup_at), arg(s.stand_yaw), arg(s.stand_feet), arg(s.group)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.active, (*got.rows)[0]) && same(want.recover, (*got.rows)[1]) && same(want.getting_up, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]) && same(converted::array_list(want.bodies), (*got.rows)[4]) && same(converted::array_list(want.joints), (*got.rows)[5]) && same(converted::array_list(want.pose), (*got.rows)[6]) && same(converted::array_list(want.from), (*got.rows)[7]) && same(converted::array_list(want.stand), (*got.rows)[8]) && same(want.colors, (*got.rows)[9]) && same(want.born, (*got.rows)[10]) && same(want.settled, (*got.rows)[11]) && same(want.getup_at, (*got.rows)[12]) && same(want.stand_yaw, (*got.rows)[13]) && same(want.stand_feet, (*got.rows)[14]) && same(want.group, (*got.rows)[15]); }
+[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return converted::rows_of(got, 16) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.recover, (*got.rows)[1]), ".recover") && converted::at_place(same(want.getting_up, (*got.rows)[2]), ".getting_up") && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]), ".key") && converted::at_place(same(converted::array_list(want.bodies), (*got.rows)[4]), ".bodies") && converted::at_place(same(converted::array_list(want.joints), (*got.rows)[5]), ".joints") && converted::at_place(same(converted::array_list(want.pose), (*got.rows)[6]), ".pose") && converted::at_place(same(converted::array_list(want.from), (*got.rows)[7]), ".from") && converted::at_place(same(converted::array_list(want.stand), (*got.rows)[8]), ".stand") && converted::at_place(same(want.colors, (*got.rows)[9]), ".colors") && converted::at_place(same(want.born, (*got.rows)[10]), ".born") && converted::at_place(same(want.settled, (*got.rows)[11]), ".settled") && converted::at_place(same(want.getup_at, (*got.rows)[12]), ".getup_at") && converted::at_place(same(want.stand_yaw, (*got.rows)[13]), ".stand_yaw") && converted::at_place(same(want.stand_feet, (*got.rows)[14]), ".stand_feet") && converted::at_place(same(want.group, (*got.rows)[15]), ".group"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Doll& s) { return defined(s.active) && defined(s.recover) && defined(s.getting_up) && defined(converted::shaped<converted::Whole>(s.key)) && defined(converted::array_list(s.bodies)) && defined(converted::array_list(s.joints)) && defined(converted::array_list(s.pose)) && defined(converted::array_list(s.from)) && defined(converted::array_list(s.stand)) && defined(s.colors) && defined(s.born) && defined(s.settled) && defined(s.getup_at) && defined(s.stand_yaw) && defined(s.stand_feet) && defined(s.group); }
 [[maybe_unused]] static std::string text(const Ragdolls::Doll& s) { return std::string("{") + text(s.active) + ", " + text(s.recover) + ", " + text(s.getting_up) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(converted::array_list(s.bodies)) + ", " + text(converted::array_list(s.joints)) + ", " + text(converted::array_list(s.pose)) + ", " + text(converted::array_list(s.from)) + ", " + text(converted::array_list(s.stand)) + ", " + text(s.colors) + ", " + text(s.born) + ", " + text(s.settled) + ", " + text(s.getup_at) + ", " + text(s.stand_yaw) + ", " + text(s.stand_feet) + ", " + text(s.group) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Doll& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<bool>(s.recover, (*v.rows)[1]); converted::take_as<bool>(s.getting_up, (*v.rows)[2]); converted::take_as<converted::Whole>(s.key, (*v.rows)[3]); { std::vector<physics::Body> items; converted::take_as<std::vector<physics::Body>>(items, (*v.rows)[4]); converted::array_from(s.bodies, items); } { std::vector<physics::Joint> items; converted::take_as<std::vector<physics::Joint>>(items, (*v.rows)[5]); converted::array_from(s.joints, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[6]); converted::array_from(s.pose, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[7]); converted::array_from(s.from, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[8]); converted::array_from(s.stand, items); } converted::take_as<Ragdolls::Colors>(s.colors, (*v.rows)[9]); converted::take_as<double>(s.born, (*v.rows)[10]); converted::take_as<double>(s.settled, (*v.rows)[11]); converted::take_as<double>(s.getup_at, (*v.rows)[12]); converted::take_as<double>(s.stand_yaw, (*v.rows)[13]); converted::take_as<Vec3>(s.stand_feet, (*v.rows)[14]); converted::take_as<int>(s.group, (*v.rows)[15]); }
@@ -316,7 +316,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Up& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.feet), arg(s.yaw)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Up& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.feet, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Ragdolls::Up& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(want.feet, (*got.rows)[1]), ".feet") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Up& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.feet) && defined(s.yaw); }
 [[maybe_unused]] static std::string text(const Ragdolls::Up& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.feet) + ", " + text(s.yaw) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Up& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<Vec3>(s.feet, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); }
@@ -331,12 +331,12 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls& s) { return converted::Value::structure({arg(s.world_), arg(s.dolls_), arg(s.ups_), arg(s.max_), arg(s.spawned_), arg(s.group_)}); }
-[[maybe_unused]] static bool same(const Ragdolls& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.world_, (*got.rows)[0]) && same(want.dolls_, (*got.rows)[1]) && same(want.ups_, (*got.rows)[2]) && same(want.max_, (*got.rows)[3]) && same(want.spawned_, (*got.rows)[4]) && same(want.group_, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.world_, (*got.rows)[0]), ".world_") && converted::at_place(same(want.dolls_, (*got.rows)[1]), ".dolls_") && converted::at_place(same(want.ups_, (*got.rows)[2]), ".ups_") && converted::at_place(same(want.max_, (*got.rows)[3]), ".max_") && converted::at_place(same(want.spawned_, (*got.rows)[4]), ".spawned_") && converted::at_place(same(want.group_, (*got.rows)[5]), ".group_"); }
 [[maybe_unused]] static bool defined(const Ragdolls& s) { return defined(s.world_) && defined(s.dolls_) && defined(s.ups_) && defined(s.max_) && defined(s.spawned_) && defined(s.group_); }
 [[maybe_unused]] static std::string text(const Ragdolls& s) { return std::string("{") + text(s.world_) + ", " + text(s.dolls_) + ", " + text(s.ups_) + ", " + text(s.max_) + ", " + text(s.spawned_) + ", " + text(s.group_) + "}"; }
 [[maybe_unused]] static void take(Ragdolls& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<World*>(s.world_, (*v.rows)[0]); converted::take_as<std::vector<Ragdolls::Doll>>(s.dolls_, (*v.rows)[1]); converted::take_as<std::vector<Ragdolls::Up>>(s.ups_, (*v.rows)[2]); converted::take_as<unsigned int>(s.max_, (*v.rows)[3]); converted::take_as<unsigned int>(s.spawned_, (*v.rows)[4]); converted::take_as<int>(s.group_, (*v.rows)[5]); }
 struct Out_Ragdolls_take_ups { Ragdolls Self; std::vector<Ragdolls::Up> out; };
-[[maybe_unused]] static bool same(const Out_Ragdolls_take_ups& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Ragdolls_take_ups& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_Ragdolls_take_ups& s) { return defined(s.Self) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_Ragdolls_take_ups& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 
@@ -345,7 +345,7 @@ SC_TEST(converted_ragdoll) {
   {  // Ragdolls::init
     converted::Tally tally("Ragdolls_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] World& a1, [[maybe_unused]] bool a2) { converted::counted([&] { return a0.init(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] Ragdolls& a0, [[maybe_unused]] World& a1, [[maybe_unused]] bool& a2) { converted::counted([&] { return a0.init(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       Ragdolls a0 = draw_Ragdolls(draw);
       World& a1 = *converted::engine_object<World>(1 + draw.below(6));
@@ -356,7 +356,9 @@ SC_TEST(converted_ragdoll) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1, std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -366,7 +368,7 @@ SC_TEST(converted_ragdoll) {
   {  // Ragdolls::take_ups
     converted::Tally tally("Ragdolls_take_ups");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0, [[maybe_unused]] std::vector<Ragdolls::Up> a1) { converted::counted([&] { return a0.take_ups(a1); }); return Out_Ragdolls_take_ups{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] Ragdolls& a0, [[maybe_unused]] std::vector<Ragdolls::Up>& a1) { converted::counted([&] { return a0.take_ups(a1); }); return Out_Ragdolls_take_ups{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       Ragdolls a0 = draw_Ragdolls(draw);
       std::vector<Ragdolls::Up> a1 = draw_list(draw, [&]() -> Ragdolls::Up { return draw_Ragdolls__Up(draw); });
@@ -376,7 +378,9 @@ SC_TEST(converted_ragdoll) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -386,7 +390,7 @@ SC_TEST(converted_ragdoll) {
   {  // Ragdolls::spawned
     converted::Tally tally("Ragdolls_spawned");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Ragdolls a0) { return converted::counted([&] { return a0.spawned(); }); };
+    const auto run = [&]([[maybe_unused]] Ragdolls& a0) { return converted::counted([&] { return a0.spawned(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Ragdolls a0 = draw_Ragdolls(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -395,7 +399,9 @@ SC_TEST(converted_ragdoll) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

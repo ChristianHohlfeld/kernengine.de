@@ -35,9 +35,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Bvh;
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct HeightSampler : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -80,6 +82,7 @@ struct BloomPass : converted::EngineObject {
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -92,6 +95,7 @@ struct Renderer : converted::EngineObject {
 struct Value : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct EngineValue;
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -107,10 +111,14 @@ struct FunctionPin : converted::EngineObject {
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Host : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -204,6 +212,7 @@ struct TouchControls : converted::EngineObject {
 };
 namespace weapons { enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb }; }
 enum class Mode : u8 { foot, drone, car, jet, parachute };
+namespace combat { } using namespace ::converted_game_controls_cpp::combat;
 f32 key(const Input& in, Key k) { return in.down(k) ? 1.0 : 0.0; }
 const char* hint_weapon(Mode m, weapons::Id foot, i32 drone) {
   // desktop_controls.mjs WEAPON_NAMES (sniper, fists, knife and GUIDED have none)
@@ -236,7 +245,7 @@ SC_TEST(converted_game_controls_cpp) {
   {  // key
     converted::Tally tally("key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const Input& a0, [[maybe_unused]] Key a1) { return converted::counted([&] { return converted_game_controls_cpp::key(a0, std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] const Input& a0, [[maybe_unused]] Key& a1) { return converted::counted([&] { return converted_game_controls_cpp::key(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const Input& a0 = *converted::engine_object<Input>(1 + draw.below(6));
       Key a1 = static_cast<Key>(draw.below(53));
@@ -246,7 +255,9 @@ SC_TEST(converted_game_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -256,7 +267,7 @@ SC_TEST(converted_game_controls_cpp) {
   {  // hint_weapon
     converted::Tally tally("hint_weapon");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mode a0, [[maybe_unused]] weapons::Id a1, [[maybe_unused]] int a2) { return converted::counted([&] { return converted_game_controls_cpp::hint_weapon(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] Mode& a0, [[maybe_unused]] weapons::Id& a1, [[maybe_unused]] int& a2) { return converted::counted([&] { return converted_game_controls_cpp::hint_weapon(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Mode a0 = static_cast<Mode>(draw.below(5));
       weapons::Id a1 = static_cast<weapons::Id>(draw.below(14));
@@ -267,7 +278,9 @@ SC_TEST(converted_game_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -277,7 +290,7 @@ SC_TEST(converted_game_controls_cpp) {
   {  // jesc
     converted::Tally tally("jesc");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_game_controls_cpp::jesc(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::string& a0) { return converted::counted([&] { return converted_game_controls_cpp::jesc(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::string a0 = draw.word();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -286,7 +299,9 @@ SC_TEST(converted_game_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
