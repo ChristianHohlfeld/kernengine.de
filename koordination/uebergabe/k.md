@@ -146,3 +146,7 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
 - 09dd6818 B3: steps_in → assigned(steps=True): eine Änderung ohne Variable der Funktion (Feld von this, *unique_ptr) zählt als Schritt; damit
   bekommt `P& r = g.a[g.cur++ % n]` / `const Lane& L = lanes[rng_.next() % n]` seinen Index einmal (`r_at`). Kleinstfall /tmp/k_r.
   Beleg geplant: vergleich game_foot_rounds, game_military, game_gaps, game_events, game.cpp (nach 054057-841).
+- 06:00 B1+B2 BELEGT (work-k-vergleich-054057-841, 46/46 beide) → BEREIT ZUM MERGEN 5d804704 gemeldet. Engine-Suite für die Tabelle offen (voller Lauf).
+- work-k-vergleich-060032-8835 (09dd6818): 52/52 ok, aber die B3-Funktionen waren NICHT geschrieben (unit_hash in gaps_rules.cpp, lane_signature in
+  road_graph.cpp, put in combat_art.cpp fehlten) – kein Beleg. Neu: work-k-vergleich-062739-13858 (foot_rounds, military, gaps, gaps_rules, road_graph, game.cpp).
+- Befunde t1 (equipment ui_radio SEGV, number_at UB) und offene Punkte (mp_hud_json connected, draw_events) in stand/k.md.

@@ -1,0 +1,244 @@
+# Lauf work-zusammen-voll-055004-6649 (fe83683e): was die 137 noch nicht geschriebenen Funktionen aufhält
+what the others wait for: functions (lines)
+    33 (  1682)   the engine's now_ms() (its node is another one in the engine: its pins differ)
+    11 (   948)   it calls Game::ctl_strike_confirm(), which waits
+     8 (   811)   an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+     6 (   483)   the engine's shots() (its node is another one in the engine: its pins differ)
+     5 (   344)   a pointer
+     1 (   306)   a vector constant written as CallExpr
+     5 (   268)   the end of a Car runs its destructor ~Car(), which is not written yet
+     4 (   259)   it calls Game::hit_scan(), which waits
+     3 (   235)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     2 (   220)   Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+     4 (   210)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_military_cpp)
+     1 (   182)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_life_cpp)
+     3 (   168)   a member of Int is set
+     1 (   155)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_gaps_cpp)
+     1 (   136)   a loop that changes the characters of a text
+     2 (   127)   it calls Game::explosion(), which waits
+     1 (   120)   a function value (lambda / std::function) of another shape: a lambda with auto inputs
+     2 (   118)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_events_cpp)
+     1 (   117)   build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+     1 (   111)   it calls register_node(), which waits
+     2 (   109)   a reference to something it changes
+     1 (   104)   algorithm: std::find_if in a list that is no place of the function
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    99)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_traffic_cpp)
+     1 (    86)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_weapons_cpp)
+     2 (    86)   it calls GeoProjector::init(), which waits
+     1 (    81)   it calls Game::step_heli(), which waits
+     1 (    81)   an assignment inside an expression
+     2 (    77)   Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_town_cpp)
+     3 (    74)   algorithm: std::remove_if with a function value that is no lambda
+     1 (    72)   the struct Feat (its field pts: a pointer)
+     1 (    65)   it calls Game::step_cop(), which waits
+     1 (    61)   GotoStmt
+     1 (    60)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_details_cpp)
+     1 (    58)   tuple / variant
+     1 (    55)   it calls Interiors::activate(), which waits
+     1 (    52)   it calls Game::life_epoch(), which waits
+     2 (    51)   the engine's sound_cues() (its node is another one in the engine: its pins differ)
+     1 (    49)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_swarm_cpp)
+     1 (    47)   Game::explosion() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+
+# je Funktion (Endstand):
+Car::spec (1): a name for a place - written where it is called
+Car::wheel (1): a name for a place - written where it is called
+CityStream::area (1): a name for a place - written where it is called
+CityStream::begin_cells (22): a place in a list of another shape
+CityStream::begin_roads (17): a member of Int is set
+CityStream::build_near (19): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::building (1): a name for a place - written where it is called
+CityStream::fail (11): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::finish_cells (44): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::finish_features (61): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::go_offline (22): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::lanes (1): a name for a place - written where it is called
+CityStream::projector (1): a name for a place - written where it is called
+CityStream::provide (9): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::relay (13): it calls CityStream::begin_roads(), which waits
+CityStream::request_around (28): an owned value that holds objects of the engine, replaced where it is no place
+CityStream::select_cells (62): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::start (12): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::stats (1): a name for a place - written where it is called
+CityStream::step_time (4): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::take_requests (11): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::terrain (1): a name for a place - written where it is called
+CityStream::update (85): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::update_collision (54): the engine's now_ms() (its node is another one in the engine: its pins differ)
+CityStream::work (110): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Decoder::step (30): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Decoder::tile (1): a name for a place - written where it is called
+Destruction::stats (1): a name for a place - written where it is called
+Drone::params (1): a name for a place - written where it is called
+Drone::telemetry (1): a name for a place - written where it is called
+Facades::frame_uniforms (1): the type kern::Renderer is only declared here (its definition is in another file)
+Field::all (1): a name for a place - written where it is called
+FirmwareRuntime::navigation_snapshot (1): a name for a place - written where it is called
+FirmwareRuntime::receiver_snapshot (1): a name for a place - written where it is called
+FirmwareRuntime::state_runtime (1): a name for a place - written where it is called
+FlightLog::flights (1): a name for a place - written where it is called
+G (1): a name for a place - written where it is called
+Game::Game (1): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+Game::build_level (99): an object of the engine as a local that is not made by a constructor of it
+Game::city (1): a name for a place - written where it is called
+Game::combat_blast (50): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_military_cpp)
+Game::combat_shot (36): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_military_cpp)
+Game::command (268): it calls Game::ctl_strike_confirm(), which waits
+Game::ctl_discrete (95): it calls Game::ctl_strike_confirm(), which waits
+Game::ctl_grenade (47): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+Game::ctl_touch_shot (29): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+Game::draw_remote_vehicles (55): the end of a Car runs its destructor ~Car(), which is not written yet
+Game::draw_traffic_lights (42): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::draw_vehicles (27): the end of a Car runs its destructor ~Car(), which is not written yet
+Game::draw_world (8): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::drive_traffic (86): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::drone_attack (32): it calls Game::hit_scan(), which waits
+Game::drone_input (116): it calls Game::hit_scan(), which waits
+Game::explosion (45): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_town_cpp)
+Game::fixed_step (34): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::foot_input (191): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+Game::foot_rounds_update (60): the engine's shots() (its node is another one in the engine: its pins differ)
+Game::gaps_draw (41): a pointer
+Game::gaps_jet_audio (57): a pointer
+Game::gaps_lamps_update (33): the engine's shots() (its node is another one in the engine: its pins differ)
+Game::gaps_sirens (58): tuple / variant
+Game::gaps_update (155): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_gaps_cpp)
+Game::handle_shots (80): a reference to something it changes
+Game::hit_scan (86): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_weapons_cpp)
+Game::hud_json (136): a loop that changes the characters of a text
+Game::jet_attack (49): it calls Game::hit_scan(), which waits
+Game::jet_input (62): it calls Game::hit_scan(), which waits
+Game::life_command (182): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_life_cpp)
+Game::life_epoch (6): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::life_update (230): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+Game::look_begin (33): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::look_command (75): a pointer
+Game::look_draw (63): a member of Int is set
+Game::look_lap (1): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::look_lighting (158): the engine's shots() (its node is another one in the engine: its pins differ)
+Game::look_view_models (150): a pointer
+Game::manage_traffic (98): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::minimap_json (72): the struct Feat (its field pts: a pointer)
+Game::net (1): a name for a place - written where it is called
+Game::net_command (225): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::place_world (43): it calls Game::ctl_strike_confirm(), which waits
+Game::police_drone_mate_hit (16): it calls Game::explosion(), which waits
+Game::puppet_car_step (23): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::read_input (61): it calls Game::ctl_strike_confirm(), which waits
+Game::rebase_origin (25): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::start (111): it calls register_node(), which waits
+Game::step_cop (81): the engine's shots() (its node is another one in the engine: its pins differ)
+Game::step_heli (69): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_military_cpp)
+Game::step_soldier (71): the engine's shots() (its node is another one in the engine: its pins differ)
+Game::step_tow (140): the end of a Car runs its destructor ~Car(), which is not written yet
+Game::step_world (35): the end of a Car runs its destructor ~Car(), which is not written yet
+Game::stop (4): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+Game::swarm_apply_hit (49): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_swarm_cpp)
+Game::swarm_draw_vehicles (11): the end of a Car runs its destructor ~Car(), which is not written yet
+Game::swarm_update (104): algorithm: std::find_if in a list that is no place of the function
+Game::townsync_update (124): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::traffic_far_step (55): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::traffic_far_switch (33): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::traffic_json (22): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::traffic_rules (26): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::ui_apply_settings (21): it calls Game::ctl_strike_confirm(), which waits
+Game::ui_command (115): it calls Game::ctl_strike_confirm(), which waits
+Game::ui_gps_update (14): it calls Game::ctl_strike_confirm(), which waits
+Game::ui_mix_audio (17): an assignment to CXXMemberCallExpr
+Game::ui_mix_cues (13): the engine's sound_cues() (its node is another one in the engine: its pins differ)
+Game::ui_move_world (7): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::ui_reset (46): it calls Game::ctl_strike_confirm(), which waits
+Game::ui_update (20): it calls Game::ui_apply_settings(), which waits
+Game::update (87): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::update_combat (24): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_events_cpp)
+Game::update_details (60): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_details_cpp)
+Game::update_enemies (94): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_events_cpp)
+Game::update_fighters_back (80): the engine's shots() (its node is another one in the engine: its pins differ)
+Game::update_guided (37): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::update_jets (55): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_military_cpp)
+Game::update_military (81): it calls Game::step_heli(), which waits
+Game::update_net (196): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::update_police (65): it calls Game::step_cop(), which waits
+Game::update_police_drones (111): it calls Game::explosion(), which waits
+Game::update_projectiles (61): GotoStmt
+Game::update_sound (38): the engine's sound_cues() (its node is another one in the engine: its pins differ)
+Game::update_town (88): it calls Game::ctl_strike_confirm(), which waits
+Game::update_traffic_world (99): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_traffic_cpp)
+Game::update_world (39): algorithm: std::remove_if with a function value that is no lambda
+Game::vr_comfort (88): a member of Int is set
+Game::vr_foot (82): it calls Game::ctl_strike_confirm(), which waits
+Game::vr_melee (81): an assignment inside an expression
+Game::vr_menu_input (115): it calls Game::ctl_strike_confirm(), which waits
+Game::water_look (1): a name for a place - written where it is called
+Game::web_audio_command (19): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_audio_web_cpp)
+Game::windows (1): a name for a place - written where it is called
+Game::world_command (76): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game::worldsync_list (52): it calls Game::life_epoch(), which waits
+Game::worldsync_update (472): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Game::wreck_car (32): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_town_cpp)
+GeoProjector::init (7): the engine's fail() (it has no node: a variadic function)
+Instance::disabled (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+Instance::graph (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+Instance::name (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+Instance::tier (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+Interiors::activate (44): it calls Interiors::build(), which waits
+Interiors::build (306): a vector constant written as CallExpr
+Interiors::plan (1): a name for a place - written where it is called
+Interiors::update (55): it calls Interiors::activate(), which waits
+Jet::spec (1): a name for a place - written where it is called
+Jet::telemetry (1): a name for a place - written where it is called
+Life::birds (1): a name for a place - written where it is called
+Life::cat_attack (1): a name for a place - written where it is called
+Life::chain (1): a name for a place - written where it is called
+Life::cows (1): a name for a place - written where it is called
+Life::flocks (1): a name for a place - written where it is called
+Life::loose_birds (1): a name for a place - written where it is called
+Life::pet_anchors (1): a name for a place - written where it is called
+Life::pets (1): a name for a place - written where it is called
+Life::ragdolls (1): a name for a place - written where it is called
+Life::trees (1): a name for a place - written where it is called
+Life::voices (1): a name for a place - written where it is called
+Marks::prune_walls (22): algorithm: std::remove_if with a function value that is no lambda
+Marks::stats (1): a name for a place - written where it is called
+Marks::update (13): algorithm: std::remove_if with a function value that is no lambda
+N (1): a name for a place - written where it is called
+P (1): a name for a place - written where it is called
+People::all (1): a name for a place - written where it is called
+People::at (1): a name for a place - written where it is called
+PingBoard::all (1): a name for a place - written where it is called
+Ragdolls::colors (1): a name for a place - written where it is called
+Runtime::instances (1): a function of Runtime, an object of the engine (a handle in a Blueprint), that is no node of it
+Scoreboard::rows (1): a name for a place - written where it is called
+Session::remotes (1): a name for a place - written where it is called
+Session::scores (1): a name for a place - written where it is called
+Session::seats (1): a name for a place - written where it is called
+Session::vote_text (1): a name for a place - written where it is called
+SmokeField::puffs (1): a name for a place - written where it is called
+StateController::debug (1): a name for a place - written where it is called
+StateRuntime::inner (1): a name for a place - written where it is called
+StateRuntime::state_controller (1): a name for a place - written where it is called
+Table::rows (1): a name for a place - written where it is called
+Terrain::build_water_chunk (117): build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+Terrain::plan_dem (51): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Terrain::plan_windows (41): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Terrain::run_job (69): the engine's now_ms() (its node is another one in the engine: its pins differ)
+Terrain::sampler (7): an object of the engine (HeightSampler) given back by value (C++ moves it to the caller)
+Terrain::stats (1): a name for a place - written where it is called
+Terrain::update (81): the engine's now_ms() (its node is another one in the engine: its pins differ)
+TouchPlay::buttons (1): a name for a place - written where it is called
+TouchPlay::fires (1): a name for a place - written where it is called
+TrafficRules::junctions (1): a name for a place - written where it is called
+WaterLook::frame_uniforms (1): the type kern::Renderer is only declared here (its definition is in another file)
+Writer::bytes (1): a name for a place - written where it is called
+Writer::end_layer (21): a pointer
+buildings_input (14): a place in a list of another shape
+clock_ms (1): the engine's now_ms() (its node is another one in the engine: its pins differ)
+decode (7): it calls Decoder::step(), which waits
+dem_grid_job (50): it calls GeoProjector::init(), which waits
+extract (120): a function value (lambda / std::function) of another shape: a lambda with auto inputs
+game (4): the state of the Blueprint Game (its one object is that Blueprint, no value)
+register_node (18): an object of the engine (NodeDef) copied or moved as a whole
+run_buildings (29): a reference to something it changes
+run_tile (36): it calls GeoProjector::init(), which waits
+spec (1): a name for a place - written where it is called
