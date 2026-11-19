@@ -2863,6 +2863,10 @@ class Const:
         d = self.unit.tree.body.get(c.get("referencedDecl", {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
         if d is None or d.get("kind") != "FunctionDecl":
             return None
+        if self.unit.tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm::"):
+            # (the engine's functions of numbers - `std::tan` of the program, which the dumps join to `kern::dm::tan`
+            # by its name and type (join_dumps): a function of a formula by its name, not the library they call)
+            return None
         body = next((x for x in kids(d) if x.get("kind") == "CompoundStmt"), None)
         stmts = kids(body) if body is not None else []
         if len(stmts) != 1 or stmts[0].get("kind") != "ReturnStmt" or not kids(stmts[0]):
