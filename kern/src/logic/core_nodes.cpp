@@ -1845,6 +1845,32 @@ void add_math(Library& lib) {
   lib.add(pure("text.of_code", "Text of Code", "Text", {data("code", "Code", K::integer, 65)}, data("result", "", K::text), of(&P::text_of_code),
                "A text of one byte: Code cut to 8 bits", "char character byte ascii"));
   {
+    // Set Code: one byte of a text variable set where it stands - what `s[i] = c` does to a std::string (Text::set_at)
+    NodeDef d = make("text.set_code", "Set Code", "Text", NodeKind::action,
+                     "Sets the byte at Index of a text variable - or of a text at a place in one - to Code (cut to 8 bits), where it stands: the text keeps its "
+                     "length, the other bytes stay. An index outside the text changes nothing.",
+                     "char character byte ascii index replace write string");
+    d.params = {param("variable", "Text", ParamDef::Kind::variable), local_of(), path_of()};
+    d.inputs = {exec_in(), data("index", "Index", PinType::integer, 0), data("code", "Code", PinType::integer, 32)};
+    d.outputs = {exec_out()};
+    d.title = [](const NodeDef&, const Node& n) { return "Set Code in " + place_title(n); };
+    d.problem = [](const Node& n, const Graph& g) -> std::string {
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && v->type != PinType::text) return "needs a text variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      return {};
+    };
+    d.run = [](Context& c) {
+      const i64 index = c.in_int("index"), code = c.in_int("code");
+      const std::vector<i64> at = c.path();  // (its indices, read after its inputs - as every step on a place)
+      c.instance().change(c.node(), at, [&](Value& v) {
+        if (v.type == PinType::text && index >= 0 && static_cast<u64>(index) < v.s.size()) v.s[static_cast<std::size_t>(index)] = static_cast<char>(static_cast<u8>(code));
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
     NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,
                      "A text from a format as C's printf has it: %d %u %x %o %c take an Int, %f %e %g a Float, %s a Text; flags - + space 0 #, width and "
