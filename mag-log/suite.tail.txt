@@ -1,0 +1,8 @@
+compilers: Ubuntu clang version 18.1.3 (1ubuntu1) / /usr/bin/clang-18
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-123021-18658/kern/games/spawncity/src/level_blueprints.cpp: 169 of 172 Blueprint(s) as C++ classes
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-123021-18658/kern/src/logic/core_nodes.cpp:1560:16: warning: lambda capture 'of' is not used [-Wunused-lambda-capture]
+ 1560 |     d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
+      |                ^~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-123021-18658/kern/src/logic/core_nodes.cpp:1592:16: warning: lambda capture 'of' is not used [-Wunused-lambda-capture]
+ 1592 |     d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
+      |                ^~
