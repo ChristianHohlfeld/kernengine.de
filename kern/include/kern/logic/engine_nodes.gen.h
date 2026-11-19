@@ -58,6 +58,7 @@ struct E_AlphaMode { using type = kern::AlphaMode; static constexpr type values[
 struct E_AoQuality { using type = kern::AoQuality; static constexpr type values[] = {kern::AoQuality::low, kern::AoQuality::medium, kern::AoQuality::high, kern::AoQuality::ultra}; };
 struct E_BloomState { using type = kern::BloomState; static constexpr type values[] = {kern::BloomState::off, kern::BloomState::active, kern::BloomState::disabled_slow_device, kern::BloomState::unsupported}; };
 struct E_Key { using type = kern::Key; static constexpr type values[] = {kern::Key::unknown, kern::Key::a, kern::Key::b, kern::Key::c, kern::Key::d, kern::Key::e, kern::Key::f, kern::Key::g, kern::Key::h, kern::Key::i, kern::Key::j, kern::Key::k, kern::Key::l, kern::Key::m, kern::Key::n, kern::Key::o, kern::Key::p, kern::Key::q, kern::Key::r, kern::Key::s, kern::Key::t, kern::Key::u, kern::Key::v, kern::Key::w, kern::Key::x, kern::Key::y, kern::Key::z, kern::Key::digit0, kern::Key::digit1, kern::Key::digit2, kern::Key::digit3, kern::Key::digit4, kern::Key::digit5, kern::Key::digit6, kern::Key::digit7, kern::Key::digit8, kern::Key::digit9, kern::Key::left, kern::Key::right, kern::Key::up, kern::Key::down, kern::Key::space, kern::Key::enter, kern::Key::escape, kern::Key::tab, kern::Key::backspace, kern::Key::shift_left, kern::Key::shift_right, kern::Key::control_left, kern::Key::control_right, kern::Key::alt_left, kern::Key::alt_right, kern::Key::count}; };
+struct E_LogLevel { using type = kern::LogLevel; static constexpr type values[] = {kern::LogLevel::debug, kern::LogLevel::info, kern::LogLevel::warn, kern::LogLevel::error}; };
 struct E_audio_Bus { using type = kern::audio::Bus; static constexpr type values[] = {kern::audio::Bus::master, kern::audio::Bus::music, kern::audio::Bus::sfx, kern::audio::Bus::ambience, kern::audio::Bus::ui, kern::audio::Bus::voice, kern::audio::Bus::count}; };
 struct E_audio_Rolloff { using type = kern::audio::Rolloff; static constexpr type values[] = {kern::audio::Rolloff::inverse, kern::audio::Rolloff::linear, kern::audio::Rolloff::exponential}; };
 struct E_audio_Wave { using type = kern::audio::Wave; static constexpr type values[] = {kern::audio::Wave::square, kern::audio::Wave::saw, kern::audio::Wave::sine, kern::audio::Wave::triangle, kern::audio::Wave::noise, kern::audio::Wave::pink, kern::audio::Wave::pulse}; };
@@ -2597,6 +2598,28 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.channels = from_value<std::remove_cvref_t<decltype(kern_n.channels)>>(kern_out[1]);
   }
+  /// Records the last error (printf-style). Always returns false so call sites can write `return fail("...")`.
+  void engine_fail(const Text& text) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const ::kern::logic::engine_values::Chars kern_a0(text);
+      decltype(auto) kern_r = kern::fail("%s", kern_a0.c_str());
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      return;
+    }
+    this->kern_engine("engine.fail", {to_value(text)}, {PinType::boolean});
+  }
+  template <class KernNode> void engine_fail(KernNode& kern_n, const Text& text) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const ::kern::logic::engine_values::Chars kern_a0(text);
+      decltype(auto) kern_r = kern::fail("%s", kern_a0.c_str());
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.fail", {to_value(text)}, {PinType::boolean});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
   /// The message of the most recent fail(); empty string when none.
   Text engine_last_error() const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -2613,6 +2636,17 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.clear_error", {}, {});
+  }
+  template <class T1> void engine_log(const T1& level, const Text& text) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::LogLevel>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_LogLevel>>::from(*kern_o, level, kern_a0);
+      const ::kern::logic::engine_values::Chars kern_a1(text);
+      kern::log(std::move(kern_a0), "%s", kern_a1.c_str());
+      return;
+    }
+    this->kern_engine("engine.log", {to_value(level), to_value(text)}, {});
   }
   /// Monotonic milliseconds (performance.now() in the browser).
   Float engine_now_ms() const {

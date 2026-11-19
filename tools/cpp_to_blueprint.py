@@ -3559,12 +3559,15 @@ class Emit:
             y = bare(kids(y)[-1])
         return y
 
-    def format_values(self, fmt, args, kinds):
+    def format_values(self, fmt, args, kinds, done=None):
         """The format and the values Format Text takes for a printf format and its arguments. A u64/i64 that an
         integer conversion writes goes in as the text of its 64 bits - Int64 to Text Signed (d i), Int64 to Text (u),
         Int64 to Hex (x) - at a %s of the same width and the same `-` (the digits are the same; printf pads a
-        number and a text alike); another flag, a precision or another conversion of one: Wait."""
-        out, done, at, k = [], [], 0, 0   # (the values in the order C++ works them out - see operand)
+        number and a text alike); another flag, a precision or another conversion of one: Wait. `done`: the operands
+        of the call worked out before them (operand) - they go after those."""
+        out, at, k = [], 0, 0
+        done = [] if done is None else done   # (the values in the order C++ works them out - see operand)
+        start = len(done)
         while at < len(fmt):
             if fmt[at] != "%":
                 out.append(fmt[at])
@@ -3586,7 +3589,7 @@ class Emit:
                     self.operand(done, x, "Text", lambda: f"{node}({self.ex(w, 'Int64')})")
             out.append(spec)
             at += m.end()
-        return "".join(out), [e[2] for e in done]
+        return "".join(out), [e[2] for e in done[start:]]
 
     @staticmethod
     def format_kinds(fmt):
@@ -6391,6 +6394,26 @@ class Emit:
                 continue
             name, bt = pin_in, in_pins[pin_in]
             raw = qtype(params[i]).strip()
+            if name == f.get("printf"):
+                # the format of a function that formats a text (Api.printf_format) and its values: the text they make -
+                # Format Text, as snprintf's (the values are the call's last arguments: nothing is worked out after them)
+                fa = bare(a)
+                while fa.get("kind") in CAST and kids(fa):
+                    fa = bare(kids(fa)[-1])
+                if fa.get("kind") != "StringLiteral":
+                    raise Wait("a format that is not written out (Format Text has its format as a setting)")
+                fmt = c_string(fa["value"])
+                fmt = fmt.decode("latin-1") if isinstance(fmt, bytes) else fmt
+                kinds = self.format_kinds(fmt)
+                if kinds is None:
+                    raise Wait("a format Format Text does not know (d i u x X o c s f e g, flags, width, precision)")
+                if len(kinds) != len(args) - i - 1:
+                    raise Wait("a format whose conversions are not its values")
+                fmt, values = self.format_values(fmt, args[i + 1:], kinds, done)
+                del done[len(done) - len(values):]
+                nodes[name] = a
+                done.append([a, bt, f"text_format<{text_literal(fmt.encode('latin-1'))}>({', '.join(['-1'] + values)})", False])
+                continue
             if count_per(u.clean(raw)) is not None:
                 # (a kern::Count<Per> made of a whole number where it is handed over: that number)
                 while a.get("kind") in ("ImplicitCastExpr", "CXXConstructExpr", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr", "ExprWithCleanups", "CXXBindTemporaryExpr") and \
@@ -10060,7 +10083,8 @@ class Api:
         tree, u = self.tree, self.u
         if d.get("kind") == "CXXConstructorDecl":
             return self.maker(d)
-        if d.get("variadic"):
+        printf = self.printf_format(d)   # (the parameter that is its format - a function that formats a text; else None)
+        if d.get("variadic") and printf is None:
             raise Wait("a variadic function")
         owner = tree.owner.get(d["id"])
         method = d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static"
@@ -10107,7 +10131,9 @@ class Api:
                 per[name] = count_per(self.u.clean(qtype(all_params[i + 1]).strip()))
                 continue
             bt, writes, handle = self.handed(qtype(p))
-            name = name_of(p.get("name") or f"value{i + 1}")
+            # (the format of a function that formats a text - `fail(const char* format, ...)`: the node takes the text
+            # the format and its values make, `text`; the engine is handed it as "%s" - kern/docs/blueprint_cpp.md)
+            name = name_of("text" if p is printf else p.get("name") or f"value{i + 1}")
             raws[name] = qtype(p)
             ins.append((name, bt, handle))
             if writes:
@@ -10126,14 +10152,27 @@ class Api:
             # engine (kern/docs/blueprint_cpp.md, "Plätze der Engine") - the node binds it, the place nodes work on it
             place = gives_place and handle is None and method and not ins[1:] and len(outs) == 1 and self.looks_up(d)
         qualified = self.home(d) + "::" + d["name"]
-        value = not place and ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
+        # (a function that formats a text writes it somewhere - the last error, the log: a step)
+        value = not place and printf is None and ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
         for name, bt, _ in ins + outs:
             self.pin(bt)
             self.shape(bt, raws.get(name))
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
                 "help": u.comment_of(d), "value": value, "place": place, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per,
-                "clock": self.reads_clock(d), "raws": raws}
+                "clock": self.reads_clock(d), "raws": raws, "printf": None if printf is None else params[all_params.index(printf)][0]}
+
+    def printf_format(self, d):
+        """The parameter that is the format of a function that formats a text as printf does - its declaration says so
+        (`__attribute__((format(printf, i, i + 1)))`: the format is the last named parameter, a `const char*`, its
+        values the variadic ones) -; None for any other function."""
+        said = [self.tree.source(c) for c in d.get("inner") or [] if c.get("kind") == "FormatAttr"]
+        if not d.get("variadic") or not any(re.match(r"(?:__)?format(?:__)?\s*\(\s*(?:__)?printf(?:__)?\s*,", x) for x in said):
+            return None
+        params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
+        if not params or qtype(params[-1]).replace(" ", "") not in ("constchar*", "constchar*const"):
+            return None
+        return params[-1]
 
     @staticmethod
     def looks_up(d):
@@ -11472,6 +11511,7 @@ class TestWriter:
         d = f["decl"]
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["converted::value_of(*this)"] if cls else []), []
+        formats = None   # (the format of a function that formats a text - Api.printf_format)
         if plain and not qtype(d).rstrip().endswith("const"):
             takes.append(("(*this)", cls, False))
         ps = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
@@ -11496,7 +11536,12 @@ class TestWriter:
             name = pin_in
             if not self.u.object_of(raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
                 self.result_ok(re.sub(r"\*\s*(const)?$", "", raw))   # (the helpers of the structs it is made of)
-            if self.u.object_of(raw):
+            if name == f.get("printf"):
+                # the format of a function that formats a text, and its values: the node gets the text they make
+                params += [(f"const char* {name}", default), ("...", "")]
+                values.append("converted::value_of(kern_text)")
+                formats = name
+            elif self.u.object_of(raw):
                 params.append((f"{self.spell(raw)} {name}", default))
                 values.append(f"converted::value_of({name})")
             elif re.search(r"\*\s*(const)?$", raw) and raw.replace(" ", "") not in ("constchar*", "constchar*const"):
@@ -11534,6 +11579,12 @@ class TestWriter:
             self.result_ok(ret_raw)
         # (its own names begin with kern_: a parameter may be called `out` or `result` - hull_mesh's)
         body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
+        said = ""
+        if formats is not None:
+            # (what the format makes of the values: as the engine's function writes it - vsnprintf)
+            body.insert(0, f"std::va_list kern_va; va_start(kern_va, {formats}); const std::string kern_text = converted::formatted({formats}, kern_va); va_end(kern_va);")
+            at = len(params) - 1 + (1 if cls else 0)   # (its place among the parameters, counted from 1 - a method's object first)
+            said = f" __attribute__((format(printf, {at}, {at + 1})))"
         k = 0
         if ret != "void" and ret.endswith("&") and self.u.object_of(ret_raw):
             # (an object of the engine it gives by reference - World& physics(): the one of that handle)
@@ -11553,7 +11604,7 @@ class TestWriter:
         if ret != "void":
             body.append("return kern_result;")
         const = " const" if cls and (not plain or qtype(d).rstrip().endswith("const")) else ""
-        return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
+        return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const}{said};",
                 f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
 
     def engine_bases(self, q):

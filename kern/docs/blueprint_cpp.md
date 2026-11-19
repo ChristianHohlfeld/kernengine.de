@@ -1274,6 +1274,14 @@ selbst“).
   Quelle zeichnet Per × Anzahl Werte auf. Steht neben einem Zeiger eine ganze Zahl eines anderen
   Typs, sagt sie nichts über seine Länge: `tools/engine_api.py` hält mit der Liste dieser
   Erklärungen an (kein Name wird gelesen, keine Länge geraten).
+- **Eine Funktion, die einen Text formatiert wie printf** – ihre Erklärung sagt es:
+  `bool fail(const char* format, ...) __attribute__((format(printf, 1, 2)))`, `log(level, format, ...)` –
+  ist ein Knoten, der den fertigen Text nimmt (Eingang `text`, Text) und ein Schritt ist (sie schreibt
+  ihn irgendwohin: den letzten Fehler, das Protokoll). Die Tür und die Klasse geben ihn der Engine als
+  `fail("%s", text)` – die Engine schreibt ihn, wie sie das Format geschrieben hätte. Der Konverter
+  schreibt den Aufruf `fail("bad %d", n)` als `engine_fail(text_format<"bad %d">(-1, n))` (Format Text,
+  ein ausgeschriebenes Format, wie bei snprintf); der Test der Quelle zeichnet den Text auf, den das
+  Format mit seinen Werten macht (vsnprintf) – verglichen wird Text gegen Text, Bit für Bit.
 - **Der Knoten auf der Engine selbst** (`kern/logic/engine_host.h`): `logic::call_engine(objects,
   function, in, out)` ruft die echte Funktion eines Knotens – `tools/engine_api.py` schreibt jeden
   Aufruf aus den Headern (`kern/src/<Teil>/engine_calls.gen.cpp`, ein Teil der Engine je Datei: ein
