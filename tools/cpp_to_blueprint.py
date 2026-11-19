@@ -4034,8 +4034,8 @@ class Emit:
                 if target.get("kind") == "DeclRefExpr":
                     root = target.get("referencedDecl", {}).get("id")
                     break
-                if target.get("kind") == "CXXThisExpr":
-                    own = True
+                if target.get("kind") == "CXXThisExpr" or (target.get("kind") == "CallExpr" and self.is_this(target)):
+                    own = True   # (of its object - or of the one object of the state, reached by its getter: is_this)
                     break
                 if target.get("kind") == "ArraySubscriptExpr" and len(kids(target)) == 2:
                     picks.append((target, 1))
