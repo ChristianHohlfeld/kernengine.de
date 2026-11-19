@@ -1632,14 +1632,25 @@ template <class C> constexpr std::size_t entries(const C& c) {
     return c.size;
   }
 }
+/// What an entry the source reads where there is none is in the test (the call is marked - C++ leaves it open -, and
+/// the source runs on with it): zero - and a C text the empty one, not null, which no function of texts takes
+/// (`std::string(p)` throws, strlen reads nowhere): the source runs on to the end of the call.
+template <class E> E none_entry() {
+  if constexpr (std::is_pointer_v<E> && std::is_same_v<std::remove_cv_t<std::remove_pointer_t<E>>, char>) {
+    static char empty[1] = {};
+    return empty;
+  } else {
+    return E{};
+  }
+}
 template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   using R = decltype(c[0]);
   const long long n = static_cast<long long>(entries(c)), k = static_cast<long long>(i);
   if (k >= 0 && k < n) return c[static_cast<std::size_t>(k)];
   open_read();
   if constexpr (std::is_reference_v<R>) {
-    static std::remove_cvref_t<R> none;   // (an entry that is an array - T[3][2] - too: every entry of it zero)
-    fill_array(none, [] { return std::remove_all_extents_t<std::remove_cvref_t<R>>{}; });
+    static std::remove_cvref_t<R> none;   // (an entry that is an array - T[3][2] - too: every entry of it none_entry)
+    fill_array(none, [] { return none_entry<std::remove_all_extents_t<std::remove_cvref_t<R>>>(); });
     return none;
   } else {
     static std::vector<bool> none(1);
