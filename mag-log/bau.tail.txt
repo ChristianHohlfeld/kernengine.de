@@ -1,0 +1,80 @@
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162115:10: warning: variable 'update_instances' set but not used [-Wunused-but-set-variable]
+ 162115 |     Bool update_instances = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162116:10: warning: variable 'set_visible_2' set but not used [-Wunused-but-set-variable]
+ 162116 |     Bool set_visible_2 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162252:10: warning: variable 'set_property_text' set but not used [-Wunused-but-set-variable]
+ 162252 |     Bool set_property_text = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162253:10: warning: variable 'set_property_number' set but not used [-Wunused-but-set-variable]
+ 162253 |     Bool set_property_number = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162254:10: warning: variable 'set_property_number_2' set but not used [-Wunused-but-set-variable]
+ 162254 |     Bool set_property_number_2 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162255:10: warning: variable 'set_property_flag' set but not used [-Wunused-but-set-variable]
+ 162255 |     Bool set_property_flag = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162256:10: warning: variable 'set_property_number_3' set but not used [-Wunused-but-set-variable]
+ 162256 |     Bool set_property_number_3 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162257:10: warning: variable 'set_property_number_4' set but not used [-Wunused-but-set-variable]
+ 162257 |     Bool set_property_number_4 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162259:10: warning: variable 'set_property_number_5' set but not used [-Wunused-but-set-variable]
+ 162259 |     Bool set_property_number_5 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162260:10: warning: variable 'set_property_text_2' set but not used [-Wunused-but-set-variable]
+ 162260 |     Bool set_property_text_2 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162261:10: warning: variable 'set_property_number_6' set but not used [-Wunused-but-set-variable]
+ 162261 |     Bool set_property_number_6 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162262:10: warning: variable 'set_property_number_7' set but not used [-Wunused-but-set-variable]
+ 162262 |     Bool set_property_number_7 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162263:10: warning: variable 'set_property_number_8' set but not used [-Wunused-but-set-variable]
+ 162263 |     Bool set_property_number_8 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162264:10: warning: variable 'set_property_number_9' set but not used [-Wunused-but-set-variable]
+ 162264 |     Bool set_property_number_9 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162265:10: warning: variable 'set_property_number_10' set but not used [-Wunused-but-set-variable]
+ 162265 |     Bool set_property_number_10 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162349:10: warning: unused variable 'xr' [-Wunused-variable]
+ 162349 |     Bool xr = false;
+        |          ^~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162350:10: warning: unused variable 'xr_2' [-Wunused-variable]
+ 162350 |     Bool xr_2 = false;
+        |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162351:10: warning: unused variable 'both' [-Wunused-variable]
+ 162351 |     Bool both = false;
+        |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162352:10: warning: unused variable 'xr_3' [-Wunused-variable]
+ 162352 |     Bool xr_3 = false;
+        |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162625:10: warning: unused variable 'actor_alive' [-Wunused-variable]
+ 162625 |     Bool actor_alive = false;
+        |          ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162698:9: warning: unused variable 'physics' [-Wunused-variable]
+ 162698 |     Int physics = 0;
+        |         ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162783:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 162783 |     Bool body_valid = false;
+        |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162786:22: warning: unused variable 'body_type' [-Wunused-variable]
+ 162786 |     physics_BodyType body_type = physics_BodyType::fixed;
+        |                      ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/kern/games/spawncity/src/level_blueprints.cpp:162849:10: warning: unused variable 'actor_alive' [-Wunused-variable]
+ 162849 |     Bool actor_alive = false;
+        |          ^~~~~~~~~~~
+3 warnings generated.
+258 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	18m39,354s
+user	49m31,461s
+sys	1m2,579s

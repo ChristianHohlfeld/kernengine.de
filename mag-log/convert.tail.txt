@@ -1,0 +1,80 @@
+    box_blur (14): written
+    filter_pass (10): written
+    crater_profile (7): written
+    bare_earth (6): written
+    dem_grid_job (50): it calls GeoProjector::init(), which waits
+    Terrain::start (8): written
+    Terrain::clear (43): written
+    Terrain::disable_dem (7): written
+    Terrain::take_requests (10): written
+    Terrain::provide (10): written
+    Terrain::fail (6): written
+    Terrain::sample_dem (13): written
+    interior_of (1): written
+    rect_in (1): written
+    Terrain::interior (3): written
+    Terrain::covers (8): written
+    Terrain::plan_windows (41): unproject() is defined in another file
+    Terrain::plan_dem (51): unproject() is defined in another file
+    Terrain::run_job (69): written
+    Terrain::grid_at (9): written
+    Terrain::elevation (11): written
+    road_key (1): written
+    Terrain::road_field (12): written
+    Terrain::set_corridors (45): written
+    Terrain::remove_corridors (12): written
+    Terrain::corridor_set (8): written
+    Terrain::corridors_at (1): written
+    Terrain::road_level (22): written
+    Terrain::node_height (12): written
+    Terrain::height (7): written
+    Terrain::normal (4): written
+    Terrain::footprint_base (12): written
+    Terrain::sampler (7): written
+    Terrain::water_cell (7): written
+    Terrain::set_water_cell (6): written
+    Terrain::on_bridge (9): written
+    Terrain::water_at (5): written
+    Terrain::flow_at (7): written
+    Terrain::surface_at (6): written
+    Terrain::add_water_polygon (23): written
+    Terrain::add_waterway (31): written
+    Terrain::add_bridge (8): written
+    albedo (9): written
+    srgb_lin8 (1): written
+    Terrain::take_image_requests (10): written
+    Terrain::image_bounds (9): tile_lonlat() is defined in another file
+    Terrain::plan_images (24): unproject() is defined in another file
+    Terrain::provide_image (36): it calls Terrain::image_bounds(), which waits
+    Terrain::fail_image (4): written
+    Terrain::ground_albedo (14): unproject() is defined in another file
+    srgb_to_linear (1): written
+    linear_to_srgb (1): written
+    to_linear (1): written
+    to_srgb (1): written
+    Terrain::add_tint (10): written
+    Terrain::remove_tints (7): written
+    Terrain::repaint (10): written
+    Terrain::add_crater (12): written
+    Terrain::crater_list (4): written
+    Terrain::set_craters (13): written
+    Terrain::dirty (21): written
+    Terrain::ground_ready (5): written
+    Terrain::has_collision (4): written
+    Terrain::want_tiles (60): written
+    Terrain::build_render_tile (91): it calls Terrain::ground_albedo(), which waits
+    Terrain::build_collision_tile (35): written
+    Terrain::build_water_chunk (117): build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+    Terrain::ready_at (12): written
+    Terrain::update (81): it calls Terrain::plan_windows(), which waits
+tiles                           2 /    2 functions        2 /      2 lines
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/tmp/kern-cpp-to-blueprint-78jfzb18/terrain_cpp.cpp: error: Callback sampler_callback: the function needs the world (For Loop (For Loop)) - a Callback only computes from its inputs and its place (node 9970)
+  (the texts: /dev/shm/spawncity-jobs-chris/work-c-vergleich-150305-5063/tmp/kern-cpp-to-blueprint-78jfzb18)
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+the Blueprints were not read: the level is as it was
+
+real	2m46,216s
+user	5m9,767s
+sys	0m17,136s
