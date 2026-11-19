@@ -6126,6 +6126,11 @@ class Emit:
         if vid not in places:
             raise Wait("a Callback's function set before its void* (the place it is handed)")
         lam = self.lambda_of(b)
+        x = self.unwrap(b)
+        while lam is None and x.get("kind") in CAST + ("CXXMemberCallExpr", "MemberExpr", "MaterializeTemporaryExpr", "ParenExpr") and kids(x):
+            # (a lambda that captures nothing, as the pointer to a function C++ makes of it: its conversion)
+            x = self.unwrap(kids(x)[0] if x.get("kind") != "CXXMemberCallExpr" else (kids(callee(x)) or [{}])[0])
+            lam = x if x.get("kind") == "LambdaExpr" else None
         if lam is None:
             raise Wait("a Callback's function that is no lambda")
         owner = places[vid]
@@ -9751,6 +9756,8 @@ class Emit:
                            + self.count_loop(i0, i1, lambda i: [f"set_add({node}, {made}, {self.conv(f'list_get<{st[5:-1]}>({src}, {i})', st[5:-1], kt)});"]))
                 return made, t
             raise Wait(f"a {t.split('<')[0].lower()} made of other arguments")
+        if callback_parts(t) and not a:
+            return t + "{}", t   # (a Callback as C++ makes it without arguments: unbound)
         raise Wait(f"a {t} made here")
 
     def listed(self, s0, st, first, last, t):
