@@ -10933,6 +10933,18 @@ class TestWriter:
         if q in self.tree.enums:
             if q not in self.enum_names:
                 raise Wait(f"the enum {q.split('::')[-1]} is not written")
+            if ("enum", q) not in self.helped:
+                # the numbers C++ gives the values, where they are not their places (the Blueprint holds the place):
+                # said to converted.h once (converted::number_enum), as the Blueprint's KERN_ENUM has them
+                first = []
+                for _, x in enum_numbers(self.tree.enums[q]):
+                    if x not in first:
+                        first.append(x)
+                line = []
+                if first != list(range(len(first))):
+                    tag = re.sub(r"\W", "_", q.strip(":"))
+                    line = [f"[[maybe_unused]] static const bool converted_numbers_{tag} = converted::number_enum<{self.enum_names[q]}>({{{', '.join(str(x) for x in first)}}});"]
+                self.helped[("enum", q)] = line
             return self.enum_names[q]
         if q in self.tree.records:
             if q not in self.names:
@@ -11069,7 +11081,7 @@ class TestWriter:
             return f"converted::draw_maybe<{self.spell(raw)}>(draw, {one})"
         q = self.record_named(c)
         if q in self.tree.enums:
-            return f"static_cast<{self.spell(raw)}>(draw.below({len(self.u.enum_values[self.u.enums[q]])}))"
+            return f"converted::enum_value<{self.spell(raw)}>(draw.below({len(self.u.enum_values[self.u.enums[q]])}))"
         if q in self.tree.records:
             return f"{self.helpers(q)}(draw)"
         raise Wait(f"the test has no values of {c}")
