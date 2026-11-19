@@ -2358,6 +2358,8 @@ struct Host : kern::Blueprint {
   }
   KERN_EXPORT_AS("game_tick", "f64") void game_tick(Float dt = 0.0) {
   }
+  KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<Int>& data, Int data_at = 0, Int length = 0) {
+  }
 };
 )kn";
   logic::Graph g;
@@ -2376,6 +2378,10 @@ struct Host : kern::Blueprint {
   std::string glue;
   CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5) {") != std::string::npos &&
         glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
+  // a pointer of C is a list and the place in it (at): no C parameter - from the host the place is 0
+  CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
+        glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
+        glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};
   CHECK(logic::export_ok(f));
@@ -2386,6 +2392,12 @@ struct Host : kern::Blueprint {
   f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
   CHECK(!logic::export_ok(f));
   f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes do not go out)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes at i32 i32 f32 -> text";   // (an at where the bytes' len is)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text at bytes len i32 f32 -> text";   // (an at after a text: a text has no place, it is a Text)
+  CHECK(!logic::export_ok(f));
+  f.wire = "i32 at bytes len i32 f32 -> text";   // (an at after no bytes)
   CHECK(!logic::export_ok(f));
   f.wire = "text len bytes len i32 f32 -> text";
   f.exported = "game hud";
