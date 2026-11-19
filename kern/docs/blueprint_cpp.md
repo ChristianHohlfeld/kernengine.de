@@ -250,6 +250,7 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 |---|---|---|
 | Boolean | `Bool` | `true`, `false` |
 | Integer | `Int` | `12`, `-3` |
+| Integer fester Breite – der Typ eines **Platzes** (siehe „Ganze Zahlen fester Breite“) | `U8`, `U16`, `U32`, `I8`, `I16`, `I32` | `200`, `-3` – eine Zahl, die die Breite hält |
 | Float | `Float` | `0.5`, `12.0`, `1e+21` |
 | Vector | `Vector` | `Vector{1.0, -2.5, 3.0}` |
 | Text | `Text` | `"a \"b\"\n"` (Escapes `\n \t \r \" \\` und oktal `\ooo`) |
@@ -474,6 +475,22 @@ void on1(Actor actor, Float value, Text text) {
   `std::vector` an (Reserve hält Platz vor, wie bei einer Liste), der Index wächst, wenn er halb voll
   ist. Herausnehmen schiebt die folgenden Einträge nach vorn und baut den Index neu – das kostet so
   viel, wie Einträge hinter dem herausgenommenen stehen.
+
+### Ganze Zahlen fester Breite
+
+Ein Platz – eine Variable, ein Feld, ein Ein- oder Ausgang, eine lokale Variable – kann ein Int fester Breite sein:
+`U8`, `U16`, `U32` (0 bis 2^w − 1) und `I8`, `I16`, `I32` (−2^(w−1) bis 2^(w−1) − 1); im Graphen ein Int mit der Breite
+am Platz (`"type":"int","of":"u32"`, Einstellung `u32`), wie die Länge bei `Fixed`. **Über einen Draht fließt ein Int** –
+die Breite hat nur der Platz. Was der Platz bekommt, hält er, wie C++ eine ganze Zahl in einem `std::uint32_t` speichert
+(`static_cast<u32>(x)`): die unteren w Bits des Int, bei Vorzeichen im Zweierkomplement – beim Setzen (`X = n3.item;`,
+`S.a = …`, `return {…}`, Aufruf, von außen) und bei Add to Variable (`E += -4294967297;`: die unteren Bits der Summe).
+Eine Float wird erst zum Int (`kern::to<Int>(x)` – auf null zu, außerhalb das nächste Ende von Int), dann gespeichert;
+`kern::to<U8>` gibt es nicht. Jeder Wert einer Breite ist kleiner als 2^32 und so in einem double genau – Interpreter
+und JIT halten ihn genau; der JIT überlässt Set/Add einer solchen Variablen der Funktion des Knotens. Das Produkt zweier
+`U32`, wie C++ es rechnet, ist `kern::math::mul32(a, b)` (für `I32`: `wrap32s(mul32(a, b))`); Produkte bis 16 Bit sind
+als Int genau. In der Klasse ist `U32` `logic::Sized<u32>` (nodes.h): gelesen ein Int, gespeichert wie C++.
+Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`); Maps haben Schlüssel und Werte ohne Breite.
+Listen fester Breite (`List<U8>`) sind noch kein Typ der Sprache.
 
 ### Int64
 

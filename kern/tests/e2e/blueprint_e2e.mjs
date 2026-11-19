@@ -140,7 +140,7 @@ await until(async () => await page.locator("#logicEditor:not([hidden]) .lg-canva
 await cmd({cmd: "logicVariable", op: "add", name: "Scores", type: "float"});
 await page.click('.lg-var[data-var="Scores"]');
 const typeSelect = page.locator('.lg-dbody [data-vk="type"]');
-check(await until(async () => await typeSelect.count() === 1) && (await typeSelect.locator("option").count()) === 16, "Details offers the seven value types, their lists, a map and a set");
+check(await until(async () => await typeSelect.count() === 1) && (await typeSelect.locator("option").count()) === 22 && (await typeSelect.locator('option[value="u32"]').textContent()) === "U32", "Details offers the seven value types, their lists, the six fixed widths (U8 ... I32), a map and a set");
 await typeSelect.selectOption("float_list");
 check(await until(async () => (await logic()).variables.find(v => v.name === "Scores")?.type === "float_list"), "a variable becomes a Float List");
 const scores = async () => JSON.stringify((await logic()).variables.find(v => v.name === "Scores")?.value);
@@ -235,7 +235,7 @@ check(await until(async () => await valueField(2).inputValue() === "Opening") &&
 await cmd({cmd: "logicVariable", op: "add", name: "State", type: "float"});
 await page.click('.lg-var[data-var="State"]');
 const enumType = page.locator('.lg-dbody [data-vk="type"]');
-check(await until(async () => await enumType.count() === 1) && (await enumType.locator("option").count()) === 18 && (await enumType.locator('option[value="Mode_list"]').textContent()) === "Mode List",
+check(await until(async () => await enumType.count() === 1) && (await enumType.locator("option").count()) === 24 && (await enumType.locator('option[value="Mode_list"]').textContent()) === "Mode List",
       "a variable's Type offers the enum and a list of it");
 await enumType.selectOption("Mode");
 const stateVar = async () => (await logic()).variables.find(v => v.name === "State");
@@ -337,7 +337,7 @@ await settle(async () => await page.locator(".lg-dbody .lg-srow").count() === 3)
 await renameField("Field", "Type");
 await settle(async () => await fieldRow("Type").count() === 1);
 const fieldType = fieldRow("Type").locator('[data-sf="type"]');
-check((await fieldType.locator("option").count()) === 20 && (await fieldType.locator('option[value="Aim_list"]').textContent()) === "Aim List" && (await fieldType.locator('option[value="Weapon"]').count()) === 0,
+check((await fieldType.locator("option").count()) === 26 && (await fieldType.locator('option[value="Aim_list"]').textContent()) === "Aim List" && (await fieldType.locator('option[value="Weapon"]').count()) === 0,
       "a field's Type offers the value types, the enums, the other structs and lists of them - not the struct itself");
 await fieldType.selectOption("Kind");
 check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:text,Type:Kind" && await fieldRow("Type").locator('select[data-sf="value"] option').count() === 2), "a field of an enum: its default is one of the values");
@@ -355,7 +355,7 @@ check(await settle(async () => await fieldsOf("Weapon") === "Damage:float,Label:
 await cmd({cmd: "logicVariable", op: "add", name: "Held", type: "float"});
 await page.click('.lg-var[data-var="Held"]');
 const heldType = page.locator('.lg-dbody [data-vk="type"]');
-check(await settle(async () => await heldType.count() === 1) && (await heldType.locator("option").count()) === 22 && (await heldType.locator('option[value="Weapon_list"]').textContent()) === "Weapon List",
+check(await settle(async () => await heldType.count() === 1) && (await heldType.locator("option").count()) === 28 && (await heldType.locator('option[value="Weapon_list"]').textContent()) === "Weapon List",
       "a variable's Type offers the structs and lists of them");
 await heldType.selectOption("Weapon");
 const held = async () => (await logic()).variables.find(v => v.name === "Held");
