@@ -1,4 +1,13 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 01:25 **work-zusammen = 2c7667bc** und darauf der **volle Lauf `work-zusammen-voll-012215-4354`** (abgelegt 01:22). Seit 9f10aa88 dazu: t1 8e2474a9 (Methoden
+  außerhalb der Klasse, note nennt den Grund der Engine; 2dacbbb5), **p 85d60a1d** (ganzzahlige Formeln mit +,−,×, Weitergabe beim Anhängen, Aufrufweg an einen
+  Actor ohne vector, Fixed an Eingängen, Switch on Text, Zeit-Test, Fix text_format; f67af15b – Belege `work-p-engine-002417-11420` rc=0,
+  `work-p-vergleich-010659-18840` 14 von 14 ok in beiden Durchgängen), **Rücknahme von 12e3da24** (ks Ausweichen; e3901213), **g 7bd9ac5d** (der Ablauf endet auch,
+  wenn die Runden kreisen: was dort wechselt und wartet, wartet von da an – „(it went round with …)“; am ganzen Programm noch unbelegt, dieser Lauf ist der Beleg).
+  · **t1 und p sind beendet** (Läufe zu Ende, alles Gebaute gemergt). Es laufen g (Wurzel des Kreises: explosion/wreck_car ↔ look_blast) und d Nachfolger 4.
+  · Offen aus ps Bericht: Zeit-Test 25 von 29 Fällen über 1,10 (mulm 7,8×, settings_escape 7×, sha256 6,7×, from_hex 5,1×, qr 5×) – zwei weitere Entwürfe zur
+    Schreibweise angekündigt (+,−,× und Vergleich an der Wurzel einer Int-Formel; Struktur-Argumente bei Call on Actor ohne logic::Value). CI-Job native-spawncity
+    läuft auf work wie auf work-p in seine 45-Minuten-Grenze (rot) – vor dem Abschluss zu lösen.
 - 00:18 **work-zusammen enthält E13: die Spiel-Suite baut mit clang** (Merge work-t1 87e3d741; Beleg `work-t1-vergleich-000108-5748`: clang 18.1.3 linkt auf mag mit
   ASan/UBSan, beide Durchgänge 43 von 44 ok, converted_destruction(_cpp) ok OHNE Absenkung). **Alle: `git merge origin/work-zusammen` – eure Vergleiche bauen dann
   mit clang.** Stellen, an denen nur die Reihenfolge der Argumente abwich (Destruction_collapse/fracture/blast; eject, state_of), sind damit erledigt; ks Absenkung

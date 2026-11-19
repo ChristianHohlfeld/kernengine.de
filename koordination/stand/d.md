@@ -145,3 +145,16 @@
   Das ist keine Frage der Form. Vorschlag (allgemein, im Generator): ein Default-Macher auch für Klassen, deren Konstruktor nur Objekte der Engine
   nimmt, die selbst einen Default-Macher haben (und Parameter mit Default) – die mitgemachten Objekte unter eigenen Handles im selben EngineObjects,
   freigegeben mit ihm. Nicht umgesetzt (über Punkt 2 hinaus; Testrahmen real = t1) – Entscheidung des Koordinators.
+- **Beleg Punkt 2+3 (00:57):** `work-d-belege-vergleich-002858-13659` (work-d-belege 07bd7074: work-zusammen 310c6e10 + work-d-count + work-d-array;
+  game.cpp + game_gaps.cpp): convert rc=0, bau rc=0; **Stellvertreter 47/47 ok** – matrix_of weicht nicht mehr ab (Basis t2 223555: 88/88 und
+  90/90), gaps_guided_sounds weicht nicht mehr ab (Basis 11/37, 12/38). **Real:** gaps_guided_sounds 39 verglichen, keine Abweichung.
+  Real-FAIL nur „only 0 calls could be compared“ bei body, eject, hide_soldier, matrix_of, state_of, step_parachute – alles Aufrufe auf GameWorld,
+  die die Engine abweist (kein Default-Macher, BEFUND oben); in der Basis genauso (matrix_of real 0 verglichen). Nichts Neues.
+  cost-Zeile gaps_guided_sounds (Klasse fordert bis 3× Speicher, Quelle 0) – in der Basis genauso.
+- Engine-Suite läuft: `work-d-belege-engine-005831-17971` (ganze Suite: E14-Test, engine_stand_in_fixed_length, geänderte Signaturen).
+- **Punkt 4 (Auftrag Koordinator 01:0x: Macher für Klassen ohne Standard-Konstruktor)** gebaut: Zweig **work-d-maker** = **b317557a**
+  (auf work-zusammen 2dacbbb5). Calls.default_makers: Werte → Null (ev::blank), Zeiger auf Objekt → null, Referenz auf Objekt der Engine →
+  mitgemacht ohne Handle (ev::MadeWith, EngineObjects::put_made, Entry::owner); abstrakte Referenz → die eine abgeleitete machbare Klasse.
+  Neu gemacht: Engine, GameAudio, GameWorld, SoundBank, net::Client, net::Server. `--list`: nicht gemacht nur kern::net::Transport (abstrakt).
+  Hinweis: GameAudio(Mixer&, SoundBank&) bekommt zwei unabhängige Mixer (jedes Objekt für sich gemacht – keine Annahme über Teilen).
+  Engine-Test engine_calls_default_objects_made_with, Doku. Syntax ✓, Generator reproduziert. Beleg folgt (vergleich net_session real; Engine-Suite).

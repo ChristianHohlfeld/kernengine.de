@@ -6,6 +6,18 @@ Zweig work-p, letzter Commit 85d60a1d (gepusht; CI 44416542751 rot an logic_fixe
 - LÄUFT: `work-p-vergleich-230429-15316` (gestartet 23:14 auf 8a028f9c: E2.1, E2.2, E2.1 Schritt 2, Fix text_format, E3-A) über qr_code, settings,
   nostr, controls, combat_rules. NICHT darin: E10 + Leser-Fix (Commit vor 6c7b9c5f). Danach `engine` auf dem Kopf. CI: run 44407872390 (work-p, 63467c0b).
 
+## BEREIT ZUM MERGEN: 85d60a1d (Paket p, Teil 2) – Belege (00:10)
+- **Engine-Suite** `work-p-engine-002417-11420` auf 85d60a1d: engine rc=0, 197 ok, blueprint_native_test ok (60 Blueprints, 14102 Aufrufe – mit den neuen
+  Fällen formula_whole_arith, formula_whole_indexed, format_text_of_value, fixed_literal_input, append_in_place), game_native_test ok.
+- **vergleich** `work-p-vergleich-230429-15316` (8a028f9c): 12/12 ok in beiden Durchgängen, keine Abweichung (Abschnitt unten).
+- **CI** 44420463362 auf 85d60a1d: build, determinism, input, e2e, native (ASan/UBSan) grün; native-spawncity lief bei Abgabe noch.
+- Inhalt: E2.1 (95ada08, 2416329), E2.2 (e7538f1), Zeit-Test (133bb74), E2.1 Schritt 2 +,−,× (c064f234), **Fix text_format = 25a7318f + aede1c3e
+  (dringend für k: danach 12e3da24 zurücknehmen)**, E3-A Aufrufweg, E10 Fixed-Literal am Eingang + Leser-Fix Int-Formel (vor 6c7b9c5f, 85d60a1d),
+  Switch on Text ohne Liste. Text der Klassen ändert sich nur durch E2.1/E2.2/E2.1-Schritt-2/E10 (genehmigt); Fixpunkt in den Fällen gleich.
+- **vergleich** `work-p-vergleich-010659-18840` auf 85d60a1d (drone, controls, combat_rules): 14/14 ok in beiden Durchgängen, keine Abweichung;
+  **keine cost-Zeile mehr für Arondight45_*** (vorher Runtime_reset/new, FirmwareRuntime_reset/new) → Wirkung von E10 belegt. cost gesamt 29/27.
+- CI native-spawncity: bei 45 min abgebrochen (Zeitgrenze des Jobs; auf `work` 44363208469 ebenso rot) – nicht von p.
+
 ## Beleg vergleich `work-p-vergleich-230429-15316` (8a028f9c; 23:29)
 convert rc=0, bau rc=0, alle rc=0: **12 ok, 0 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT von 12 – in beiden Durchgängen (Stellvertreter und SC_ENGINE=real)**,
 alle-abweichungen.txt und alle-real-abweichungen.txt leer. Tests: blueprint_call, combat_rules_cpp, common, controls, controls_cpp, engine_math_math,

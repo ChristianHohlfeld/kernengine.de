@@ -18,3 +18,6 @@ Rohdaten: $S/mag/work-t2-vergleich-223555-30482/einzeln (je Test ganze Ausgabe),
 - 00:53 konvert 002324 rc=1: Kreis = wechselnde Wartegründe (explosion: look_blast/explosion „not written“). 480af66b: Regel verallgemeinert
   (wechselt im Kreis + wartet → wartet für immer, Grund + „(it went round with <BP>)“). Merge work-zusammen 9f10aa88 → 2a5d6f77.
   Beleg: work-g1-konvert-005330-16535. Bei rc=0: sofort main melden (er mischt ein und legt voll ab). Danach (1): Wurzel der gepinnten.
+- 01:21 konvert 005330: Pinnen griff (16 Funktionen), dann ValueError (Variable `more` überschrieb --program-Liste) → 7bd9ac5d. Neu: work-g1-konvert-012113-4171.
+  Wurzel offen: explosion/wreck_car (game_town) „look_blast()/explosion() of the Blueprint Game is not written“ = Unit.foreign: Schlüssel fehlt in world.table
+  (w.table aus tables der need-Einheiten). Idee: WHY=explosion (Env, druckt die Stelle) in einem ganzen Lauf.
