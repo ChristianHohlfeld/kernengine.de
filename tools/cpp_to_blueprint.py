@@ -10106,6 +10106,8 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
   const T* e = converted_pointed_end(p, static_cast<long long>(n));
   return {p, static_cast<std::size_t>(e - p)};
 }"""
+# A text of the library whose bytes a pointer of the source points into (`s.c_str() + from` - converted::text_end).
+TEXT_TYPE = re.compile(r"(?:const\s+)?std::(?:basic_string|string|string_view|basic_string_view|u8string|u16string|u32string|wstring)\b")
 # A view the test hands a function (kern::Span): its entries are a list a pointer of the source points into (`bytes.data`).
 SPAN_TYPE = re.compile(r"(?:const\s+)?(?:kern::)?Span<")
 WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
@@ -10328,6 +10330,22 @@ class TestWriter:
                 return self.u.pointed(qtype(r)) is not None
             except Wait:
                 return False
+        def text_bytes(x):
+            """Is this the bytes of a text (`s.c_str()`, `s.data()` of a std::string or std::string_view, also through a pointer
+            `p->c_str()`)? (the text, which of the two, through a pointer) - else None."""
+            x = bare(x)
+            while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(x):
+                x = bare(kids(x)[0])
+            m = bare(kids(x)[0]) if x.get("kind") == "CXXMemberCallExpr" and len(kids(x)) == 1 else {}
+            if m.get("kind") != "MemberExpr" or m.get("name") not in ("c_str", "data") or not kids(m):
+                return None
+            o = kids(m)[0]
+            t = self.u.clean(qtype(o)).strip()
+            if m.get("isArrow"):
+                if not t.endswith("*"):
+                    return None
+                t = t[:-1].strip()
+            return (o, m["name"], bool(m.get("isArrow"))) if TEXT_TYPE.match(t) else None
         def wide_layout(q):
             """The fields of the record q where the test holds them otherwise than the program (a float of the
             program is a 64-bit number there): ([(field, its number, its place)], the size) - None where the test
@@ -10458,6 +10476,17 @@ class TestWriter:
                 swap(a, xa, "*", "converted_pointed(")
                 edits.append((b, 0, -depth, b, ", 0)"))
                 self.pointed = True
+            elif k == "BinaryOperator" and n.get("opcode") in ("+", "-") and len(ks) == 2 and "*" in qtype(ks[0]) and text_bytes(ks[0]) is not None:
+                # a place in the bytes of a text (`s.c_str() + from`): in the text or at its end (where a std::string's null
+                # stands), as C++ defines it; beyond the end C++ leaves open what a read there gives (bytes after the text) - the
+                # call is marked and the place is the text's end (converted::text_end; the text is the one it was, said once)
+                text, which, arrow = text_bytes(ks[0])
+                (a, b), (_, tb), (ra, _) = span(n), span(text), span(ks[1])
+                if not re.fullmatch(r"\s*(?:\.|->)\s*%s\s*\(\s*\)\s*%s\s*" % (which, re.escape(n["opcode"])), raw[tb:ra]):
+                    raise Wait("written by a macro")
+                edits.append((a, 2, depth, a, "converted::text_end<%s>(%s" % ("true" if which == "c_str" else "false", "*" if arrow else "")))
+                edits.append((tb, 1, 0, ra, ", " if n["opcode"] == "+" else ", -("))
+                edits.append((b, 0, -depth, b, ")" if n["opcode"] == "+" else "))"))
             elif k == "BinaryOperator" and n.get("opcode") in ("+", "-") and len(ks) == 2 and "*" in qtype(ks[0]) and into_list(ks[0]):
                 # a place further on in a list a pointer points into (`values + n`, the end of what a call of the
                 # library reads - `insert(end, values, values + n)`): in the list or just past its end, as C++
