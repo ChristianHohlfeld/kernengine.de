@@ -1,5 +1,20 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+## E20 Schritt 4 (Konverter schreibt die Breiten) – gebaut bis 344551db, Belege laufen (16:55)
+Commits: 5f0d81f9 (Konverter: Plätze u8…i32 und int → U8…I32, List<U8>…; wire/put, Wurzel-Wegnahme beim Speichern),
+4d612317 (Bytes of Text/S geben List<U8>; Engine-Pins in den Breiten ihrer Listen, engine_api.py neu), c2244413 + Folgende
+(Klasse: Index fester Breite, logic::pinned in formula, Glue List<U8>-Felder, Sized → i64 implizit + format_arg/==), 0e4667ff/344551db
+(Fall „jeder Knoten“). work-zusammen fb51251f eingemischt.
+- vergleich `work-p-vergleich-163201-22238` (0e4667ff; nostr qr_code mvt city_jobs terrain): 14 von 15 ok in beiden Durchgängen;
+  FAIL nur converted_terrain_cpp (set_water_cell u. a.) – NICHT von p: siehe BEFUND FÜR k.
+- Läuft: engine `work-p-engine-165514-3888`, konvert `work-p-konvert-165517-3943`, CI (dispatch 16:55).
+
+## BEFUND FÜR k (16:55)
+Terrain::set_water_cell (`WaterBlock& b = water_[key2(cx >> 4, cy >> 4)];`): der Konverter von work-zusammen (fb51251f) schreibt
+`Int b_row = 0;` und liest `self.water_[b_row]` – die Zeilen `key = key2(...); map_add(nX, self.water_, key); b_row = …` fehlen
+(voll-100601 hatte sie). Lokal mit dem Konverter von origin/work-zusammen allein über src/terrain.cpp nachgestellt (p-tmp/w4/tz).
+Folge: Terrain_set_water_cell 300/300, add_water_polygon, add_waterway, build_collision_tile weichen ab (beide Durchgänge).
+
 
 
 ## BEREIT ZUM MERGEN: 1e91e798 (E20 Schritt 3: List<U8> … List<I32>; Bytes-Knoten nehmen Listen jeder Breite) – Belege (15:40)

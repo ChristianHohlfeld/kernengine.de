@@ -160,3 +160,20 @@ ruft heute genau diese Methode nach dem Umwandeln. Beleg: Engine-Suite; vergleic
   Bereich liegen; ein Argument außerhalb (Zufallszahl > 2^32 an einen u32-Parameter) gibt der Quelle die gewickelte Zahl (C++-Umwandlung beim
   Aufruf) – der Blueprint wickelt am Eingang (fitted) genauso. Kein Befund, solange der Test die Zahl über die C++-Signatur reicht.
 - Danach Schritt 5 (Schleife mit lokalem Wächter, ENTWURF 4 (b)) und (b) Struktur-Argumente ohne Heap (Bauplan oben).
+
+## Nachfolger 6 (19.11., ab ~15:40) – E20 Schritt 4 gebaut
+- Konverter (tools/cpp_to_blueprint.py): `WIDTH`/`WIDTHS`, `wire(t)`, `Unit.place(raw)` (Plätze: local, Parameter, f.value, Struktur-
+  felder, Zustand, Konstanten, Paare über entry; `entry()` nutzt place → List<U8>). Intern speichert `self.types` den ERKLÄRTEN Typ
+  (U8), `tp()`/`value()`/`conv()` geben Int (wire). `put(n, t)` statt `ex` an Speicherstellen (Zuweisung, Init, return, push_back,
+  resize-Wert): `stored()` nimmt an der Wurzel IntegralCasts auf ≥ Breite weg (nicht über * oder <<) und markiert ein unsigned-32-+/−
+  bzw. −x (`self.unwrapped`), dessen wrap32 fx dann weglässt. `wraps_sum`: `x += b`/`++x` auf U8…I32 als Add to Variable.
+  Bytes: BYTE_FIELD in Breiten; bytes_pointer nach Zeigertyp (u8 → List<U8>); bit_cast/struct_bytes-Temp List<U8>.
+- Engine: text.bytes/struct.bytes geben List<U8> (core_nodes `bytes_out`, blueprint.h); Api.pin/shape/tag kennen Breiten,
+  Span/Zeiger über place → engine_api.py neu (jobs::submit/take …: List<U8>). engine_direct.h: Int-Pin nimmt Sized.
+  Klasse: Index fester Breite (nodes.h requires … || is_sized<I>), `logic::pinned` in kern::formula, Glue held() für List<U8>-
+  Felder, **Sized → i64 implizit** (vorher explicit: Funktionen mit i64-Parametern nahmen kein U32) + format_arg(Sized),
+  operator== (Whole, ganzzahlig, andere Breite). Lokal geprüft: Klassen der 5 Vergleichsquellen (34 Blueprints) übersetzen.
+- Werkzeug lokal: lesen.py → /home/claude/lese/l.klevel, dann `tools/blueprint_cpp.sh l.klevel out.cpp` und
+  `clang++ -fsyntax-only -ferror-limit=0 -Ikern/include -Ikern/third_party/box3d/include -Ikern/games/spawncity/src out.cpp`
+  (findet alle Klassenfehler auf einmal; der Werkzeugbau nach Engine-Änderung dauert ~18 min unter der Sperre).
+- Belege: vergleich 163201 14/15 (terrain: Befund k, nicht p). Offen: engine 165514, konvert 165517, CI, Zeit-Test.

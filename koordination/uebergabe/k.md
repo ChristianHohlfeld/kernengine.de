@@ -226,3 +226,20 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
 - Neu offen: gaps_draw – `GapsState::Part& part = p.ember ? g.ember : g.disc;` (Referenz auf einen von zwei Plätzen: Bedingung beim Binden halten,
   jede Verwendung als Wahl – Lesen select, Schreiben if/else).
 - Nächster Schritt: Warteliste des vollen Laufs (123021-18658 oder neuer) nach dem Einmischen lesen; extract, minimap_json, gaps_draw (oben).
+
+# NACHFOLGER 6 (19.11., ab 15:55) – Warteliste work-zusammen-voll-143319-13859
+- Achtung: Der Lauf 143319 rechnete auf 0f7f5a46, also OHNE 4d14f00c…798186ff. Die Wartestellen List.g, Decoder::step, end_layer, gaps_jet_audio/sirens,
+  swarm_update und life_update (`mine = &c` → entry_pointer_set) erscheinen dort deshalb noch.
+- Commits auf work-k (Basis fb51251f):
+  * c684e716: In inlined werden kern::dm::-Funktionen nicht eingesetzt. join_dumps verbindet std::tan(float) nach Name und Typ mit kern::dm::tan, dadurch
+    entstand „a constant computed with kern_musl_tanf()“. Betrifft tyre, jet_input und jet_attack. Ein Rest bleibt: join_dumps prüft den Namensraum nicht (allgemeiner).
+  * 521274be: Ein Lambda, das einen Platz nennt (`-> f32&`, alles per Referenz gefangen), wird an jedem Aufruf zu diesem Platz (dissolve/placed mit CXXOperatorCallExpr). Betrifft build_water_chunk.
+  * 0679bafe: Emit.either_place macht aus `T& r = c ? a : b` ein if über dem Rest des Blocks. Betrifft gaps_draw.
+  * 54dcd7cd: Lambda mit auto-Eingängen: Unit.generic und Emit.instance machen je Spezialisierung eine lokale Funktion; das übergebene Lambda wird eine eigene. Betrifft extract.
+  * 3af75896: RÜCKSCHRITT aus 1cb0e7e1 behoben. Die Hebungen aus name_references gehören vor das bindende Statement (block_steps). Seit 4ef56569 war
+    converted_terrain_cpp rot (set_water_cell, build_collision_tile, add_water_polygon …, dieselbe Ursache vermutet).
+- Kleinstfälle: /tmp/k_tan, /tmp/k_at, /tmp/k_or, /tmp/k_gl, /tmp/k_wc.
+- Belege:
+  * 163507-23262 (0679bafe): tyre und Car::step geschrieben, converted_car_cpp ok in beiden Durchgängen. build_water_chunk ist geschrieben, aber terrain ist rot (Ursache war 3af75896).
+  * Beleg 171851-19774 (3af75896) läuft: terrain, tiles, game_swarm, game_gaps, game_barricades, game.cpp.
+- Offen bzw. nicht meins: siehe stand/k.md „Nachfolger 6“. minimap_json ist ein BEFUND für g (Absenkung).

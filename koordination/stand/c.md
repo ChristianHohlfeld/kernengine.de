@@ -57,3 +57,29 @@ Entscheidungen beim Bau (nach den Zielen, ohne Freigabe – Chris).
 - 150305 (8e576119): sampler geschrieben; Check-Fehler „needs the world (For Loop)“ → behoben in 6a7c58bd; begin_roads wartete an data().
   fail/go_offline/finish_features/update warten in der Probe an Funktionen anderer Dateien (training_level, road_is_water, request_around→unproject).
 - Laufen: work-c-vergleich-154541-25809 (city_stream, terrain, tiles), CI 44547268243 (Engine-Suite).
+
+## Stand 16:30 – work-c = 9c1907e8 (gepusht; mit work-zusammen fb51251f)
+- 154541 (92e43c44; city_stream, terrain, tiles): convert rc=0, Terrain::sampler geschrieben und verglichen (ok), extract (tiles) geschrieben;
+  Test city_stream übersetzte nicht: converted.h – Callback-Überladungen (take/arg …) erst nach den Vorlagen deklariert (ADL findet sie in std/kern
+  nicht) → behoben 2a… (Vorwärtsdeklarationen); road_stream.data ohne Stellvertreter („no values of double *“) → behoben (const T* = gehaltene Zahlen).
+  Lokal (city_stream+terrain, STAND_INS=1): kein „no stand-in“ mehr, Test übersetzt.
+- Offen: Terrain_plan_dem 62/300, plan_windows 43/300 (beide Durchgänge, „no place named“) – im vollen Lauf 100601 ok. Ursache prüfen:
+  Basislauf work-zusammen (terrain, tiles, city_stream) abgelegt.
+- BEFUND s5 (ShaderExtension, App-Ereignisse) notiert – nach den city_stream-Funktionen.
+- 16:43 Basis-Beleg work-zusammen-vergleich-162208-17909 (fb51251f; city_stream, terrain, tiles): ROT aus der Basis – CityStream_feed_terrain 9/32,
+  merge_damage 2/300, Terrain add_water_polygon 17/84, add_waterway 2/22, build_collision_tile 20/20, build_render_tile 10/20, plan_dem 62/300,
+  plan_images 39/300, plan_windows 43/300, set_water_cell 300/300 (real ähnlich). plan_dem/plan_windows in work-c 154541 mit denselben Zahlen → nicht von c.
+  → BEFUND FÜR Koordinator/k (Basis seit 4ac2e4f9/fb51251f; im vollen Lauf 100601 waren plan_* ok).
+- CI 44547268243 (92e43c44): native, build, determinism, input grün; e2e rot nur an „cannot convert int to int64 (voice)“ (Basis, siehe stand/e.md).
+
+## BEREIT ZUM MERGEN: 9c1907e8 (work-c, enthält work-zusammen fb51251f) – Belege
+- work-c-vergleich-164339-32470 (9c1907e8; city_stream, terrain, tiles): convert/bau rc=0; **CityStream::begin_roads, relay, finish_features,
+  Terrain::sampler geschrieben UND verglichen, beide Durchgänge ohne Abweichung**. Rot nur, was die Basis genauso rot hat (Beleg
+  work-zusammen-vergleich-162208-17909 auf fb51251f): CityStream_feed_terrain 9/32, Terrain_plan_dem 62/300 (real 67), plan_windows 43/300 (real 49)
+  – dieselben Zahlen; die Basis hat dazu noch mehr Rotes (set_water_cell, build_collision_tile …), das in work-c nicht auftritt.
+- Engine-Suite: CI 44547268243 (92e43c44, alle Sprach-/Test-Änderungen von c): native, build, determinism, input grün; e2e rot nur an
+  „cannot convert int to int64 (voice)“ (Basis, stand/e.md); native-spawncity abgebrochen (Zeit). Danach nur Konverter/converted.h + Merge fb51251f.
+- Das FAIL converted_terrain_cpp (real) aus 132846: Basis (Terrain_run_job/j.id, d a12da91a fehlte damals).
+- Noch wartend (kein Funktionswert): CityStream::fail, go_offline, request_around (→ update): „an owned value that holds objects of the engine,
+  replaced where it is no place“ (Map von unique_ptr<Tile> mit Engine-Objekten – Besitz/Destruktoren, nicht c). extract: Beleg läuft
+  (tiles+mvt, layer() steht in mvt.cpp).

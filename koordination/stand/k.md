@@ -1,5 +1,25 @@
 # Paket k – Stand
 
+## Nachfolger 6 (19.11., ab 15:55; work-k = work-zusammen fb51251f + eigene Commits)
+- Warteliste des Laufs work-zusammen-voll-143319-13859 lief auf 0f7f5a46 – OHNE 4d14f00c…798186ff (erst 4ef56569 gemergt): darum
+  warten dort noch worldsync_update (List.g), Decoder::step, end_layer, gaps_jet_audio/gaps_sirens (Tupel/&q), swarm_update, life_update
+  (`mine = &c` – entry_pointer_set 4e8ae7d1). Zeigt der nächste volle Lauf.
+- c684e716: Konstante mit std::tan/std::cos – join_dumps verbindet std::tan(float) (std wird nicht ausgegeben) nach Name+Typ mit
+  kern::dm::tan; inlined setzte dessen Rumpf ein → „kern_musl_tanf()“. Funktionen aus kern::dm:: werden nicht eingesetzt → Formel der
+  Engine. tyre (5 Folgefunktionen, 466 Zeilen), jet_input, jet_attack. Kleinstfall /tmp/k_tan.
+- 521274be: lokale Funktion, die einen Platz nennt (`auto at = [&](i,j) -> f32& { return dist[j*W+i]; }`) → jeder Aufruf ist der Platz
+  (dissolve/placed auch für CXXOperatorCallExpr). build_water_chunk (→ Terrain::update). Kleinstfall /tmp/k_at.
+- 0679bafe: `T& r = c ? a : b;` → Rest des Blocks als if (c) {r=a} else {r=b} (Emit.either_place). gaps_draw. Kleinstfall /tmp/k_or.
+- 54dcd7cd: Lambda mit auto-Eingängen → je Spezialisierung eine lokale Funktion, übergebenes Lambda = eigene lokale Funktion (Emit.instance).
+  extract (tiles.cpp). Kleinstfall /tmp/k_gl.
+- Beleg läuft: work-k-vergleich-163507-23262 (0679bafe; car, terrain, game_gaps, game_controls, game_weapons, game.cpp).
+- Nicht meins (Liste 143319): mp_local_ready/round_meets_mate/melee_hit/gaps_hud = Test-Schreiber (t1, „undeclared identifier Game“);
+  step_heli/hit_scan/look_blast/explosion/CityStream::work = Rekursion (E16, gemergt); step_cop/handle_shots/run_buildings = Platz der Engine (d);
+  register_node (NodeDef mit std::function-Feldern: Rückrufe, c); build_level (kern::game::Level als lokales Objekt der Engine, d);
+  request_around (eigener Wert mit Engine-Objekten, d); look_view_models/look_command (kern::Mesh*, d).
+- minimap_json (Feat.pts = Zeiger auf eine fremde Liste in einem Listeneintrag): keine Sprachfähigkeit ohne Kopie (mehr Speicher) –
+  BEFUND FÜR g (Absenkung in game_town.cpp: Feat hält Kachel/Art/Index statt Zeiger, mit Differenztest).
+
 ## Nachfolger 5 (19.11., ab 13:40; work-k = work-zusammen fc8752ab + eigene Commits)
 - 4d14f00c: (1) Unit.state_pointer – `Game* g` einer Struktur aus dem Rumpf einer Methode des Zustands, jeder Wert dort mit
   `this` gemacht (geprüft: Klammerlisten, Kopien; Feld nur zum Erreichen gelesen; keine Liste/optional/Zeiger der Struktur)
@@ -324,3 +344,4 @@
 - t1: Spiel-Suite mit clang (E13) → dann vergleich destruction.cpp unter clang, danach 90ecf01f zurücknehmen.
 - p: text_format-Fix der Klasse → dann 12e3da24 zurücknehmen (vergleich combat_rules.cpp).
 - einen gültigen vollen Lauf → Liste für meine Dateien (city_stream, destruction, combat_*, drone, car, Firmware-Einheiten).
+- t1: Befund 928b7571 (Destruktoren) – k baut in TestWriter.take: fehlende closures → unit.missing (e1362b36, work-k); Beleg folgt (k).
