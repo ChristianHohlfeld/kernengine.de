@@ -1,0 +1,80 @@
+ 157666 |     Bool set_property_number_8 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:157667:10: warning: variable 'set_property_number_9' set but not used [-Wunused-but-set-variable]
+ 157667 |     Bool set_property_number_9 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:157668:10: warning: variable 'set_property_number_10' set but not used [-Wunused-but-set-variable]
+ 157668 |     Bool set_property_number_10 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:157752:10: warning: unused variable 'xr' [-Wunused-variable]
+ 157752 |     Bool xr = false;
+        |          ^~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:157753:10: warning: unused variable 'xr_2' [-Wunused-variable]
+ 157753 |     Bool xr_2 = false;
+        |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:157754:10: warning: unused variable 'both' [-Wunused-variable]
+ 157754 |     Bool both = false;
+        |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:157755:10: warning: unused variable 'xr_3' [-Wunused-variable]
+ 157755 |     Bool xr_3 = false;
+        |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:158028:10: warning: unused variable 'actor_alive' [-Wunused-variable]
+ 158028 |     Bool actor_alive = false;
+        |          ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:158086:9: warning: unused variable 'physics' [-Wunused-variable]
+ 158086 |     Int physics = 0;
+        |         ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:158159:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 158159 |     Bool body_valid = false;
+        |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/src/level_blueprints.cpp:158162:22: warning: unused variable 'body_type' [-Wunused-variable]
+ 158162 |     physics_BodyType body_type = physics_BodyType::fixed;
+        |                      ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:614:21: warning: unused variable 'draw' [-Wunused-variable]
+  614 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:634:21: warning: unused variable 'draw' [-Wunused-variable]
+  634 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:654:21: warning: unused variable 'draw' [-Wunused-variable]
+  654 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:674:21: warning: unused variable 'draw' [-Wunused-variable]
+  674 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:694:21: warning: unused variable 'draw' [-Wunused-variable]
+  694 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:714:21: warning: unused variable 'draw' [-Wunused-variable]
+  714 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:734:21: warning: unused variable 'draw' [-Wunused-variable]
+  734 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:958:21: warning: unused variable 'draw' [-Wunused-variable]
+  958 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_facades.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_facades_cpp.cpp:186:21: warning: unused variable 'draw' [-Wunused-variable]
+  186 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_facades_cpp.cpp:206:21: warning: unused variable 'draw' [-Wunused-variable]
+  206 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_facades_cpp.cpp:226:21: warning: unused variable 'draw' [-Wunused-variable]
+  226 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_facades_cpp.cpp:246:21: warning: unused variable 'draw' [-Wunused-variable]
+  246 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-zeit-spiel-065452-25462/kern/games/spawncity/tests/converted/test_facades_cpp.cpp:266:21: warning: unused variable 'draw' [-Wunused-variable]
+  266 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+2 warnings generated.
+1 warning generated.
+3 warnings generated.
+5 warnings generated.
+8 warnings generated.
+252 warnings generated.
