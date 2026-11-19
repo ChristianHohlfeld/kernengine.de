@@ -2966,7 +2966,7 @@ class Emit:
         self.locals = []      # (name, type): declared at the top of the body
         self.lengths = {}     # the local variables that are lists of a fixed length (name -> length)
         self.taken = set()
-        self.made = set()     # the local variables of the function's own making (temp)
+        self.temps = set()     # the local variables of the function's own making (temp)
         self.index = {}       # decl id of a loop's counter -> "n12.index"
         self.pre = []         # steps to run before the statement being written
         self.loops = []       # the loops around the statement being written: their flags for break and continue
@@ -3078,7 +3078,7 @@ class Emit:
         a value for a reference of that type)."""
         name = self.u.fresh(want, self.taken)
         self.taken.add(name)
-        self.made.add(name)
+        self.temps.add(name)
         self.locals.append((name, t))
         if fixed:
             self.lengths[name] = fixed
@@ -3355,7 +3355,7 @@ class Emit:
         that changes something, no store into a place of the function)?"""
         for ln in lines:
             m = re.fullmatch(r"(\w+) = (.*);", ln, re.S)
-            if m is None or m.group(1) not in self.made:
+            if m is None or m.group(1) not in self.temps:
                 return False
         return True
 
@@ -3363,7 +3363,7 @@ class Emit:
         """Is this text of an operand the same before and after any step: a number or a text written out, a
         variable made for a value, what a call made as a step gave (n12.Result)?"""
         return (re.fullmatch(r'-?\d+(\.\d*)?([eE][-+]?\d+)?|"(?:[^"\\]|\\.)*"|true|false', text) is not None
-                or text in self.made or re.fullmatch(r"n\d+\.Result", text) is not None)
+                or text in self.temps or re.fullmatch(r"n\d+\.Result", text) is not None)
 
     def lazily(self, fn):
         """Writes a part of an expression apart from the statement it stands in: (the steps it needs, its text)."""
