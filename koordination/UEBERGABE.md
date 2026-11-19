@@ -980,3 +980,7 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   `work-t1-zeit-spiel-072523-9219` grün belegt; `einzeln()` in lauf2.sh auf `--name` umstellen; (2) Liste des Einzel-Laufs 080335 an k/d/t1; (3) Belegtes von k, d,
   t2 einmischen; (4) voller Lauf als Kandidat (`MAG_NOWAIT=1 ./mag.sh voll origin/work-zusammen` – die Engine-Suite des Laufs abwarten!) → bei convert rc=0,
   suite rc=0, engine rc=0 nach `work` (Abschnitt 10), CI.
+- **Chris 08:39 (verbindlich):** „nie stoppen“ – am Planlimit läuft die Arbeit auf Credits weiter (Obergrenze laut seiner Seite 72,08 $/Monat, Aufladen aus;
+  darüber steht es, bis er sie anhebt). **„Du hältst dich zurück, koordinierst nur“** – der Koordinator behebt und untersucht nichts mehr selbst: Belege
+  prüfen, einmischen, Läufe starten, Listen und Entscheidungen weitergeben; alles andere an die Agenten. Kontrollen etwa stündlich, kurz. Drei Agenten
+  (t1, k, d) auf dem Weg zum ersten grünen Stand, bis Chris mehr freigibt. Danach: neue Koordinator-Sitzung mit dieser Übergabe (billiger je Schritt).
