@@ -191,6 +191,12 @@ template <std::size_t N, class T, class F> std::array<kern::u8, N> bytes_of(cons
   return out;
 }
 template <class T, class F> void of_bytes(T& v, const void* bytes, F fields) { fields(v, static_cast<const kern::u8*>(bytes)); }
+/// std::memcpy of a value of such a struct into bytes: its bytes as the program lays it out (`fields` writes them);
+/// gives where they went, as std::memcpy does.
+template <class T, class F> void* to_bytes(void* bytes, const T& v, F fields) {
+  fields(v, static_cast<kern::u8*>(bytes));
+  return bytes;
+}
 /// std::memcpy / std::memmove between lists of numbers of the program of which one holds floats (Copy
 /// Bytes; the test holds such a float as a 64-bit number - ToSingle, FromSingle): the `count` bytes the
 /// program copies, a float as its 32 bits and every other number as it is, as std::memmove copies them -

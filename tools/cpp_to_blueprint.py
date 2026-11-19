@@ -10449,6 +10449,15 @@ class TestWriter:
                     steps = " ".join("converted::layout::%s(v_.%s, p_ + %d);" % ("single_from" if code == "f32" else "raw_from", name, at) for name, code, at in lay[0])
                     edits.append((a, 1, 0, b, "converted::layout::of_bytes(%s, %s, [](auto& v_, const kern::u8* p_) { %s })" % (text_of(held[0]), text_of(ks[2]), steps)))
                     return
+                # the other way: the bytes of a value of such a struct into bytes (`memcpy(in.data() + at, &win, sizeof win)`) -
+                # the program's bytes of each field, a float as its 32 bits (the count is the program's sizeof, below)
+                held = addressed_record(self.tree, ks[2])
+                lay = wide_layout(held[1]) if held is not None else None
+                if lay is not None:
+                    a, b = span(n)
+                    steps = " ".join("converted::layout::%s(o_ + %d, v_.%s);" % ("single_to" if code == "f32" else "raw_to", at, name) for name, code, at in lay[0])
+                    edits.append((a, 1, 0, b, "converted::layout::to_bytes(%s, %s, [](const auto& v_, kern::u8* o_) { %s })" % (text_of(ks[1]), text_of(held[0]), steps)))
+                    return
                 # between lists of numbers of which one holds floats of the program (Copy Bytes): the bytes the
                 # program copies, a float as its 32 bits (converted::layout::copy_bytes)
                 to_code, from_code = pointer_code(self.u, ks[1]), pointer_code(self.u, ks[2])
