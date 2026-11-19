@@ -3967,12 +3967,18 @@ class Emit:
             if k == "DeclRefExpr":
                 return (x.get("referencedDecl") or {}).get("kind") in ("VarDecl", "ParmVarDecl")   # (a variable stays where it is; a reference is not bound again)
             if k == "MemberExpr" and kids(x):
-                return bare(kids(x)[0]).get("kind") == "CXXThisExpr" if x.get("isArrow") else fixed(kids(x)[0])
+                if x.get("isArrow") and bare(kids(x)[0]).get("kind") != "CXXThisExpr":
+                    return fixed(kids(x)[0]) and not self.reads(kids(x)[0]) & changed   # (through a pointer nothing after changes)
+                return True if x.get("isArrow") else fixed(kids(x)[0])
+            if (k == "CXXOperatorCallExpr" and callee_name(x) in ("operator*", "operator->") and len(kids(x)) == 2) or (k == "UnaryOperator" and x.get("opcode") == "*" and kids(x)):
+                held = kids(x)[-1]   # (what an owned value or a pointer holds - `*gaps_`: as long as nothing after sets it)
+                return fixed(held) and not self.reads(held) & changed
             return k == "CXXThisExpr"
         cond, a, b = kids(init)
+        rest = stmts[i + 1:]
+        changed = self.assigned({"kind": "CompoundStmt", "inner": rest})
         if not (fixed(a) and fixed(b)):
             return None
-        rest = stmts[i + 1:]
         for x in (y for r in rest for y in walk(r)):
             if x.get("kind") == "LabelStmt":
                 return None   # (a goto into what follows: the copies would have the label twice)
