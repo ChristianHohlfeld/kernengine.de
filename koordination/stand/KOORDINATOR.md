@@ -1,4 +1,14 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 07:50 **GÜLTIG: `work-zusammen-voll-070328-32111` auf 821208ac – convert rc=0 (07:40).** „1725 of 1844 functions … written (22779 of 30978 lines)“,
+  „1682 … compared“; 2 Zeilen „cannot compare it yet“; 18 „waits for good“ (055004: 1707 / 1664 / 3). `grundlage` für `vergleich` ist dieser Lauf.
+  Was die 119 übrigen aufhält: **`$S/wartet_070328.txt`** (neu sichtbar: „an entry of a list handed to change to a function that may run handlers“ 13;
+  „the struct List (its field g: a pointer)“ worldsync_update 472 Zeilen; „a member of Int is set“ 6; „CityStream::work() calls itself“ → Paket e).
+  Einzel-Lauf aller Tests darauf: `ergebnis-work-zusammen-voll-070328-32111-alle-074913-6919` (startet, sobald der volle Lauf endet; Liste ~08:40).
+  · **Tabellen-Fix belegt, mit neuen Befunden** (`work-tabelle-vergleich-070253-30791`): die now_ms-Funktionen sind geschrieben und verglichen; gegen den
+    Stellvertreter 46 von 47 ok – **Terrain_run_job 13/300 (→ k)**; gegen die Engine selbst weicht jede Uhr ab (clock_ms 300/300, CityStream_select_cells
+    300/300 `.vis_ms_`, take_requests 88/287: die echte Uhr läuft zwischen Quelle und Blueprint weiter) **→ d Nachfolger 6 (gestartet 07:55): eine Uhr
+    (Schalter `clock` der Tabelle) gibt den Blueprints im Durchgang gegen die Engine die Antwort, die sie der Quelle gab.**
+  · 07:42 Server-Neustart (der sechste): t1, t2, k, p, e geweckt.
 - 07:35 **Entscheidung E16 (Rekursion, Paket e):** die Sprache lässt zu, dass eine Funktion sich selbst ruft, direkt oder über andere – als Schritt (func.call);
   ein Kreis über einen pure gelesenen Wert bleibt ein Fehler. Grenze 65.536 geschachtelte Funktionsaufrufe in Interpreter und JIT (festgelegter Fehler, der
   Blueprint stoppt; Events/call_on bleiben bei 64) – über allem, was das C++ des Spiels erreicht (nativ ~40.000 Aufrufe, WASM ~2.600 Ebenen). Interpreter und JIT

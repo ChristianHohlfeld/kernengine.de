@@ -1,4 +1,18 @@
-# Paket k – Stand (neuer Auftrag 04:40: B0–B3)
+# Paket k – Stand
+
+## Nachfolger 3 (ab 07:30, work-k auf work-zusammen 821208ac)
+
+| Abweichung | Ursache | Commit | Beleg | Stand |
+|---|---|---|---|---|
+| mp_hud_json 7/20 (Stellv.), 4/20 (Engine): "connected" Quelle false / Blueprint true; gegen die Engine „source asks server.running, Blueprint server.connected_clients“ | Reihenfolge: ein Argument mit Schritten (`esc(net_.status())` → `a_2 = Session_status(net_)` gehoben) lief vor den Argumenten links davon (hosting(), connected() standen in der Anweisung) – status() ruft connected() und die Engine | ed63dca3 (operand: Eingänge von Aufrufen des Programms/der Engine/Formaten von links; Links-Stehendes, das die Schritte sehen/ändern können oder das selbst ruft, wird vorher gehalten) | work-k-vergleich-073648-13858 (läuft) | gebaut |
+| draw_events 9/20 (`.combat_art_.parts_[0].transforms`) | kein Konverterfehler: die abweichenden Matrizen sind Pfosten der Renn-Tore (CombatArt::gate, box). Der Test gibt `combat_kGates` (7, 12) vor, `combat_rules_g_gates` aber weder vor noch vergleicht er es – Blueprint: leere Liste (Tor = Nullen), Quelle: `g_gates[k]` einer Liste, die kGates nicht entspricht (jenseits des Endes / Rest früherer Aufrufe) | – | Einzelausgabe 043356 | BEFUND FÜR t1 |
+
+### BEFUND FÜR t1 (07:35) – draw_events
+- `gate(i)` = `g_gates[((i % kGates) + kGates) % kGates]` (combat_rules.cpp:478); Vorbedingung des Programms: kGates == g_gates.size() (bind_race setzt beides).
+  Der Test von Game::draw_events gibt combat_kGates zufällig (7, 12), g_gates (Datei-Zustand von combat_rules, in Game `combat_rules_g_gates`) steht nicht
+  in seinem Zustand – die Quelle liest außerhalb der Liste (UB) bzw. was ein früherer Aufruf dort ließ. Erste Abweichung: Pfosten (`put(box, …)`, m[10] = c.z − h/2:
+  Quelle 25.115 = race_origin.z − 0.5, Blueprint 25.615 mit h = 0). Kein Konverterfehler.
+
 
 ## BEREIT ZUM MERGEN: 09dd6818 (B3 Index mit Schritt, auf B0–B2) – Beleg work-k-vergleich-062739-13858
 - vergleich game_foot_rounds, game_military, game_gaps, gaps_rules, road_graph, game.cpp auf 09dd6818: convert rc=0, bau rc=0; Stellvertreter 54/54 ok;

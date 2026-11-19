@@ -17,3 +17,10 @@ für die Messung abgeschaltet; zyklen.py: grobe Aufrufzyklen der Game-Methoden; 
   wreck_car/blast_cars sind KEIN Zyklus (damage_car setzt nur den Brand; wreck_car ruft update_town).
 
 Entwurf und Begründung: siehe Bericht an main (Handback), gleichlautend unten nach dem Ja.
+
+## E16: JA (07:35). Schritt 1 – neue Form der Klasse
+- a020e227 (gepusht): Shape::locals – Schrittwert/Schleifenzustand einer Funktion lokal in der Methode, wenn alle Leser auf dem Weg der Funktion
+  nach dem Schritt stehen (kein Weg vom Entry am Schritt vorbei); sonst Member. Leser: lokale Deklarationen im Rumpf; Member-Form weiter
+  angenommen (Konverter-Texte, alte Texte = derselbe Blueprint); Deklaration im falschen Rumpf abgewiesen. Engine-Fall
+  logic_notation_values_of_a_call; Doku „Werte eines Aufrufs“. Lokal: alle 43 logic_cases + Fib-Graph Rundreise = Fixpunkt.
+- Belege laufen: mag work-e-engine-074752-4918; Bench vorher/nachher lokal ($S/e/bench/base.txt, neu.txt). Danach vergleich car/drone/city_stream.
