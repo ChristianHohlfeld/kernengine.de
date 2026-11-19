@@ -237,6 +237,7 @@ KERN_LAYOUT(Demo) {
 | Schritt, der einfach weitergeht | `debug_print(text, true);` |
 | was ein Knoten gibt und anderswo gelesen wird | Member `struct { Float value = 0.0; } n12;`, gelesen als `n12.value` |
 | was ein Knoten sich merkt (Schleifenindex, Do Once, Wartezeit, Zufallsfolge) | Member `kern::Node<12> n12;` bzw. `struct : kern::Node<12> { Int index = 0; } n12;` |
+| was ein Schritt einer Funktion gibt oder eine ihrer Schleifen sich merkt, wo es nur der Weg dieser Funktion nach ihm liest | lokal in der Methode, als erste Zeilen ihres Rumpfs nach den lokalen Variablen: `FnResult n14;`, `struct { Float value = 0.0; } n12;`, `struct : kern::Node<9> { Int index = 0; } n9;` – jeder Aufruf hat seine eigenen (siehe „Werte eines Aufrufs“) |
 | Wert, den mehrere Eingänge lesen | ein Name: `const auto n7 = [&] { return math_add(a, b); };`, gelesen als `n7()` |
 | Schritt, zu dem mehrere Drähte führen (oder keiner) | eine eigene Methode `void go9() { ... }`, jeder Draht ist ein Aufruf `go9();` |
 | Wert, den niemand liest | `(void)math_add(1.0, 2.0);` in `void detached() { ... }` |
@@ -1477,6 +1478,19 @@ in denen C++ weiterliefe, wo der Graph aufhört.
 
 **Funktionen mit Ausgängen.** Endet ein Weg ohne Return-Knoten, behalten die Ausgänge ihre
 Vorgaben: Der Rumpf endet dann mit `return {};` (kein Knoten).
+
+**Werte eines Aufrufs.** Was ein Schritt einer Funktion gibt (`n14 = Fn(args);`, `n5.value = (Heat += x);`)
+und was eine Schleife der Funktion sich merkt, während sie läuft (Index, Eintrag), gehört dem Aufruf, wie ein
+Wert in C++: Es steht lokal in der Methode – als erste Zeilen ihres Rumpfs, nach den lokalen Variablen, nach
+Ids –, wenn jeder Schritt, der es liest (auch über Werte), auf dem Weg dieser Funktion steht und erst nach ihm
+kommt: Kein Weg vom Function Entry zu einem Leser geht an dem Schritt vorbei (eine Schleife, deren Rumpf vor ihm
+liest, ein anderer Ausgang einer Sequence oder eines Branch tun das). Sonst bleibt es ein Member der Klasse:
+gelesen in einem anderen Rumpf (`go<id>`, ein Event, ein Wert mehrerer Rümpfe), nach einem Warten, oder wo der
+Schritt in diesem Aufruf noch nicht gelaufen sein kann (dann liest man, was er im letzten Aufruf gab – in jeder
+Stufe). Was ein Knoten über Aufrufe hinweg behält (Do Once, Gate, Flip Flop, Wartezeit, Zufallsfolge), bleibt
+immer ein Member. Der Leser nimmt einen solchen Wert auch als Member an (die Form früherer Texte – derselbe
+Blueprint); geschrieben wird er lokal. Eine Deklaration im Rumpf einer Funktion für einen Knoten, der nicht so
+dieser Funktion gehört, weist er ab.
 
 ## Regeln: was kein Blueprint sein darf
 

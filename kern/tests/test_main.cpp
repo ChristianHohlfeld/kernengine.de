@@ -4151,6 +4151,78 @@ TEST(logic_notation_every_node_type) {
     CHECK(!logic::cpp_name_ok(no));
 }
 
+TEST(logic_notation_values_of_a_call) {
+  // What a step of a function gives, and what its loop keeps while it runs, is the call's own: a
+  // local of the method, where only the function's own path after it reads it. Read before the
+  // step (a loop's earlier pass) or in an event: a member, as before. The reader also takes such a
+  // value as a member (texts of before); declared in the wrong body, it is refused.
+  const std::string text =
+      "struct Calls : kern::Blueprint {\n"
+      "  // ---- variables ----\n"
+      "  Float Total = 0.0;\n"
+      "  Float Last = 0.0;\n"
+      "\n"
+      "  // ---- functions ----\n"
+      "  struct HalfResult { Float h = 0.0; };\n"
+      "  HalfResult Half(Float x = 0.0) {\n"
+      "    return {math_div(x, 2.0)};\n"
+      "  }\n"
+      "\n"
+      "  struct SumResult { Float s = 0.0; };\n"
+      "  SumResult Sum(Int n = 0) {\n"
+      "    Float Acc = 0.0;\n"
+      "    struct : kern::Node<11> { Int index = 0; } n11;\n"
+      "    HalfResult n12;\n"
+      "    for (auto it11 = flow_for(n11, 1, n); it11.next();) {\n"
+      "      Last = n13.h;\n"
+      "      n12 = Half(kern::to<Float>(n11.index));\n"
+      "      Acc = math_add(Acc, n12.h);\n"
+      "      n13 = Half(Acc);\n"
+      "    }\n"
+      "    return {Acc};\n"
+      "  }\n"
+      "\n"
+      "  // ---- events ----\n"
+      "  KERN_EVENT(on1, event_custom<\"Go\">)\n"
+      "  void on1(Actor actor, Float value, Text text) {\n"
+      "    n2 = Sum(kern::to<Int>(value));\n"
+      "    Total = n2.s;\n"
+      "  }\n"
+      "\n"
+      "  // ---- what nodes give and keep ----\n"
+      "  SumResult n2;\n"
+      "  HalfResult n13;\n"
+      "};\n";
+  auto strip = [](const std::string& s) {  // (the struct alone: without the head and the layout)
+    const std::size_t from = s.find("struct Calls"), at = s.find("\nKERN_LAYOUT(");
+    return from == std::string::npos || at == std::string::npos ? s : s.substr(from, at - from);
+  };
+  logic::Graph g;
+  std::string name, error, again;
+  const bool read = logic::from_cpp(text, g, &name, &error);
+  if (!read) std::printf("%s\n", error.c_str());
+  CHECK(read && logic::to_cpp(g, name, again, &error));
+  if (strip(again) != text) std::printf("%s\n", again.c_str());
+  CHECK(strip(again) == text);
+  // the same Blueprint with n12 and n11 as members (as texts had them before)
+  std::string before = text;
+  auto cut = [&](const std::string& what) { const std::size_t at = before.find(what); CHECK(at != std::string::npos); if (at != std::string::npos) before.erase(at, what.size()); };
+  cut("    HalfResult n12;\n");
+  cut("    struct : kern::Node<11> { Int index = 0; } n11;\n");
+  before.insert(before.rfind("};"), "  HalfResult n12;\n  struct : kern::Node<11> { Int index = 0; } n11;\n");
+  logic::Graph old;
+  CHECK(logic::from_cpp(before, old, &name, &error) && logic::same_blueprint(old, g));
+  // a value an earlier pass of the loop reads (n13), or one an event reads (n2), is no local of Sum
+  for (const char* member : {"  HalfResult n13;\n", "  SumResult n2;\n"}) {
+    std::string wrong = text;
+    const std::size_t at = wrong.find(member);
+    wrong.erase(at, std::strlen(member));
+    wrong.insert(wrong.find("    for (auto it11"), std::string("  ") + member);
+    logic::Graph bad;
+    CHECK(!logic::from_cpp(wrong, bad, &name, &error) && error.find("it is a member of the class") != std::string::npos);
+  }
+}
+
 TEST(logic_notation_reads_what_a_person_writes) {
   // C++ as one writes it by hand - early returns, else if, statements after an if, no layout -
   // read as a Blueprint and written back the one canonical way.

@@ -316,6 +316,8 @@ struct Info {
   bool guard = false;        // a Branch whose True path always returns: its False path is written after it
   int place = kNowhere;      // the body (context) its text stands in
   bool member = false;       // it has a member n<id>: outputs read elsewhere, or memory
+  int local_in = -1;         // a step of a function whose n<id> is a local of the function's method: the entry
+  bool kept() const { return member || local_in >= 0; }  // it has its n<id> (a member or a local)
 };
 
 /// An exec output a list of statements leaves through: wired to `target`, or to nothing (-1). kOn:
@@ -553,7 +555,57 @@ struct Shape {
       for (const auto& r : x.readers)
         if (at(r.first).place != x.place) x.member = true;
     }
+    locals();
     return rules();
+  }
+
+  /// What a step of a function gives - and what a loop of it keeps while it runs - is the call's
+  /// own: a local of the function's method, as a value in C++ is, where every step that reads it
+  /// stands on the function's own path after it (in the same call, nothing reads it before the
+  /// step gave it). Else it stays a member: a value read in another body, after a wait, or where
+  /// the step may not have run in this call (what the step gave in an earlier call).
+  void locals() {
+    for (int i : by_id) {
+      Info& x = at(i);
+      if (x.pure || x.event || x.place < 0 || ctx[static_cast<std::size_t>(x.place)].first != kCallable) continue;
+      if (!(x.member && (!x.def->memory || x.def->loop))) continue;
+      const int e = ctx[static_cast<std::size_t>(x.place)].second;
+      if (e < 0 || at(e).def->type != "func.entry") continue;
+      // the steps that read it, through the values that pass it on
+      std::vector<int> users, todo;
+      std::vector<u8> seen(n.size(), 0);
+      bool here = true;
+      for (const auto& r : x.readers) todo.push_back(r.first);
+      while (here && !todo.empty()) {
+        const int y = todo.back();
+        todo.pop_back();
+        if (seen[static_cast<std::size_t>(y)]) continue;
+        seen[static_cast<std::size_t>(y)] = 1;
+        if (at(y).place != x.place || y == i) here = false;
+        else if (at(y).pure) for (const auto& r : at(y).readers) todo.push_back(r.first);
+        else users.push_back(y);
+      }
+      if (!here) continue;
+      // from the function's entry on, the paths that do not pass the step reach none of them
+      std::vector<u8> reach(n.size(), 0);
+      std::vector<int> walk{e};
+      reach[static_cast<std::size_t>(e)] = 1;
+      while (!walk.empty()) {
+        const int y = walk.back();
+        walk.pop_back();
+        for (const auto& d : at(y).dst) {
+          const int t = d.first;
+          if (t < 0 || t == i || reach[static_cast<std::size_t>(t)] || at(t).place != x.place) continue;
+          reach[static_cast<std::size_t>(t)] = 1;
+          walk.push_back(t);
+        }
+      }
+      bool after = true;
+      for (int u : users) after = after && !reach[static_cast<std::size_t>(u)];
+      if (!after) continue;
+      x.member = false;
+      x.local_in = e;
+    }
   }
 
   /// Values: no circles; a value with memory (Random) is read by one input, and so is everything
@@ -1552,7 +1604,7 @@ struct Writer {
   /// the variable it changes, then what its inputs are given.
   std::string call(int x, int entry, int c, bool definition) {
     std::vector<std::string> head;
-    if (at(x).member) head.push_back("n" + id(x));
+    if (at(x).kept()) head.push_back("n" + id(x));
     if (at(x).exec_in.size() >= 2) head.push_back(definition ? std::string("entry") : text_literal(at(x).in[static_cast<std::size_t>(entry)].id));
     if (runs_function(*at(x).def, *at(x).node)) head.push_back("*this");
     if (names_place(*at(x).def)) head.push_back(place_text(x, c));
@@ -1689,18 +1741,18 @@ struct Writer {
       // or, when what the node gives is read: n5.value = (Heat = value);
       const std::string where = place_text(x, c);
       const std::string set = where + (t == "var.set" ? " = " + given(x, X.data_in.front(), c) : " += " + value(x, X.data_in.front(), c));
-      line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
+      line(ind, X.kept() ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
       return 0;
     }
     if (t == "func.call") {
       const std::string args = call_args(x, c);
-      line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
+      line(ind, (X.kept() ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
       return 0;
     }
     if (t == "func.call_on") {
       // func_call_on<"Fn">(target, kern::out(n7.a, n7.b), values...);   (kern::out(): nothing reads what it gave)
       std::string args = value(x, X.data_in.front(), c) + ", kern::out(";
-      if (X.member)
+      if (X.kept())
         for (std::size_t k = 0; k < X.data_out.size(); ++k) args += (k ? ", n" : "n") + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out[k])].id;
       args += ")";
       for (std::size_t k = 1; k < X.data_in.size(); ++k) args += ", " + value(x, X.data_in[k], c);
@@ -1749,6 +1801,9 @@ struct Writer {
       for (int k : at(e).data_out) names += (names.empty() ? "" : ", ") + at(e).out[static_cast<std::size_t>(k)].id;
       line(ind, "n" + id(e) + " = {" + names + "};");
     }
+    // (what its steps give and its loops keep, where only its own path reads it: the call's own)
+    for (int i : s.by_id)
+      if (at(i).local_in == e) line(ind, member_text(at(i), s.g));
     named_values(at(e).place, ind);
     return at(e).exec_out.empty() ? false : follow(e, 0, at(e).place, ind);
   }
@@ -1964,6 +2019,7 @@ struct Reader {
   struct MemberDecl {
     bool memory = false, result = false;
     std::string result_of;
+    std::string local;  // declared in this function's body (a local of its method), not in the class
     std::vector<std::pair<std::string, TypeRef>> fields;
     std::size_t tok = 0;
   };
@@ -2866,7 +2922,7 @@ struct Reader {
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
-        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set")) && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set")) && is("<", 1)) || (peek(1).kind == Tok::id && !numbered(peek(1).s, "n") && (is("=", 2) || is(";", 2)))) && type_here(type);) {
           FunctionPin l;
           l.type = type.type;
           l.of = type.of;
@@ -2883,6 +2939,30 @@ struct Reader {
           f.locals.push_back(std::move(l));
         }
         if (failed()) return false;
+        // FnResult n12;   struct { Float value = 0.0; } n13;   struct : kern::Node<14> { Int index = 0; } n14;
+        // what its steps give and its loops keep, the call's own (Writer::body)
+        for (;;) {
+          MemberDecl d;
+          d.local = f.name;
+          u32 base = 0;
+          if (peek().kind == Tok::id && peek(1).kind == Tok::id && numbered(peek(1).s, "n") && is(";", 2)) {
+            const std::size_t at_type = p;
+            const std::string ret = toks[p++].s;
+            if (ret.size() <= 6 || ret.substr(ret.size() - 6) != "Result") return fail(at_type, "\"" + ret + "\" is no type here: what a called function gave is <Function>Result n<id>;");
+            d.result = true;
+            d.result_of = ret.substr(0, ret.size() - 6);
+            if (!member_name(std::move(d), 0)) return false;
+            continue;
+          }
+          if (is("kern") && is("::", 1) && is("Node", 2)) {
+            if (!node_base(d.memory, base) || !member_name(std::move(d), base)) return false;
+            continue;
+          }
+          if (!(is("struct") && (is("{", 1) || is(":", 1)))) break;
+          ++p;
+          if (accept(":") && !node_base(d.memory, base)) return false;
+          if (!expect("{") || !fields(d.fields, nullptr, "what a node gives") || !member_name(std::move(d), base)) return false;
+        }
       }
       it.open = p;
       items.push_back(std::move(it));
@@ -4483,10 +4563,15 @@ struct Reader {
         for (int k : x.data_out) names += (names.empty() ? "" : ", ") + x.out[static_cast<std::size_t>(k)].id;
         return fail(m.tok, "its values are read outside its own method: the method begins with " + nid + " = {" + names + "};");
       }
-      if (!x.member && decl == members.end()) continue;
+      if (!x.kept() && decl == members.end()) continue;
       const std::string want = Writer::member_text(x, g);
-      if (decl == members.end()) return fail(m.tok, nid + " is not declared: " + want);
+      const std::string fn = x.local_in >= 0 ? shape.at(x.local_in).node->param("function") : std::string();
+      if (decl == members.end()) return fail(m.tok, nid + " is not declared: " + want + (fn.empty() ? "" : " (at the top of the body of " + fn + ")"));
       const MemberDecl& d = decl->second;
+      // (one that is the call's own may also be a member of the class, as texts had it before: the same Blueprint)
+      if (!d.local.empty() && d.local != fn)
+        return fail(d.tok, nid + (fn.empty() ? " is read outside the path of " + d.local + " after it, or where it may not have run in this call: it is a member of the class - " + want
+                                              : " belongs to the function " + fn + ": " + want + " at the top of its body"));
       bool same = d.memory == (x.def->memory && !x.event) && d.result == (x.def->type == "func.call");
       if (d.result) same = same && d.result_of == x.node->param("function");
       else {
