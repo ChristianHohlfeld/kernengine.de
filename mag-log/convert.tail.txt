@@ -1,0 +1,80 @@
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+537 of 611 functions of the program are written as Blueprints (3674 of 6586 lines), and 18 of the engine's headers that they call: 64 Blueprints - 6 of source files, 1 of states, 57 of headers and of shapes
+492 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (   268)   ctl_command() is defined in another file
+     3 (   205)   gaps_riding() is defined in another file
+     7 (   186)   unproject() is defined in another file
+     2 (   183)   stars() is defined in another file
+     1 (   149)   ctl_camera() is defined in another file
+     1 (   136)   vr_menu_json() is defined in another file
+     1 (   117)   build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+     1 (   111)   it calls register_node(), which waits
+     1 (   110)   read_features() is defined in another file
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    91)   it calls Terrain::ground_albedo(), which waits
+     1 (    87)   look_begin() is defined in another file
+     1 (    86)   detach() is defined in another file
+     1 (    85)   it calls CityStream::request_around(), which waits
+     2 (    84)   combat_banner() is defined in another file
+     1 (    81)   it calls Terrain::plan_windows(), which waits
+     1 (    80)   the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+     2 (    73)   road_is_water() is defined in another file
+     2 (    65)   it calls Game::toggle_drone(), which waits
+     2 (    62)   it calls GeoProjector::init(), which waits
+     1 (    44)   chunk_count() is defined in another file
+     1 (    43)   index_of() is defined in another file
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    36)   it calls Terrain::image_bounds(), which waits
+     1 (    34)   step() is defined in another file
+     2 (    33)   training_level() is defined in another file
+     1 (    27)   begin() is defined in another file
+     1 (    24)   explosion() is defined in another file
+     1 (    22)   buildings_input() is defined in another file
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    17)   a member of Int is set
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    11)   init() is defined in another file
+     1 (     9)   tile_input() is defined in another file
+     1 (     9)   tile_lonlat() is defined in another file
+     1 (     7)   kill() is defined in another file
+     1 (     7)   an object of the engine (HeightSampler) given back by value (C++ moves it to the caller)
+
+real	6m45,362s
+user	19m59,071s
+sys	1m5,626s
