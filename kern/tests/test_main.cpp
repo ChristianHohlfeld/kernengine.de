@@ -6368,6 +6368,23 @@ TEST(engine_stand_in_fixed_length) {
   }
 }
 
+TEST(engine_stand_in_one_or_none) {
+  using logic::Value;
+  // what may be there or not (`std::optional<Message> Client::receive`, the std::optional components of a level's actor)
+  // is a list of no entry or one in the form - `[?item]` - and so in every answer of the stand-in: never two
+  const logic::EngineFunction* f = logic::engine_function("engine.client.receive");
+  CHECK(f && f->outputs.size() == 1 && std::string(f->outputs[0].shape).starts_with("[?{"));
+  logic::EngineStandIn s;
+  bool none = false, one = false;
+  for (i64 channel = 0; channel < 40; ++channel) {
+    std::vector<Value> out(1);
+    CHECK(s.engine("engine.client.receive", {Value::integer(1), Value::integer(channel)}, out));
+    CHECK(out.size() == 1 && out[0].rows && out[0].rows->size() <= 1);
+    (out[0].rows && out[0].rows->empty() ? none : one) = true;
+  }
+  CHECK(none && one);
+}
+
 TEST(engine_calls_mixer_is_the_mixer) {
   using logic::Value;
   // what the engine writes through `out` is 2 numbers a frame: the table says so
