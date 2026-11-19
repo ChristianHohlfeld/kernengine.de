@@ -1371,6 +1371,19 @@ struct { engine_game_world_shots_place<List<game_ShotEvent>> result = {}; } n12;
   `BuildingBuilder::chunks()` tut, Bit für Bit, und zählt die Speicheranforderungen; der Fall mit jedem Knoten
   hat einen Platz (`kern/tests/test_main.cpp`).
 
+### Felder eines Objekts der Engine
+
+Ein öffentliches Feld eines Objekts der Engine mit Handle (`Mesh::visible`, `Mesh::material`, `TextureDesc::width`) ist
+ein Platz der Engine wie das, was `T& f() { return f_; }` nennt: Knoten `engine.<klasse>.<feld>` (Handle → Platz),
+`EngineFunction::field`. `tools/engine_api.py` nimmt jedes öffentliche, nicht statische Feld, das kein `const`, keine
+Referenz, kein Zeiger, kein Array und kein Objekt der Engine ist (sonst wartet es, `--list` nennt es) – eine Regel,
+keine Liste. Anders als eine Methode fragt das Binden die Engine nichts: der Knoten ruft keine Funktion (Interpreter,
+JIT, Klasse; keine Aufzeichnung), Lesen und Setzen gehen wie bei jedem Platz durch `<feld>@get` / `<feld>@set`.
+Der Konverter schreibt `m->visible`, `td.width = 64` als diesen Platz (Emit.engine_field); `m->material.viewmodel` liest
+das Feld `viewmodel` des Platzes. Im Test hält der Stellvertreter des Objekts jedes Feld, das das Programm nennt, als
+eigenes Feld – C++ liest und setzt es dort, ungesehen – und `converted::FieldSync` gleicht es mit der Engine ab: vor
+jedem Aufruf der Engine gesetzt, danach gelesen, ebenso, wenn ein Aufruf der Quelle beginnt und endet (wie die Plätze).
+
 ### Rückrufe der Engine (Callback)
 
 Wo die Engine eine Funktion des Programms ruft – eine Höhe je Punkt (`kern::HeightSampler`, ein Zeiger auf eine

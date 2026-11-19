@@ -568,6 +568,38 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
+// engine.mixer.speed_of_sound: kern::audio::Mixer::speed_of_sound
+bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
+  if (!self) return false;
+  ev::give<ev::Float>(o, out, 0, self->speed_of_sound);
+  return true;
+}
+
+// engine.mixer.speed_of_sound@set: what stands at the place kern::audio::Mixer::speed_of_sound gives
+bool c47_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
+  if (!self) return false;
+  ev::take<ev::Float>(o, in, 1, self->speed_of_sound);
+  return true;
+}
+
+// engine.mixer.doppler_factor: kern::audio::Mixer::doppler_factor
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
+  if (!self) return false;
+  ev::give<ev::Float>(o, out, 0, self->doppler_factor);
+  return true;
+}
+
+// engine.mixer.doppler_factor@set: what stands at the place kern::audio::Mixer::doppler_factor gives
+bool c48_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
+  if (!self) return false;
+  ev::take<ev::Float>(o, in, 1, self->doppler_factor);
+  return true;
+}
+
 const EngineCall kCalls[] = {
     {"engine.audio.bus_name", &c0},
     {"engine.audio.parse_bus", &c1},
@@ -616,6 +648,12 @@ const EngineCall kCalls[] = {
     {"engine.builtin_job.release", &c44},
     {"engine.mixer.make", &c45},
     {"engine.mixer.release", &c46},
+    {"engine.mixer.speed_of_sound", &c47},
+    {"engine.mixer.doppler_factor", &c48},
+    {"engine.mixer.speed_of_sound@get", &c47},
+    {"engine.mixer.speed_of_sound@set", &c47_set},
+    {"engine.mixer.doppler_factor@get", &c48},
+    {"engine.mixer.doppler_factor@set", &c48_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

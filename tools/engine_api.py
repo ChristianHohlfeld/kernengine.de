@@ -85,7 +85,10 @@ def table_text(api, functions):
             return "{" + ", ".join(out) + "}"
         lines.append(f"      {{{c_text(f['type'])}, {c_text(f['cpp'])}, {c_text(f['label'])}, {c_text(f['category'])}, {c_text(f['help'])}, {'true' if f['value'] else 'false'},")
         lines.append(f"       {pins(f['ins'])},")
-        lines.append(f"       {pins(f['outs'])}" + (f", {'true' if f.get('place') else 'false'}, true" if f.get("clock") else ", true" if f.get("place") else "") + "},")
+        flags = [bool(f.get("place")), bool(f.get("clock")), bool(f.get("field"))]
+        while flags and not flags[-1]:
+            flags.pop()
+        lines.append(f"       {pins(f['outs'])}" + "".join(", true" if x else ", false" for x in flags) + "},")
     lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
     return "\n".join(lines)
 
@@ -390,6 +393,10 @@ class Calls:
             q = f["class"]
             return [f"if (!o.release<{q}>(in.empty() ? 0 : in[0].as_int())) {{",
                     f"  o.error = \"the handle names no {q.split('::')[-1]} that was made\";", "  return false;", "}", "return true;"]
+        if f.get("field"):   # (a field of the object: what stands there - "<type>@get" - nothing is called)
+            q, (pin0, _, _) = f["class"], f["ins"][0]
+            return [f'auto* self = ev::object<{q}>(o, in, 0, {c_text(pin0)});', "if (!self) return false;",
+                    f"ev::give<{self.tag(f['outs'][0][1], need)}>(o, out, 0, self->{d['name']});", "return true;"]
         mangled = d.get("mangledName")
         ptypes = self.ptypes(f)
         parms = [p for p in c2b.kids(d) if p.get("kind") == "ParmVarDecl"]   # (their declarations: an array's length)
@@ -706,22 +713,24 @@ class Calls:
                 bodies += lines
                 continue
             # a step: what it gives goes to the node's member (n.result ...), when the text reads it
-            direct, _ = self.direct(f, need, "unread", lambda given: f"{{ {failed} return; }}")
-            function(f"{head}void {name}({', '.join(params)})", direct + ["return;"], [f"{door};"])
+            if not f.get("field"):   # (a field binds only: nothing is called - see below)
+                direct, _ = self.direct(f, need, "unread", lambda given: f"{{ {failed} return; }}")
+                function(f"{head}void {name}({', '.join(params)})", direct + ["return;"], [f"{door};"])
             if f.get("place"):
                 # a place of the engine: the node binds it - its member n.result is the place (ev::Place), `auto& r =
                 # object->f();` once; through the door the function is called as it is there, and the place is read
                 # and set through it after (<node>@get, <node>@set)
                 pin, _, q = f["ins"][0]
                 m, out = f["decl"]["name"], f["outs"][0]
+                named = m if f.get("field") else m + "()"   # (a field of the object, or what the method names)
                 places.append([f"struct P_{name} {{",
                                f"  using Object = {q};",
-                               f"  using C = std::remove_reference_t<decltype(std::declval<{q}&>().{m}())>;",
+                               f"  using C = std::remove_reference_t<decltype((std::declval<{q}&>().{named}))>;",
                                f"  using Tag = {self.dtag(out[1], need)};",
                                f"  static constexpr const char* pin = {c_text(pin)};",
                                f"  static constexpr const char* get = {c_text(f['type'] + '@get')};",
                                f"  static constexpr const char* set = {c_text(f['type'] + '@set')};",
-                               f"  static C& at(Object& o) {{ return o.{m}(); }}",
+                               f"  static C& at(Object& o) {{ return o.{named}; }}",
                                "};"])
                 lines.append(f"  /// The place {f['cpp']} gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.")
                 lines.append(f"  template <class B> using {name}_place = {EV}Place<engine_direct::P_{name}, B>;")
@@ -730,7 +739,7 @@ class Calls:
                          ["kern_o->begin_call();", f"auto* const kern_self = {EV}object_of<{q}>(*kern_o, {handle}, {c_text(pin)});",
                           f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, kern_self ? &engine_direct::P_{name}::at(*kern_self) : nullptr);",
                           f"if (!kern_self) {failed}", "return;"],
-                         [f"{door};", f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, nullptr);"])
+                         ([] if f.get("field") else [f"{door};"]) + [f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, nullptr);"])
                 bodies += lines
                 continue
             if f["outs"]:
@@ -919,7 +928,7 @@ class Calls:
                     bodies += [f"// {f['type']}@set: what stands at the place {f['cpp']} gives",
                                f"bool c{k}_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {{",
                                f"  auto* self = ev::object<{q}>(o, in, 0, {c_text(pin)});", "  if (!self) return false;",
-                               f"  ev::take<{self.tag(f['outs'][0][1], need)}>(o, in, 1, self->{f['decl']['name']}());", "  return true;", "}", ""]
+                               f"  ev::take<{self.tag(f['outs'][0][1], need)}>(o, in, 1, self->{f['decl']['name']}{'' if f.get('field') else '()'});", "  return true;", "}", ""]
                 if f.get("role") == "make" and f["class"] in plans and plans[f["class"]][0] is f:
                     # (a host without an object at a handle - a test - makes one there: see default_makers)
                     makers.append((f["class"], self.maker_text(f["class"], plans, headers)))
@@ -970,6 +979,11 @@ def main(argv):
                 waiting.append((q + "::" + q.split("::")[-1], str(w)))
         if made:
             functions.append(api.releaser(q))
+        for f, c in api.fields(q):   # (its fields: places of the engine - Api.fields)
+            if isinstance(f, Wait):
+                waiting.append((q + "::" + c["name"], str(f)))
+            else:
+                functions.append(f)
     if api.unsaid:   # (a whole number beside a pointer must say in its type that it is its count: no length is guessed)
         raise SystemExit("engine_api.py: a whole number beside a pointer that does not say in its type that it counts what the pointer shows - "
                          "declare it kern::Count<Per> (Per numbers each):\n  " + "\n  ".join(sorted(set(api.unsaid))))

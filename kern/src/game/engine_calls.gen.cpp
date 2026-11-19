@@ -60,6 +60,7 @@ struct S_game_Level { [[maybe_unused]] static Value to(EngineObjects& o, const k
 struct S_game_LightComponent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::game::LightComponent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::game::LightComponent& x); };
 struct S_game_MaterialDesc { [[maybe_unused]] static Value to(EngineObjects& o, const kern::game::MaterialDesc& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::game::MaterialDesc& x); };
 struct S_game_MeshComponent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::game::MeshComponent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::game::MeshComponent& x); };
+struct S_game_MotionKey { [[maybe_unused]] static Value to(EngineObjects& o, const kern::game::MotionKey& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::game::MotionKey& x); };
 struct S_game_MoverComponent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::game::MoverComponent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::game::MoverComponent& x); };
 struct S_game_PickupComponent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::game::PickupComponent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::game::PickupComponent& x); };
 struct S_game_PlayInput { [[maybe_unused]] static Value to(EngineObjects& o, const kern::game::PlayInput& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::game::PlayInput& x); };
@@ -146,6 +147,8 @@ Value S_game_MaterialDesc::to(EngineObjects& o, const kern::game::MaterialDesc& 
 void S_game_MaterialDesc::from(EngineObjects& o, const Value& v, kern::game::MaterialDesc& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.color); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.roughness); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.metalness); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.emissive); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.emissive_strength); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.opacity); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.unlit); if (const Value* f = v.field(7)) ev::Conv<ev::Bool>::from(o, *f, x.cast_shadow); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.double_sided); if (const Value* f = v.field(9)) ev::Conv<ev::Text>::from(o, *f, x.texture); if (const Value* f = v.field(10)) ev::Conv<ev::Float>::from(o, *f, x.tiling); }
 Value S_game_MeshComponent::to(EngineObjects& o, const kern::game::MeshComponent& x) { return Value::structure({ev::Conv<ev::Enum<E_game_Shape>>::to(o, x.shape), ev::Conv<ev::Vector>::to(o, x.size), ev::Conv<ev::Float>::to(o, x.radius), ev::Conv<ev::Float>::to(o, x.height), ev::Conv<ev::Int>::to(o, x.segments), ev::Conv<ev::Text>::to(o, x.asset), ev::Conv<ev::Bool>::to(o, x.collision), ev::Conv<ev::Float>::to(o, x.friction), ev::Conv<ev::Float>::to(o, x.restitution), ev::Conv<ev::Float>::to(o, x.rolling_resistance), ev::Conv<ev::Text>::to(o, x.surface), ev::Conv<ev::Struct<S_game_MaterialDesc>>::to(o, x.material)}); }
 void S_game_MeshComponent::from(EngineObjects& o, const Value& v, kern::game::MeshComponent& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_game_Shape>>::from(o, *f, x.shape); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.size); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.radius); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.height); if (const Value* f = v.field(4)) ev::Conv<ev::Int>::from(o, *f, x.segments); if (const Value* f = v.field(5)) ev::Conv<ev::Text>::from(o, *f, x.asset); if (const Value* f = v.field(6)) ev::Conv<ev::Bool>::from(o, *f, x.collision); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.friction); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.restitution); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.rolling_resistance); if (const Value* f = v.field(10)) ev::Conv<ev::Text>::from(o, *f, x.surface); if (const Value* f = v.field(11)) ev::Conv<ev::Struct<S_game_MaterialDesc>>::from(o, *f, x.material); }
+Value S_game_MotionKey::to(EngineObjects& o, const kern::game::MotionKey& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.time), ev::Conv<ev::List<ev::Float>>::to(o, x.joints)}); }
+void S_game_MotionKey::from(EngineObjects& o, const Value& v, kern::game::MotionKey& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.time); if (const Value* f = v.field(1)) ev::Conv<ev::List<ev::Float>>::from(o, *f, x.joints); }
 Value S_game_MoverComponent::to(EngineObjects& o, const kern::game::MoverComponent& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.offset), ev::Conv<ev::Float>::to(o, x.period), ev::Conv<ev::Float>::to(o, x.phase), ev::Conv<ev::Enum<E_game_MoverMode>>::to(o, x.mode)}); }
 void S_game_MoverComponent::from(EngineObjects& o, const Value& v, kern::game::MoverComponent& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.offset); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.period); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.phase); if (const Value* f = v.field(3)) ev::Conv<ev::Enum<E_game_MoverMode>>::from(o, *f, x.mode); }
 Value S_game_PickupComponent::to(EngineObjects& o, const kern::game::PickupComponent& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.points), ev::Conv<ev::Vector>::to(o, x.burst_color), ev::Conv<ev::Float>::to(o, x.respawn), ev::Conv<ev::Text>::to(o, x.sound), ev::Conv<ev::Float>::to(o, x.heal), ev::Conv<ev::Int>::to(o, x.ammo)}); }
@@ -2640,14 +2643,30 @@ bool c214(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
-// engine.property_change.make: kern::game::GameWorld::PropertyChange::PropertyChange
+// engine.game_world.logic_native: kern::game::GameWorld::logic_native
 bool c215(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  ev::give<ev::Bool>(o, out, 0, self->logic_native);
+  return true;
+}
+
+// engine.game_world.logic_native@set: what stands at the place kern::game::GameWorld::logic_native gives
+bool c215_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  ev::take<ev::Bool>(o, in, 1, self->logic_native);
+  return true;
+}
+
+// engine.property_change.make: kern::game::GameWorld::PropertyChange::PropertyChange
+bool c216(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::GameWorld::PropertyChange>(std::unique_ptr<kern::game::GameWorld::PropertyChange>(new kern::game::GameWorld::PropertyChange())));
   return true;
 }
 
 // engine.property_change.release: kern::game::GameWorld::PropertyChange::~PropertyChange
-bool c216(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c217(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::GameWorld::PropertyChange>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no PropertyChange that was made";
     return false;
@@ -2655,14 +2674,46 @@ bool c216(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.property_change.actor: kern::game::GameWorld::PropertyChange::actor
+bool c218(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
+  if (!self) return false;
+  ev::give<ev::Int>(o, out, 0, self->actor);
+  return true;
+}
+
+// engine.property_change.actor@set: what stands at the place kern::game::GameWorld::PropertyChange::actor gives
+bool c218_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
+  if (!self) return false;
+  ev::take<ev::Int>(o, in, 1, self->actor);
+  return true;
+}
+
+// engine.property_change.path: kern::game::GameWorld::PropertyChange::path
+bool c219(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
+  if (!self) return false;
+  ev::give<ev::Text>(o, out, 0, self->path);
+  return true;
+}
+
+// engine.property_change.path@set: what stands at the place kern::game::GameWorld::PropertyChange::path gives
+bool c219_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
+  if (!self) return false;
+  ev::take<ev::Text>(o, in, 1, self->path);
+  return true;
+}
+
 // engine.motion_asset.make: kern::game::MotionAsset::MotionAsset
-bool c217(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c220(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::MotionAsset>(std::unique_ptr<kern::game::MotionAsset>(new kern::game::MotionAsset())));
   return true;
 }
 
 // engine.motion_asset.release: kern::game::MotionAsset::~MotionAsset
-bool c218(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c221(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::MotionAsset>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no MotionAsset that was made";
     return false;
@@ -2670,14 +2721,62 @@ bool c218(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.motion_asset.name: kern::game::MotionAsset::name
+bool c222(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::MotionAsset>(o, in, 0, "motion_asset");
+  if (!self) return false;
+  ev::give<ev::Text>(o, out, 0, self->name);
+  return true;
+}
+
+// engine.motion_asset.name@set: what stands at the place kern::game::MotionAsset::name gives
+bool c222_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::MotionAsset>(o, in, 0, "motion_asset");
+  if (!self) return false;
+  ev::take<ev::Text>(o, in, 1, self->name);
+  return true;
+}
+
+// engine.motion_asset.duration: kern::game::MotionAsset::duration
+bool c223(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::MotionAsset>(o, in, 0, "motion_asset");
+  if (!self) return false;
+  ev::give<ev::Float>(o, out, 0, self->duration);
+  return true;
+}
+
+// engine.motion_asset.duration@set: what stands at the place kern::game::MotionAsset::duration gives
+bool c223_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::MotionAsset>(o, in, 0, "motion_asset");
+  if (!self) return false;
+  ev::take<ev::Float>(o, in, 1, self->duration);
+  return true;
+}
+
+// engine.motion_asset.keys: kern::game::MotionAsset::keys
+bool c224(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::MotionAsset>(o, in, 0, "motion_asset");
+  if (!self) return false;
+  ev::give<ev::List<ev::Struct<S_game_MotionKey>>>(o, out, 0, self->keys);
+  return true;
+}
+
+// engine.motion_asset.keys@set: what stands at the place kern::game::MotionAsset::keys gives
+bool c224_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::MotionAsset>(o, in, 0, "motion_asset");
+  if (!self) return false;
+  ev::take<ev::List<ev::Struct<S_game_MotionKey>>>(o, in, 1, self->keys);
+  return true;
+}
+
 // engine.night_windows.make: kern::game::NightWindows::NightWindows
-bool c219(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c225(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::NightWindows, kern::ShaderExtension>(std::unique_ptr<kern::game::NightWindows>(new kern::game::NightWindows())));
   return true;
 }
 
 // engine.night_windows.release: kern::game::NightWindows::~NightWindows
-bool c220(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c226(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::NightWindows>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no NightWindows that was made";
     return false;
@@ -2685,14 +2784,30 @@ bool c220(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.night_windows.night: kern::game::NightWindows::night
+bool c227(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
+  if (!self) return false;
+  ev::give<ev::Float>(o, out, 0, self->night);
+  return true;
+}
+
+// engine.night_windows.night@set: what stands at the place kern::game::NightWindows::night gives
+bool c227_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
+  if (!self) return false;
+  ev::take<ev::Float>(o, in, 1, self->night);
+  return true;
+}
+
 // engine.soldier_art_delete.make: kern::game::SoldierArtDelete::SoldierArtDelete
-bool c221(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c228(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::SoldierArtDelete>(std::unique_ptr<kern::game::SoldierArtDelete>(new kern::game::SoldierArtDelete())));
   return true;
 }
 
 // engine.soldier_art_delete.release: kern::game::SoldierArtDelete::~SoldierArtDelete
-bool c222(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c229(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::SoldierArtDelete>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no SoldierArtDelete that was made";
     return false;
@@ -2701,13 +2816,13 @@ bool c222(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_asset.make: kern::game::SoundAsset::SoundAsset
-bool c223(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c230(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::SoundAsset>(std::unique_ptr<kern::game::SoundAsset>(new kern::game::SoundAsset())));
   return true;
 }
 
 // engine.sound_asset.release: kern::game::SoundAsset::~SoundAsset
-bool c224(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c231(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::SoundAsset>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no SoundAsset that was made";
     return false;
@@ -2715,8 +2830,56 @@ bool c224(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.sound_asset.id: kern::game::SoundAsset::id
+bool c232(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::SoundAsset>(o, in, 0, "sound_asset");
+  if (!self) return false;
+  ev::give<ev::Text>(o, out, 0, self->id);
+  return true;
+}
+
+// engine.sound_asset.id@set: what stands at the place kern::game::SoundAsset::id gives
+bool c232_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::SoundAsset>(o, in, 0, "sound_asset");
+  if (!self) return false;
+  ev::take<ev::Text>(o, in, 1, self->id);
+  return true;
+}
+
+// engine.sound_asset.name: kern::game::SoundAsset::name
+bool c233(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::SoundAsset>(o, in, 0, "sound_asset");
+  if (!self) return false;
+  ev::give<ev::Text>(o, out, 0, self->name);
+  return true;
+}
+
+// engine.sound_asset.name@set: what stands at the place kern::game::SoundAsset::name gives
+bool c233_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::SoundAsset>(o, in, 0, "sound_asset");
+  if (!self) return false;
+  ev::take<ev::Text>(o, in, 1, self->name);
+  return true;
+}
+
+// engine.sound_asset.duration: kern::game::SoundAsset::duration
+bool c234(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::SoundAsset>(o, in, 0, "sound_asset");
+  if (!self) return false;
+  ev::give<ev::Float>(o, out, 0, self->duration);
+  return true;
+}
+
+// engine.sound_asset.duration@set: what stands at the place kern::game::SoundAsset::duration gives
+bool c234_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::SoundAsset>(o, in, 0, "sound_asset");
+  if (!self) return false;
+  ev::take<ev::Float>(o, in, 1, self->duration);
+  return true;
+}
+
 // engine.sound_bank.make: kern::game::SoundBank::SoundBank
-bool c225(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c235(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::audio::Mixer* a0 = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!a0) return false;
   out[0] = Value::integer(o.own<kern::game::SoundBank>(std::unique_ptr<kern::game::SoundBank>(new kern::game::SoundBank(*a0))));
@@ -2724,7 +2887,7 @@ bool c225(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.release: kern::game::SoundBank::~SoundBank
-bool c226(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c236(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::SoundBank>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no SoundBank that was made";
     return false;
@@ -2733,17 +2896,81 @@ bool c226(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.texture_asset.make: kern::game::TextureAsset::TextureAsset
-bool c227(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c237(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::TextureAsset>(std::unique_ptr<kern::game::TextureAsset>(new kern::game::TextureAsset())));
   return true;
 }
 
 // engine.texture_asset.release: kern::game::TextureAsset::~TextureAsset
-bool c228(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c238(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::TextureAsset>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no TextureAsset that was made";
     return false;
   }
+  return true;
+}
+
+// engine.texture_asset.id: kern::game::TextureAsset::id
+bool c239(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::give<ev::Text>(o, out, 0, self->id);
+  return true;
+}
+
+// engine.texture_asset.id@set: what stands at the place kern::game::TextureAsset::id gives
+bool c239_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::take<ev::Text>(o, in, 1, self->id);
+  return true;
+}
+
+// engine.texture_asset.name: kern::game::TextureAsset::name
+bool c240(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::give<ev::Text>(o, out, 0, self->name);
+  return true;
+}
+
+// engine.texture_asset.name@set: what stands at the place kern::game::TextureAsset::name gives
+bool c240_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::take<ev::Text>(o, in, 1, self->name);
+  return true;
+}
+
+// engine.texture_asset.width: kern::game::TextureAsset::width
+bool c241(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::give<ev::Int>(o, out, 0, self->width);
+  return true;
+}
+
+// engine.texture_asset.width@set: what stands at the place kern::game::TextureAsset::width gives
+bool c241_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::take<ev::Int>(o, in, 1, self->width);
+  return true;
+}
+
+// engine.texture_asset.height: kern::game::TextureAsset::height
+bool c242(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::give<ev::Int>(o, out, 0, self->height);
+  return true;
+}
+
+// engine.texture_asset.height@set: what stands at the place kern::game::TextureAsset::height gives
+bool c242_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::game::TextureAsset>(o, in, 0, "texture_asset");
+  if (!self) return false;
+  ev::take<ev::Int>(o, in, 1, self->height);
   return true;
 }
 
@@ -2963,20 +3190,34 @@ const EngineCall kCalls[] = {
     {"engine.game_audio.release", &c212},
     {"engine.game_world.make", &c213},
     {"engine.game_world.release", &c214},
-    {"engine.property_change.make", &c215},
-    {"engine.property_change.release", &c216},
-    {"engine.motion_asset.make", &c217},
-    {"engine.motion_asset.release", &c218},
-    {"engine.night_windows.make", &c219},
-    {"engine.night_windows.release", &c220},
-    {"engine.soldier_art_delete.make", &c221},
-    {"engine.soldier_art_delete.release", &c222},
-    {"engine.sound_asset.make", &c223},
-    {"engine.sound_asset.release", &c224},
-    {"engine.sound_bank.make", &c225},
-    {"engine.sound_bank.release", &c226},
-    {"engine.texture_asset.make", &c227},
-    {"engine.texture_asset.release", &c228},
+    {"engine.game_world.logic_native", &c215},
+    {"engine.property_change.make", &c216},
+    {"engine.property_change.release", &c217},
+    {"engine.property_change.actor", &c218},
+    {"engine.property_change.path", &c219},
+    {"engine.motion_asset.make", &c220},
+    {"engine.motion_asset.release", &c221},
+    {"engine.motion_asset.name", &c222},
+    {"engine.motion_asset.duration", &c223},
+    {"engine.motion_asset.keys", &c224},
+    {"engine.night_windows.make", &c225},
+    {"engine.night_windows.release", &c226},
+    {"engine.night_windows.night", &c227},
+    {"engine.soldier_art_delete.make", &c228},
+    {"engine.soldier_art_delete.release", &c229},
+    {"engine.sound_asset.make", &c230},
+    {"engine.sound_asset.release", &c231},
+    {"engine.sound_asset.id", &c232},
+    {"engine.sound_asset.name", &c233},
+    {"engine.sound_asset.duration", &c234},
+    {"engine.sound_bank.make", &c235},
+    {"engine.sound_bank.release", &c236},
+    {"engine.texture_asset.make", &c237},
+    {"engine.texture_asset.release", &c238},
+    {"engine.texture_asset.id", &c239},
+    {"engine.texture_asset.name", &c240},
+    {"engine.texture_asset.width", &c241},
+    {"engine.texture_asset.height", &c242},
     {"engine.game_world.hud_mut@get", &c97},
     {"engine.game_world.hud_mut@set", &c97_set},
     {"engine.game_world.events@get", &c112},
@@ -2985,6 +3226,34 @@ const EngineCall kCalls[] = {
     {"engine.game_world.sound_cues@set", &c113_set},
     {"engine.game_world.shots@get", &c114},
     {"engine.game_world.shots@set", &c114_set},
+    {"engine.game_world.logic_native@get", &c215},
+    {"engine.game_world.logic_native@set", &c215_set},
+    {"engine.property_change.actor@get", &c218},
+    {"engine.property_change.actor@set", &c218_set},
+    {"engine.property_change.path@get", &c219},
+    {"engine.property_change.path@set", &c219_set},
+    {"engine.motion_asset.name@get", &c222},
+    {"engine.motion_asset.name@set", &c222_set},
+    {"engine.motion_asset.duration@get", &c223},
+    {"engine.motion_asset.duration@set", &c223_set},
+    {"engine.motion_asset.keys@get", &c224},
+    {"engine.motion_asset.keys@set", &c224_set},
+    {"engine.night_windows.night@get", &c227},
+    {"engine.night_windows.night@set", &c227_set},
+    {"engine.sound_asset.id@get", &c232},
+    {"engine.sound_asset.id@set", &c232_set},
+    {"engine.sound_asset.name@get", &c233},
+    {"engine.sound_asset.name@set", &c233_set},
+    {"engine.sound_asset.duration@get", &c234},
+    {"engine.sound_asset.duration@set", &c234_set},
+    {"engine.texture_asset.id@get", &c239},
+    {"engine.texture_asset.id@set", &c239_set},
+    {"engine.texture_asset.name@get", &c240},
+    {"engine.texture_asset.name@set", &c240_set},
+    {"engine.texture_asset.width@get", &c241},
+    {"engine.texture_asset.width@set", &c241_set},
+    {"engine.texture_asset.height@get", &c242},
+    {"engine.texture_asset.height@set", &c242_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

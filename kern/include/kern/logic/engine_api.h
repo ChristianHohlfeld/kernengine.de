@@ -68,6 +68,10 @@ struct EngineFunction {
   /// It reads a clock (KERN_CLOCK, kern/core/base.h: now_ms, wall_ms): what it gives changes by itself - two
   /// plays of the same program on the engine itself do not get the same from it (kern/tests/native_show.h).
   bool clock = false;
+  /// A field of an object of the engine (`Mesh::visible`, `TextureDesc::width`): a place as above, but no function
+  /// is called - the node binds it without asking the engine anything; reading and setting it is "<type>@get" /
+  /// "<type>@set" (kern/docs/blueprint_cpp.md, "Felder eines Objekts der Engine").
+  bool field = false;
 };
 
 /// Every function of the engine that is a node, in the order of the headers.

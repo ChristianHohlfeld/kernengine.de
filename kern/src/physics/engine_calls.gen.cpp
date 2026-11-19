@@ -17,6 +17,7 @@ struct S_Quat { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Q
 struct S_physics_Body { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Body& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Body& x); };
 struct S_physics_BodySettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::BodySettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::BodySettings& x); };
 struct S_physics_Capsule { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Capsule& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Capsule& x); };
+struct S_physics_CharacterMover_Settings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::CharacterMover::Settings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::CharacterMover::Settings& x); };
 struct S_physics_ContactPoint { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::ContactPoint& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::ContactPoint& x); };
 struct S_physics_HitEvent { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::HitEvent& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::HitEvent& x); };
 struct S_physics_Joint { [[maybe_unused]] static Value to(EngineObjects& o, const kern::physics::Joint& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::physics::Joint& x); };
@@ -42,6 +43,8 @@ Value S_physics_BodySettings::to(EngineObjects& o, const kern::physics::BodySett
 void S_physics_BodySettings::from(EngineObjects& o, const Value& v, kern::physics::BodySettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Enum<E_physics_BodyType>>::from(o, *f, x.type); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.position); if (const Value* f = v.field(2)) ev::Conv<ev::Struct<S_Quat>>::from(o, *f, x.rotation); if (const Value* f = v.field(3)) ev::Conv<ev::Vector>::from(o, *f, x.linear_velocity); if (const Value* f = v.field(4)) ev::Conv<ev::Vector>::from(o, *f, x.angular_velocity); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.linear_damping); if (const Value* f = v.field(6)) ev::Conv<ev::Float>::from(o, *f, x.angular_damping); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.gravity_scale); if (const Value* f = v.field(8)) ev::Conv<ev::Bool>::from(o, *f, x.enable_sleep); if (const Value* f = v.field(9)) ev::Conv<ev::Bool>::from(o, *f, x.awake); if (const Value* f = v.field(10)) ev::Conv<ev::Bool>::from(o, *f, x.enabled); if (const Value* f = v.field(11)) ev::Conv<ev::Bool>::from(o, *f, x.bullet); if (const Value* f = v.field(12)) ev::Conv<ev::Int64>::from(o, *f, x.user); }
 Value S_physics_Capsule::to(EngineObjects& o, const kern::physics::Capsule& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.center1), ev::Conv<ev::Vector>::to(o, x.center2), ev::Conv<ev::Float>::to(o, x.radius)}); }
 void S_physics_Capsule::from(EngineObjects& o, const Value& v, kern::physics::Capsule& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.center1); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.center2); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.radius); }
+Value S_physics_CharacterMover_Settings::to(EngineObjects& o, const kern::physics::CharacterMover::Settings& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.radius), ev::Conv<ev::Float>::to(o, x.height), ev::Conv<ev::Float>::to(o, x.step_height), ev::Conv<ev::Float>::to(o, x.max_speed), ev::Conv<ev::Float>::to(o, x.accelerate), ev::Conv<ev::Float>::to(o, x.friction), ev::Conv<ev::Float>::to(o, x.air_control), ev::Conv<ev::Float>::to(o, x.stop_speed), ev::Conv<ev::Float>::to(o, x.jump_speed), ev::Conv<ev::Float>::to(o, x.sprint), ev::Conv<ev::Float>::to(o, x.gravity), ev::Conv<ev::Float>::to(o, x.max_slope_deg), ev::Conv<ev::Float>::to(o, x.push_strength), ev::Conv<ev::Int64>::to(o, x.mask_bits)}); }
+void S_physics_CharacterMover_Settings::from(EngineObjects& o, const Value& v, kern::physics::CharacterMover::Settings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.radius); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.height); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.step_height); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.max_speed); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.accelerate); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.friction); if (const Value* f = v.field(6)) ev::Conv<ev::Float>::from(o, *f, x.air_control); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.stop_speed); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.jump_speed); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.sprint); if (const Value* f = v.field(10)) ev::Conv<ev::Float>::from(o, *f, x.gravity); if (const Value* f = v.field(11)) ev::Conv<ev::Float>::from(o, *f, x.max_slope_deg); if (const Value* f = v.field(12)) ev::Conv<ev::Float>::from(o, *f, x.push_strength); if (const Value* f = v.field(13)) ev::Conv<ev::Int64>::from(o, *f, x.mask_bits); }
 Value S_physics_ContactPoint::to(EngineObjects& o, const kern::physics::ContactPoint& x) { return Value::structure({ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Float>::to(o, x.separation), ev::Conv<ev::Float>::to(o, x.impulse)}); }
 void S_physics_ContactPoint::from(EngineObjects& o, const Value& v, kern::physics::ContactPoint& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Vector>::from(o, *f, x.point); if (const Value* f = v.field(1)) ev::Conv<ev::Vector>::from(o, *f, x.normal); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.separation); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.impulse); }
 Value S_physics_HitEvent::to(EngineObjects& o, const kern::physics::HitEvent& x) { return Value::structure({ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_a), ev::Conv<ev::Struct<S_physics_Shape>>::to(o, x.shape_b), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_a), ev::Conv<ev::Struct<S_physics_Body>>::to(o, x.body_b), ev::Conv<ev::Vector>::to(o, x.point), ev::Conv<ev::Vector>::to(o, x.normal), ev::Conv<ev::Float>::to(o, x.approach_speed)}); }
@@ -1201,14 +1204,30 @@ bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.mouse_grab.make: kern::physics::MouseGrab::MouseGrab
+// engine.character_mover.settings: kern::physics::CharacterMover::settings
 bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
+  if (!self) return false;
+  ev::give<ev::Struct<S_physics_CharacterMover_Settings>>(o, out, 0, self->settings);
+  return true;
+}
+
+// engine.character_mover.settings@set: what stands at the place kern::physics::CharacterMover::settings gives
+bool c97_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::physics::CharacterMover>(o, in, 0, "character_mover");
+  if (!self) return false;
+  ev::take<ev::Struct<S_physics_CharacterMover_Settings>>(o, in, 1, self->settings);
+  return true;
+}
+
+// engine.mouse_grab.make: kern::physics::MouseGrab::MouseGrab
+bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::physics::MouseGrab>(std::unique_ptr<kern::physics::MouseGrab>(new kern::physics::MouseGrab())));
   return true;
 }
 
 // engine.mouse_grab.release: kern::physics::MouseGrab::~MouseGrab
-bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::physics::MouseGrab>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no MouseGrab that was made";
     return false;
@@ -1217,13 +1236,13 @@ bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.world.make: kern::physics::World::World
-bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::physics::World>(std::unique_ptr<kern::physics::World>(new kern::physics::World())));
   return true;
 }
 
 // engine.world.release: kern::physics::World::~World
-bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::physics::World>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no World that was made";
     return false;
@@ -1329,10 +1348,13 @@ const EngineCall kCalls[] = {
     {"engine.physics.hull_mesh", &c94},
     {"engine.character_mover.make", &c95},
     {"engine.character_mover.release", &c96},
-    {"engine.mouse_grab.make", &c97},
-    {"engine.mouse_grab.release", &c98},
-    {"engine.world.make", &c99},
-    {"engine.world.release", &c100},
+    {"engine.character_mover.settings", &c97},
+    {"engine.mouse_grab.make", &c98},
+    {"engine.mouse_grab.release", &c99},
+    {"engine.world.make", &c100},
+    {"engine.world.release", &c101},
+    {"engine.character_mover.settings@get", &c97},
+    {"engine.character_mover.settings@set", &c97_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

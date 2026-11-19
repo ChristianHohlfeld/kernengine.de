@@ -1387,17 +1387,58 @@ struct OpenPlace {
 };
 inline std::vector<OpenPlace> g_places;
 inline bool g_places_busy = false;   // (while they are read or set: no other place is)
+/// The fields of the source's objects of the engine (`Mesh::visible`, kern/docs/blueprint_cpp.md "Felder eines Objekts
+/// der Engine"): the stand-in of the object holds each as a field of its own - C++ reads and sets it there, unseen -
+/// and every object that is alive has one FieldSync, which sets them in the engine ("<field>@set") with the places
+/// and reads them from it ("<field>@get") with the places: before and after each call of the engine, as a call of
+/// the source begins and when it returns. Neither is a call of the source; the Blueprint binds a field without a call.
+struct FieldSync {
+  using Fn = void (*)(void* owner, bool set);
+  std::ptrdiff_t at;   // (where it stands in its object: the object of a copy is found the same way)
+  Fn fn;
+  template <class O> FieldSync(O* owner, Fn f) : at(reinterpret_cast<char*>(this) - reinterpret_cast<char*>(static_cast<void*>(owner))), fn(f) { live().insert(this); }
+  FieldSync(const FieldSync& o) : at(o.at), fn(o.fn) { live().insert(this); }
+  FieldSync& operator=(const FieldSync&) { return *this; }   // (it stays its own object's)
+  ~FieldSync() { live().erase(this); }
+  void* owner() const { return const_cast<char*>(reinterpret_cast<const char*>(this)) - at; }
+  static std::set<FieldSync*>& live() {
+    static std::set<FieldSync*> all;
+    return all;
+  }
+};
+inline void fields_sync(bool set) {
+  const std::vector<FieldSync*> all(FieldSync::live().begin(), FieldSync::live().end());
+  for (FieldSync* f : all)
+    if (FieldSync::live().count(f)) f->fn(f->owner(), set);
+}
 inline void places_set() {
   if (g_places_busy) return;
   g_places_busy = true;
   for (OpenPlace& p : g_places) p.set();
+  fields_sync(true);
   g_places_busy = false;
 }
 inline void places_get() {
   if (g_places_busy) return;
   g_places_busy = true;
   for (OpenPlace& p : g_places) p.get();
+  fields_sync(false);
   g_places_busy = false;
+}
+/// One field of an object of the source (FieldSync): set in the engine or read from it - an object without a handle
+/// has nothing there.
+template <class T, class Shape> void field_sync(const char* function, const EngineObject& o, T& field, bool set) {
+  if (!o.kern_handle) return;
+  const std::vector<Value> in{value_of(o)};
+  if (set) {
+    std::vector<Value> with = in, none;
+    with.push_back(value_of(field));
+    test_engine(g_source_engine, g_source_objects, std::string(function) + "@set", with, none);
+    return;
+  }
+  const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
+  std::vector<Value> out{Value::zero(f ? f->outputs[0].type : kern::logic::PinType::exec)};
+  if (test_engine(g_source_engine, g_source_objects, std::string(function) + "@get", in, out)) take_as<Shape>(field, out[0]);
 }
 /// The source's function returned: its places are set back, and it holds none.
 inline void places_close() {

@@ -41,7 +41,7 @@ void add_engine_nodes(Library& lib) {
       std::vector<Value> in, out;
       for (std::size_t k = 0; k < f.inputs.size(); ++k) in.push_back(c.in(first + k));
       for (const EnginePin& p : f.outputs) out.push_back(Value::zero(p.type));
-      c.host().engine(f.type, in, out);
+      if (!f.field) c.host().engine(f.type, in, out);   // (a field of an object: nothing is asked - EngineFunction::field)
       // A place of the engine: the node binds it - its output is not what the function gave (a copy)
       // but what it was given, the place's key: the nodes that name it (setting "bound") read and set
       // what the engine holds there through the door, "<function>@get" / "<function>@set".

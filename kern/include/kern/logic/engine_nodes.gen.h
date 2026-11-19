@@ -95,6 +95,7 @@ struct S_Lighting;
 struct S_Mat4;
 struct S_Material;
 struct S_MeshData;
+struct S_MeshGpu;
 struct S_MeshInput;
 struct S_MeshLook;
 struct S_ParticleSpec;
@@ -151,6 +152,7 @@ struct S_game_Level;
 struct S_game_LightComponent;
 struct S_game_MaterialDesc;
 struct S_game_MeshComponent;
+struct S_game_MotionKey;
 struct S_game_MoverComponent;
 struct S_game_PickupComponent;
 struct S_game_PlayInput;
@@ -182,10 +184,12 @@ struct S_net_ConnectionConfig;
 struct S_net_EndpointConfig;
 struct S_net_EndpointStats;
 struct S_net_Message;
+struct S_net_SimulatorSettings;
 struct S_net_Simulator_Packet;
 struct S_physics_Body;
 struct S_physics_BodySettings;
 struct S_physics_Capsule;
+struct S_physics_CharacterMover_Settings;
 struct S_physics_ContactPoint;
 struct S_physics_HitEvent;
 struct S_physics_Joint;
@@ -394,6 +398,28 @@ struct S_MeshData {
     ev::Field<D, ev::Int, C, B, decltype(kern::MeshData::extra_size), decltype(B::extra_size), &kern::MeshData::extra_size, &B::extra_size> extra_size;
     ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::MeshData::indices), decltype(B::indices), &kern::MeshData::indices, &B::indices> indices;
     explicit Fields(D* kern_d) : positions(kern_d), normals(kern_d), colors(kern_d), uvs(kern_d), extra(kern_d), extra_size(kern_d), indices(kern_d) { (void)kern_d; }
+  };
+};
+struct S_MeshGpu {
+  template <class B> static void from(EngineObjects& o, const B& b, kern::MeshGpu& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13] = b; ev::Direct<ev::Int>::from(o, f0, x.vao); ev::Direct<ev::Int>::from(o, f1, x.position); ev::Direct<ev::Int>::from(o, f2, x.normal); ev::Direct<ev::Int>::from(o, f3, x.color); ev::Direct<ev::Int>::from(o, f4, x.uv); ev::Direct<ev::Int>::from(o, f5, x.transforms); ev::Direct<ev::Int>::from(o, f6, x.tints); ev::Direct<ev::Int>::from(o, f7, x.instance_normals); ev::Direct<ev::Int>::from(o, f8, x.joints); ev::Direct<ev::Int>::from(o, f9, x.weights); ev::Direct<ev::List<ev::Int>>::from(o, f10, x.extension); ev::Direct<ev::Int>::from(o, f11, x.element); ev::Direct<ev::Int>::from(o, f12, x.element_type); ev::Direct<ev::List<ev::Int>>::from(o, f13, x.capacity); }
+  template <class B> static B make(EngineObjects& o, const kern::MeshGpu& x) { B b{ev::made<ev::Int>(o, x.vao), ev::made<ev::Int>(o, x.position), ev::made<ev::Int>(o, x.normal), ev::made<ev::Int>(o, x.color), ev::made<ev::Int>(o, x.uv), ev::made<ev::Int>(o, x.transforms), ev::made<ev::Int>(o, x.tints), ev::made<ev::Int>(o, x.instance_normals), ev::made<ev::Int>(o, x.joints), ev::made<ev::Int>(o, x.weights), ev::made<ev::List<ev::Int>>(o, x.extension), ev::made<ev::Int>(o, x.element), ev::made<ev::Int>(o, x.element_type), ev::made<ev::List<ev::Int>>(o, x.capacity)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Int>::pass(o, x.vao); ev::Direct<ev::Int>::pass(o, x.position); ev::Direct<ev::Int>::pass(o, x.normal); ev::Direct<ev::Int>::pass(o, x.color); ev::Direct<ev::Int>::pass(o, x.uv); ev::Direct<ev::Int>::pass(o, x.transforms); ev::Direct<ev::Int>::pass(o, x.tints); ev::Direct<ev::Int>::pass(o, x.instance_normals); ev::Direct<ev::Int>::pass(o, x.joints); ev::Direct<ev::Int>::pass(o, x.weights); ev::Direct<ev::List<ev::Int>>::pass(o, x.extension); ev::Direct<ev::Int>::pass(o, x.element); ev::Direct<ev::Int>::pass(o, x.element_type); ev::Direct<ev::List<ev::Int>>::pass(o, x.capacity); }
+  template <class D, class C, class B> struct Fields {
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::vao), decltype(B::vao), &kern::MeshGpu::vao, &B::vao> vao;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::position), decltype(B::position), &kern::MeshGpu::position, &B::position> position;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::normal), decltype(B::normal), &kern::MeshGpu::normal, &B::normal> normal;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::color), decltype(B::color), &kern::MeshGpu::color, &B::color> color;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::uv), decltype(B::uv), &kern::MeshGpu::uv, &B::uv> uv;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::transforms), decltype(B::transforms), &kern::MeshGpu::transforms, &B::transforms> transforms;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::tints), decltype(B::tints), &kern::MeshGpu::tints, &B::tints> tints;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::instance_normals), decltype(B::instance_normals), &kern::MeshGpu::instance_normals, &B::instance_normals> instance_normals;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::joints), decltype(B::joints), &kern::MeshGpu::joints, &B::joints> joints;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::weights), decltype(B::weights), &kern::MeshGpu::weights, &B::weights> weights;
+    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::MeshGpu::extension), decltype(B::extension), &kern::MeshGpu::extension, &B::extension> extension;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::element), decltype(B::element), &kern::MeshGpu::element, &B::element> element;
+    ev::Field<D, ev::Int, C, B, decltype(kern::MeshGpu::element_type), decltype(B::element_type), &kern::MeshGpu::element_type, &B::element_type> element_type;
+    ev::Field<D, ev::List<ev::Int>, C, B, decltype(kern::MeshGpu::capacity), decltype(B::capacity), &kern::MeshGpu::capacity, &B::capacity> capacity;
+    explicit Fields(D* kern_d) : vao(kern_d), position(kern_d), normal(kern_d), color(kern_d), uv(kern_d), transforms(kern_d), tints(kern_d), instance_normals(kern_d), joints(kern_d), weights(kern_d), extension(kern_d), element(kern_d), element_type(kern_d), capacity(kern_d) { (void)kern_d; }
   };
 };
 struct S_MeshInput {
@@ -1331,6 +1357,16 @@ struct S_game_MeshComponent {
     explicit Fields(D* kern_d) : shape(kern_d), size(kern_d), radius(kern_d), height(kern_d), segments(kern_d), asset(kern_d), collision(kern_d), friction(kern_d), restitution(kern_d), rolling_resistance(kern_d), surface(kern_d), material(kern_d) { (void)kern_d; }
   };
 };
+struct S_game_MotionKey {
+  template <class B> static void from(EngineObjects& o, const B& b, kern::game::MotionKey& x) { const auto& [f0, f1] = b; ev::Direct<ev::Float>::from(o, f0, x.time); ev::Direct<ev::List<ev::Float>>::from(o, f1, x.joints); }
+  template <class B> static B make(EngineObjects& o, const kern::game::MotionKey& x) { B b{ev::made<ev::Float>(o, x.time), ev::made<ev::List<ev::Float>>(o, x.joints)}; [[maybe_unused]] const auto& [f0, f1] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.time); ev::Direct<ev::List<ev::Float>>::pass(o, x.joints); }
+  template <class D, class C, class B> struct Fields {
+    ev::Field<D, ev::Float, C, B, decltype(kern::game::MotionKey::time), decltype(B::time), &kern::game::MotionKey::time, &B::time> time;
+    ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::game::MotionKey::joints), decltype(B::joints), &kern::game::MotionKey::joints, &B::joints> joints;
+    explicit Fields(D* kern_d) : time(kern_d), joints(kern_d) { (void)kern_d; }
+  };
+};
 struct S_game_MoverComponent {
   template <class B> static void from(EngineObjects& o, const B& b, kern::game::MoverComponent& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Vector>::from(o, f0, x.offset); ev::Direct<ev::Float>::from(o, f1, x.period); ev::Direct<ev::Float>::from(o, f2, x.phase); ev::Direct<ev::Enum<E_game_MoverMode>>::from(o, f3, x.mode); }
   template <class B> static B make(EngineObjects& o, const kern::game::MoverComponent& x) { B b{ev::made<ev::Vector>(o, x.offset), ev::made<ev::Float>(o, x.period), ev::made<ev::Float>(o, x.phase), ev::made<ev::Enum<E_game_MoverMode>>(o, x.mode)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
@@ -1842,6 +1878,18 @@ struct S_net_Message {
     explicit Fields(D* kern_d) : id(kern_d), type(kern_d), data(kern_d) { (void)kern_d; }
   };
 };
+struct S_net_SimulatorSettings {
+  template <class B> static void from(EngineObjects& o, const B& b, kern::net::SimulatorSettings& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Float>::from(o, f0, x.latency_ms); ev::Direct<ev::Float>::from(o, f1, x.jitter_ms); ev::Direct<ev::Float>::from(o, f2, x.loss_percent); ev::Direct<ev::Float>::from(o, f3, x.duplicate_percent); }
+  template <class B> static B make(EngineObjects& o, const kern::net::SimulatorSettings& x) { B b{ev::made<ev::Float>(o, x.latency_ms), ev::made<ev::Float>(o, x.jitter_ms), ev::made<ev::Float>(o, x.loss_percent), ev::made<ev::Float>(o, x.duplicate_percent)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.latency_ms); ev::Direct<ev::Float>::pass(o, x.jitter_ms); ev::Direct<ev::Float>::pass(o, x.loss_percent); ev::Direct<ev::Float>::pass(o, x.duplicate_percent); }
+  template <class D, class C, class B> struct Fields {
+    ev::Field<D, ev::Float, C, B, decltype(kern::net::SimulatorSettings::latency_ms), decltype(B::latency_ms), &kern::net::SimulatorSettings::latency_ms, &B::latency_ms> latency_ms;
+    ev::Field<D, ev::Float, C, B, decltype(kern::net::SimulatorSettings::jitter_ms), decltype(B::jitter_ms), &kern::net::SimulatorSettings::jitter_ms, &B::jitter_ms> jitter_ms;
+    ev::Field<D, ev::Float, C, B, decltype(kern::net::SimulatorSettings::loss_percent), decltype(B::loss_percent), &kern::net::SimulatorSettings::loss_percent, &B::loss_percent> loss_percent;
+    ev::Field<D, ev::Float, C, B, decltype(kern::net::SimulatorSettings::duplicate_percent), decltype(B::duplicate_percent), &kern::net::SimulatorSettings::duplicate_percent, &B::duplicate_percent> duplicate_percent;
+    explicit Fields(D* kern_d) : latency_ms(kern_d), jitter_ms(kern_d), loss_percent(kern_d), duplicate_percent(kern_d) { (void)kern_d; }
+  };
+};
 struct S_net_Simulator_Packet {
   template <class B> static void from(EngineObjects& o, const B& b, kern::net::Simulator::Packet& x) { const auto& [f0, f1, f2, f3] = b; ev::Direct<ev::Struct<S_net_Address>>::from(o, f0, x.from); ev::Direct<ev::Struct<S_net_Address>>::from(o, f1, x.to); ev::Direct<ev::Float>::from(o, f2, x.deliver); ev::Direct<ev::List<ev::Int>>::from(o, f3, x.data); }
   template <class B> static B make(EngineObjects& o, const kern::net::Simulator::Packet& x) { B b{ev::made<ev::Struct<S_net_Address>>(o, x.from), ev::made<ev::Struct<S_net_Address>>(o, x.to), ev::made<ev::Float>(o, x.deliver), ev::made<ev::List<ev::Int>>(o, x.data)}; [[maybe_unused]] const auto& [f0, f1, f2, f3] = b; return b; }
@@ -1893,6 +1941,28 @@ struct S_physics_Capsule {
     ev::Field<D, ev::Vector, C, B, decltype(kern::physics::Capsule::center2), decltype(B::center2), &kern::physics::Capsule::center2, &B::center2> center2;
     ev::Field<D, ev::Float, C, B, decltype(kern::physics::Capsule::radius), decltype(B::radius), &kern::physics::Capsule::radius, &B::radius> radius;
     explicit Fields(D* kern_d) : center1(kern_d), center2(kern_d), radius(kern_d) { (void)kern_d; }
+  };
+};
+struct S_physics_CharacterMover_Settings {
+  template <class B> static void from(EngineObjects& o, const B& b, kern::physics::CharacterMover::Settings& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13] = b; ev::Direct<ev::Float>::from(o, f0, x.radius); ev::Direct<ev::Float>::from(o, f1, x.height); ev::Direct<ev::Float>::from(o, f2, x.step_height); ev::Direct<ev::Float>::from(o, f3, x.max_speed); ev::Direct<ev::Float>::from(o, f4, x.accelerate); ev::Direct<ev::Float>::from(o, f5, x.friction); ev::Direct<ev::Float>::from(o, f6, x.air_control); ev::Direct<ev::Float>::from(o, f7, x.stop_speed); ev::Direct<ev::Float>::from(o, f8, x.jump_speed); ev::Direct<ev::Float>::from(o, f9, x.sprint); ev::Direct<ev::Float>::from(o, f10, x.gravity); ev::Direct<ev::Float>::from(o, f11, x.max_slope_deg); ev::Direct<ev::Float>::from(o, f12, x.push_strength); ev::Direct<ev::Int64>::from(o, f13, x.mask_bits); }
+  template <class B> static B make(EngineObjects& o, const kern::physics::CharacterMover::Settings& x) { B b{ev::made<ev::Float>(o, x.radius), ev::made<ev::Float>(o, x.height), ev::made<ev::Float>(o, x.step_height), ev::made<ev::Float>(o, x.max_speed), ev::made<ev::Float>(o, x.accelerate), ev::made<ev::Float>(o, x.friction), ev::made<ev::Float>(o, x.air_control), ev::made<ev::Float>(o, x.stop_speed), ev::made<ev::Float>(o, x.jump_speed), ev::made<ev::Float>(o, x.sprint), ev::made<ev::Float>(o, x.gravity), ev::made<ev::Float>(o, x.max_slope_deg), ev::made<ev::Float>(o, x.push_strength), ev::made<ev::Int64>(o, x.mask_bits)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9, f10, f11, f12, f13] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Float>::pass(o, x.radius); ev::Direct<ev::Float>::pass(o, x.height); ev::Direct<ev::Float>::pass(o, x.step_height); ev::Direct<ev::Float>::pass(o, x.max_speed); ev::Direct<ev::Float>::pass(o, x.accelerate); ev::Direct<ev::Float>::pass(o, x.friction); ev::Direct<ev::Float>::pass(o, x.air_control); ev::Direct<ev::Float>::pass(o, x.stop_speed); ev::Direct<ev::Float>::pass(o, x.jump_speed); ev::Direct<ev::Float>::pass(o, x.sprint); ev::Direct<ev::Float>::pass(o, x.gravity); ev::Direct<ev::Float>::pass(o, x.max_slope_deg); ev::Direct<ev::Float>::pass(o, x.push_strength); ev::Direct<ev::Int64>::pass(o, x.mask_bits); }
+  template <class D, class C, class B> struct Fields {
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::radius), decltype(B::radius), &kern::physics::CharacterMover::Settings::radius, &B::radius> radius;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::height), decltype(B::height), &kern::physics::CharacterMover::Settings::height, &B::height> height;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::step_height), decltype(B::step_height), &kern::physics::CharacterMover::Settings::step_height, &B::step_height> step_height;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::max_speed), decltype(B::max_speed), &kern::physics::CharacterMover::Settings::max_speed, &B::max_speed> max_speed;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::accelerate), decltype(B::accelerate), &kern::physics::CharacterMover::Settings::accelerate, &B::accelerate> accelerate;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::friction), decltype(B::friction), &kern::physics::CharacterMover::Settings::friction, &B::friction> friction;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::air_control), decltype(B::air_control), &kern::physics::CharacterMover::Settings::air_control, &B::air_control> air_control;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::stop_speed), decltype(B::stop_speed), &kern::physics::CharacterMover::Settings::stop_speed, &B::stop_speed> stop_speed;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::jump_speed), decltype(B::jump_speed), &kern::physics::CharacterMover::Settings::jump_speed, &B::jump_speed> jump_speed;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::sprint), decltype(B::sprint), &kern::physics::CharacterMover::Settings::sprint, &B::sprint> sprint;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::gravity), decltype(B::gravity), &kern::physics::CharacterMover::Settings::gravity, &B::gravity> gravity;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::max_slope_deg), decltype(B::max_slope_deg), &kern::physics::CharacterMover::Settings::max_slope_deg, &B::max_slope_deg> max_slope_deg;
+    ev::Field<D, ev::Float, C, B, decltype(kern::physics::CharacterMover::Settings::push_strength), decltype(B::push_strength), &kern::physics::CharacterMover::Settings::push_strength, &B::push_strength> push_strength;
+    ev::Field<D, ev::Int64, C, B, decltype(kern::physics::CharacterMover::Settings::mask_bits), decltype(B::mask_bits), &kern::physics::CharacterMover::Settings::mask_bits, &B::mask_bits> mask_bits;
+    explicit Fields(D* kern_d) : radius(kern_d), height(kern_d), step_height(kern_d), max_speed(kern_d), accelerate(kern_d), friction(kern_d), air_control(kern_d), stop_speed(kern_d), jump_speed(kern_d), sprint(kern_d), gravity(kern_d), max_slope_deg(kern_d), push_strength(kern_d), mask_bits(kern_d) { (void)kern_d; }
   };
 };
 struct S_physics_ContactPoint {
@@ -2129,7 +2199,7 @@ struct S_physics_WorldSettings {
 // The places of the engine (engine_values::Place): the object's class, what it holds there, how it is reached.
 struct P_engine_game_world_hud_mut {
   using Object = kern::game::GameWorld;
-  using C = std::remove_reference_t<decltype(std::declval<kern::game::GameWorld&>().hud_mut())>;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::GameWorld&>().hud_mut()))>;
   using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Hud>;
   static constexpr const char* pin = "game_world";
   static constexpr const char* get = "engine.game_world.hud_mut@get";
@@ -2138,7 +2208,7 @@ struct P_engine_game_world_hud_mut {
 };
 struct P_engine_game_world_events {
   using Object = kern::game::GameWorld;
-  using C = std::remove_reference_t<decltype(std::declval<kern::game::GameWorld&>().events())>;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::GameWorld&>().events()))>;
   using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Text>;
   static constexpr const char* pin = "game_world";
   static constexpr const char* get = "engine.game_world.events@get";
@@ -2147,7 +2217,7 @@ struct P_engine_game_world_events {
 };
 struct P_engine_game_world_sound_cues {
   using Object = kern::game::GameWorld;
-  using C = std::remove_reference_t<decltype(std::declval<kern::game::GameWorld&>().sound_cues())>;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::GameWorld&>().sound_cues()))>;
   using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoundCue>>;
   static constexpr const char* pin = "game_world";
   static constexpr const char* get = "engine.game_world.sound_cues@get";
@@ -2156,7 +2226,7 @@ struct P_engine_game_world_sound_cues {
 };
 struct P_engine_game_world_shots {
   using Object = kern::game::GameWorld;
-  using C = std::remove_reference_t<decltype(std::declval<kern::game::GameWorld&>().shots())>;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::GameWorld&>().shots()))>;
   using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_ShotEvent>>;
   static constexpr const char* pin = "game_world";
   static constexpr const char* get = "engine.game_world.shots@get";
@@ -2165,7 +2235,7 @@ struct P_engine_game_world_shots {
 };
 struct P_engine_building_builder_chunks {
   using Object = kern::BuildingBuilder;
-  using C = std::remove_reference_t<decltype(std::declval<kern::BuildingBuilder&>().chunks())>;
+  using C = std::remove_reference_t<decltype((std::declval<kern::BuildingBuilder&>().chunks()))>;
   using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_GeoChunk>>;
   static constexpr const char* pin = "building_builder";
   static constexpr const char* get = "engine.building_builder.chunks@get";
@@ -2174,12 +2244,462 @@ struct P_engine_building_builder_chunks {
 };
 struct P_engine_road_builder_chunks {
   using Object = kern::RoadBuilder;
-  using C = std::remove_reference_t<decltype(std::declval<kern::RoadBuilder&>().chunks())>;
+  using C = std::remove_reference_t<decltype((std::declval<kern::RoadBuilder&>().chunks()))>;
   using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_GeoChunk>>;
   static constexpr const char* pin = "road_builder";
   static constexpr const char* get = "engine.road_builder.chunks@get";
   static constexpr const char* set = "engine.road_builder.chunks@set";
   static C& at(Object& o) { return o.chunks(); }
+};
+struct P_engine_mesh_id {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().id))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.id@get";
+  static constexpr const char* set = "engine.mesh.id@set";
+  static C& at(Object& o) { return o.id; }
+};
+struct P_engine_mesh_visible {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().visible))>;
+  using Tag = ::kern::logic::engine_values::Bool;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.visible@get";
+  static constexpr const char* set = "engine.mesh.visible@set";
+  static C& at(Object& o) { return o.visible; }
+};
+struct P_engine_mesh_layers {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().layers))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.layers@get";
+  static constexpr const char* set = "engine.mesh.layers@set";
+  static C& at(Object& o) { return o.layers; }
+};
+struct P_engine_mesh_pick_bvh {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().pick_bvh))>;
+  using Tag = ::kern::logic::engine_values::Bool;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.pick_bvh@get";
+  static constexpr const char* set = "engine.mesh.pick_bvh@set";
+  static C& at(Object& o) { return o.pick_bvh; }
+};
+struct P_engine_mesh_linear_colors {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().linear_colors))>;
+  using Tag = ::kern::logic::engine_values::Bool;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.linear_colors@get";
+  static constexpr const char* set = "engine.mesh.linear_colors@set";
+  static C& at(Object& o) { return o.linear_colors; }
+};
+struct P_engine_mesh_material {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().material))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Material>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.material@get";
+  static constexpr const char* set = "engine.mesh.material@set";
+  static C& at(Object& o) { return o.material; }
+};
+struct P_engine_mesh_texture {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().texture))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.texture@get";
+  static constexpr const char* set = "engine.mesh.texture@set";
+  static C& at(Object& o) { return o.texture; }
+};
+struct P_engine_mesh_positions {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().positions))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.positions@get";
+  static constexpr const char* set = "engine.mesh.positions@set";
+  static C& at(Object& o) { return o.positions; }
+};
+struct P_engine_mesh_normals {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().normals))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.normals@get";
+  static constexpr const char* set = "engine.mesh.normals@set";
+  static C& at(Object& o) { return o.normals; }
+};
+struct P_engine_mesh_colors {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().colors))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.colors@get";
+  static constexpr const char* set = "engine.mesh.colors@set";
+  static C& at(Object& o) { return o.colors; }
+};
+struct P_engine_mesh_uvs {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().uvs))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.uvs@get";
+  static constexpr const char* set = "engine.mesh.uvs@set";
+  static C& at(Object& o) { return o.uvs; }
+};
+struct P_engine_mesh_indices {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().indices))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Int>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.indices@get";
+  static constexpr const char* set = "engine.mesh.indices@set";
+  static C& at(Object& o) { return o.indices; }
+};
+struct P_engine_mesh_joints {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().joints))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.joints@get";
+  static constexpr const char* set = "engine.mesh.joints@set";
+  static C& at(Object& o) { return o.joints; }
+};
+struct P_engine_mesh_weights {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().weights))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.weights@get";
+  static constexpr const char* set = "engine.mesh.weights@set";
+  static C& at(Object& o) { return o.weights; }
+};
+struct P_engine_mesh_bones {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().bones))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.bones@get";
+  static constexpr const char* set = "engine.mesh.bones@set";
+  static C& at(Object& o) { return o.bones; }
+};
+struct P_engine_mesh_transforms {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().transforms))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.transforms@get";
+  static constexpr const char* set = "engine.mesh.transforms@set";
+  static C& at(Object& o) { return o.transforms; }
+};
+struct P_engine_mesh_tints {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().tints))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.tints@get";
+  static constexpr const char* set = "engine.mesh.tints@set";
+  static C& at(Object& o) { return o.tints; }
+};
+struct P_engine_mesh_instance_normals {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().instance_normals))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Float>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.instance_normals@get";
+  static constexpr const char* set = "engine.mesh.instance_normals@set";
+  static C& at(Object& o) { return o.instance_normals; }
+};
+struct P_engine_mesh_instance_count {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().instance_count))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.instance_count@get";
+  static constexpr const char* set = "engine.mesh.instance_count@set";
+  static C& at(Object& o) { return o.instance_count; }
+};
+struct P_engine_mesh_mirror {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().mirror))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.mirror@get";
+  static constexpr const char* set = "engine.mesh.mirror@set";
+  static C& at(Object& o) { return o.mirror; }
+};
+struct P_engine_mesh_local_bounds {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().local_bounds))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.local_bounds@get";
+  static constexpr const char* set = "engine.mesh.local_bounds@set";
+  static C& at(Object& o) { return o.local_bounds; }
+};
+struct P_engine_mesh_world_bounds {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().world_bounds))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.world_bounds@get";
+  static constexpr const char* set = "engine.mesh.world_bounds@set";
+  static C& at(Object& o) { return o.world_bounds; }
+};
+struct P_engine_mesh_gpu {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().gpu))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshGpu>;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.gpu@get";
+  static constexpr const char* set = "engine.mesh.gpu@set";
+  static C& at(Object& o) { return o.gpu; }
+};
+struct P_engine_mesh_sort_distance {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().sort_distance))>;
+  using Tag = ::kern::logic::engine_values::Float;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.sort_distance@get";
+  static constexpr const char* set = "engine.mesh.sort_distance@set";
+  static C& at(Object& o) { return o.sort_distance; }
+};
+struct P_engine_mesh_live_index {
+  using Object = kern::Mesh;
+  using C = std::remove_reference_t<decltype((std::declval<kern::Mesh&>().live_index))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "mesh";
+  static constexpr const char* get = "engine.mesh.live_index@get";
+  static constexpr const char* set = "engine.mesh.live_index@set";
+  static C& at(Object& o) { return o.live_index; }
+};
+struct P_engine_shader_extension_material_base {
+  using Object = kern::ShaderExtension;
+  using C = std::remove_reference_t<decltype((std::declval<kern::ShaderExtension&>().material_base))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "shader_extension";
+  static constexpr const char* get = "engine.shader_extension.material_base@get";
+  static constexpr const char* set = "engine.shader_extension.material_base@set";
+  static C& at(Object& o) { return o.material_base; }
+};
+struct P_engine_shader_extension_attribute_base {
+  using Object = kern::ShaderExtension;
+  using C = std::remove_reference_t<decltype((std::declval<kern::ShaderExtension&>().attribute_base))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "shader_extension";
+  static constexpr const char* get = "engine.shader_extension.attribute_base@get";
+  static constexpr const char* set = "engine.shader_extension.attribute_base@set";
+  static C& at(Object& o) { return o.attribute_base; }
+};
+struct P_engine_texture_desc_width {
+  using Object = kern::TextureDesc;
+  using C = std::remove_reference_t<decltype((std::declval<kern::TextureDesc&>().width))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "texture_desc";
+  static constexpr const char* get = "engine.texture_desc.width@get";
+  static constexpr const char* set = "engine.texture_desc.width@set";
+  static C& at(Object& o) { return o.width; }
+};
+struct P_engine_texture_desc_height {
+  using Object = kern::TextureDesc;
+  using C = std::remove_reference_t<decltype((std::declval<kern::TextureDesc&>().height))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "texture_desc";
+  static constexpr const char* get = "engine.texture_desc.height@get";
+  static constexpr const char* set = "engine.texture_desc.height@set";
+  static C& at(Object& o) { return o.height; }
+};
+struct P_engine_texture_desc_mipmaps {
+  using Object = kern::TextureDesc;
+  using C = std::remove_reference_t<decltype((std::declval<kern::TextureDesc&>().mipmaps))>;
+  using Tag = ::kern::logic::engine_values::Bool;
+  static constexpr const char* pin = "texture_desc";
+  static constexpr const char* get = "engine.texture_desc.mipmaps@get";
+  static constexpr const char* set = "engine.texture_desc.mipmaps@set";
+  static C& at(Object& o) { return o.mipmaps; }
+};
+struct P_engine_texture_desc_repeat {
+  using Object = kern::TextureDesc;
+  using C = std::remove_reference_t<decltype((std::declval<kern::TextureDesc&>().repeat))>;
+  using Tag = ::kern::logic::engine_values::Bool;
+  static constexpr const char* pin = "texture_desc";
+  static constexpr const char* get = "engine.texture_desc.repeat@get";
+  static constexpr const char* set = "engine.texture_desc.repeat@set";
+  static C& at(Object& o) { return o.repeat; }
+};
+struct P_engine_texture_desc_nearest {
+  using Object = kern::TextureDesc;
+  using C = std::remove_reference_t<decltype((std::declval<kern::TextureDesc&>().nearest))>;
+  using Tag = ::kern::logic::engine_values::Bool;
+  static constexpr const char* pin = "texture_desc";
+  static constexpr const char* get = "engine.texture_desc.nearest@get";
+  static constexpr const char* set = "engine.texture_desc.nearest@set";
+  static C& at(Object& o) { return o.nearest; }
+};
+struct P_engine_mixer_speed_of_sound {
+  using Object = kern::audio::Mixer;
+  using C = std::remove_reference_t<decltype((std::declval<kern::audio::Mixer&>().speed_of_sound))>;
+  using Tag = ::kern::logic::engine_values::Float;
+  static constexpr const char* pin = "mixer";
+  static constexpr const char* get = "engine.mixer.speed_of_sound@get";
+  static constexpr const char* set = "engine.mixer.speed_of_sound@set";
+  static C& at(Object& o) { return o.speed_of_sound; }
+};
+struct P_engine_mixer_doppler_factor {
+  using Object = kern::audio::Mixer;
+  using C = std::remove_reference_t<decltype((std::declval<kern::audio::Mixer&>().doppler_factor))>;
+  using Tag = ::kern::logic::engine_values::Float;
+  static constexpr const char* pin = "mixer";
+  static constexpr const char* get = "engine.mixer.doppler_factor@get";
+  static constexpr const char* set = "engine.mixer.doppler_factor@set";
+  static C& at(Object& o) { return o.doppler_factor; }
+};
+struct P_engine_game_world_logic_native {
+  using Object = kern::game::GameWorld;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::GameWorld&>().logic_native))>;
+  using Tag = ::kern::logic::engine_values::Bool;
+  static constexpr const char* pin = "game_world";
+  static constexpr const char* get = "engine.game_world.logic_native@get";
+  static constexpr const char* set = "engine.game_world.logic_native@set";
+  static C& at(Object& o) { return o.logic_native; }
+};
+struct P_engine_property_change_actor {
+  using Object = kern::game::GameWorld::PropertyChange;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::GameWorld::PropertyChange&>().actor))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "property_change";
+  static constexpr const char* get = "engine.property_change.actor@get";
+  static constexpr const char* set = "engine.property_change.actor@set";
+  static C& at(Object& o) { return o.actor; }
+};
+struct P_engine_property_change_path {
+  using Object = kern::game::GameWorld::PropertyChange;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::GameWorld::PropertyChange&>().path))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  static constexpr const char* pin = "property_change";
+  static constexpr const char* get = "engine.property_change.path@get";
+  static constexpr const char* set = "engine.property_change.path@set";
+  static C& at(Object& o) { return o.path; }
+};
+struct P_engine_motion_asset_name {
+  using Object = kern::game::MotionAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::MotionAsset&>().name))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  static constexpr const char* pin = "motion_asset";
+  static constexpr const char* get = "engine.motion_asset.name@get";
+  static constexpr const char* set = "engine.motion_asset.name@set";
+  static C& at(Object& o) { return o.name; }
+};
+struct P_engine_motion_asset_duration {
+  using Object = kern::game::MotionAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::MotionAsset&>().duration))>;
+  using Tag = ::kern::logic::engine_values::Float;
+  static constexpr const char* pin = "motion_asset";
+  static constexpr const char* get = "engine.motion_asset.duration@get";
+  static constexpr const char* set = "engine.motion_asset.duration@set";
+  static C& at(Object& o) { return o.duration; }
+};
+struct P_engine_motion_asset_keys {
+  using Object = kern::game::MotionAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::MotionAsset&>().keys))>;
+  using Tag = ::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MotionKey>>;
+  static constexpr const char* pin = "motion_asset";
+  static constexpr const char* get = "engine.motion_asset.keys@get";
+  static constexpr const char* set = "engine.motion_asset.keys@set";
+  static C& at(Object& o) { return o.keys; }
+};
+struct P_engine_night_windows_night {
+  using Object = kern::game::NightWindows;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::NightWindows&>().night))>;
+  using Tag = ::kern::logic::engine_values::Float;
+  static constexpr const char* pin = "night_windows";
+  static constexpr const char* get = "engine.night_windows.night@get";
+  static constexpr const char* set = "engine.night_windows.night@set";
+  static C& at(Object& o) { return o.night; }
+};
+struct P_engine_sound_asset_id {
+  using Object = kern::game::SoundAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::SoundAsset&>().id))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  static constexpr const char* pin = "sound_asset";
+  static constexpr const char* get = "engine.sound_asset.id@get";
+  static constexpr const char* set = "engine.sound_asset.id@set";
+  static C& at(Object& o) { return o.id; }
+};
+struct P_engine_sound_asset_name {
+  using Object = kern::game::SoundAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::SoundAsset&>().name))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  static constexpr const char* pin = "sound_asset";
+  static constexpr const char* get = "engine.sound_asset.name@get";
+  static constexpr const char* set = "engine.sound_asset.name@set";
+  static C& at(Object& o) { return o.name; }
+};
+struct P_engine_sound_asset_duration {
+  using Object = kern::game::SoundAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::SoundAsset&>().duration))>;
+  using Tag = ::kern::logic::engine_values::Float;
+  static constexpr const char* pin = "sound_asset";
+  static constexpr const char* get = "engine.sound_asset.duration@get";
+  static constexpr const char* set = "engine.sound_asset.duration@set";
+  static C& at(Object& o) { return o.duration; }
+};
+struct P_engine_texture_asset_id {
+  using Object = kern::game::TextureAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().id))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  static constexpr const char* pin = "texture_asset";
+  static constexpr const char* get = "engine.texture_asset.id@get";
+  static constexpr const char* set = "engine.texture_asset.id@set";
+  static C& at(Object& o) { return o.id; }
+};
+struct P_engine_texture_asset_name {
+  using Object = kern::game::TextureAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().name))>;
+  using Tag = ::kern::logic::engine_values::Text;
+  static constexpr const char* pin = "texture_asset";
+  static constexpr const char* get = "engine.texture_asset.name@get";
+  static constexpr const char* set = "engine.texture_asset.name@set";
+  static C& at(Object& o) { return o.name; }
+};
+struct P_engine_texture_asset_width {
+  using Object = kern::game::TextureAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().width))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "texture_asset";
+  static constexpr const char* get = "engine.texture_asset.width@get";
+  static constexpr const char* set = "engine.texture_asset.width@set";
+  static C& at(Object& o) { return o.width; }
+};
+struct P_engine_texture_asset_height {
+  using Object = kern::game::TextureAsset;
+  using C = std::remove_reference_t<decltype((std::declval<kern::game::TextureAsset&>().height))>;
+  using Tag = ::kern::logic::engine_values::Int;
+  static constexpr const char* pin = "texture_asset";
+  static constexpr const char* get = "engine.texture_asset.height@get";
+  static constexpr const char* set = "engine.texture_asset.height@set";
+  static C& at(Object& o) { return o.height; }
+};
+struct P_engine_simulator_settings {
+  using Object = kern::net::Simulator;
+  using C = std::remove_reference_t<decltype((std::declval<kern::net::Simulator&>().settings))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_SimulatorSettings>;
+  static constexpr const char* pin = "simulator";
+  static constexpr const char* get = "engine.simulator.settings@get";
+  static constexpr const char* set = "engine.simulator.settings@set";
+  static C& at(Object& o) { return o.settings; }
+};
+struct P_engine_character_mover_settings {
+  using Object = kern::physics::CharacterMover;
+  using C = std::remove_reference_t<decltype((std::declval<kern::physics::CharacterMover&>().settings))>;
+  using Tag = ::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_CharacterMover_Settings>;
+  static constexpr const char* pin = "character_mover";
+  static constexpr const char* get = "engine.character_mover.settings@get";
+  static constexpr const char* set = "engine.character_mover.settings@set";
+  static C& at(Object& o) { return o.settings; }
 };
 
 }  // namespace engine_direct
@@ -15073,6 +15593,309 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.mesh.release", {to_value(mesh)}, {});
   }
+  /// The place kern::Mesh::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_id, B>;
+  template <class KernNode> void engine_mesh_id(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_id::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.id");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::visible gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_visible_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_visible, B>;
+  template <class KernNode> void engine_mesh_visible(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_visible::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.visible");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::layers gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_layers_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_layers, B>;
+  template <class KernNode> void engine_mesh_layers(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_layers::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.layers");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// MeshInput::pick_bvh
+  /// The place kern::Mesh::pick_bvh gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_pick_bvh_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_pick_bvh, B>;
+  template <class KernNode> void engine_mesh_pick_bvh(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_pick_bvh::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.pick_bvh");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::linear_colors gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_linear_colors_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_linear_colors, B>;
+  template <class KernNode> void engine_mesh_linear_colors(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_linear_colors::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.linear_colors");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::material gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_material_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_material, B>;
+  template <class KernNode> void engine_mesh_material(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_material::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.material");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::texture gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_texture_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_texture, B>;
+  template <class KernNode> void engine_mesh_texture(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_texture::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.texture");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::positions gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_positions_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_positions, B>;
+  template <class KernNode> void engine_mesh_positions(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_positions::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.positions");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::normals gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_normals_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_normals, B>;
+  template <class KernNode> void engine_mesh_normals(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_normals::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.normals");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::colors gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_colors_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_colors, B>;
+  template <class KernNode> void engine_mesh_colors(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_colors::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.colors");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::uvs gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_uvs_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_uvs, B>;
+  template <class KernNode> void engine_mesh_uvs(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_uvs::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.uvs");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::indices gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_indices_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_indices, B>;
+  template <class KernNode> void engine_mesh_indices(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_indices::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.indices");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::joints gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_joints_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_joints, B>;
+  template <class KernNode> void engine_mesh_joints(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_joints::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.joints");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::weights gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_weights_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_weights, B>;
+  template <class KernNode> void engine_mesh_weights(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_weights::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.weights");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::bones gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_bones_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_bones, B>;
+  template <class KernNode> void engine_mesh_bones(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_bones::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.bones");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::transforms gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_transforms_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_transforms, B>;
+  template <class KernNode> void engine_mesh_transforms(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_transforms::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.transforms");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::tints gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_tints_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_tints, B>;
+  template <class KernNode> void engine_mesh_tints(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_tints::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.tints");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::instance_normals gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_instance_normals_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_instance_normals, B>;
+  template <class KernNode> void engine_mesh_instance_normals(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_instance_normals::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.instance_normals");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::instance_count gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_instance_count_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_instance_count, B>;
+  template <class KernNode> void engine_mesh_instance_count(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_instance_count::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.instance_count");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// instances with negative determinant: 0 none, 1 all, 2 some
+  /// The place kern::Mesh::mirror gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_mirror_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_mirror, B>;
+  template <class KernNode> void engine_mesh_mirror(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_mirror::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.mirror");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::local_bounds gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_local_bounds_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_local_bounds, B>;
+  template <class KernNode> void engine_mesh_local_bounds(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_local_bounds::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.local_bounds");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::world_bounds gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_world_bounds_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_world_bounds, B>;
+  template <class KernNode> void engine_mesh_world_bounds(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_world_bounds::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.world_bounds");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::gpu gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_gpu_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_gpu, B>;
+  template <class KernNode> void engine_mesh_gpu(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_gpu::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.gpu");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// The place kern::Mesh::sort_distance gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_sort_distance_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_sort_distance, B>;
+  template <class KernNode> void engine_mesh_sort_distance(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_sort_distance::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.sort_distance");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
+  /// position in Renderer's dense live list
+  /// The place kern::Mesh::live_index gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mesh_live_index_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_live_index, B>;
+  template <class KernNode> void engine_mesh_live_index(KernNode& kern_n, Int mesh) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_live_index::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mesh.live_index");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
+  }
   /// Makes a Particles of the engine: its handle (the host keeps it until it is released).
   void engine_particles_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15208,6 +16031,32 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.road_stream.release", {to_value(road_stream)}, {});
   }
+  /// Set by the renderer: index of this extension's first material parameter.
+  /// The place kern::ShaderExtension::material_base gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_shader_extension_material_base_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_shader_extension_material_base, B>;
+  template <class KernNode> void engine_shader_extension_material_base(KernNode& kern_n, Int shader_extension) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::ShaderExtension>(*kern_o, static_cast<::kern::i64>(shader_extension), "shader_extension");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), kern_self ? &engine_direct::P_engine_shader_extension_material_base::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.shader_extension.material_base");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), nullptr);
+  }
+  /// Set by the renderer: vertex location of this extension's first attribute.
+  /// The place kern::ShaderExtension::attribute_base gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_shader_extension_attribute_base_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_shader_extension_attribute_base, B>;
+  template <class KernNode> void engine_shader_extension_attribute_base(KernNode& kern_n, Int shader_extension) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::ShaderExtension>(*kern_o, static_cast<::kern::i64>(shader_extension), "shader_extension");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), kern_self ? &engine_direct::P_engine_shader_extension_attribute_base::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.shader_extension.attribute_base");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), nullptr);
+  }
   /// Makes a SkyPass of the engine: its handle (the host keeps it until it is released).
   void engine_sky_pass_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15288,6 +16137,67 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.texture_desc.release", {to_value(texture_desc)}, {});
+  }
+  /// The place kern::TextureDesc::width gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_desc_width_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_width, B>;
+  template <class KernNode> void engine_texture_desc_width(KernNode& kern_n, Int texture_desc) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_width::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_desc.width");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
+  }
+  /// The place kern::TextureDesc::height gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_desc_height_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_height, B>;
+  template <class KernNode> void engine_texture_desc_height(KernNode& kern_n, Int texture_desc) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_height::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_desc.height");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
+  }
+  /// The place kern::TextureDesc::mipmaps gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_desc_mipmaps_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_mipmaps, B>;
+  template <class KernNode> void engine_texture_desc_mipmaps(KernNode& kern_n, Int texture_desc) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_mipmaps::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_desc.mipmaps");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
+  }
+  /// The place kern::TextureDesc::repeat gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_desc_repeat_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_repeat, B>;
+  template <class KernNode> void engine_texture_desc_repeat(KernNode& kern_n, Int texture_desc) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_repeat::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_desc.repeat");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
+  }
+  /// nearest-neighbour filtering (pixel art), no mipmaps
+  /// The place kern::TextureDesc::nearest gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_desc_nearest_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_nearest, B>;
+  template <class KernNode> void engine_texture_desc_nearest(KernNode& kern_n, Int texture_desc) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_nearest::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_desc.nearest");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
   }
   /// Makes a UniformCache of the engine: its handle (the host keeps it until it is released).
   void engine_uniform_cache_make() {
@@ -15370,6 +16280,31 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.mixer.release", {to_value(mixer)}, {});
   }
+  /// The place kern::audio::Mixer::speed_of_sound gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mixer_speed_of_sound_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mixer_speed_of_sound, B>;
+  template <class KernNode> void engine_mixer_speed_of_sound(KernNode& kern_n, Int mixer) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), kern_self ? &engine_direct::P_engine_mixer_speed_of_sound::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mixer.speed_of_sound");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), nullptr);
+  }
+  /// global scale of the Doppler effect
+  /// The place kern::audio::Mixer::doppler_factor gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_mixer_doppler_factor_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mixer_doppler_factor, B>;
+  template <class KernNode> void engine_mixer_doppler_factor(KernNode& kern_n, Int mixer) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), kern_self ? &engine_direct::P_engine_mixer_doppler_factor::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.mixer.doppler_factor");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), nullptr);
+  }
   /// Makes a GameAudio of the engine: its handle (the host keeps it until it is released).
   void engine_game_audio_make(Int mixer, Int bank) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15440,6 +16375,19 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.release", {to_value(game_world)}, {});
   }
+  /// A Blueprint whose C++ class the program has runs as that class (logic::Runtime::native). Off: the interpreter or the JIT, whatever the program has - read when the game starts.
+  /// The place kern::game::GameWorld::logic_native gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_game_world_logic_native_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_game_world_logic_native, B>;
+  template <class KernNode> void engine_game_world_logic_native(KernNode& kern_n, Int game_world) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(game_world), kern_self ? &engine_direct::P_engine_game_world_logic_native::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.game_world.logic_native");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(game_world), nullptr);
+  }
   /// Makes a PropertyChange of the engine: its handle (the host keeps it until it is released).
   void engine_property_change_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15466,6 +16414,32 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.property_change.release", {to_value(property_change)}, {});
+  }
+  /// Replicated changes made by logic (the network server sends them; clients apply them).
+  /// The place kern::game::GameWorld::PropertyChange::actor gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_property_change_actor_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_property_change_actor, B>;
+  template <class KernNode> void engine_property_change_actor(KernNode& kern_n, Int property_change) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld::PropertyChange>(*kern_o, static_cast<::kern::i64>(property_change), "property_change");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), kern_self ? &engine_direct::P_engine_property_change_actor::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.property_change.actor");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), nullptr);
+  }
+  /// Replicated changes made by logic (the network server sends them; clients apply them).
+  /// The place kern::game::GameWorld::PropertyChange::path gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_property_change_path_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_property_change_path, B>;
+  template <class KernNode> void engine_property_change_path(KernNode& kern_n, Int property_change) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld::PropertyChange>(*kern_o, static_cast<::kern::i64>(property_change), "property_change");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), kern_self ? &engine_direct::P_engine_property_change_path::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.property_change.path");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), nullptr);
   }
   /// Makes a MotionAsset of the engine: its handle (the host keeps it until it is released).
   void engine_motion_asset_make() {
@@ -15494,6 +16468,45 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.motion_asset.release", {to_value(motion_asset)}, {});
   }
+  /// the move's name (motion_name_ok)
+  /// The place kern::game::MotionAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_motion_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_name, B>;
+  template <class KernNode> void engine_motion_asset_name(KernNode& kern_n, Int motion_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::MotionAsset>(*kern_o, static_cast<::kern::i64>(motion_asset), "motion_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), kern_self ? &engine_direct::P_engine_motion_asset_name::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.motion_asset.name");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), nullptr);
+  }
+  /// seconds, kMotionMinSeconds .. kMotionMaxSeconds
+  /// The place kern::game::MotionAsset::duration gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_motion_asset_duration_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_duration, B>;
+  template <class KernNode> void engine_motion_asset_duration(KernNode& kern_n, Int motion_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::MotionAsset>(*kern_o, static_cast<::kern::i64>(motion_asset), "motion_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), kern_self ? &engine_direct::P_engine_motion_asset_duration::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.motion_asset.duration");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), nullptr);
+  }
+  /// in time order (none: taught from something else, as the jump is)
+  /// The place kern::game::MotionAsset::keys gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_motion_asset_keys_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_keys, B>;
+  template <class KernNode> void engine_motion_asset_keys(KernNode& kern_n, Int motion_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::MotionAsset>(*kern_o, static_cast<::kern::i64>(motion_asset), "motion_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), kern_self ? &engine_direct::P_engine_motion_asset_keys::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.motion_asset.keys");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), nullptr);
+  }
   /// Makes a NightWindows of the engine: its handle (the host keeps it until it is released).
   void engine_night_windows_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15520,6 +16533,18 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.night_windows.release", {to_value(night_windows)}, {});
+  }
+  /// The place kern::game::NightWindows::night gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_night_windows_night_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_night_windows_night, B>;
+  template <class KernNode> void engine_night_windows_night(KernNode& kern_n, Int night_windows) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::NightWindows>(*kern_o, static_cast<::kern::i64>(night_windows), "night_windows");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(night_windows), kern_self ? &engine_direct::P_engine_night_windows_night::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.night_windows.night");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(night_windows), nullptr);
   }
   /// Makes a SoldierArtDelete of the engine: its handle (the host keeps it until it is released).
   void engine_soldier_art_delete_make() {
@@ -15574,6 +16599,43 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.sound_asset.release", {to_value(sound_asset)}, {});
+  }
+  /// The place kern::game::SoundAsset::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_sound_asset_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_id, B>;
+  template <class KernNode> void engine_sound_asset_id(KernNode& kern_n, Int sound_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundAsset>(*kern_o, static_cast<::kern::i64>(sound_asset), "sound_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), kern_self ? &engine_direct::P_engine_sound_asset_id::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.sound_asset.id");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), nullptr);
+  }
+  /// The place kern::game::SoundAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_sound_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_name, B>;
+  template <class KernNode> void engine_sound_asset_name(KernNode& kern_n, Int sound_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundAsset>(*kern_o, static_cast<::kern::i64>(sound_asset), "sound_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), kern_self ? &engine_direct::P_engine_sound_asset_name::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.sound_asset.name");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), nullptr);
+  }
+  /// seconds (informational)
+  /// The place kern::game::SoundAsset::duration gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_sound_asset_duration_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_duration, B>;
+  template <class KernNode> void engine_sound_asset_duration(KernNode& kern_n, Int sound_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundAsset>(*kern_o, static_cast<::kern::i64>(sound_asset), "sound_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), kern_self ? &engine_direct::P_engine_sound_asset_duration::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.sound_asset.duration");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), nullptr);
   }
   /// Makes a SoundBank of the engine: its handle (the host keeps it until it is released).
   void engine_sound_bank_make(Int mixer) {
@@ -15632,6 +16694,54 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.texture_asset.release", {to_value(texture_asset)}, {});
+  }
+  /// The place kern::game::TextureAsset::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_asset_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_id, B>;
+  template <class KernNode> void engine_texture_asset_id(KernNode& kern_n, Int texture_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_id::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_asset.id");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
+  }
+  /// The place kern::game::TextureAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_name, B>;
+  template <class KernNode> void engine_texture_asset_name(KernNode& kern_n, Int texture_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_name::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_asset.name");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
+  }
+  /// The place kern::game::TextureAsset::width gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_asset_width_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_width, B>;
+  template <class KernNode> void engine_texture_asset_width(KernNode& kern_n, Int texture_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_width::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_asset.width");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
+  }
+  /// The place kern::game::TextureAsset::height gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_texture_asset_height_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_height, B>;
+  template <class KernNode> void engine_texture_asset_height(KernNode& kern_n, Int texture_asset) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_height::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.texture_asset.height");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
   }
   /// Makes a Client of the engine: its handle (the host keeps it until it is released).
   template <class T1> void engine_client_make(Int transport, const T1& config, Int64 salt_seed) {
@@ -15860,6 +16970,18 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.simulator.release", {to_value(simulator)}, {});
   }
+  /// The place kern::net::Simulator::settings gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_simulator_settings_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_simulator_settings, B>;
+  template <class KernNode> void engine_simulator_settings(KernNode& kern_n, Int simulator) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Simulator>(*kern_o, static_cast<::kern::i64>(simulator), "simulator");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(simulator), kern_self ? &engine_direct::P_engine_simulator_settings::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.simulator.settings");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(simulator), nullptr);
+  }
   /// Makes a CharacterMover of the engine: its handle (the host keeps it until it is released).
   void engine_character_mover_make() {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15886,6 +17008,18 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.character_mover.release", {to_value(character_mover)}, {});
+  }
+  /// The place kern::physics::CharacterMover::settings gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
+  template <class B> using engine_character_mover_settings_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_character_mover_settings, B>;
+  template <class KernNode> void engine_character_mover_settings(KernNode& kern_n, Int character_mover) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::CharacterMover>(*kern_o, static_cast<::kern::i64>(character_mover), "character_mover");
+      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(character_mover), kern_self ? &engine_direct::P_engine_character_mover_settings::at(*kern_self) : nullptr);
+      if (!kern_self) this->kern_engine_failed("engine.character_mover.settings");
+      return;
+    }
+    kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(character_mover), nullptr);
   }
   /// Makes a MouseGrab of the engine: its handle (the host keeps it until it is released).
   void engine_mouse_grab_make() {
