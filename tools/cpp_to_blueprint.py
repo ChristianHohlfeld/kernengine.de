@@ -11813,6 +11813,8 @@ class TestWriter:
                 return
             if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
                 return
+            if d.get("isImplicit"):
+                return   # (what the compiler makes of a class - its copy, its assignment: it makes it in the test too; its place is the class's name, no source)
             if tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm::"):
                 return   # (the engine's functions of numbers: in the test's source the formula's, see `widen`)
             if ENGINE_NODES and (u.api().declared_only(d) or u.api().declared_only(tree.decl.get(i, d))):
@@ -11853,8 +11855,11 @@ class TestWriter:
             if far is other:
                 G.foreign[same] = merged
             else:
-                del G.foreign[same]
-                G.foreign[place] = merged
+                # (under the place of the farther, where the nearer stood: what took the statement before stands
+                # after it - at the end, it would stand after the functions that name its constants)
+                kept = list(G.foreign.items())
+                G.foreign.clear()
+                G.foreign.update((place, merged) if p == same else (p, x) for p, x in kept)
         def take(i):
             """A function whose body stands in another source file: the pieces its test holds, as the test of
             that file hands them on."""
@@ -12250,24 +12255,34 @@ class TestWriter:
                 if c.get("kind") not in ("CompoundStmt", "CXXCtorInitializer"):
                     continue
                 for n in walk_source(c):
-                    if n.get("kind") != "DeclRefExpr" or n.get("_file") != d["_file"]:
+                    if n.get("_file") != d["_file"]:
                         continue
-                    rid = (n.get("referencedDecl") or {}).get("id")
-                    t = tree.template_of.get(rid) or tree.decl.get(rid)
-                    if t is None or not here(t) or not namespace_level(t) or t.get("kind") not in ("FunctionDecl", "FunctionTemplateDecl", "VarDecl", "EnumConstantDecl") or not own(t):
-                        continue
-                    named_enum = t.get("kind") == "EnumConstantDecl" and "_enum" in t   # (a value of an enum without a name: by its own name, where it stands)
-                    if named_enum:
-                        e = tree.enums.get(t["_enum"])
-                        if e is None or not namespace_level(e):
+                    if n.get("kind") == "IntegerLiteral" and n.get("_unnamed") is not None:
+                        # a value of an enum without a name: the tree has the number it is (Tree.number_names),
+                        # the source its name - by the namespace of the file, where the enum stands
+                        t = tree.decl.get(n["_unnamed"])
+                        if t is None or not here(t) or not namespace_level(t) or not own(t):
                             continue
-                        said = (t["name"], e.get("name"))
+                        said, home_of = tuple(x["name"] for x in kids(t) if x.get("kind") == "EnumConstantDecl" and x.get("name")), t
                     else:
-                        said = (t.get("name"),)
+                        if n.get("kind") != "DeclRefExpr":
+                            continue
+                        rid = (n.get("referencedDecl") or {}).get("id")
+                        t = tree.template_of.get(rid) or tree.decl.get(rid)
+                        if t is None or not here(t) or not namespace_level(t) or t.get("kind") not in ("FunctionDecl", "FunctionTemplateDecl", "VarDecl", "EnumConstantDecl") or not own(t):
+                            continue
+                        home_of = t
+                        if t.get("kind") == "EnumConstantDecl" and "_enum" in t:   # (a value of an enum with a name, by its own name or the enum's)
+                            e = tree.enums.get(t["_enum"])
+                            if e is None or not namespace_level(e):
+                                continue
+                            said, home_of = (t["name"], e.get("name")), e
+                        else:
+                            said = (t.get("name"),)
                     a = n.get("_at", (None,))[0]
                     word = re.match(r"[A-Za-z_]\w*", raw[a:a + 256]) if a is not None else None
                     if word and word.group(0) in said and not raw[max(0, a - 64):a].rstrip().endswith(("::", ".", "->")):
-                        scope = tree.scope_of.get((tree.enums[t["_enum"]] if named_enum else t)["id"], "")
+                        scope = tree.scope_of.get(home_of["id"], "")
                         edits.append((a, 3, 0, a, "::".join(self.local_path(scope, within)) + "::"))
                 if c.get("kind") == "CompoundStmt" and raw[c["_at"][0]:c["_at"][0] + 1] == "{":
                     named = set(re.findall(r"[A-Za-z_]\w*", raw[c["_at"][0]:c["_at"][1]]))
@@ -13004,6 +13019,12 @@ class TestWriter:
         if warned:
             print(f"    (test_{stem}: compiles with {len(warned)} kind(s) of warning, as in the suite: {warned[0]}{' …' if len(warned) > 1 else ''})")
         if r.returncode != 0:
+            if os.environ.get("TEST_ERRORS"):   # (to look at: the first errors as the compiler says them, with the test's text there)
+                said = [x for x in r.stderr.split("\n") if x.strip()]
+                firsts = [i for i, x in enumerate(said) if re.search(r"\berror: ", x)][:3]
+                for i in firsts:
+                    for x in said[max(0, i - 2):i + 3]:
+                        sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
             mine = re.compile(re.escape(path) + r":(\d+):")
