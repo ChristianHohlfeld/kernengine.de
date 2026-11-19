@@ -2088,18 +2088,40 @@ template <class R, class A, class B> constexpr bool both_held(A a, B b) {
     return false;
   }
 }
+// A whole number with a sign narrower than 64 bits (i32, and what is promoted to int): C++ leaves open what a
+// sum, a difference, a product or a negation gives outside its range (UBSan: "signed integer overflow"). The
+// test computes it exactly, marks the call there (open_read - it is given up and drawn again, never compared)
+// and goes on with the bits the number keeps, so the source itself never does what C++ leaves open.
+template <class R> constexpr bool narrow_signed() { return std::is_integral_v<R> && std::is_signed_v<R> && sizeof(R) < 8; }
+template <class R> constexpr R kept_narrow(long long exact) {
+  if (exact < static_cast<long long>(std::numeric_limits<R>::min()) || exact > static_cast<long long>(std::numeric_limits<R>::max())) open_read();
+  return static_cast<R>(static_cast<std::make_unsigned_t<R>>(static_cast<unsigned long long>(exact)));
+}
+template <class A> constexpr auto neg(A a) -> decltype(-a) {
+  using R = decltype(-a);
+  if constexpr (std::is_integral_v<R> && std::is_signed_v<R>) {
+    if (static_cast<R>(a) == std::numeric_limits<R>::min()) {
+      open_read();
+      return static_cast<R>(a);
+    }
+  }
+  return -a;
+}
 template <class A, class B> constexpr auto plus(A a, B b) -> decltype(a + b) {
   using R = decltype(a + b);
+  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) + static_cast<long long>(b));
   if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) + static_cast<long long>(static_cast<R>(b)));
   return a + b;
 }
 template <class A, class B> constexpr auto minus(A a, B b) -> decltype(a - b) {
   using R = decltype(a - b);
+  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) - static_cast<long long>(b));
   if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) - static_cast<long long>(static_cast<R>(b)));
   return a - b;
 }
 template <class A, class B> constexpr auto times(A a, B b) -> decltype(a * b) {
   using R = decltype(a * b);
+  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) * static_cast<long long>(b));
   if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) * static_cast<long long>(static_cast<R>(b)));
   return a * b;
 }

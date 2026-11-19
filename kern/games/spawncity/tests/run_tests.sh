@@ -77,6 +77,10 @@ printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
 cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
+# SC_TEST_SHARD=k/n (the CI: n jobs): this job runs the k-th of every n tests, in both passes; the steps after the
+# tests - the game's own sources, the rules' Blueprint as C++ - the first job alone.
+whole=1
+case "${SC_TEST_SHARD:-}" in "" | 1/*) ;; *) whole=0 ;; esac
 # (every test runs, whatever an earlier one gave - see test_main.cpp; the run's result is that of all of it)
 # (up to KERN_JOBS tests at once, else as many as there are cores - test_main.cpp; each in its own process, its lines as one piece in the order of the tests)
 rc=0
@@ -87,7 +91,7 @@ rc=0
 if [ $# -eq 0 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
-if [ $# -eq 0 ]; then
+if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
   rest=()
   for f in "$game"/src/*.cpp; do if [ "$(basename "$f")" = main.cpp ] || grep -q '#include "game.h"' "$f"; then rest+=("$f"); fi; done
   printf '%s\n' "${rest[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} "$cxx" -std=c++20 -fsyntax-only -fno-exceptions -fno-rtti -Wall -Wextra -Wno-unused-parameter \
@@ -96,7 +100,7 @@ if [ $# -eq 0 ]; then
 fi
 # The rules' Blueprint as its C++ text, compiled as it is by the host compiler (nothing looked up
 # at run time), gives what the interpreter gives: every call, value for value.
-if [ $# -eq 0 ]; then
+if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
   nat="$out/native"
   rm -rf "$nat" && mkdir -p "$nat"
   "$out/spawncity_tests" --emit-native "$nat"
