@@ -6041,6 +6041,51 @@ class Emit:
         g.lifted = True
         return lines
 
+    def callback_lambda(self, lam, want):
+        """A lambda where a Callback is wanted (ro.deformed = [this](f64 x, f64 y, f64 r) { ... }): a function of the
+        Blueprint made of its body - its object (`this`), a const reference, its first input -, and the Callback of it,
+        bound to that object: callback<&Lib::fn>(self). It captures nothing but its object: the engine calls it when and
+        as often as it wants, and what it reads is its object where it stands. (A Blueprint that keeps something has no
+        Callback of its own functions: a Callback names a function of a library.)"""
+        u, tree = self.u, self.tree
+        rec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), None)
+        method = next((c for c in kids(rec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
+        body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
+        if body is None:
+            raise Wait("a Callback of a lambda with auto inputs")
+        this_used = uses_this(body)
+        if any(not (this_used and qtype(c).rstrip().endswith("*") and "&" not in qtype(c)) for c in kids(rec) if c.get("kind") == "FieldDecl"):
+            raise Wait("a Callback of a lambda that captures more than its object (this)")
+        if u.state is not None:
+            raise Wait("a Callback in a Blueprint that keeps something (a Callback names a function of a library)")
+        if this_used and self.f.self_type is None:
+            raise Wait("a Callback of a lambda that uses an object outside a method")
+        outer = self.f.decl
+        raw_type = qtype(method)
+        trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
+        if trailing:
+            raw_type = f"{trailing.group(2)} {trailing.group(1)}"
+        if this_used:
+            raw_type = re.sub(r"\s*\bconst\s*$", "", raw_type) + " const"   # (it reads its object: a const reference)
+        synth = {"id": method["id"], "_mine": True, "kind": "CXXMethodDecl" if this_used else "FunctionDecl", "name": f"{outer.get('name', 'f')}_callback",
+                 "type": {"qualType": raw_type}, "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)),
+                 "inner": [c for c in kids(method) if c.get("kind") == "ParmVarDecl"] + [body]}
+        tree.body[method["id"]] = synth
+        tree.scope_of[method["id"]] = tree.scope_of.get(outer["id"], "")
+        if this_used:
+            tree.owner[method["id"]] = tree.owner.get(outer["id"])
+        g = u.function(method["id"])
+        g.lifted = True
+        if not g.pure:
+            raise Wait(f"a Callback of a lambda that changes something ({g.name})")
+        takes = [t for i, (_, t) in enumerate(g.params) if not (this_used and i == 0)]
+        made = f"Callback<{g.value or 'void'}({', '.join(takes)})>"
+        if made != want:
+            raise Wait(f"a lambda that is {made} where a {want} is wanted")
+        self.f.calls.append(g)
+        name = g.name if "::" in g.name else f"{u.name}::{g.name}"
+        return f"callback<&{name}>({self.self_name if this_used else ''})", want
+
     def local_call(self, n):
         """A call of a local function: (text, type) of what it gives, as `invoke` has it."""
         info = self.u.lambdas[callee(n)["referencedDecl"]["id"]]
@@ -8196,6 +8241,8 @@ class Emit:
     def ex(self, n, want=None):
         """An expression as a value of the notation, of the type `want` when one is given."""
         b = bare(n)
+        if callback_parts(want) and self.lambda_of(n) is not None:
+            return self.callback_lambda(self.lambda_of(n), want)[0]
         if want is not None and b.get("kind") in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "InitListExpr") and "_bt" not in b and (want in self.u.struct_fields or want.startswith(("List<", "Map<", "Set<"))):
             # a value made here, of the type it is made for (the entry of a list of std::pair<f32, u64> that
             # push_back is given - its type, as the compiler names it, is std::pair<float, unsigned long>):
