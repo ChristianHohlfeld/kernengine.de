@@ -232,6 +232,53 @@ struct Workshop : virtual kern::Library, virtual Parts {
   struct : kern::Node<20> { Int index = 0; } n20;
 };
 )kn";
+// Callbacks: a function of a library as a value only the engine calls (Make Callback) - bound to a variable, to a field in
+// one, or to nothing; the place is read where it stands when the value is called (native_show calls it, as the engine would).
+inline const char* kGround = R"kn(
+struct Ground : virtual kern::Library {
+  KERN_STRUCT(Field) {
+    Float Base = 1.0;
+    Float Slope = 0.5;
+  };
+
+  struct heightResult { Float h = 0.0; };
+  /// The height of the field at (x, y): what the engine asks.
+  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {
+    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x - y; }, f.Base, f.Slope, x, y)};
+  }
+  struct highResult { Bool up = false; };
+  KERN_PURE highResult high(Float x = 0.0) {
+    return {math_compare<">">(x, 1.0)};
+  }
+};
+)kn";
+inline const char* kSite = R"kn(
+struct Site : virtual kern::Blueprint, virtual Ground {
+  KERN_STRUCT(Twin) {
+    Field First = Field{1.0, 1.0};
+    Field Second = Field{3.0, -1.0};
+  };
+
+  Field Here = Field{2.0, 0.5};
+  Twin Pair = Twin{Field{1.0, 1.0}, Field{3.0, -1.0}};
+  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
+  Callback<Float(Float, Float)> Other = Callback<Float(Float, Float)>{};
+
+  struct MakeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; Callback<Bool(Float)> up = Callback<Bool(Float)>{}; };
+  /// Callbacks bound to a variable and to a field in one; one without a place.
+  MakeResult Make(Float base = 0.0) {
+    Here.Base = base;
+    Kept = callback<&Ground::height>(Here);
+    Other = callback<&Ground::height>(Pair.Second);
+    return {callback<&Ground::height>(Here), callback<&Ground::high>()};
+  }
+  /// The places change: what the engine reads when it calls.
+  void Again() {
+    Here.Slope = 3.0;
+    Pair.Second.Base = 7.0;
+  }
+};
+)kn";
 inline const char* kGarage = R"kn(
 struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
   KERN_STRUCT(Car) {
@@ -1504,6 +1551,11 @@ inline std::vector<Case> cases() {
     r.calls.push_back({"next", {samples({PinType::structure, "Rng"}, r.graph).front(), I(5)}});
     Case& d = read("dice", kDice);
     for (i64 step : {i64{1}, i64{4}, i64{-2}}) d.calls.push_back({"roll", {I(step)}});
+    Case& ground = read("Ground", kGround);
+    for (const Value& field : samples({PinType::structure, "Field"}, ground.graph)) ground.calls.push_back({"height", {field, N(1.5), N(-2.0)}});
+    ground.calls.push_back({"high", {N(2.0)}});
+    Case& site = read("Site", kSite);
+    site.calls = {{"Make", {N(0.5)}}, {"Again", {}}, {"Make", {N(-3.0)}}};
     Case& c = read("Garage", kGarage);
     const i64 most = std::numeric_limits<i64>::max();
     for (i64 car : {i64{0}, i64{1}, i64{-1}, most})

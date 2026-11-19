@@ -4055,6 +4055,7 @@ static logic::Graph every_node_graph(bool wired) {
   for (const std::string& type : types) {
     const logic::NodeDef* def = lib.find(type);
     if (type == "func.entry" || type == "func.return") continue;
+    if (type == "func.callback") continue;  // (it names a function of a library: a Blueprint of its own uses one - logic_callbacks)
     // (the engine's functions name the engine's structs: a Blueprint of their own declares those and calls
     // every one of them - the case Engine of blueprint_native.h, read from its text and written again)
     if (logic::engine_function(type)) continue;
@@ -5737,6 +5738,92 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n  Float x = 0.0;\n", g, nullptr, &error) && error.find("\"};\" is missing") != std::string::npos);
   CHECK(!logic::from_cpp("struct A : kern::Blueprint {\n};\nint more;", g, nullptr, &error) && error.find("is too much") != std::string::npos);
   CHECK(logic::from_cpp("struct A : kern::Blueprint {\n};\n", g, nullptr, &error) && g.empty());
+}
+
+TEST(logic_callbacks) {
+  // A Callback: a function of a library as a value only the engine calls (Make Callback) - its first input bound to a
+  // place, read where it stands when the engine calls; unbound once the Blueprint that made it has ended.
+  const char* ground =
+      "struct Ground : virtual kern::Library {\n  // ---- types ----\n  KERN_STRUCT(Field) {\n    Float Base = 1.0;\n    Float Slope = 0.5;\n  };\n\n  // ---- functions ----\n"
+      "  struct heightResult { Float h = 0.0; };\n"
+      "  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {\n    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x + y; }, f.Base, f.Slope, x, y)};\n  }\n\n"
+      "  struct loudResult { Float h = 0.0; };\n"
+      "  loudResult loud(const Field& f, Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {f.Base};\n  }\n};\n";
+  const char* site =
+      "struct Site : virtual kern::Blueprint, virtual Ground {\n  // ---- variables ----\n"
+      "  Field Here = Field{2.0, 0.5};\n  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};\n\n  // ---- functions ----\n"
+      "  void Make() {\n    Kept = callback<&Ground::height>(Here);\n  }\n\n"
+      "  struct MadeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; };\n"
+      "  KERN_PURE MadeResult Made() {\n    return {callback<&Ground::height>(Here)};\n  }\n};\n";
+  std::map<std::string, logic::Graph> project;
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    auto it = project.find(std::string(name));
+    return it == project.end() ? nullptr : &it->second;
+  };
+  auto read = [&](const char* name, const std::string& text) {
+    std::string error;
+    logic::Graph g;
+    if (!logic::from_cpp(text, g, nullptr, &error, logic::library(), all)) return error;
+    for (const logic::Issue& i : logic::check(g)) if (i.error) error += i.text + "\n";
+    if (!error.empty()) return error;
+    project[name] = std::move(g);
+    return std::string();
+  };
+  const std::string g1 = read("Ground", ground), g2 = read("Site", site);
+  CHECK(g1.empty() && g2.empty());
+  if (!g1.empty() || !g2.empty()) std::printf("%s%s", g1.c_str(), g2.c_str());
+  const logic::TypeRef type{logic::PinType::callback, "float(float,float)"};
+  // the text, the graph and the document: one thing
+  for (const char* name : {"Ground", "Site"}) {
+    std::string text, error;
+    logic::Graph back, stored;
+    CHECK(logic::to_cpp(project[name], name, text, &error, logic::library(), false));
+    CHECK(logic::from_cpp(text, back, nullptr, &error, logic::library(), all) && back == project[name]);
+    if (!(back == project[name])) std::printf("%s is written as:\n%s\n%s\n", name, text.c_str(), error.c_str());
+    CHECK(logic::graph_from_json(logic::graph_to_json(project[name]), stored) && stored == project[name]);
+    CHECK(logic::cpp_problem(project[name]).empty());
+  }
+  CHECK(logic::type_label(type) == "Callback of Float(Float, Float)" && logic::type_text(type) == "callback<float(float,float)>");
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    rt.blueprints = all;
+    logic::Instance* inst = rt.add(project["Site"], 0, "Site");
+    rt.begin();
+    std::vector<logic::Value> out;
+    logic::Value r;
+    CHECK(!logic::call_back(inst->get("Kept"), type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.type == logic::PinType::number && r.n == 0);
+    CHECK(inst->call("Make", {}, out) && host.errors.empty());
+    const logic::Value kept = inst->get("Kept");
+    // 2 + 0.5 * 1 + 3: the place as it is when the engine calls
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 5.5);
+    CHECK(inst->set("Here", logic::Value::structure({logic::Value::number(10), logic::Value::number(2)})));
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 15);
+    CHECK(inst->call("Made", {}, out) && out.size() == 1 && out[0].type == logic::PinType::callback && logic::call_back(out[0], type, std::vector<logic::Value>{logic::Value::number(0), logic::Value::number(0)}, r) && r.n == 10);
+    rt.remove(0);
+    rt.clear();
+    CHECK(!logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 0);  // (its Blueprint has ended: unbound)
+  }
+  // what is no Callback
+  auto says = [&](const std::string& got, const char* why) {
+    if (got.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, got.empty() ? "(nothing wrong)" : got.c_str());
+    return got.find(why) != std::string::npos;
+  };
+  // a loop keeps where it is only while it runs (set anew whenever it starts): a Callback's function may have one
+  {
+    const std::string loops = read("Loops", "struct Loops : virtual kern::Library {\n  struct stepsResult { Float h = 0.0; };\n  stepsResult steps(Float x = 0.0) {\n"
+                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\">(kern::to<Float>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
+                                            "    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n"
+                                            "    return {callback<&Loops::steps>()};\n  }\n\n  struct : kern::Node<1> { Int index = 0; } n1;\n};\n");
+    CHECK(loops.empty());
+    if (!loops.empty()) std::printf("Loops: %s", loops.c_str());
+  }
+  CHECK(says(read("Bad1", "struct Bad1 : virtual kern::Blueprint, virtual Ground {\n  Callback<Float(Float)> K = Callback<Float(Float)>{};\n\n  void Make() {\n    K = callback<&Ground::loud>(Here);\n  }\n};\n"), "Here"));
+  CHECK(says(read("Bad2", "struct Bad2 : virtual kern::Library {\n  struct loudResult { Float h = 0.0; };\n  loudResult loud(Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad2::loud>()};\n  }\n};\n"), "needs the world"));
+  CHECK(says(read("Bad4", "struct Bad4 : virtual kern::Blueprint, virtual Ground {\n  List<Field> Fields = List<Field>{Field{1.0, 0.5}};\n  Callback<Float(Float, Float)> K = Callback<Float(Float, Float)>{};\n\n  void Make() {\n    K = callback<&Ground::height>(Fields[0]);\n  }\n};\n"), "an entry of a list"));
+  CHECK(says(read("Bad3", "struct Bad3 : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct fResult { Float r = 0.0; };\n  KERN_PURE fResult f(Float x = 0.0) {\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad3::f>()};\n  }\n};\n"), "a Callback names a function of a library"));
 }
 
 TEST(logic_libraries) {

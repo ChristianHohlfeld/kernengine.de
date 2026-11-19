@@ -1100,6 +1100,43 @@ def count_per(t):
     return int(m.group(1)) if m else None
 
 
+CALLBACK_VALUES = ("Bool", "Int", "Float", "Vector", "Int64")   # (what the engine hands a Callback and what it gives: values C++ passes as values)
+CALLBACK_PIN = {"Bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Int64": "int64"}
+
+
+def split_top(text):
+    """The parts of a list of types at its top level: "f64, std::pair<a, b>" -> ["f64", "std::pair<a, b>"]."""
+    out, depth, cur = [], 0, ""
+    for ch in text:
+        if ch in "<([":
+            depth += 1
+        elif ch in ">)]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
+    return out
+
+
+def callback_parts(bt):
+    """A Callback's Blueprint type "Callback<Float(Float, Float)>": (its result - None: it gives nothing -, its inputs);
+    None for any other type."""
+    m = re.fullmatch(r"Callback<(\w+)\((.*)\)>", bt or "")
+    if not m:
+        return None
+    return (None if m.group(1) == "void" else m.group(1)), split_top(m.group(2))
+
+
+def callback_of(bt):
+    """What TypeRef::of says of a Callback (kern/include/kern/logic/logic.h, callback_of): "float(float,float)"."""
+    r, a = callback_parts(bt)
+    return (CALLBACK_PIN[r] if r else "") + "(" + ",".join(CALLBACK_PIN[x] for x in a) + ")"
+
+
 def template_args(t):
     """The arguments of a template type's name: "std::pair<int, std::vector<float>>" -> ["int", "std::vector<float>"]."""
     a, b = t.find("<"), t.rfind(">")
@@ -1651,12 +1688,66 @@ class Unit:
         self.objects_seen.add(q)
         return q
 
+    def callback_record(self, q):
+        """The record `q` as a Callback: a struct of the engine of exactly a pointer to a function that takes a void* in
+        front and that void* (kern::HeightSampler: fn, user - the function the engine calls and what it hands it) - its
+        Blueprint type "Callback<Float(Float, Float)>"; None for any other record."""
+        rec = self.tree.records.get(q)
+        if rec is None or not q.startswith(ENGINE + "::"):
+            return None
+        fields = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        if len(fields) != 2:
+            return None
+        fn, user = (re.sub(r"\s+", " ", qtype(c).strip()) for c in fields)
+        m = re.fullmatch(r"(.+?)\s*\(\s*\*\s*\)\s*\((.*)\)", fn)
+        if not m or user.replace(" ", "") != "void*":
+            return None
+        args = split_top(m.group(2))
+        if not args or args[0].replace(" ", "") != "void*":
+            return None
+        return self.callback_sig(m.group(1), args[1:], same=True)
+
+    def callback_sig(self, result, args, same=False):
+        """The Callback of a C++ signature: its result and its inputs, each a value C++ hands over as a value (Bool, Int,
+        Float, Vector, Int64). `same`: the engine calls the class's thunk itself (a function pointer, no std::function
+        between) - then each is the type the class has for it: bool, f64, Vec3 (an Int of the class is a Whole)."""
+        def one(raw):
+            t = self.clean(raw)
+            if t == "void":
+                return "void"
+            bt = self.btype(raw)
+            if bt not in CALLBACK_VALUES:
+                raise Wait(f"a callback that is handed or gives a {bt} (a Callback: Bool, Int, Float, Vector, Int64)")
+            if same and (bt in ("Int", "Int64") or (bt == "Float" and t not in ("double", "f64", "kern::f64")) or (bt == "Vector" and t != "kern::Vec3")):
+                raise Wait(f"a callback through a function pointer that is handed or gives a {t} (the class's thunk has f64, bool, Vec3)")
+            return bt
+        r = one(result)
+        ins = [one(a) for a in args if a.strip() not in ("", "void")]
+        if "void" in ins:
+            raise Wait("a callback handed nothing (void)")
+        return f"Callback<{r}({', '.join(ins)})>"
+
+    def callback_type(self, raw):
+        """The Callback a C++ type is: std::function<R(A...)>, or a struct of the engine that is one (callback_record).
+        None: no such type."""
+        t = self.clean(raw)
+        m = re.fullmatch(r"std::function<(.+?)\s*\((.*)\)>", t)
+        if m:
+            return self.callback_sig(m.group(1), split_top(m.group(2)))
+        try:
+            q = self.find_type(t) if t.startswith(ENGINE + "::") else None
+        except Wait:
+            q = None
+        return self.callback_record(q) if q else None
+
     def engine_object(self, q):
         """Is the class `q` of the engine an object with a life of its own (a handle in a Blueprint), not
         plain data? A `class` is one (its state is its own: the engine's convention), and so is a struct
         that cannot be a struct of the Blueprint (a pointer in it, a field without a Blueprint type).
-        Api.opaque asks the same."""
+        Api.opaque asks the same. (A struct that is a Callback is a value: callback_record.)"""
         if not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+            return False
+        if self.callback_record(q):
             return False
         rec = self.tree.records[q]
         if rec.get("tagUsed") == "class":
@@ -1690,7 +1781,8 @@ class Unit:
                 text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
             except OSError:
                 text = ""
-            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
+            # (what a pin names: a struct or an enum - a word -, or a Callback's signature - "float(float,float)")
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "([\w(),]*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
             # (an entry may end with what the engine says of the node beyond its pins - `place`, `clock`, written only
             # where one is set: `{...outputs...}, true},` - the pins are the same node; read without them, the last
             # output was taken for the end of the entry and every such node "differed")
@@ -1707,6 +1799,9 @@ class Unit:
             # said here, where the type still says that what its entries point at is not changed)
             inner = re.sub(r"\[\d*\]\s*$", "", raw.strip(), count=1).strip()
             return f"List<{self.element(self.btype(inner), self.entries(inner))}>"
+        cb = self.callback_type(raw) if "*" not in re.sub(r"<.*>|\(.*\)", "", raw) else None
+        if cb:
+            return cb
         if self.object_of(raw):
             return "Int"
         t = self.clean(raw)
@@ -2026,8 +2121,8 @@ class Unit:
             return ZERO[t]
         if re.match(r"Fixed<(.+), (\d+)>$", t):   # (a list of a fixed length: what its text does not say is zero)
             return t + "{}"
-        if t.startswith(("List<", "Map<", "Set<")):
-            return t + "{}"
+        if t.startswith(("List<", "Map<", "Set<", "Callback<")):
+            return t + "{}"   # (a Callback: unbound)
         if t in self.enum_values:
             return f"{t}::{self.enum_values[t][0]}"
         if t in self.struct_fields:
@@ -6010,6 +6105,8 @@ class Emit:
             return self.entry_pointer_set(self.unwrap(kids(n)[0])["referencedDecl"]["id"], kids(n)[1])   # (a pointer to an entry is given one, or none)
         if k == "BinaryOperator" and n.get("opcode") == "=" and self.asked_or_none(kids(n)[0]) is not None:
             return self.text_or_none_set(self.unwrap(kids(n)[0])["referencedDecl"], kids(n)[1])   # (a text or none is given one, or none)
+        if k == "BinaryOperator" and n.get("opcode") == "=" and (done := self.callback_field_set(*kids(n))) is not None:
+            return done
         if k == "BinaryOperator" and n.get("opcode") == "=":
             a, b = kids(n)
             inner = self.unwrap(b)
@@ -6547,6 +6644,149 @@ class Emit:
         g.lifted = True
         return lines
 
+    def callback_lambda(self, lam, want):
+        """A lambda where a Callback is wanted (ro.deformed = [this](f64 x, f64 y, f64 r) { ... }): a function of the
+        Blueprint made of its body - its object (`this`), a const reference, its first input -, and the Callback of it,
+        bound to that object: callback<&Lib::fn>(self). It captures nothing but its object: the engine calls it when and
+        as often as it wants, and what it reads is its object where it stands. (A Blueprint that keeps something has no
+        Callback of its own functions: a Callback names a function of a library.)"""
+        u, tree = self.u, self.tree
+        rec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), None)
+        method = next((c for c in kids(rec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
+        body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
+        if body is None:
+            raise Wait("a Callback of a lambda with auto inputs")
+        this_used = uses_this(body)
+        if any(not (this_used and qtype(c).rstrip().endswith("*") and "&" not in qtype(c)) for c in kids(rec) if c.get("kind") == "FieldDecl"):
+            raise Wait("a Callback of a lambda that captures more than its object (this)")
+        if u.state is not None:
+            raise Wait("a Callback in a Blueprint that keeps something (a Callback names a function of a library)")
+        if this_used and self.f.self_type is None:
+            raise Wait("a Callback of a lambda that uses an object outside a method")
+        outer = self.f.decl
+        raw_type = qtype(method)
+        trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
+        if trailing:
+            raw_type = f"{trailing.group(2)} {trailing.group(1)}"
+        if this_used:
+            raw_type = re.sub(r"\s*\bconst\s*$", "", raw_type) + " const"   # (it reads its object: a const reference)
+        synth = {"id": method["id"], "_mine": True, "kind": "CXXMethodDecl" if this_used else "FunctionDecl", "name": f"{outer.get('name', 'f')}_callback",
+                 "type": {"qualType": raw_type}, "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)),
+                 "inner": [c for c in kids(method) if c.get("kind") == "ParmVarDecl"] + [body]}
+        tree.body[method["id"]] = synth
+        tree.scope_of[method["id"]] = tree.scope_of.get(outer["id"], "")
+        if this_used:
+            tree.owner[method["id"]] = tree.owner.get(outer["id"])
+        g = u.function(method["id"])
+        g.lifted = True
+        if not g.pure:
+            raise Wait(f"a Callback of a lambda that changes something ({g.name})")
+        takes = [t for i, (_, t) in enumerate(g.params) if not (this_used and i == 0)]
+        made = f"Callback<{g.value or 'void'}({', '.join(takes)})>"
+        if made != want:
+            raise Wait(f"a lambda that is {made} where a {want} is wanted")
+        self.f.calls.append(g)
+        name = g.name if "::" in g.name else f"{u.name}::{g.name}"
+        return f"callback<&{name}>({self.self_name if this_used else ''})", want
+
+    def callback_field_set(self, a, b):
+        """A Callback set field by field, as C++ sets the struct of the engine that is one (callback_record: the
+        pointer to a function and the void* it hands it): `s.user = const_cast<Terrain*>(this);` names the place
+        (the function's object), `s.fn = [](void* u, f64 x, f64 y) { return static_cast<const Terrain*>(u)->height(...); };`
+        the function - a lambda that captures nothing and reads its void* as that object. Then s is
+        callback<&Lib::fn>(self): the lambda a function of the Blueprint whose first input is the object, a const
+        reference. None: no such assignment."""
+        m = self.unwrap(a)
+        if m.get("kind") != "MemberExpr" or m.get("isArrow") or not kids(m):
+            return None
+        var = self.unwrap(kids(m)[0])
+        if var.get("kind") != "DeclRefExpr":
+            return None
+        q = None
+        try:
+            q = self.u.find_type(self.u.clean(self.ctype(var)))
+        except Wait:
+            return None
+        cb = self.u.callback_record(q) if q else None
+        if not cb:
+            return None
+        rec = self.tree.records[q]
+        fn_field, user_field = [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        vid = var["referencedDecl"]["id"]
+        places = self.__dict__.setdefault("callback_places", {})
+        if m.get("name") == user_field:
+            obj = self.unwrap(b)
+            while obj.get("kind") in CAST + ("CXXConstCastExpr", "ParenExpr") and kids(obj):
+                obj = self.unwrap(kids(obj)[0])
+            if obj.get("kind") != "CXXThisExpr" or self.f.self_type is None:
+                raise Wait("a Callback's void* that is not the object of its function (this)")
+            places[vid] = self.tree.owner.get(self.f.decl["id"])
+            return []
+        if m.get("name") != fn_field:
+            return None
+        if vid not in places:
+            raise Wait("a Callback's function set before its void* (the place it is handed)")
+        lam = self.lambda_of(b)
+        x = self.unwrap(b)
+        while lam is None and x.get("kind") in CAST + ("CXXMemberCallExpr", "MemberExpr", "MaterializeTemporaryExpr", "ParenExpr") and kids(x):
+            # (a lambda that captures nothing, as the pointer to a function C++ makes of it: its conversion)
+            x = self.unwrap(kids(x)[0] if x.get("kind") != "CXXMemberCallExpr" else (kids(callee(x)) or [{}])[0])
+            lam = x if x.get("kind") == "LambdaExpr" else None
+        if lam is None:
+            raise Wait("a Callback's function that is no lambda")
+        owner = places[vid]
+        lrec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), None)
+        method = next((c for c in kids(lrec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
+        body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
+        params = [c for c in kids(method or {}) if c.get("kind") == "ParmVarDecl"]
+        if body is None or not params or any(c.get("kind") == "FieldDecl" for c in kids(lrec)) or qtype(params[0]).replace(" ", "") != "void*":
+            raise Wait("a Callback's function that captures something or takes no void* first")
+        pid = params[0]["id"]
+        obj_type = {"qualType": "const " + owner}
+        body = copy.deepcopy(body)
+        def is_place(x):
+            x = self.unwrap(x)
+            if x.get("kind") not in CAST + ("CXXConstCastExpr", "CXXReinterpretCastExpr") or not kids(x):
+                return False
+            inner = self.unwrap(kids(x)[0])
+            return inner.get("kind") == "DeclRefExpr" and (inner.get("referencedDecl") or {}).get("id") == pid
+        def place_ref():
+            return {"kind": "DeclRefExpr", "type": dict(obj_type), "valueCategory": "lvalue", "referencedDecl": {"id": pid, "kind": "ParmVarDecl", "name": params[0].get("name", "u"), "type": dict(obj_type)}}
+        def mend(x):
+            for i, c in enumerate(x.get("inner", []) or []):
+                if c.get("kind") == "MemberExpr" and c.get("isArrow") and kids(c) and is_place(kids(c)[0]):
+                    c["isArrow"] = False
+                    c["inner"][0] = place_ref()
+                elif c.get("kind") == "UnaryOperator" and c.get("opcode") == "*" and kids(c) and is_place(kids(c)[0]):
+                    x["inner"][i] = c = place_ref()
+                mend(c)
+        mend(body)
+        if any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == pid and x.get("type", {}).get("qualType") != obj_type["qualType"] for x in walk(body)):
+            raise Wait("a Callback's void* read otherwise than as its object (static_cast<const T*>(u)->...)")
+        first = dict(params[0], type={"qualType": "const " + owner + " &"})
+        outer = self.f.decl
+        raw_type = qtype(method)
+        trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
+        if trailing:
+            raw_type = f"{trailing.group(2)} {trailing.group(1)}"
+        raw_type = re.sub(r"\(\s*void\s*\*\s*,?", "(const " + owner + " &" + ("," if len(params) > 1 else ""), raw_type, count=1)
+        synth = {"id": method["id"], "_mine": True, "kind": "FunctionDecl", "name": f"{outer.get('name', 'f')}_callback", "type": {"qualType": re.sub(r"\s*\bconst\s*$", "", raw_type)},
+                 "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)), "inner": [first] + params[1:] + [body]}
+        if self.u.state is not None:
+            raise Wait("a Callback in a Blueprint that keeps something (a Callback names a function of a library)")
+        self.tree.body[method["id"]] = synth
+        self.tree.scope_of[method["id"]] = self.tree.scope_of.get(outer["id"], "")
+        g = self.u.function(method["id"])
+        g.lifted = True
+        if not g.pure:
+            raise Wait(f"a Callback of a lambda that changes something ({g.name})")
+        made = f"Callback<{g.value or 'void'}({', '.join(t for _, t in g.params[1:])})>"
+        if made != cb:
+            raise Wait(f"a lambda that is {made} where a {cb} is wanted")
+        self.f.calls.append(g)
+        name = g.name if "::" in g.name else f"{self.u.name}::{g.name}"
+        return self.store(var, lambda t: f"callback<&{name}>({self.self_name})")
+
     def local_call(self, n):
         """A call of a local function: (text, type) of what it gives, as `invoke` has it."""
         cid = callee(n)["referencedDecl"]["id"]
@@ -6828,6 +7068,9 @@ class Emit:
             if b.get("kind") == "CXXMemberCallExpr":
                 if callee(b).get("name") != "data" or not kids(callee(b)):
                     break
+                if self.u.object_of(self.ctype(kids(callee(b))[0])):
+                    # (the data of an object of the engine - kern::RoadStream::data() -: its own node, the list it gives)
+                    return self.ex(b, bt)
                 b = self.unwrap(kids(callee(b))[0])
             elif len(kids(b)) == 1:
                 b = self.unwrap(kids(b)[0])
@@ -8817,6 +9060,8 @@ class Emit:
     def ex(self, n, want=None):
         """An expression as a value of the notation, of the type `want` when one is given."""
         b = bare(n)
+        if callback_parts(want) and self.lambda_of(n) is not None:
+            return self.callback_lambda(self.lambda_of(n), want)[0]
         if want is not None and b.get("kind") in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "InitListExpr") and "_bt" not in b and (want in self.u.struct_fields or want.startswith(("List<", "Map<", "Set<"))):
             # a value made here, of the type it is made for (the entry of a list of std::pair<f32, u64> that
             # push_back is given - its type, as the compiler names it, is std::pair<float, unsigned long>):
@@ -10245,6 +10490,10 @@ class Emit:
                            + self.count_loop(i0, i1, lambda i: [f"set_add({node}, {made}, {self.conv(f'list_get<{st[5:-1]}>({src}, {i})', st[5:-1], kt)});"]))
                 return made, t
             raise Wait(f"a {t.split('<')[0].lower()} made of other arguments")
+        if callback_parts(t) and all(x.get("kind") in ("ImplicitValueInitExpr", "CXXDefaultInitExpr") for x in a):
+            return t + "{}", t   # (a Callback as C++ makes it without arguments - also `HeightSampler{}`, its fields zero: unbound)
+        if callback_parts(t) and len(a) == 1 and self.tp_or_none(a[0]) == t:
+            return self.ex(a[0], t), t   # (a copy of one: the same function and place, as C++ copies them)
         raise Wait(f"a {t} made here")
 
     def listed(self, s0, st, first, last, t):
@@ -10463,6 +10712,8 @@ class Api:
         """(pin type, the struct or enum it names) of a Blueprint type."""
         if bt in ENGINE_PIN:
             return ENGINE_PIN[bt], ""
+        if callback_parts(bt):
+            return "callback", callback_of(bt)
         if bt in self.u.enum_values:
             return "enumeration", bt
         if bt in self.u.struct_fields:
@@ -10481,6 +10732,9 @@ class Api:
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in ENGINE_PIN:
             return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
+        if callback_parts(bt):   # (c, what it gives - none: nothing -, and in brackets what it is handed: cn(nn))
+            r, a = callback_parts(bt)
+            return "c" + (self.shape(r) if r else "") + "(" + "".join(self.shape(x) for x in a) + ")"
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:
@@ -11641,6 +11895,11 @@ class TestWriter:
         if m:   # (a view of a list: of entries the test keeps - converted::kept_span; as constant as the source says)
             const, inner = self.span_of(raw, m.group(1))
             return f"converted::wide::Span<{const}{self.spell(inner)}>"
+        m = re.fullmatch(r"const\s+(.+?)\s*\*\s*(?:const)?", raw.strip())
+        if m and self.u.clean(m.group(1)) in ("float", "double", "long double", *NUMBER):
+            # (numbers the engine gives at a place of its own - RoadStream::data(): the test keeps the ones its stand-in
+            # answers and points at them, converted::take of a const T*)
+            return f"const {self.spell(m.group(1))}*"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
         if count_per(c) is not None:
@@ -11675,6 +11934,9 @@ class TestWriter:
         if m:   # (what may be there or not - in the Blueprint a list of no entry or one; a list in braces: the drawn list, see converted::listed)
             inner = self.spell(template_args(c)[0])
             return f"std::vector<{inner}>" if m.group(1) == "initializer_list" else f"std::{m.group(1)}<{inner}>"
+        m = re.fullmatch(r"std::function<(.+?)\s*\((.*)\)>", c)
+        if m:   # (a callback: the test's own values in it - converted.h, "callbacks")
+            return f"std::function<{self.spell(m.group(1)) if m.group(1).strip() != 'void' else 'void'}({', '.join(self.spell(a) for a in split_top(m.group(2)) if a.strip())})>"
         q = self.record_named(c)
         if q in self.tree.enums:
             if q not in self.enum_names:
@@ -11769,6 +12031,11 @@ class TestWriter:
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return f"draw.said_c_word({self.said_list()})" if self.said else "draw.c_word()"
+        cq = self.u.find_type(c)
+        if c.startswith("std::function<") or (cq in self.tree.records and self.u.callback_record(cq)):
+            # a callback (std::function, or a struct of the engine that is one - fn and user): none, or one of a few plain
+            # functions of its inputs (converted::draw_callback); arg, same, take of it are converted.h's
+            return f"converted::draw_callback<{self.spell(raw)}>(draw)"
         q = self.u.object_of(raw)
         if q:   # (an object of the engine: one of a few the test keeps, by its handle)
             one = f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
@@ -11849,7 +12116,7 @@ class TestWriter:
             return [c]
         for part in parts(c):
             q = self.u.find_type(part)
-            if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2"):
+            if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2") and not self.u.callback_record(q):   # (a callback: converted.h's)
                 self.helpers(q)
 
     def helpers(self, q):
