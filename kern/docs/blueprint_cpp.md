@@ -190,6 +190,7 @@ KERN_LAYOUT(Demo) {
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
+| Make Callback (eine Funktion einer Bibliothek, die die Engine ruft) | `callback<&Lib::fn>(platz)`, Typ `Callback<Float(Float, Float)>` |
 | Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
 | Bibliothek (ein Blueprint, der nichts behält) und wer sie benutzt | `struct Workshop : virtual kern::Library { … };` · `struct Garage : virtual kern::Blueprint, virtual Workshop { … };` – Aufruf `Workshop::skid(Spare[i], 1.0);` (siehe „Bibliotheken“) |
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
@@ -1312,6 +1313,54 @@ selbst“).
   wird die eine Klasse gemacht, die von ihr abgeleitet ist und so gemacht werden kann – gibt es keine
   oder mehrere, wird das Objekt nicht gemacht (`tools/engine_api.py --list` nennt, welche Klassen und
   warum). Erzeugt in `kMakers` jeder `engine_calls.gen.cpp`; keine Liste von Klassen.
+
+### Rückrufe der Engine (Callback)
+
+Wo die Engine eine Funktion des Programms ruft – eine Höhe je Punkt (`kern::HeightSampler`, ein Zeiger auf eine
+Funktion mit ihrem `void*`), ob eine Stelle verformt ist (`std::function<bool(f64, f64, f64)>` in `RoadOptions`) –,
+gibt ihr ein Blueprint einen **Callback**: eine Funktion einer Bibliothek als Wert, den nur die Engine ruft.
+
+```cpp
+struct Ground : virtual kern::Library {
+  KERN_STRUCT(Field) { Float Base = 1.0; Float Slope = 0.5; };
+  struct heightResult { Float h = 0.0; };
+  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) { ... }
+};
+struct Site : virtual kern::Blueprint, virtual Ground {
+  Field Here = Field{2.0, 0.5};
+  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
+  void Make() { Kept = callback<&Ground::height>(Here); }
+};
+```
+
+- **Typ** `Callback<R(A…)>` (Pin-Typ `callback`, `TypeRef::of` die Signatur `float(float,float)`; ohne Ergebnis
+  `Callback<void(Int)>`): R und A sind Bool, Int, Float, Vector, Int64 – was C++ als Wert übergibt. Ein Callback steht in
+  einer Variablen, einem Feld, einem Ein- oder Ausgang, einer lokalen Variablen; nicht in einer Liste, Map oder einem Set.
+  Unbound ist `Callback<…>{}`: ruft die Engine ihn, bekommt sie die Null von R.
+- **Make Callback** (`func.callback`, Wert-Knoten, `callback<&Lib::fn>(platz)`, ohne Platz `callback<&Lib::fn>()`): nennt
+  eine **Funktion einer Bibliothek** mit höchstens einem Ausgang. Ist ihr erster Eingang eine const-Referenz, bindet der
+  Knoten ihn an den Platz, den er nennt (Einstellungen wie die Referenz-Eingänge von Call); die übrigen Eingänge gibt die
+  Engine. Gelesen wird der Platz, wie er steht, wenn die Engine ruft.
+- **Regeln (check):** die Funktion braucht nichts von der Welt – auf ihrem Weg und dem der Funktionen, die sie ruft, kein
+  Knoten der Engine oder des Spiels, kein Print, keine Game Time, kein Random, kein Call Event/Call on Actor, nichts, was
+  wartet oder sich etwas merkt (`NodeDef::world`). Darum darf die Engine sie rufen, wann und wie oft sie will: sie ändert
+  nichts, und jede Stufe gibt dasselbe. Ein Blueprint ruft, vergleicht und wandelt einen Callback nicht.
+- **Interpreter und JIT:** der Wert hält die Nummer der Instanz, die Funktion und den Platz (`Instance::Spot`); die Engine
+  ruft ihn synchron auf dem Frame-Thread (`Callable::call` → `Instance::call_inside`). Ist die Instanz zu Ende, ist er
+  unbound.
+- **Klasse:** `kern::logic::Callback<R(A…)>` sind zwei Wörter, `{R (*fn)(void*, A…); void* place;}` – der Thunk ruft die
+  Funktion der Bibliothek auf `the_library<L>` (eine Bibliothek hält nichts) mit dem Platz. Zur Engine gehen sie Feld für
+  Feld (`HeightSampler{fn, user}`: dieselben Kosten wie der Zeiger mit `void*` in C++) oder als `std::function`, die die
+  beiden Wörter hält (keine Anforderung).
+- **Tür:** `Conv<Callback<…>>` macht den Funktionszeiger mit `void*` (ein Trampolin auf den `Callable`) bzw. die
+  `std::function`. Was ein Aufruf der Engine an Callbacks bekommt, bleibt für den Aufruf; einer Methode eines Objekts der
+  Engine gegeben (sein Handle zuerst), bleibt es mit dem Objekt, bis es endet (`EngineObjects::kept_by`).
+- **Tabelle:** `tools/engine_api.py` erkennt die C++-Form am Typ – ein Struct der Engine aus genau einem Zeiger auf eine
+  Funktion mit `void*` vorn und einem `void*`, oder `std::function<R(A…)>`; Form `c<gibt>(<nimmt>)`, z. B. `cn(nn)`.
+- **Stellvertreter:** `EngineStandIn` ruft jeden Callback, den ein Aufruf bekommt, dreimal mit aus dem Aufruf gewürfelten
+  Eingängen; was er gibt, steht in der Aufzeichnung und geht in die Antwort ein. Einem Objekt gegeben, ruft er ihn bei
+  jedem späteren Aufruf auf diesem Objekt wieder, bis es freigegeben wird – so wird auch der behaltene Weg verglichen.
+- Geprüft: `logic_callbacks` (kern/tests/test_main.cpp).
 
 ### Formeln
 

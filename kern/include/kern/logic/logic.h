@@ -73,7 +73,9 @@ using ActorRef = u32;  // game actor id (0 = none)
 enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 };
 constexpr u8 kValueTypes = 9;  // boolean ... int64
 /// A list type, the type of a list's items (of a value: the type itself), and the list of a type.
@@ -85,7 +87,7 @@ constexpr PinType list_of(PinType t) { return t >= PinType::boolean && t <= PinT
 /// The names of the pin types, in the order of PinType.
 inline constexpr std::string_view kPinTypeNames[] = {"exec",      "bool",     "int",        "float",       "vector",    "text",      "actor",      "enum",      "struct",      "int64",
                                                      "bool_list", "int_list", "float_list", "vector_list", "text_list", "actor_list", "enum_list", "struct_list", "int64_list",
-                                                     "map",       "set"};
+                                                     "map",       "set",      "callback"};
 static_assert(sizeof kPinTypeNames / sizeof kPinTypeNames[0] == static_cast<std::size_t>(PinType::count));
 /// "bool", "int", "float", "vector", "text", "actor"; a list: "float_list" ...
 const char* pin_type_name(PinType t);
@@ -190,6 +192,18 @@ template <> constexpr PinType list_type_of<std::string>() { return PinType::text
 template <> constexpr PinType list_type_of<ActorHandle>() { return PinType::actor_list; }
 template <> constexpr PinType list_type_of<Int64>() { return PinType::int64_list; }
 
+/// What a Callback value calls: a function of a library, with the place it is bound to. Only the engine
+/// calls it (logic::call_back) - a Blueprint does not call, compare or convert a Callback.
+struct Callable {
+  virtual ~Callable() = default;
+  /// Calls the function with `args` (its inputs after the bound place, in their order); `result`
+  /// gets its output. False: it is unbound now (the Blueprint it was made in has ended).
+  virtual bool call(std::span<const struct Value> args, struct Value& result) const = 0;
+  /// Of one a Blueprint's class made (logic::detail::NativeCallable): which one (its signature's own mark) - the class
+  /// takes it back as it was. Null: one of the interpreter or the JIT.
+  virtual const void* native_kind() const { return nullptr; }
+};
+
 /// A value on a data pin.
 struct Value {
   PinType type = PinType::number;
@@ -209,6 +223,8 @@ struct Value {
   /// A map's or a set's entries, in the order their keys came (none: it is empty). Shared like a
   /// list's items.
   std::shared_ptr<const MapEntries> entries;
+  /// A Callback's function and place (none: it is unbound).
+  std::shared_ptr<const Callable> call;
 
   static Value boolean(bool x) { Value r; r.type = PinType::boolean; r.b = x; return r; }
   static Value integer(i64 x) { Value r; r.type = PinType::integer; r.i = normal(x); return r; }
@@ -242,6 +258,8 @@ struct Value {
     return r;
   }
   static Value zero(PinType t);
+  /// A Callback (none: unbound).
+  static Value callback(std::shared_ptr<const Callable> c) { Value r; r.type = PinType::callback; r.call = std::move(c); return r; }
   /// A list of these items (T: bool, i64, f64, Vec3, std::string or ActorHandle; Value: structs).
   /// Whole numbers are held as every Int is (logic::normal).
   template <class T> static Value of(std::vector<T> items) {
@@ -457,6 +475,16 @@ TypeRef key_type(const TypeRef& keyed);
 TypeRef value_type(const TypeRef& map);
 /// What TypeRef::of says of a map with these keys and values (`value` null: of a set).
 std::string keyed_of(const TypeRef& key, const TypeRef* value);
+/// A Callback's signature (TypeRef::of beside PinType::callback): its result - none: PinType::exec - and
+/// its inputs, "float(float,float)", without a result "(float)". Each is a Bool, an Int, a Float, a Vector
+/// or an Int64: what C++ hands over as a value.
+TypeRef callback_result(const TypeRef& callback);
+std::vector<TypeRef> callback_inputs(const TypeRef& callback);
+std::string callback_of(const TypeRef& result, const std::vector<TypeRef>& inputs);
+constexpr bool callback_type_ok(PinType t) { return t == PinType::boolean || t == PinType::integer || t == PinType::number || t == PinType::vector || t == PinType::int64; }
+/// The engine calls a Callback: with `args` (the inputs of its signature), `result` its output - the zero
+/// of the result's type where it is unbound or gives none. False: unbound.
+bool call_back(const Value& callback, const TypeRef& type, std::span<const Value> args, Value& result);
 /// The types of the Blueprint (enums and structs) a type names: itself or its items - of a map its
 /// keys and its values, of a set its keys. (Each with the type it has there: Mode, Weapon_list.)
 std::vector<TypeRef> types_named(const TypeRef& t);
@@ -569,6 +597,10 @@ struct Function {
   const FunctionPin* local(std::string_view name) const;
   FunctionPin* local(std::string_view name);
 };
+
+/// The signature of a Callback of `f` (Make Callback): its inputs after the place its first input binds,
+/// where that is a reference, and its output.
+std::string callback_of(const Function& f);
 
 /// A comment box (Blueprint "C"): a titled frame behind a group of nodes; moving it moves them.
 struct CommentBox {
@@ -842,6 +874,9 @@ struct NodeDef {
   bool raises = false;   // a step that may run handlers of Blueprints before it goes on (Call Event, Call on
                          // Actor, a gameplay step that raises an event at once): whatever a Blueprint holds may
                          // have changed after it - no call holds a place inside a list across it
+  bool world = false;    // reads or changes the world it runs in - the host's time, print, random numbers, other
+                         // Blueprints, the engine: a Callback's function has no such node (latent, raising and
+                         // remembering nodes, events and every node of the engine or the game are such nodes too)
   std::vector<PinDef> inputs, outputs;  // exec pins included, in drawing order
   std::vector<ParamDef> params;
   std::string keywords;
@@ -1210,6 +1245,10 @@ class Instance {
   /// The same for a function with reference inputs: `places[k]` is the place the call gives the
   /// function's k-th input, if that one is a reference (its entry in `args` is not read).
   bool call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, const std::vector<Spot>& places);
+  /// A Callback of this Blueprint's function (Make Callback): the engine calls it with the inputs after
+  /// `place` (where `bound`: the place its first input, a const reference, is - read when it is called).
+  /// It is unbound once this Blueprint has ended.
+  std::shared_ptr<const Callable> callable(const std::string& function, bool bound, Spot place);
   /// A variable's value, to change it in place (a list: Value::edit). Null for a number - those
   /// live in the slots, use set -, for a name that is none, and for a Blueprint that runs as its
   /// class (its variables are that class's members).

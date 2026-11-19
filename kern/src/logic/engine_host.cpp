@@ -72,6 +72,7 @@ bool EngineObjects::end(i64 handle, Kind k) {
     if (v.empty()) by_object_.erase(o);
   }
   e.end(e.owner ? e.owner : e.at);
+  if (!entries_.count(handle)) kept_.erase(handle);  // (the Callbacks it was given go with it)
   return true;
 }
 
@@ -86,6 +87,8 @@ void EngineObjects::clear() {
   }
   entries_.clear();
   by_object_.clear();
+  kept_.clear();
+  calling_.clear();
   next_ = 1;
 }
 
@@ -139,7 +142,9 @@ bool call_engine(EngineObjects& objects, std::string_view function, const std::v
     return false;
   }
   objects.begin_call();
-  return f(objects, in, out);
+  const bool done = f(objects, in, out);
+  if (!in.empty() && in[0].type == PinType::integer) objects.kept_by(in[0].as_int(), function);  // (what a method of an object was handed stays with it)
+  return done;
 }
 
 }  // namespace kern::logic
