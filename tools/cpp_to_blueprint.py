@@ -780,7 +780,8 @@ class Tree:
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
         for i, n in list(self.decl.items()):
-            if n.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl") and any(c.get("kind") == "CompoundStmt" for c in kids(n)):
+            # (and a destructor that does something of its own: a function of its Blueprint - Emit.ended_parts calls it)
+            if (n.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl") or ends_itself(n)) and any(c.get("kind") == "CompoundStmt" for c in kids(n)):
                 self.body[i] = n
                 p = n.get("previousDecl")
                 while p:
@@ -1915,10 +1916,14 @@ class Unit:
             if c.get("isImplicit"):
                 continue
             k = c.get("kind")
-            special = k == "CXXDestructorDecl" or (k == "CXXConstructorDecl" and of_itself(c)) or (k == "CXXMethodDecl" and c.get("name") == "operator=")
-            if special:   # (one it declares, even = default, is no longer C++'s own move field by field: a destructor or a copy of its own leave it none)
+            special = (k == "CXXConstructorDecl" and of_itself(c)) or (k == "CXXMethodDecl" and c.get("name") == "operator=")
+            if special:   # (a copy or a move it declares, even = default, is no longer C++'s own move field by field)
                 raise Wait(f"what stays where a value was moved out of (std::move): {q.split('::')[-1]} moves as it says itself")
         st = self.struct(q)
+        if any(c.get("kind") == "CXXDestructorDecl" and not c.get("isImplicit") for c in kids(rec)):
+            # A class that declares a destructor (even = default) and no copy or move has no move of C++'s own: what
+            # takes it out of a place copies it (its copy - C++'s own, field by field), and everything stays.
+            return [at + (fname,) for fname, _, _, _ in self.struct_fields[st]]
         keep = []
         fds = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
         for (fname, ft, _, _), fd in zip(self.struct_fields[st], fds):
@@ -2165,6 +2170,8 @@ class Unit:
         want = self.cpp_name(d).replace("::", "_")
         if d.get("kind") == "CXXConstructorDecl":
             want = owner.split("::")[-1] + "_new"
+        elif d.get("kind") == "CXXDestructorDecl":
+            want = owner.split("::")[-1] + "_end"
         elif d.get("name", "").startswith("operator") and d["name"][8:] in ops:
             want = (owner.split("::")[-1] + "_" if owner else "") + ops[d["name"][8:]]
         return want
@@ -3147,7 +3154,7 @@ class Emit:
         # a method: its object is the first parameter - a reference to a value of the struct its class's data is:
         # the place the call names, changed where it stands (a const method reads it there)
         static = d.get("storageClass") == "static" or self.tree.decl.get(d.get("previousDecl"), {}).get("storageClass") == "static"
-        if d.get("kind") == "CXXMethodDecl" and not static and not f.state and uses_this(d):
+        if d.get("kind") in ("CXXMethodDecl", "CXXDestructorDecl") and not static and not f.state and uses_this(d):
             owner = self.tree.owner.get(d["id"])
             if owner is None:
                 raise Wait("the state of its object (its class is not known here)")
@@ -3222,7 +3229,10 @@ class Emit:
             f.pure = False   # (it changes a place of its caller: a step, not a value)
         # what a call changes or gives, as the test compares it: the object, what the C++ returns, what it wrote
         # through its parameters. The function itself gives what the C++ returns (a constructor: the object).
-        if f.mutates and f.state:
+        if d.get("kind") == "CXXDestructorDecl":
+            pass   # (a destructor's object is gone after it: what it did is what it changed elsewhere - compared where a
+                   # value ends, in the test of the function that ends it)
+        elif f.mutates and f.state:
             f.out_fields.append(("State", u.name, "state"))   # (the test compares all the Blueprint's variables)
         elif f.mutates:
             f.out_fields.append(("Self", f.self_type, "self"))
@@ -4004,10 +4014,8 @@ class Emit:
         that holds some ends the same way."""
         parts, body = self.u.life(q)
         short = q.split("::")[-1]
-        if body:
-            raise Wait(f"the end of a {short} runs its destructor ~{short}(), which is not written yet")
         sname = self.u.struct(q)
-        out = []
+        out = self.own_end(q, place) if body else []   # (first its own body, then its fields)
         for c, (kind, what) in reversed(parts):
             fname, _ = self.u.field(sname, c["name"])
             p = f"{place}.{fname}"
@@ -4026,10 +4034,7 @@ class Emit:
         object of the engine a variable of its Blueprint holds or owns is released, each value that holds some
         ends the same way."""
         parts, body = self.u.life(self.u.state)
-        if body:
-            short = self.u.state.split("::")[-1]
-            raise Wait(f"the end of the state {short} runs its destructor ~{short}(), which is not written yet")
-        out = []
+        out = self.own_end(self.u.state, None) if body else []   # (first its own body, then its fields)
         for c, (kind, what) in reversed(parts):
             name, _ = self.u.state_variable(c["name"])
             if kind in ("object", "owned"):
@@ -4041,6 +4046,26 @@ class Emit:
             else:
                 raise Wait(f"the end of the state: its field {c['name']} is a list, a map or an array of what ends with it")
         return out
+
+    def own_end(self, q, place):
+        """The call of the destructor of the program's class `q` that does something of its own (Unit.life) on the
+        value at `place` (None: the one object of the state) - its Blueprint's function (Unit.function), a step."""
+        rec = self.tree.records.get(q) or {}
+        dtor = next((c for c in kids(rec) if c.get("kind") == "CXXDestructorDecl" and not c.get("isImplicit")), None)
+        if dtor is None:
+            raise Wait(f"the end of a {q.split('::')[-1]}: its destructor is not known here")
+        g = self.u.function(dtor["id"])
+        self.f.calls.append(g)
+        self.f.indexes = self.f.indexes or g.indexes
+        self.f.pure = False
+        if g.state:
+            if not self.f.state:
+                raise Wait(f"the end of the state {q.split('::')[-1]} outside a function of its Blueprint")
+            self.f.mutates = True
+            return [f"{g.name}();"]
+        if g.self_type is None:
+            return [f"{g.name}();"]   # (a destructor that does not use its object)
+        return [f"{g.name}({place});"]
 
     def ended_box(self, q, place):
         """The end of what an owned or optional value at `place` holds (a value of the program's class `q`), if it
@@ -13372,7 +13397,7 @@ def survey_one(job):
     for i, d in tree.body.items():
         # (a constructor defined `= default` outside its class is C++'s own: a function only of the state - see main)
         if (i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or (d.get("explicitlyDefaulted") and not defaulted_maker(d))
-                or d.get("kind") == "CXXDestructorDecl"):
+                or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))):
             continue
         file = os.path.abspath(d["_file"])
         if file != me and not is_header(file):
@@ -13578,7 +13603,7 @@ def convert_unit(job):
         # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
                 and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
-                         or d.get("kind") == "CXXDestructorDecl") and world.part_of_function(tree, d) == part]
+                         or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part]
         mine.sort(key=lambda d: (not is_header(d["_file"]), os.path.abspath(d["_file"]), d.get("_at", (0, 0))[0] or 0))
         # A function is written only when its test compares it: what the test cannot compare yet waits,
         # and with it what calls it - the file is converted again without those. And no input or local
