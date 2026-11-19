@@ -1,4 +1,28 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 04:40 **DIE GANZE LISTE (erste vollständige Auswertung): `work-zusammen-suite-alle-032626-8142`** – Level und Tests des gültigen Laufs 020121 (4748a503), jeder
+  der 150 Tests einzeln. **Stellvertreter: 113 ok, 35 FAIL, 4 ZEIT. Engine selbst: 108 ok, 39 FAIL, 9 LECK, 3 ZEIT.** Auswertung von t1b: stand/t1.md „SUITE 020121“.
+  **A. Eine Ursache für 33 Game-Tests (+ die 4 ZEIT) – BEHOBEN vom Koordinator (work-zusammen 12438d1c, Engine):** „Game runs as its C++ class (it runs:
+     interpreter)“. tools/blueprint_cpp schrieb Game nicht als Klasse: „the Blueprint holds the function person_hit::hit as its library had it before“. Das Level war
+     stimmig – `cpp_names` (Lader/Werkzeug) benannte den Eingang `pad` der GEHALTENEN Bibliotheks-Funktion in `pad2` um, weil Game eine Variable `pad` hat. Jetzt
+     behalten gehaltene Funktionen ihre Eingangsnamen (wie der Leser es schon hält). Lokal: 173 von 173 Klassen, Klassentext übersetzt mit clang. Neuer Lauf auf
+     demselben Level mit dem Fix: **`work-zusammen-suite-alle-043356-8771`**; Engine-Suite: `work-zusammen-engine-043403-8808`.
+  **B. Regeln des Konverters (Nachfolger k, Zweig work-k):**
+     0. SPERRT DEN NÄCHSTEN LAUF: „Game: two parts have a constant kQuiet that is not the same“ (game_projsync.cpp:25 kQuiet = 0.6, game_toss.cpp:34 kQuiet = 0.5) –
+        zwei dateieigene Konstanten gleichen Namens in zwei Teilen eines Blueprints; mit den Test-Fixen von t1b (work-t1 c5b8ab99, noch nicht gemergt) werden ihre
+        Nutzer erst geschrieben, dann bricht die Konvertierung ab (`work-t1-konvert-034529-8942`, convert rc=1). Allgemeine Regel nötig (Ablauf ~Z. 13850).
+     1. Mat4_perspective 300/300, projection_matrix 62/300: „first difference at .m[15]: the source 1, the Blueprint 0“ (converted_engine_math_math).
+     2. SoundFx_drive 40/300, SoundFx_update 169/300: `.l.voice` – ein u64 ging über Float64 (wie CityStream_buildings_near).
+     3. Game: draw_events 8/18, gaps_guided 4/7, number_at 8/300, rocket_smoke_emit 2/20, spawn_squad 10/20, spawn_tank 5/20; game_details_cpp `.Result`;
+        Session_update 1/56; gegen die Engine life_hud 1/33.
+  **C. Test-Schreiber (Nachfolger t1, Zweig work-t1 = c5b8ab99):** 9 × „dispatch: no member named 'get_u8' in wire::Reader“ (Reader::get_u8 inline in wire.h fehlt
+     im Klassentext des Tests); converted_mvt_cpp bricht ab (der Test zieht Reader{p, end, ok} unabhängig von der Span – die Quelle liest über den Puffer);
+     converted_life_cpp (signal 6: std::string aus nullptr); SoundBank::request_level; look_apply_tier (LightPool-Temporär ohne make); Graph (E12).
+  **D. Engine-Objekte / Durchgang gegen die Engine (Nachfolger d, Zweig work-d):** 9 LECK (Objekte aus engine_make_default: interiors, terrain, net_session,
+     world_marks, game_gaps, game_town); converted_city_stream_cpp bricht gegen die Engine mit ASan in kern::weld ab; 14 Funktionen „only 0 calls could be compared“
+     (aim_ray, car_input, ctl_screen_ray, gaps_init, key, my_state, parachute_input, ui_draw_gps, ui_draw_helpers, update_camera, vr_room, vr_room_forward,
+     vr_scope_update, vr_update_view – in converted_Game__game_cpp / game_controls).
+  **E. cost-Zeilen:** 271 (Stellvertreter) – Leistung/Speicher, Paket p nach dem ersten grünen Stand.
+  · t1b ist beendet (Familien 1–7 der wartenden Funktionen gebaut: im abgebrochenen Lauf 11 statt 87 Wartende; mergen erst mit der kQuiet-Regel).
 - 03:30 **Lauf 020121: `engine rc=0` (02:37), `suite rc=1` (03:19) – und die Spiel-Suite ist in beiden Durchgängen nach 25 bzw. 27 Tests abgeschnitten.**
   Ursache im Testrahmen (Kindprozess je Test, test_main.cpp): das Kind erbte die Summen der Tests vor ihm und meldete sie mit seinen eigenen zurück – die Summe
   verdoppelte sich je Test (Überlauf in int nach ~26 Tests, UBSan beendete den Durchgang, test_main.cpp:232), und ein Fehlschlag ließ jeden Test danach als FAIL
