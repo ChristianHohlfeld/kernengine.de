@@ -335,6 +335,10 @@ struct Shape {
   std::string error;
   u32 error_node = 0;
 
+  /// The calls that give a function that may run handlers an entry of a list of any length (places_ok): call node ->
+  /// (the reference input's prefix, the entries of its path in such a list, by their place) - the Writer checks them (held).
+  std::map<int, std::vector<std::pair<std::string, std::vector<std::size_t>>>> held_calls;
+
   Shape(const Graph& graph, const Library& library) : g(graph), lib(library) {}
 
   Info& at(int i) { return n[static_cast<std::size_t>(i)]; }
@@ -858,24 +862,34 @@ struct Shape {
           const std::string place = root + at(call).node->param(prefix + "path");
           (void)kind;
           // (an entry of a list of a fixed length stays where it is whatever runs: nothing changes how long that
-          // list is - TypeRef::count. Only an entry of a list of any length, of a map, can be gone after a handler)
-          bool movable = false;
+          // list is - TypeRef::count. Only an entry of a list of any length, of a map, of an owned value can be gone
+          // after a handler)
+          std::vector<std::size_t> lists;  // (the entries on the way that are in such a list, by their place in the path)
+          bool known = true;
+          std::size_t entry = 0;
           TypeRef along{named.type, named.of, named.count};
           for (const std::string& step : held) {
             if (step.empty()) {
-              if (!is_list(along.type) || along.count == 0) { movable = true; break; }
-              along = TypeRef{element_of(along.type), along.of};
+              if (!is_list(along.type) && along.type != PinType::map) { known = false; break; }
+              if (along.type == PinType::map || along.count == 0) lists.push_back(entry);
+              along = along.type == PinType::map ? value_type(along) : TypeRef{element_of(along.type), along.of};
+              ++entry;
               continue;
             }
             const StructType* s = along.type == PinType::structure ? g.structure(along.of) : nullptr;
             const int k = s ? s->field(step) : -1;
-            if (k < 0) { movable = true; break; }
+            if (k < 0) { known = false; break; }
             along = s->fields[static_cast<std::size_t>(k)].type;
           }
-          if (raises[static_cast<std::size_t>(callee)] >= 0 && movable)
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && (!known || (!lists.empty() && at(call).def->type != "func.call")))
             return fail(title(call) + " gives " + fn.name + " the place " + place + " - an entry of a list -, and " + fn.name + " may run handlers while it holds it (" +
-                            title(raises[static_cast<std::size_t>(callee)]) + "): they could change how long the list is. Give it the entry's index instead, or the value",
+                            title(raises[static_cast<std::size_t>(callee)]) + "): " + (known ? "a value read so cannot be checked - call it as a step" : "what the place goes through is not known") +
+                            ". Give it the entry's index instead, or the value",
                         call);
+          // A handler may change how long such a list is while the function holds the entry - in C++ the reference would
+          // then go nowhere (undefined). The call is checked: the lists keep their length (and, in the class, where their
+          // entries are), or the run stops there with an error (held / Runtime::held_lost - docs/blueprint_cpp.md).
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && !lists.empty()) held_calls[call].push_back({prefix, lists});
           for (const Write& w : during) {
             if (w.kind != kind || w.root != root || w.path.size() > held.size() || !std::equal(w.path.begin(), w.path.end(), held.begin())) continue;
             // (the write stands at or above the place that is held: does it reach a list the place goes through?)
@@ -1199,6 +1213,34 @@ struct Writer {
       r += "[" + index + "]";
       ++entry;
     }
+    return r;
+  }
+  /// The lists a call holds an entry of (Shape::held_calls), outermost first: each as the place it is, up to the
+  /// entry - "Cars, Cars[n4.index].Wheels" (none: "").
+  std::string held_lists(int x, int c) {
+    auto it = s.held_calls.find(x);
+    if (it == s.held_calls.end()) return {};
+    std::string r;
+    const std::size_t named = order.size();   // (the call names its nodes where it stands: the lists name them again)
+    for (const auto& [prefix, lists] : it->second) {
+      std::string place = at(x).node->param(prefix + "variable");
+      std::vector<std::string> steps;
+      if (!path_steps(at(x).node->param(prefix + "path"), steps)) continue;
+      std::size_t entry = 0;
+      for (const std::string& step : steps) {
+        if (!step.empty()) {
+          place += "." + step;
+          continue;
+        }
+        if (std::find(lists.begin(), lists.end(), entry) != lists.end()) r += (r.empty() ? "" : ", ") + place;
+        int pin = -1;
+        for (int k : at(x).data_in)
+          if (at(x).in[static_cast<std::size_t>(k)].id == prefix + path_pin(entry)) pin = k;
+        place += "[" + (pin >= 0 ? value(x, pin, c) : std::string("0")) + "]";
+        ++entry;
+      }
+    }
+    order.resize(named);
     return r;
   }
   /// What a call gives its function's inputs, in their order: a value for an input by value,
@@ -1700,8 +1742,13 @@ struct Writer {
       return 0;
     }
     if (t == "func.call") {
+      // (a call that holds an entry of a list of any length while its function may run handlers - Shape::held_calls:
+      // const kern::logic::Held held_12(Cars, Cars[n4.index].Wheels); Car_step(Cars[n4.index].Wheels[0]); held_after(held_12);)
+      const std::string lists = held_lists(x, c);
+      if (!lists.empty()) line(ind, "const kern::logic::Held held_" + id(x) + "(" + lists + ");");
       const std::string args = call_args(x, c);
       line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
+      if (!lists.empty()) line(ind, "held_after(held_" + id(x) + ");");
       return 0;
     }
     if (t == "func.call_on") {
@@ -3600,6 +3647,21 @@ struct Reader {
   Ends statement(Ends in) {
     const std::size_t at = p;
     const Tok t = peek();
+    // the check around a call that holds an entry of a list of any length while its function may run handlers
+    // (Writer::held_lists): it follows from the graph and is read as nothing -
+    // const kern::logic::Held held_12(Cars, ...);  ...  held_after(held_12);
+    const bool held_name = peek(6).kind == Tok::id && peek(6).s.rfind("held_", 0) == 0;
+    if (is("const") && is("kern", 1) && is("::", 2) && is("logic", 3) && is("::", 4) && is("Held", 5) && held_name && is("(", 7)) {
+      p += 8;
+      for (int depth = 1; depth > 0 && peek().kind != Tok::end; ++p) depth += is("(") ? 1 : is(")") ? -1 : 0;
+      expect(";");
+      return in;
+    }
+    if (is("held_after") && is("(", 1) && peek(2).kind == Tok::id && peek(2).s.rfind("held_", 0) == 0 && is(")", 3)) {
+      p += 4;
+      expect(";");
+      return in;
+    }
     if (accept("return")) {
       scope.first = false;
       if (!scope.function) {

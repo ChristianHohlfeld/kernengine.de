@@ -1074,14 +1074,26 @@ void on1(Float delta) {
 - **Ein Eintrag, der gehalten wird, bleibt, wo er ist** (Regel, `check()`): Nennt ein Aufruf
   einen Platz in einer Liste (`Cars[i]`, `Cars[i].Wheels[j]`), dann ändert nichts, was die
   Funktion tut – sie selbst oder was sie aufruft –, die Länge dieser Liste oder setzt eine andere
-  an ihre Stelle; und sie führt keinen Schritt aus, der Handler starten kann (Call Event, Call on
-  Actor, ein Gameplay-Schritt: `NodeDef::raises`) – ein Handler könnte dasselbe tun. So bleibt
-  „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
+  an ihre Stelle. So bleibt „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
   Referenz von C++ ist. Die Liste selbst als Referenz zu geben und zu ändern
   (`Fill(Cars[i].Marks)`), ein Feld des Eintrags zu ändern oder eine andere Liste – das alles
-  geht. Ein Eintrag einer Liste fester Länge (`Fixed<Car, 2> Two`, siehe „Listen fester Länge“)
-  bleibt immer, wo er ist – nichts ändert, wie lang sie ist –: `Shout(Two[1])` darf Handler
-  starten; `Hum(Two[1].Marks[0])` nicht, denn `Marks` hat irgendeine Länge.
+  geht.
+- **Handler, während ein Eintrag gehalten wird** (geprüft): Führt die Funktion einen Schritt aus,
+  der Handler starten kann (Call Event, Call on Actor, ein Gameplay-Schritt: `NodeDef::raises`),
+  weiß niemand vorher, ob ein Handler die Liste ändert – C++ hätte dann eine Referenz ins Leere
+  (undefiniert). Der Aufruf wird darum geprüft, in jeder Stufe gleich: vor ihm wird jede Liste
+  beliebiger Länge (jede Map, jeder besessene Wert) auf dem Weg zum Eintrag gemerkt, nach ihm
+  muss sie dieselbe Länge haben – in der Klasse auch ihre Einträge an derselben Stelle (`data()`) –,
+  sonst endet der Lauf dort mit einem Fehler wie am Schleifenwächter (`Runtime::held_lost`: die
+  Schleifen der Kette enden, die Kette läuft zu Ende, der Blueprint wird angehalten). Im Text steht
+  die Prüfung um den Aufruf – sie folgt aus dem Graphen, der Leser liest sie als nichts:
+  `const kern::logic::Held held_12(Cars, Cars[n4.index].Wheels); Car_step(Cars[n4.index].Wheels[0]); held_after(held_12);`
+  (die Listen von außen nach innen; die Klasse sieht eine innere nur an, solange die äußere blieb).
+  Der Interpreter und der JIT prüfen die Längen in `Instance::call`. Eine Funktion, die als Wert
+  gelesen wird, rechnet nur – sie startet keine Handler; startet sie doch welche, wird ein solcher
+  Eintrag abgewiesen. Ein Eintrag einer Liste fester Länge (`Fixed<Car, 2> Two`, siehe „Listen
+  fester Länge“) bleibt immer, wo er ist: `Shout(Two[1])` braucht keine Prüfung,
+  `Hum(Two[1].Marks[0])` prüft `Two[1].Marks`.
 - **Von außen** (`Instance::call`, der Kleber der Klasse) nimmt ein Referenz-Eingang einen Wert:
   Er ist dann eine eigene Variable des Aufrufs, die mit diesem Wert beginnt, und was die
   Funktion aus ihr gemacht hat, steht hinter den Ausgängen in `results` – für jeden

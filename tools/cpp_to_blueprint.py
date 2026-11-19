@@ -7591,18 +7591,14 @@ class Emit:
         return (any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
                 or (self.f.state and self.u.is_state_variable(root)))   # (a variable of the Blueprint: C++ said whether the method may change it)
 
-    def place_arg(self, n, t, kind, after, fixed=None, raising=False):
+    def place_arg(self, n, t, kind, after, fixed=None):
         """What a call gives a reference input: the place the argument is. Where the argument is none of the
         notation's places (a value, a map's row by its key ...), a variable holds it for the call - and is
         stored back after it, when the function changes it (`after`: the lines for that). `fixed`: the input
-        is a list of that fixed length - so is the variable (a reference is the place itself). `raising`: the
-        function may run handlers (it calls on an actor's Blueprint) - while it runs, a place in a list could
-        go: an entry is given as its value (a const reference reads it as it was), one to change waits."""
+        is a list of that fixed length - so is the variable (a reference is the place itself). An entry of a list
+        is given as the place it is also to a function that may run handlers: the language checks
+        that call - the list stays, or the run stops there (docs/blueprint_cpp.md, E18)."""
         got = self.spot(n)
-        if got is not None and got[1] == t and raising and "[" in got[0] and self.movable_entry(n):
-            if kind == "ref":
-                raise Wait("an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)")
-            got = None
         if got is not None and got[1] == t and (kind != "ref" or self.writable(got[0])):
             return got[0]
         held = self.temp("a", t, fixed)
@@ -7670,44 +7666,6 @@ class Emit:
                 return g.kinds[first + j] if first + j < len(g.kinds) else None
             j += 1
         return None
-
-    def movable_entry(self, n):
-        """Does the place an lvalue is go through an entry of a list whose length can change - a list of any
-        length, a map, what an owned value holds? (An entry of a list of a fixed length - an array, a
-        std::array - stays where it is whatever runs: the language lets a call hold it while handlers run.)
-        Where it cannot tell, it says yes."""
-        b = self.unwrap(n)
-        while True:
-            k = b.get("kind")
-            if k == "CXXThisExpr" or (k == "UnaryOperator" and b.get("opcode") == "*" and kids(b) and self.is_this(kids(b)[0])):
-                return False
-            if k == "DeclRefExpr":
-                name = self.names.get(b.get("referencedDecl", {}).get("id"))
-                return name is None or "[" in name   # (the entry a loop is at: as if it could)
-            if k == "MemberExpr" and kids(b):
-                if b.get("isArrow") and not self.is_this(kids(b)[0]):
-                    return True   # (what a pointer or an owned value holds)
-                b = self.unwrap(kids(b)[0])
-                continue
-            if k in ("ArraySubscriptExpr", "CXXOperatorCallExpr") and (k == "ArraySubscriptExpr" or callee_name(b) == "operator[]"):
-                base = kids(b)[0] if k == "ArraySubscriptExpr" else kids(b)[1]
-                inner = bare(base)
-                while inner.get("kind") == "ImplicitCastExpr" and inner.get("castKind") in ("ArrayToPointerDecay", "NoOp", "LValueToRValue") and kids(inner):
-                    inner = bare(kids(inner)[0])
-                if not self.u.fixed(qtype(inner)):
-                    return True
-                b = self.unwrap(inner)
-                continue
-            return True
-
-    def may_raise(self, g, seen=None):
-        """May the function run handlers while it runs - does it call on an actor's Blueprint, itself or
-        through what it calls?"""
-        seen = set() if seen is None else seen
-        if id(g) in seen:
-            return False
-        seen.add(id(g))
-        return bool(g.on_actors) or any(self.may_raise(c, seen) for c in g.calls)
 
     def fixed(self, index):
         """The index of a list entry on the way to a place. For the list a loop goes through it is worked out
@@ -8051,7 +8009,7 @@ class Emit:
                     self.self_var()   # (a method that only reads its object does not call one that changes it)
                 done.append([None, None, self.self_name, True])
             else:
-                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after, raising=self.may_raise(g)), place=True)
+                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after), place=True)
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
@@ -8070,7 +8028,7 @@ class Emit:
                 continue
             (_, pt), kind = params[j], kinds[j]
             if kind:
-                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j), raising=self.may_raise(g)), place=True)
+                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j)), place=True)
             else:
                 self.operand(done, a, pt, lambda: self.ex(a, pt))
             j += 1

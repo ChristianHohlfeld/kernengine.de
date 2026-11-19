@@ -2603,6 +2603,12 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
       e.outputs[o] = k < args.size() ? from_outside(args[k], {e.out[o].type, e.out[o].of, in.count}, graph_) : Value::from_json(in.value, declared(in), graph_).converted(e.out[o].type);
     }
   }
+  // (a place in a list of any length is held through the call: the lists stay as they are, or the run stops -
+  // Runtime::held_lost; the class checks the same around such a call, logic::Held)
+  std::vector<std::vector<std::size_t>> lengths;
+  if (places)
+    for (std::size_t k = 0; k < fn.inputs.size() && k < places->size(); ++k)
+      if (fn.inputs[k].ref) lengths.push_back(lengths_on(bound[k]));
   std::vector<Spot> outer = std::move(refs_[static_cast<std::size_t>(f)]);
   refs_[static_cast<std::size_t>(f)] = std::move(bound);
   // A call from outside any chain (the engine's C++ asking a rule) is a step of its own for the
@@ -2619,6 +2625,14 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   rt_.run_from(*this, entry, 0, inside ? Runtime::Chain::call_inside : Runtime::Chain::call);
   results = std::move(frames_.back().results);
   frames_.pop_back();
+  if (places) {
+    std::size_t j = 0;
+    for (std::size_t k = 0; k < fn.inputs.size() && k < places->size(); ++k)
+      if (fn.inputs[k].ref && lengths_on((*places)[k]) != lengths[j++]) {
+        rt_.held_lost(*this);
+        break;
+      }
+  }
   // (from outside: what the function made of its reference inputs stands behind its outputs)
   if (!places)
     for (const FunctionPin& in : fn.inputs)
@@ -2857,6 +2871,31 @@ bool Instance::spot(const Node& n, std::string_view prefix, const std::vector<i6
   }
   return true;
 }
+std::vector<std::size_t> Instance::lengths_on(const Spot& s) const {
+  std::vector<std::size_t> out;
+  if (s.beside || s.entry >= 0) return out;   // (an entry of its own beside a list, an input by value: no list holds it)
+  auto type = var_types_.find(s.key);
+  if (type == var_types_.end()) return out;
+  TypeRef t = type->second;
+  Value at = held(s.key);
+  for (const Spot::Step& st : s.steps) {
+    if (!st.field.empty()) {
+      const StructType* str = t.type == PinType::structure ? graph_.structure(t.of) : nullptr;
+      const int f = str ? str->field(st.field) : -1;
+      if (f < 0) return out;
+      at = field_of(at, *str, static_cast<std::size_t>(f), graph_);
+      t = str->fields[static_cast<std::size_t>(f)].type;
+      continue;
+    }
+    if (!indexed(t.type)) return out;
+    if (t.type == PinType::map || t.count == 0) out.push_back(at.size());
+    if (st.index < 0 || static_cast<std::size_t>(st.index) >= at.size()) return out;
+    at = at.item(static_cast<std::size_t>(st.index));
+    t = entry_type(t);
+  }
+  return out;
+}
+
 Value Instance::read(const Spot& s) const {
   if (s.beside) return value_at(s.beside->value, s.beside->type, s.steps, 0, graph_);
   if (s.entry >= 0) {
@@ -3118,6 +3157,13 @@ bool Runtime::pass(Instance& inst) {
     host_.error(inst.name() + ": a loop made more than " + std::to_string(counters_[1]) + " passes in one step - infinite loop? The Blueprint is stopped.");
   }
   return false;
+}
+
+void Runtime::held_lost(Instance& inst) {
+  if (inst.stopping_) return;
+  inst.stopping_ = true;
+  host_.error(inst.name() + ": a call held an entry of a list while handlers ran, and they changed the list (how long it is, or where its entries are) - "
+              "in C++ the reference would go nowhere. The Blueprint is stopped.");
 }
 
 void Runtime::chain_ends(Instance& inst) {
