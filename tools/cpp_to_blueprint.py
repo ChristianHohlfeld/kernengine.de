@@ -10309,6 +10309,11 @@ class TestWriter:
                 if to_code is not None and from_code is not None and "f32" in (to_code, from_code):
                     a, b = span(ks[0])
                     edits.append((a, 1, 0, b, "converted::layout::copy_bytes<%s, %s>" % ("true" if to_code == "f32" else "false", "true" if from_code == "f32" else "false")))
+            if k == "CallExpr" and callee_name(n) == "memset" and len(ks) == 4 and pointer_code(self.u, ks[1]) == "f32":
+                # into a list of floats of the program: the bytes the program sets - `sizeof` is the program's (below) -, a float
+                # as its 32 bits (converted::layout::set_bytes; the test holds the float in 64 bits)
+                a, b = span(ks[0])
+                edits.append((a, 1, 0, b, "converted::layout::set_bytes<true>"))
             if k == "UnaryExprOrTypeTraitExpr" and n.get("name") == "sizeof":
                 # the bytes of what holds a float of the program, as the program has them (the test holds it in 64 bits)
                 got = byte_size(self.u, sized(n) or "")
