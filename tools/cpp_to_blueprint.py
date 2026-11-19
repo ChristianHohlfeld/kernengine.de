@@ -12250,24 +12250,34 @@ class TestWriter:
                 if c.get("kind") not in ("CompoundStmt", "CXXCtorInitializer"):
                     continue
                 for n in walk_source(c):
-                    if n.get("kind") != "DeclRefExpr" or n.get("_file") != d["_file"]:
+                    if n.get("_file") != d["_file"]:
                         continue
-                    rid = (n.get("referencedDecl") or {}).get("id")
-                    t = tree.template_of.get(rid) or tree.decl.get(rid)
-                    if t is None or not here(t) or not namespace_level(t) or t.get("kind") not in ("FunctionDecl", "FunctionTemplateDecl", "VarDecl", "EnumConstantDecl") or not own(t):
-                        continue
-                    named_enum = t.get("kind") == "EnumConstantDecl" and "_enum" in t   # (a value of an enum without a name: by its own name, where it stands)
-                    if named_enum:
-                        e = tree.enums.get(t["_enum"])
-                        if e is None or not namespace_level(e):
+                    if n.get("kind") == "IntegerLiteral" and n.get("_unnamed") is not None:
+                        # a value of an enum without a name: the tree has the number it is (Tree.number_names),
+                        # the source its name - by the namespace of the file, where the enum stands
+                        t = tree.decl.get(n["_unnamed"])
+                        if t is None or not here(t) or not namespace_level(t) or not own(t):
                             continue
-                        said = (t["name"], e.get("name"))
+                        said, home_of = tuple(x["name"] for x in kids(t) if x.get("kind") == "EnumConstantDecl" and x.get("name")), t
                     else:
-                        said = (t.get("name"),)
+                        if n.get("kind") != "DeclRefExpr":
+                            continue
+                        rid = (n.get("referencedDecl") or {}).get("id")
+                        t = tree.template_of.get(rid) or tree.decl.get(rid)
+                        if t is None or not here(t) or not namespace_level(t) or t.get("kind") not in ("FunctionDecl", "FunctionTemplateDecl", "VarDecl", "EnumConstantDecl") or not own(t):
+                            continue
+                        home_of = t
+                        if t.get("kind") == "EnumConstantDecl" and "_enum" in t:   # (a value of an enum with a name, by its own name or the enum's)
+                            e = tree.enums.get(t["_enum"])
+                            if e is None or not namespace_level(e):
+                                continue
+                            said, home_of = (t["name"], e.get("name")), e
+                        else:
+                            said = (t.get("name"),)
                     a = n.get("_at", (None,))[0]
                     word = re.match(r"[A-Za-z_]\w*", raw[a:a + 256]) if a is not None else None
                     if word and word.group(0) in said and not raw[max(0, a - 64):a].rstrip().endswith(("::", ".", "->")):
-                        scope = tree.scope_of.get((tree.enums[t["_enum"]] if named_enum else t)["id"], "")
+                        scope = tree.scope_of.get(home_of["id"], "")
                         edits.append((a, 3, 0, a, "::".join(self.local_path(scope, within)) + "::"))
                 if c.get("kind") == "CompoundStmt" and raw[c["_at"][0]:c["_at"][0] + 1] == "{":
                     named = set(re.findall(r"[A-Za-z_]\w*", raw[c["_at"][0]:c["_at"][1]]))
