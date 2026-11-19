@@ -11034,6 +11034,11 @@ class TestWriter:
             return NUMBER.get(c) == "Int" or self.u.find_type(c) in self.tree.enums
         def wide(n):
             return self.u.clean(qtype(n)) in ("long", "unsigned long", "long long", "unsigned long long")
+        def narrow(n):
+            """A sum, difference or product computed as an int (i32, and what is promoted to it): C++ leaves open what it
+            gives outside the range (signed overflow) - the test computes it exactly and marks the call there."""
+            computed = n.get("computeResultType") if n.get("kind") == "CompoundAssignOperator" and n.get("computeResultType") else n.get("type", {})
+            return self.u.clean(qtype({"type": computed})) == "int"
         def fixed(n):
             n = bare(n)
             while n.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and kids(n):
@@ -11372,14 +11377,21 @@ class TestWriter:
                 else:
                     swap(a, xa, n["opcode"], f"converted::{name}(")
                     edits.append((b, 0, -depth, b, ")"))
-            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and wide(n) and whole(ks[0]) and whole(ks[1]):
-                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign)
+            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and (wide(n) or narrow(n)) and whole(ks[0]) and whole(ks[1]):
+                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign);
+                # an int: C++ leaves open what it gives outside its range (converted.h kept_narrow)
                 op = n["opcode"]
                 (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted::" + {"+": "plus", "-": "minus", "*": "times"}[op.rstrip("=")] + ("_to(" if op.endswith("=") else "(")))
                 swap(xb, ya, op, ", ")
                 edits.append((b, 0, -depth, b, ")"))
-            elif k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1 and wide(ks[0]):
+            elif (k == "UnaryOperator" and n.get("opcode") == "-" and len(ks) == 1 and not n.get("_w64") and whole(n) and whole(ks[0])
+                  and self.u.clean(qtype(n)) in ("int", "long", "long long") and not fixed(ks[0])):
+                # the negation of the least number of a signed type: C++ leaves open what it gives (converted.h neg)
+                (a, b), (xa, xb) = span(n), span(ks[0])
+                swap(a, xa, "-", "converted::neg(")
+                edits.append((b, 0, -depth, b, ")"))
+            elif k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1 and (wide(ks[0]) or self.u.clean(qtype(ks[0])) == "int"):
                 (a, b), (xa, xb) = span(n), span(ks[0])
                 name = ("post_" if n.get("isPostfix") else "pre_") + ("inc" if n["opcode"] == "++" else "dec")
                 if n.get("isPostfix"):
