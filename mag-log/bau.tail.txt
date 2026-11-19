@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:42065:10: warning: variable 'set_property_number_8' set but not used [-Wunused-but-set-variable]
+ 42065 |     Bool set_property_number_8 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:42066:10: warning: variable 'set_property_number_9' set but not used [-Wunused-but-set-variable]
+ 42066 |     Bool set_property_number_9 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:42067:10: warning: variable 'set_property_number_10' set but not used [-Wunused-but-set-variable]
+ 42067 |     Bool set_property_number_10 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:42151:10: warning: unused variable 'xr' [-Wunused-variable]
+ 42151 |     Bool xr = false;
+       |          ^~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:42152:10: warning: unused variable 'xr_2' [-Wunused-variable]
+ 42152 |     Bool xr_2 = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:42153:10: warning: unused variable 'both' [-Wunused-variable]
+ 42153 |     Bool both = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:42154:10: warning: unused variable 'xr_3' [-Wunused-variable]
+ 42154 |     Bool xr_3 = false;
+       |          ^~~~
+1 warning generated.
+1 warning generated.
+In file included from /dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:4:
+In file included from /dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/blueprint.h:27:
+In file included from /dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/engine_nodes.gen.h:46:
+In file included from /dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/engine_direct.h:37:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/nodes.h:2764:55: error: no matching function for call to 'from'
+ 2764 | template <class T, class S> T to(const S& v) { return logic::detail::To<T>::from(v); }
+      |                                                       ^~~~~~~~~~~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/src/level_blueprints.cpp:41702:46: note: in instantiation of function template specialization 'kern::to<double, kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_game_SoundCue>, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue>, kern::logic::engine_values::Int, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue, unsigned int, kern::logic::Whole, &kern::game::SoundCue::actor, &kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue::actor>>' requested here
+ 41702 |       if (logic_and(math_compare<"==">(kern::to<Float>(n26214420.result[n26214421.index].actor), kern::to<Float>(soldier_)), logic_or(logic_or(text_equal(n26214420.result[n26214421.index].sound, "sc:shot0"), text_equal(n26214420.result[n26214421.index].sound, "sc:pistol0")), text_equal(n26214420.result[n26214421.index].sound, "builtin:sniper")))) {
+       |                                              ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/nodes.h:2736:14: note: candidate function not viable: no known conversion from 'const kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_game_SoundCue>, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue>, kern::logic::engine_values::Int, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue, unsigned int, kern::logic::Whole, &kern::game::SoundCue::actor, &kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue::actor>' to 'bool' for 1st argument
+ 2736 |   static f64 from(bool v) { return v ? 1 : 0; }
+      |              ^    ~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/nodes.h:2737:14: note: candidate function not viable: no known conversion from 'const kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_game_SoundCue>, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue>, kern::logic::engine_values::Int, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue, unsigned int, kern::logic::Whole, &kern::game::SoundCue::actor, &kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue::actor>' to 'i64' (aka 'long') for 1st argument
+ 2737 |   static f64 from(i64 v) { return static_cast<f64>(v); }
+      |              ^    ~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/nodes.h:2738:14: note: candidate function not viable: no known conversion from 'const kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_game_SoundCue>, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue>, kern::logic::engine_values::Int, kern::game::SoundCue, kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue, unsigned int, kern::logic::Whole, &kern::game::SoundCue::actor, &kern_blueprint_90abe7bf67181b25::engine_game_runtime::game_SoundCue::actor>' to 'f64' (aka 'double') for 1st argument
+ 2738 |   static f64 from(f64 v) { return v; }
+      |              ^    ~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/include/kern/logic/nodes.h:2735:33: note: candidate template ignored: could not match 'Sized' against 'Field'
+ 2735 |   template <class T> static f64 from(Sized<T> v) { return static_cast<f64>(v.v); }
+      |                                 ^
+50 warnings and 3 errors generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/converted/test_game_gaps_cpp.cpp:637:21: warning: unused variable 'draw' [-Wunused-variable]
+  637 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/converted/test_game_look_cpp.cpp:632:21: warning: unused variable 'draw' [-Wunused-variable]
+  632 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-150328-5241/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+
+real	15m11,316s
+user	201m23,555s
+sys	2m21,661s
