@@ -3360,9 +3360,10 @@ class Emit:
                 return None
         return None
 
-    def assigned(self, body):
+    def assigned(self, body, steps=False):
         """The variables the body changes: by assigning, or through a call that writes to its object or
-        through a parameter."""
+        through a parameter. `steps`: also what it changes that is no variable of the function - a field of the
+        method's object, what a pointer or an owned value holds (`(*gaps_).cursor++`): there it holds None."""
         out = set()
         for n in walk(body):
             k = n.get("kind")
@@ -3398,7 +3399,7 @@ class Emit:
                             targets.append(a)
             for t in targets:
                 i = self.root(t)
-                if i is not None:
+                if i is not None or steps:
                     out.add(i)
         # (a reference the body declares to a part of another variable - `i32& v = corner[at];` -: what changes
         # through it changes that variable)
@@ -3782,8 +3783,9 @@ class Emit:
 
     def steps_in(self, n):
         """Does working out this expression change something (a call that changes its object or what it is
-        handed, an assignment, ++)?"""
-        return bool(self.assigned(n))
+        handed, an assignment, ++) - a variable of the function or anything else (a field of its object, what an
+        owned value holds)?"""
+        return bool(self.assigned(n, steps=True))
 
     def changed_while_named(self, stmts, vid):
         """What the statements change while a name declared before them is still used: all they change up to
