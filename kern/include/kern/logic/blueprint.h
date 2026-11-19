@@ -429,12 +429,8 @@ struct BlueprintCore : logic::PureNodes {
   }
   /// (a text handed on - std::move, `Log = text_append(std::move(Log), x, "")` - that holds its characters
   /// gets the others appended where it is, as std::string's += appends: in the room it has, without a copy)
-  static Text text_append(Text&& a, const Text& b, const Text& c) {
-    if (!a.holds() || &b == &a || &c == &a) return text_append(static_cast<const Text&>(a), b, c);
-    std::string t = std::move(a).str();
-    t.append(b.view()).append(c.view());
-    return t;
-  }
+  /// (Text::Appending: set to the text handed on itself, it appends where that text is)
+  static Text::Appending text_append(Text&& a, const Text& b, const Text& c) { return {a, b, c}; }
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
@@ -444,7 +440,7 @@ struct BlueprintCore : logic::PureNodes {
     const std::string_view v = a.view();
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
   }
-  static Text text_of_code(Int code) { return std::string(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
+  static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
   // (what std::string and std::string_view do, on the characters where they are - logic::texts)
   static Int text_find(const Text& a, const Text& b, Int from) { return logic::texts::find(a.view(), b.view(), from); }
   static Int text_rfind(const Text& a, const Text& b, Int from) { return logic::texts::rfind(a.view(), b.view(), from); }

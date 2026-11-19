@@ -4,7 +4,7 @@
 //   bench [--check <limit>] [rounds] [case ...]     (default 15 rounds, every case)
 //
 // --check: the time as a test - it fails (exit 1) when for a case the class's best time is more
-// than <limit> times the source's (the best of the rounds, both measured in turn: noise only makes
+// than <limit> times that of the source in the numbers of the language (src64, cases.h) (the best of the rounds, both measured in turn: noise only makes
 // a run slower, so the best is the steadiest - on this machine the best ratio moved by at most 6 %
 // between runs, the median by up to 15 %), or when the checksums differ where they must not.
 //
@@ -23,7 +23,7 @@
 #include "cases.h"
 #include "classes.h"
 
-#define DECLARE_SRC(name, kind, same) bench::u64 src_##name();
+#define DECLARE_SRC(name, kind, same) bench::u64 src_##name(); bench::u64 src64_##name();
 BENCH_CASES(DECLARE_SRC)
 #undef DECLARE_SRC
 
@@ -308,7 +308,7 @@ bench::u64 cls_perf_governor() {
   bp::perf_cpp::perf_Governor gov;
   bench::u64 h = 0;
   for (double dt : in) h = bench::fold(h, p.Governor_update(gov, dt).Result);
-  return bench::fold_number(bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(p.Governor_tier(gov).Result))), p.Governor_fps(gov).Result);
+  return h;  // (as src_perf.inc)
 }
 bench::u64 cls_audio_render() {
   const List<Float> pcm = the<bp::combat_audio_cpp>().render(bp::combat_audio_cpp::combat_audio_Kind::shot, 1, 8000).Result;
@@ -321,8 +321,9 @@ bench::u64 cls_lamps_place_road() {
   auto& l = the<bp::lamps_cpp>();
   bp::lamps_cpp::lamps_Field f;
   l.Field_place_road(f, pts, 12, 1, 0);
-  bench::u64 h = bench::fold(0, f.lamps_.size());
-  for (const auto& lp : f.lamps_) h = bench::fold(bench::fold_number(h, lp.yaw), lp.key.bits);
+  bench::u64 h = 0;  // (as src_lamps.inc: through near() at three points of the road)
+  for (int k : {0, 11, 23})
+    for (const Int& i : l.Field_near(f, pts[k].x, pts[k].y, 40).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(i)));
   return h;
 }
 bench::u64 cls_lamps_near() {
@@ -341,9 +342,10 @@ struct Case {
   const char* kind;
   bool same;
   bench::u64 (*src)();
+  bench::u64 (*src64)();
   bench::u64 (*cls)();
 };
-#define LIST_CASE(name, kind, same) {#name, kind, same != 0, src_##name, cls_##name},
+#define LIST_CASE(name, kind, same) {#name, kind, same != 0, src_##name, src64_##name, cls_##name},
 const Case kCases[] = {BENCH_CASES(LIST_CASE)};
 #undef LIST_CASE
 
@@ -368,31 +370,40 @@ int main(int argc, char** argv) {
     limit = std::atof(argv[2]);
     argv += 2, argc -= 2;
   }
-  int failed = 0;
+  int failed = 0, over_src = 0, over_64 = 0, counted = 0;
   int rounds = argc > 1 ? std::atoi(argv[1]) : 15;
   if (rounds < 1) rounds = 15;
   std::vector<std::string> only(argv + std::min(argc, 2), argv + argc);
-  std::printf("%-20s %-20s %10s %10s %10s %10s %7s %7s %s\n", "Fall", "Art", "C++ min", "C++ med", "Kl. min", "Kl. med", "min", "med", "gleich");
+  std::printf("%-20s %-20s %9s %9s %9s %7s %7s %7s %7s %-6s %s\n", "Fall", "Art", "C++ min", "C64 min", "Kl. min", "min", "med", "min64", "med64", "gleich", "gleich64");
   for (const Case& c : kCases) {
     if (!only.empty() && std::find(only.begin(), only.end(), c.name) == only.end()) continue;
-    bench::u64 s = 0, k = 0;
+    bench::u64 s = 0, w = 0, k = 0;
     // (a round runs the source for at least ~2 ms: the clock's step is far below it)
     int reps = 1;
     while (seconds(c.src, reps, s) < 2e-3 && reps < (1 << 20)) reps *= 2;
-    std::vector<double> ts, tk;
-    for (int r = 0; r < rounds; ++r) {
+    std::vector<double> ts, tw, tk;
+    for (int r = 0; r < rounds; ++r) {  // (the three in turn: what disturbs a round disturbs each alike)
       ts.push_back(seconds(c.src, reps, s) / reps);
+      tw.push_back(seconds(c.src64, reps, w) / reps);
       tk.push_back(seconds(c.cls, reps, k) / reps);
     }
-    const double smin = *std::min_element(ts.begin(), ts.end()), kmin = *std::min_element(tk.begin(), tk.end());
-    const double smed = median(ts), kmed = median(tk);
+    const double smin = *std::min_element(ts.begin(), ts.end()), wmin = *std::min_element(tw.begin(), tw.end()), kmin = *std::min_element(tk.begin(), tk.end());
+    const double smed = median(ts), wmed = median(tw), kmed = median(tk);
     const char* same = s == k ? "=" : c.same ? "ABWEICHUNG" : "f32";
-    const bool over = limit > 0 && kmin / smin > limit;
-    failed += (s != k && c.same) || over ? 1 : 0;
-    std::printf("%-20s %-20s %10.2f %10.2f %10.2f %10.2f %7.2f %7.2f %s\n", c.name, c.kind, smin * 1e6, smed * 1e6, kmin * 1e6, kmed * 1e6, kmin / smin, kmed / smed, same);
-    if (over) std::printf("  ^ %s: die Klasse braucht %.2f-mal die Zeit der Quelle (Grenze %.2f)\n", c.name, kmin / smin, limit);
+    // (in the numbers of the language the source and the class give the same, bit for bit - as the test compares them)
+    const char* same64 = w == k ? "=" : "ABWEICHUNG";
+    ++counted;
+    over_src += kmin / smin > 1.10 ? 1 : 0;
+    over_64 += kmin / wmin > 1.10 ? 1 : 0;
+    const bool over = limit > 0 && kmin / wmin > limit;
+    failed += (s != k && c.same) || w != k || over ? 1 : 0;
+    std::printf("%-20s %-20s %9.2f %9.2f %9.2f %7.2f %7.2f %7.2f %7.2f %-6s %s\n", c.name, c.kind, smin * 1e6, wmin * 1e6, kmin * 1e6, kmin / smin, kmed / smed, kmin / wmin,
+                kmed / wmed, same, same64);
+    if (over) std::printf("  ^ %s: die Klasse braucht %.2f-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze %.2f)\n", c.name, kmin / wmin, limit);
   }
-  std::printf("(Zeiten in µs je Aufruf eines Falls; min/med: Klasse geteilt durch C++)\n");
+  std::printf("(Zeiten in µs je Aufruf eines Falls; C++: die Quelle, wie das Spiel sie baut; C64: die Quelle in den Zahlen der Sprache, wie der\n"
+              " Vergleichstest sie baut (tests/converted); min/med: Klasse geteilt durch C++, min64/med64: Klasse geteilt durch C64)\n");
+  std::printf("gegen die Quelle (f32): %d von %d Fällen über 1,10; gegen die Quelle in 64 Bit: %d von %d Fällen über 1,10\n", over_src, counted, over_64, counted);
   if (failed) std::printf("%d Fall/Fälle über der Grenze oder mit abweichender Prüfsumme\n", failed);
   return failed ? 1 : 0;
 }
