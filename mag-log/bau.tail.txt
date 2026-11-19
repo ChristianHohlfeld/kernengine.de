@@ -1,0 +1,80 @@
+ 1808 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1589:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1589 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/converted/test_Arondight45_StateControl.cpp:1961:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1961 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/converted/test_car.cpp:285:21: warning: unused variable 'draw' [-Wunused-variable]
+  285 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:23669:16: warning: unused variable 'a' [-Wunused-variable]
+ 23669 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:23707:16: warning: unused variable 'a_4' [-Wunused-variable]
+ 23707 |     nostr_U256 a_4 = nostr_U256{Fixed<Int, 8>{}};
+       |                ^~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:23773:16: warning: unused variable 'a' [-Wunused-variable]
+ 23773 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:28046:9: warning: unused variable 'key_10' [-Wunused-variable]
+ 28046 |     Int key_10 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:28048:9: warning: unused variable 'key_12' [-Wunused-variable]
+ 28048 |     Int key_12 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:28059:9: warning: unused variable 'key_15' [-Wunused-variable]
+ 28059 |     Int key_15 = 0;
+       |         ^~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/converted/test_facades.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:46787:11: warning: unused variable 'sim_time' [-Wunused-variable]
+ 46787 |     Float sim_time = 0.0;
+       |           ^~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:46802:10: warning: variable 'actor_matrix' set but not used [-Wunused-but-set-variable]
+ 46802 |     Bool actor_matrix = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:46850:10: warning: variable 'set_mode' set but not used [-Wunused-but-set-variable]
+ 46850 |     Bool set_mode = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:46858:10: warning: variable 'teleport' set but not used [-Wunused-but-set-variable]
+ 46858 |     Bool teleport = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/src/level_blueprints.cpp:46859:10: warning: variable 'set_actor_velocity' set but not used [-Wunused-but-set-variable]
+ 46859 |     Bool set_actor_velocity = false;
+       |          ^
+1 warning generated.
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-115906-7020/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+1 warning generated.
+4 warnings generated.
+11 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	8m35,543s
+user	60m27,652s
+sys	1m14,876s
