@@ -10319,8 +10319,8 @@ class Api:
         r = re.sub(r"^const\s+", "", r)
         c = self.u.clean(r)
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", c)
-        if m:   # a view of a list: the list
-            return f"List<{self.u.element(self.u.btype(m.group(1)))}>", False, None
+        if m:   # a view of a list: the list (of entries of a fixed width: a list of that width - Span<const u8> a List<U8>)
+            return f"List<{self.u.entry(m.group(1))}>", False, None
         q = None
         try:
             q = self.u.find_type(c)
@@ -10333,7 +10333,7 @@ class Api:
             # the first of several (samples, with their count beside them) - the list of them, none for null
             if writes:
                 raise Wait("a pointer it writes through")
-            inner = self.u.btype(r)
+            inner = self.u.place(r)
             if inner is None:
                 raise Wait("a pointer to anything (void*)")
             return f"List<{self.u.element(inner)}>", False, None
@@ -10343,6 +10343,8 @@ class Api:
         """(pin type, the struct or enum it names) of a Blueprint type."""
         if bt in ENGINE_PIN:
             return ENGINE_PIN[bt], ""
+        if bt in WIDTHS:   # (an entry of a list of a fixed width: List<U8> is an int list of "u8")
+            return "integer", bt.lower()
         if bt in self.u.enum_values:
             return "enumeration", bt
         if bt in self.u.struct_fields:
@@ -10359,8 +10361,8 @@ class Api:
         result, its "shapes"), e<values>, {fields}, [items] - [N items] for a list of a fixed
         length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it), [?item] for what
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
-        if bt in ENGINE_PIN:
-            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
+        if bt in ENGINE_PIN or bt in WIDTHS:
+            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[wire(bt)]
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:

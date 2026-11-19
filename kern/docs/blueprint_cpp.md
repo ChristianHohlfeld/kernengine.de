@@ -500,7 +500,8 @@ beim Setzen; Copy Bytes schreibt in eine Liste einer Breite nur Zahlen dieser Br
 Eine Liste einer Breite ist ein eigener Typ: sie geht nicht in einen Eingang `List<Int>` und umgekehrt (C++: kein
 `std::vector<int>` aus einem `std::vector<u8>`). Die Knoten, die die Zahlen einer Liste lesen, wie sie sind – Text of Bytes,
 Struct of Bytes, Items von Copy Bytes – nehmen eine Liste von Ints **jeder** Breite (`List<Int>`, `List<U8>` …; Eingang
-`kAnyWidth`); in der Klasse eine Funktion über die Einträge (`logic::items_of`, `Items<T>`). Ein Feld einer Breite hat in
+`kAnyWidth`); in der Klasse eine Funktion über die Einträge (`logic::items_of`, `Items<T>`). Was Bytes gibt – Bytes of Text,
+Bytes of S –, gibt eine `List<U8>` (C++: `std::vector<u8>`, `std::array<u8, N>`). Ein Feld einer Breite hat in
 einer Anordnung (Bytes of Struct, Struct of Bytes) seine eigene Breite (`U16 a` ↔ `u16@0`). Die Listenknoten mit Typ
 (`list_length<U8>(B)`, `flow_for_each<U8>(n4, B)`) nennen die Breite als Typ der Einträge; ein Ausgang `item` ist dort ein `U8`.
 
@@ -726,7 +727,7 @@ Reihenfolge der Felder, die Zahl, als die C++ es hält, und wo es beginnt.
 ```cpp
 KERN_STRUCT(Frame) { Int Magic = 827736398; Int Version = 1; Int Sequence = 0; Int Vx = 0; };
 // #pragma pack(1) struct Frame { uint32_t magic; uint16_t version, sequence; int16_t vx; };
-Fixed<Int, 10> Bytes = struct_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Now);
+Fixed<U8, 10> Bytes = struct_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Now);
 Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
 ```
 
@@ -738,8 +739,8 @@ Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
   gerade tut (WebAssembly lässt es offen).
 - **Die Bytes stehen little-endian**, auf jeder Plattform gleich (die Engine läuft nur auf
   solchen). Ein Byte, das kein Feld deckt (was C++ als Füllung lässt), ist 0.
-- **Bytes of S** gibt so viele Bytes, wie das Layout groß ist, je eine Zahl 0 bis 255 – in der
-  Klasse eine Liste fester Länge (`Fixed<Int, N>`): sie liegt, wo sie steht, nichts wird
+- **Bytes of S** gibt so viele Bytes, wie das Layout groß ist, je eine Zahl 0 bis 255 (eine `List<U8>`) – in der
+  Klasse eine Liste fester Länge (`Fixed<U8, N>`): sie liegt, wo sie steht, nichts wird
   angefordert, wie bei `std::array<uint8_t, N>`.
 - **S of Bytes** liest die Felder aus einer Liste von Zahlen, beginnend bei `at`. Ein Byte ist
   das, was C++ einem `unsigned char` von der Zahl lässt: ihre letzten 8 Bit. Wo die Liste keins
@@ -992,7 +993,7 @@ Befehl = text_erase(std::move(Befehl), 0, 3);         // cmd.erase(0, 3) – am 
 | Repeat Text | `std::string(count, c)` | den Text so oft hintereinander (höchstens 2^24 Zeichen) |
 | Reserve Text | `reserve(count)` | den Text, wie er ist – in der Klasse mit Platz für Count Zeichen (höchstens 2^24) |
 | Text of Bytes | `std::string(reinterpret_cast<const char*>(bytes) + at, count)` | Count Bytes einer Liste ab At, jedes auf 8 Bit geschnitten |
-| Bytes of Text | `std::vector<u8>(text.begin(), text.end())` | die Bytes des Texts als `List<Int>`, je 0 bis 255 |
+| Bytes of Text | `std::vector<u8>(text.begin(), text.end())` | die Bytes des Texts als `List<U8>` |
 | Insert Text Bytes (Schritt) | `bytes.insert(bytes.begin() + at, text.begin(), text.end())` | die Bytes des Texts in eine Liste ganzer Zahlen, wo sie steht, in einem Zug |
 
 - **Wo C++ wirft** (`at` hinter dem Ende bei `substr`, `insert`, `erase`, `replace`: `std::out_of_range`,

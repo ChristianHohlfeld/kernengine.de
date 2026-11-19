@@ -2136,7 +2136,7 @@ TEST(logic_bytes_of_struct) {
   logic::Runtime rt(host);
   const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":513},
       {"name":"Vx","type":"int","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0.1},{"name":"Key","type":"int64","value":"18364758544493064720"}]}],
-    "variables":[{"name":"B","type":"int_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
+    "variables":[{"name":"B","type":"int_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
     "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},
       {"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},
       {"id":5,"type":"var.set","params":{"variable":"Back"}},{"id":6,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},

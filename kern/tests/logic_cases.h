@@ -124,7 +124,7 @@ inline const std::vector<Case>& cases() {
       {"bytes",
        R"kg({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":0},{"name":"Vx","type":"int","value":-3},)kg"
        R"kg({"name":"Flags","type":"int","value":70000},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0}]}],)kg"
-       R"kg("variables":[{"name":"B","type":"int_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}},{"name":"Shifted","type":"struct","of":"Frame","value":{}}],)kg"
+       R"kg("variables":[{"name":"B","type":"int_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}},{"name":"Shifted","type":"struct","of":"Frame","value":{}}],)kg"
        R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},)kg"
        R"kg({"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},)kg"
        R"kg({"id":5,"type":"math.formula","params":{"formula":"value * 0.1"}},{"id":6,"type":"math.round"},{"id":7,"type":"var.set","params":{"variable":"Back"}},)kg"
@@ -567,7 +567,7 @@ inline const std::vector<Case>& cases() {
           {"id":4,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":0,"code":321}}],
           "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})"},
       {"text_scan",
-       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
+       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","of":"u8","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
           {"id":2,"type":"var.set","params":{"variable":"Shown"}},
           {"id":30,"type":"list.insert_text","params":{"variable":"Bytes"},"values":{"index":1,"text":"A\u00e4"}},{"id":31,"type":"text.bytes","values":{"a":"hi"}},
           {"id":32,"type":"list.append","params":{"variable":"Bytes"}},{"id":33,"type":"var.get","params":{"variable":"Bytes"}},{"id":34,"type":"text.append"},
