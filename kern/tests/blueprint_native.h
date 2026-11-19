@@ -1148,7 +1148,12 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
   }
   if (logic::element_of(t.type) != PinType::structure) {
     const logic::EnumType* e = g.enumeration(t.of);
-    return samples(t.type, e ? e->values.size() : 0);
+    std::vector<Value> r = samples(t.type, e ? e->values.size() : 0);
+    // (a list of Ints of a width holds its values only - a C++ caller hands over a List<U8>, which holds no -1; one Int of a
+    // width is handed over as an Int, the input holds its low bits)
+    if (t.type == PinType::integer_list && logic::has_width(t))
+      for (Value& v : r) v = logic::fitted(v, t, g);
+    return r;
   }
   std::vector<Value> items;
   if (const logic::StructType* s = g.structure(t.of)) {
