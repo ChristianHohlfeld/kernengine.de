@@ -29,6 +29,34 @@
 
 namespace kern {
 
+namespace logic {
+/// A call that gives a function that may run handlers an entry of a list of any length (of a map, of an owned
+/// value) - `const kern::logic::Held held_12(Cars, Cars[n4.index].Wheels); Car_step(...); held_after(held_12);`.
+/// In C++ the reference would go nowhere if a handler changed how long such a list is (undefined); the language
+/// checks it: before the call each list's length and where its entries are, after it the same - or the run
+/// stops there with an error (BlueprintCore::held_after, Runtime::held_lost; the interpreter checks the lengths,
+/// Instance::call). The lists outermost first: an inner one is looked at only while the one around it stayed.
+template <class... L> struct Held {
+  std::tuple<const L*...> lists;
+  std::array<std::size_t, sizeof...(L)> sizes;
+  std::array<const void*, sizeof...(L)> where;
+  explicit Held(const L&... l) : lists(&l...), sizes{l.size()...}, where{entries_of(l)...} {}
+  template <class T> static const void* entries_of(const T& l) {
+    if constexpr (requires { l.data(); }) return static_cast<const void*>(l.data());
+    else return nullptr;
+  }
+  bool same() const { return same_from<0>(); }
+  template <std::size_t K> bool same_from() const {
+    if constexpr (K == sizeof...(L)) {
+      return true;
+    } else {
+      const auto* l = std::get<K>(lists);
+      return l->size() == sizes[K] && entries_of(*l) == where[K] && same_from<K + 1>();
+    }
+  }
+};
+}  // namespace logic
+
 /// A list in a Blueprint's C++: List<Float>, List<Int>, List<Text> ... - a std::vector whose []
 /// never reaches beside the list (logic::List, nodes.h).
 template <class T> using List = logic::List<T>;
@@ -241,6 +269,10 @@ struct BlueprintCore : logic::PureNodes {
       return true;
     }
     return kern_world.runtime->pass(*kern_world.instance);
+  }
+  /// After a call that held an entry of a list (logic::Held): did the lists stay? Else the run stops here with an error.
+  template <class... L> void held_after(const logic::Held<L...>& held) {
+    if (!held.same() && kern_world.runtime && kern_world.instance) kern_world.runtime->held_lost(*kern_world.instance);
   }
   /// while (loop(condition)): a While Loop.
   bool loop(Bool condition) { return condition && kern_pass(); }
@@ -469,12 +501,8 @@ struct BlueprintCore : logic::PureNodes {
   }
   /// (a text handed on - std::move, `Log = text_append(std::move(Log), x, "")` - that holds its characters
   /// gets the others appended where it is, as std::string's += appends: in the room it has, without a copy)
-  static Text text_append(Text&& a, const Text& b, const Text& c) {
-    if (!a.holds() || &b == &a || &c == &a) return text_append(static_cast<const Text&>(a), b, c);
-    std::string t = std::move(a).str();
-    t.append(b.view()).append(c.view());
-    return t;
-  }
+  /// (Text::Appending: set to the text handed on itself, it appends where that text is)
+  static Text::Appending text_append(Text&& a, const Text& b, const Text& c) { return {a, b, c}; }
   static Bool text_equal(const Text& a, const Text& b) { return a == b; }
   static Bool text_contains(const Text& a, const Text& b) { return a.view().find(b.view()) != std::string_view::npos; }
   static Int text_length(const Text& a) { return static_cast<i64>(a.size()); }
@@ -484,7 +512,7 @@ struct BlueprintCore : logic::PureNodes {
     const std::string_view v = a.view();
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
   }
-  static Text text_of_code(Int code) { return std::string(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
+  static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
   // (what std::string and std::string_view do, on the characters where they are - logic::texts)
   static Int text_find(const Text& a, const Text& b, Int from) { return logic::texts::find(a.view(), b.view(), from); }
   static Int text_rfind(const Text& a, const Text& b, Int from) { return logic::texts::rfind(a.view(), b.view(), from); }

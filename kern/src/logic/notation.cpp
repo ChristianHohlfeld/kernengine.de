@@ -336,6 +336,10 @@ struct Shape {
   std::string error;
   u32 error_node = 0;
 
+  /// The calls that give a function that may run handlers an entry of a list of any length (places_ok): call node ->
+  /// (the reference input's prefix, the entries of its path in such a list, by their place) - the Writer checks them (held).
+  std::map<int, std::vector<std::pair<std::string, std::vector<std::size_t>>>> held_calls;
+
   Shape(const Graph& graph, const Library& library) : g(graph), lib(library) {}
 
   Info& at(int i) { return n[static_cast<std::size_t>(i)]; }
@@ -862,24 +866,34 @@ struct Shape {
           const std::string place = root + at(call).node->param(prefix + "path");
           (void)kind;
           // (an entry of a list of a fixed length stays where it is whatever runs: nothing changes how long that
-          // list is - TypeRef::count. Only an entry of a list of any length, of a map, can be gone after a handler)
-          bool movable = false;
+          // list is - TypeRef::count. Only an entry of a list of any length, of a map, of an owned value can be gone
+          // after a handler)
+          std::vector<std::size_t> lists;  // (the entries on the way that are in such a list, by their place in the path)
+          bool known = true;
+          std::size_t entry = 0;
           TypeRef along{named.type, named.of, named.count};
           for (const std::string& step : held) {
             if (step.empty()) {
-              if (!is_list(along.type) || along.count == 0) { movable = true; break; }
-              along = TypeRef{element_of(along.type), along.of};
+              if (!is_list(along.type) && along.type != PinType::map) { known = false; break; }
+              if (along.type == PinType::map || along.count == 0) lists.push_back(entry);
+              along = along.type == PinType::map ? value_type(along) : TypeRef{element_of(along.type), along.of};
+              ++entry;
               continue;
             }
             const StructType* s = along.type == PinType::structure ? g.structure(along.of) : nullptr;
             const int k = s ? s->field(step) : -1;
-            if (k < 0) { movable = true; break; }
+            if (k < 0) { known = false; break; }
             along = s->fields[static_cast<std::size_t>(k)].type;
           }
-          if (raises[static_cast<std::size_t>(callee)] >= 0 && movable)
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && (!known || (!lists.empty() && at(call).def->type != "func.call")))
             return fail(title(call) + " gives " + fn.name + " the place " + place + " - an entry of a list -, and " + fn.name + " may run handlers while it holds it (" +
-                            title(raises[static_cast<std::size_t>(callee)]) + "): they could change how long the list is. Give it the entry's index instead, or the value",
+                            title(raises[static_cast<std::size_t>(callee)]) + "): " + (known ? "a value read so cannot be checked - call it as a step" : "what the place goes through is not known") +
+                            ". Give it the entry's index instead, or the value",
                         call);
+          // A handler may change how long such a list is while the function holds the entry - in C++ the reference would
+          // then go nowhere (undefined). The call is checked: the lists keep their length (and, in the class, where their
+          // entries are), or the run stops there with an error (held / Runtime::held_lost - docs/blueprint_cpp.md).
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && !lists.empty()) held_calls[call].push_back({prefix, lists});
           for (const Write& w : during) {
             if (w.kind != kind || w.root != root || w.path.size() > held.size() || !std::equal(w.path.begin(), w.path.end(), held.begin())) continue;
             // (the write stands at or above the place that is held: does it reach a list the place goes through?)
@@ -1162,14 +1176,22 @@ struct Writer {
     const PinType want = at(x).in[static_cast<std::size_t>(k)].type;
     return pin.type == want || !convert ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
   }
-  /// Is the formula `x` written as a formula of whole numbers - [](Int a) -> Int (Formula::whole,
-  /// and every input a wire from an Int)?
-  bool whole_formula(int x, const Formula& f) {
-    if (!f.whole()) return false;
-    for (int k : at(x).data_in) {
-      const auto [from, o] = at(x).src[static_cast<std::size_t>(k)];
-      if (from < 0 || at(from).out[static_cast<std::size_t>(o)].type != PinType::integer) return false;
+  /// The types of the formula `x` in a Blueprint's C++ (docs/blueprint_cpp.md, "Formeln"): input i is an
+  /// Int where Formula::int_input(i) holds and its wire comes from an Int, else a Float; the result is an
+  /// Int where every input is and Formula::whole_result() holds - and, its root being +, - or *
+  /// (result_sum), where every input that reads it is an Int. Returns whether the result is an Int.
+  bool formula_types(int x, const Formula& f, std::vector<char>& ints) {
+    ints.assign(f.inputs().size(), 0);
+    bool all = !ints.empty();
+    for (std::size_t i = 0; i < at(x).data_in.size() && i < ints.size(); ++i) {
+      const auto [from, o] = at(x).src[static_cast<std::size_t>(at(x).data_in[i])];
+      ints[i] = from >= 0 && at(from).out[static_cast<std::size_t>(o)].type == PinType::integer && f.int_input(i);
+      all = all && ints[i];
     }
+    if (!all || !f.whole_result()) return false;
+    if (f.result_sum())
+      for (const auto& [reader, input] : at(x).readers)
+        if (at(reader).in[static_cast<std::size_t>(input)].type != PinType::integer) return false;
     return true;
   }
 
@@ -1200,6 +1222,34 @@ struct Writer {
       r += "[" + index + "]";
       ++entry;
     }
+    return r;
+  }
+  /// The lists a call holds an entry of (Shape::held_calls), outermost first: each as the place it is, up to the
+  /// entry - "Cars, Cars[n4.index].Wheels" (none: "").
+  std::string held_lists(int x, int c) {
+    auto it = s.held_calls.find(x);
+    if (it == s.held_calls.end()) return {};
+    std::string r;
+    const std::size_t named = order.size();   // (the call names its nodes where it stands: the lists name them again)
+    for (const auto& [prefix, lists] : it->second) {
+      std::string place = at(x).node->param(prefix + "variable");
+      std::vector<std::string> steps;
+      if (!path_steps(at(x).node->param(prefix + "path"), steps)) continue;
+      std::size_t entry = 0;
+      for (const std::string& step : steps) {
+        if (!step.empty()) {
+          place += "." + step;
+          continue;
+        }
+        if (std::find(lists.begin(), lists.end(), entry) != lists.end()) r += (r.empty() ? "" : ", ") + place;
+        int pin = -1;
+        for (int k : at(x).data_in)
+          if (at(x).in[static_cast<std::size_t>(k)].id == prefix + path_pin(entry)) pin = k;
+        place += "[" + (pin >= 0 ? value(x, pin, c) : std::string("0")) + "]";
+        ++entry;
+      }
+    }
+    order.resize(named);
     return r;
   }
   /// What a call gives its function's inputs, in their order: a value for an input by value,
@@ -1477,15 +1527,14 @@ struct Writer {
     if (t == "math.formula") {
       const std::string text = at(x).node->param("formula", "a + b");
       const Formula& f = Formula::cached(text);
-      // (a formula of whole numbers whose inputs are Ints: Int in, Int out - the same value, docs/blueprint_cpp.md "Formeln")
-      const bool whole = whole_formula(x, f);
-      const std::string type = whole ? "Int " : "Float ";
+      // (Int inputs where they are read as whole numbers and come from Ints, an Int where the value is one - the same value, docs/blueprint_cpp.md "Formeln")
+      std::vector<char> ints;
+      const bool whole = formula_types(x, f, ints);
       std::string lambda = "[](";
-      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += (i ? ", " : "") + type + f.inputs()[i];
-      lambda += ") -> " + type + "{ return " + f.cpp() + "; }";
-      if (!whole) return "kern::formula(" + inputs(x, c, {lambda}) + ")";
+      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += std::string(i ? ", " : "") + (ints[i] ? "Int " : "Float ") + f.inputs()[i];
+      lambda += std::string(") -> ") + (whole ? "Int " : "Float ") + "{ return " + f.cpp() + "; }";
       std::string args = lambda;
-      for (int k : at(x).data_in) args += ", " + value(x, k, c, false);
+      for (std::size_t i = 0; i < at(x).data_in.size(); ++i) args += ", " + value(x, at(x).data_in[i], c, i >= ints.size() || !ints[i]);
       return "kern::formula(" + args + ")";
     }
     std::vector<std::string> head;
@@ -1702,8 +1751,13 @@ struct Writer {
       return 0;
     }
     if (t == "func.call") {
+      // (a call that holds an entry of a list of any length while its function may run handlers - Shape::held_calls:
+      // const kern::logic::Held held_12(Cars, Cars[n4.index].Wheels); Car_step(Cars[n4.index].Wheels[0]); held_after(held_12);)
+      const std::string lists = held_lists(x, c);
+      if (!lists.empty()) line(ind, "const kern::logic::Held held_" + id(x) + "(" + lists + ");");
       const std::string args = call_args(x, c);
       line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
+      if (!lists.empty()) line(ind, "held_after(held_" + id(x) + ");");
       return 0;
     }
     if (t == "func.call_on") {
@@ -2030,7 +2084,8 @@ struct Reader {
     std::size_t moved = 0;  // std::move(value): the token it stands at, plus one
   };
   struct DataWire { int to; std::string in; Src from; };
-  std::vector<int> whole_formulas;  // (the formulas read as formulas of whole numbers: their inputs are Ints, as they are)
+  std::set<std::pair<int, std::string>> int_inputs;  // (the Int inputs of formulas: (node, input) - Ints, as they are)
+  std::vector<int> int_sums;  // (the formulas that give an Int by +, - or *: read only by Ints)
   struct ExecWire { int from; std::string out; int to; u32 to_id; std::string in; std::size_t tok; };
   /// An exec output that waits for its wire. node < 0 (kGone): a path that has ended in the graph
   /// where C++ would go on with the next statement (after a wait, a Sequence, go<id>()).
@@ -3469,18 +3524,24 @@ struct Reader {
     s.tok = tok;
     std::vector<std::string> names;
     if (!expect("(") || !expect("[") || !expect("]") || !expect("(")) return s;
-    // (Float inputs and a Float - or, a formula of whole numbers, Int inputs and an Int: Formula::whole)
-    const bool whole = is("Int");
-    const char* type = whole ? "Int" : "Float";
+    // (each input a Float or - where Formula::int_input holds - an Int, the result a Float or - where every input is an Int
+    // and Formula::whole_result holds - an Int: docs/blueprint_cpp.md "Formeln")
+    std::vector<char> ints;
     while (!is(")")) {
       std::string nm;
-      if (!expect(type, whole ? "(the inputs of a formula of whole numbers are Int, every one)" : "(a formula's inputs are Float)") || !word(nm, "the input's name")) return s;
+      const bool int_in = is("Int");
+      if (!int_in && !is("Float")) { expect("Float", "(an input of a formula is Float, or Int where it is read as a whole number)"); return s; }
+      ++p;
+      if (!word(nm, "the input's name")) return s;
       names.push_back(nm);
+      ints.push_back(int_in);
       if (!accept(",")) break;
     }
-    if (!expect(")") || !expect("->") || !expect(type, whole ? "(a formula with Int inputs gives an Int)" : "(a formula with Float inputs gives a Float)") || !expect("{") ||
-        !expect("return"))
-      return s;
+    if (!expect(")") || !expect("->")) return s;
+    const bool whole = is("Int");
+    if (!whole && !expect("Float", "(a formula gives a Float, or an Int where its value is a whole number)")) return s;
+    if (whole) ++p;
+    if (!expect("{") || !expect("return")) return s;
     const std::size_t from = peek().begin;
     int depth = 0;
     while (peek().kind != Tok::end && !(depth == 0 && (is(";") || is("}")))) {
@@ -3500,9 +3561,17 @@ struct Reader {
       fail(tok, "the formula reads (" + want + "): the lambda's parameters are exactly these, in this order");
       return s;
     }
-    if (whole && !f.whole()) {
-      fail(body_tok, "Int inputs and an Int are a formula of whole numbers: one whose value is a whole number by band, bor, bxor, shl, shr, wrap32, wrap32s or mul32 "
-                     "and that reads each input only as an argument of one of them or through +, - and * between them - this one is a formula of Floats: [](Float ...) -> Float");
+    for (std::size_t i = 0; i < ints.size(); ++i)
+      if (ints[i] && !f.int_input(i)) {
+        fail(body_tok, "the input " + names[i] + " is an Int only where the formula reads it as a whole number: as an argument of band, bor, bxor, shl, shr, wrap32, wrap32s "
+                       "or mul32, as a side of a comparison whose other side is an input, a number or one of those, or through +, - and * between them - "
+                       "here it is read otherwise (by /, %, ^, a function, ! or ?:): Float " + names[i]);
+        return s;
+      }
+    if (whole && std::find(ints.begin(), ints.end(), 0) != ints.end()) { fail(tok, "a formula with a Float input gives a Float: -> Float"); return s; }
+    if (whole && !f.whole_result()) {
+      fail(body_tok, "-> Int is a formula whose value is a whole number: band, bor, bxor, shl, shr, wrap32, wrap32s or mul32, or +, - and * of inputs, numbers and those - "
+                     "this one gives a Float: -> Float");
       return s;
     }
     const int node = make("math.formula", tok, {{"formula", f.text()}});
@@ -3512,14 +3581,16 @@ struct Reader {
     const std::size_t wires_before = data_wires.size();
     if (!args_of(node, a, "this formula")) return s;
     if (!expect(")", "(one value per input of the formula)")) return s;
-    if (whole) {
-      // (every input a wire from an Int - what the graph has where the text says Int)
-      // (count the wires into this formula only: an argument may make wires of its own - p[kern::to<Int>(...)])
-      std::size_t into = 0;
-      for (std::size_t w = wires_before; w < data_wires.size(); ++w) into += data_wires[w].to == node;
-      if (into != names.size()) { fail(tok, "every input of a formula of whole numbers is an Int that is read (no number written out)"); return s; }
-      whole_formulas.push_back(node);
+    // (every Int input a wire from an Int - what the graph has where the text says Int)
+    // (count the wires into this formula only: an argument may make wires of its own - p[kern::to<Int>(...)])
+    for (std::size_t i = 0; i < ints.size(); ++i) {
+      if (!ints[i]) continue;
+      bool wired = false;
+      for (std::size_t w = wires_before; w < data_wires.size(); ++w) wired = wired || (data_wires[w].to == node && data_wires[w].in == names[i]);
+      if (!wired) { fail(tok, "an Int input of a formula is an Int that is read (no number written out): Float " + names[i]); return s; }
+      int_inputs.insert({node, names[i]});
     }
+    if (whole && f.result_sum()) int_sums.push_back(node);
     s.node = node;
     s.root = true;
     return s;
@@ -3673,6 +3744,21 @@ struct Reader {
   Ends statement(Ends in) {
     const std::size_t at = p;
     const Tok t = peek();
+    // the check around a call that holds an entry of a list of any length while its function may run handlers
+    // (Writer::held_lists): it follows from the graph and is read as nothing -
+    // const kern::logic::Held held_12(Cars, ...);  ...  held_after(held_12);
+    const bool held_name = peek(6).kind == Tok::id && peek(6).s.rfind("held_", 0) == 0;
+    if (is("const") && is("kern", 1) && is("::", 2) && is("logic", 3) && is("::", 4) && is("Held", 5) && held_name && is("(", 7)) {
+      p += 8;
+      for (int depth = 1; depth > 0 && peek().kind != Tok::end; ++p) depth += is("(") ? 1 : is(")") ? -1 : 0;
+      expect(";");
+      return in;
+    }
+    if (is("held_after") && is("(", 1) && peek(2).kind == Tok::id && peek(2).s.rfind("held_", 0) == 0 && is(")", 3)) {
+      p += 4;
+      expect(";");
+      return in;
+    }
     if (accept("return")) {
       scope.first = false;
       if (!scope.function) {
@@ -4506,10 +4592,12 @@ struct Reader {
       if (!in) continue;
       const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
       const std::string need = cpp_type(to_type), have = cpp_type(from_type);
-      if (std::find(whole_formulas.begin(), whole_formulas.end(), w.to) != whole_formulas.end()) {
+      if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::integer)
+        return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
+      if (int_inputs.count({w.to, w.in})) {
         // (an Int into the Float input of the formula - the wire's own conversion, which the class does not write)
-        if (w.from.cast) return fail(w.from.tok, "an input of a formula of whole numbers is an Int as it is: no kern::to");
-        if (from_type.type != PinType::integer) return fail(w.from.tok, "this is " + have + ", an input of a formula of whole numbers is an Int");
+        if (w.from.cast) return fail(w.from.tok, "an Int input of a formula is an Int as it is: no kern::to");
+        if (from_type.type != PinType::integer) return fail(w.from.tok, "this is " + have + ", the input of the formula is an Int");
         g.links.push_back({f.node.id, out_pin->id, to.node.id, in->id});
         continue;
       }

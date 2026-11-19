@@ -700,6 +700,29 @@ inline const std::vector<Case>& cases() {
           {"name":"Twice","inputs":[{"name":"name","type":"text","value":"n"}],"outputs":[{"name":"a","type":"text","value":""},{"name":"b","type":"text","value":""}]},
           {"name":"TakeLog","inputs":[],"outputs":[{"name":"list","type":"float_list","value":[]}]},
           {"name":"LocalTake","inputs":[{"name":"given","type":"text","value":"g"}],"outputs":[{"name":"text","type":"text","value":""},{"name":"left","type":"text","value":""}],"locals":[{"name":"Held","type":"text","value":"h"}]}]})"},
+      // An entry of a list of any length held by a call whose function runs handlers (Raise Event): while the
+      // handlers leave the list as it is, the function works on the entry (Go: Shout raises Ping, then adds to
+      // car.Speed); when a handler changes how long the list is (Open: Ping adds to Cars while Call2 holds Cars[0] -
+      // in C++ the reference would go nowhere), the run stops there with an error and the Blueprint is stopped, in
+      // every tier the same (Runtime::held_lost; logic::Held in the class).
+      {"held_entry",
+       R"({"structs":[{"name":"Car","fields":[{"name":"Speed","type":"float","value":0}]}],"variables":[
+          {"name":"Cars","type":"struct_list","of":"Car","value":[{"Speed":1}]},{"name":"Extra","type":"struct","of":"Car","value":{"Speed":5}},
+          {"name":"Grow","type":"bool","value":false},{"name":"Count","type":"int","value":0}],"nodes":[
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.call","params":{"function":"Shout","car.variable":"Cars","car.path":"[]"},"values":{"car.path0":0}},
+          {"id":3,"type":"func.entry","params":{"function":"Shout"}},{"id":4,"type":"flow.call","params":{"name":"Ping"}},
+          {"id":5,"type":"var.add","params":{"variable":"car","scope":"Shout","path":".Speed"},"values":{"amount":1}},
+          {"id":6,"type":"event.custom","params":{"name":"Ping"}},{"id":7,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},
+          {"id":8,"type":"flow.branch"},{"id":9,"type":"var.get","params":{"variable":"Grow"}},
+          {"id":10,"type":"list.add","params":{"variable":"Cars"}},{"id":11,"type":"var.get","params":{"variable":"Extra"}},
+          {"id":12,"type":"event.custom","params":{"name":"Open"}},{"id":13,"type":"var.set","params":{"variable":"Grow"},"values":{"value":true}},
+          {"id":14,"type":"func.call","params":{"function":"Call2","car.variable":"Cars","car.path":"[]"},"values":{"car.path0":0}},
+          {"id":15,"type":"func.entry","params":{"function":"Call2"}},{"id":16,"type":"flow.call","params":{"name":"Ping"}}],
+        "links":[[1,"then",2,"exec"],[3,"then",4,"exec"],[4,"then",5,"exec"],[6,"then",7,"exec"],[7,"then",8,"exec"],[9,"value",8,"condition"],
+          [8,"true",10,"exec"],[11,"value",10,"item"],[12,"then",13,"exec"],[13,"then",14,"exec"],[15,"then",16,"exec"]],"functions":[
+          {"name":"Shout","inputs":[{"name":"car","type":"struct","of":"Car","ref":true,"value":{"Speed":0}}],"outputs":[]},
+          {"name":"Call2","inputs":[{"name":"car","type":"struct","of":"Car","ref":true,"value":{"Speed":0}}],"outputs":[]}]})"},
       // Call on Actor: a function called on a Blueprint (here its own: the Level's) - one that
       // calls itself that way, every call with its own parameters and local variable; a function
       // of another Blueprint nobody has (the declared defaults); calls that never end (64 deep).
@@ -1007,6 +1030,42 @@ inline const std::vector<Case>& cases() {
        R"kg(],[3,"item",31,"a"],[4,"item",31,"b"],[31,"result",32,"a"],[32,"result",30,"item"],[27,"then",30,"exec"],[3,"item",34,"a"],[4,"item",34,"b"],[34,"result",35,"a"],[35,"result",33,"item"],[30,"then",33,)kg"
        R"kg("exec"],[3,"item",37,"a"],[4,"item",37,"b"],[37,"result",38,"a"],[38,"result",36,"item"],[33,"then",36,"exec"],[3,"item",40,"a"],[4,"item",40,"b"],[40,"result",41,"a"],[41,"result",39,"item"],[36,"the)kg"
        R"kg(n",39,"exec"],[3,"item",43,"a"],[4,"item",43,"b"],[43,"result",44,"a"],[44,"result",42,"item"],[39,"then",42,"exec"]]})kg"},
+      // A formula with Int inputs (Formula::int_input) and an Int result where its value is +, - or * of them (Formula::whole_result,
+      // read only by Ints) - in the class [](Int a, Int b) -> Int over logic::Sum - at the edges of Int (every pair of the Ints of
+      // formula_whole_ints: 2^53, 2^53 + 2, 2^62, Int's ends, mixed signs), into an Int (W) and as the 64 bits of a Float (R): i - 1,
+      // 2 * a + 1, products past Int's ends, a number that is not whole (a * 0.5), comparisons with Float results ((a < 0) != (b < 0),
+      // an Int against 2^53 + 1 and 2^63 written out), an input read where it stays a Float (?:, /), an input typed in (f), +, - and *
+      // of whole functions alone (a Float), and one formula read by an Int and a Float (-> Float).
+      {"formula_int_sums",
+       R"kg({"variables":[{"name":"In","type":"int_list","value":[0,1,-1,2,31,32,63,64,65,2147483648,-2147483648,4294967296,-4294967296,9007199254740991,-9007199254740991,9007199254740992,-9007199254740992,900719)kg"
+       R"kg(9254740994,-9007199254740994,4611686018427387904,-4611686018427387904,9223372036854775807,-9223372036854775807]},{"name":"R","type":"int64_list","value":[]},{"name":"W","type":"int_list","value":[]}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"In"}},{"id":3,"type":"flow.for_each","params":{"type":"int"}},{"id":4,"type":"flow.for_each","params":{"type":"int)kg"
+       R"kg("}},{"id":5,"type":"math.formula","params":{"formula":"a - 1"}},{"id":6,"type":"list.add","params":{"variable":"W"}},{"id":7,"type":"math.formula","params":{"formula":"2 * a + 1"}},{"id":8,"type":"lis)kg"
+       R"kg(t.add","params":{"variable":"W"}},{"id":9,"type":"math.formula","params":{"formula":"a + b"}},{"id":10,"type":"list.add","params":{"variable":"W"}},{"id":11,"type":"math.formula","params":{"formula":")kg"
+       R"kg(a - b"}},{"id":12,"type":"list.add","params":{"variable":"W"}},{"id":13,"type":"math.formula","params":{"formula":"a * b"}},{"id":14,"type":"list.add","params":{"variable":"W"}},{"id":15,"type":"math.)kg"
+       R"kg(formula","params":{"formula":"a * b - a"}},{"id":16,"type":"list.add","params":{"variable":"W"}},{"id":17,"type":"math.formula","params":{"formula":"a * 0.5 + b"}},{"id":18,"type":"list.add","params":)kg"
+       R"kg({"variable":"W"}},{"id":19,"type":"math.formula","params":{"formula":"(a < 0) != (b < 0)"}},{"id":20,"type":"list.add","params":{"variable":"W"}},{"id":21,"type":"math.formula","params":{"formula":"a )kg"
+       R"kg(- 1 < b"}},{"id":22,"type":"list.add","params":{"variable":"W"}},{"id":23,"type":"math.formula","params":{"formula":"a == 9007199254740993"}},{"id":24,"type":"list.add","params":{"variable":"W"}},{"id)kg"
+       R"kg(":25,"type":"math.formula","params":{"formula":"a >= 9223372036854775807"}},{"id":26,"type":"list.add","params":{"variable":"W"}},{"id":27,"type":"math.formula","params":{"formula":"a < b ? a : b"}},{)kg"
+       R"kg("id":28,"type":"list.add","params":{"variable":"W"}},{"id":29,"type":"math.formula","params":{"formula":"a / 2 + b"}},{"id":30,"type":"list.add","params":{"variable":"W"}},{"id":31,"type":"math.formul)kg"
+       R"kg(a","params":{"formula":"a + f"},"values":{"f":0.25}},{"id":32,"type":"list.add","params":{"variable":"W"}},{"id":33,"type":"math.formula","params":{"formula":"band(a, 7) * b + a"}},{"id":34,"type":"li)kg"
+       R"kg(st.add","params":{"variable":"W"}},{"id":35,"type":"math.formula","params":{"formula":"band(a, 1) + 2"}},{"id":36,"type":"list.add","params":{"variable":"W"}},{"id":37,"type":"math.formula","params":{)kg"
+       R"kg("formula":"b - a * 3 >= a + 1"}},{"id":38,"type":"list.add","params":{"variable":"W"}},{"id":39,"type":"math.formula","params":{"formula":"a + b"}},{"id":40,"type":"int64.bits_of_float"},{"id":41,"typ)kg"
+       R"kg(e":"list.add","params":{"variable":"R"}},{"id":42,"type":"math.formula","params":{"formula":"a * b * a"}},{"id":43,"type":"int64.bits_of_float"},{"id":44,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":45,"type":"math.formula","params":{"formula":"a - 1"}},{"id":46,"type":"int64.bits_of_float"},{"id":47,"type":"list.add","params":{"variable":"R"}},{"id":48,"type":"math.formula","params":{"formu)kg"
+       R"kg(la":"(a < b) + (a == b) * 2"}},{"id":49,"type":"int64.bits_of_float"},{"id":50,"type":"list.add","params":{"variable":"R"}},{"id":51,"type":"math.formula","params":{"formula":"a * b + 1"}},{"id":52,"t)kg"
+       R"kg(ype":"list.add","params":{"variable":"W"}},{"id":53,"type":"int64.bits_of_float"},{"id":54,"type":"list.add","params":{"variable":"R"}}],"links":[[2,"value",3,"list"],[1,"then",3,"exec"],[2,"value",4,)kg"
+       R"kg("list"],[3,"body",4,"exec"],[3,"item",5,"a"],[5,"result",6,"item"],[4,"body",6,"exec"],[3,"item",7,"a"],[7,"result",8,"item"],[6,"then",8,"exec"],[3,"item",9,"a"],[4,"item",9,"b"],[9,"result",10,"item)kg"
+       R"kg("],[8,"then",10,"exec"],[3,"item",11,"a"],[4,"item",11,"b"],[11,"result",12,"item"],[10,"then",12,"exec"],[3,"item",13,"a"],[4,"item",13,"b"],[13,"result",14,"item"],[12,"then",14,"exec"],[3,"item",15)kg"
+       R"kg(,"a"],[4,"item",15,"b"],[15,"result",16,"item"],[14,"then",16,"exec"],[3,"item",17,"a"],[4,"item",17,"b"],[17,"result",18,"item"],[16,"then",18,"exec"],[3,"item",19,"a"],[4,"item",19,"b"],[19,"result")kg"
+       R"kg(,20,"item"],[18,"then",20,"exec"],[3,"item",21,"a"],[4,"item",21,"b"],[21,"result",22,"item"],[20,"then",22,"exec"],[3,"item",23,"a"],[23,"result",24,"item"],[22,"then",24,"exec"],[3,"item",25,"a"],[2)kg"
+       R"kg(5,"result",26,"item"],[24,"then",26,"exec"],[3,"item",27,"a"],[4,"item",27,"b"],[27,"result",28,"item"],[26,"then",28,"exec"],[3,"item",29,"a"],[4,"item",29,"b"],[29,"result",30,"item"],[28,"then",30,)kg"
+       R"kg("exec"],[3,"item",31,"a"],[31,"result",32,"item"],[30,"then",32,"exec"],[3,"item",33,"a"],[4,"item",33,"b"],[33,"result",34,"item"],[32,"then",34,"exec"],[3,"item",35,"a"],[35,"result",36,"item"],[34,)kg"
+       R"kg("then",36,"exec"],[3,"item",37,"a"],[4,"item",37,"b"],[37,"result",38,"item"],[36,"then",38,"exec"],[3,"item",39,"a"],[4,"item",39,"b"],[39,"result",40,"a"],[40,"result",41,"item"],[38,"then",41,"exec)kg"
+       R"kg("],[3,"item",42,"a"],[4,"item",42,"b"],[42,"result",43,"a"],[43,"result",44,"item"],[41,"then",44,"exec"],[3,"item",45,"a"],[45,"result",46,"a"],[46,"result",47,"item"],[44,"then",47,"exec"],[3,"item")kg"
+       R"kg(,48,"a"],[4,"item",48,"b"],[48,"result",49,"a"],[49,"result",50,"item"],[47,"then",50,"exec"],[3,"item",51,"a"],[4,"item",51,"b"],[51,"result",52,"item"],[50,"then",52,"exec"],[51,"result",53,"a"],[53)kg"
+       R"kg(,"result",54,"item"],[52,"then",54,"exec"]]})kg"
+      },
       // A value for %s that is not a Text (what int64.text* give, long enough to be held on the heap): the class
       // hands Format Text a view of that value itself, which lives until the call ends (BlueprintCore::format_arg).
       {"format_text_of_value",

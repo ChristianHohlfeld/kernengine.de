@@ -192,6 +192,12 @@ template <std::size_t N, class T, class F> std::array<kern::u8, N> bytes_of(cons
   return out;
 }
 template <class T, class F> void of_bytes(T& v, const void* bytes, F fields) { fields(v, static_cast<const kern::u8*>(bytes)); }
+/// std::memcpy of a value of such a struct into bytes: its bytes as the program lays it out (`fields` writes them);
+/// gives where they went, as std::memcpy does.
+template <class T, class F> void* to_bytes(void* bytes, const T& v, F fields) {
+  fields(v, static_cast<kern::u8*>(bytes));
+  return bytes;
+}
 /// std::memcpy / std::memmove between lists of numbers of the program of which one holds floats (Copy
 /// Bytes; the test holds such a float as a 64-bit number - ToSingle, FromSingle): the `count` bytes the
 /// program copies, a float as its 32 bits and every other number as it is, as std::memmove copies them -
@@ -664,9 +670,31 @@ inline Value arg(std::string_view x) { return Value::text(std::string(x)); }
 template <class T>
   requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
 Value arg(T x) { return Value::integer(static_cast<kern::i64>(x)); }
+/// The values of an enum, as the Blueprint has them: by their place in the enum (0, 1, 2 ...), not by the number C++ gives
+/// them. Where those differ (`enum class ClientState : i8 { denied = -3, ... }`), the test says the numbers in their order
+/// (converted::number_enum, written by the test); otherwise a value's place is its number.
+template <class E> struct EnumNumbers { static inline std::vector<kern::i64> numbers; };
+template <class E> bool number_enum(std::initializer_list<kern::i64> numbers) {
+  EnumNumbers<E>::numbers.assign(numbers);
+  return true;
+}
+/// The place of a value of the source (-1: a number that is no value of the enum - the Blueprint has none such).
+template <class E> kern::i64 enum_place(E e) {
+  const std::vector<kern::i64>& n = EnumNumbers<E>::numbers;
+  if (n.empty()) return static_cast<kern::i64>(e);
+  for (std::size_t k = 0; k < n.size(); ++k)
+    if (n[k] == static_cast<kern::i64>(e)) return static_cast<kern::i64>(k);
+  return -1;
+}
+/// The value at a place (a place the enum does not have: that number, as the source would read it).
+template <class E> E enum_value(kern::i64 place) {
+  const std::vector<kern::i64>& n = EnumNumbers<E>::numbers;
+  if (!n.empty() && place >= 0 && place < static_cast<kern::i64>(n.size())) return static_cast<E>(n[static_cast<std::size_t>(place)]);
+  return static_cast<E>(place);
+}
 template <class E>
   requires std::is_enum_v<E>
-Value arg(E e) { return Value::enumeration(static_cast<kern::i64>(e)); }
+Value arg(E e) { return Value::enumeration(enum_place(e)); }
 /// A pair - a row of a map: the struct of its two parts.
 template <class A, class B> Value arg(const std::pair<A, B>& p) { return Value::structure({arg(p.first), arg(p.second)}); }
 template <class T> Value arg(const std::vector<T>& v) {
@@ -678,7 +706,7 @@ template <class T> Value arg(const std::vector<T>& v) {
     return Value::of(std::vector<kern::i64>(v.begin(), v.end()));
   } else if constexpr (std::is_enum_v<T>) {
     std::vector<kern::i64> out;
-    for (const T& x : v) out.push_back(static_cast<kern::i64>(x));
+    for (const T& x : v) out.push_back(enum_place(x));
     return Value::enumerations(std::move(out));
   } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
     return Value::of(std::vector<std::string>(v.begin(), v.end()));
@@ -776,7 +804,7 @@ bool same(T want, const Value& got) {
 template <class E>
   requires std::is_enum_v<E>
 bool same(E want, const Value& got) {
-  return got.i == static_cast<kern::i64>(want) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want)); }, [&] { return std::to_string(got.i); });
+  return got.i == enum_place(want) || differ_at([&] { return std::to_string(enum_place(want)); }, [&] { return std::to_string(got.i); });
 }
 template <class A, class B> bool same(const std::pair<A, B>& want, const Value& got) {
   return rows_of(got, 2) && at_place(same(want.first, (*got.rows)[0]), ".first") && at_place(same(want.second, (*got.rows)[1]), ".second");
@@ -795,8 +823,9 @@ template <class T> bool same(const std::vector<T>& want, const Value& got) {
   } else if constexpr (std::is_integral_v<T> || std::is_enum_v<T>) {
     const auto& g = got.items<kern::i64>();
     if (!lengths(want.size(), g.size())) return false;
+    const auto as_held = [](const T& x) -> kern::i64 { if constexpr (std::is_enum_v<T>) return enum_place(x); else return static_cast<kern::i64>(x); };
     for (std::size_t i = 0; i < want.size(); ++i)
-      if (!at_place(g[i] == static_cast<kern::i64>(want[i]) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want[i])); }, [&] { return std::to_string(g[i]); }), "[" + std::to_string(i) + "]"))
+      if (!at_place(g[i] == as_held(want[i]) || differ_at([&] { return std::to_string(as_held(want[i])); }, [&] { return std::to_string(g[i]); }), "[" + std::to_string(i) + "]"))
         return false;
     return true;
   } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
@@ -1034,7 +1063,7 @@ template <class T>
 void take(T& to, const Value& v) { to = static_cast<T>(v.as_int()); }
 template <class E>
   requires std::is_enum_v<E>
-void take(E& to, const Value& v) { to = static_cast<E>(v.i); }
+void take(E& to, const Value& v) { to = enum_value<E>(v.i); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(T*& to, const Value& v) { to = engine_object<std::remove_const_t<T>>(v.as_int()); }   // (one the source may only read: the same object)
@@ -1520,6 +1549,22 @@ inline Value read_state(const kern::logic::Instance& inst, const Variables& vars
   return Value::structure(std::move(out));
 }
 
+/// How much a value holds: one for every value in it (a struct, a list, a map with what is in them).
+inline long long weight(const Value& v) {
+  using kern::logic::PinType;
+  long long w = 1;
+  if (v.type == PinType::structure) {
+    if (v.rows) for (const Value& r : *v.rows) w += weight(r);
+  } else if (v.type == PinType::structure_list) {
+    for (const Value& r : v.items<Value>()) w += weight(r);
+  } else if (v.type == PinType::map) {
+    for (std::size_t k = 0; k < v.size(); ++k) w += 1 + weight(v.keyed().value_at(k));
+  } else if (v.type == PinType::set || kern::logic::is_list(v.type)) {
+    w += static_cast<long long>(v.size());
+  }
+  return w;
+}
+
 /// The comparison of one function over its calls.
 struct Tally {
   const char* function;
@@ -1528,19 +1573,33 @@ struct Tally {
   int refused = 0;                   // calls not compared: the engine itself refused a call of the source (real_engine)
   std::string first_refused;         // (the first such call of the source: said in the note)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
-  double slowest = 0;
+  long long most_passes_alone = 0;   // (of the calls compared with the class alone: the most loop passes of one)
+  double class_seconds = 0, interpreter_seconds = 0, take_seconds = 0;   // (where the function's time went: said in its "time:" line)
+  long long held = 0, passes = 0, most_passes = 0;     // (what the calls were given and their objects held; the loop passes of the class)
+  long long work = 0;                                  // (both together: the work of the calls so far - see more())
+  mutable int drawn = 0;                               // (the calls drawn: what more() was asked for)
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(const char* f) : function(f) { cost::tracing = cost::where() && std::strcmp(cost::where(), f) == 0; }
-  /// Is there another call to make? Up to kCalls compared ones; of a function that takes long, as many
-  /// as two seconds have room for, but twenty at least. (What the source says nothing for is drawn again.)
+  /// Is there another call to make? Up to kCalls compared ones; of a function whose calls are much work, as many
+  /// as kWork has room for, but twenty at least. (What the source says nothing for is drawn again.)
+  /// The work of a call is counted, not timed - a test gives the same verdict in every run, on any machine: the
+  /// values it is given and its object holds (weight: what is drawn, handed to the Blueprints, read back and
+  /// compared - one each) and the loop passes of the class (Runtime::budget counts them, the same in every tier) -
+  /// one for ten in the class, a hundred for one in the interpreter. (In units of about a microsecond: measured
+  /// with work-t1-vergleich-101036-32705 - a value about 1.3 µs, a pass of the class 0.12 µs, of the interpreter 90-280 µs.)
   bool more(int tried) const {
+    drawn = tried;
     if (compared >= kCalls || tried >= kCalls * 20) return false;
-    if (compared >= 20) return seconds() < 2.0;
-    return compared < 5 || seconds() < kLong;
+    if (compared >= 20) return work < kWork;
+    return compared < 5 || work < kLongWork;
   }
-  /// A function whose calls take seconds each (a number raised to a 256-bit power, limb by limb): five
-  /// compared calls at least, and as many more as twenty seconds have room for.
-  static constexpr double kLong = 20.0;
+  static constexpr long long kWork = 1000000;
+  /// A function whose calls are each a great deal of work (a number raised to a 256-bit power, limb by limb): five
+  /// compared calls at least, and as many more, up to twenty, as kLongWork has room for.
+  static constexpr long long kLongWork = 20000000;
+  /// A call in whose class loops pass more often than this would take the interpreter minutes: it is compared with
+  /// the class alone, and the function's line says so (~Tally).
+  static constexpr long long kInterpreterPasses = 5000;
   double seconds() const { return std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count(); }
   /// One call. `want`: what the source gives, computed with the Blueprint language's numbers;
   /// `left`: the source divided by zero or left the numbers on the way - nothing to compare.
@@ -1554,7 +1613,17 @@ struct Tally {
   template <class Want, class Describe>
   void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}, const Variables* state = nullptr,
             bool changes = false) {
+    struct Took {   // (the whole of take: what the Blueprints' variables, the calls and the comparing cost)
+      double& sum;
+      std::chrono::steady_clock::time_point at = std::chrono::steady_clock::now();
+      ~Took() { sum += std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count(); }
+    } const took_all{take_seconds};
     if (!bp.interp || !bp.native) return;
+    long long given = 0;
+    for (const Value& v : args) given += weight(v);
+    if (state) for (const auto& v : *state) given += weight(v.second);
+    held += given;
+    work += given;
     if (left || !defined(want)) { ++outside; return; }
     // The engine itself (SC_ENGINE=real) refused a call the source made: what the source got there is the
     // zeros of a call that did not happen, not what C++ says - nothing to compare; drawn again (the twenty
@@ -1576,9 +1645,9 @@ struct Tally {
       for (int k : order) fields.push_back(given[static_cast<std::size_t>(k)]);
       given = {Value::structure(std::move(fields))};
     };
-    // The compiled class first. A call that takes it long (a sound of a hundred thousand samples, a number
-    // raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the class
-    // alone, and the function's line says so (~Tally).
+    // The compiled class first. A call whose loops pass very often (a sound of a hundred thousand samples, a
+    // number raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the
+    // class alone, and the function's line says so (~Tally).
     std::vector<Value> a, b;
     bp.before_call(true);
     const auto before = std::chrono::steady_clock::now();
@@ -1586,10 +1655,17 @@ struct Tally {
     g_class_asks = 0;
     const bool ib = bp.native->call(function, args, b);
     const long class_asks = g_class_asks;
-    const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
-    const bool both = took < 0.005;
+    const long long looped = bp.native->counters()[3];   // (the loop passes of this call - the runtime counts from zero for a call from outside)
+    passes += looped;
+    work += looped / 10;
+    most_passes = std::max(most_passes, looped);
+    class_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
+    const bool both = looped <= kInterpreterPasses;
+    if (both) work += looped * 100;
     if (both) bp.before_call(false);
+    const auto interpreter_began = std::chrono::steady_clock::now();
     const bool ia = both ? bp.interp->call(function, args, a) : ib;
+    interpreter_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - interpreter_began).count();
     if (state && changes) {
       b.push_back(read_state(*bp.native, *state));
       if (both) a.push_back(read_state(*bp.interp, *state));
@@ -1618,7 +1694,7 @@ struct Tally {
     if (!both) {
       a = b;
       ++class_only;
-      slowest = std::max(slowest, took);
+      most_passes_alone = std::max(most_passes_alone, looped);
     }
     ++compared;
     if (class_asks > source_asks) {
@@ -1651,17 +1727,23 @@ struct Tally {
   void given_up() { ++outside; }
   ~Tally() {
     cost::tracing = false;
+    // (a function that takes the test a second or more: where the time went - the class, the interpreter, setting and reading the
+    // Blueprints' variables and comparing, or drawing the arguments and the object and the source's call)
+    if (seconds() >= 1.0)
+      std::printf("  time: %s: %.1f s (the class %.1f s, the interpreter %.1f s, the Blueprints' variables and comparing %.1f s, drawing and the source %.1f s) - %d calls drawn, %d compared; %lld values given and held, %lld loop passes of the class (up to %lld in a call)\n",
+                  function, seconds(), class_seconds, interpreter_seconds, take_seconds - class_seconds - interpreter_seconds, seconds() - take_seconds, drawn, compared, held, passes,
+                  most_passes);
     if (class_only > 0)
-      std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
-                  function, class_only, compared, slowest * 1000);
+      std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call in whose class loops pass more than %lld times - here up to %lld - is not run in the interpreter)\n",
+                  function, class_only, compared, kInterpreterPasses, most_passes_alone);
     if (refused > 0)
       std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared; the first: %s)\n", function, refused, compared,
                   first_refused.c_str());
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     if (costlier > 0)
       std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
-    const bool long_calls = compared >= 5 && compared < 20 && seconds() >= kLong;
-    if (long_calls) std::printf("  note: %s: %d calls compared (they take %.0f s; of a function whose calls take less, twenty at least are)\n", function, compared, seconds());
+    const bool long_calls = compared >= 5 && compared < 20 && work >= kLongWork;
+    if (long_calls) std::printf("  note: %s: %d calls compared (their work: %lld values and loop passes; of a function whose calls are less work, twenty at least are)\n", function, compared, work);
     SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);
   }
 };
@@ -1692,6 +1774,24 @@ inline void open_read() {
     g_can_bail = false;
     std::longjmp(g_bail, 1);
   }
+}
+
+/// A place in the bytes of a text (`s.c_str() + n`, `s.data() + n` - CText: of c_str(), a C text): in the text or at its
+/// end, where a std::string's null stands - as C++ defines it. Beyond the end, or before the start, C++ leaves open what a
+/// read there gives (the bytes after the text: what the memory held): the call is marked (open_read), and the place is the
+/// text's end - nothing of the text, and nothing behind it, is read from there. (The text is said once, as in the source.)
+template <bool CText, class S, class N> auto text_end(S&& s, N n) {
+  using M = std::remove_cvref_t<N>;
+  static_assert(std::is_integral_v<M>, "a place in a text is a whole number of bytes from its start");
+  const auto first = [&] {
+    if constexpr (CText) return s.c_str();
+    else return s.data();
+  }();
+  const unsigned long long size = s.size();
+  const bool in = std::is_signed_v<M> ? n >= 0 && static_cast<unsigned long long>(n) <= size : static_cast<unsigned long long>(n) <= size;
+  if (in) return first + n;
+  open_read();
+  return first + size;
 }
 
 /// What a std::unique_ptr or a std::optional holds, where the source reads it (`*p`, `p->x`): of one that holds
