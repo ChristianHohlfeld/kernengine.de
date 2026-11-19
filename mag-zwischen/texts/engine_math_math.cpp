@@ -1,0 +1,255 @@
+struct engine_math_math : virtual kern::Library {
+  // ---- types ----
+  KERN_STRUCT(Mat4) { Fixed<Float, 16> m = List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
+  KERN_STRUCT(Quat) { Float x = 0.0; Float y = 0.0; Float z = 0.0; Float w = 1.0; };
+  KERN_STRUCT(Vec4) { Float x = 0.0; Float y = 0.0; Float z = 0.0; Float w = 0.0; };
+  KERN_STRUCT(Camera) { Vector eye = Vector{0.0, -18.0, 8.0}; Vector target = Vector{0.0, 0.0, 2.0}; Vector up = Vector{0.0, 0.0, 1.0}; Float fov = 1.0471975511965976; Float near = 0.05; Float far = 1800.0; Bool orthographic = false; Float ortho_height = 20.0; Bool has_projection = false; Mat4 projection = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+
+  // ---- functions ----
+  struct Vec4_newResult { Vec4 Result = Vec4{0.0, 0.0, 0.0, 0.0}; };
+  KERN_PURE Vec4_newResult Vec4_new(Float x_ = 0.0, Float y_ = 0.0, Float z_ = 0.0, Float w_ = 0.0) {
+    Vec4 self = Vec4{0.0, 0.0, 0.0, 0.0};
+    self.x = x_;
+    self.y = y_;
+    self.z = z_;
+    self.w = w_;
+    return {self};
+  }
+
+  struct Quat_axis_angleResult { Quat Result = Quat{0.0, 0.0, 0.0, 1.0}; };
+  KERN_PURE Quat_axis_angleResult Quat_axis_angle(Vector axis = Vector{0.0, 0.0, 0.0}, Float radians = 0.0) {
+    Vector a = Vector{0.0, 0.0, 0.0};
+    Float s = 0.0;
+    a = logic_select<Vector>(math_compare<">">(vector_length(axis), 9.999999717180685e-10), vector_normalize(axis), Vector{0.0, 0.0, 1.0});
+    s = kern::formula([](Float radians) -> Float { return kern::math::sin((radians * 0.5)); }, radians);
+    return {struct_make<Quat>(kern::formula([](Float x, Float s) -> Float { return (x * s); }, vector_break(a).x, s), kern::formula([](Float y, Float s) -> Float { return (y * s); }, vector_break(a).y, s), kern::formula([](Float z, Float s) -> Float { return (z * s); }, vector_break(a).z, s), kern::formula([](Float radians) -> Float { return kern::math::cos((radians * 0.5)); }, radians))};
+  }
+
+  struct Quat_mulResult { Quat Result = Quat{0.0, 0.0, 0.0, 1.0}; };
+  KERN_PURE Quat_mulResult Quat_mul(const Quat& self, const Quat& b) {
+    return {struct_make<Quat>(kern::formula([](Float w, Float x, Float x_2, Float w_2, Float y, Float z, Float z_2, Float y_2) -> Float { return ((((w * x) + (x_2 * w_2)) + (y * z)) - (z_2 * y_2)); }, self.w, b.x, self.x, b.w, self.y, b.z, self.z, b.y), kern::formula([](Float w, Float y, Float x, Float z, Float y_2, Float w_2, Float z_2, Float x_2) -> Float { return ((((w * y) - (x * z)) + (y_2 * w_2)) + (z_2 * x_2)); }, self.w, b.y, self.x, b.z, self.y, b.w, self.z, b.x), kern::formula([](Float w, Float z, Float x, Float y, Float y_2, Float x_2, Float z_2, Float w_2) -> Float { return ((((w * z) + (x * y)) - (y_2 * x_2)) + (z_2 * w_2)); }, self.w, b.z, self.x, b.y, self.y, b.x, self.z, b.w), kern::formula([](Float w, Float w_2, Float x, Float x_2, Float y, Float y_2, Float z, Float z_2) -> Float { return ((((w * w_2) - (x * x_2)) - (y * y_2)) - (z * z_2)); }, self.w, b.w, self.x, b.x, self.y, b.y, self.z, b.z))};
+  }
+
+  struct Quat_rotateResult { Vector Result = Vector{0.0, 0.0, 0.0}; };
+  KERN_PURE Quat_rotateResult Quat_rotate(const Quat& self, Vector v = Vector{0.0, 0.0, 0.0}) {
+    Vector q = Vector{0.0, 0.0, 0.0};
+    Vector t = Vector{0.0, 0.0, 0.0};
+    q = vector_make(self.x, self.y, self.z);
+    t = vector_scale(vector_cross(q, v), 2.0);
+    return {vector_add(vector_add(v, vector_scale(t, self.w)), vector_cross(q, t))};
+  }
+
+  struct Mat4_translationResult { Vector Result = Vector{0.0, 0.0, 0.0}; };
+  KERN_PURE Mat4_translationResult Mat4_translation(const Mat4& self) {
+    return {vector_make(self.m[12], self.m[13], self.m[14])};
+  }
+
+  struct Mat4_mulResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  KERN_PURE Mat4_mulResult Mat4_mul(const Mat4& self, const Mat4& b) {
+    Mat4 r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    Float b0 = 0.0;
+    Float b1 = 0.0;
+    Float b2 = 0.0;
+    Float b3 = 0.0;
+    r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    for (auto it10 = flow_for(n10, 0, 3); it10.next();) {
+      b0 = b.m[kern::to<Int>(kern::formula([](Float index) -> Float { return (4.0 * index); }, kern::to<Float>(n10.index)))];
+      b1 = b.m[kern::to<Int>(kern::formula([](Float index) -> Float { return ((4.0 * index) + 1.0); }, kern::to<Float>(n10.index)))];
+      b2 = b.m[kern::to<Int>(kern::formula([](Float index) -> Float { return ((4.0 * index) + 2.0); }, kern::to<Float>(n10.index)))];
+      b3 = b.m[kern::to<Int>(kern::formula([](Float index) -> Float { return ((4.0 * index) + 3.0); }, kern::to<Float>(n10.index)))];
+      for (auto it11 = flow_for(n11, 0, 3); it11.next();) {
+        r.m[kern::to<Int>(kern::formula([](Float index, Float index_2) -> Float { return ((4.0 * index) + index_2); }, kern::to<Float>(n10.index), kern::to<Float>(n11.index)))] = kern::formula([](Float a, Float b0, Float a_2, Float b1, Float a_3, Float b2, Float a_4, Float b3) -> Float { return ((((a * b0) + (a_2 * b1)) + (a_3 * b2)) + (a_4 * b3)); }, self.m[n11.index], b0, self.m[kern::to<Int>(kern::formula([](Float index) -> Float { return (4.0 + index); }, kern::to<Float>(n11.index)))], b1, self.m[kern::to<Int>(kern::formula([](Float index) -> Float { return (8.0 + index); }, kern::to<Float>(n11.index)))], b2, self.m[kern::to<Int>(kern::formula([](Float index) -> Float { return (12.0 + index); }, kern::to<Float>(n11.index)))], b3);
+      }
+    }
+    return {r};
+  }
+
+  struct Mat4_transform_pointResult { Vector Result = Vector{0.0, 0.0, 0.0}; };
+  KERN_PURE Mat4_transform_pointResult Mat4_transform_point(const Mat4& self, Vector p = Vector{0.0, 0.0, 0.0}) {
+    return {vector_make(kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z, Float a_4) -> Float { return ((((a * x) + (a_2 * y)) + (a_3 * z)) + a_4); }, self.m[0], vector_break(p).x, self.m[4], vector_break(p).y, self.m[8], vector_break(p).z, self.m[12]), kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z, Float a_4) -> Float { return ((((a * x) + (a_2 * y)) + (a_3 * z)) + a_4); }, self.m[1], vector_break(p).x, self.m[5], vector_break(p).y, self.m[9], vector_break(p).z, self.m[13]), kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z, Float a_4) -> Float { return ((((a * x) + (a_2 * y)) + (a_3 * z)) + a_4); }, self.m[2], vector_break(p).x, self.m[6], vector_break(p).y, self.m[10], vector_break(p).z, self.m[14]))};
+  }
+
+  struct Mat4_transform_vectorResult { Vector Result = Vector{0.0, 0.0, 0.0}; };
+  KERN_PURE Mat4_transform_vectorResult Mat4_transform_vector(const Mat4& self, Vector v = Vector{0.0, 0.0, 0.0}) {
+    return {vector_make(kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z) -> Float { return (((a * x) + (a_2 * y)) + (a_3 * z)); }, self.m[0], vector_break(v).x, self.m[4], vector_break(v).y, self.m[8], vector_break(v).z), kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z) -> Float { return (((a * x) + (a_2 * y)) + (a_3 * z)); }, self.m[1], vector_break(v).x, self.m[5], vector_break(v).y, self.m[9], vector_break(v).z), kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z) -> Float { return (((a * x) + (a_2 * y)) + (a_3 * z)); }, self.m[2], vector_break(v).x, self.m[6], vector_break(v).y, self.m[10], vector_break(v).z))};
+  }
+
+  struct Mat4_transformResult { Vec4 Result = Vec4{0.0, 0.0, 0.0, 0.0}; };
+  KERN_PURE Mat4_transformResult Mat4_transform(const Mat4& self, Vec4 p = Vec4{0.0, 0.0, 0.0, 0.0}) {
+    return {Vec4_new(kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z, Float a_4, Float w) -> Float { return ((((a * x) + (a_2 * y)) + (a_3 * z)) + (a_4 * w)); }, self.m[0], p.x, self.m[4], p.y, self.m[8], p.z, self.m[12], p.w), kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z, Float a_4, Float w) -> Float { return ((((a * x) + (a_2 * y)) + (a_3 * z)) + (a_4 * w)); }, self.m[1], p.x, self.m[5], p.y, self.m[9], p.z, self.m[13], p.w), kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z, Float a_4, Float w) -> Float { return ((((a * x) + (a_2 * y)) + (a_3 * z)) + (a_4 * w)); }, self.m[2], p.x, self.m[6], p.y, self.m[10], p.z, self.m[14], p.w), kern::formula([](Float a, Float x, Float a_2, Float y, Float a_3, Float z, Float a_4, Float w) -> Float { return ((((a * x) + (a_2 * y)) + (a_3 * z)) + (a_4 * w)); }, self.m[3], p.x, self.m[7], p.y, self.m[11], p.z, self.m[15], p.w)).Result};
+  }
+
+  struct Mat4_translateResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  KERN_PURE Mat4_translateResult Mat4_translate(Vector t = Vector{0.0, 0.0, 0.0}) {
+    Mat4 r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r.m[12] = vector_break(t).x;
+    r.m[13] = vector_break(t).y;
+    r.m[14] = vector_break(t).z;
+    return {r};
+  }
+
+  struct Mat4_scaleResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  KERN_PURE Mat4_scaleResult Mat4_scale(Vector s = Vector{0.0, 0.0, 0.0}) {
+    Mat4 r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r.m[0] = vector_break(s).x;
+    r.m[5] = vector_break(s).y;
+    r.m[10] = vector_break(s).z;
+    return {r};
+  }
+
+  struct Mat4_trsResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  /// Translation * rotation * scale.
+  KERN_PURE Mat4_trsResult Mat4_trs(Vector t = Vector{0.0, 0.0, 0.0}, Quat q = Quat{0.0, 0.0, 0.0, 1.0}, Vector s = Vector{0.0, 0.0, 0.0}) {
+    Float x2 = 0.0;
+    Float y2 = 0.0;
+    Float z2 = 0.0;
+    Float xx = 0.0;
+    Float xy = 0.0;
+    Float xz = 0.0;
+    Float yy = 0.0;
+    Float yz = 0.0;
+    Float zz = 0.0;
+    Float wx = 0.0;
+    Float wy = 0.0;
+    Float wz = 0.0;
+    Mat4 r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    x2 = kern::formula([](Float x) -> Float { return (x + x); }, q.x);
+    y2 = kern::formula([](Float y) -> Float { return (y + y); }, q.y);
+    z2 = kern::formula([](Float z) -> Float { return (z + z); }, q.z);
+    xx = kern::formula([](Float x, Float x2) -> Float { return (x * x2); }, q.x, x2);
+    xy = kern::formula([](Float x, Float y2) -> Float { return (x * y2); }, q.x, y2);
+    xz = kern::formula([](Float x, Float z2) -> Float { return (x * z2); }, q.x, z2);
+    yy = kern::formula([](Float y, Float y2) -> Float { return (y * y2); }, q.y, y2);
+    yz = kern::formula([](Float y, Float z2) -> Float { return (y * z2); }, q.y, z2);
+    zz = kern::formula([](Float z, Float z2) -> Float { return (z * z2); }, q.z, z2);
+    wx = kern::formula([](Float w, Float x2) -> Float { return (w * x2); }, q.w, x2);
+    wy = kern::formula([](Float w, Float y2) -> Float { return (w * y2); }, q.w, y2);
+    wz = kern::formula([](Float w, Float z2) -> Float { return (w * z2); }, q.w, z2);
+    r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r.m[0] = kern::formula([](Float yy, Float zz, Float x) -> Float { return (((1.0 - yy) - zz) * x); }, yy, zz, vector_break(s).x);
+    r.m[1] = kern::formula([](Float xy, Float wz, Float x) -> Float { return ((xy + wz) * x); }, xy, wz, vector_break(s).x);
+    r.m[2] = kern::formula([](Float xz, Float wy, Float x) -> Float { return ((xz - wy) * x); }, xz, wy, vector_break(s).x);
+    r.m[3] = 0.0;
+    r.m[4] = kern::formula([](Float xy, Float wz, Float y) -> Float { return ((xy - wz) * y); }, xy, wz, vector_break(s).y);
+    r.m[5] = kern::formula([](Float xx, Float zz, Float y) -> Float { return (((1.0 - xx) - zz) * y); }, xx, zz, vector_break(s).y);
+    r.m[6] = kern::formula([](Float yz, Float wx, Float y) -> Float { return ((yz + wx) * y); }, yz, wx, vector_break(s).y);
+    r.m[7] = 0.0;
+    r.m[8] = kern::formula([](Float xz, Float wy, Float z) -> Float { return ((xz + wy) * z); }, xz, wy, vector_break(s).z);
+    r.m[9] = kern::formula([](Float yz, Float wx, Float z) -> Float { return ((yz - wx) * z); }, yz, wx, vector_break(s).z);
+    r.m[10] = kern::formula([](Float xx, Float yy, Float z) -> Float { return (((1.0 - xx) - yy) * z); }, xx, yy, vector_break(s).z);
+    r.m[11] = 0.0;
+    r.m[12] = vector_break(t).x;
+    r.m[13] = vector_break(t).y;
+    r.m[14] = vector_break(t).z;
+    r.m[15] = 1.0;
+    return {r};
+  }
+
+  struct Mat4_perspectiveResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  KERN_PURE Mat4_perspectiveResult Mat4_perspective(Float fov = 0.0, Float aspect = 0.0, Float near = 0.0, Float far = 0.0) {
+    Float f = 0.0;
+    Float nf = 0.0;
+    Mat4 r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    f = kern::formula([](Float fov) -> Float { return kern::math::div(1.0, kern::math::tan((fov * 0.5))); }, fov);
+    nf = kern::formula([](Float near, Float far) -> Float { return kern::math::div(1.0, (near - far)); }, near, far);
+    r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r.m = List<Float>{};
+    r.m[0] = kern::formula([](Float f, Float aspect) -> Float { return kern::math::div(f, aspect); }, f, aspect);
+    r.m[5] = f;
+    r.m[10] = kern::formula([](Float far, Float near, Float nf) -> Float { return ((far + near) * nf); }, far, near, nf);
+    r.m[11] = -1.0;
+    r.m[14] = kern::formula([](Float far, Float near, Float nf) -> Float { return (((2.0 * far) * near) * nf); }, far, near, nf);
+    return {r};
+  }
+
+  struct Mat4_orthoResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  KERN_PURE Mat4_orthoResult Mat4_ortho(Float l = 0.0, Float r_ = 0.0, Float b = 0.0, Float t = 0.0, Float n = 0.0, Float f = 0.0) {
+    Mat4 r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    r.m = List<Float>{};
+    r.m[0] = kern::formula([](Float r_, Float l) -> Float { return kern::math::div(2.0, (r_ - l)); }, r_, l);
+    r.m[5] = kern::formula([](Float t, Float b) -> Float { return kern::math::div(2.0, (t - b)); }, t, b);
+    r.m[10] = kern::formula([](Float f, Float n) -> Float { return kern::math::div((-2.0), (f - n)); }, f, n);
+    r.m[12] = kern::formula([](Float r_, Float l) -> Float { return kern::math::div((-(r_ + l)), (r_ - l)); }, r_, l);
+    r.m[13] = kern::formula([](Float t, Float b) -> Float { return kern::math::div((-(t + b)), (t - b)); }, t, b);
+    r.m[14] = kern::formula([](Float f, Float n) -> Float { return kern::math::div((-(f + n)), (f - n)); }, f, n);
+    r.m[15] = 1.0;
+    return {r};
+  }
+
+  struct Mat4_look_atResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  /// View matrix. Returns identity (and false in `ok`) for a degenerate basis.
+  Mat4_look_atResult Mat4_look_at(Bool& ok, Vector eye = Vector{0.0, 0.0, 0.0}, Vector target = Vector{0.0, 0.0, 0.0}, Vector up = Vector{0.0, 0.0, 0.0}) {
+    Vector z = Vector{0.0, 0.0, 0.0};
+    Float len = 0.0;
+    Mat4 r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    Vector x = Vector{0.0, 0.0, 0.0};
+    Vector y = Vector{0.0, 0.0, 0.0};
+    z = vector_sub(eye, target);
+    len = vector_length(z);
+    r = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}};
+    if (logic_not(math_compare<">">(len, 1e-10))) {
+      ok = false;
+      return {r};
+    }
+    z = vector_make(kern::formula([](Float a, Float b) -> Float { return kern::math::div(a, kern::math::single(b)); }, vector_break(z).x, len), kern::formula([](Float a, Float b) -> Float { return kern::math::div(a, kern::math::single(b)); }, vector_break(z).y, len), kern::formula([](Float a, Float b) -> Float { return kern::math::div(a, kern::math::single(b)); }, vector_break(z).z, len));
+    x = vector_cross(up, z);
+    len = vector_length(x);
+    if (logic_not(math_compare<">">(len, 1e-10))) {
+      ok = false;
+      return {r};
+    }
+    x = vector_make(kern::formula([](Float a, Float b) -> Float { return kern::math::div(a, kern::math::single(b)); }, vector_break(x).x, len), kern::formula([](Float a, Float b) -> Float { return kern::math::div(a, kern::math::single(b)); }, vector_break(x).y, len), kern::formula([](Float a, Float b) -> Float { return kern::math::div(a, kern::math::single(b)); }, vector_break(x).z, len));
+    y = vector_cross(z, x);
+    r.m[0] = vector_break(x).x;
+    r.m[1] = vector_break(y).x;
+    r.m[2] = vector_break(z).x;
+    r.m[3] = 0.0;
+    r.m[4] = vector_break(x).y;
+    r.m[5] = vector_break(y).y;
+    r.m[6] = vector_break(z).y;
+    r.m[7] = 0.0;
+    r.m[8] = vector_break(x).z;
+    r.m[9] = vector_break(y).z;
+    r.m[10] = vector_break(z).z;
+    r.m[11] = 0.0;
+    r.m[12] = kern::formula([](Float a) -> Float { return (-a); }, vector_dot(x, eye));
+    r.m[13] = kern::formula([](Float a) -> Float { return (-a); }, vector_dot(y, eye));
+    r.m[14] = kern::formula([](Float a) -> Float { return (-a); }, vector_dot(z, eye));
+    r.m[15] = 1.0;
+    ok = true;
+    return {r};
+  }
+
+  struct Mat4_look_at_2Result { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  /// The same, where nobody asks whether it is one.
+  Mat4_look_at_2Result Mat4_look_at_2(Vector eye = Vector{0.0, 0.0, 0.0}, Vector target = Vector{0.0, 0.0, 0.0}, Vector up = Vector{0.0, 0.0, 0.0}) {
+    Bool ok = false;
+    ok = false;
+    n12 = Mat4_look_at(ok, eye, target, up);
+    return {n12.Result};
+  }
+
+  struct projection_matrixResult { Mat4 Result = Mat4{List<Float>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}}; };
+  /// Projection matrix of the camera for a viewport aspect ratio (width / height).
+  KERN_PURE projection_matrixResult projection_matrix(const Camera& c, Float aspect = 0.0) {
+    Float h = 0.0;
+    Float w = 0.0;
+    if (c.has_projection) {
+      return {c.projection};
+    }
+    if (logic_not(c.orthographic)) {
+      return {Mat4_perspective(c.fov, aspect, c.near, c.far).Result};
+    }
+    h = kern::formula([](Float ortho_height) -> Float { return (ortho_height * 0.5); }, c.ortho_height);
+    w = kern::formula([](Float h, Float aspect) -> Float { return (h * aspect); }, h, aspect);
+    return {Mat4_ortho(kern::formula([](Float w) -> Float { return (-w); }, w), w, kern::formula([](Float h) -> Float { return (-h); }, h), h, c.near, c.far).Result};
+  }
+
+  // ---- what nodes give and keep ----
+  struct : kern::Node<10> { Int index = 0; } n10;
+  struct : kern::Node<11> { Int index = 0; } n11;
+  Mat4_look_atResult n12;
+};
