@@ -458,7 +458,7 @@ class Calls:
                 if fixed:   # (an array of a fixed length: the engine reads so many)
                     later.append(f'if ({a}.size() < {fixed}) {{ o.error = "the list {pin_in} has fewer than {fixed} entries"; return false; }}')
                 nxt = params[i + 1][0] if i + 1 < len(params) else None
-                if nxt is not None and re.search(r"count|size|len|num|^n$", nxt) and pin.get(nxt, ("", None))[0] == "Int":
+                if nxt is not None and c2b.count_per(ptypes[i + 1]) is not None:   # (the type says it: kern::Count<Per>)
                     # (the first of as many as the count beside it says - Count<Per>: Per numbers each -: no more than the list has - the engine reads them)
                     after_take = f'if (ev::numbers(a{i + 1}) > {a}.size()) {{ o.error = "the list {pin_in} has fewer entries than {nxt} says"; return false; }}'
                     later.append(after_take)
@@ -595,7 +595,7 @@ class Calls:
                 if fixed:   # (an array of a fixed length: the engine reads so many)
                     later.append(f'if ({a}.size() < {fixed}) {{ kern_o->error = "the list {pin_in} has fewer than {fixed} entries"; {fail(given)} }}')
                 nxt = params[i + 1][0] if i + 1 < len(params) else None
-                if nxt is not None and re.search(r"count|size|len|num|^n$", nxt) and pin.get(nxt, ("", None))[0] == "Int":
+                if nxt is not None and c2b.count_per(ptypes[i + 1]) is not None:   # (the type says it: kern::Count<Per>)
                     # (the first of as many as the count beside it says - Count<Per>: Per numbers each -: no more than the list has - the engine reads them)
                     later.append(f'if ({EV}numbers(kern_a{i + 1}) > {a}.size()) {{ kern_o->error = "the list {pin_in} has fewer entries than {nxt} says"; {fail(given)} }}')
             elif re.match(r"kern::Span<", re.sub(r"\s*\bconst\s*&$|\s*&$", "", P)):
@@ -872,6 +872,9 @@ def main(argv):
                 waiting.append((q + "::" + q.split("::")[-1], str(w)))
         if made:
             functions.append(api.releaser(q))
+    if api.unsaid:   # (a whole number beside a pointer must say in its type that it is its count: no length is guessed)
+        raise SystemExit("engine_api.py: a whole number beside a pointer that does not say in its type that it counts what the pointer shows - "
+                         "declare it kern::Count<Per> (Per numbers each):\n  " + "\n  ".join(sorted(set(api.unsaid))))
     types = [f["type"] for f in functions]
     assert len(set(types)) == len(types), [t for t in types if types.count(t) > 1]
     if "--list" in argv:

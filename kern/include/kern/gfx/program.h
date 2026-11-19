@@ -45,11 +45,12 @@ class UniformCache {
   void set_vec3(u32 location, Vec3 v);
   void set_vec4(u32 location, Vec4 v);
   /// Arrays and matrices are compared by content (up to 64 floats cached).
-  void set_vec4_array(u32 location, const f32* values, i32 count);
-  void set_vec3_array(u32 location, const f32* values, i32 count);
+  void set_vec4_array(u32 location, const f32* values, Count<4> count);
+  void set_vec3_array(u32 location, const f32* values, Count<3> count);
   void set_mat4(u32 location, const f32* values);
   /// Uncached upload (large or always-changing data such as bone palettes).
-  static void set_mat4_array(u32 location, const f32* values, i32 count) {
+  static void set_mat4_array(u32 location, const f32* values, Count<16> n) {
+    const i32 count = static_cast<i32>(static_cast<u32>(n));   // (the matrices, as many as the caller says)
     if (location) gl::uniformMatrix4fv(location, values, count);
   }
 

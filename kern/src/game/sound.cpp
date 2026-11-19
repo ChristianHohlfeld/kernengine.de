@@ -187,12 +187,12 @@ const std::string* SoundBank::source(std::string_view id) const {
   return e && e->src ? e->src.get() : nullptr;
 }
 
-bool SoundBank::set_pcm(std::string_view id, const f32* samples, u32 frames, u32 channels, u32 rate) {
+bool SoundBank::set_pcm(std::string_view id, const f32* data, Count<1> samples, u32 channels, u32 rate) {
   Entry* e = entry(id);
   if (!e || is_builtin(id) || !mixer_.ready()) return false;
   if (e->clip) { mixer_.destroy_clip(e->clip); e->clip = 0; }
   // Down-mix anything beyond stereo is done by the host; here 1 or 2 channels.
-  e->clip = mixer_.create_clip(samples, frames, channels, rate, std::string(id));
+  e->clip = mixer_.create_clip(data, samples, channels, rate, std::string(id));
   e->requested = false;
   if (!e->clip) {
     e->failed = true;

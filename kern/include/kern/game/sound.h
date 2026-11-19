@@ -55,8 +55,9 @@ class SoundBank {
   std::vector<std::string> pending_imports() const;
   /// The source (data URL) of an imported sound for the host decoder.
   const std::string* source(std::string_view id) const;
-  /// Decoded PCM of an imported sound (interleaved, any rate); false when invalid.
-  bool set_pcm(std::string_view id, const f32* samples, u32 frames, u32 channels, u32 rate);
+  /// Decoded PCM of an imported sound: `samples` interleaved samples of `channels` channels (samples /
+  /// channels frames) at any rate; false when invalid - also a sample count that is no whole number of frames.
+  bool set_pcm(std::string_view id, const f32* data, Count<1> samples, u32 channels, u32 rate);
   void set_failed(std::string_view id, std::string reason);
   /// Duration in seconds of a ready clip (0 otherwise).
   f32 duration(std::string_view ref) const;

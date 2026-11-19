@@ -53,7 +53,7 @@ bool c0(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out)
   if (!self) return false;
   std::vector<double> a0;
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::BuildingOptions const&>>();
   ev::take<ev::Struct<S_BuildingOptions>>(o, in, 3, a2);
@@ -183,7 +183,7 @@ bool c11(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<kern::Vec2> a0;
   ev::take<ev::List<ev::Vector>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list points has fewer entries than count says"; return false; }
   self->ring(a0.empty() ? nullptr : a0.data(), std::move(a1));
@@ -221,7 +221,7 @@ bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   std::vector<double> a0;
   ev::take<ev::List<ev::Float>>(o, in, 0, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<2u>>>();
   ev::take<ev::Int>(o, in, 1, a1);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list xy has fewer entries than count says"; return false; }
   decltype(auto) r = kern::ring_area(a0.empty() ? nullptr : a0.data(), std::move(a1));
@@ -239,7 +239,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Int>(o, in, 2, a1);
   std::vector<unsigned int> a2;
   ev::take<ev::List<ev::Int>>(o, in, 3, a2);
-  auto a3 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a3 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
   ev::take<ev::List<ev::Int>>(o, in, 5, a4);
@@ -258,11 +258,11 @@ bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Int>(o, in, 1, a1);
   std::vector<unsigned int> a2;
   ev::take<ev::List<ev::Int>>(o, in, 2, a2);
-  auto a3 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a3 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 3, a3);
   std::vector<unsigned int> a4;
   ev::take<ev::List<ev::Int>>(o, in, 4, a4);
-  auto a5 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a5 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 5, a5);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list xy has fewer entries than vertex_count says"; return false; }
   if (ev::numbers(a3) > a2.size()) { o.error = "the list hole_starts has fewer entries than hole_count says"; return false; }
@@ -458,7 +458,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<double> a0;
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
   kern::RoadOptions* a2 = ev::object<kern::RoadOptions>(o, in, 3, "options");
   if (!a2) return false;
@@ -540,7 +540,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<kern::Vec2> a0;
   ev::take<ev::List<ev::Vector>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<double>>();
   ev::take<ev::Float>(o, in, 3, a2);

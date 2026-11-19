@@ -6992,8 +6992,10 @@ TEST(audio_mixer_resampling_and_stereo) {
   // Stereo clips keep their channels.
   std::vector<f32> st(48000 * 2);
   for (u32 i = 0; i < 48000; ++i) { st[i * 2] = 0.5f * std::sin(2 * kPi * 300 * i / 48000.0f); st[i * 2 + 1] = 0; }
-  const audio::ClipId sc = m.create_clip(st.data(), 48000, 2, 48000, "stereo");
-  CHECK(sc != 0 && m.clip_info(sc)->channels == 2);
+  const audio::ClipId sc = m.create_clip(st.data(), static_cast<u32>(st.size()), 2, 48000, "stereo");
+  CHECK(sc != 0 && m.clip_info(sc)->channels == 2 && m.clip_info(sc)->frames == 48000);
+  // The count says the samples it reads; one that is no whole number of frames is refused.
+  CHECK(m.create_clip(st.data(), 3, 2, 48000, "odd") == 0);
   m.play(sc, {});
   Rendered r = render_mixer(m, 9600);
   CHECK(r.rms_l > 0.1f && r.rms_r < 0.01f);

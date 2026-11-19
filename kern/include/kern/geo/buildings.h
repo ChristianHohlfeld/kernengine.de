@@ -54,7 +54,7 @@ struct GeoChunk {
 /// `seed_hash` (u32) drives colours and facade variation.
 class BuildingBuilder {
  public:
-  bool begin(const f64* stream, std::size_t length, const BuildingOptions& options);
+  bool begin(const f64* stream, Count<1> length, const BuildingOptions& options);
   /// Processes buildings until `budget_ms` elapsed. Returns true when finished.
   bool step(f64 budget_ms);
   bool done() const { return done_; }
@@ -103,7 +103,7 @@ class FootprintStream {
     rings_at_ = data_.size() - 1;
   }
   bool empty() const { return data_[0] == 0; }
-  void ring(const Vec2* points, u32 count) {
+  void ring(const Vec2* points, Count<1> count) {
     data_[rings_at_] += 1;
     data_.push_back(count);
     for (u32 i = 0; i < count; ++i) data_.insert(data_.end(), {static_cast<f64>(points[i].x), static_cast<f64>(points[i].y)});
@@ -119,6 +119,6 @@ class FootprintStream {
 /// Removes repeated points (< 1.5 cm apart) and the closing duplicate; empties
 /// the ring when fewer than 3 points or |area| <= 0.08 m^2 remain. xy pairs.
 void clean_ring(std::vector<f64>& xy);
-f64 ring_area(const f64* xy, u32 count);
+f64 ring_area(const f64* xy, Count<2> count);
 
 }  // namespace kern

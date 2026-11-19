@@ -35,7 +35,7 @@ mixer.init(48000);          // sample rate of the output device, 8000..192000; m
 
 A clip is PCM at the mixer's rate, mono or stereo.
 
-- `create_clip(samples, frames, channels, rate, name)` copies samples at any rate (3000 to 384,000 Hz) and converts them **once** to the mixer rate. Clips with more samples than 60 seconds of stereo at 384 kHz would have (`60 × 384 000 × 2`) are rejected; non-finite samples are replaced by 0 after resampling.
+- `create_clip(data, samples, channels, rate, name)` copies `samples` interleaved samples (the count says what is read, `Count<1>`; `samples / channels` frames - a count that is no whole number of frames is rejected) at any rate (3000 to 384,000 Hz) and converts them **once** to the mixer rate. Clips with more samples than 60 seconds of stereo at 384 kHz would have (`60 × 384 000 × 2`) are rejected; non-finite samples are replaced by 0 after resampling.
 - `adopt_clip(samples, channels, name, loopable)` takes over samples that are already at the mixer rate – this is how the synthesized sounds get in.
 - `destroy_clip` stops all voices of the clip. `clip_info` returns name, frames, channels, duration, peak value and whether the clip is a seamless loop.
 
@@ -357,7 +357,7 @@ The bank turns references into mixer clips.
 
 - `clip(ref)` returns the clip, or 0 as long as it is not ready – and requests it in the process.
 - **Built-in sounds** go into a queue. `prepare(budget_ms)` renders them with `BuiltinJob` in time slices and hands the result over with `adopt_clip`.
-- **Imported sounds** are "requested". The host fetches the list with `pending_imports()` and the data URL with `source(id)`, decodes it and returns the PCM with `set_pcm(id, samples, frames, channels, rate)`; from that, the bank creates a clip with `create_clip` (windowed-sinc resampling). If decoding fails, the host reports `set_failed(id, reason)`.
+- **Imported sounds** are "requested". The host fetches the list with `pending_imports()` and the data URL with `source(id)`, decodes it and returns the PCM with `set_pcm(id, data, samples, channels, rate)` (`samples` = frames × channels, as in `create_clip`); from that, the bank creates a clip with `create_clip` (windowed-sinc resampling). If decoding fails, the host reports `set_failed(id, reason)`.
 - `request_level(level)` requests in advance everything a level may need: music, ambience, impact and break sounds, the controllers' engine, jump and boost sounds, footsteps and landings depending on the movement type, weapon and hit sounds, pickup and trigger sounds (with the defaults `goal`, `hazard`, `checkpoint`, `confirm`), audio sources, `goal`/`lose` if the level can be won or lost, and `impact_light` if `impact` is used anywhere. Play then starts with everything in place.
 - `sync_assets(level)` discards clips of assets that have been removed or replaced (recognized by the identity of the source).
 

@@ -3226,46 +3226,48 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Bool>(this->kern_engine("engine.mixer.ready", {to_value(mixer)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
-  /// ---- clips ---- Copies `frames` frames of `channels` interleaved samples at `rate` and resamples them to the mixer rate. Returns 0 (and sets last_error) for invalid input.
-  void engine_mixer_create_clip(Int mixer, const List<Float>& samples, Int frames, Int channels, Int rate, const Text& name) {
+  /// ---- clips ---- Copies `samples` interleaved samples of `channels` channels at `rate` (samples / channels frames) and resamples them to the mixer rate. Returns 0 (and sets last_error) for invalid input - also a sample count that is no whole number of frames.
+  void engine_mixer_create_clip(Int mixer, const List<Float>& data, Int samples, Int channels, Int rate, const Text& name) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.create_clip"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a1);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, rate, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, name, kern_a4);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than samples says"; { this->kern_engine_failed("engine.mixer.create_clip"); return; } }
       decltype(auto) kern_r = kern_self->create_clip(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(samples), to_value(frames), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
+    this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(data), to_value(samples), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
   }
-  template <class KernNode> void engine_mixer_create_clip(KernNode& kern_n, Int mixer, const List<Float>& samples, Int frames, Int channels, Int rate, const Text& name) {
+  template <class KernNode> void engine_mixer_create_clip(KernNode& kern_n, Int mixer, const List<Float>& data, Int samples, Int channels, Int rate, const Text& name) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.mixer.create_clip"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a1);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, rate, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(*kern_o, name, kern_a4);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than samples says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.mixer.create_clip"); return; } }
       decltype(auto) kern_r = kern_self->create_clip(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(samples), to_value(frames), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.mixer.create_clip", {to_value(mixer), to_value(data), to_value(samples), to_value(channels), to_value(rate), to_value(name)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Takes samples already at the mixer rate (synthesised sounds).
@@ -7884,44 +7886,46 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<List<Text>>(this->kern_engine("engine.sound_bank.source", {to_value(sound_bank), to_value(id)}, {PinType::text_list})[0].converted(pin_type_of<List<Text>>()));
   }
-  /// Decoded PCM of an imported sound (interleaved, any rate); false when invalid.
-  void engine_sound_bank_set_pcm(Int sound_bank, const Text& id, const List<Float>& samples, Int frames, Int channels, Int rate) {
+  /// Decoded PCM of an imported sound: `samples` interleaved samples of `channels` channels (samples / channels frames) at any rate; false when invalid - also a sample count that is no whole number of frames.
+  void engine_sound_bank_set_pcm(Int sound_bank, const Text& id, const List<Float>& data, Int samples, Int channels, Int rate) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
       if (!kern_self) { this->kern_engine_failed("engine.sound_bank.set_pcm"); return; }
       const std::string_view kern_a0 = id.view();
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a2);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, rate, kern_a4);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than samples says"; { this->kern_engine_failed("engine.sound_bank.set_pcm"); return; } }
       decltype(auto) kern_r = kern_self->set_pcm(kern_a0, kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(samples), to_value(frames), to_value(channels), to_value(rate)}, {PinType::boolean});
+    this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(data), to_value(samples), to_value(channels), to_value(rate)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_sound_bank_set_pcm(KernNode& kern_n, Int sound_bank, const Text& id, const List<Float>& samples, Int frames, Int channels, Int rate) {
+  template <class KernNode> void engine_sound_bank_set_pcm(KernNode& kern_n, Int sound_bank, const Text& id, const List<Float>& data, Int samples, Int channels, Int rate) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.sound_bank.set_pcm"); return; }
       const std::string_view kern_a0 = id.view();
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, samples);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, frames, kern_a2);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, data);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, samples, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, channels, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, rate, kern_a4);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than samples says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.sound_bank.set_pcm"); return; } }
       decltype(auto) kern_r = kern_self->set_pcm(kern_a0, kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(samples), to_value(frames), to_value(channels), to_value(rate)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.sound_bank.set_pcm", {to_value(sound_bank), to_value(id), to_value(data), to_value(samples), to_value(channels), to_value(rate)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_sound_bank_set_failed(Int sound_bank, const Text& id, const Text& reason) {
@@ -8093,7 +8097,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::BuildingBuilder>(*kern_o, static_cast<::kern::i64>(building_builder), "building_builder");
       if (!kern_self) { this->kern_engine_failed("engine.building_builder.begin"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, options);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.building_builder.begin"); return; } }
@@ -8109,7 +8113,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::BuildingBuilder>(*kern_o, static_cast<::kern::i64>(building_builder), "building_builder");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.building_builder.begin"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, options);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.building_builder.begin"); return; } }
@@ -8276,7 +8280,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::FootprintStream>(*kern_o, static_cast<::kern::i64>(footprint_stream), "footprint_stream");
       if (!kern_self) { this->kern_engine_failed("engine.footprint_stream.ring"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Vector>, std::vector<kern::Vec2>>(*kern_o, points);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list points has fewer entries than count says"; { this->kern_engine_failed("engine.footprint_stream.ring"); return; } }
       kern_self->ring(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
@@ -8332,7 +8336,7 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than count says"; { this->kern_engine_failed("engine.ring_area"); return Float{}; } }
       decltype(auto) kern_r = kern::ring_area(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
@@ -8349,7 +8353,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a4);
@@ -8370,7 +8374,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a4);
@@ -8391,10 +8395,10 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
       decltype(auto) kern_a4 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, triangles);
-      auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index_count, kern_a5);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
       if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
@@ -8678,7 +8682,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::RoadBuilder>(*kern_o, static_cast<::kern::i64>(road_builder), "road_builder");
       if (!kern_self) { this->kern_engine_failed("engine.road_builder.begin"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
       kern::RoadOptions* const kern_a2 = ::kern::logic::engine_values::object_of<kern::RoadOptions>(*kern_o, static_cast<::kern::i64>(options), "options");
       if (!kern_a2) { this->kern_engine_failed("engine.road_builder.begin"); return; }
@@ -8697,7 +8701,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::RoadBuilder>(*kern_o, static_cast<::kern::i64>(road_builder), "road_builder");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
       kern::RoadOptions* const kern_a2 = ::kern::logic::engine_values::object_of<kern::RoadOptions>(*kern_o, static_cast<::kern::i64>(options), "options");
       if (!kern_a2) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; }
@@ -8808,7 +8812,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::RoadStream>(*kern_o, static_cast<::kern::i64>(road_stream), "road_stream");
       if (!kern_self) { this->kern_engine_failed("engine.road_stream.road"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Vector>, std::vector<kern::Vec2>>(*kern_o, points);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, width, kern_a2);
@@ -8970,13 +8974,13 @@ template <class Core> struct EngineNodesOf : Core {
     return from_value<Vector>(this->kern_engine("engine.mesh.posed_vertex", {to_value(mesh), to_value(v)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   /// Bounding sphere of a position array.
-  using kern_given_engine_bounding_sphere = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>, decltype(kern::bounding_sphere(std::declval<float const*>(), std::declval<unsigned int>()))>;
+  using kern_given_engine_bounding_sphere = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>, decltype(kern::bounding_sphere(std::declval<float const*>(), std::declval<kern::Count<3u>>()))>;
   kern_given_engine_bounding_sphere engine_bounding_sphere(const List<Float>& positions, Int vertex_count) const {
     using kern_G = kern_given_engine_bounding_sphere;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, positions);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<3u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list positions has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.bounding_sphere"); return kern_G(*kern_o); } }
       decltype(auto) kern_r = kern::bounding_sphere(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
@@ -8989,7 +8993,7 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, transforms);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<16u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, instance_count, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list transforms has fewer entries than instance_count says"; { this->kern_engine_failed("engine.mirror_state"); return Int{}; } }
       decltype(auto) kern_r = kern::mirror_state(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
@@ -9009,14 +9013,14 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.apply_cull_mode", {to_value(mode)}, {});
   }
   /// World sphere enclosing every instance transform of a local sphere.
-  using kern_given_engine_instanced_bounds = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>, decltype(kern::instanced_bounds(std::declval<kern::Sphere const&>(), std::declval<float const*>(), std::declval<unsigned int>()))>;
+  using kern_given_engine_instanced_bounds = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>, decltype(kern::instanced_bounds(std::declval<kern::Sphere const&>(), std::declval<float const*>(), std::declval<kern::Count<16u>>()))>;
   template <class T1> kern_given_engine_instanced_bounds engine_instanced_bounds(const T1& local, const List<Float>& transforms, Int instance_count) const {
     using kern_G = kern_given_engine_instanced_bounds;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>, std::remove_cvref_t<kern::Sphere const&>>(*kern_o, local);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, transforms);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<16u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, instance_count, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list transforms has fewer entries than instance_count says"; { this->kern_engine_failed("engine.instanced_bounds"); return kern_G(*kern_o); } }
       decltype(auto) kern_r = kern::instanced_bounds(kern_a0, kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
@@ -9903,7 +9907,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, location, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, values);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<4u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_vec4_array"); return; } }
       kern_self->set_vec4_array(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
@@ -9919,7 +9923,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, location, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, values);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<3u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_vec3_array"); return; } }
       kern_self->set_vec3_array(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
@@ -9941,19 +9945,19 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.uniform_cache.set_mat4", {to_value(uniform_cache), to_value(location), to_value(values)}, {});
   }
   /// Uncached upload (large or always-changing data such as bone palettes).
-  void engine_uniform_cache_set_mat4_array(Int location, const List<Float>& values, Int count) {
+  void engine_uniform_cache_set_mat4_array(Int location, const List<Float>& values, Int n) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, location, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, values);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, count, kern_a2);
-      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than count says"; { this->kern_engine_failed("engine.uniform_cache.set_mat4_array"); return; } }
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<16u>>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, n, kern_a2);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list values has fewer entries than n says"; { this->kern_engine_failed("engine.uniform_cache.set_mat4_array"); return; } }
       kern::UniformCache::set_mat4_array(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.uniform_cache.set_mat4_array", {to_value(location), to_value(values), to_value(count)}, {});
+    this->kern_engine("engine.uniform_cache.set_mat4_array", {to_value(location), to_value(values), to_value(n)}, {});
   }
   /// Extensions must outlive the renderer.
   template <class T1> void engine_renderer_init(Int renderer, const T1& options, const List<Int>& extensions) {
@@ -11628,8 +11632,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Connection>(*kern_o, static_cast<::kern::i64>(connection), "connection");
       if (!kern_self) { this->kern_engine_failed("engine.connection.receive_packet"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.connection.receive_packet"); return; } }
       kern_self->receive_packet(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return;
     }
@@ -11744,8 +11749,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
       if (!kern_self) { this->kern_engine_failed("engine.endpoint.send_packet"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, payload);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list payload has fewer entries than bytes says"; { this->kern_engine_failed("engine.endpoint.send_packet"); return; } }
       decltype(auto) kern_r = kern_self->send_packet(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
@@ -11758,8 +11764,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.endpoint.send_packet"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, payload);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list payload has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.endpoint.send_packet"); return; } }
       decltype(auto) kern_r = kern_self->send_packet(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -11773,8 +11780,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
       if (!kern_self) { this->kern_engine_failed("engine.endpoint.receive_packet"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, packet);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list packet has fewer entries than bytes says"; { this->kern_engine_failed("engine.endpoint.receive_packet"); return; } }
       kern_self->receive_packet(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return;
     }
@@ -11877,8 +11885,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::BitWriter>(*kern_o, static_cast<::kern::i64>(bit_writer), "bit_writer");
       if (!kern_self) { this->kern_engine_failed("engine.bit_writer.write_bytes"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.bit_writer.write_bytes"); return; } }
       kern_self->write_bytes(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return;
     }
@@ -12012,7 +12021,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::BitReader>(*kern_o, static_cast<::kern::i64>(bit_reader), "bit_reader");
       if (!kern_self) { this->kern_engine_failed("engine.bit_reader.read_bytes"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       ::kern::logic::engine_values::Written<unsigned char> kern_a0(::kern::logic::engine_values::room(kern_a1) * 1);
       kern_self->read_bytes(kern_a0.data(), std::move(kern_a1));
@@ -12027,7 +12036,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::BitReader>(*kern_o, static_cast<::kern::i64>(bit_reader), "bit_reader");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.data); this->kern_engine_failed("engine.bit_reader.read_bytes"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       ::kern::logic::engine_values::Written<unsigned char> kern_a0(::kern::logic::engine_values::room(kern_a1) * 1);
       kern_self->read_bytes(kern_a0.data(), std::move(kern_a1));
@@ -12150,8 +12159,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::WriteStream>(*kern_o, static_cast<::kern::i64>(write_stream), "write_stream");
       if (!kern_self) { this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; } }
       decltype(auto) kern_r = kern_self->serialize_bytes(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -12164,8 +12174,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::WriteStream>(*kern_o, static_cast<::kern::i64>(write_stream), "write_stream");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; } }
       decltype(auto) kern_r = kern_self->serialize_bytes(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -12351,7 +12362,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::ReadStream>(*kern_o, static_cast<::kern::i64>(read_stream), "read_stream");
       if (!kern_self) { this->kern_engine_failed("engine.read_stream.serialize_bytes"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       ::kern::logic::engine_values::Written<unsigned char> kern_a0(::kern::logic::engine_values::room(kern_a1) * 1);
       decltype(auto) kern_r = kern_self->serialize_bytes(kern_a0.data(), std::move(kern_a1));
@@ -12367,7 +12378,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::ReadStream>(*kern_o, static_cast<::kern::i64>(read_stream), "read_stream");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.data); this->kern_engine_failed("engine.read_stream.serialize_bytes"); return; }
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       ::kern::logic::engine_values::Written<unsigned char> kern_a0(::kern::logic::engine_values::room(kern_a1) * 1);
       decltype(auto) kern_r = kern_self->serialize_bytes(kern_a0.data(), std::move(kern_a1));
@@ -12542,8 +12553,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::MeasureStream>(*kern_o, static_cast<::kern::i64>(measure_stream), "measure_stream");
       if (!kern_self) { this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, value1);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list value1 has fewer entries than bytes says"; { this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; } }
       decltype(auto) kern_r = kern_self->serialize_bytes(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -12556,8 +12568,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::MeasureStream>(*kern_o, static_cast<::kern::i64>(measure_stream), "measure_stream");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, value1);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
+      if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list value1 has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; } }
       decltype(auto) kern_r = kern_self->serialize_bytes(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -12665,8 +12678,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.transport.send"); return; } }
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -12681,8 +12695,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.transport.send"); return; } }
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -12698,7 +12713,7 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
       decltype(auto) kern_r = kern_self->receive(kern_a0, kern_a1.data(), std::move(kern_a2));
@@ -12717,7 +12732,7 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.from); ::kern::logic::engine_values::none(kern_n.data); this->kern_engine_failed("engine.transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
       decltype(auto) kern_r = kern_self->receive(kern_a0, kern_a1.data(), std::move(kern_a2));
@@ -12755,10 +12770,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, now, kern_a4);
+      if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.simulator.send"); return; } }
       kern_self->send(std::move(kern_a0), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), std::move(kern_a4));
       return;
     }
@@ -12947,8 +12963,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.host_transport.send"); return; } }
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
@@ -12963,8 +12980,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.host_transport.send"); return; } }
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
@@ -12979,7 +12997,7 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.host_transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
       decltype(auto) kern_r = kern_self->receive(kern_a0, kern_a1.data(), std::move(kern_a2));
@@ -12998,7 +13016,7 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.from); ::kern::logic::engine_values::none(kern_n.data); this->kern_engine_failed("engine.host_transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
       decltype(auto) kern_r = kern_self->receive(kern_a0, kern_a1.data(), std::move(kern_a2));
@@ -13034,8 +13052,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
-      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
+      if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.host_transport.push_incoming"); return; } }
       kern_self->push_incoming(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return;
     }
@@ -14620,10 +14639,10 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Bvh>(*kern_o, static_cast<::kern::i64>(bvh), "bvh");
       if (!kern_self) { this->kern_engine_failed("engine.bvh.build"); return; }
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, positions);
-      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<3u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
       decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, indices);
-      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
+      auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, leaf_size, kern_a4);
