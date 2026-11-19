@@ -3453,11 +3453,7 @@ class Emit:
                     if node is None or set(m.group(1)) - {"-"} or m.group(3) is not None or m.group(4) in ("h", "hh"):
                         raise Wait("a 64-bit number in a format Int64 to Text does not write so (a flag, a precision, X, o, c)")
                     spec = f"%{m.group(1)}{m.group(2)}s"
-                    # (the text in a variable of its own: Format Text reads its values where they lie, and the
-                    # text a node gives is a temporary - in the class it would be gone before it is read)
-                    digits = self.temp("digits", "Text")
-                    self.hoist([f"{digits} = {node}({self.ex(w, 'Int64')});"])
-                    values.append(digits)
+                    values.append(f"{node}({self.ex(w, 'Int64')})")
             out.append(spec)
             at += m.end()
         return "".join(out), values
