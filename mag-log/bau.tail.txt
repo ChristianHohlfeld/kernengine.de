@@ -1,0 +1,80 @@
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:25031:16: warning: unused variable 'a_4' [-Wunused-variable]
+ 25031 |     nostr_U256 a_4 = nostr_U256{Fixed<Int, 8>{}};
+       |                ^~~
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:25097:16: warning: unused variable 'a' [-Wunused-variable]
+ 25097 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:29370:9: warning: unused variable 'key_10' [-Wunused-variable]
+ 29370 |     Int key_10 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:29372:9: warning: unused variable 'key_12' [-Wunused-variable]
+ 29372 |     Int key_12 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:29383:9: warning: unused variable 'key_15' [-Wunused-variable]
+ 29383 |     Int key_15 = 0;
+       |         ^~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:37485:10: warning: unused variable 'playing' [-Wunused-variable]
+ 37485 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:37864:10: warning: unused variable 'playing' [-Wunused-variable]
+ 37864 |     Bool playing = false;
+       |          ^~~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/converted/test_equipment_cpp.cpp:748:21: warning: unused variable 'draw' [-Wunused-variable]
+  748 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:50663:11: warning: unused variable 'sim_time' [-Wunused-variable]
+ 50663 |     Float sim_time = 0.0;
+       |           ^~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:50678:10: warning: variable 'actor_matrix' set but not used [-Wunused-but-set-variable]
+ 50678 |     Bool actor_matrix = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:50726:10: warning: variable 'set_mode' set but not used [-Wunused-but-set-variable]
+ 50726 |     Bool set_mode = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:50734:10: warning: variable 'teleport' set but not used [-Wunused-but-set-variable]
+ 50734 |     Bool teleport = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:50735:10: warning: variable 'set_actor_velocity' set but not used [-Wunused-but-set-variable]
+ 50735 |     Bool set_actor_velocity = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/src/level_blueprints.cpp:50858:10: warning: variable 'set_pcm' set but not used [-Wunused-but-set-variable]
+ 50858 |     Bool set_pcm = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/converted/test_facades.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+2 warnings generated.
+1 warning generated.
+1 warning generated.
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t2-vergleich-081716-25113/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+14 warnings generated.
+0 tests, 0 checks, 0 failures
+
+real	29m44,310s
+user	124m56,744s
+sys	1m42,132s
