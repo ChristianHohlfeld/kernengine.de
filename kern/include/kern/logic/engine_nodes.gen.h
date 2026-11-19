@@ -2048,13 +2048,13 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Stops with a short fade (seconds; 0 = 5 ms click guard).
-  void engine_mixer_stop(Int mixer, Int voice, Float fade) {
+  void engine_mixer_stop(Int mixer, Int64 voice, Float fade) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.stop"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, fade, kern_a1);
       kern_self->stop(std::move(kern_a0), std::move(kern_a1));
@@ -2077,25 +2077,25 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.mixer.stop_all", {to_value(mixer), to_value(bus), to_value(fade)}, {});
   }
-  Bool engine_mixer_playing(Int mixer, Int voice) const {
+  Bool engine_mixer_playing(Int mixer, Int64 voice) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.playing"); return Bool{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       decltype(auto) kern_r = kern_self->playing(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
     return from_value<Bool>(this->kern_engine("engine.mixer.playing", {to_value(mixer), to_value(voice)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
-  void engine_mixer_set_volume(Int mixer, Int voice, Float volume, Float ramp) {
+  void engine_mixer_set_volume(Int mixer, Int64 voice, Float volume, Float ramp) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.set_volume"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, volume, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -2105,13 +2105,13 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.mixer.set_volume", {to_value(mixer), to_value(voice), to_value(volume), to_value(ramp)}, {});
   }
-  void engine_mixer_set_pitch(Int mixer, Int voice, Float pitch) {
+  void engine_mixer_set_pitch(Int mixer, Int64 voice, Float pitch) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.set_pitch"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, pitch, kern_a1);
       kern_self->set_pitch(std::move(kern_a0), std::move(kern_a1));
@@ -2119,13 +2119,13 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.mixer.set_pitch", {to_value(mixer), to_value(voice), to_value(pitch)}, {});
   }
-  void engine_mixer_set_pan(Int mixer, Int voice, Float pan) {
+  void engine_mixer_set_pan(Int mixer, Int64 voice, Float pan) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.set_pan"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, pan, kern_a1);
       kern_self->set_pan(std::move(kern_a0), std::move(kern_a1));
@@ -2133,13 +2133,13 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.mixer.set_pan", {to_value(mixer), to_value(voice), to_value(pan)}, {});
   }
-  void engine_mixer_set_position(Int mixer, Int voice, Vector position, Vector velocity) {
+  void engine_mixer_set_position(Int mixer, Int64 voice, Vector position, Vector velocity) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.set_position"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, position, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -2149,13 +2149,13 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.mixer.set_position", {to_value(mixer), to_value(voice), to_value(position), to_value(velocity)}, {});
   }
-  void engine_mixer_set_paused(Int mixer, Int voice, Bool paused) {
+  void engine_mixer_set_paused(Int mixer, Int64 voice, Bool paused) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.set_paused"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, paused, kern_a1);
       kern_self->set_paused(std::move(kern_a0), std::move(kern_a1));
@@ -2177,13 +2177,13 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.mixer.set_all_paused", {to_value(mixer), to_value(paused)}, {});
   }
   /// Playback position in seconds.
-  Float engine_mixer_position_of(Int mixer, Int voice) const {
+  Float engine_mixer_position_of(Int mixer, Int64 voice) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.position_of"); return Float{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, voice, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, voice, kern_a0);
       decltype(auto) kern_r = kern_self->position_of(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
