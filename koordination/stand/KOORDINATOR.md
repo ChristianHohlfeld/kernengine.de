@@ -1,4 +1,8 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 16:25 **work-zusammen = Rekursion gemergt (work-e-tramp 20997a34, E16): NEUE FORM DER KLASSE (Schrittwert lokal), Sprungbrett in Interpreter/JIT.** Dazu seit
+  12:15: k 798186ff (Zeiger/Index/text.set_code), k 1e523e83 (Destruktoren, asks_engine), t1 ed9f2c8e (kGates, held_lost), d belege3/make (optional, jobs,
+  Macher), p 1e91e798 (U8…I32, List<U8>). **ALLE: origin/work-zusammen einmischen, erzeugte Dateien NEU ERZEUGEN (`python3 tools/engine_api.py`), nicht Text
+  mischen.** Kandidat-Lauf `work-zusammen-voll-143319-13859` (0f7f5a46) rechnet. Arbeitsliste des Endzustands: `$S/luecken.txt` (s5).
 - 12:15 **work-zusammen = 6998a56e** (t1 ab817fdf: E19 Maß statt Uhr, Enum = Stelle, text_end; k 977e515b: E18 gehaltener Eintrag; p 1831e165: Int-Formeln;
   t2 80d7d98b: E15; t1-Rahmen nebeneinander). **ALLE: vor dem nächsten `vergleich`/`alle` origin/work-zusammen einmischen** – das mag-Skript ruft die Tests
   jetzt mit `--name <ganzer Name>`; ein Stand ohne den Rahmen (vor 25445622) findet damit keinen Test. `mag.sh vergleich` braucht Pfade `src/<datei>.cpp`.

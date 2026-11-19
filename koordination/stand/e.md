@@ -76,3 +76,11 @@ code (170 compiled)“. Nicht von e. (Job 135460440782.)
   → neuer konvert.
 - 15:05: work-e-tramp-konvert-125819-29832 (1d706cc9) wartet seit 12:58 auf mag – vor ihm läuft work-d-konvert-125538-27289 seit 13:10 (konvert-Aufträge laufen offenbar einzeln).
 - 15:55: work-e-tramp 20997a34 (work-zusammen 4ac2e4f9 eingemischt; engine_api.py neu: keine Änderung). konvert 125819 abgebrochen (Weg 2). vergleich über die Kreis-Dateien abgelegt, CI gestartet.
+
+## BEREIT ZUM MERGEN work-e-tramp @ 20997a34 (Schritte 1–5 + work-zusammen 4ac2e4f9)
+- vergleich work-e-tramp-vergleich-154113-24347 (game.cpp, game_town, game_military, game_controls, game_ui, game_audio_web, game_vehicle_damage):
+  convert/bau/alle rc=0 – **56 ok von 56 in beiden Durchgängen, 0 Abweichungen** (Stellvertreter und echte Engine), cost 10, 0 „went round“.
+- Die Kreis-Funktionen warten in dieser Teil-Probe nur an „X() is defined in another file“ (look_blast, ui_equipment_command, vr_hand_ray …: Dateien
+  außerhalb der Probe) – im ganzen Programm (konvert 104550) waren sie geschrieben; ihre Tests übersetzten dort nicht (Quelle der anderen Datei),
+  behoben mit 1d706cc9 – Beleg im ganzen Programm: der nächste volle Lauf.
+- CI 44546443340 auf 20997a34: native grün, build grün mit „Logic JIT: all cases match“, determinism/input grün; e2e-Rot aus der Basis (BEFUND FÜR k).

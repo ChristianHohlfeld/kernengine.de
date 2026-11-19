@@ -116,3 +116,10 @@ Reihenfolge 1–5, jeder Schritt mit Beleg.
   Abweichungen gegen den Basislauf work-zusammen-voll-100601-31771 prüfen; dann „BEREIT ZUM MERGEN work-e-tramp <commit>“ (Koordinator 10:12, Belege a–d).
 - Werkzeuge lokal: /tmp/e/b/build.sh <baum> <out> (Interpreter-Objekte + bcall), cases.cpp (play aller Fälle), /tmp/e/tocpp.cpp (Rundreise; `r datei` liest einen Text)
   – nicht gesichert außer $S/e/*.
+
+
+## Fortschreibung 16:15 (maßgeblich)
+- BEREIT ZUM MERGEN work-e-tramp @ 20997a34 (stand/e.md). Offen nur der Beleg im ganzen Programm (nächster voller Lauf): Kreis-Funktionen
+  (explosion, combat_blast, command, ui_command …) geschrieben UND verglichen? Falls nicht: Grund in convert.log (xzgrep '^ +Game::explosion ').
+- Konverter-Änderungen von e: Unit.function (Rekursion im Teil, leaning), Unit.foreign (Anlehnen an follow_on-Wartende desselben Blueprints,
+  ohne closures-Prüfung), main.pin_circles (am Fixpunkt), convert_unit (Exporte aller Testversuche), entry_of: calls/leans.
