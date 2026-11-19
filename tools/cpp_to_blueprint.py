@@ -1656,7 +1656,10 @@ class Unit:
             except OSError:
                 text = ""
             pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
-            for m in re.finditer(r'\{"(engine\.[\w.]+)", (?:"(?:\\.|[^"\\])*", ){4}(true|false),\n\s*\{(.*)\},\n\s*\{(.*)\}\},', text):
+            # (an entry may end with what the engine says of the node beyond its pins - `place`, `clock`, written only
+            # where one is set: `{...outputs...}, true},` - the pins are the same node; read without them, the last
+            # output was taken for the end of the entry and every such node "differed")
+            for m in re.finditer(r'\{"(engine\.[\w.]+)", (?:"(?:\\.|[^"\\])*", ){4}(true|false),\n\s*\{(.*)\},\n\s*\{(.*)\}(?:, (?:true|false))*\},', text):
                 self._table[m.group(1)] = (m.group(2) == "true", pins(m.group(3)), pins(m.group(4)))
         return self._table
 
@@ -6172,6 +6175,11 @@ class Emit:
         mine = (f["value"], [(n, *u.api().pin(bt)) for n, bt, _ in f["ins"]], [(n, *u.api().pin(bt)) for n, bt, _ in f["outs"]])
         if known != mine:
             raise Wait(f"the engine's {d.get('name')}() (its node is another one in the engine: {'none' if known is None else 'its pins differ'})")
+        if f.get("place"):
+            # (what it gives is a reference to something the engine holds: written as a node that gives a value, a change
+            # through the reference - `world.sound_cues().clear()` - would change a copy. The node that binds the place
+            # is not written here yet)
+            raise Wait(f"the engine's {d.get('name')}() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)")
         u.engine_calls[d["id"]] = f
         ins, texts, own = list(f["ins"]), [], None
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
