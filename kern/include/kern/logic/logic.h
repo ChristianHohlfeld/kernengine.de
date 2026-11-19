@@ -1270,6 +1270,9 @@ class Instance {
   bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places = nullptr);
   bool call_class(std::string_view function, std::span<const Value> args, Results& results);  // (the class's: NativeBlueprint::call)
   Value read(const Spot& s) const;
+  /// How long each list of any length (each map) is that the place goes through, outermost first - up to the first
+  /// the place lies beside (Runtime::held_lost: a call that holds the place checks them after it).
+  std::vector<std::size_t> lengths_on(const Spot& s) const;
   bool write(const Spot& s, const std::function<void(Value&)>& change);
   std::vector<std::vector<Spot>> refs_;                   // per function: where its reference inputs are, for the call that runs
   Value held(const std::string& key) const;
@@ -1414,6 +1417,10 @@ class Runtime {
   u32 budget = 200000;
   /// May a loop of `inst` make another pass? (Counts it. False: the guard - the loop ends.)
   bool pass(Instance& inst);
+  /// A call held an entry of a list of any length while its function could run handlers, and the list did not stay
+  /// (its length - in a class also where its entries are): in C++ the reference would go nowhere. The run of `inst`
+  /// stops as at the loop guard - its loops end, the chain runs to its end, the Blueprint is stopped - and it is said.
+  void held_lost(Instance& inst);
   u64 executed() const { return executed_; }
   /// The host linked the native code of instance `id` (`function` = table index, < 0 failed).
   static void jit_ready(i32 id, i32 function);
