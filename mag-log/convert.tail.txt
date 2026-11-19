@@ -1,0 +1,80 @@
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_marks_cpp                10 /   15 functions      141 /    376 lines
+    ragged (1): written
+    Marks::ring_put_Scorch (5): written
+    Marks::ring_put_WallMark (5): written
+    Marks::clear (14): written
+    Marks::blast (22): height() is defined in another file
+    Marks::add_soot (32): height() is defined in another file
+    Marks::add_breach (44): height() is defined in another file
+    Marks::spawn_rubble (33): written
+    fh (1): written
+    facade_glass (24): written
+    Marks::bullet (23): written
+    Marks::update (13): written
+    Marks::prune_walls (22): written
+    Marks::rebuild (112): height() is defined in another file
+    Marks::draw (25): it calls Marks::rebuild(), which waits
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+425 of 533 functions of the program are written as Blueprints (2526 of 6879 lines), and 17 of the engine's headers that they call: 63 Blueprints - 5 of source files, 1 of states, 57 of headers and of shapes
+379 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     4 (   491)   it calls Devices::touch_down(), which waits
+     8 (   315)   it calls CityStream::ground_height(), which waits
+     4 (   296)   step() is defined in another file
+     5 (   211)   height() is defined in another file
+     1 (   191)   look_curve_strength() is defined in another file
+     1 (   158)   project_screen() is defined in another file
+     2 (   151)   voice_mic_on() is defined in another file
+     1 (   142)   send_fx() is defined in another file
+     2 (   115)   frighten() is defined in another file
+     1 (   115)   ui_reset() is defined in another file
+     3 (   114)   osfx() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (   110)   read_features() is defined in another file
+     2 (   105)   a member of Int is set
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     3 (    97)   gaps_riding() is defined in another file
+     2 (    87)   detach() is defined in another file
+     1 (    87)   look_begin() is defined in another file
+     1 (    85)   it calls CityStream::request_around(), which waits
+     2 (    69)   it calls Game::clear_spot(), which waits
+     1 (    65)   aim_ellipse() is defined in another file
+     2 (    62)   it calls Devices::key(), which waits
+     1 (    61)   foot_round_step() is defined in another file
+     1 (    61)   road_is_water() is defined in another file
+     3 (    60)   remove_tints() is defined in another file
+     3 (    56)   unproject() is defined in another file
+     1 (    49)   a constant computed with kern_musl_cosf()
+     1 (    47)   take_pressed() is defined in another file
+     1 (    44)   chunk_count() is defined in another file
+     1 (    42)   held() is defined in another file
+     1 (    42)   gaps_boardable() is defined in another file
+     1 (    38)   ui_mix_cues() is defined in another file
+     2 (    35)   gaps_seat_press() is defined in another file
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    33)   hint_line() is defined in another file
+     2 (    33)   it calls CityStream::remove(), which waits
+     1 (    32)   it calls Game::hit_scan(), which waits
+
+real	8m0,105s
+user	31m49,448s
+sys	1m33,768s
