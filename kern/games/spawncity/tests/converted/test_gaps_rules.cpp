@@ -133,7 +133,7 @@ namespace gaps { struct VisualPose {
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::SmokeEffect& s) { return converted::Value::structure({arg(s.id), arg(s.at), arg(s.scale), arg(s.started), arg(s.expires), arg(s.last_emit), arg(s.serial), arg(s.seed)}); }
-[[maybe_unused]] static bool same(const gaps::SmokeEffect& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.id, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.scale, (*got.rows)[2]) && same(want.started, (*got.rows)[3]) && same(want.expires, (*got.rows)[4]) && same(want.last_emit, (*got.rows)[5]) && same(want.serial, (*got.rows)[6]) && same(want.seed, (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const gaps::SmokeEffect& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.at, (*got.rows)[1]), ".at") && converted::at_place(same(want.scale, (*got.rows)[2]), ".scale") && converted::at_place(same(want.started, (*got.rows)[3]), ".started") && converted::at_place(same(want.expires, (*got.rows)[4]), ".expires") && converted::at_place(same(want.last_emit, (*got.rows)[5]), ".last_emit") && converted::at_place(same(want.serial, (*got.rows)[6]), ".serial") && converted::at_place(same(want.seed, (*got.rows)[7]), ".seed"); }
 [[maybe_unused]] static bool defined(const gaps::SmokeEffect& s) { return defined(s.id) && defined(s.at) && defined(s.scale) && defined(s.started) && defined(s.expires) && defined(s.last_emit) && defined(s.serial) && defined(s.seed); }
 [[maybe_unused]] static std::string text(const gaps::SmokeEffect& s) { return std::string("{") + text(s.id) + ", " + text(s.at) + ", " + text(s.scale) + ", " + text(s.started) + ", " + text(s.expires) + ", " + text(s.last_emit) + ", " + text(s.serial) + ", " + text(s.seed) + "}"; }
 [[maybe_unused]] static void take(gaps::SmokeEffect& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<std::string>(s.id, (*v.rows)[0]); converted::take_as<Vec3>(s.at, (*v.rows)[1]); converted::take_as<double>(s.scale, (*v.rows)[2]); converted::take_as<double>(s.started, (*v.rows)[3]); converted::take_as<double>(s.expires, (*v.rows)[4]); converted::take_as<double>(s.last_emit, (*v.rows)[5]); converted::take_as<unsigned int>(s.serial, (*v.rows)[6]); converted::take_as<unsigned int>(s.seed, (*v.rows)[7]); }
@@ -156,7 +156,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::Puff& s) { return converted::Value::structure({arg(s.alive), arg(s.ember), arg(s.pos), arg(s.vel), arg(s.born), arg(s.expires), arg(s.s0), arg(s.s1), arg(s.opacity), arg(s.rotation), arg(s.serial), arg(s.color)}); }
-[[maybe_unused]] static bool same(const gaps::Puff& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.alive, (*got.rows)[0]) && same(want.ember, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.vel, (*got.rows)[3]) && same(want.born, (*got.rows)[4]) && same(want.expires, (*got.rows)[5]) && same(want.s0, (*got.rows)[6]) && same(want.s1, (*got.rows)[7]) && same(want.opacity, (*got.rows)[8]) && same(want.rotation, (*got.rows)[9]) && same(want.serial, (*got.rows)[10]) && same(want.color, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const gaps::Puff& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.alive, (*got.rows)[0]), ".alive") && converted::at_place(same(want.ember, (*got.rows)[1]), ".ember") && converted::at_place(same(want.pos, (*got.rows)[2]), ".pos") && converted::at_place(same(want.vel, (*got.rows)[3]), ".vel") && converted::at_place(same(want.born, (*got.rows)[4]), ".born") && converted::at_place(same(want.expires, (*got.rows)[5]), ".expires") && converted::at_place(same(want.s0, (*got.rows)[6]), ".s0") && converted::at_place(same(want.s1, (*got.rows)[7]), ".s1") && converted::at_place(same(want.opacity, (*got.rows)[8]), ".opacity") && converted::at_place(same(want.rotation, (*got.rows)[9]), ".rotation") && converted::at_place(same(want.serial, (*got.rows)[10]), ".serial") && converted::at_place(same(want.color, (*got.rows)[11]), ".color"); }
 [[maybe_unused]] static bool defined(const gaps::Puff& s) { return defined(s.alive) && defined(s.ember) && defined(s.pos) && defined(s.vel) && defined(s.born) && defined(s.expires) && defined(s.s0) && defined(s.s1) && defined(s.opacity) && defined(s.rotation) && defined(s.serial) && defined(s.color); }
 [[maybe_unused]] static std::string text(const gaps::Puff& s) { return std::string("{") + text(s.alive) + ", " + text(s.ember) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.born) + ", " + text(s.expires) + ", " + text(s.s0) + ", " + text(s.s1) + ", " + text(s.opacity) + ", " + text(s.rotation) + ", " + text(s.serial) + ", " + text(s.color) + "}"; }
 [[maybe_unused]] static void take(gaps::Puff& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<bool>(s.alive, (*v.rows)[0]); converted::take_as<bool>(s.ember, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<Vec3>(s.vel, (*v.rows)[3]); converted::take_as<double>(s.born, (*v.rows)[4]); converted::take_as<double>(s.expires, (*v.rows)[5]); converted::take_as<double>(s.s0, (*v.rows)[6]); converted::take_as<double>(s.s1, (*v.rows)[7]); converted::take_as<double>(s.opacity, (*v.rows)[8]); converted::take_as<double>(s.rotation, (*v.rows)[9]); converted::take_as<unsigned int>(s.serial, (*v.rows)[10]); converted::take_as<Vec3>(s.color, (*v.rows)[11]); }
@@ -169,7 +169,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::SmokeField& s) { return converted::Value::structure({arg(s.effects_), arg(s.puffs_)}); }
-[[maybe_unused]] static bool same(const gaps::SmokeField& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.effects_, (*got.rows)[0]) && same(want.puffs_, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const gaps::SmokeField& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.effects_, (*got.rows)[0]), ".effects_") && converted::at_place(same(want.puffs_, (*got.rows)[1]), ".puffs_"); }
 [[maybe_unused]] static bool defined(const gaps::SmokeField& s) { return defined(s.effects_) && defined(s.puffs_); }
 [[maybe_unused]] static std::string text(const gaps::SmokeField& s) { return std::string("{") + text(s.effects_) + ", " + text(s.puffs_) + "}"; }
 [[maybe_unused]] static void take(gaps::SmokeField& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<gaps::SmokeEffect>>(s.effects_, (*v.rows)[0]); converted::take_as<std::vector<gaps::Puff>>(s.puffs_, (*v.rows)[1]); }
@@ -183,7 +183,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -197,7 +197,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::VisualPose& s) { return converted::Value::structure({arg(s.init_), arg(s.mode_), arg(s.offset_), arg(s.q_)}); }
-[[maybe_unused]] static bool same(const gaps::VisualPose& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.init_, (*got.rows)[0]) && same(want.mode_, (*got.rows)[1]) && same(want.offset_, (*got.rows)[2]) && same(want.q_, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const gaps::VisualPose& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.init_, (*got.rows)[0]), ".init_") && converted::at_place(same(want.mode_, (*got.rows)[1]), ".mode_") && converted::at_place(same(want.offset_, (*got.rows)[2]), ".offset_") && converted::at_place(same(want.q_, (*got.rows)[3]), ".q_"); }
 [[maybe_unused]] static bool defined(const gaps::VisualPose& s) { return defined(s.init_) && defined(s.mode_) && defined(s.offset_) && defined(s.q_); }
 [[maybe_unused]] static std::string text(const gaps::VisualPose& s) { return std::string("{") + text(s.init_) + ", " + text(s.mode_) + ", " + text(s.offset_) + ", " + text(s.q_) + "}"; }
 [[maybe_unused]] static void take(gaps::VisualPose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.init_, (*v.rows)[0]); converted::take_as<int>(s.mode_, (*v.rows)[1]); converted::take_as<Vec3>(s.offset_, (*v.rows)[2]); converted::take_as<Quat>(s.q_, (*v.rows)[3]); }
@@ -208,7 +208,7 @@ SC_TEST(converted_gaps_rules) {
   {  // SmokeField::of
     converted::Tally tally("SmokeField_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return gaps::SmokeField::of(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return gaps::SmokeField::of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -217,7 +217,9 @@ SC_TEST(converted_gaps_rules) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -227,7 +229,7 @@ SC_TEST(converted_gaps_rules) {
   {  // SmokeField::effects
     converted::Tally tally("SmokeField_effects");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0) { return converted::counted([&] { return a0.effects(); }); };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0) { return converted::counted([&] { return a0.effects(); }); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -236,7 +238,9 @@ SC_TEST(converted_gaps_rules) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -246,7 +250,7 @@ SC_TEST(converted_gaps_rules) {
   {  // VisualPose::invalidate
     converted::Tally tally("VisualPose_invalidate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::VisualPose a0) { converted::counted([&] { return a0.invalidate(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] gaps::VisualPose& a0) { converted::counted([&] { return a0.invalidate(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::VisualPose a0 = draw_gaps__VisualPose(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -255,7 +259,9 @@ SC_TEST(converted_gaps_rules) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

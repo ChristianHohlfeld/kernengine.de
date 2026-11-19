@@ -106,7 +106,7 @@ namespace controls { struct Devices {
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::RateStick& s) { return converted::Value::structure({arg(s.full_px_s), arg(s.tau), arg(s.rate)}); }
-[[maybe_unused]] static bool same(const controls::RateStick& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.full_px_s, (*got.rows)[0]) && same(want.tau, (*got.rows)[1]) && same(want.rate, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const controls::RateStick& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.full_px_s, (*got.rows)[0]), ".full_px_s") && converted::at_place(same(want.tau, (*got.rows)[1]), ".tau") && converted::at_place(same(want.rate, (*got.rows)[2]), ".rate"); }
 [[maybe_unused]] static bool defined(const controls::RateStick& s) { return defined(s.full_px_s) && defined(s.tau) && defined(s.rate); }
 [[maybe_unused]] static std::string text(const controls::RateStick& s) { return std::string("{") + text(s.full_px_s) + ", " + text(s.tau) + ", " + text(s.rate) + "}"; }
 [[maybe_unused]] static void take(controls::RateStick& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.full_px_s, (*v.rows)[0]); converted::take_as<double>(s.tau, (*v.rows)[1]); converted::take_as<Vec2>(s.rate, (*v.rows)[2]); }
@@ -123,7 +123,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::GrenadeCook& s) { return converted::Value::structure({arg(s.carry), arg(s.regen_at), arg(s.cooking), arg(s.at), arg(s.power), arg(s.source)}); }
-[[maybe_unused]] static bool same(const controls::GrenadeCook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.carry, (*got.rows)[0]) && same(want.regen_at, (*got.rows)[1]) && same(want.cooking, (*got.rows)[2]) && same(want.at, (*got.rows)[3]) && same(want.power, (*got.rows)[4]) && same(want.source, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const controls::GrenadeCook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.carry, (*got.rows)[0]), ".carry") && converted::at_place(same(want.regen_at, (*got.rows)[1]), ".regen_at") && converted::at_place(same(want.cooking, (*got.rows)[2]), ".cooking") && converted::at_place(same(want.at, (*got.rows)[3]), ".at") && converted::at_place(same(want.power, (*got.rows)[4]), ".power") && converted::at_place(same(want.source, (*got.rows)[5]), ".source"); }
 [[maybe_unused]] static bool defined(const controls::GrenadeCook& s) { return defined(s.carry) && defined(s.regen_at) && defined(s.cooking) && defined(s.at) && defined(s.power) && defined(s.source); }
 [[maybe_unused]] static std::string text(const controls::GrenadeCook& s) { return std::string("{") + text(s.carry) + ", " + text(s.regen_at) + ", " + text(s.cooking) + ", " + text(s.at) + ", " + text(s.power) + ", " + text(s.source) + "}"; }
 [[maybe_unused]] static void take(controls::GrenadeCook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<int>(s.carry, (*v.rows)[0]); converted::take_as<double>(s.regen_at, (*v.rows)[1]); converted::take_as<bool>(s.cooking, (*v.rows)[2]); converted::take_as<double>(s.at, (*v.rows)[3]); converted::take_as<double>(s.power, (*v.rows)[4]); converted::take_as<int>(s.source, (*v.rows)[5]); }
@@ -140,7 +140,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::Devices& s) { return converted::Value::structure({arg(s.fine), arg(s.coarse), arg(s.touch_points), arg(s.desktop), arg(s.pad), arg(s.changes)}); }
-[[maybe_unused]] static bool same(const controls::Devices& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.fine, (*got.rows)[0]) && same(want.coarse, (*got.rows)[1]) && same(want.touch_points, (*got.rows)[2]) && same(want.desktop, (*got.rows)[3]) && same(want.pad, (*got.rows)[4]) && same(want.changes, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const controls::Devices& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.fine, (*got.rows)[0]), ".fine") && converted::at_place(same(want.coarse, (*got.rows)[1]), ".coarse") && converted::at_place(same(want.touch_points, (*got.rows)[2]), ".touch_points") && converted::at_place(same(want.desktop, (*got.rows)[3]), ".desktop") && converted::at_place(same(want.pad, (*got.rows)[4]), ".pad") && converted::at_place(same(want.changes, (*got.rows)[5]), ".changes"); }
 [[maybe_unused]] static bool defined(const controls::Devices& s) { return defined(s.fine) && defined(s.coarse) && defined(s.touch_points) && defined(s.desktop) && defined(s.pad) && defined(s.changes); }
 [[maybe_unused]] static std::string text(const controls::Devices& s) { return std::string("{") + text(s.fine) + ", " + text(s.coarse) + ", " + text(s.touch_points) + ", " + text(s.desktop) + ", " + text(s.pad) + ", " + text(s.changes) + "}"; }
 [[maybe_unused]] static void take(controls::Devices& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.fine, (*v.rows)[0]); converted::take_as<bool>(s.coarse, (*v.rows)[1]); converted::take_as<int>(s.touch_points, (*v.rows)[2]); converted::take_as<bool>(s.desktop, (*v.rows)[3]); converted::take_as<bool>(s.pad, (*v.rows)[4]); converted::take_as<unsigned int>(s.changes, (*v.rows)[5]); }
@@ -151,7 +151,7 @@ SC_TEST(converted_controls) {
   {  // RateStick::reset
     converted::Tally tally("RateStick_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::RateStick a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::RateStick& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::RateStick a0 = draw_controls__RateStick(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -160,7 +160,9 @@ SC_TEST(converted_controls) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -170,7 +172,7 @@ SC_TEST(converted_controls) {
   {  // GrenadeCook::reset
     converted::Tally tally("GrenadeCook_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::GrenadeCook& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -179,7 +181,9 @@ SC_TEST(converted_controls) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -189,7 +193,7 @@ SC_TEST(converted_controls) {
   {  // Devices::set
     converted::Tally tally("Devices_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0, [[maybe_unused]] bool& a1) { converted::counted([&] { return a0.set(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
       bool a1 = draw.flag();
@@ -199,7 +203,9 @@ SC_TEST(converted_controls) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

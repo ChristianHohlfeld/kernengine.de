@@ -58,8 +58,41 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
   if (p != nullptr && !held) return p[i];
   converted::open_read();
   static T none;
-  none = T{};
+  none = converted::none_entry<T>();
   return none;
+}
+// p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
+// any other is marked (C++ leaves it open) and stands at p - a range up to it is empty, nothing is read there.
+template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  const long long k = static_cast<long long>(n);
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + k;
+    if (e >= 0 && e <= static_cast<long long>((b - a) / sizeof(T))) return p + k;
+    converted::open_read();
+    return p;
+  }
+  if (p != nullptr || k == 0) return p + k;
+  converted::open_read();
+  return p;
+}
+template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }
+// n entries from p, as a value of the library is made of them (`std::string_view s(p, n)`): where they do not all
+// stand in the list p points into, the call is marked (C++ leaves it open) and the value has none of them.
+template <class T> struct converted_pointed_range_t {
+  const T* p;
+  std::size_t n;
+  template <class V> requires (!std::is_pointer_v<V> && std::is_constructible_v<V, const T*, std::size_t>) operator V() const { return V(p, n); }
+};
+template <class T, class N> converted_pointed_range_t<T> converted_pointed_range(const T* p, N n) {
+  if ((std::is_signed_v<N> && static_cast<long long>(n) < 0) || static_cast<unsigned long long>(n) > 0x7fffffffffffffffull) {
+    converted::open_read();   // (more entries than any list has)
+    return {p, 0};
+  }
+  const T* e = converted_pointed_end(p, static_cast<long long>(n));
+  return {p, static_cast<std::size_t>(e - p)};
 }
 
 // ---- Arondight45_DroneFC_Core.hpp and what it uses, as it stands ----
@@ -662,7 +695,7 @@ private:
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::V3& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z)}); }
-[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z"); }
 [[maybe_unused]] static bool defined(const fc::V3& s) { return defined(s.x) && defined(s.y) && defined(s.z); }
 [[maybe_unused]] static std::string text(const fc::V3& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + "}"; }
 [[maybe_unused]] static void take(fc::V3& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); }
@@ -676,7 +709,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::PT1& s) { return converted::Value::structure({arg(s.cutoff_hz_), arg(s.y_), arg(s.initialized_)}); }
-[[maybe_unused]] static bool same(const fc::PT1& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.cutoff_hz_, (*got.rows)[0]) && same(want.y_, (*got.rows)[1]) && same(want.initialized_, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::PT1& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.cutoff_hz_, (*got.rows)[0]), ".cutoff_hz_") && converted::at_place(same(want.y_, (*got.rows)[1]), ".y_") && converted::at_place(same(want.initialized_, (*got.rows)[2]), ".initialized_"); }
 [[maybe_unused]] static bool defined(const fc::PT1& s) { return defined(s.cutoff_hz_) && defined(s.y_) && defined(s.initialized_); }
 [[maybe_unused]] static std::string text(const fc::PT1& s) { return std::string("{") + text(s.cutoff_hz_) + ", " + text(s.y_) + ", " + text(s.initialized_) + "}"; }
 [[maybe_unused]] static void take(fc::PT1& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.cutoff_hz_, (*v.rows)[0]); converted::take_as<double>(s.y_, (*v.rows)[1]); converted::take_as<bool>(s.initialized_, (*v.rows)[2]); }
@@ -689,7 +722,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Filters& s) { return converted::Value::structure({arg(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())), arg(std::vector<fc::PT1>(s.accel.begin(), s.accel.end()))}); }
-[[maybe_unused]] static bool same(const fc::Filters& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(std::vector<fc::PT1>(want.gyro.begin(), want.gyro.end()), (*got.rows)[0]) && same(std::vector<fc::PT1>(want.accel.begin(), want.accel.end()), (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const fc::Filters& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(std::vector<fc::PT1>(want.gyro.begin(), want.gyro.end()), (*got.rows)[0]), ".gyro") && converted::at_place(same(std::vector<fc::PT1>(want.accel.begin(), want.accel.end()), (*got.rows)[1]), ".accel"); }
 [[maybe_unused]] static bool defined(const fc::Filters& s) { return defined(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())) && defined(std::vector<fc::PT1>(s.accel.begin(), s.accel.end())); }
 [[maybe_unused]] static std::string text(const fc::Filters& s) { return std::string("{") + text(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())) + ", " + text(std::vector<fc::PT1>(s.accel.begin(), s.accel.end())) + "}"; }
 [[maybe_unused]] static void take(fc::Filters& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.gyro); ++k) converted::take_as<fc::PT1>(s.gyro[k], items.item(k)); } { const converted::Value& items = (*v.rows)[1]; for (std::size_t k = 0; k < items.size() && k < std::size(s.accel); ++k) converted::take_as<fc::PT1>(s.accel[k], items.item(k)); } }
@@ -702,7 +735,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Imu& s) { return converted::Value::structure({arg(s.a), arg(s.g)}); }
-[[maybe_unused]] static bool same(const fc::Imu& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.a, (*got.rows)[0]) && same(want.g, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const fc::Imu& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.a, (*got.rows)[0]), ".a") && converted::at_place(same(want.g, (*got.rows)[1]), ".g"); }
 [[maybe_unused]] static bool defined(const fc::Imu& s) { return defined(s.a) && defined(s.g); }
 [[maybe_unused]] static std::string text(const fc::Imu& s) { return std::string("{") + text(s.a) + ", " + text(s.g) + "}"; }
 [[maybe_unused]] static void take(fc::Imu& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<fc::V3>(s.a, (*v.rows)[0]); converted::take_as<fc::V3>(s.g, (*v.rows)[1]); }
@@ -716,7 +749,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Attitude& s) { return converted::Value::structure({arg(s.roll), arg(s.pitch), arg(s.yaw)}); }
-[[maybe_unused]] static bool same(const fc::Attitude& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.roll, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::Attitude& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.roll, (*got.rows)[0]), ".roll") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw"); }
 [[maybe_unused]] static bool defined(const fc::Attitude& s) { return defined(s.roll) && defined(s.pitch) && defined(s.yaw); }
 [[maybe_unused]] static std::string text(const fc::Attitude& s) { return std::string("{") + text(s.roll) + ", " + text(s.pitch) + ", " + text(s.yaw) + "}"; }
 [[maybe_unused]] static void take(fc::Attitude& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.roll, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); }
@@ -733,7 +766,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Gains& s) { return converted::Value::structure({arg(s.kp), arg(s.ki), arg(s.kd), arg(s.integral_limit), arg(s.output_limit), arg(s.d_cutoff_hz)}); }
-[[maybe_unused]] static bool same(const fc::Gains& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.kp, (*got.rows)[0]) && same(want.ki, (*got.rows)[1]) && same(want.kd, (*got.rows)[2]) && same(want.integral_limit, (*got.rows)[3]) && same(want.output_limit, (*got.rows)[4]) && same(want.d_cutoff_hz, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const fc::Gains& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.kp, (*got.rows)[0]), ".kp") && converted::at_place(same(want.ki, (*got.rows)[1]), ".ki") && converted::at_place(same(want.kd, (*got.rows)[2]), ".kd") && converted::at_place(same(want.integral_limit, (*got.rows)[3]), ".integral_limit") && converted::at_place(same(want.output_limit, (*got.rows)[4]), ".output_limit") && converted::at_place(same(want.d_cutoff_hz, (*got.rows)[5]), ".d_cutoff_hz"); }
 [[maybe_unused]] static bool defined(const fc::Gains& s) { return defined(s.kp) && defined(s.ki) && defined(s.kd) && defined(s.integral_limit) && defined(s.output_limit) && defined(s.d_cutoff_hz); }
 [[maybe_unused]] static std::string text(const fc::Gains& s) { return std::string("{") + text(s.kp) + ", " + text(s.ki) + ", " + text(s.kd) + ", " + text(s.integral_limit) + ", " + text(s.output_limit) + ", " + text(s.d_cutoff_hz) + "}"; }
 [[maybe_unused]] static void take(fc::Gains& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.kp, (*v.rows)[0]); converted::take_as<double>(s.ki, (*v.rows)[1]); converted::take_as<double>(s.kd, (*v.rows)[2]); converted::take_as<double>(s.integral_limit, (*v.rows)[3]); converted::take_as<double>(s.output_limit, (*v.rows)[4]); converted::take_as<double>(s.d_cutoff_hz, (*v.rows)[5]); }
@@ -749,7 +782,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::PID& s) { return converted::Value::structure({arg(s.gains_), arg(s.d_filter_), arg(s.integral_), arg(s.previous_), arg(s.have_previous_)}); }
-[[maybe_unused]] static bool same(const fc::PID& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.gains_, (*got.rows)[0]) && same(want.d_filter_, (*got.rows)[1]) && same(want.integral_, (*got.rows)[2]) && same(want.previous_, (*got.rows)[3]) && same(want.have_previous_, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::PID& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.gains_, (*got.rows)[0]), ".gains_") && converted::at_place(same(want.d_filter_, (*got.rows)[1]), ".d_filter_") && converted::at_place(same(want.integral_, (*got.rows)[2]), ".integral_") && converted::at_place(same(want.previous_, (*got.rows)[3]), ".previous_") && converted::at_place(same(want.have_previous_, (*got.rows)[4]), ".have_previous_"); }
 [[maybe_unused]] static bool defined(const fc::PID& s) { return defined(s.gains_) && defined(s.d_filter_) && defined(s.integral_) && defined(s.previous_) && defined(s.have_previous_); }
 [[maybe_unused]] static std::string text(const fc::PID& s) { return std::string("{") + text(s.gains_) + ", " + text(s.d_filter_) + ", " + text(s.integral_) + ", " + text(s.previous_) + ", " + text(s.have_previous_) + "}"; }
 [[maybe_unused]] static void take(fc::PID& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<fc::Gains>(s.gains_, (*v.rows)[0]); converted::take_as<fc::PT1>(s.d_filter_, (*v.rows)[1]); converted::take_as<double>(s.integral_, (*v.rows)[2]); converted::take_as<double>(s.previous_, (*v.rows)[3]); converted::take_as<bool>(s.have_previous_, (*v.rows)[4]); }
@@ -765,7 +798,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::RC& s) { return converted::Value::structure({arg(std::vector<unsigned short>(s.ch.begin(), s.ch.end())), arg(s.lost), arg(s.failsafe), arg(s.valid), arg(converted::shaped<converted::Whole>(s.us))}); }
-[[maybe_unused]] static bool same(const fc::RC& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(std::vector<unsigned short>(want.ch.begin(), want.ch.end()), (*got.rows)[0]) && same(want.lost, (*got.rows)[1]) && same(want.failsafe, (*got.rows)[2]) && same(want.valid, (*got.rows)[3]) && same(converted::shaped<converted::Whole>(want.us), (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::RC& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(std::vector<unsigned short>(want.ch.begin(), want.ch.end()), (*got.rows)[0]), ".ch") && converted::at_place(same(want.lost, (*got.rows)[1]), ".lost") && converted::at_place(same(want.failsafe, (*got.rows)[2]), ".failsafe") && converted::at_place(same(want.valid, (*got.rows)[3]), ".valid") && converted::at_place(same(converted::shaped<converted::Whole>(want.us), (*got.rows)[4]), ".us"); }
 [[maybe_unused]] static bool defined(const fc::RC& s) { return defined(std::vector<unsigned short>(s.ch.begin(), s.ch.end())) && defined(s.lost) && defined(s.failsafe) && defined(s.valid) && defined(converted::shaped<converted::Whole>(s.us)); }
 [[maybe_unused]] static std::string text(const fc::RC& s) { return std::string("{") + text(std::vector<unsigned short>(s.ch.begin(), s.ch.end())) + ", " + text(s.lost) + ", " + text(s.failsafe) + ", " + text(s.valid) + ", " + text(converted::shaped<converted::Whole>(s.us)) + "}"; }
 [[maybe_unused]] static void take(fc::RC& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.ch); ++k) converted::take_as<unsigned short>(s.ch[k], items.item(k)); } converted::take_as<bool>(s.lost, (*v.rows)[1]); converted::take_as<bool>(s.failsafe, (*v.rows)[2]); converted::take_as<bool>(s.valid, (*v.rows)[3]); converted::take_as<converted::Whole>(s.us, (*v.rows)[4]); }
@@ -779,7 +812,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::SbusParser& s) { return converted::Value::structure({arg(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())), arg(s.size_), arg(converted::shaped<converted::Whole>(s.last_us_))}); }
-[[maybe_unused]] static bool same(const fc::SbusParser& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(std::vector<unsigned char>(want.buffer_.begin(), want.buffer_.end()), (*got.rows)[0]) && same(want.size_, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.last_us_), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::SbusParser& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(std::vector<unsigned char>(want.buffer_.begin(), want.buffer_.end()), (*got.rows)[0]), ".buffer_") && converted::at_place(same(want.size_, (*got.rows)[1]), ".size_") && converted::at_place(same(converted::shaped<converted::Whole>(want.last_us_), (*got.rows)[2]), ".last_us_"); }
 [[maybe_unused]] static bool defined(const fc::SbusParser& s) { return defined(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())) && defined(s.size_) && defined(converted::shaped<converted::Whole>(s.last_us_)); }
 [[maybe_unused]] static std::string text(const fc::SbusParser& s) { return std::string("{") + text(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())) + ", " + text(s.size_) + ", " + text(converted::shaped<converted::Whole>(s.last_us_)) + "}"; }
 [[maybe_unused]] static void take(fc::SbusParser& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.buffer_); ++k) converted::take_as<unsigned char>(s.buffer_[k], items.item(k)); } converted::take_as<unsigned long>(s.size_, (*v.rows)[1]); converted::take_as<converted::Whole>(s.last_us_, (*v.rows)[2]); }
@@ -795,7 +828,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Command& s) { return converted::Value::structure({arg(s.roll), arg(s.pitch), arg(s.throttle), arg(s.yaw), arg(s.arm)}); }
-[[maybe_unused]] static bool same(const fc::Command& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.roll, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.throttle, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.arm, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::Command& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.roll, (*got.rows)[0]), ".roll") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.throttle, (*got.rows)[2]), ".throttle") && converted::at_place(same(want.yaw, (*got.rows)[3]), ".yaw") && converted::at_place(same(want.arm, (*got.rows)[4]), ".arm"); }
 [[maybe_unused]] static bool defined(const fc::Command& s) { return defined(s.roll) && defined(s.pitch) && defined(s.throttle) && defined(s.yaw) && defined(s.arm); }
 [[maybe_unused]] static std::string text(const fc::Command& s) { return std::string("{") + text(s.roll) + ", " + text(s.pitch) + ", " + text(s.throttle) + ", " + text(s.yaw) + ", " + text(s.arm) + "}"; }
 [[maybe_unused]] static void take(fc::Command& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.roll, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.throttle, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<bool>(s.arm, (*v.rows)[4]); }
@@ -807,7 +840,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Mix& s) { return converted::Value::structure({arg(std::vector<double>(s.motor.begin(), s.motor.end()))}); }
-[[maybe_unused]] static bool same(const fc::Mix& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(want.motor.begin(), want.motor.end()), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const fc::Mix& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(std::vector<double>(want.motor.begin(), want.motor.end()), (*got.rows)[0]), ".motor"); }
 [[maybe_unused]] static bool defined(const fc::Mix& s) { return defined(std::vector<double>(s.motor.begin(), s.motor.end())); }
 [[maybe_unused]] static std::string text(const fc::Mix& s) { return std::string("{") + text(std::vector<double>(s.motor.begin(), s.motor.end())) + "}"; }
 [[maybe_unused]] static void take(fc::Mix& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.motor); ++k) converted::take_as<double>(s.motor[k], items.item(k)); } }
@@ -821,7 +854,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::ArmState& s) { return converted::Value::structure({arg(s.armed_), arg(s.saw_low_), arg(converted::shaped<converted::Whole>(s.since_us_))}); }
-[[maybe_unused]] static bool same(const fc::ArmState& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.armed_, (*got.rows)[0]) && same(want.saw_low_, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.since_us_), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::ArmState& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.armed_, (*got.rows)[0]), ".armed_") && converted::at_place(same(want.saw_low_, (*got.rows)[1]), ".saw_low_") && converted::at_place(same(converted::shaped<converted::Whole>(want.since_us_), (*got.rows)[2]), ".since_us_"); }
 [[maybe_unused]] static bool defined(const fc::ArmState& s) { return defined(s.armed_) && defined(s.saw_low_) && defined(converted::shaped<converted::Whole>(s.since_us_)); }
 [[maybe_unused]] static std::string text(const fc::ArmState& s) { return std::string("{") + text(s.armed_) + ", " + text(s.saw_low_) + ", " + text(converted::shaped<converted::Whole>(s.since_us_)) + "}"; }
 [[maybe_unused]] static void take(fc::ArmState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<bool>(s.armed_, (*v.rows)[0]); converted::take_as<bool>(s.saw_low_, (*v.rows)[1]); converted::take_as<converted::Whole>(s.since_us_, (*v.rows)[2]); }
@@ -835,7 +868,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::ArmState::Result& s) { return converted::Value::structure({arg(s.armed), arg(s.armed_now), arg(s.disarmed_now)}); }
-[[maybe_unused]] static bool same(const fc::ArmState::Result& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.armed, (*got.rows)[0]) && same(want.armed_now, (*got.rows)[1]) && same(want.disarmed_now, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::ArmState::Result& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.armed, (*got.rows)[0]), ".armed") && converted::at_place(same(want.armed_now, (*got.rows)[1]), ".armed_now") && converted::at_place(same(want.disarmed_now, (*got.rows)[2]), ".disarmed_now"); }
 [[maybe_unused]] static bool defined(const fc::ArmState::Result& s) { return defined(s.armed) && defined(s.armed_now) && defined(s.disarmed_now); }
 [[maybe_unused]] static std::string text(const fc::ArmState::Result& s) { return std::string("{") + text(s.armed) + ", " + text(s.armed_now) + ", " + text(s.disarmed_now) + "}"; }
 [[maybe_unused]] static void take(fc::ArmState::Result& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<bool>(s.armed, (*v.rows)[0]); converted::take_as<bool>(s.armed_now, (*v.rows)[1]); converted::take_as<bool>(s.disarmed_now, (*v.rows)[2]); }
@@ -850,7 +883,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Controller& s) { return converted::Value::structure({arg(s.attitude), arg(s.roll_pid_), arg(s.pitch_pid_), arg(s.yaw_pid_)}); }
-[[maybe_unused]] static bool same(const fc::Controller& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.attitude, (*got.rows)[0]) && same(want.roll_pid_, (*got.rows)[1]) && same(want.pitch_pid_, (*got.rows)[2]) && same(want.yaw_pid_, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const fc::Controller& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.attitude, (*got.rows)[0]), ".attitude") && converted::at_place(same(want.roll_pid_, (*got.rows)[1]), ".roll_pid_") && converted::at_place(same(want.pitch_pid_, (*got.rows)[2]), ".pitch_pid_") && converted::at_place(same(want.yaw_pid_, (*got.rows)[3]), ".yaw_pid_"); }
 [[maybe_unused]] static bool defined(const fc::Controller& s) { return defined(s.attitude) && defined(s.roll_pid_) && defined(s.pitch_pid_) && defined(s.yaw_pid_); }
 [[maybe_unused]] static std::string text(const fc::Controller& s) { return std::string("{") + text(s.attitude) + ", " + text(s.roll_pid_) + ", " + text(s.pitch_pid_) + ", " + text(s.yaw_pid_) + "}"; }
 [[maybe_unused]] static void take(fc::Controller& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<fc::Attitude>(s.attitude, (*v.rows)[0]); converted::take_as<fc::PID>(s.roll_pid_, (*v.rows)[1]); converted::take_as<fc::PID>(s.pitch_pid_, (*v.rows)[2]); converted::take_as<fc::PID>(s.yaw_pid_, (*v.rows)[3]); }
@@ -873,7 +906,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Runtime& s) { return converted::Value::structure({arg(s.filters_), arg(s.controller_), arg(s.arm_), arg(s.calibrated_), arg(s.calibration_count_), arg(s.gyro_sum_), arg(s.gyro_sq_sum_), arg(s.accel_sum_), arg(s.gyro_bias_), arg(s.bad_timing_), arg(s.fault_), arg(s.armed_)}); }
-[[maybe_unused]] static bool same(const fc::Runtime& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.filters_, (*got.rows)[0]) && same(want.controller_, (*got.rows)[1]) && same(want.arm_, (*got.rows)[2]) && same(want.calibrated_, (*got.rows)[3]) && same(want.calibration_count_, (*got.rows)[4]) && same(want.gyro_sum_, (*got.rows)[5]) && same(want.gyro_sq_sum_, (*got.rows)[6]) && same(want.accel_sum_, (*got.rows)[7]) && same(want.gyro_bias_, (*got.rows)[8]) && same(want.bad_timing_, (*got.rows)[9]) && same(want.fault_, (*got.rows)[10]) && same(want.armed_, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const fc::Runtime& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.filters_, (*got.rows)[0]), ".filters_") && converted::at_place(same(want.controller_, (*got.rows)[1]), ".controller_") && converted::at_place(same(want.arm_, (*got.rows)[2]), ".arm_") && converted::at_place(same(want.calibrated_, (*got.rows)[3]), ".calibrated_") && converted::at_place(same(want.calibration_count_, (*got.rows)[4]), ".calibration_count_") && converted::at_place(same(want.gyro_sum_, (*got.rows)[5]), ".gyro_sum_") && converted::at_place(same(want.gyro_sq_sum_, (*got.rows)[6]), ".gyro_sq_sum_") && converted::at_place(same(want.accel_sum_, (*got.rows)[7]), ".accel_sum_") && converted::at_place(same(want.gyro_bias_, (*got.rows)[8]), ".gyro_bias_") && converted::at_place(same(want.bad_timing_, (*got.rows)[9]), ".bad_timing_") && converted::at_place(same(want.fault_, (*got.rows)[10]), ".fault_") && converted::at_place(same(want.armed_, (*got.rows)[11]), ".armed_"); }
 [[maybe_unused]] static bool defined(const fc::Runtime& s) { return defined(s.filters_) && defined(s.controller_) && defined(s.arm_) && defined(s.calibrated_) && defined(s.calibration_count_) && defined(s.gyro_sum_) && defined(s.gyro_sq_sum_) && defined(s.accel_sum_) && defined(s.gyro_bias_) && defined(s.bad_timing_) && defined(s.fault_) && defined(s.armed_); }
 [[maybe_unused]] static std::string text(const fc::Runtime& s) { return std::string("{") + text(s.filters_) + ", " + text(s.controller_) + ", " + text(s.arm_) + ", " + text(s.calibrated_) + ", " + text(s.calibration_count_) + ", " + text(s.gyro_sum_) + ", " + text(s.gyro_sq_sum_) + ", " + text(s.accel_sum_) + ", " + text(s.gyro_bias_) + ", " + text(s.bad_timing_) + ", " + text(s.fault_) + ", " + text(s.armed_) + "}"; }
 [[maybe_unused]] static void take(fc::Runtime& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<fc::Filters>(s.filters_, (*v.rows)[0]); converted::take_as<fc::Controller>(s.controller_, (*v.rows)[1]); converted::take_as<fc::ArmState>(s.arm_, (*v.rows)[2]); converted::take_as<bool>(s.calibrated_, (*v.rows)[3]); converted::take_as<unsigned int>(s.calibration_count_, (*v.rows)[4]); converted::take_as<fc::V3>(s.gyro_sum_, (*v.rows)[5]); converted::take_as<fc::V3>(s.gyro_sq_sum_, (*v.rows)[6]); converted::take_as<fc::V3>(s.accel_sum_, (*v.rows)[7]); converted::take_as<fc::V3>(s.gyro_bias_, (*v.rows)[8]); converted::take_as<unsigned int>(s.bad_timing_, (*v.rows)[9]); converted::take_as<fc::FaultCode>(s.fault_, (*v.rows)[10]); converted::take_as<bool>(s.armed_, (*v.rows)[11]); }
@@ -889,7 +922,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::RuntimeOutput& s) { return converted::Value::structure({arg(std::vector<unsigned short>(s.motor_us.begin(), s.motor_us.end())), arg(std::vector<short>(s.attitude_cdeg.begin(), s.attitude_cdeg.end())), arg(s.state), arg(s.fault), arg(s.armed)}); }
-[[maybe_unused]] static bool same(const fc::RuntimeOutput& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(std::vector<unsigned short>(want.motor_us.begin(), want.motor_us.end()), (*got.rows)[0]) && same(std::vector<short>(want.attitude_cdeg.begin(), want.attitude_cdeg.end()), (*got.rows)[1]) && same(want.state, (*got.rows)[2]) && same(want.fault, (*got.rows)[3]) && same(want.armed, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::RuntimeOutput& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(std::vector<unsigned short>(want.motor_us.begin(), want.motor_us.end()), (*got.rows)[0]), ".motor_us") && converted::at_place(same(std::vector<short>(want.attitude_cdeg.begin(), want.attitude_cdeg.end()), (*got.rows)[1]), ".attitude_cdeg") && converted::at_place(same(want.state, (*got.rows)[2]), ".state") && converted::at_place(same(want.fault, (*got.rows)[3]), ".fault") && converted::at_place(same(want.armed, (*got.rows)[4]), ".armed"); }
 [[maybe_unused]] static bool defined(const fc::RuntimeOutput& s) { return defined(std::vector<unsigned short>(s.motor_us.begin(), s.motor_us.end())) && defined(std::vector<short>(s.attitude_cdeg.begin(), s.attitude_cdeg.end())) && defined(s.state) && defined(s.fault) && defined(s.armed); }
 [[maybe_unused]] static std::string text(const fc::RuntimeOutput& s) { return std::string("{") + text(std::vector<unsigned short>(s.motor_us.begin(), s.motor_us.end())) + ", " + text(std::vector<short>(s.attitude_cdeg.begin(), s.attitude_cdeg.end())) + ", " + text(s.state) + ", " + text(s.fault) + ", " + text(s.armed) + "}"; }
 [[maybe_unused]] static void take(fc::RuntimeOutput& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.motor_us); ++k) converted::take_as<unsigned short>(s.motor_us[k], items.item(k)); } { const converted::Value& items = (*v.rows)[1]; for (std::size_t k = 0; k < items.size() && k < std::size(s.attitude_cdeg); ++k) converted::take_as<short>(s.attitude_cdeg[k], items.item(k)); } converted::take_as<unsigned short>(s.state, (*v.rows)[2]); converted::take_as<fc::FaultCode>(s.fault, (*v.rows)[3]); converted::take_as<bool>(s.armed, (*v.rows)[4]); }
@@ -907,45 +940,45 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::RuntimeInput& s) { return converted::Value::structure({arg(s.raw), arg(s.rc), arg(converted::shaped<converted::Whole>(s.now_us)), arg(s.dt_us), arg(s.missed_samples), arg(s.imu_valid), arg(s.rc_fresh)}); }
-[[maybe_unused]] static bool same(const fc::RuntimeInput& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.raw, (*got.rows)[0]) && same(want.rc, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.now_us), (*got.rows)[2]) && same(want.dt_us, (*got.rows)[3]) && same(want.missed_samples, (*got.rows)[4]) && same(want.imu_valid, (*got.rows)[5]) && same(want.rc_fresh, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const fc::RuntimeInput& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.raw, (*got.rows)[0]), ".raw") && converted::at_place(same(want.rc, (*got.rows)[1]), ".rc") && converted::at_place(same(converted::shaped<converted::Whole>(want.now_us), (*got.rows)[2]), ".now_us") && converted::at_place(same(want.dt_us, (*got.rows)[3]), ".dt_us") && converted::at_place(same(want.missed_samples, (*got.rows)[4]), ".missed_samples") && converted::at_place(same(want.imu_valid, (*got.rows)[5]), ".imu_valid") && converted::at_place(same(want.rc_fresh, (*got.rows)[6]), ".rc_fresh"); }
 [[maybe_unused]] static bool defined(const fc::RuntimeInput& s) { return defined(s.raw) && defined(s.rc) && defined(converted::shaped<converted::Whole>(s.now_us)) && defined(s.dt_us) && defined(s.missed_samples) && defined(s.imu_valid) && defined(s.rc_fresh); }
 [[maybe_unused]] static std::string text(const fc::RuntimeInput& s) { return std::string("{") + text(s.raw) + ", " + text(s.rc) + ", " + text(converted::shaped<converted::Whole>(s.now_us)) + ", " + text(s.dt_us) + ", " + text(s.missed_samples) + ", " + text(s.imu_valid) + ", " + text(s.rc_fresh) + "}"; }
 [[maybe_unused]] static void take(fc::RuntimeInput& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<fc::Imu>(s.raw, (*v.rows)[0]); converted::take_as<fc::RC>(s.rc, (*v.rows)[1]); converted::take_as<converted::Whole>(s.now_us, (*v.rows)[2]); converted::take_as<unsigned int>(s.dt_us, (*v.rows)[3]); converted::take_as<unsigned int>(s.missed_samples, (*v.rows)[4]); converted::take_as<bool>(s.imu_valid, (*v.rows)[5]); converted::take_as<bool>(s.rc_fresh, (*v.rows)[6]); }
 }
 struct Out_PT1_run { fc::PT1 Self; double Result; };
-[[maybe_unused]] static bool same(const Out_PT1_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_PT1_run& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_PT1_run& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_PT1_run& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Filters_run { fc::Filters Self; fc::Imu Result; };
-[[maybe_unused]] static bool same(const Out_Filters_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Filters_run& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Filters_run& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Filters_run& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_PID_run { fc::PID Self; double Result; };
-[[maybe_unused]] static bool same(const Out_PID_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_PID_run& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_PID_run& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_PID_run& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_decode_sbus { bool Result; fc::RC out; };
-[[maybe_unused]] static bool same(const Out_decode_sbus& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_decode_sbus& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_decode_sbus& s) { return defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_decode_sbus& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_SbusParser_feed { fc::SbusParser Self; bool Result; fc::RC out; };
-[[maybe_unused]] static bool same(const Out_SbusParser_feed& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.out, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_SbusParser_feed& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.out, (*got.rows)[2]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_SbusParser_feed& s) { return defined(s.Self) && defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_SbusParser_feed& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_ArmState_run { fc::ArmState Self; fc::ArmState::Result Result; };
-[[maybe_unused]] static bool same(const Out_ArmState_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_ArmState_run& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_ArmState_run& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_ArmState_run& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Controller_run { fc::Controller Self; fc::Mix Result; };
-[[maybe_unused]] static bool same(const Out_Controller_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Controller_run& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Controller_run& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Controller_run& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Runtime_step_command { fc::Runtime Self; fc::RuntimeOutput Result; };
-[[maybe_unused]] static bool same(const Out_Runtime_step_command& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Runtime_step_command& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Runtime_step_command& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Runtime_step_command& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Runtime_step { fc::Runtime Self; fc::RuntimeOutput Result; };
-[[maybe_unused]] static bool same(const Out_Runtime_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Runtime_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Runtime_step& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Runtime_step& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -954,7 +987,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // mag
     converted::Tally tally("mag");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::V3 a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::mag(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] fc::V3& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::mag(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::V3 a0 = draw_fc__V3(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -963,7 +996,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -973,7 +1008,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // finite
     converted::Tally tally("finite");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::V3 a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::finite(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] fc::V3& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::finite(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::V3 a0 = draw_fc__V3(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -982,7 +1017,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -992,7 +1029,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // PT1::PT1
     converted::Tally tally("PT1_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return fc::PT1(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return fc::PT1(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1001,7 +1038,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1011,7 +1050,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // PT1::run
     converted::Tally tally("PT1_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::PT1 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2)); }); return Out_PT1_run{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::PT1& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2)); }); return Out_PT1_run{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::PT1 a0 = draw_fc__PT1(draw);
       double a1 = draw.number();
@@ -1022,7 +1061,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1032,7 +1073,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // PT1::reset
     converted::Tally tally("PT1_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::PT1 a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::PT1& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::PT1 a0 = draw_fc__PT1(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1041,7 +1082,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1051,7 +1094,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Filters::run
     converted::Tally tally("Filters_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Filters a0, [[maybe_unused]] fc::Imu a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2)); }); return Out_Filters_run{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::Filters& a0, [[maybe_unused]] fc::Imu& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2)); }); return Out_Filters_run{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::Filters a0 = draw_fc__Filters(draw);
       fc::Imu a1 = draw_fc__Imu(draw);
@@ -1062,7 +1105,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1072,7 +1117,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Attitude::reset
     converted::Tally tally("Attitude_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Attitude a0, [[maybe_unused]] fc::V3 a1) { converted::counted([&] { return a0.reset(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::Attitude& a0, [[maybe_unused]] fc::V3& a1) { converted::counted([&] { return a0.reset(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Attitude a0 = draw_fc__Attitude(draw);
       fc::V3 a1 = draw_fc__V3(draw);
@@ -1082,7 +1127,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1092,7 +1139,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Attitude::run
     converted::Tally tally("Attitude_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Attitude a0, [[maybe_unused]] fc::Imu a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.run(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::Attitude& a0, [[maybe_unused]] fc::Imu& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.run(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Attitude a0 = draw_fc__Attitude(draw);
       fc::Imu a1 = draw_fc__Imu(draw);
@@ -1103,7 +1150,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1113,7 +1162,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // PID::PID
     converted::Tally tally("PID_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Gains a0) { return converted::counted([&] { return fc::PID(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] fc::Gains& a0) { return converted::counted([&] { return fc::PID(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Gains a0 = draw_fc__Gains(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1122,7 +1171,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1132,7 +1183,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // PID::run
     converted::Tally tally("PID_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::PID a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] bool a4) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_PID_run{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::PID& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_PID_run{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::PID a0 = draw_fc__PID(draw);
       double a1 = draw.number();
@@ -1145,7 +1196,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1155,7 +1208,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // PID::reset
     converted::Tally tally("PID_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::PID a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::PID& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::PID a0 = draw_fc__PID(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1164,7 +1217,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1174,7 +1229,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // PID::integral
     converted::Tally tally("PID_integral");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::PID a0) { return converted::counted([&] { return a0.integral(); }); };
+    const auto run = [&]([[maybe_unused]] fc::PID& a0) { return converted::counted([&] { return a0.integral(); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::PID a0 = draw_fc__PID(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1183,7 +1238,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1193,7 +1250,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // sbus_end
     converted::Tally tally("sbus_end");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned char a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::sbus_end(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned char& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::sbus_end(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1202,7 +1259,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1212,10 +1271,10 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // decode_sbus
     converted::Tally tally("decode_sbus");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long a1, [[maybe_unused]] fc::RC a2) { auto r = converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::decode_sbus((a1 < 0 ? nullptr : a0.data() + a1), a2); }); return Out_decode_sbus{std::move(r), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long& a1, [[maybe_unused]] fc::RC& a2) { auto r = converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::decode_sbus((a1 < 0 ? nullptr : a0.data() + a1), a2); }); return Out_decode_sbus{std::move(r), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0(25); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
-      const long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
+      long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
       fc::RC a2 = draw_fc__RC(draw);
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
       const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
@@ -1224,7 +1283,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, a1, std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1234,7 +1295,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // SbusParser::feed
     converted::Tally tally("SbusParser_feed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::SbusParser a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] u64 a2, [[maybe_unused]] fc::RC a3) { auto r = converted::counted([&] { return a0.feed(std::move(a1), std::move(a2), a3); }); return Out_SbusParser_feed{std::move(a0), std::move(r), std::move(a3)}; };
+    const auto run = [&]([[maybe_unused]] fc::SbusParser& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] u64& a2, [[maybe_unused]] fc::RC& a3) { auto r = converted::counted([&] { return a0.feed(std::move(a1), std::move(a2), a3); }); return Out_SbusParser_feed{std::move(a0), std::move(r), std::move(a3)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::SbusParser a0 = draw_fc__SbusParser(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -1246,7 +1307,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1256,7 +1319,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // centered
     converted::Tally tally("centered");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned short a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::centered(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned short& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::centered(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned short a0 = static_cast<unsigned short>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1265,7 +1328,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1275,7 +1340,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // throttle
     converted::Tally tally("throttle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned short a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::throttle(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned short& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::throttle(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned short a0 = static_cast<unsigned short>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1284,7 +1349,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1294,7 +1361,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // shape
     converted::Tally tally("shape");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::shape(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::shape(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1305,7 +1372,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1315,7 +1384,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // finite
     converted::Tally tally("finite_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Command a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::finite(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] fc::Command& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::finite(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Command a0 = draw_fc__Command(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1324,7 +1393,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1334,7 +1405,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // sanitize
     converted::Tally tally("sanitize");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Command a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::sanitize(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] fc::Command& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::sanitize(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Command a0 = draw_fc__Command(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1343,7 +1414,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1353,7 +1426,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // command
     converted::Tally tally("command");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::RC a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::command(a0); }); };
+    const auto run = [&]([[maybe_unused]] fc::RC& a0) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::command(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::RC a0 = draw_fc__RC(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1362,7 +1435,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1372,7 +1447,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // mix
     converted::Tally tally("mix");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::mix(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::mix(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1384,7 +1459,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1394,7 +1471,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // pulse
     converted::Tally tally("pulse");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] bool a1) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::pulse(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] bool& a1) { return converted::counted([&] { return converted_Arondight45_DroneFC_Core::fc::pulse(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       bool a1 = draw.flag();
@@ -1404,7 +1481,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1414,7 +1493,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // ArmState::run
     converted::Tally tally("ArmState_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::ArmState a0, [[maybe_unused]] u64 a1, [[maybe_unused]] bool a2, [[maybe_unused]] fc::Command a3, [[maybe_unused]] bool a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return Out_ArmState_run{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::ArmState& a0, [[maybe_unused]] u64& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] fc::Command& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] double& a5, [[maybe_unused]] double& a6) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return Out_ArmState_run{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::ArmState a0 = draw_fc__ArmState(draw);
       u64 a1 = static_cast<u64>(draw.bits());
@@ -1429,7 +1508,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1439,7 +1520,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Controller::reset
     converted::Tally tally("Controller_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Controller a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::Controller& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Controller a0 = draw_fc__Controller(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1448,7 +1529,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1458,7 +1541,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Controller::run
     converted::Tally tally("Controller_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Controller a0, [[maybe_unused]] fc::Imu a1, [[maybe_unused]] fc::Command a2, [[maybe_unused]] double a3, [[maybe_unused]] bool a4) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_Controller_run{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::Controller& a0, [[maybe_unused]] fc::Imu& a1, [[maybe_unused]] fc::Command& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4) { auto r = converted::counted([&] { return a0.run(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_Controller_run{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::Controller a0 = draw_fc__Controller(draw);
       fc::Imu a1 = draw_fc__Imu(draw);
@@ -1471,7 +1554,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1481,7 +1566,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::reset
     converted::Tally tally("Runtime_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1490,7 +1575,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1508,7 +1595,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1518,7 +1607,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::to_cdeg
     converted::Tally tally("Runtime_to_cdeg");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return fc::Runtime::to_cdeg(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return fc::Runtime::to_cdeg(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1527,7 +1616,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1537,7 +1628,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::finalize
     converted::Tally tally("Runtime_finalize");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0, [[maybe_unused]] fc::RuntimeOutput a1, [[maybe_unused]] bool a2, [[maybe_unused]] bool a3) { return converted::counted([&] { return a0.finalize(std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0, [[maybe_unused]] fc::RuntimeOutput& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] bool& a3) { return converted::counted([&] { return a0.finalize(std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       fc::RuntimeOutput a1 = draw_fc__RuntimeOutput(draw);
@@ -1549,7 +1640,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1559,7 +1652,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::set_fault
     converted::Tally tally("Runtime_set_fault");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0, [[maybe_unused]] fc::FaultCode a1) { converted::counted([&] { return a0.set_fault(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0, [[maybe_unused]] fc::FaultCode& a1) { converted::counted([&] { return a0.set_fault(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       fc::FaultCode a1 = static_cast<fc::FaultCode>(draw.below(6));
@@ -1569,7 +1662,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1579,7 +1674,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::calibrate
     converted::Tally tally("Runtime_calibrate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0, [[maybe_unused]] fc::Imu a1) { converted::counted([&] { return a0.calibrate(a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0, [[maybe_unused]] fc::Imu& a1) { converted::counted([&] { return a0.calibrate(a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       fc::Imu a1 = draw_fc__Imu(draw);
@@ -1589,7 +1684,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1599,7 +1696,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::step_command
     converted::Tally tally("Runtime_step_command");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0, [[maybe_unused]] fc::RuntimeInput a1, [[maybe_unused]] fc::Command a2, [[maybe_unused]] bool a3) { auto r = converted::counted([&] { return a0.step_command(a1, std::move(a2), std::move(a3)); }); return Out_Runtime_step_command{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0, [[maybe_unused]] fc::RuntimeInput& a1, [[maybe_unused]] fc::Command& a2, [[maybe_unused]] bool& a3) { auto r = converted::counted([&] { return a0.step_command(a1, std::move(a2), std::move(a3)); }); return Out_Runtime_step_command{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       fc::RuntimeInput a1 = draw_fc__RuntimeInput(draw);
@@ -1611,7 +1708,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1621,7 +1720,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::step
     converted::Tally tally("Runtime_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0, [[maybe_unused]] fc::RuntimeInput a1) { auto r = converted::counted([&] { return a0.step(a1); }); return Out_Runtime_step{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0, [[maybe_unused]] fc::RuntimeInput& a1) { auto r = converted::counted([&] { return a0.step(a1); }); return Out_Runtime_step{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       fc::RuntimeInput a1 = draw_fc__RuntimeInput(draw);
@@ -1631,7 +1730,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1641,7 +1742,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::calibrated
     converted::Tally tally("Runtime_calibrated");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0) { return converted::counted([&] { return a0.calibrated(); }); };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0) { return converted::counted([&] { return a0.calibrated(); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1650,7 +1751,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1660,7 +1763,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::armed
     converted::Tally tally("Runtime_armed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0) { return converted::counted([&] { return a0.armed(); }); };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0) { return converted::counted([&] { return a0.armed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1669,7 +1772,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1679,7 +1784,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::fault
     converted::Tally tally("Runtime_fault");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::Runtime a0) { return converted::counted([&] { return a0.fault(); }); };
+    const auto run = [&]([[maybe_unused]] fc::Runtime& a0) { return converted::counted([&] { return a0.fault(); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::Runtime a0 = draw_fc__Runtime(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1688,7 +1793,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1698,7 +1805,7 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
   {  // Runtime::fault_name
     converted::Tally tally("Runtime_fault_name");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::FaultCode a0) { return converted::counted([&] { return fc::Runtime::fault_name(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] fc::FaultCode& a0) { return converted::counted([&] { return fc::Runtime::fault_name(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::FaultCode a0 = static_cast<fc::FaultCode>(draw.below(6));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1707,7 +1814,9 @@ SC_TEST(converted_Arondight45_DroneFC_Core) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

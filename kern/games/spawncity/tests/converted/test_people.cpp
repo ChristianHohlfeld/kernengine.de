@@ -131,7 +131,7 @@ struct People {
   /// A citizen put somewhere in plain sight (a driver who gets out of his car); the caller sets
   /// his pavement route (lane, seg, along, side, off) and what he does.
   
-  
+  Person& at(i32 i) { return converted::at(people_, static_cast<std::size_t>(i)); }
   
   /// A free step along `dir` that does not go through walls (tries turned directions).
   
@@ -169,7 +169,7 @@ struct People {
   /// by a car and getting up again (the person waits until stand_up()).
   struct Fall { i32 index; Vec3 push; bool car; bool alive; };
   void take_falls(std::vector<Fall>& out) { out.insert(out.end(), falls_.begin(), falls_.end()); falls_.clear(); }
-  
+  void stand_up(i32 i, Vec3 feet, f32 yaw) { Person& p = at(i); p.pos = feet; p.yaw = yaw; p.knocked_until = 0; }
   /// MP client: the citizens are the host's (puppets eased to his snapshots, no own spawning).
   void set_puppets(bool on) { if (on != puppets_) { puppets_ = on; for (Person& p : people_) if (p.kind == Kind::citizen) p.state = State::gone; } }
   bool puppets() const { return puppets_; }
@@ -265,7 +265,7 @@ struct People {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const People::Person& s) { return converted::Value::structure({arg(s.kind), arg(s.state), arg(s.pos), arg(s.yaw), arg(s.speed), arg(s.v), arg(s.hp), arg(s.phase), arg(s.shirt), arg(s.pants), arg(s.skin), arg(s.lane), arg(s.seg), arg(s.dir), arg(s.along), arg(s.side), arg(s.off), arg(s.flee_until), arg(s.burst_until), arg(s.flee_speed), arg(s.hands_up_until), arg(s.shaken_until), arg(s.wait_until), arg(s.flee_dir), arg(s.fitness), arg(s.down_at), arg(s.fall_dir), arg(s.unit), arg(s.aiming), arg(s.aim_pitch), arg(s.held), arg(s.hands), arg(s.hand_l), arg(s.hand_r), arg(s.punch), arg(s.seed), arg(s.provoked_at), arg(s.fight_until), arg(s.last_attack), arg(s.provoked_hit), arg(s.role), arg(s.knocked_until), arg(s.hurt_at), arg(s.remote), arg(s.net), arg(s.net_to), arg(s.net_at)}); }
-[[maybe_unused]] static bool same(const People::Person& want, const converted::Value& got) { return got.rows && got.rows->size() == 47 && same(want.kind, (*got.rows)[0]) && same(want.state, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.speed, (*got.rows)[4]) && same(want.v, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.shirt, (*got.rows)[8]) && same(want.pants, (*got.rows)[9]) && same(want.skin, (*got.rows)[10]) && same(want.lane, (*got.rows)[11]) && same(want.seg, (*got.rows)[12]) && same(want.dir, (*got.rows)[13]) && same(want.along, (*got.rows)[14]) && same(want.side, (*got.rows)[15]) && same(want.off, (*got.rows)[16]) && same(want.flee_until, (*got.rows)[17]) && same(want.burst_until, (*got.rows)[18]) && same(want.flee_speed, (*got.rows)[19]) && same(want.hands_up_until, (*got.rows)[20]) && same(want.shaken_until, (*got.rows)[21]) && same(want.wait_until, (*got.rows)[22]) && same(want.flee_dir, (*got.rows)[23]) && same(want.fitness, (*got.rows)[24]) && same(want.down_at, (*got.rows)[25]) && same(want.fall_dir, (*got.rows)[26]) && same(want.unit, (*got.rows)[27]) && same(want.aiming, (*got.rows)[28]) && same(want.aim_pitch, (*got.rows)[29]) && same(want.held, (*got.rows)[30]) && same(want.hands, (*got.rows)[31]) && same(want.hand_l, (*got.rows)[32]) && same(want.hand_r, (*got.rows)[33]) && same(want.punch, (*got.rows)[34]) && same(want.seed, (*got.rows)[35]) && same(want.provoked_at, (*got.rows)[36]) && same(want.fight_until, (*got.rows)[37]) && same(want.last_attack, (*got.rows)[38]) && same(want.provoked_hit, (*got.rows)[39]) && same(want.role, (*got.rows)[40]) && same(want.knocked_until, (*got.rows)[41]) && same(want.hurt_at, (*got.rows)[42]) && same(want.remote, (*got.rows)[43]) && same(want.net, (*got.rows)[44]) && same(want.net_to, (*got.rows)[45]) && same(want.net_at, (*got.rows)[46]); }
+[[maybe_unused]] static bool same(const People::Person& want, const converted::Value& got) { return converted::rows_of(got, 47) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.state, (*got.rows)[1]), ".state") && converted::at_place(same(want.pos, (*got.rows)[2]), ".pos") && converted::at_place(same(want.yaw, (*got.rows)[3]), ".yaw") && converted::at_place(same(want.speed, (*got.rows)[4]), ".speed") && converted::at_place(same(want.v, (*got.rows)[5]), ".v") && converted::at_place(same(want.hp, (*got.rows)[6]), ".hp") && converted::at_place(same(want.phase, (*got.rows)[7]), ".phase") && converted::at_place(same(want.shirt, (*got.rows)[8]), ".shirt") && converted::at_place(same(want.pants, (*got.rows)[9]), ".pants") && converted::at_place(same(want.skin, (*got.rows)[10]), ".skin") && converted::at_place(same(want.lane, (*got.rows)[11]), ".lane") && converted::at_place(same(want.seg, (*got.rows)[12]), ".seg") && converted::at_place(same(want.dir, (*got.rows)[13]), ".dir") && converted::at_place(same(want.along, (*got.rows)[14]), ".along") && converted::at_place(same(want.side, (*got.rows)[15]), ".side") && converted::at_place(same(want.off, (*got.rows)[16]), ".off") && converted::at_place(same(want.flee_until, (*got.rows)[17]), ".flee_until") && converted::at_place(same(want.burst_until, (*got.rows)[18]), ".burst_until") && converted::at_place(same(want.flee_speed, (*got.rows)[19]), ".flee_speed") && converted::at_place(same(want.hands_up_until, (*got.rows)[20]), ".hands_up_until") && converted::at_place(same(want.shaken_until, (*got.rows)[21]), ".shaken_until") && converted::at_place(same(want.wait_until, (*got.rows)[22]), ".wait_until") && converted::at_place(same(want.flee_dir, (*got.rows)[23]), ".flee_dir") && converted::at_place(same(want.fitness, (*got.rows)[24]), ".fitness") && converted::at_place(same(want.down_at, (*got.rows)[25]), ".down_at") && converted::at_place(same(want.fall_dir, (*got.rows)[26]), ".fall_dir") && converted::at_place(same(want.unit, (*got.rows)[27]), ".unit") && converted::at_place(same(want.aiming, (*got.rows)[28]), ".aiming") && converted::at_place(same(want.aim_pitch, (*got.rows)[29]), ".aim_pitch") && converted::at_place(same(want.held, (*got.rows)[30]), ".held") && converted::at_place(same(want.hands, (*got.rows)[31]), ".hands") && converted::at_place(same(want.hand_l, (*got.rows)[32]), ".hand_l") && converted::at_place(same(want.hand_r, (*got.rows)[33]), ".hand_r") && converted::at_place(same(want.punch, (*got.rows)[34]), ".punch") && converted::at_place(same(want.seed, (*got.rows)[35]), ".seed") && converted::at_place(same(want.provoked_at, (*got.rows)[36]), ".provoked_at") && converted::at_place(same(want.fight_until, (*got.rows)[37]), ".fight_until") && converted::at_place(same(want.last_attack, (*got.rows)[38]), ".last_attack") && converted::at_place(same(want.provoked_hit, (*got.rows)[39]), ".provoked_hit") && converted::at_place(same(want.role, (*got.rows)[40]), ".role") && converted::at_place(same(want.knocked_until, (*got.rows)[41]), ".knocked_until") && converted::at_place(same(want.hurt_at, (*got.rows)[42]), ".hurt_at") && converted::at_place(same(want.remote, (*got.rows)[43]), ".remote") && converted::at_place(same(want.net, (*got.rows)[44]), ".net") && converted::at_place(same(want.net_to, (*got.rows)[45]), ".net_to") && converted::at_place(same(want.net_at, (*got.rows)[46]), ".net_at"); }
 [[maybe_unused]] static bool defined(const People::Person& s) { return defined(s.kind) && defined(s.state) && defined(s.pos) && defined(s.yaw) && defined(s.speed) && defined(s.v) && defined(s.hp) && defined(s.phase) && defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.lane) && defined(s.seg) && defined(s.dir) && defined(s.along) && defined(s.side) && defined(s.off) && defined(s.flee_until) && defined(s.burst_until) && defined(s.flee_speed) && defined(s.hands_up_until) && defined(s.shaken_until) && defined(s.wait_until) && defined(s.flee_dir) && defined(s.fitness) && defined(s.down_at) && defined(s.fall_dir) && defined(s.unit) && defined(s.aiming) && defined(s.aim_pitch) && defined(s.held) && defined(s.hands) && defined(s.hand_l) && defined(s.hand_r) && defined(s.punch) && defined(s.seed) && defined(s.provoked_at) && defined(s.fight_until) && defined(s.last_attack) && defined(s.provoked_hit) && defined(s.role) && defined(s.knocked_until) && defined(s.hurt_at) && defined(s.remote) && defined(s.net) && defined(s.net_to) && defined(s.net_at); }
 [[maybe_unused]] static std::string text(const People::Person& s) { return std::string("{") + text(s.kind) + ", " + text(s.state) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.speed) + ", " + text(s.v) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.lane) + ", " + text(s.seg) + ", " + text(s.dir) + ", " + text(s.along) + ", " + text(s.side) + ", " + text(s.off) + ", " + text(s.flee_until) + ", " + text(s.burst_until) + ", " + text(s.flee_speed) + ", " + text(s.hands_up_until) + ", " + text(s.shaken_until) + ", " + text(s.wait_until) + ", " + text(s.flee_dir) + ", " + text(s.fitness) + ", " + text(s.down_at) + ", " + text(s.fall_dir) + ", " + text(s.unit) + ", " + text(s.aiming) + ", " + text(s.aim_pitch) + ", " + text(s.held) + ", " + text(s.hands) + ", " + text(s.hand_l) + ", " + text(s.hand_r) + ", " + text(s.punch) + ", " + text(s.seed) + ", " + text(s.provoked_at) + ", " + text(s.fight_until) + ", " + text(s.last_attack) + ", " + text(s.provoked_hit) + ", " + text(s.role) + ", " + text(s.knocked_until) + ", " + text(s.hurt_at) + ", " + text(s.remote) + ", " + text(s.net) + ", " + text(s.net_to) + ", " + text(s.net_at) + "}"; }
 [[maybe_unused]] static void take(People::Person& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 47) return; converted::take_as<People::Kind>(s.kind, (*v.rows)[0]); converted::take_as<People::State>(s.state, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.speed, (*v.rows)[4]); converted::take_as<double>(s.v, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<Vec3>(s.shirt, (*v.rows)[8]); converted::take_as<Vec3>(s.pants, (*v.rows)[9]); converted::take_as<Vec3>(s.skin, (*v.rows)[10]); converted::take_as<int>(s.lane, (*v.rows)[11]); converted::take_as<int>(s.seg, (*v.rows)[12]); converted::take_as<int>(s.dir, (*v.rows)[13]); converted::take_as<double>(s.along, (*v.rows)[14]); converted::take_as<double>(s.side, (*v.rows)[15]); converted::take_as<double>(s.off, (*v.rows)[16]); converted::take_as<double>(s.flee_until, (*v.rows)[17]); converted::take_as<double>(s.burst_until, (*v.rows)[18]); converted::take_as<double>(s.flee_speed, (*v.rows)[19]); converted::take_as<double>(s.hands_up_until, (*v.rows)[20]); converted::take_as<double>(s.shaken_until, (*v.rows)[21]); converted::take_as<double>(s.wait_until, (*v.rows)[22]); converted::take_as<Vec2>(s.flee_dir, (*v.rows)[23]); converted::take_as<double>(s.fitness, (*v.rows)[24]); converted::take_as<double>(s.down_at, (*v.rows)[25]); converted::take_as<Vec3>(s.fall_dir, (*v.rows)[26]); converted::take_as<int>(s.unit, (*v.rows)[27]); converted::take_as<bool>(s.aiming, (*v.rows)[28]); converted::take_as<double>(s.aim_pitch, (*v.rows)[29]); converted::take_as<int>(s.held, (*v.rows)[30]); converted::take_as<bool>(s.hands, (*v.rows)[31]); converted::take_as<Vec3>(s.hand_l, (*v.rows)[32]); converted::take_as<Vec3>(s.hand_r, (*v.rows)[33]); converted::take_as<unsigned char>(s.punch, (*v.rows)[34]); converted::take_as<unsigned int>(s.seed, (*v.rows)[35]); converted::take_as<double>(s.provoked_at, (*v.rows)[36]); converted::take_as<double>(s.fight_until, (*v.rows)[37]); converted::take_as<double>(s.last_attack, (*v.rows)[38]); converted::take_as<bool>(s.provoked_hit, (*v.rows)[39]); converted::take_as<unsigned char>(s.role, (*v.rows)[40]); converted::take_as<double>(s.knocked_until, (*v.rows)[41]); converted::take_as<double>(s.hurt_at, (*v.rows)[42]); converted::take_as<bool>(s.remote, (*v.rows)[43]); converted::take_as<int>(s.net, (*v.rows)[44]); converted::take_as<Vec3>(s.net_to, (*v.rows)[45]); converted::take_as<double>(s.net_at, (*v.rows)[46]); }
@@ -277,7 +277,7 @@ struct People {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CrimeReport& s) { return converted::Value::structure({arg(s.crime), arg(s.at), arg(s.witnessed)}); }
-[[maybe_unused]] static bool same(const CrimeReport& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.crime, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.witnessed, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const CrimeReport& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.crime, (*got.rows)[0]), ".crime") && converted::at_place(same(want.at, (*got.rows)[1]), ".at") && converted::at_place(same(want.witnessed, (*got.rows)[2]), ".witnessed"); }
 [[maybe_unused]] static bool defined(const CrimeReport& s) { return defined(s.crime) && defined(s.at) && defined(s.witnessed); }
 [[maybe_unused]] static std::string text(const CrimeReport& s) { return std::string("{") + text(s.crime) + ", " + text(s.at) + ", " + text(s.witnessed) + "}"; }
 [[maybe_unused]] static void take(CrimeReport& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<wanted::Crime>(s.crime, (*v.rows)[0]); converted::take_as<Vec3>(s.at, (*v.rows)[1]); converted::take_as<bool>(s.witnessed, (*v.rows)[2]); }
@@ -290,7 +290,7 @@ struct People {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const People::Death& s) { return converted::Value::structure({arg(s.index), arg(s.kind), arg(s.by_player), arg(s.head)}); }
-[[maybe_unused]] static bool same(const People::Death& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.index, (*got.rows)[0]) && same(want.kind, (*got.rows)[1]) && same(want.by_player, (*got.rows)[2]) && same(want.head, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const People::Death& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.index, (*got.rows)[0]), ".index") && converted::at_place(same(want.kind, (*got.rows)[1]), ".kind") && converted::at_place(same(want.by_player, (*got.rows)[2]), ".by_player") && converted::at_place(same(want.head, (*got.rows)[3]), ".head"); }
 [[maybe_unused]] static bool defined(const People::Death& s) { return defined(s.index) && defined(s.kind) && defined(s.by_player) && defined(s.head); }
 [[maybe_unused]] static std::string text(const People::Death& s) { return std::string("{") + text(s.index) + ", " + text(s.kind) + ", " + text(s.by_player) + ", " + text(s.head) + "}"; }
 [[maybe_unused]] static void take(People::Death& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<int>(s.index, (*v.rows)[0]); converted::take_as<People::Kind>(s.kind, (*v.rows)[1]); converted::take_as<bool>(s.by_player, (*v.rows)[2]); converted::take_as<bool>(s.head, (*v.rows)[3]); }
@@ -303,7 +303,7 @@ struct People {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const People::Fall& s) { return converted::Value::structure({arg(s.index), arg(s.push), arg(s.car), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const People::Fall& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.index, (*got.rows)[0]) && same(want.push, (*got.rows)[1]) && same(want.car, (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const People::Fall& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.index, (*got.rows)[0]), ".index") && converted::at_place(same(want.push, (*got.rows)[1]), ".push") && converted::at_place(same(want.car, (*got.rows)[2]), ".car") && converted::at_place(same(want.alive, (*got.rows)[3]), ".alive"); }
 [[maybe_unused]] static bool defined(const People::Fall& s) { return defined(s.index) && defined(s.push) && defined(s.car) && defined(s.alive); }
 [[maybe_unused]] static std::string text(const People::Fall& s) { return std::string("{") + text(s.index) + ", " + text(s.push) + ", " + text(s.car) + ", " + text(s.alive) + "}"; }
 [[maybe_unused]] static void take(People::Fall& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<int>(s.index, (*v.rows)[0]); converted::take_as<Vec3>(s.push, (*v.rows)[1]); converted::take_as<bool>(s.car, (*v.rows)[2]); converted::take_as<bool>(s.alive, (*v.rows)[3]); }
@@ -314,7 +314,7 @@ struct People {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const People::RemoteHit& s) { return converted::Value::structure({arg(s.index), arg(s.damage)}); }
-[[maybe_unused]] static bool same(const People::RemoteHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.index, (*got.rows)[0]) && same(want.damage, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const People::RemoteHit& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.index, (*got.rows)[0]), ".index") && converted::at_place(same(want.damage, (*got.rows)[1]), ".damage"); }
 [[maybe_unused]] static bool defined(const People::RemoteHit& s) { return defined(s.index) && defined(s.damage); }
 [[maybe_unused]] static std::string text(const People::RemoteHit& s) { return std::string("{") + text(s.index) + ", " + text(s.damage) + "}"; }
 [[maybe_unused]] static void take(People::RemoteHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<int>(s.index, (*v.rows)[0]); converted::take_as<double>(s.damage, (*v.rows)[1]); }
@@ -328,7 +328,7 @@ struct People {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const People::Hurt& s) { return converted::Value::structure({arg(s.net), arg(s.seed), arg(s.damage), arg(s.by), arg(s.push)}); }
-[[maybe_unused]] static bool same(const People::Hurt& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.net, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]) && same(want.damage, (*got.rows)[2]) && same(want.by, (*got.rows)[3]) && same(want.push, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const People::Hurt& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.net, (*got.rows)[0]), ".net") && converted::at_place(same(want.seed, (*got.rows)[1]), ".seed") && converted::at_place(same(want.damage, (*got.rows)[2]), ".damage") && converted::at_place(same(want.by, (*got.rows)[3]), ".by") && converted::at_place(same(want.push, (*got.rows)[4]), ".push"); }
 [[maybe_unused]] static bool defined(const People::Hurt& s) { return defined(s.net) && defined(s.seed) && defined(s.damage) && defined(s.by) && defined(s.push); }
 [[maybe_unused]] static std::string text(const People::Hurt& s) { return std::string("{") + text(s.net) + ", " + text(s.seed) + ", " + text(s.damage) + ", " + text(s.by) + ", " + text(s.push) + "}"; }
 [[maybe_unused]] static void take(People::Hurt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.net, (*v.rows)[0]); converted::take_as<unsigned int>(s.seed, (*v.rows)[1]); converted::take_as<double>(s.damage, (*v.rows)[2]); converted::take_as<People::HurtBy>(s.by, (*v.rows)[3]); converted::take_as<Vec3>(s.push, (*v.rows)[4]); }
@@ -351,28 +351,28 @@ struct People {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const People& s) { return converted::Value::structure({arg(s.people_), arg(s.reports_), arg(s.deaths_), arg(s.falls_), arg(s.remote_hits_), arg(s.hurts_), arg(s.last_head_), arg(s.puppets_), arg(s.budget_), arg(s.serial_), arg(s.spawns_allowed_), arg(s.spawns_denied_), arg(s.show_), arg(s.hide_)}); }
-[[maybe_unused]] static bool same(const People& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.people_, (*got.rows)[0]) && same(want.reports_, (*got.rows)[1]) && same(want.deaths_, (*got.rows)[2]) && same(want.falls_, (*got.rows)[3]) && same(want.remote_hits_, (*got.rows)[4]) && same(want.hurts_, (*got.rows)[5]) && same(want.last_head_, (*got.rows)[6]) && same(want.puppets_, (*got.rows)[7]) && same(want.budget_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]) && same(want.spawns_allowed_, (*got.rows)[10]) && same(want.spawns_denied_, (*got.rows)[11]) && same(want.show_, (*got.rows)[12]) && same(want.hide_, (*got.rows)[13]); }
+[[maybe_unused]] static bool same(const People& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.people_, (*got.rows)[0]), ".people_") && converted::at_place(same(want.reports_, (*got.rows)[1]), ".reports_") && converted::at_place(same(want.deaths_, (*got.rows)[2]), ".deaths_") && converted::at_place(same(want.falls_, (*got.rows)[3]), ".falls_") && converted::at_place(same(want.remote_hits_, (*got.rows)[4]), ".remote_hits_") && converted::at_place(same(want.hurts_, (*got.rows)[5]), ".hurts_") && converted::at_place(same(want.last_head_, (*got.rows)[6]), ".last_head_") && converted::at_place(same(want.puppets_, (*got.rows)[7]), ".puppets_") && converted::at_place(same(want.budget_, (*got.rows)[8]), ".budget_") && converted::at_place(same(want.serial_, (*got.rows)[9]), ".serial_") && converted::at_place(same(want.spawns_allowed_, (*got.rows)[10]), ".spawns_allowed_") && converted::at_place(same(want.spawns_denied_, (*got.rows)[11]), ".spawns_denied_") && converted::at_place(same(want.show_, (*got.rows)[12]), ".show_") && converted::at_place(same(want.hide_, (*got.rows)[13]), ".hide_"); }
 [[maybe_unused]] static bool defined(const People& s) { return defined(s.people_) && defined(s.reports_) && defined(s.deaths_) && defined(s.falls_) && defined(s.remote_hits_) && defined(s.hurts_) && defined(s.last_head_) && defined(s.puppets_) && defined(s.budget_) && defined(s.serial_) && defined(s.spawns_allowed_) && defined(s.spawns_denied_) && defined(s.show_) && defined(s.hide_); }
 [[maybe_unused]] static std::string text(const People& s) { return std::string("{") + text(s.people_) + ", " + text(s.reports_) + ", " + text(s.deaths_) + ", " + text(s.falls_) + ", " + text(s.remote_hits_) + ", " + text(s.hurts_) + ", " + text(s.last_head_) + ", " + text(s.puppets_) + ", " + text(s.budget_) + ", " + text(s.serial_) + ", " + text(s.spawns_allowed_) + ", " + text(s.spawns_denied_) + ", " + text(s.show_) + ", " + text(s.hide_) + "}"; }
 [[maybe_unused]] static void take(People& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<std::vector<People::Person>>(s.people_, (*v.rows)[0]); converted::take_as<std::vector<CrimeReport>>(s.reports_, (*v.rows)[1]); converted::take_as<std::vector<People::Death>>(s.deaths_, (*v.rows)[2]); converted::take_as<std::vector<People::Fall>>(s.falls_, (*v.rows)[3]); converted::take_as<std::vector<People::RemoteHit>>(s.remote_hits_, (*v.rows)[4]); converted::take_as<std::vector<People::Hurt>>(s.hurts_, (*v.rows)[5]); converted::take_as<bool>(s.last_head_, (*v.rows)[6]); converted::take_as<bool>(s.puppets_, (*v.rows)[7]); converted::take_as<unsigned int>(s.budget_, (*v.rows)[8]); converted::take_as<unsigned int>(s.serial_, (*v.rows)[9]); converted::take_as<unsigned int>(s.spawns_allowed_, (*v.rows)[10]); converted::take_as<unsigned int>(s.spawns_denied_, (*v.rows)[11]); converted::take_as<double>(s.show_, (*v.rows)[12]); converted::take_as<double>(s.hide_, (*v.rows)[13]); }
 struct Out_People_take_reports { People Self; std::vector<CrimeReport> out; };
-[[maybe_unused]] static bool same(const Out_People_take_reports& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_People_take_reports& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_People_take_reports& s) { return defined(s.Self) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_People_take_reports& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 struct Out_People_take_deaths { People Self; std::vector<People::Death> out; };
-[[maybe_unused]] static bool same(const Out_People_take_deaths& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_People_take_deaths& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_People_take_deaths& s) { return defined(s.Self) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_People_take_deaths& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 struct Out_People_take_remote_hits { People Self; std::vector<People::RemoteHit> out; };
-[[maybe_unused]] static bool same(const Out_People_take_remote_hits& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_People_take_remote_hits& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_People_take_remote_hits& s) { return defined(s.Self) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_People_take_remote_hits& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 struct Out_People_take_hurts { People Self; std::vector<People::Hurt> out; };
-[[maybe_unused]] static bool same(const Out_People_take_hurts& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_People_take_hurts& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_People_take_hurts& s) { return defined(s.Self) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_People_take_hurts& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 struct Out_People_take_falls { People Self; std::vector<People::Fall> out; };
-[[maybe_unused]] static bool same(const Out_People_take_falls& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_People_take_falls& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_People_take_falls& s) { return defined(s.Self) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_People_take_falls& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 
@@ -381,7 +381,7 @@ SC_TEST(converted_people) {
   {  // People::set_budget
     converted::Tally tally("People_set_budget");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return a0.set_budget(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] unsigned int& a1) { converted::counted([&] { return a0.set_budget(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -391,7 +391,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -401,7 +403,7 @@ SC_TEST(converted_people) {
   {  // People::set_ranges
     converted::Tally tally("People_set_ranges");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.set_ranges(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.set_ranges(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       double a1 = draw.number();
@@ -412,7 +414,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -422,7 +426,7 @@ SC_TEST(converted_people) {
   {  // People::clear
     converted::Tally tally("People_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { converted::counted([&] { return a0.clear(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] People& a0) { converted::counted([&] { return a0.clear(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -431,7 +435,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -441,7 +447,7 @@ SC_TEST(converted_people) {
   {  // People::spawns_allowed
     converted::Tally tally("People_spawns_allowed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.spawns_allowed(); }); };
+    const auto run = [&]([[maybe_unused]] People& a0) { return converted::counted([&] { return a0.spawns_allowed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -450,7 +456,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -460,7 +468,7 @@ SC_TEST(converted_people) {
   {  // People::spawns_denied
     converted::Tally tally("People_spawns_denied");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.spawns_denied(); }); };
+    const auto run = [&]([[maybe_unused]] People& a0) { return converted::counted([&] { return a0.spawns_denied(); }); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -469,7 +477,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -479,7 +489,7 @@ SC_TEST(converted_people) {
   {  // People::take_reports
     converted::Tally tally("People_take_reports");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<CrimeReport> a1) { converted::counted([&] { return a0.take_reports(a1); }); return Out_People_take_reports{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] std::vector<CrimeReport>& a1) { converted::counted([&] { return a0.take_reports(a1); }); return Out_People_take_reports{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       std::vector<CrimeReport> a1 = draw_list(draw, [&]() -> CrimeReport { return draw_CrimeReport(draw); });
@@ -489,7 +499,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -499,7 +511,7 @@ SC_TEST(converted_people) {
   {  // People::take_deaths
     converted::Tally tally("People_take_deaths");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Death> a1) { converted::counted([&] { return a0.take_deaths(a1); }); return Out_People_take_deaths{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] std::vector<People::Death>& a1) { converted::counted([&] { return a0.take_deaths(a1); }); return Out_People_take_deaths{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       std::vector<People::Death> a1 = draw_list(draw, [&]() -> People::Death { return draw_People__Death(draw); });
@@ -509,7 +521,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -519,7 +533,7 @@ SC_TEST(converted_people) {
   {  // People::take_remote_hits
     converted::Tally tally("People_take_remote_hits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::RemoteHit> a1) { converted::counted([&] { return a0.take_remote_hits(a1); }); return Out_People_take_remote_hits{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] std::vector<People::RemoteHit>& a1) { converted::counted([&] { return a0.take_remote_hits(a1); }); return Out_People_take_remote_hits{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       std::vector<People::RemoteHit> a1 = draw_list(draw, [&]() -> People::RemoteHit { return draw_People__RemoteHit(draw); });
@@ -529,7 +543,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -539,7 +555,7 @@ SC_TEST(converted_people) {
   {  // People::take_hurts
     converted::Tally tally("People_take_hurts");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Hurt> a1) { converted::counted([&] { return a0.take_hurts(a1); }); return Out_People_take_hurts{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] std::vector<People::Hurt>& a1) { converted::counted([&] { return a0.take_hurts(a1); }); return Out_People_take_hurts{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       std::vector<People::Hurt> a1 = draw_list(draw, [&]() -> People::Hurt { return draw_People__Hurt(draw); });
@@ -549,7 +565,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -559,7 +577,7 @@ SC_TEST(converted_people) {
   {  // People::take_falls
     converted::Tally tally("People_take_falls");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] std::vector<People::Fall> a1) { converted::counted([&] { return a0.take_falls(a1); }); return Out_People_take_falls{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] std::vector<People::Fall>& a1) { converted::counted([&] { return a0.take_falls(a1); }); return Out_People_take_falls{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       std::vector<People::Fall> a1 = draw_list(draw, [&]() -> People::Fall { return draw_People__Fall(draw); });
@@ -569,17 +587,43 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
+  {  // People::stand_up
+    converted::Tally tally("People_stand_up");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] int& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.stand_up(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      People a0 = draw_People(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // People::set_puppets
     converted::Tally tally("People_set_puppets");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set_puppets(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] bool& a1) { converted::counted([&] { return a0.set_puppets(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       bool a1 = draw.flag();
@@ -589,7 +633,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -599,7 +645,7 @@ SC_TEST(converted_people) {
   {  // People::puppets
     converted::Tally tally("People_puppets");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.puppets(); }); };
+    const auto run = [&]([[maybe_unused]] People& a0) { return converted::counted([&] { return a0.puppets(); }); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -608,7 +654,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -618,7 +666,7 @@ SC_TEST(converted_people) {
   {  // People::last_head
     converted::Tally tally("People_last_head");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0) { return converted::counted([&] { return a0.last_head(); }); };
+    const auto run = [&]([[maybe_unused]] People& a0) { return converted::counted([&] { return a0.last_head(); }); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -627,7 +675,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -637,7 +687,7 @@ SC_TEST(converted_people) {
   {  // People::knock
     converted::Tally tally("People_knock");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.knock(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] int& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.knock(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -649,7 +699,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -659,7 +711,7 @@ SC_TEST(converted_people) {
   {  // People::grab_knock
     converted::Tally tally("People_grab_knock");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People a0, [[maybe_unused]] int a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.grab_knock(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] People& a0, [[maybe_unused]] int& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.grab_knock(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       People a0 = draw_People(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -671,7 +723,9 @@ SC_TEST(converted_people) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
