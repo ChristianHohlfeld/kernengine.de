@@ -1,0 +1,73 @@
+city_stream.cpp: clang failed
+clang++-18: error: no such file or directory: 'city_stream.cpp'
+clang++-18: error: no input files
+
+mvt.cpp: clang failed
+clang++-18: error: no such file or directory: 'mvt.cpp'
+clang++-18: error: no input files
+
+terrain.cpp: clang failed
+clang++-18: error: no such file or directory: 'terrain.cpp'
+clang++-18: error: no input files
+
+game_look.cpp: clang failed
+clang++-18: error: no such file or directory: 'game_look.cpp'
+clang++-18: error: no input files
+
+mvt.cpp: clang failed
+clang++-18: error: no such file or directory: 'mvt.cpp'
+clang++-18: error: no input files
+
+city_stream.cpp: clang failed
+clang++-18: error: no such file or directory: 'city_stream.cpp'
+clang++-18: error: no input files
+
+game_look.cpp: clang failed
+clang++-18: error: no such file or directory: 'game_look.cpp'
+clang++-18: error: no input files
+
+terrain.cpp: clang failed
+clang++-18: error: no such file or directory: 'terrain.cpp'
+clang++-18: error: no input files
+
+game_look.cpp: clang failed
+clang++-18: error: no such file or directory: 'game_look.cpp'
+clang++-18: error: no input files
+
+mvt.cpp: clang failed
+clang++-18: error: no such file or directory: 'mvt.cpp'
+clang++-18: error: no input files
+
+terrain.cpp: clang failed
+clang++-18: error: no such file or directory: 'terrain.cpp'
+clang++-18: error: no input files
+
+city_stream.cpp: clang failed
+clang++-18: error: no such file or directory: 'city_stream.cpp'
+clang++-18: error: no input files
+
+game_look.cpp: clang failed
+clang++-18: error: no such file or directory: 'game_look.cpp'
+clang++-18: error: no input files
+
+terrain.cpp: clang failed
+clang++-18: error: no such file or directory: 'terrain.cpp'
+clang++-18: error: no input files
+
+city_stream.cpp: clang failed
+clang++-18: error: no such file or directory: 'city_stream.cpp'
+clang++-18: error: no input files
+
+mvt.cpp: clang failed
+clang++-18: error: no such file or directory: 'mvt.cpp'
+clang++-18: error: no input files
+
+
+0 of 0 functions of the program are written as Blueprints (0 of 0 lines): 0 Blueprints - 0 of source files, 0 of states, 0 of headers and of shapes
+0 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+
+real	0m17,477s
+user	1m10,648s
+sys	0m4,308s
