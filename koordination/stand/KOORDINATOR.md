@@ -1,5 +1,5 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
-- 06:45 **work-zusammen = 0f05da13** (+ k 09dd6818, B3: Name für einen Eintrag mit Schritt im Index; Beleg `work-k-vergleich-060032-8835` 52 von 52 ok in beiden
+- 06:37 **work-zusammen = 0f05da13** (+ k 09dd6818, B3: Name für einen Eintrag mit Schritt im Index; Beleg `work-k-vergleich-060032-8835` 52 von 52 ok in beiden
   Durchgängen, kein Rückschritt – die vier Funktionen der Abweichung schreibt der Teil-Lauf nicht, ihren Vergleich zeigt der volle Lauf).
   · **BEFUND Koordinator (Konverter, seit 18.11. abends unbemerkt):** 33 Funktionen (1682 Zeilen: CityStream::update/work/…, Terrain::update/run_job/…,
     Decoder::step, Game::update/fixed_step/drive_traffic/worldsync_update/…) warten an „the engine's now_ms() (… its pins differ)“. Ursache: `engine_table()` las
@@ -7,7 +7,7 @@
     mitgelesen; ein Knoten mit place wartet weiter, mit dem wahren Grund, bis „Platz der Engine“ eingemischt ist). Beleg läuft:
     `work-tabelle-vergleich-063526-15825` (city_stream, terrain, mvt, game_look).
   · Was die 137 noch nicht geschriebenen Funktionen aufhält (Lauf 055004), je Grund und je Funktion: **`$S/wartet_055004.txt`**.
-  · **Neu gestartet 06:40:** t1 Nachfolger 6 (A ZEIT converted_Game__game; B ein Test gibt bei jedem Lauf dasselbe Urteil + genauer Filter; C number_at/Zeiger
+  · **Neu gestartet 06:36:** t1 Nachfolger 6 (A ZEIT converted_Game__game; B ein Test gibt bei jedem Lauf dasselbe Urteil + genauer Filter; C number_at/Zeiger
     hinter das Ende eines Texts; D Auswertung „SUITE 055004“) und t2 (E12: Graph als Wert, SoundBank::request_level – die letzten 3 „cannot compare it yet“).
   · d: Beleg-Zweig work-d-belege2 (leck, weld, app, key, release) mischt sich ohne Konflikt in 0f05da13 (lokal geprüft, Generator reproduziert); eingemischt
     wird, sobald `work-d-belege2-engine-062159-12230` grün ist.
