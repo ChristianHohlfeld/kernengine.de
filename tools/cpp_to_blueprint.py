@@ -475,11 +475,38 @@ WHOLE64 = re.compile(r"(?<![\w:])(?:kern::|std::|sc::)?(u64|i64|uint64_t|int64_t
 UNSPELLED = re.compile(r"(?<![\w])(?:value_type|reference|const_reference|size_type|difference_type|key_type|mapped_type|element_type|iterator|const_iterator|pointer)\b|\bauto\b|\bdecltype\b|\btypename\b|__")
 
 
+# The names the program and the engine give a 64-bit whole number (`using VoiceId = u64;`), of the tree read last
+# (Tree.wide_names): name -> [(the scope it is declared in, the type it names, spelled as a 64-bit one, or None)].
+WIDE_NAMES = {}
+
+
+def wide_spelled(spelled):
+    """A type spelled with a name the program gives a 64-bit whole number (kern::audio::VoiceId, const VoiceId &):
+    spelled with that number's own name (kern::u64, const kern::u64 &) - its 64 bits are what C++ holds, as where
+    it is spelled u64; the compiler's desugaring says `unsigned long`, as of a size_t. None: no such name in it."""
+    if not WIDE_NAMES:
+        return None
+    hit = False
+    def one(m):
+        nonlocal hit
+        at, name = m.group(1) or "", m.group(2)
+        named = [w for scope, w in WIDE_NAMES.get(name, ()) if (scope + name).endswith(at + name)]
+        if named and all(w is not None and w == named[0] for w in named):
+            hit = True
+            return named[0]
+        return m.group(0)
+    out = re.sub(r"(?<![\w:])((?:\w+::)*)(\w+)\b", one, spelled)
+    return out if hit else None
+
+
 def qtype(n):
     t = n.get("type", {})
     spelled = t.get("qualType", "")
     if spelled and WHOLE64.search(spelled) and not UNSPELLED.search(spelled):
         return spelled
+    wide = wide_spelled(spelled) if spelled and not UNSPELLED.search(spelled) else None
+    if wide is not None:
+        return wide
     return t.get("desugaredQualType") or spelled
 
 
@@ -752,9 +779,33 @@ class Tree:
         for i, n in list(self.decl.items()):  # (a constant declared in a header and defined later)
             if n.get("kind") == "VarDecl" and n.get("init") and n.get("previousDecl"):
                 self.body.setdefault(n["previousDecl"], n)
+        self.wide_names()
         self.join_dumps()
         self.take_locals(seen)
         self.number_names()
+
+    def wide_names(self):
+        """The names this tree's program and engine give a 64-bit whole number - also through another such name
+        (WIDE_NAMES, which qtype reads): `using VoiceId = u64;` is u64 wherever it is named."""
+        WIDE_NAMES.clear()
+        named = {}   # (an alias declaration's id) -> the 64-bit type it names, spelled so
+        for _ in range(8):
+            before = len(named)
+            for o, scope in self.alias_decls:
+                if o.get("id") in named:
+                    continue
+                t = o.get("type", {})
+                spelled = t.get("qualType", "")
+                if UNSPELLED.search(spelled):
+                    continue
+                if WHOLE64.search(spelled):
+                    named[o.get("id")] = spelled
+                elif t.get("typeAliasDeclId") in named and re.fullmatch(r"(?:\w+::)*\w+", spelled.strip()):
+                    named[o.get("id")] = named[t["typeAliasDeclId"]]
+            if len(named) == before:
+                break
+        for o, scope in self.alias_decls:
+            WIDE_NAMES.setdefault(o["name"], []).append((scope, named.get(o.get("id"))))
 
     def join_dumps(self):
         """A function of another namespace of the program that a dump names by an address the dump of its own
@@ -10335,6 +10386,11 @@ class TestWriter:
                 if to_code is not None and from_code is not None and "f32" in (to_code, from_code):
                     a, b = span(ks[0])
                     edits.append((a, 1, 0, b, "converted::layout::copy_bytes<%s, %s>" % ("true" if to_code == "f32" else "false", "true" if from_code == "f32" else "false")))
+            if k == "CallExpr" and callee_name(n) == "memset" and len(ks) == 4 and pointer_code(self.u, ks[1]) == "f32":
+                # into a list of floats of the program: the bytes the program sets - `sizeof` is the program's (below) -, a float
+                # as its 32 bits (converted::layout::set_bytes; the test holds the float in 64 bits)
+                a, b = span(ks[0])
+                edits.append((a, 1, 0, b, "converted::layout::set_bytes<true>"))
             if k == "UnaryExprOrTypeTraitExpr" and n.get("name") == "sizeof":
                 # the bytes of what holds a float of the program, as the program has them (the test holds it in 64 bits)
                 got = byte_size(self.u, sized(n) or "")

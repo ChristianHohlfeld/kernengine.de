@@ -235,6 +235,31 @@ template <bool ToSingle, bool FromSingle, class D, class S> void copy_bytes(D* t
     }
   }
 }
+/// std::memset into a list of numbers of the program (ToSingle: of floats - the test holds such a float as a
+/// 64-bit number): the `count` bytes the program sets, a float as its 32 bits. An entry set in part keeps its
+/// other bytes.
+template <bool ToSingle, class D> void* set_bytes(D* to, int value, std::size_t count) {
+  constexpr std::size_t kTo = ToSingle ? 4 : sizeof(D);
+  static_assert(!ToSingle || std::is_same_v<D, double>);
+  for (std::size_t j = 0; j * kTo < count; ++j) {
+    kern::u8 one[8];
+    if constexpr (ToSingle) {
+      const float f = static_cast<float>(to[j]);
+      std::memcpy(one, &f, sizeof f);
+    } else {
+      std::memcpy(one, &to[j], sizeof(D));
+    }
+    for (std::size_t b = 0; b < kTo && j * kTo + b < count; ++b) one[b] = static_cast<kern::u8>(value);
+    if constexpr (ToSingle) {
+      float f;
+      std::memcpy(&f, one, sizeof f);
+      to[j] = static_cast<double>(f);
+    } else {
+      std::memcpy(&to[j], one, sizeof(D));
+    }
+  }
+  return to;
+}
 }  // namespace layout
 
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
