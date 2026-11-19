@@ -1300,6 +1300,11 @@ class World:
         return self.parts.get(part, part)
 
 
+def follow_on(why):
+    """A reason to wait that only passes another function's on: it calls one that waits, or one not written yet."""
+    return bool(re.match(r"it calls .*\(\), which waits$", why) or re.match(r".*\(\) of the Blueprint \S+ is not written$", why))
+
+
 def is_header(path):
     return path.endswith((".h", ".hpp", ".hh", ".inl"))
 
@@ -1439,6 +1444,13 @@ class Unit:
         self.variable_values = {}   # Blueprint variable -> (type, literal, the C++ declaration)
         self.const_deps = {}        # constants other constants are computed from (decl id -> declaration)
         self.functions = {}         # id of the function's body -> Function
+        # Functions that call themselves, directly or through others (docs/blueprint_cpp.md): the ones being
+        # converted, innermost last; per function the keys of this Blueprint's functions it calls; and what it
+        # leans on - a function still being converted, or one of another part that waits only in a circle with it
+        # (written in the end, or it waits too: main checks that between the rounds)
+        self.converting = []
+        self.calls_of = {}
+        self.leaning = {}
         self.order = []             # the written functions, callees first
         self.members = []
         # (the nodes of a part of a Blueprint of several files have ids of their own: a block of 2^20 for each part)
@@ -2503,7 +2515,16 @@ class Unit:
             if f.wait:
                 raise Wait(f"it calls {f.cpp}(), which waits")
             if f.text is None:
-                raise Wait(f"{f.cpp}() calls itself (a Blueprint's function does not)")
+                # It calls itself, directly or through others: a call like any other (each with its own values).
+                # Every function of the circle is a step (a value has no circles); what is written before the
+                # function is done leans on it.
+                if f not in self.converting:
+                    raise Wait(f"{f.cpp}() is being converted")
+                for g in self.converting[self.converting.index(f):]:
+                    g.pure = False
+                    if g is not f:
+                        self.leaning.setdefault(g.key, set()).add(f.key)
+            self.called(f.key)
             return f
         name = self.function_names.get(d["id"])
         if name is None:   # (a function a function declares in itself: named when it is met)
@@ -2529,16 +2550,37 @@ class Unit:
                 raise Wait(self.barred[d["id"]])
             outer, self.local_scope = self.local_scope, self.tree.local_scope(d)
             looked, self.lookup_scope = self.lookup_scope, self.scope_for(d)
+            self.converting.append(f)
             try:
                 Emit(self, f).run()
             finally:
+                self.converting.pop()
                 self.local_scope = outer
                 self.lookup_scope = looked
+            # (what leaned on it while it was converted does not any more: it is written)
+            for keys in self.leaning.values():
+                keys.discard(f.key)
+            if self.converting:
+                self.called(f.key)
             # (what calls a function on the Blueprint of an actor of the level: its test runs that Blueprint - the
             # source calls it as the program binds it, the Blueprint calls it on that actor; TestWriter)
             self.order.append(f)
         except Wait as w:
             f.wait = str(w)
+            # What was written leaning on it while it was converted waits with it (and what leans on that)
+            fallen = {f.key}
+            while True:
+                more = {k for k, keys in self.leaning.items() if keys & fallen} - fallen
+                if not more:
+                    break
+                fallen |= more
+            for g in list(self.functions.values()):
+                if g is not f and g.key in fallen and g.text is not None:
+                    g.text, g.wait = None, f"it calls {f.cpp}(), which waits"
+                    if g in self.order:
+                        self.order.remove(g)
+            for k in fallen:
+                self.leaning.pop(k, None)
             if os.environ.get("WHY") and re.search(os.environ["WHY"], f.cpp):
                 # (to look at: where in this tool the reason was found - its last steps, innermost first)
                 at = (getattr(Emit, "looked_at", None) or {}).get("_at", (None, None))[0]
@@ -2567,6 +2609,12 @@ class Unit:
             if e is None:
                 self.missing.add((part, key))
                 raise Wait(f"{self.cpp_name(d)}() of the Blueprint {self.world.parts.get(part, part)} is not written")
+            # A function of another part of this Blueprint that waits only because what it calls waits - it may be in a
+            # circle with this one: called as written, a step, leaning on it (main: written in the end, or this waits too)
+            leans = e["wait"] and e["unit"] == self.name and follow_on(e["wait"]) and self.converting and key not in self.world.bars
+            why_waits = e["wait"]
+            if leans:
+                e = dict(e, wait=None, pure=False)
             # (a function of another part of this Blueprint is one of its own: called by its name)
             f = Function(e["name"] if e["unit"] == self.name else f"{e['unit']}::{e['name']}")
             f.unit, f.key, f.cpp, f.decl, f.file = e["unit"], key, e["cpp"], d, d.get("_file", "")
@@ -2583,11 +2631,18 @@ class Unit:
             f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
             f.pointers = list(e["pointers"])
             f.logic = list(e.get("logic", ()))
-            if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
+            # (one it leans on has no test yet whose source is handed on: when it is written, it has - and this one is
+            # converted again with it, main)
+            if not f.wait and not leans and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
                 f.wait = "what it calls stands in another source file, whose test does not hand its source on"
                 f.text = ""
+            if not f.wait and leans:
+                # (what it would take and give is told before its body: a function that waited before it said so does not lean)
+                told_now = [tuple(x) for x in e["params"]]
+                if e["result"] is None and e["value"] is None and not told_now and e["out_fields"] == []:
+                    f.wait = why_waits
             if not f.wait:
                 # the types it takes and gives are this Blueprint's too now: as this file's compiler sees them
                 # (they are the same types - a type is converted the same wherever it is seen)
@@ -2603,14 +2658,29 @@ class Unit:
                 finally:
                     self.lookup_scope = looked
                 told = [t for _, t in f.params] + ([f.value] if f.value is not None else [])
-                if seen != told:
+                if seen != told and leans:
+                    f.wait, f.text = why_waits, ""   # (it waited before it said what it takes: it does not lean)
+                elif seen != told:
                     raise SystemExit(f"{self.name}: {f.cpp}() of {f.unit} takes and gives {told} there and {seen} here")
+            f.leans = leans
             self.stubs[key] = f
         if f.wait:
             if (self.world.table.get(key) or {}).get("wait"):
                 self.asked.add(key)   # (it waits where it stands: should it be written later, this Blueprint is converted again - main)
             raise Wait(f.wait if f.open else f"it calls {f.cpp}(), which waits")
+        if getattr(f, "leans", False) and self.converting:
+            self.asked.add(key)
+            for g in self.converting:
+                g.pure = False   # (in a circle: a step)
+            self.leaning.setdefault(self.converting[-1].key, set()).add(key)
+        if f.unit == self.name:
+            self.called(key)
         return f
+
+    def called(self, key):
+        """The function being converted calls `key`, a function of this Blueprint (main: the circles)."""
+        if self.converting:
+            self.calls_of.setdefault(self.converting[-1].key, set()).add(key)
 
     def entry_of(self, f):
         """What a call of a function of this Blueprint needs to know, for the table of the whole program."""
@@ -2618,7 +2688,8 @@ class Unit:
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
                 "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers, "logic": f.logic,
-                "actors": sorted(actors_called(f)), "engine": f.asks_engine}
+                "actors": sorted(actors_called(f)), "engine": f.asks_engine, "calls": sorted(self.calls_of.get(f.key, ())),
+                "leans": sorted(k for k in self.leaning.get(f.key, ()) if k != f.key)}
 
     def uses(self):
         """The Blueprints whose functions the written functions call."""
@@ -14463,6 +14534,7 @@ def convert_unit(job):
         # variable is called what the Blueprint has in the end (a constant met after it was named): then,
         # too, it is converted again, with those names known.
         barred, reserved = {}, set()
+        exported = ({}, {})
         while True:
             writer = None
             unit = Unit(tree, name, world, part)
@@ -14492,12 +14564,25 @@ def convert_unit(job):
             writer.path = main_file
             writer.test_dir = test
             unit.test = writer.write()
+            # (the source of a function is what it is, whether its test compares it yet or not: the tests of other files
+            # that call it hold it - in a circle of functions over files, each test needs the others' source before any
+            # test of them compares)
+            tried = writer.exports()
+            for k, v in tried[0].items():
+                exported[0].setdefault(k, v)
+            for k, v in tried[1].items():
+                exported[1].setdefault(k, v)
             more = {f.decl["id"]: f"its test cannot compare it yet ({why})" for f, why in unit.test[1] if why != "it gives nothing" and f.decl["id"] not in barred}
             if not more:
                 break
             barred.update(more)
-        # what the tests of other files need of this one to hold the source of its functions they call
+        # what the tests of other files need of this one to hold the source of its functions they call - also of those
+        # whose own test does not compare them yet (exported: every try's)
         exports = writer.exports() if writer is not None else ({}, {})
+        for k, v in exported[0].items():
+            exports[0].setdefault(k, v)
+        for k, v in exported[1].items():
+            exports[1].setdefault(k, v)
     finally:
         sys.stderr = keep
         if scratch:
@@ -14864,11 +14949,45 @@ def main(argv):
         return (tuple(sorted(unit_files[u])), None if u in program else tuple(sorted(wanted[u])),
                 tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())))
 
+    def pin_circles():
+        """At the fixpoint: what leaned (Unit.foreign) on a function of another part of its Blueprint, and calls -
+        itself or through others - one that waits for a reason of its own, waits too (World.bars, as what went
+        round); functions that only wait on each other in a circle are written, each calling the others. True:
+        something new waits (the rounds go on)."""
+        every = {k: e for u in tables for k, e in tables[u].items()}
+        named = collections.defaultdict(set)
+        for k, e in every.items():
+            named[(e["unit"], e["cpp"])].add(k)
+        def on(k, e):
+            if not e["wait"]:
+                return set(e.get("calls", ())) | set(e.get("leans", ()))
+            m = re.match(r"it calls (.*)\(\), which waits$", e["wait"]) or re.match(r"(.*)\(\) of the Blueprint \S+ is not written$", e["wait"])
+            return set(named.get((e["unit"], m.group(1)), ())) if m else set()
+        edges = {k: on(k, e) & set(every) for k, e in every.items()}
+        bad = {k for k, e in every.items() if e["wait"] and (not follow_on(e["wait"]) or not edges[k])} | {k for u in held for k in held[u]}
+        while True:
+            more = {k for k in every if k not in bad and edges[k] & bad}
+            if not more:
+                break
+            bad |= more
+        pinned = False
+        for u in sorted(tables):
+            for k, e in sorted(tables[u].items()):
+                if e["wait"] or k not in bad or k in held.get(u, {}) or not e.get("leans"):
+                    continue
+                culprit = sorted(edges[k] & bad)[0]
+                held.setdefault(u, {})[k] = f"it calls {every[culprit]['cpp']}(), which waits"
+                print(f"{u}: {e['cpp']}() leaned on a circle that waits: {held[u][k]}", flush=True)
+                pinned = True
+        return pinned
+
     while True:
         needs = {u: need_of(u) for u in deps}
         asks = {u: asked_of(u, needs) for u in deps}
         new = {u for u in deps if given.get(u) != asks[u]}
         if not new:
+            if pin_circles():
+                continue
             break
         # (the same state twice: the rounds would go round for ever - what the Blueprints named give changes
         # what they are given, and that changes back)
