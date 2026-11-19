@@ -225,6 +225,16 @@ TEST(weld_and_hash) {
   CHECK(soup.indices.size() == 36);
   CHECK(s.bytes_after < s.bytes_before);
   CHECK(content_hash(soup) != hash);
+  // a soup whose streams do not have one entry per vertex is not read past its ends: it stays as it is
+  for (int cut = 0; cut < 4; ++cut) {
+    MeshData bad;
+    for (u32 i : cube.indices) bad.push(Vec3::load(&cube.positions[i * 3]), Vec3::load(&cube.normals[i * 3]), {1, 1, 1}, {0, 0});
+    std::vector<f32>* streams[4] = {&bad.normals, &bad.colors, &bad.uvs, &bad.positions};
+    streams[cut]->resize(cut == 3 ? streams[cut]->size() - 1 : 1);
+    const u32 before = content_hash(bad);
+    const WeldStats w = weld(bad);
+    CHECK(!w.indexed && w.unique_vertices == 0 && bad.indices.empty() && content_hash(bad) == before);
+  }
   MeshData a = primitives::box({1, 1, 1}), b = primitives::box({1, 1, 1});
   CHECK(content_hash(a) == content_hash(b));
   b.positions[0] += 1e-3f;
