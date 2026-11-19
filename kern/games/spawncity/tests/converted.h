@@ -191,6 +191,12 @@ template <std::size_t N, class T, class F> std::array<kern::u8, N> bytes_of(cons
   return out;
 }
 template <class T, class F> void of_bytes(T& v, const void* bytes, F fields) { fields(v, static_cast<const kern::u8*>(bytes)); }
+/// std::memcpy of a value of such a struct into bytes: its bytes as the program lays it out (`fields` writes them);
+/// gives where they went, as std::memcpy does.
+template <class T, class F> void* to_bytes(void* bytes, const T& v, F fields) {
+  fields(v, static_cast<kern::u8*>(bytes));
+  return bytes;
+}
 /// std::memcpy / std::memmove between lists of numbers of the program of which one holds floats (Copy
 /// Bytes; the test holds such a float as a 64-bit number - ToSingle, FromSingle): the `count` bytes the
 /// program copies, a float as its 32 bits and every other number as it is, as std::memmove copies them -
@@ -1461,6 +1467,22 @@ inline Value read_state(const kern::logic::Instance& inst, const Variables& vars
   return Value::structure(std::move(out));
 }
 
+/// How much a value holds: one for every value in it (a struct, a list, a map with what is in them).
+inline long long weight(const Value& v) {
+  using kern::logic::PinType;
+  long long w = 1;
+  if (v.type == PinType::structure) {
+    if (v.rows) for (const Value& r : *v.rows) w += weight(r);
+  } else if (v.type == PinType::structure_list) {
+    for (const Value& r : v.items<Value>()) w += weight(r);
+  } else if (v.type == PinType::map) {
+    for (std::size_t k = 0; k < v.size(); ++k) w += 1 + weight(v.keyed().value_at(k));
+  } else if (v.type == PinType::set || kern::logic::is_list(v.type)) {
+    w += static_cast<long long>(v.size());
+  }
+  return w;
+}
+
 /// The comparison of one function over its calls.
 struct Tally {
   const char* function;
@@ -1470,11 +1492,15 @@ struct Tally {
   std::string first_refused;         // (the first such call of the source: said in the note)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
+  double class_seconds = 0, interpreter_seconds = 0, take_seconds = 0;   // (where the function's time went: said in its "time:" line)
+  long long held = 0, passes = 0, most_passes = 0;     // (what the calls were given and their objects held; the loop passes of the class)
+  mutable int drawn = 0;                               // (the calls drawn: what more() was asked for)
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(const char* f) : function(f) { cost::tracing = cost::where() && std::strcmp(cost::where(), f) == 0; }
   /// Is there another call to make? Up to kCalls compared ones; of a function that takes long, as many
   /// as two seconds have room for, but twenty at least. (What the source says nothing for is drawn again.)
   bool more(int tried) const {
+    drawn = tried;
     if (compared >= kCalls || tried >= kCalls * 20) return false;
     if (compared >= 20) return seconds() < 2.0;
     return compared < 5 || seconds() < kLong;
@@ -1495,7 +1521,14 @@ struct Tally {
   template <class Want, class Describe>
   void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}, const Variables* state = nullptr,
             bool changes = false) {
+    struct Took {   // (the whole of take: what the Blueprints' variables, the calls and the comparing cost)
+      double& sum;
+      std::chrono::steady_clock::time_point at = std::chrono::steady_clock::now();
+      ~Took() { sum += std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count(); }
+    } const took_all{take_seconds};
     if (!bp.interp || !bp.native) return;
+    for (const Value& v : args) held += weight(v);
+    if (state) for (const auto& v : *state) held += weight(v.second);
     if (left || !defined(want)) { ++outside; return; }
     // The engine itself (SC_ENGINE=real) refused a call the source made: what the source got there is the
     // zeros of a call that did not happen, not what C++ says - nothing to compare; drawn again (the twenty
@@ -1527,10 +1560,15 @@ struct Tally {
     g_class_asks = 0;
     const bool ib = bp.native->call(function, args, b);
     const long class_asks = g_class_asks;
+    passes += bp.native->counters()[3];
+    most_passes = std::max<long long>(most_passes, bp.native->counters()[3]);
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
+    class_seconds += took;
     const bool both = took < 0.005;
     if (both) bp.before_call(false);
+    const auto interpreter_began = std::chrono::steady_clock::now();
     const bool ia = both ? bp.interp->call(function, args, a) : ib;
+    interpreter_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - interpreter_began).count();
     if (state && changes) {
       b.push_back(read_state(*bp.native, *state));
       if (both) a.push_back(read_state(*bp.interp, *state));
@@ -1592,6 +1630,12 @@ struct Tally {
   void given_up() { ++outside; }
   ~Tally() {
     cost::tracing = false;
+    // (a function that takes the test a second or more: where the time went - the class, the interpreter, setting and reading the
+    // Blueprints' variables and comparing, or drawing the arguments and the object and the source's call)
+    if (seconds() >= 1.0)
+      std::printf("  time: %s: %.1f s (the class %.1f s, the interpreter %.1f s, the Blueprints' variables and comparing %.1f s, drawing and the source %.1f s) - %d calls drawn, %d compared; %lld values given and held, %lld loop passes of the class (up to %lld in a call)\n",
+                  function, seconds(), class_seconds, interpreter_seconds, take_seconds - class_seconds - interpreter_seconds, seconds() - take_seconds, drawn, compared, held, passes,
+                  most_passes);
     if (class_only > 0)
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
@@ -1633,6 +1677,24 @@ inline void open_read() {
     g_can_bail = false;
     std::longjmp(g_bail, 1);
   }
+}
+
+/// A place in the bytes of a text (`s.c_str() + n`, `s.data() + n` - CText: of c_str(), a C text): in the text or at its
+/// end, where a std::string's null stands - as C++ defines it. Beyond the end, or before the start, C++ leaves open what a
+/// read there gives (the bytes after the text: what the memory held): the call is marked (open_read), and the place is the
+/// text's end - nothing of the text, and nothing behind it, is read from there. (The text is said once, as in the source.)
+template <bool CText, class S, class N> auto text_end(S&& s, N n) {
+  using M = std::remove_cvref_t<N>;
+  static_assert(std::is_integral_v<M>, "a place in a text is a whole number of bytes from its start");
+  const auto first = [&] {
+    if constexpr (CText) return s.c_str();
+    else return s.data();
+  }();
+  const unsigned long long size = s.size();
+  const bool in = std::is_signed_v<M> ? n >= 0 && static_cast<unsigned long long>(n) <= size : static_cast<unsigned long long>(n) <= size;
+  if (in) return first + n;
+  open_read();
+  return first + size;
 }
 
 /// What a std::unique_ptr or a std::optional holds, where the source reads it (`*p`, `p->x`): of one that holds
@@ -1943,6 +2005,7 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
+    g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - rule_blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }

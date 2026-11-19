@@ -458,6 +458,16 @@ def bound_type(v):
     t["desugaredQualType"] = f"{base} {'&&' if spelled.endswith('&&') else '&'}"
 
 
+def calls_in(n):
+    """Does this expression call a function - of the program, of the engine, an operator of a class (what can see or
+    change what another part of the statement changes, and what the engine sees in its order)?"""
+    if n is None:
+        return False
+    if n.get("kind") in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr"):
+        return True
+    return any(calls_in(c) for c in kids(n))
+
+
 def kids(n):
     """The parts of a node (without the comments and attributes that stand with a declaration). An array written
     out with fewer values than it has entries (`f32 a[20] = {x, 2}`): the compiler's tree names what fills the
@@ -3025,6 +3035,7 @@ class Emit:
         self.locals = []      # (name, type): declared at the top of the body
         self.lengths = {}     # the local variables that are lists of a fixed length (name -> length)
         self.taken = set()
+        self.temps = set()     # the local variables of the function's own making (temp)
         self.index = {}       # decl id of a loop's counter -> "n12.index"
         self.pre = []         # steps to run before the statement being written
         self.loops = []       # the loops around the statement being written: their flags for break and continue
@@ -3136,6 +3147,7 @@ class Emit:
         a value for a reference of that type)."""
         name = self.u.fresh(want, self.taken)
         self.taken.add(name)
+        self.temps.add(name)
         self.locals.append((name, t))
         if fixed:
             self.lengths[name] = fixed
@@ -3382,6 +3394,46 @@ class Emit:
             raise Hoists("a call that changes something, in a part of an expression that does not always run")
         self.pre += lines
 
+    def operand(self, done, node, t, write, place=False):
+        """Writes the next operand of a call - of the program, of the engine, of a format -, after those in `done`
+        ([node, type, text, place] each), in the order C++ works them out (from the left, as clang does - E13).
+        The steps an operand needs run before the statement (hoist), the operands written before it stand in the
+        statement itself and so would run after them: where the steps can see or change what such an operand
+        reads, or the operand calls a function (the engine sees its calls in their order), it is held first, in
+        a variable of its own, before the steps. Never held: a place (a reference binds it, the function reads it
+        when it runs - as C++ does), a number or a text written out, a variable made for a value already.
+        Gives the operand's text; `done` gets it (its text can change to the variable that holds it)."""
+        if self.cond_depth:   # (where steps are refused - see hoist - nothing is moved before the statement)
+            text = write()
+        else:
+            pre, text = self.lazily(write)
+            if pre:
+                calm = self.calm(pre)
+                for e in done:
+                    if e[3] or self.unmoved(e[2]) or (calm and not calls_in(e[0])):
+                        continue
+                    held = self.temp("arg", e[1])
+                    self.hoist([f"{held} = {e[2]};"])
+                    e[2] = held
+                self.hoist(pre)
+        done.append([node, t, text, place])
+        return text
+
+    def calm(self, lines):
+        """Do these steps change nothing but variables of the function's own making, each set to a value (no call
+        that changes something, no store into a place of the function)?"""
+        for ln in lines:
+            m = re.fullmatch(r"(\w+) = (.*);", ln, re.S)
+            if m is None or m.group(1) not in self.temps:
+                return False
+        return True
+
+    def unmoved(self, text):
+        """Is this text of an operand the same before and after any step: a number or a text written out, a
+        variable made for a value, what a call made as a step gave (n12.Result)?"""
+        return (re.fullmatch(r'-?\d+(\.\d*)?([eE][-+]?\d+)?|"(?:[^"\\]|\\.)*"|true|false', text) is not None
+                or text in self.temps or re.fullmatch(r"n\d+\.Result", text) is not None)
+
     def lazily(self, fn):
         """Writes a part of an expression apart from the statement it stands in: (the steps it needs, its text)."""
         saved, self.pre = self.pre, []
@@ -3558,7 +3610,7 @@ class Emit:
         integer conversion writes goes in as the text of its 64 bits - Int64 to Text Signed (d i), Int64 to Text (u),
         Int64 to Hex (x) - at a %s of the same width and the same `-` (the digits are the same; printf pads a
         number and a text alike); another flag, a precision or another conversion of one: Wait."""
-        out, values, at, k = [], [], 0, 0
+        out, done, at, k = [], [], 0, 0   # (the values in the order C++ works them out - see operand)
         while at < len(fmt):
             if fmt[at] != "%":
                 out.append(fmt[at])
@@ -3571,16 +3623,16 @@ class Emit:
                 k += 1
                 w = self.bits64(x) if t == "Int" else None
                 if w is None:
-                    values.append(self.ex(x, t))
+                    self.operand(done, x, t, lambda: self.ex(x, t))
                 else:
                     node = {"d": "int64_text_signed", "i": "int64_text_signed", "u": "int64_text", "x": "int64_text_hex"}.get(m.group(5))
                     if node is None or set(m.group(1)) - {"-"} or m.group(3) is not None or m.group(4) in ("h", "hh"):
                         raise Wait("a 64-bit number in a format Int64 to Text does not write so (a flag, a precision, X, o, c)")
                     spec = f"%{m.group(1)}{m.group(2)}s"
-                    values.append(f"{node}({self.ex(w, 'Int64')})")
+                    self.operand(done, x, "Text", lambda: f"{node}({self.ex(w, 'Int64')})")
             out.append(spec)
             at += m.end()
-        return "".join(out), values
+        return "".join(out), [e[2] for e in done]
 
     @staticmethod
     def format_kinds(fmt):
@@ -6250,14 +6302,14 @@ class Emit:
             # is not written here yet)
             raise Wait(f"the engine's {d.get('name')}() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)")
         u.engine_calls[d["id"]] = f
-        ins, texts, own = list(f["ins"]), [], None
+        ins, done, own = list(f["ins"]), [], None   # (done: the inputs in the order C++ works them out - see operand)
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
             # (of an object of the engine: its handle; of plain data the engine defines the method of - MeshData::as_input
             # -: the value, the node's first input, and what a method that is not const makes of it its output `self`)
             _, bt, handle = ins.pop(0)
             if obj is None or self.is_this(obj):
                 raise Wait("a call of the engine on its own object")
-            texts.append(self.ex(obj, bt))
+            self.operand(done, obj, bt, lambda: self.ex(obj, bt))
             own = obj
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         nodes = {}   # pin -> the argument it is (an output: where the call wants it - None: nowhere)
@@ -6303,11 +6355,12 @@ class Emit:
             while made.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(made)) == 1:
                 made = self.unwrap(kids(made)[0])
             if bt in u.struct_fields and made.get("kind") in ("CXXConstructExpr", "InitListExpr", "CXXTemporaryObjectExpr") and not [x for x in kids(made) if x.get("kind") != "CXXDefaultArgExpr"]:
-                texts.append(u.zero(bt))   # ({} - the struct with its defaults)
+                done.append([a, bt, u.zero(bt), True])   # ({} - the struct with its defaults)
             elif bt.startswith("List<") and (re.search(r"\*\s*(const)?$", raw) or "Span<" in raw):
-                texts.append(self.as_list(a, bt))
+                self.operand(done, a, bt, lambda: self.as_list(a, bt))
             else:
-                texts.append(self.ex(a, bt))
+                self.operand(done, a, bt, lambda: self.ex(a, bt))
+        texts = [e[2] for e in done]
         fn = f["type"].replace(".", "_")
         outs = f["outs"]
         if f["value"]:
@@ -8032,7 +8085,6 @@ class Emit:
         self.f.indexes = self.f.indexes or g.indexes
         if g.state and g.mutates and self.f.state and not self.f.mutates:
             self.f.mutates, self.f.pure = True, False   # (what a function of the state it calls changes, it changes)
-        texts = []
         params = g.params
         if any(x.get("kind") == "CXXDefaultArgExpr" for x in args):
             # an argument the call leaves out: the default the function's declaration gives it
@@ -8057,6 +8109,7 @@ class Emit:
             args = filled
         kinds = g.kinds
         after = []   # (what is stored back after the call: reference arguments that are no places of the notation)
+        done = []    # (the inputs written so far, in the order C++ works them out - see operand)
         if g.state and obj is not None and not self.is_this(obj):
             raise Wait(f"a function of the Blueprint {self.u.name} on another object of its state")
         if g.self_type is not None and not g.ctor:
@@ -8065,9 +8118,9 @@ class Emit:
                     raise Wait("a method of another object is called as its own")
                 if kinds[0] == "ref":
                     self.self_var()   # (a method that only reads its object does not call one that changes it)
-                texts.append(self.self_name)
+                done.append([None, None, self.self_name, True])
             else:
-                texts.append(self.place_arg(obj, g.self_type, kinds[0], after, raising=self.may_raise(g)))
+                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after, raising=self.may_raise(g)), place=True)
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
@@ -8079,12 +8132,18 @@ class Emit:
                 self.logic_arg(a)
                 continue
             if first + j in g.pointers:   # (a pointer into a list: the list and the place in it - Unit.pointed)
-                texts += self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))
+                two = []
+                self.operand(done, a, None, lambda: two.extend(self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))), place=True)
+                done[-1:] = [[a, None, x, True] for x in two]
                 j += 2
                 continue
             (_, pt), kind = params[j], kinds[j]
-            texts.append(self.place_arg(a, pt, kind, after, g.fixed.get(first + j), raising=self.may_raise(g)) if kind else self.ex(a, pt))
+            if kind:
+                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j), raising=self.may_raise(g)), place=True)
+            else:
+                self.operand(done, a, pt, lambda: self.ex(a, pt))
             j += 1
+        texts = [e[2] for e in done]
         gives = g.self_type if g.ctor else g.value
         texts = [texts[i] for i in g.order()]   # (as the Blueprint function has its inputs: those by reference first)
         call = f"{g.name}({', '.join(texts)}).Result"
@@ -10183,6 +10242,8 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
   const T* e = converted_pointed_end(p, static_cast<long long>(n));
   return {p, static_cast<std::size_t>(e - p)};
 }"""
+# A text of the library whose bytes a pointer of the source points into (`s.c_str() + from` - converted::text_end).
+TEXT_TYPE = re.compile(r"(?:const\s+)?std::(?:basic_string|string|string_view|basic_string_view|u8string|u16string|u32string|wstring)\b")
 # A view the test hands a function (kern::Span): its entries are a list a pointer of the source points into (`bytes.data`).
 SPAN_TYPE = re.compile(r"(?:const\s+)?(?:kern::)?Span<")
 WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
@@ -10405,6 +10466,22 @@ class TestWriter:
                 return self.u.pointed(qtype(r)) is not None
             except Wait:
                 return False
+        def text_bytes(x):
+            """Is this the bytes of a text (`s.c_str()`, `s.data()` of a std::string or std::string_view, also through a pointer
+            `p->c_str()`)? (the text, which of the two, through a pointer) - else None."""
+            x = bare(x)
+            while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(x):
+                x = bare(kids(x)[0])
+            m = bare(kids(x)[0]) if x.get("kind") == "CXXMemberCallExpr" and len(kids(x)) == 1 else {}
+            if m.get("kind") != "MemberExpr" or m.get("name") not in ("c_str", "data") or not kids(m):
+                return None
+            o = kids(m)[0]
+            t = self.u.clean(qtype(o)).strip()
+            if m.get("isArrow"):
+                if not t.endswith("*"):
+                    return None
+                t = t[:-1].strip()
+            return (o, m["name"], bool(m.get("isArrow"))) if TEXT_TYPE.match(t) else None
         def wide_layout(q):
             """The fields of the record q where the test holds them otherwise than the program (a float of the
             program is a 64-bit number there): ([(field, its number, its place)], the size) - None where the test
@@ -10458,6 +10535,15 @@ class TestWriter:
                     a, b = span(n)
                     steps = " ".join("converted::layout::%s(v_.%s, p_ + %d);" % ("single_from" if code == "f32" else "raw_from", name, at) for name, code, at in lay[0])
                     edits.append((a, 1, 0, b, "converted::layout::of_bytes(%s, %s, [](auto& v_, const kern::u8* p_) { %s })" % (text_of(held[0]), text_of(ks[2]), steps)))
+                    return
+                # the other way: the bytes of a value of such a struct into bytes (`memcpy(in.data() + at, &win, sizeof win)`) -
+                # the program's bytes of each field, a float as its 32 bits (the count is the program's sizeof, below)
+                held = addressed_record(self.tree, ks[2])
+                lay = wide_layout(held[1]) if held is not None else None
+                if lay is not None:
+                    a, b = span(n)
+                    steps = " ".join("converted::layout::%s(o_ + %d, v_.%s);" % ("single_to" if code == "f32" else "raw_to", at, name) for name, code, at in lay[0])
+                    edits.append((a, 1, 0, b, "converted::layout::to_bytes(%s, %s, [](const auto& v_, kern::u8* o_) { %s })" % (text_of(ks[1]), text_of(held[0]), steps)))
                     return
                 # between lists of numbers of which one holds floats of the program (Copy Bytes): the bytes the
                 # program copies, a float as its 32 bits (converted::layout::copy_bytes)
@@ -10535,6 +10621,17 @@ class TestWriter:
                 swap(a, xa, "*", "converted_pointed(")
                 edits.append((b, 0, -depth, b, ", 0)"))
                 self.pointed = True
+            elif k == "BinaryOperator" and n.get("opcode") in ("+", "-") and len(ks) == 2 and "*" in qtype(ks[0]) and text_bytes(ks[0]) is not None:
+                # a place in the bytes of a text (`s.c_str() + from`): in the text or at its end (where a std::string's null
+                # stands), as C++ defines it; beyond the end C++ leaves open what a read there gives (bytes after the text) - the
+                # call is marked and the place is the text's end (converted::text_end; the text is the one it was, said once)
+                text, which, arrow = text_bytes(ks[0])
+                (a, b), (_, tb), (ra, _) = span(n), span(text), span(ks[1])
+                if not re.fullmatch(r"\s*(?:\.|->)\s*%s\s*\(\s*\)\s*%s\s*" % (which, re.escape(n["opcode"])), raw[tb:ra]):
+                    raise Wait("written by a macro")
+                edits.append((a, 2, depth, a, "converted::text_end<%s>(%s" % ("true" if which == "c_str" else "false", "*" if arrow else "")))
+                edits.append((tb, 1, 0, ra, ", " if n["opcode"] == "+" else ", -("))
+                edits.append((b, 0, -depth, b, ")" if n["opcode"] == "+" else "))"))
             elif k == "BinaryOperator" and n.get("opcode") in ("+", "-") and len(ks) == 2 and "*" in qtype(ks[0]) and into_list(ks[0]):
                 # a place further on in a list a pointer points into (`values + n`, the end of what a call of the
                 # library reads - `insert(end, values, values + n)`): in the list or just past its end, as C++
@@ -10830,6 +10927,60 @@ class TestWriter:
         if not re.search(r"\b[ui]64\b", spelled):
             return expr
         return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
+
+    def logic_value(self, q):
+        """Is `q` a class of the engine's logic that is a value of the language - plain data (Unit.engine_object):
+        a Graph, a Node - and not its machinery (Runtime, Instance: objects; ActorBlueprint: in the language not a
+        value but Call on Actor, Unit.actor_type - in a test the engine's own)?"""
+        return q.startswith(ENGINE + "::logic::") and q in self.tree.records and not self.u.engine_object(q) and not self.u.actor_type(q)
+
+    def hands_logic(self, d, seen=None):
+        """What the function `d` - or a function of the program it calls - hands to the engine's logic itself (a
+        function or a method of it - Node::set_value, graph_to_json, Runtime ... - whose object, parameters or result
+        are a value of it, logic_value): the reason it waits, or None. In a test the logic is the engine's own, and
+        the test holds such a value as the Blueprint does, field by field (its own class): the two do not meet."""
+        tree, u = self.tree, self.u
+        seen = set() if seen is None else seen
+        if d["id"] in seen:
+            return None
+        seen.add(d["id"])
+        def values_in(text):
+            out = []
+            for word in sorted(set(re.findall(r"[A-Za-z_][\w:]*", text))):
+                try:
+                    q = u.find_type(word)
+                except Wait:
+                    continue
+                if q and self.logic_value(q) and q not in out:
+                    out.append(q)
+            return out
+        for x in walk_source(tree.body.get(d["id"], d)):
+            k = x.get("kind")
+            r = None
+            if k == "DeclRefExpr":
+                r = x.get("referencedDecl", {})
+            elif k == "MemberExpr":
+                r = tree.decl.get(x.get("referencedMemberDecl"), {})
+            elif k == "CXXConstructExpr":
+                r = constructor_of(tree, x)
+            if not r or r.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
+                continue
+            i = r.get("id")
+            scope = tree.owner.get(i) or tree.scope_of.get(i, "")
+            if scope.startswith(ENGINE + "::logic"):
+                if r.get("isImplicit"):
+                    continue   # (what the compiler makes of a class - its copy, its assignment: the test's class has its own)
+                owner = tree.owner.get(i) or ""
+                values = ([owner] if self.logic_value(owner) else []) + [q for q in values_in(qtype(tree.decl.get(i, r))) if q != owner]
+                if values:
+                    name = "::".join(x for x in [owner.split("::")[-1] if owner else "", r.get("name", "")] if x)
+                    return (f"it hands a value of the engine's logic ({', '.join(q.split('::')[-1] for q in values)}) to the engine's logic itself "
+                            f"({name}): in a test that is the engine's own, and the test holds such a value as the Blueprint does, field by field")
+            elif not scope.startswith(ENGINE + "::") and i in tree.body:
+                why = self.hands_logic(tree.body[i], seen)
+                if why:
+                    return why
+        return None
 
     def object_name(self, q):
         """The stand-in of a class of the engine in the test (its objects are handles in the Blueprint)."""
@@ -11681,7 +11832,10 @@ class TestWriter:
                     table.setdefault("::".join([name, *parts[k:]]), local)
         # (the engine's logic - how C++ runs and calls a Blueprint - is in a test the engine's own: `logic::Graph`
         # in the engine's source is ::kern::logic::Graph there, see gather)
-        logic = re.compile(r"(?<![\w:.>])(?:::)?(?:" + ENGINE + r"::)?logic::")
+        # (- but for a value of it the test holds, compiled along: a Graph, a Node, and the stand-ins of what they hold -
+        # it is the test's own, by the name the test gives it)
+        held = sorted({q[len(ENGINE + "::logic::"):].split("::")[0] for q in [*self.names, *self.enum_names] if q.startswith(ENGINE + "::logic::")})
+        logic = re.compile(r"(?<![\w:.>])(?:::)?(?:" + ENGINE + r"::)?logic::" + (r"(?!(?:" + "|".join(map(re.escape, held)) + r")\b)" if held else ""))
         def own(code):
             return logic.sub(f"::{ENGINE}::logic::", code)
         own_logic = own
@@ -11908,13 +12062,18 @@ class TestWriter:
         converted = self.converted
         G = Held()
         todo, seen_types = [], set()
+        in_value = [False]   # (scanning a value of the engine's logic: an object of it there is a part of that value)
         def want_record(q):
             t = self.home_of(q)
             if t != self.top_of(q):
                 want_record(self.top_of(q))   # (a class defined outside its class: with that class, after it)
             d = tree.records.get(t)
-            if t.startswith(ENGINE + "::logic::"):
-                return   # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints)
+            if t.startswith(ENGINE + "::logic::") and not self.logic_value(t) and not (in_value[0] and u.engine_object(t)):
+                # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints.
+                # A class of it that is plain data - a Graph, a Node: a struct of the language - is a value like any
+                # struct of the engine, compiled along; what such a value holds that is an object of the engine - a
+                # Variable, a json::Value - is a stand-in, by its handle, as the Blueprint has it)
+                return
             parts = t.split("::")
             if t.startswith(ENGINE + "::") and any("::".join(parts[:i]) in tree.records and u.engine_object("::".join(parts[:i])) for i in range(2, len(parts))):
                 return   # (what an object of the engine has inside it - LightPool::Request -: its stand-in has none of it)
@@ -12148,7 +12307,9 @@ class TestWriter:
             want_record(q)
         while todo:
             kind, d = todo.pop()
+            in_value[0] = kind == "record" and self.logic_value(d.get("_q") or "")
             scan_record(d) if kind == "record" else scan(d)
+            in_value[0] = False
             scan_text(d)
             if kind == "record":
                 want_comparisons(d)
@@ -12306,13 +12467,14 @@ class TestWriter:
         [(the declaration, its text, the name it gives (a pair))]."""
         numbers = {"f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"}
         words = set(re.findall(r"[A-Za-z_]\w*", "\n".join(texts)))
+        logic_words = {w for q in self.names if self.logic_value(q) for w in re.findall(r"[A-Za-z_]\w*", self.tree.source(self.tree.records[q]))}
         out, taken = [], set()
         for _ in range(4):
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
-                if (scope or "").startswith(ENGINE + "::logic::"):
-                    continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather)
+                if (scope or "").startswith(ENGINE + "::logic::") and o.get("name") not in logic_words:
+                    continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather - but for what a value of it the test holds names: logic_value)
                 # (one in a class the test compiles along stands in its text; one in a class it does not has the
                 # namespace of the class's name - in_classes)
                 if o.get("_at", (None, None))[0] is None or o["_at"][1] is None or self.inside(o, decls) is not None or self.in_function(o):
@@ -12525,6 +12687,12 @@ class TestWriter:
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
         for o, text, pair in aliases:
             put(o, {"kind": "alias", "text": text, "pairs": [pair]})
+        # a function declared here whose body another file's test handed on: its declaration - what C++ takes from it
+        # (its default arguments: `render(Kind k, u32 variant, u32 rate = kSampleRate)`) goes on with the body, to a
+        # test whose file does not see that declaration
+        for d in G.declared.values():
+            if d.get("_at", (None, None))[1] is not None:
+                put(d, {"kind": "declaration", "text": self.in_spaces(d, self.piece(d) + ";", local_of(d))})
         # a method declared in its class here whose body another file's test handed on: that it is a member, for
         # the test that takes these pieces (its class's text holds the declaration) - and of a class this tree does
         # not have either, the place of the member in the piece of the file that has it
@@ -12702,6 +12870,10 @@ class TestWriter:
                 continue
             if not f.out_fields:
                 skipped.append((f, "it gives nothing"))
+                continue
+            handed = self.hands_logic(d)
+            if handed:
+                skipped.append((f, handed))
                 continue
             if f.indexes and d["id"] in unguarded:
                 skipped.append((f, f"it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, {unguarded[d['id']]}: C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is"))

@@ -1,6 +1,9 @@
 // The cases of the measurement (bench.h): CASE(name, kind, same) - `same`: the checksums of source
 // and class must be equal (the source computes in the numbers of the language).
-// The source side of a case is src_<name>() in src_<unit>.cpp, the class side cls_<name>() in bench.cpp.
+// The source side of a case is src_<name>() in src_<file>.cpp (the source as the game builds it) and
+// src64_<name>() in src64_<file>.cpp (the source in the numbers of the language, as the test of
+// tests/converted compiles it) - one text of the case, src_<file>.inc -, the class side cls_<name>() in
+// bench.cpp. The class must give what src64 gives, bit for bit, and is held to its time (--check).
 #define BENCH_CASES(CASE)                     \
   CASE(qr_encode, "Int, Liste, Text", 1)      \
   CASE(qr_gf_mul, "Int (Bits)", 1)            \
