@@ -1,2 +1,6 @@
 work-e-vergleich-094554-24308: vergleich auf fa063fd3 (origin/work-e), 14 Kerne, Start 2026-11-19 09:46:16
 werkzeuge: clang=/usr/bin/clang++-18 (Ubuntu clang version 18.1.3 (1ubuntu1)) c++=/usr/bin/c++ (c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0) python=Python 3.12.3 PATH=/home/chris/.local/bin:/home/chris/bin:/home/chris/bin:/home/chris/.local/bin:/home/chris/.grok/bin:/home/chris/.local/bin:/home/chris/.opencode/bin:/home/chris/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+grundlage: mag/ergebnis-work-zusammen-voll-070328-32111 ba5b20b5
+convert rc=0 09:49:03
+bau rc=0 09:54:32
+alle rc=1 09:57:33 (--- 19 ok, 0 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 19 Tests; cost: 22, note: 30; real: --- 18 ok, 1 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 19 Tests; cost: 22, note: 23)

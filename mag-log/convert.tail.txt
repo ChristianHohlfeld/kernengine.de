@@ -1,0 +1,80 @@
+    battery_under_load (3): written
+    encode_sbus (10): written
+    put_be16 (6): written
+    quat_yaw_deg (3): written
+    clearance_rate (6): written
+    clearance_lead (6): written
+    Drone::Drone (12): written
+    Drone::rigid_spec (75): written
+    Drone::reset (22): written
+    Drone::imu_bytes (25): written
+    Drone::motor_tick (39): written
+    Drone::step (131): written
+engine_geo_mesh_data            2 /    2 functions        2 /      2 lines   (what the program calls of it)
+    MeshData::vertex_count (1): written
+    MeshData::triangle_count (1): written
+engine_geo_roads                1 /    2 functions        4 /     11 lines   (what the program calls of it)
+    GeoProjector::init (7): the engine's fail() (it has no node: a variadic function)
+    GeoProjector::project (4): written
+engine_math_math                3 /    3 functions       11 /     11 lines   (what the program calls of it)
+    Vec4::Vec4 (1): written
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+engine_physics_physics          4 /    4 functions        4 /      4 lines   (what the program calls of it)
+    Body::valid (1): written
+    Body::operator== (1): written
+    Shape::valid (1): written
+    QueryFilter::QueryFilter (1): written
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+rigid_spec                      3 /    3 functions       51 /     51 lines
+    capsule_between (14): written
+    create_body (29): written
+    box_inertia (8): written
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+208 of 229 functions of the program are written as Blueprints (2490 of 3047 lines), and 10 of the engine's headers that they call: 22 Blueprints - 3 of source files, 0 of states, 19 of headers and of shapes
+195 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 1 give nothing
+
+what the others wait for: functions (lines)
+     1 (   110)   read_features() is defined in another file
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    61)   road_is_water() is defined in another file
+     3 (    60)   remove_tints() is defined in another file
+     3 (    56)   unproject() is defined in another file
+     1 (    44)   chunk_count() is defined in another file
+     2 (    33)   it calls CityStream::remove(), which waits
+     1 (    22)   buildings_input() is defined in another file
+     1 (    19)   it calls CityStream::ground_height(), which waits
+     1 (    17)   a member of Int is set
+     1 (    14)   ready_at() is defined in another file
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    12)   add_water_polygon() is defined in another file
+     1 (     9)   tile_input() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	2m43,037s
+user	6m23,107s
+sys	0m21,840s

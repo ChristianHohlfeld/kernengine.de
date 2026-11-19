@@ -1,0 +1,20 @@
+FAIL converted_city_stream_cpp
+ok   converted_Arondight45_DroneFC_Core
+ok   converted_Arondight45_FirmwareRuntime
+ok   converted_Arondight45_HardwareSensors
+ok   converted_Arondight45_StateControl
+ok   converted_car
+ok   converted_car_cpp
+ok   converted_city_stream
+ok   converted_common
+ok   converted_drone
+ok   converted_drone_cpp
+ok   converted_engine_geo_mesh_data
+ok   converted_engine_geo_roads
+ok   converted_engine_math_math
+ok   converted_engine_physics_physics
+ok   converted_mvt
+ok   converted_rigid_spec
+ok   converted_terrain
+ok   converted_tiles
+--- 18 ok, 1 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 19 Tests; cost: 22, note: 23
