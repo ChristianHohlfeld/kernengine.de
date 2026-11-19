@@ -1,0 +1,1 @@
+vergleich origin/work-d src/game.cpp src/game_events.cpp src/game_lamps.cpp src/game_look.cpp src/game_foot_rounds.cpp src/game_military.cpp src/game_town.cpp src/game_ui.cpp
