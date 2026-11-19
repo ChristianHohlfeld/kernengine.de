@@ -3931,6 +3931,25 @@ class Emit:
                 stood = {k: node[k] for k in ("_at", "_file") if k in node}
                 node.clear()
                 node.update({"kind": "ArraySubscriptExpr", "type": was, "valueCategory": "lvalue", "_bt": lt[5:-1], "inner": [lst, at], **stood})
+            slot = self.unwrap(init)
+            if self.is_slot(bare(slot)):
+                # `V& r = m[key];` - C++ finds the key's entry once, where the reference is bound (adding it when the key is
+                # new): its row, held while the reference lives - the entries of a map stand in a list, as the
+                # address C++ keeps (Unit: kern::Map). Every use of r is that entry, without finding it again.
+                slot = bare(slot)
+                picks = [(n_, a_) for n_, a_ in picks if n_ is not slot]   # (its key: worked out here, once)
+                base = kids(slot)[1]
+                _, _, kt, vt = self.rows(base)
+                key = self.temp("key", kt)
+                lines, at, _ = self.put_row(base, key)
+                self.hoist([f"{key} = {self.ex(kids(slot)[2], kt)};"] + lines)
+                row = self.temp(f"{v.get('name') or 'ref'}_row", "Int")
+                self.hoist([f"{row} = {at};"])
+                was = slot.get("type", {})
+                stood = {k: slot[k] for k in ("_at", "_file") if k in slot}
+                held = self.entry(base, {"kind": "_Text", "_text": row, "_type": "Int", "_steady": True}, vt)   # (the row: set here alone)
+                slot.clear()
+                slot.update({**held, "type": was, **stood})
             rest = {"kind": "CompoundStmt", "inner": stmts[i + 1:]}
             changed = self.assigned(rest)
             if re.search(r"\bconst\b", raw) and not own and root not in changed:
@@ -6899,7 +6918,7 @@ class Emit:
                 while i.get("kind") in CAST and kids(i):
                     i = bare(kids(i)[-1])
                 ref = i.get("referencedDecl") or {}
-                if i.get("kind") == "IntegerLiteral" or (i.get("kind") == "DeclRefExpr" and ref.get("kind") in ("VarDecl", "ParmVarDecl")
+                if i.get("kind") == "IntegerLiteral" or i.get("_steady") or (i.get("kind") == "DeclRefExpr" and ref.get("kind") in ("VarDecl", "ParmVarDecl")
                                                          and re.match(r"\s*const\b", (ref.get("type") or {}).get("qualType", "")) and "&" not in (ref.get("type") or {}).get("qualType", "")):
                     b = self.unwrap(base)
                     continue
