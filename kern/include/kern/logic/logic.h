@@ -697,20 +697,30 @@ class Formula {
   /// and pi are those of kern::math, / % ^ are its calls div, mod and pow, numbers are double
   /// literals. Read back by from_cpp (the text without "kern::math::" is a formula again).
   std::string cpp() const;
-  /// A formula of whole numbers: what it gives is a whole number, and it reads its inputs only as
-  /// whole numbers - its root is a function that says so (band bor bxor shl shr wrap32 wrap32s
-  /// mul32: each says it in the formula's table of functions), and every input is an argument of
-  /// such a function, or given to +, - or * whose value is read so (those operators are given only
-  /// inputs, numbers written out, such functions and such operators - kWholeOperators). In a Blueprint's C++ such a formula whose inputs are all wires from
-  /// Ints is written with Int inputs and an Int result (docs/blueprint_cpp.md, "Formeln"): the same
-  /// value, without the way through the double.
-  bool whole() const;
+  /// Int inputs and an Int result (docs/blueprint_cpp.md, "Formeln") - one rule on the formula, no
+  /// list of names: which functions give a whole number for whole numbers says the formula's table
+  /// of functions (band bor bxor shl shr wrap32 wrap32s mul32); +, - and * (kWholeOperators) are
+  /// whole where they are given only inputs, numbers written out, such functions and such operators.
+  /// int_input(k): input k is read only as a whole number - as an argument of such a function, as a
+  /// side of a comparison (== != < <= > >=) whose other side is an input, a number written out,
+  /// such a function or such an operator, or through such an operator whose own value is read so
+  /// (or is the formula's value). Never under / % ^ or another function: there it is a Float. In a
+  /// Blueprint's C++ the input is then an Int where its wire comes from an Int: the same value,
+  /// because every Int is exact as a double and the comparison of two of them is that of the doubles.
+  bool int_input(std::size_t k) const;
+  /// whole_result(): every input is int_input, and what the formula gives is a whole number - its root
+  /// is such a function, or such an operator with an input among its operands (result_sum()). -> Int in a Blueprint's C++ where every
+  /// input is a wire from an Int; with result_sum() only where everything that reads the value is an
+  /// Int (past Int's ends the Int is its end, the double is not).
+  bool whole_result() const;
+  bool result_sum() const;
 
  private:
   friend struct FormulaParser;
   struct Op { u8 code = 0; u8 args = 0; u16 index = 0; f64 number = 0; };
   struct Term { u8 code = 0; u16 index = 0; int a = -1, b = -1, c = -1; f64 number = 0; };  // the formula as a tree
   std::string print(int term, int outer, bool cpp) const;
+  bool whole_operand(int term) const;  // (an input, a number, a whole function, or +, - or * of those)
   std::vector<Term> tree_;
   int root_ = -1;
   std::vector<Op> code_;
@@ -1280,6 +1290,9 @@ class Instance {
   bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places = nullptr);
   bool call_class(std::string_view function, std::span<const Value> args, Results& results);  // (the class's: NativeBlueprint::call)
   Value read(const Spot& s) const;
+  /// How long each list of any length (each map) is that the place goes through, outermost first - up to the first
+  /// the place lies beside (Runtime::held_lost: a call that holds the place checks them after it).
+  std::vector<std::size_t> lengths_on(const Spot& s) const;
   bool write(const Spot& s, const std::function<void(Value&)>& change);
   std::vector<std::vector<Spot>> refs_;                   // per function: where its reference inputs are, for the call that runs
   Value held(const std::string& key) const;
@@ -1320,6 +1333,8 @@ class Instance {
     int call_node = -1;
     std::size_t base = 0;
     std::vector<Spot> outer_refs;
+    std::vector<Spot> held;                         // the places in lists the call holds (by reference)
+    std::vector<std::vector<std::size_t>> lengths;  // and how long those lists were when it began
     std::unique_ptr<Kept> kept;
   };
   static constexpr int kAfterCall = -1000;  // the entry of the mark that ends a call (Frame::trampoline)
@@ -1461,6 +1476,10 @@ class Runtime {
   u32 budget = 200000;
   /// May a loop of `inst` make another pass? (Counts it. False: the guard - the loop ends.)
   bool pass(Instance& inst);
+  /// A call held an entry of a list of any length while its function could run handlers, and the list did not stay
+  /// (its length - in a class also where its entries are): in C++ the reference would go nowhere. The run of `inst`
+  /// stops as at the loop guard - its loops end, the chain runs to its end, the Blueprint is stopped - and it is said.
+  void held_lost(Instance& inst);
   u64 executed() const { return executed_; }
   /// The host linked the native code of instance `id` (`function` = table index, < 0 failed).
   static void jit_ready(i32 id, i32 function);

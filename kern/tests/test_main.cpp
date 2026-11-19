@@ -5372,14 +5372,17 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a +; }, 1.0);"), "the formula:");
-  // (a formula of whole numbers, [](Int a) -> Int: only where Formula::whole holds, every input a wire from an Int as it is)
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a + 1.0; }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(kern::math::div(a, 2.0), 3.0); }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::band(a, 3.0); }, Count));"), "(a formula with Int inputs gives an Int)");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "(the inputs of a formula of whole numbers are Int");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "an input of a formula of whole numbers is an Int");
+  // (Int inputs only where Formula::int_input holds, an Int result only where Formula::whole_result holds and - by +, - or * -
+  // everything that reads it is an Int; every Int input a wire from an Int as it is)
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::div(a, 2.0); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return a < 3.0 ? a : 1.0; }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a < 3.0; }, Count));"), "-> Int is a formula whose value is a whole number");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 1.0) + 2.0; }, Count));"), "-> Int is a formula whose value is a whole number");
+  refused(in_event("    Heat = kern::formula([](Int a) -> Int { return a + 1.0; }, Count);"), "this formula gives an Int by +, - or *, and this reads it as Float");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a Float input gives a Float: -> Float");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an Int");
   refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, kern::to<Float>(Count)));"), "an Int as it is: no kern::to");
   refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
   // (a list of a fixed length written out on an input says the input's length: Fixed<Float, 3> for a field of three)
@@ -5549,13 +5552,37 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     CHECK(says(bump + "  void Clear(Car& car) {\n    list_clear(car.Marks);\n  }\n  void Both(Car& car) {\n    Clear(car);\n  }\n  void Mark(Float& mark, Car& car) {\n    Both(car);\n    mark += 1.0;\n  }\n" +
                    in_event("    Mark(Mine.Marks[0], Mine);"),
                "while Mark holds it, the length of Mine.Marks is changed"));
-    CHECK(says("  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n" + in_event("    Shout(Cars[0]);"), "may run handlers while it holds it"));
+    // an entry of a list of any length given to a function that may run handlers: the call is checked - logic::Held
+    // around it in the text and the class, the lengths in the interpreter (Runtime::held_lost) -, and the text reads back
+    // as the same Blueprint (the check follows from the graph)
+    auto held_text = [&](const std::string& body) {
+      logic::Graph g, again;
+      std::string error, text, difference;
+      if (!logic::from_cpp("struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n" + car + body + "\n};\n", g, nullptr, &error)) return "not read: " + error;
+      if (!logic::check(g).empty() || !logic::cpp_problem(g).empty()) return "not checked: " + logic::cpp_problem(g);
+      if (!logic::to_cpp(g, "B", text, &error)) return "not written: " + error;
+      if (!logic::from_cpp(text, again, nullptr, &error)) return "not read again: " + error;
+      if (!logic::same_blueprint(g, again, &difference)) return "not the same: " + difference;
+      return text;
+    };
+    const std::string shouts = "  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n";
+    CHECK(wrong(shouts + in_event("    Shout(Cars[0]);")).empty());
+    {
+      const std::string text = held_text(shouts + in_event("    Shout(Cars[0]);"));
+      CHECK(text.find("const kern::logic::Held held_") != std::string::npos && text.find("(Cars);\n") != std::string::npos && text.find("held_after(held_") != std::string::npos);
+      if (text.find("held_after(held_") == std::string::npos) std::printf("%s\n", text.c_str());
+      // (a function that runs no handlers: no check)
+      CHECK(held_text(bump + in_event("    Bump(Cars[0].Speed, 1.0);")).find("Held") == std::string::npos);
+    }
     // (an entry of a list of a fixed length stays where it is whatever the handlers do: nothing changes how long
     // that list is - but an entry of a list of any length inside it can go)
     const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n"
                               "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, mark, \"\");\n  }\n";
     CHECK(wrong(shout + in_event("    Shout(Two[1]);\n    Hum(Two[0].Speed);")).empty());
-    CHECK(says(shout + in_event("    Hum(Two[1].Marks[0]);"), "may run handlers while it holds it"));
+    CHECK(wrong(shout + in_event("    Hum(Two[1].Marks[0]);")).empty());
+    CHECK(held_text(shout + in_event("    Hum(Two[1].Marks[0]);")).find("(Two[1].Marks);") != std::string::npos);
+    // (a function read as a value cannot be checked around: it may not hold such an entry while it runs handlers - there is none
+    // that runs them, a pure function only computes)
     // ... and what is fine: the list itself, another list, a field of the entry, a variable that is no entry
     CHECK(wrong("  void Grow(List<Car>& cars, Car& car) {\n    car.Speed = 1.0;\n    list_add(car.Marks, 2.0);\n  }\n  void More(List<Float>& marks) {\n    list_add(marks, 1.0);\n  }\n" +
                 in_event("    Grow(Cars, Mine);\n    More(Cars[0].Marks);\n    More(Mine.Marks);"))

@@ -1075,14 +1075,26 @@ void on1(Float delta) {
 - **Ein Eintrag, der gehalten wird, bleibt, wo er ist** (Regel, `check()`): Nennt ein Aufruf
   einen Platz in einer Liste (`Cars[i]`, `Cars[i].Wheels[j]`), dann ändert nichts, was die
   Funktion tut – sie selbst oder was sie aufruft –, die Länge dieser Liste oder setzt eine andere
-  an ihre Stelle; und sie führt keinen Schritt aus, der Handler starten kann (Call Event, Call on
-  Actor, ein Gameplay-Schritt: `NodeDef::raises`) – ein Handler könnte dasselbe tun. So bleibt
-  „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
+  an ihre Stelle. So bleibt „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
   Referenz von C++ ist. Die Liste selbst als Referenz zu geben und zu ändern
   (`Fill(Cars[i].Marks)`), ein Feld des Eintrags zu ändern oder eine andere Liste – das alles
-  geht. Ein Eintrag einer Liste fester Länge (`Fixed<Car, 2> Two`, siehe „Listen fester Länge“)
-  bleibt immer, wo er ist – nichts ändert, wie lang sie ist –: `Shout(Two[1])` darf Handler
-  starten; `Hum(Two[1].Marks[0])` nicht, denn `Marks` hat irgendeine Länge.
+  geht.
+- **Handler, während ein Eintrag gehalten wird** (geprüft): Führt die Funktion einen Schritt aus,
+  der Handler starten kann (Call Event, Call on Actor, ein Gameplay-Schritt: `NodeDef::raises`),
+  weiß niemand vorher, ob ein Handler die Liste ändert – C++ hätte dann eine Referenz ins Leere
+  (undefiniert). Der Aufruf wird darum geprüft, in jeder Stufe gleich: vor ihm wird jede Liste
+  beliebiger Länge (jede Map, jeder besessene Wert) auf dem Weg zum Eintrag gemerkt, nach ihm
+  muss sie dieselbe Länge haben – in der Klasse auch ihre Einträge an derselben Stelle (`data()`) –,
+  sonst endet der Lauf dort mit einem Fehler wie am Schleifenwächter (`Runtime::held_lost`: die
+  Schleifen der Kette enden, die Kette läuft zu Ende, der Blueprint wird angehalten). Im Text steht
+  die Prüfung um den Aufruf – sie folgt aus dem Graphen, der Leser liest sie als nichts:
+  `const kern::logic::Held held_12(Cars, Cars[n4.index].Wheels); Car_step(Cars[n4.index].Wheels[0]); held_after(held_12);`
+  (die Listen von außen nach innen; die Klasse sieht eine innere nur an, solange die äußere blieb).
+  Der Interpreter und der JIT prüfen die Längen in `Instance::call`. Eine Funktion, die als Wert
+  gelesen wird, rechnet nur – sie startet keine Handler; startet sie doch welche, wird ein solcher
+  Eintrag abgewiesen. Ein Eintrag einer Liste fester Länge (`Fixed<Car, 2> Two`, siehe „Listen
+  fester Länge“) bleibt immer, wo er ist: `Shout(Two[1])` braucht keine Prüfung,
+  `Hum(Two[1].Marks[0])` prüft `Two[1].Marks`.
 - **Von außen** (`Instance::call`, der Kleber der Klasse) nimmt ein Referenz-Eingang einen Wert:
   Er ist dann eine eigene Variable des Aufrufs, die mit diesem Wert beginnt, und was die
   Funktion aus ihr gemacht hat, steht hinter den Ausgängen in `results` – für jeden
@@ -1297,7 +1309,7 @@ Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schr
 jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
 bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
 Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
-Funktion liest (`Formula::whole()`), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
+Funktion liest (`Formula::whole_result()`, unten), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
 und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
 `Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
 Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
@@ -1312,10 +1324,29 @@ neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Za
 verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
 Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
 (`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
-Formel, an `band` … `mul32` als ganze Zahl). Ist ein Eingang ein Float, eine
-geschriebene Zahl oder liest die Formel einen Eingang anders (`a + 1` an der Wurzel, `-a`, `a / 2`, `a < b`),
-ist sie eine Formel über Floats wie oben. Der Leser lehnt `[](Int …) -> Int` für eine Formel ab, die das nicht hergibt, ebenso
-gemischte Eingänge, eine geschriebene Zahl oder ein `kern::to` an einem ihrer Eingänge.
+Formel, an `band` … `mul32` als ganze Zahl, als Int `whole` dieser Zahl).
+
+**Int-Eingänge und Int-Ergebnis, Eingang für Eingang** (`Formula::int_input(k)`, `Formula::whole_result()` – eine
+Regel am Ausdruck, keine Namen). Ein Eingang ist ein `Int`, wo sein Draht von einem Int kommt und die Formel ihn
+nur als ganze Zahl liest: als Argument einer solchen Funktion, als Seite eines Vergleichs (`==` `!=` `<` `<=` `>`
+`>=`), dessen andere Seite ein Eingang, eine geschriebene Zahl, eine solche Funktion oder ein solches `+`/`−`/`×` ist,
+oder durch `+`, `−`, `×` (die nur Eingänge, Zahlen, solche Funktionen und einander bekommen), deren Wert selbst so
+gelesen wird oder der Wert der Formel ist. Unter `/`, `%`, `^`, einer anderen Funktion, `-a`, `!` oder `?:` ist er
+ein Float (Int/Int wäre in C++ ganzzahlige Division; `/` steht ohnehin als `kern::math::div`). Jeder andere Eingang
+ist ein Float wie oben – ein Float-Eingang oder eine geschriebene Zahl macht nur diesen Eingang zum Float:
+`kern::formula([](Int a, Float f) -> Float { return a + f; }, n3.item, 0.25)`.
+Das Ergebnis ist ein `Int`, wo jeder Eingang einer ist und die Wurzel eine solche Funktion ist oder ein `+`/`−`/`×`,
+in dem ein Eingang steht – im zweiten Fall nur, wo alles, was den Wert liest, ein Int ist (jenseits der Enden von Int
+ist das Int sein Ende, das double nicht): `List[kern::to<Int>(kern::formula([](Int i) -> Int { return i - 1.0; }, i))]`.
+Sonst ein `Float`, auch mit Int-Eingängen: `kern::formula([](Int i, Int n) -> Float { return (i < 0.0) != (n < 0.0); }, i, n)`.
+In jeder Stufe derselbe Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double. In der Klasse ist jedes
+Int als double exakt (`normal`), und die Umwandlung erhält die Ordnung – der Vergleich zweier Ints oder eines Ints mit
+einer Zahl in i64 bzw. über das double gibt, was der der doubles gibt (auch an 2^53 und ±(2^63 − 1): `a == 9007199254740993`
+vergleicht mit dem double 2^53); `+`/`−`/`×` sind `logic::Sum` – als Float genau die double-Rechnung, als Int
+`whole` von ihr (ganzzahlig, wo jede Zahl auf dem Weg in ±2^53 liegt). Der Leser lehnt ab: `Int` an einem Eingang,
+den die Formel anders liest (`div(a, 2.0)`, `-a`, `a * sqrt(2.0)`, `a < 3.0 ? a : 1.0`); `-> Int` mit einem Float-Eingang,
+mit einer Wurzel, die kein Int gibt (`a < 3.0`, `sin(a)`, `band(a, 1.0) + 2.0`), oder mit `+`/`−`/`×` an der Wurzel und
+einem Leser, der kein Int ist; eine geschriebene Zahl oder ein `kern::to` an einem Int-Eingang.
 
 ## Wo was steht
 
