@@ -1929,7 +1929,8 @@ struct Writer {
           line(1, (f.remote.empty() ? std::string("KERN_EXTERN ") : "KERN_EXTERN_AS(" + text_literal(f.remote) + ") ") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
           continue;
         }
-        line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
+        line(1, (f.exported.empty() ? std::string() : "KERN_EXPORT_AS(" + text_literal(f.exported) + ", " + text_literal(f.wire) + ") ") + std::string(f.pure ? "KERN_PURE " : "") +
+                    (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (its local variables: every call starts with them as they stand here)
         for (const FunctionPin& l : f.locals) line(2, cpp_type(declared(l)) + " " + l.name + " = " + literal(Value::from_json(l.value, declared(l), g), declared(l), g) + ";");
         // (a path that ends without a Return gives the outputs' defaults)
@@ -2682,6 +2683,8 @@ struct Reader {
     std::string docs;
     bool has_docs = false, pure = false, external = false, has_event = false;
     std::string remote;  // (KERN_EXTERN_AS: the name the other Blueprint has the function under)
+    std::string exported, wire;  // (KERN_EXPORT_AS: the C name the program gives the function under, and how its values cross)
+    std::size_t export_at = 0;
     Item event;
     auto take_docs = [&] {
       std::string r = has_docs ? docs : std::string();
@@ -2839,6 +2842,15 @@ struct Reader {
         pure = true;
         continue;
       }
+      if (accept("KERN_EXPORT_AS")) {
+        // KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult game_hud(...) { ... }   (Function::exported, Function::wire)
+        export_at = p;
+        if (!expect("(") || !string(exported, "the C name the program gives the function under") || !expect(",") ||
+            !string(wire, "how its inputs and its output cross: \"i32 f32 text -> text\"") || !expect(")"))
+          return false;
+        if (exported.empty()) return fail(export_at, "KERN_EXPORT_AS names the export: KERN_EXPORT_AS(\"game_hud\", \"-> text\")");
+        continue;
+      }
       if (accept("KERN_EXTERN")) {
         external = true;
         continue;
@@ -2929,12 +2941,19 @@ struct Reader {
           if (!accept(",")) break;
         }
         f.help = take_docs();
+        f.exported = std::move(exported);
+        f.wire = std::move(wire);
+        exported.clear();
+        wire.clear();
+        if (std::string why; !export_ok(f, &why)) return fail(export_at ? export_at : at, why);
+        export_at = 0;
         it.kind = Item::function;
         it.fn = fn;
         g.functions.push_back(std::move(f));
       }
       it.tok = at + 1;
       if (external && it.kind != Item::function) return fail(at, "KERN_EXTERN stands in front of a function of another Blueprint");
+      if (!exported.empty()) return fail(export_at, "KERN_EXPORT_AS stands in front of a function");
       pure = false;
       if (!expect(")")) return false;
       if (external) {
@@ -5084,6 +5103,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   }
   if (!keep.empty())
     events = "    const bool at_work = self.kern_world.instance && self.kern_world.instance->chains() > 1;\n" + keep + events + "    if (at_work) {" + give_back + " }\n";
+  const bool exports = std::any_of(g.functions.begin(), g.functions.end(), [](const Function& f) { return !f.exported.empty(); });
   std::string s = "// How the engine reaches the Blueprint " + name + " by name (written by logic::native_glue after its\n"
                   "// text): glue, not part of the notation - nothing to edit here.\n" +
                   structs +
@@ -5091,7 +5111,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "struct " + name + "_Native final : kern::logic::NativeBlueprint {\n"
                   "  " + name + " self;\n" +
                   running +
-                  "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n"
+                  (exports ? "  // (it gives functions to the host under their C names: the exports below call them on this object - the\n"
+                             "  // instance that started last as this class)\n"
+                             "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; kern::logic::blueprint_object<" + name + "> = &self; }\n"
+                             "  ~" + name + "_Native() override { if (kern::logic::blueprint_object<" + name + "> == &self) kern::logic::blueprint_object<" + name + "> = nullptr; }\n"
+                           : "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n") +
                   "  void* object(const void* type) override { return type == &kern::logic::class_key<" + name + "> ? &self : nullptr; }\n"
                   "  void run(int node, int entry) override {\n"
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
@@ -5142,6 +5166,46 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
        "[[maybe_unused]] const bool " + name + "_registered =\n"
        "    (kern::logic::register_native_blueprint(" + hash + ", [] { return std::unique_ptr<kern::logic::NativeBlueprint>(new " + name + "_Native()); }), true);\n"
        "}  // namespace\n";
+  // The exports (Function::exported): C functions under their names that call the function on the object of the
+  // instance that runs as this class - nothing looked up by name; without one (the level has not started) they
+  // give zero, an empty text, nothing.
+  for (const Function& f : g.functions) {
+    if (f.exported.empty()) continue;
+    std::vector<std::string> words;
+    std::string out_word;
+    {
+      std::string w;
+      bool arrow = false;
+      for (std::size_t i = 0; i <= f.wire.size(); ++i) {
+        if (i < f.wire.size() && f.wire[i] != ' ') { w += f.wire[i]; continue; }
+        if (w == "->") arrow = true;
+        else if (!w.empty()) (arrow ? out_word : words.emplace_back()) = w;
+        w.clear();
+      }
+    }
+    if (words.size() != f.inputs.size()) {
+      if (error) *error = "the export " + f.exported + ": its wire does not fit the function";
+      return false;
+    }
+    std::string params, args;
+    for (std::size_t k = 0; k < words.size(); ++k) {
+      const std::string a = "a" + std::to_string(k);
+      params += std::string(k ? ", " : "");
+      args += std::string(k ? ", " : "");
+      if (words[k] == "text") params += "const char* " + a + ", kern::u32 " + a + "_length", args += "kern::logic::export_text_in(" + a + ", " + a + "_length)";
+      else if (words[k] == "bytes") params += "const kern::u8* " + a + ", kern::u32 " + a + "_length", args += "kern::logic::export_bytes_in(" + a + ", " + a + "_length)";
+      else params += "kern::" + words[k] + " " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
+    }
+    const std::string ret = out_word.empty() ? "void" : out_word == "text" ? "const char*" : "kern::" + out_word;
+    const std::string none = out_word.empty() ? "return;" : out_word == "text" ? "return \"\";" : "return 0;";
+    s += "KERN_EXPORT(" + f.exported + ") " + ret + " " + f.exported + "(" + params + ") {\n"
+         "  " + name + "* const object = kern::logic::blueprint_object<" + name + ">;\n"
+         "  if (!object) " + none + "\n";
+    if (out_word.empty()) s += "  object->" + f.name + "(" + args + ");\n";
+    else if (out_word == "text") s += "  return kern::logic::export_text_out(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
+    else s += "  return kern::logic::export_out<kern::" + out_word + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
+    s += "}\n";
+  }
   out = std::move(s);
   return true;
 }

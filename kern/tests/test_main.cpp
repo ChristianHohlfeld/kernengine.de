@@ -2346,6 +2346,51 @@ struct Ends : kern::Blueprint {
   }
 }
 
+TEST(logic_function_export) {
+  // A function the program gives its host under a fixed C name (Function::exported, KERN_EXPORT_AS): the name
+  // and how its values cross (the wire) are part of the Blueprint - in its graph, its text, both ways - and the
+  // glue of its class writes the C function (logic::native_glue; blueprint_native_test calls the case's).
+  const char* text = R"kn(
+struct Host : kern::Blueprint {
+  struct game_hudResult { Text Result = ""; };
+  KERN_EXPORT_AS("game_hud", "text bytes i32 f32 -> text") game_hudResult game_hud(const Text& ask, const List<Int>& data, Int view = 0, Float scale = 0.0) {
+    return {ask};
+  }
+  KERN_EXPORT_AS("game_tick", "f64") void game_tick(Float dt = 0.0) {
+  }
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  const logic::Function* hud = g.function("game_hud");
+  CHECK(hud && hud->exported == "game_hud" && hud->wire == "text bytes i32 f32 -> text");
+  CHECK(g.function("game_tick") && g.function("game_tick")->exported == "game_tick" && g.function("game_tick")->wire == "f64");
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+  std::string written;
+  CHECK(logic::to_cpp(g, "Host", written, &error) && written.find("  KERN_EXPORT_AS(\"game_hud\", \"text bytes i32 f32 -> text\") game_hudResult game_hud(") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(written, read, nullptr, &error) && read == g);
+  std::string glue;
+  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a0_length, const kern::u8* a1, kern::u32 a1_length, kern::i32 a2, kern::f32 a3) {") != std::string::npos &&
+        glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
+  // what does not fit is said
+  logic::Function f = hud ? *hud : logic::Function{};
+  CHECK(logic::export_ok(f));
+  f.wire = "text bytes i32 -> text";
+  CHECK(!logic::export_ok(f));
+  f.wire = "text bytes text f32 -> text";
+  CHECK(!logic::export_ok(f));
+  f.wire = "text bytes i32 f32 -> bytes";
+  CHECK(!logic::export_ok(f));
+  f.wire = "text bytes i32 f32 -> text";
+  f.exported = "game hud";
+  CHECK(!logic::export_ok(f));
+  CHECK(!logic::from_cpp(std::string(text).replace(std::string(text).find("\"f64\""), 5, "\"text\""), read, nullptr, &error));
+}
+
 TEST(logic_call_on_actor_by_its_name) {
   // A function of another Blueprint named here otherwise (KERN_EXTERN_AS): Call on Actor calls it by the
   // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.

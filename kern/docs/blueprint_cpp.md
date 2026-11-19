@@ -1213,6 +1213,28 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
   Interpreter, bis neu gebaut ist.
 
+### Exporte: eine Funktion unter festem C-Namen
+Ein Programm gibt seinem Host (dem Skript einer Seite) Funktionen unter festen Namen – das C++ eines
+Programms schreibt dafür `KERN_EXPORT(name)`. Ein Blueprint kann das selbst: Die Funktion trägt den Namen
+und sagt, wie ihre Werte hinüberkommen (`Function::exported`, `Function::wire`; im Level `"export"`,
+`"wire"`):
+
+```cpp
+KERN_EXPORT_AS("game_hud", "text bytes i32 f32 -> text") game_hudResult game_hud(const Text& ask, const List<Int>& data, Int view = 0, Float scale = 0.0) { ... }
+```
+
+- Ein Wort je Eingang, in ihrer Reihenfolge; nach `->` der eine Ausgang (oder keiner). `i32`, `u32`,
+  `f32`, `f64`: eine Zahl dieses C-Typs (eine Zahl oder ein Bool als Wert; C++ wandelt sie, wie C++
+  wandelt – `f32` ist, was der Host als 32-Bit-Zahl gibt). `text`: hinein ein Zeiger und eine Länge (u32),
+  heraus ein Zeiger auf die Zeichen, gehalten bis zum nächsten Text, den ein Export gibt. `bytes`: hinein
+  ein Zeiger auf u8 und eine Länge – eine `List<Int>` der Bytes.
+- Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen,
+  die die Funktion am Objekt der Instanz ruft, die als die Klasse läuft (die zuletzt gestartete:
+  `kern::logic::blueprint_object`, `kern/logic/blueprint_class.h`) – nichts wird beim Namen gesucht. Läuft
+  keine, gibt sie 0, einen leeren Text, nichts.
+- Interpreter und JIT haben keine Exporte: ein Export gibt es im Programm, das die Klassen übersetzt.
+- `logic::export_ok` sagt, was nicht passt (der Leser und das Level weisen es ab).
+
 ### Knoten der Engine
 
 Was nur die Engine kann – ein Strahl durch die Physik, ein Mesh zeichnen, einen Ton mischen –, ist

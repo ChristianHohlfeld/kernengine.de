@@ -233,7 +233,8 @@ int main(int argc, char** argv) {
   std::string out = "// Generated from " + name + " by tools/blueprint_cpp - do not edit: these are the level's Blueprints\n"
                     "// as C++ classes (kern/docs/blueprint_cpp.md). Change the Blueprint in the level; the build writes\n"
                     "// this file again.\n"
-                    "#include \"kern/logic/blueprint.h\"\n";
+                    "#include \"kern/logic/blueprint.h\"\n"
+                    "#include \"kern/logic/blueprint_class.h\"  // (the exports of Blueprints: KERN_EXPORT_AS)\n";
   std::string header;  // (with <out.h>: the classes the program calls, and the libraries they use)
   if (header_path) {
     std::string included = header_path;

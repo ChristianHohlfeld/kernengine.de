@@ -563,6 +563,16 @@ struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order: i32, u32, f32, f64 (a number of that C type; a Bool as 0/1), text
+  /// (an input: a pointer and a u32 length; the output: a pointer to its characters, kept until the next
+  /// export gives a text), bytes (an input: a pointer to u8 and a u32 length - a List<Int> of the bytes).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   const FunctionPin* input(std::string_view name) const;
   const FunctionPin* output(std::string_view name) const;
@@ -660,6 +670,8 @@ bool is_path_pin(std::string_view id);
 std::string ref_key(std::string_view input, std::string_view what);
 
 json::Value graph_to_json(const Graph& g);
+/// Is a function's export (Function::exported, Function::wire) one the glue can write? False: why not.
+bool export_ok(const Function& f, std::string* why = nullptr);
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error = nullptr);
 
 /// The value something of type `t` has when nothing else is said: the zero of a value type, the

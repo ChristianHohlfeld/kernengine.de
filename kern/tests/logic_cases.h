@@ -76,7 +76,7 @@ inline const std::vector<Case>& cases() {
         "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"],[4,"then",6,"exec"],[1,"value",5,"in"],[5,"out",7,"in"],[7,"out",6,"amount"]]})"},
       {"functions",
        R"({"variables":[{"name":"Total","type":"float","value":0},{"name":"A","type":"float","value":0},{"name":"Early","type":"int","value":0},{"name":"Acc","type":"float","value":0},{"name":"AccSum","type":"float","value":0}],
-        "functions":[{"name":"Double","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
+        "functions":[{"name":"Double","pure":true,"export":"logic_cases_double","wire":"f64 -> f64","inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"result","type":"float","value":0}]},
           {"name":"SumTo","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"sum","type":"float","value":0},{"name":"early","type":"bool","value":false}]}],
         "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.add","params":{"variable":"Total"}},{"id":3,"type":"func.pure","params":{"function":"Double"}},
           {"id":4,"type":"func.call","params":{"function":"SumTo"}},{"id":5,"type":"var.set","params":{"variable":"A"}},{"id":6,"type":"flow.branch"},

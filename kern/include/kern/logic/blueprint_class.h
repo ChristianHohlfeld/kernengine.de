@@ -16,7 +16,12 @@
 // the world the runtime gives it - its loop guard (Runtime::budget) is the runtime's, as in every tier.
 #pragma once
 
+#include <string>
+#include <string_view>
+#include <type_traits>
+#include "kern/api/c_api.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/nodes.h"
 
 namespace kern::logic {
 
@@ -40,4 +45,35 @@ template <class T> bool bind_blueprint(Runtime& logic) {
 /// The bound object of the class T (bind_blueprint first): its functions are called on it directly.
 template <class T> T& blueprint() { return *blueprint_object<T>; }
 
+
+// ---- exports: a function of a Blueprint the program gives its host under a fixed C name ----
+// (Function::exported, KERN_EXPORT_AS; the glue of the class writes the export - logic::native_glue)
+/// A number as the export takes it in (i32, u32, f32, f64) - into the language's Int, Float or Bool as C++
+/// converts it.
+template <class In, class C> In export_in(C x) { return In(x); }
+template <> inline bool export_in<bool, i32>(i32 x) { return x != 0; }
+template <> inline bool export_in<bool, u32>(u32 x) { return x != 0; }
+template <> inline bool export_in<bool, f32>(f32 x) { return x != 0; }
+template <> inline bool export_in<bool, f64>(f64 x) { return x != 0; }
+/// A text that comes in: its characters, copied (the host's memory is the host's).
+inline Text export_text_in(const char* text, u32 length) { return Text(std::string_view(text ? text : "", text ? length : 0)); }
+/// Bytes that come in: a List of Int, one entry each.
+inline List<Whole> export_bytes_in(const u8* bytes, u32 length) {
+  List<Whole> out;
+  out.reserve(length);
+  for (u32 i = 0; i < length; ++i) out.push_back(Whole(static_cast<i64>(bytes[i])));
+  return out;
+}
+/// A number as the export gives it (i32, u32, f32, f64): as C++ converts it.
+template <class C, class Out> C export_out(const Out& x) {
+  if constexpr (std::is_same_v<Out, Whole>) return static_cast<C>(x.v);
+  else return static_cast<C>(x);
+}
+/// A text the export gives: its characters, kept until an export gives the next text (the host reads them by
+/// the pointer, as far as its length says).
+inline const char* export_text_out(const Text& text) {
+  static std::string held;
+  held.assign(text.view());
+  return held.c_str();
+}
 }  // namespace kern::logic
