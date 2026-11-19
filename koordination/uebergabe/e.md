@@ -1,4 +1,4 @@
-# Übergabe Paket e (Rekursion) – 19.11., 08:45
+# Übergabe Paket e (Rekursion) – 19.11., 08:45 (Fortschreibung 11:20 unten – maßgeblich)
 
 Entscheidung E16 (Koordinator, stand/KOORDINATOR.md 07:35): Rekursion als Schritt (func.call); ein Kreis über eine Funktion, die als Wert
 gelesen wird (pure), bleibt ein Fehler. Grenze 65.536 geschachtelte Funktionsaufrufe in Interpreter und JIT, am selben Aufruf, mit festgelegtem
@@ -104,3 +104,15 @@ Reihenfolge 1–5, jeder Schritt mit Beleg.
 - Interpreter vorher 1.504 B je Ebene (nativ -O2), Absturz bei 8 MiB nach rund 5.500 Ebenen.
 - C++: explosion 248 B + combat_blast 152 B; WASM-Stapel 1 MiB (kern/build.sh:153).
 - Tiefe von explosion ≤ 1 + Panzer, die nicht wreck sind (keine feste Schranke).
+
+
+## Fortschreibung 11:20 (maßgeblich)
+- Alles liegt auf **work-e-tramp @ 34d65edd** (Schritte 1–5 + origin/work-zusammen 25445622 eingemischt, 3e879f14). work-e @ fa063fd3 = Schritt 1.
+- Belege: CI 44495706968 (3e879f14) native grün; CI 44490407612 build „Logic JIT: all cases match“ (47 Fälle samt Rekursion);
+  vergleich work-e-vergleich-094554-24308 (Schritt 1) sauber; e2e-Rot (voice int→int64) kommt aus der Basis (BEFUND FÜR k, stand/e.md).
+- Schritt 1 nachgebessert (fa063fd3): Schleifenzustand nur lokal, wenn allein der Rumpf liest.
+- Konverter: konvert 100402 rc=0, 0 „went round“; dann Kreis an „whose test does not hand its source on“ → 34d65edd; Lauf work-e-tramp-konvert-104550-13876
+  (wartet auf mag). Danach: vergleich origin/work-e-tramp src/game.cpp src/game_town.cpp src/game_military.cpp src/game_controls.cpp src/game_ui.cpp src/game_audio_web.cpp,
+  Abweichungen gegen den Basislauf work-zusammen-voll-100601-31771 prüfen; dann „BEREIT ZUM MERGEN work-e-tramp <commit>“ (Koordinator 10:12, Belege a–d).
+- Werkzeuge lokal: /tmp/e/b/build.sh <baum> <out> (Interpreter-Objekte + bcall), cases.cpp (play aller Fälle), /tmp/e/tocpp.cpp (Rundreise; `r datei` liest einen Text)
+  – nicht gesichert außer $S/e/*.

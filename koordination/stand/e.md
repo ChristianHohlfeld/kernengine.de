@@ -52,3 +52,19 @@ Entwurf und Begründung: siehe Bericht an main (Handback), gleichlautend unten n
   in der Klasse), build mit „Logic JIT: all cases match“. e2e rot in work-e und tramp gleich: game_equipment_cpp/sound_fx_cpp „cannot convert int
   to int64 (voice)“ – Basis-CI auf work-zusammen f0450061 (44492893907) läuft zum Gegenprüfen.
 - konvert work-e-tramp-konvert-100402-29913 abgelegt (Schritt 5).
+
+## BEREIT ZUM MERGEN: Schritt 1 – work-e @ fa063fd3 (a020e227, b7abff9d, fa063fd3)
+Belege: CI 44490402393 native GRÜN (Engine-Suite samt blueprint_native_test), build/determinism/input grün; vergleich work-e-vergleich-094554-24308
+sauber (s. o.); Bench geom. Mittel 2,100 → 2,086 (lamps_near unklar, s. o.). e2e rot wie auf work-e-tramp – Basis-CI 44492893907 entscheidet, ob vorher schon.
+Für p: die Stelle „wo der Wert eines Schritts steht“ (Shape::locals, Writer::body, Leser im ersten Durchgang) ist neu.
+
+## BEFUND FÜR k (e2e, aus der Basis)
+CI 44492893907 auf work-zusammen f0450061 (ohne e): e2e rot mit genau denselben drei Zeilen wie work-e/work-e-tramp –
+game_equipment_cpp und sound_fx_cpp „its Blueprint compiles in the editor: cannot convert int to int64 (voice)“, daraus „Play runs them as machine
+code (170 compiled)“. Nicht von e. (Job 135460440782.)
+- 10:40: work-e-tramp hat origin/work-zusammen 25445622 eingemischt → 3e879f14 (ohne Konflikte; lokal: 47 Fälle Interpreter unverändert, Rundreise
+  aller Fälle Fixpunkt); CI 44495706968 läuft.
+- konvert work-e-tramp-konvert-100402-29913 (ae2a3583): convert rc=0, 1.753/1.878 Funktionen, 22.892/31.103 Zeilen, **0 „went round“**; die
+  Kreis-Funktionen warteten nun an „what it calls stands in another source file, whose test does not hand its source on“ (wieder ein Kreis: die
+  Quelle des Gerufenen kommt erst, wenn er geschrieben ist) → 34d65edd (angelehnt: diese Prüfung entfällt; der Rufer wird neu umgewandelt, sobald
+  der Gerufene geschrieben ist). Neuer Lauf work-e-tramp-konvert-104550-13876. CI 44495706968 auf 3e879f14: native grün.

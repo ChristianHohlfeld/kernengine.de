@@ -1,13 +1,22 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
-## Punkt 2 (Int-Formeln ganz) gebaut: 1831e165 (auf work-zusammen e32ba575) – Beleg läuft (10:00)
+## 11:45: 1831e165 gemergt (work-zusammen 0cb3f6b6); (b) und E20 entschieden – Bauplan in uebergabe/p.md, Nachfolger nötig (Kontext erschöpft)
+
+## (gemergt) BEREIT ZUM MERGEN: 1831e165 (Punkt 2, Int-Formeln ganz) – Belege (11:35)
+- Engine-Suite `work-p-engine-095126-25407` auf 1831e165: engine rc=0, 54610 checks, 0 failures; blueprint_native_test ok (61 Blueprints, 14102 Aufrufe –
+  darin formula_int_sums), game_native_test ok.
+- vergleich `work-p-vergleich-103059-7878` (src/qr_code.cpp src/nostr.cpp src/settings.cpp src/mvt.cpp, Grundlage 070328): 11 ok von 11 in beiden Durchgängen,
+  keine Abweichung; cost-Zeilen nur solche, die schon die Grundlage hat (bind_settings, find_opt, opt_spec, Settings_*, Writer_feature, encode, event_json,
+  lift_x – gleiche Zahlen), keine neue.
+- Zeit-Test: 24 von 29 über 1,10 (f32-Spalte), 23 von 29 (64-Bit-Spalte).
+
+## Punkt 2 (Int-Formeln ganz) gebaut: 1831e165 (auf work-zusammen e32ba575)
 - Formula::int_input(k) / whole_result() / result_sum() (formula.cpp, eine Regel am Ausdruck); Schreiber/Leser je Eingang Int oder Float, -> Int nur
   wo alle Int und whole_result (bei +,−,× an der Wurzel: jeder Leser Int); Klasse: Whole(Sum). Engine-Fall formula_int_sums; Leser-Fälle in test_main;
   Doku blueprint_cpp.md „Formeln“. Lokal: Fixpunkt über alle logic_cases gleich, Leser-Fälle wie erwartet, Lambdas gegen Formula::evaluate bitgleich.
 - Zeit-Test ($S/p/p2_1.txt, Klassen neu, Level/Tests 055004, gleich/gleich64 29/29 „=“): **24 von 29 über 1,10 (f32-Spalte), 23 von 29 (64-Bit-Spalte)**
   (vorher 25/23). min/min64: qr_encode 4,96→3,36/2,60, gf_mul 3,46→2,82/2,81, rs 5,09→3,30/2,58, get_u32 3,89→2,97/2,69, read_geometry 2,51→2,03/1,18,
   ring_area 3,44→3,21/1,17, from_hex 5,09→4,79/4,75, sha256 6,64→6,14/6,49, mulm 6,08→6,20/3,49 (Rauschen).
-- Beleg: engine `work-p-engine-095126-25407` (läuft), danach EIN vergleich über src/qr_code.cpp src/nostr.cpp src/settings.cpp src/mvt.cpp.
 
 ## Punkt 3 (getypter Einstieg func_call_on) – NICHT gebaut, Befund (10:00)
 Die cost-Zeilen (GrenadeCook_pull u. a. in controls_cpp, Fun_multiplier … in combat_rules_cpp) kommen aus Struktur-Argumenten/-Ergebnissen. Ziel ist

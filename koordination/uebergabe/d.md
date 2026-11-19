@@ -273,3 +273,16 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
   release 7b1a05ed; Belege 044258-11385, 055045-6922, Engine-Suite 062159-12230 rc=0. work-d = 9949fd00 (work-zusammen eingemischt, Konflikt in place:
   Generation + owner). Beim späteren Mischen von leck in work-d: ++generation_ in place/end/clear behalten.
 - Offen: im nächsten vollen Lauf prüfen, dass interiors/game_gaps/game_town (gleiche Leck-Ursache) ohne LECK sind; Platz der Engine erst nach erstem grünen Stand.
+
+## Nachfolger 6 (19.11., ab 07:45)
+- **Uhren gegen die Engine (gemergt, work-zusammen cf71d466):** work-d-uhr 4b7074b1 – sc::Clocks in tests/rule_blueprint.h: Antworten einer Uhr (EngineFunction::clock)
+  an die Quelle je Stelle der Aufzeichnung; ein Blueprint-Aufruf an derselben Stelle mit demselben Aufruftext bekommt sie. Watch setzt g_clocks. Beleg 075109-9150.
+- **Einzel-Lauf 070328-…-alle-080335-20196 ausgewertet:** nur gegen die Engine rot waren allein Uhren (city_stream, clock_ms) – erledigt; für d nichts weiter.
+- **work-d = 0c4c551f** (work-zusammen cf71d466 eingemischt; Konflikt EngineObjects::end = leck-Fassung + ++generation_; Wartestelle „node that binds it is not written
+  yet“ aus 1007cb7e entfernt – Emit.engine() bindet den Platz). Wichtig: vor 1007cb7e las engine_table() Platz-Einträge gar nicht, Schritt 7 lief nie.
+  Beleg 082602-26333 (8 Game-Dateien): 58/58 beide Durchgänge, aber die Platz-Funktionen bleiben in Teil-Proben ungeschrieben („defined in another file“) →
+  nächster Schritt: `./mag.sh konvert origin/work-d 9` (zeigt, ob die 8 Funktionen mit shots()/sound_cues() geschrieben werden) und vergleich über ALLE src/game*.cpp.
+  Danach Engine-Suite auf work-d. NICHT einmischen ohne Wort des Koordinators.
+- **Befunde 10:05:** work-d-opt 2226dbe9 (optional = `[?item]`, höchstens ein Eintrag im Stellvertreter), work-d-jobs a12da91a (fresh_engine: jobs::reset + set_threads(false);
+  neues kern::jobs::reset). Beleg-Zweig work-d-belege3 20eeaaf0; vergleich `work-d-belege3-vergleich-101159-615` (terrain, city_stream, game.cpp), danach Engine-Suite.
+  Danach beide in work-d mischen (Generator neu laufen lassen: engine_api.gen.cpp, engine_case.gen.h).

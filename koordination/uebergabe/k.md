@@ -168,3 +168,9 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
   Der Konverter gibt bei const-Referenz eine Kopie (place_arg raising) – bei Car (Destruktor mit Rumpf) falsch; vermutlich Ursache der ~Car-Wartenden
   draw_vehicles/draw_remote_vehicles/swarm_draw_vehicles (unbelegt). „a member of Int is set“ (vr_comfort, look_draw, begin_roads): Engine-Struktur
   (TextureDesc mit `const u8* rgba`/MeshLook?) wird als Int geführt – nicht untersucht, eher Paket d.
+- 10:20: 3878258a gemergt (work-zusammen f0450061; work-k hat es eingemischt). Belege 081204 (58/58), 091538 (54/54), 095224 (60/60) – kein Rückschritt;
+  mp_hud_json in keiner Probe geschrieben (Kette mp_local_ready → mp_art → mp_rules → player_position …) → voller Lauf 100601.
+- Session_update (080335): BEFUND FÜR t1 – arg(E) im Testrahmen gibt die C++-Zahl eines Enums statt seines Index (ClientState −3…3).
+- E18 (Koordinator 09:55: Weg A) – ENTSCHEIDUNG NÖTIG zur Form in der Klasse (V1 Prüfung im Text um den Aufruf / V2 in jeder Listenoperation), siehe stand/k.md.
+  Erkenntnisse: Interpreter Instance::call(places) logic.cpp ~2590 (Spot = Schlüssel + Pfad, je Zugriff neu aufgelöst); JIT ruft func.call über die
+  C++-Funktion des Knotens (keine eigene Arbeit); Klasse = Text der Notation (call_args notation.cpp ~1425), Listenoperationen über logic::list::* (nodes.h).

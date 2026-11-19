@@ -24,6 +24,21 @@
   von d: Terrain_run_job (k, Bytes von jobs.submit), number_at (8 bzw. 17/300, t1), converted_game_details_cpp, die ZEIT der Game-Tests (t1). Nur gegen den Stellvertreter:
   Session_update (k), ZEIT converted_Game__mp_rules_cpp. **Für d bleibt aus dieser Liste nichts.**
 
+- **Aufgabe 3, Beleg 10:05:** `work-d-vergleich-082602-26333` (work-d 0c4c551f; game.cpp + game_events, game_lamps, game_look, game_foot_rounds, game_military,
+  game_town, game_ui): convert/bau rc=0, **58/58 ok in beiden Durchgängen, 0 LECK** – kein Rückschritt. Die 9 Platz-Funktionen werden in der Teil-Probe aber nicht
+  geschrieben („X() is defined in another file“) – Schritt 7 belegt erst ein Lauf über alle Game-Teile (konvert 9 / vergleich über alle game*.cpp). Offen.
+- **Befund t2 (optional, 10:05) – Fix gebaut:** **work-d-opt = 2226dbe9** (auf work-zusammen 18526372): Api.shape schreibt aus dem C++-Typ `[?item]` für std::optional /
+  std::unique_ptr eines Werts (Feld, Ergebnis, Parameter, Eintrag einer std::vector); answer gibt dort 0 oder 1 Eintrag. Generator: 29 Einträge (Level-Akteure,
+  Client::receive). Engine-Test engine_stand_in_one_or_none, Doku.
+- **Befund k (j.id, 10:05) – Fix gebaut:** **work-d-jobs = a12da91a**: Ursache – die Seiten teilen den Zustand der Aufträge der Engine (Nummern zählten weiter: Quelle 1,
+  Klasse 2, Interpreter 3). fresh_engine setzt jetzt auch jobs zurück (set_threads(false) + neues kern::jobs::reset()); Knoten der Engine, Generator neu,
+  Engine-Test jobs_reset_begins_again. CityStream_step_time/update_collision = Uhren → von work-d-uhr gedeckt (Lauf 075109: ohne Abweichung).
+- Beleg-Zweig **work-d-belege3 = 20eeaaf0** (18526372 + opt + jobs, Generator reproduziert). Läuft: vergleich (terrain, city_stream, game.cpp); danach Engine-Suite.
+
+- **Beleg 11:05:** `work-d-belege3-vergleich-101159-615` (20eeaaf0; terrain, city_stream, game.cpp): convert/bau rc=0, **48/48 ok in beiden Durchgängen, keine
+  Abweichung, 0 LECK** – Terrain_run_job (geschrieben, 300 Aufrufe) gegen die Engine gleich (vorher 35/237 j.id). Game::audio_init dort nicht geschrieben (Teil fehlt) →
+  `work-d-belege3-vergleich-110539-22562` mit den Quellen von t2s Beleg (game, game_equipment, sound_fx, game_details, equipment, combat_audio). Danach Engine-Suite.
+
 ## BEREIT ZUM MERGEN (d, 08:30): work-d-uhr 4b7074b1 – Beleg work-d-uhr-vergleich-075109-9150
 - Ein Commit auf work-zusammen 821208ac, nur Testrahmen (rule_blueprint.h sc::Clocks + test_engine; converted.h Watch eine Zeile). Keine Engine-Änderung → keine Engine-Suite nötig.
 - In work-d eingemischt (e757c565; Konflikte mit dem Platz der Engine: @get/@set-Zeile + g_places.clear() behalten).

@@ -15,9 +15,46 @@ Paket e (E16) besitzt „wo der Wert eines Schritts steht“ (nNN als Mitglied) 
   whole_result bei einer Operator-Wurzel einen Eingang darin (sonst würde double→i64→Whole still abschneiden).
   Lokaler Prüfer (ohne Suite): /home/claude/p-tmp/chk (chk.cpp: Fixpunkt aller logic_cases + Leser-Fälle aus test_main; sem.cpp: Lambdas gegen
   Formula::evaluate über alle Paare). Bau: Objekte in chk/o, unter heavy3, ~1 min.
-- Belege offen: engine `work-p-engine-095126-25407`; danach vergleich über src/qr_code.cpp src/nostr.cpp src/settings.cpp src/mvt.cpp.
+- Belegt (stand/p.md „BEREIT ZUM MERGEN: 1831e165“): engine `work-p-engine-095126-25407` rc=0, vergleich `work-p-vergleich-103059-7878` 11/11 beide Durchgänge.
+- Nächstes (wenn entschieden): Punkt 3 nach dem gewählten Weg; Rest über 1,10 laut Tabelle (Wächter, Bereich, Bytes = Entwurf 4 bei Chris).
 - **Punkt 3 nicht gebaut:** der geplante getypte Einstieg greift bei den cost-Aufrufen nie (Ziel = Level-Actor mit eigenen Struct-/Enum-Typen,
   andere Feldnamen) – Befund und zwei Wege in stand/p.md „Punkt 3“, Entscheidung beim Koordinator.
+
+## Stand 11:45 (Nachfolger 3 endet – Kontext erschöpft) – Entscheidungen des Koordinators 11:30
+work-p = 0cb3f6b6 (= work-zusammen, vorgespult, gepusht). Entschieden: **Punkt 3 → Weg (b)**; **E20 = Entwurf 4 Weg 1 JA** (u8/u16/u32/i8/i16/i32 als
+Typen, Speichern wickelt wie C++, Interpreter/JIT exakt in double, × als ganzzahliger Knoten; List<u8> statt Bytes-Typ; danach Schleife mit lokalem Wächter
+für Rümpfe ohne Aufruf). Reihenfolge: (b) bauen+belegen, dann E20 in kleinen einzeln belegten Schritten (Sprache/Leser/Schreiber/Interpreter/JIT/Klasse/
+Editor-Typen/Doku/Engine-Fälle; Konverter als eigener Schritt mit konvert-Beleg). Paket e mischt bald die neue Klassenform ein – work-zusammen einmischen,
+sobald der Koordinator es meldet.
+
+### Bauplan (b) – Struktur beim Aufruf ohne Heap (noch nicht begonnen)
+Wo die Anforderungen entstehen (GrenadeCook_pull: 5 statt 0): (1) Aufrufer blueprint.h func_call_on: `logic::to_value(struct)` → Value::structure =
+make_shared + vector (2); (2) Glue des Ziels (notation.cpp native_glue, `results = {to_value(out.x)…}`) für ein Struktur-Ergebnis (2); (3) Runtime::call_on
+(logic.cpp ~3047) `from_outside(results[k], declared, g)` → from_outside_typed + fitted (logic.cpp 678/680) baut die Struktur neu (≥1). Das Ziel liest Argumente
+über native_arg<T> → detail::Held<T>::from (Feld für Feld, kein Heap für Zahlen/Bool/Enum).
+Value: `std::shared_ptr<const std::vector<Value>> rows` mit Kopie-beim-Schreiben über use_count (own_rows, logic.h ~300); Kopierkonstruktor = default.
+Falle: ein „geliehener“ rows-Zeiger (Aliasing-shared_ptr ohne Kontrollblock) hat use_count 0 und überlebt Kopien – das Interpreter/JIT-Ziel kopiert die
+Argumente (Instance::call_into: `std::vector<Value>(args…)`) in seine Knoten → hängender Zeiger nach dem Aufruf. Darum NICHT so.
+Vorschlag, wie es sauber geht (bitte prüfen, dann bauen):
+- Weg über die Glue statt über Value-Felder: NativeBlueprint bekommt `call_fields(function, args, results)` nicht nötig – einfacher: der Aufrufer reicht
+  Struktur-Argumente als Value, deren Felder in einem `std::array<Value,N>` der Aufrufstelle liegen, NUR an ein Klassen-Ziel (Instance::blueprint_ gesetzt;
+  dort liest Held::from sofort in den eigenen Typ, nichts bleibt liegen). Für Interpreter/JIT-Ziele bleibt der heutige Weg (vorher in eine eigene Value kopieren).
+  Dafür braucht Value eine nicht besitzende Sicht auf Felder (z. B. `const Value* view_; u32 view_n_` neben rows; field()/fields() lesen beide; jede Kopie
+  einer Sicht macht daraus rows – also Kopierkonstruktor/Zuweisung nicht mehr default, Kosten messen!).
+- Ergebnis: Runtime::call_on gibt dem Klassen-Ziel vorgeformte Plätze (Sicht auf ein std::array der Aufrufstelle, Feldzahl nach dem erklärten Ausgang);
+  die Glue schreibt `to_value(out.x)` Feld für Feld hinein, wo der Platz eine Sicht gleicher Feldzahl ist, sonst wie heute.
+- from_outside für Strukturen: prüfen, ob es bei passender Gestalt (gleiche Feldzahl, Felder schon vom erklärten Typ) den Wert unverändert lassen kann
+  (gleiche Bedeutung) – sonst bleibt dort eine Anforderung.
+Beleg: Engine-Suite (Fall: Aufruf an einen Actor mit Struktur hin und zurück, Klasse→Klasse und Klasse→Interpreter, Feldtypen abweichend → Vorgabe),
+vergleich src/controls.cpp src/combat_rules.cpp – cost-Zeilen GrenadeCook_*, WorldLook_*, Chaos_*, Fun_multiplier, MilitaryClock_update, Race_update,
+ZombieRounds_*, choose_enemy, flak_cell weg (Liste: mag/ergebnis-work-zusammen-voll-070328-32111-alle-080335-20196/alle-cost.txt).
+
+### E20 – erste Schritte (Vorschlag)
+1. PinType u8…i32 (logic.h), Wandlungsregeln (convertible, Speichern = Wickeln wie static_cast), JSON/Notation-Namen (`U32` …), check(); Engine-Fall Ränder.
+2. Interpreter/JIT: Speichern wickelt (double exakt, da ≤ 2^32), × zweier fester Breiten als ganzzahliger Knoten (mul32 heute).
+3. Klasse: Typen als u8…i32 (nodes.h/blueprint.h), Leser/Schreiber, Fixpunkt; Editor-Farben (studio/logic_edit.cpp), Doku.
+4. List<u8> (Bytes-Knoten auf List<u8>), dann Konverter (tools/cpp_to_blueprint.py: u32-Quelle → u32-Blueprint, wrap32/band entfallen) mit konvert-Beleg.
+5. Schleifenform mit lokalem Wächter (Entwurf 4 (b)).
 
 ## Werkzeuge
 - $S/p/rb.sh <runden> [fall…]: Bench mit den Headern des Worktrees neu bauen, ohne neue Klassen (CL=classes-Ordner, Vorgabe $S/p/b4;

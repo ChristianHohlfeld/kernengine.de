@@ -2,6 +2,14 @@
 
 ## Nachfolger 3 (ab 07:30, work-k auf work-zusammen 821208ac)
 
+## E18 (V1) gebaut – 26e4c7c7 (Sprache), b622d9a8 (Konverter) – unbelegt
+- Angefasst (für Paket e): logic.cpp NUR Instance::call (Längen vor/nach), neu Instance::lengths_on, Runtime::held_lost (neben Runtime::pass); logic.h
+  Deklarationen; notation.cpp places_ok (Shape::held_calls statt Abbruch), Writer func.call + held_lists, Reader statement (Held/held_after = nichts);
+  blueprint.h logic::Held + BlueprintCore::held_after; tests: test_main (Rundreise), logic_cases „held_entry“; docs/blueprint_cpp.md.
+- Konverter: place_arg ohne raising-Zweig (kein Wait, keine Kopie); movable_entry/may_raise entfernt.
+- **Sprache belegt (CI 44496602788 auf 26e4c7c7):** native 200 ok / 0 FAIL (test_main mit den neuen Fällen, blueprint_native_test: 61 Klassen), build „Logic JIT: all cases match“ (held_entry im JIT), determinism, input ok. (mag-Engine-Lauf 102727 abgebrochen – doppelt.)
+- Konverter b622d9a8: Beleg work-k-vergleich-105013-14336 (game_traffic, game_net, game_townsync, game_traffic_far, vehicle_art, game.cpp) läuft.
+
 ## ENTSCHEIDUNG NÖTIG (10:05) – E18 (A): wie erfährt die KLASSE von einem gehaltenen Eintrag?
 - Interpreter: Instance::call mit `places` (logic.cpp ~2590) kann vor dem Aufruf je Liste beliebiger Länge auf dem Weg des Platzes Länge (und Identität des
   Speichers) merken und danach vergleichen → Fehler. JIT: ruft für func.call die C++-Funktion des Knotens (codegen.cpp: nur Fluss/Zahlen inline) → bekommt
@@ -25,7 +33,8 @@
   und verglichen (vorher 13/300 bzw. im Einzel-Lauf 074913 8/184); Engine 57/58 – nur Terrain_run_job über j.id der echten Engine (BEFUND FÜR d).
 - 091538 (+ mp_art, combat_art): alle rc=0, 54/54 in beiden Durchgängen, kein Rückschritt durch ed63dca3.
 - mp_hud_json selbst war in beiden Proben nicht geschrieben (fehlende Teile der Kette: mp_local_ready → mp_art, dann safe_mobile_marker_point → mp_rules);
-  Beleg mit ganzer Kette: work-k-vergleich-095224-26050 (läuft). Sonst zeigt es der volle Lauf.
+  095224-26050 (+mp_rules, combat_rules): 60/60 in beiden Durchgängen ok, aber mp_hud_json wieder nicht geschrieben (player_position wartet), draw_events
+  ebenso (CityStream::ground_height) – die Kette ist zu lang für eine Probe: **mp_hud_json unbelegt, zeigt der volle Lauf work-zusammen-voll-100601-31771.**
 
 | Abweichung | Ursache | Commit | Beleg | Stand |
 |---|---|---|---|---|
@@ -58,6 +67,13 @@
 ### BEFUND FÜR d (09:20) – Terrain_run_job gegen die Engine (work-k-vergleich-081204-23050: 35 von 237)
 - Gegen den Stellvertreter ok. Gegen die Engine weicht nur `j.id` ab (Quelle 4, Interpreter 6, Klasse 5; bzw. 7/9/8): jeder Durchgang reicht bei der ECHTEN
   Engine einen Job ein (kern::jobs::submit), ihr Zähler läuft weiter – wie die echte Uhr (clock_ms). Kein Konverterfehler.
+
+### BEFUND FÜR t1 (10:15) – Session_update 1/56, 2/64 (Einzel-Lauf 080335, Stellvertreter)
+- „call 3: the source asks engine.client.advance_time, the Blueprint engine.client.connect“ – net_session.cpp:967 `client_->state() < ClientState::disconnected`.
+- Ursache im Testrahmen: converted.h:667 `arg(E e) { return Value::enumeration(static_cast<i64>(e)); }` gibt die C++-ZAHL des Enums; ein Enum der Sprache ist
+  sein INDEX (der Blueprint: `list_get<Int>(net_ClientState_numbers, enum_index(...))`, Zahlen {-3,…,3}). disconnected (0) wird so Index 0 = denied (−3) → der
+  Blueprint verbindet. Betrifft jedes Enum, dessen Zahlen nicht 0…n−1 sind, wo der Stellvertreter einen Wert der Engine gibt (und Listen: Value::enumerations).
+  Allgemein: Zahl → Index über die Zahlen des Enums (der TestWriter kennt sie: Unit.enum_numbers). Kein Konverterfehler.
 
 ### BEFUND FÜR t1 (07:35) – draw_events
 - `gate(i)` = `g_gates[((i % kGates) + kGates) % kGates]` (combat_rules.cpp:478); Vorbedingung des Programms: kGates == g_gates.size() (bind_race setzt beides).
