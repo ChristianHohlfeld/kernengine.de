@@ -1,4 +1,14 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 07:35 **Entscheidung E16 (Rekursion, Paket e):** die Sprache lässt zu, dass eine Funktion sich selbst ruft, direkt oder über andere – als Schritt (func.call);
+  ein Kreis über einen pure gelesenen Wert bleibt ein Fehler. Grenze 65.536 geschachtelte Funktionsaufrufe in Interpreter und JIT (festgelegter Fehler, der
+  Blueprint stoppt; Events/call_on bleiben bei 64) – über allem, was das C++ des Spiels erreicht (nativ ~40.000 Aufrufe, WASM ~2.600 Ebenen). Interpreter und JIT
+  werden über ein Sprungbrett vom Maschinenstapel unabhängig (heute 1.504 B je Aufruf: in WASM nur ~350 Ebenen). Die Klasse: gewöhnlicher Methodenaufruf, ohne
+  Zähler. Endlose Rekursion = „C++ leaves open“ (im Test aufgegeben und neu gezogen). **Neue Form der Klasse, allgemein:** der Wert eines Schritts, der nur auf
+  dem Weg seiner Funktion gelesen wird, ist lokal in der Methode, sonst Mitglied – das ändert die Texte aller Blueprints; e baut das ZUERST und einzeln
+  (Beleg Engine-Suite + vergleich + Zeit-Test), p baut darauf auf. Befund e: echte Kreise im Spiel sind nur {explosion, combat_blast} und
+  {command, ui_command, ctl_*, ui_reset, vr_* – 21 Funktionen}; heute hat in keiner Stufe ein Aufruf eigene Werte (Fib(10): Interpreter −80, Klasse 5, C++ 55 bei
+  abgeschalteter Leser-Regel) – die Regel nur zu streichen reicht nicht.
+  · k Nachfolger 3 gestartet 07:25 (mp_hud_json, draw_events, Session_update, life_hud; dann die Regel-Gründe aus wartet_055004.txt).
 - 07:20 **work-zusammen = 821208ac** (+ d work-d-belege2: leck, weld, app, key, release – Engine-Suite 062159 rc=0; + Tabellen-Fix 1007cb7e now_ms).
   Voller Lauf **`work-zusammen-voll-070328-32111`** rechnet darauf (Konvertierung bis ~07:45). Engine-Suiten grün: fe83683e (im Lauf 055004), f03f0f53 (060116).
   · **Die Spiel-Suite läuft ihre Tests nacheinander (ein Kern): 41 von 150 Tests in ~40 Minuten** – Suite von 055004 abgebrochen (40 ok, 1 FAIL
