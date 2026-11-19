@@ -75,3 +75,4 @@ code (170 compiled)“. Nicht von e. (Job 135460440782.)
   weitergereicht wird, wenn deren Test vergleicht – wieder ein Kreis, 72 „went round“). Behoben im Ablauf (convert_unit: Exporte jedes Versuchs)
   → neuer konvert.
 - 15:05: work-e-tramp-konvert-125819-29832 (1d706cc9) wartet seit 12:58 auf mag – vor ihm läuft work-d-konvert-125538-27289 seit 13:10 (konvert-Aufträge laufen offenbar einzeln).
+- 15:55: work-e-tramp 20997a34 (work-zusammen 4ac2e4f9 eingemischt; engine_api.py neu: keine Änderung). konvert 125819 abgebrochen (Weg 2). vergleich über die Kreis-Dateien abgelegt, CI gestartet.

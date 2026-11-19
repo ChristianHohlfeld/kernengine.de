@@ -303,3 +303,6 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
   und was die Kette sonst braucht – besser alle src/game*.cpp) und Engine-Suite auf work-d → „BEREIT ZUM MERGEN“ erst auf Wort des Koordinators einmischen.
   (3) ks Liste (Koordinator 13:45): GeoProjector::init (fail variadisch → Engine-Knoten fail(Text)), look_* (`kern::Mesh*`), handle_shots/run_buildings (Platz),
   „a member of Int is set“ (TextureDesc als Engine-Objekt mit Handle; stand/k.md „BEFUND FÜR d (08:55)“).
+- **15:45 (Nachfolger 7):** work-d e2f1dc6f (work-zusammen 4ac2e4f9 eingemischt + Fix Feld eines Platzes als Wert). Laufen: `work-d-vergleich-154229-25045`
+  (game*.cpp + people.cpp), `work-d-konvert-125538-27289` (275d3ddf). Danach: Engine-Suite `./mag.sh engine origin/work-d` → BEREIT ZUM MERGEN. Gebaut, unbelegt:
+  work-d-fail 5500074b (printf-Knoten; Beleg: vergleich src/city_stream.cpp + Engine-Suite). Entwurf Felder von Engine-Objekten: stand/d.md „Nachfolger 7“.

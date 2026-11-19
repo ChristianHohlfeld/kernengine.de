@@ -1,5 +1,20 @@
 # Stand d (18.11., Nachfolger)
 
+## Nachfolger 7 (ab 15:00, 19.11.; nach Server-Neustart 15:40 weiter)
+- work-d = **e2f1dc6f** = 275d3ddf + work-zusammen 0f7f5a46 (0651fb31; Konflikt Emit.engine: asks_engine behalten, Wartestelle bleibt weg) + work-zusammen 4ac2e4f9
+  (7e836a51; blueprint.h Sought<T>/Listen jeder Breite (p) + Platz-Fassungen/read_of (d); is_local/writable bound + sees_state) + Fix e2f1dc6f.
+- `work-d-vergleich-150328-5241` (0651fb31, alle game*.cpp): convert rc=0, die Platz-Funktionen jetzt GESCHRIEBEN (look_lighting/shots, sound_cues …), aber
+  **bau rc=123**: 3 Fehler in level_blueprints.cpp – ein Feld eines Platzes (n.result[i].volume) als Argument von kern::formula (Field nicht kopierbar) und in
+  kern::to<Float>(n.result[i].actor). Fix e2f1dc6f (Field kopierbar, kern::to liest einen Platz zuerst: PlaceOps::kern_place_value). handle_shots wartet dort nur auf
+  frighten() (people.cpp). Neu: `work-d-vergleich-154229-25045` (e2f1dc6f, game*.cpp + people.cpp). `work-d-konvert-125538-27289` (275d3ddf) rechnet noch.
+- **Warteliste, gebaut: work-d-fail = 5500074b** (auf work-zusammen 0f7f5a46, unbelegt): Funktion mit printf-Format (`__attribute__((format(printf…)))`, Format = letzter
+  benannter const char*) ist ein Knoten mit Eingang `text` (Schritt); Tür/Klasse: `fail("%s", text)`; Konverter: `text_format<fmt>(-1, werte)`; Stellvertreter der Quelle:
+  vsnprintf (converted::formatted). Neue Knoten engine.fail, engine.log. Gegen GeoProjector::init (CityStream::start, rebase_origin, run_tile, ui_move_world).
+- **Entwurf (nicht gebaut): Felder eines Engine-Objekts** (look_view_models/look_command `m->visible`, `m->material.viewmodel`; „a member of Int is set“ TextureDesc
+  td.width = …): ein öffentliches Feld eines Objekts mit Handle ist ein Platz der Engine wie `T& f() { return f_; }` (Knoten engine.<klasse>.<feld>, @get/@set).
+  Offen ist die Quellseite im Test: `m->visible` lässt sich in C++ nicht abfangen → Stellvertreter-Felder als echte Glieder, abgeglichen wie converted::engine_place
+  (vor jedem Engine-Aufruf setzen, danach lesen); das Binden eines Felds ist kein Aufruf.
+
 ## Nachfolger 6 (ab 07:45, 19.11.)
 - **Aufgabe 1 Uhren gegen die Engine – Fix gebaut:** Zweig **work-d-uhr = 4b7074b1** (ein Commit auf work-zusammen 821208ac; nur tests/rule_blueprint.h + converted.h).
   sc::Clocks: die Antworten einer Uhr (EngineFunction::clock, aus KERN_CLOCK) an die Quelle je Stelle ihrer Aufzeichnung; ein Blueprint-Aufruf an derselben

@@ -48,3 +48,12 @@ Entscheidungen beim Bau (nach den Zielen, ohne Freigabe – Chris).
   Kleinstfall /tmp/c_gl/k.
 - FAIL converted_terrain_cpp (real) in 132846: aus der Basis (Terrain_run_job, j.id – d a12da91a fehlte in a137ba34, jetzt drin).
 - Läuft: work-c-vergleich-150305-5063 (8e576119; city_stream, terrain).
+
+## Stand 15:46 – work-c = 92e43c44 (gepusht), nach Server-Neustart weiter
+- 6a7c58bd: Regel Callback – Schleife erlaubt (memory && !loop, wie Bibliotheksregel; Test logic_callbacks „Loops“); Konverter: data() eines
+  Engine-Objekts = sein Knoten (begin_roads: road_stream.data – Kosten: eine Kopie des Stroms je begin_roads, bis „Platz der Engine“ (d));
+  HeightSampler{} = ungebunden; Fix f877b9e5 (drop außerhalb local_one → NameError). Kleinstfälle /tmp/c_gl/k, /tmp/c_gl/r.
+- 92e43c44 Merge work-zusammen 4ac2e4f9.
+- 150305 (8e576119): sampler geschrieben; Check-Fehler „needs the world (For Loop)“ → behoben in 6a7c58bd; begin_roads wartete an data().
+  fail/go_offline/finish_features/update warten in der Probe an Funktionen anderer Dateien (training_level, road_is_water, request_around→unproject).
+- Laufen: work-c-vergleich-154541-25809 (city_stream, terrain, tiles), CI 44547268243 (Engine-Suite).
