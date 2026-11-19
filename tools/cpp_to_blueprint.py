@@ -6202,6 +6202,9 @@ class Emit:
                 # value first, then the old one ends (unique_ptr::operator=: the pointer stored, then the old deleted)
                 self.moved_into(ops[1], qtype(callee(n)))
                 got = self.spot(ops[0])
+                if got is None and self.is_slot(ops[0]):
+                    # (m[key] = std::move(v): the key's entry - made where the key is new, as operator[] does -, then replaced)
+                    got = self.spot(self.held_by(ops[0]))
                 if got is None or not self.writable(got[0]):
                     raise Wait("an owned value that holds objects of the engine, replaced where it is no place")
                 lt = got[1]
