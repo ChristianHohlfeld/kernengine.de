@@ -990,6 +990,10 @@ class Tree:
                 r = self.decl.get(o["parentDeclContextId"])
                 if r is not None and r.get("_q"):
                     self.owner[o["id"]] = r["_q"]
+                    # (a method defined outside its class - `void Field::rebuild(const std::vector<Spot>&)` -
+                    # stands in its class as its declaration there: C++ looks its names up in the class -
+                    # `Spot` is Field::Spot, not another Spot of the namespace)
+                    self.scope_of[o["id"]] = r["_q"] + "::"
 
 
 def enum_underlying(values):
