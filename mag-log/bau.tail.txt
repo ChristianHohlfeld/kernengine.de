@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:23196:16: warning: unused variable 'a' [-Wunused-variable]
+ 23196 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:27631:9: warning: unused variable 'key_10' [-Wunused-variable]
+ 27631 |     Int key_10 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:27633:9: warning: unused variable 'key_12' [-Wunused-variable]
+ 27633 |     Int key_12 = 0;
+       |         ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:27644:9: warning: unused variable 'key_15' [-Wunused-variable]
+ 27644 |     Int key_15 = 0;
+       |         ^~~~~~
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:38255:10: warning: unused variable 'playing' [-Wunused-variable]
+ 38255 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:38634:10: warning: unused variable 'playing' [-Wunused-variable]
+ 38634 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:45787:9: warning: unused variable 'count' [-Wunused-variable]
+ 45787 |     Int count = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:45788:9: warning: unused variable 'at_5' [-Wunused-variable]
+ 45788 |     Int at_5 = 0;
+       |         ^~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:45789:9: warning: unused variable 'end_4' [-Wunused-variable]
+ 45789 |     Int end_4 = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:49407:10: warning: unused variable 'a' [-Wunused-variable]
+ 49407 |     Vec4 a = Vec4{0.0, 0.0, 0.0, 0.0};
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:49609:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 49609 |     Bool remove = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:49610:10: warning: variable 'remove_2' set but not used [-Wunused-but-set-variable]
+ 49610 |     Bool remove_2 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:49611:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 49611 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:49942:10: warning: unused variable 'a' [-Wunused-variable]
+ 49942 |     Vec4 a = Vec4{0.0, 0.0, 0.0, 0.0};
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:50593:11: warning: unused variable 'key' [-Wunused-variable]
+ 50593 |     Int64 key = Int64{0x0};
+       |           ^~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:51486:11: warning: unused variable 'key' [-Wunused-variable]
+ 51486 |     Int64 key = Int64{0x0};
+       |           ^~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:51488:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 51488 |     Bool remove = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:51646:11: warning: unused variable 'key' [-Wunused-variable]
+ 51646 |     Int64 key = Int64{0x0};
+       |           ^~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:51648:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 51648 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+/dev/shm/spawncity-jobs-chris/work-c-vergleich-154541-25809/kern/games/spawncity/src/level_blueprints.cpp:65238:22: warning: unused variable 'body_type' [-Wunused-variable]
+ 65238 |     physics_BodyType body_type = physics_BodyType::fixed;
+       |                      ^~~~~~~~~
+4 warnings generated.
+22 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	6m31,079s
+user	34m38,254s
+sys	0m51,914s
