@@ -8453,7 +8453,12 @@ class Emit:
             if op == ",":
                 raise Wait("the comma operator")
             if op == "=":
-                raise Wait("an assignment inside an expression")
+                # (x = v) as a value - if ((hit = f()) >= 0): the assignment is a step before the statement, the value
+                # is x as it is after it (C++: the assigned object)
+                if self.unwrap(kids(b)[0]).get("kind") not in ("DeclRefExpr", "MemberExpr"):
+                    raise Wait("an assignment inside an expression")
+                self.hoist(self.effect(b))
+                return self.value(kids(b)[0])
             raise Wait(f"the operator {op}")
         if k == "CompoundAssignOperator":
             raise Wait("an assignment inside an expression")
