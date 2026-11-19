@@ -11,6 +11,7 @@
 #include "gl_stub.h"
 #include "kern/kern.h"
 #include "kern/physics/physics.h"
+#include "kern/core/jobs.h"
 #include "kern/core/json.h"
 #include "kern/game/demos.h"
 #include "kern/audio/synth.h"
@@ -4620,6 +4621,81 @@ TEST(game_blueprints_as_classes) {
   }
 }
 
+TEST(logic_fixed_widths) {
+  // An Int place of a fixed width (U8 ... I32): what flows is an Int, the place holds its low
+  // bits as C++ stores them - in every tier, at every place (a variable, a field, an input, an
+  // output, a local variable), by Set, Add to Variable, a call and from outside.
+  const std::string text =
+      "struct B : kern::Blueprint {\n"
+      "  KERN_STRUCT(P) {\n    U16 a = 65535;\n  };\n"
+      "  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n  I32 Big = 0;\n  Int Plain = 0;\n  P Pt = P{65535};\n"
+      "  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x) {\n    I16 Here = 0;\n    Here = x;\n    return {Here};\n  }\n"
+      "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n"
+      "    Small = 300;\n    Signed = kern::to<Int>(value);\n    Big = Hash;\n    Pt.a = kern::to<Int>(value);\n    Small += 220;\n    Hash += -4000000001;\n  }\n};\n";
+  logic::Graph g, back;
+  std::string error, written, twice;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(g.variable("Small") && g.variable("Small")->type == logic::PinType::integer && g.variable("Small")->of == "u8" && g.structure("P") && g.structure("P")->fields[0].type.of == "u16");
+  for (const logic::Issue& i : logic::check(g))
+    if (i.error) { std::printf("check: %s\n", i.text.c_str()); CHECK(false); }
+  CHECK(logic::to_cpp(g, "B", written, &error, logic::library(), false));
+  CHECK(written.find("  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n") != std::string::npos && written.find("  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x = 0) {\n    I16 Here = 0;\n") != std::string::npos);
+  CHECK(logic::from_cpp(written, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == written);
+  if (twice != written) std::printf("%s\n---\n%s\n", written.c_str(), twice.c_str());
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+  CHECK(logic::type_label({logic::PinType::integer, "u32"}) == "U32" && logic::type_text({logic::PinType::integer, "i16"}) == "i16");
+  logic::TypeRef named;
+  CHECK(logic::type_from_text("u8", g, named) && named.type == logic::PinType::integer && named.of == "u8" && !logic::type_from_text("map<u8>float", g, named));
+  // the ends of every width, and Ints beyond them: static_cast<u32>(x), two's complement for a signed width
+  CHECK(logic::wrapped(256, "u8") == 0 && logic::wrapped(-1, "u8") == 255 && logic::wrapped(128, "i8") == -128 && logic::wrapped(-129, "i8") == 127);
+  CHECK(logic::wrapped(65536 + 7, "u16") == 7 && logic::wrapped(32768, "i16") == -32768 && logic::wrapped(i64{1} << 32, "u32") == 0 && logic::wrapped(-1, "u32") == 4294967295);
+  CHECK(logic::wrapped(i64{2147483648}, "i32") == -2147483648LL && logic::wrapped(9223372036854775807LL, "u32") == 4294967295 && logic::wrapped(-9223372036854775807LL, "i32") == 1);
+  CHECK(logic::wrapped((i64{1} << 53) + 2, "u32") == 2 && logic::wrapped(-(i64{1} << 53), "i16") == 0 && logic::wrapped(5, "") == 5);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    rt.begin();
+    rt.call("Go", 0, {{"value", logic::Value::number(200.7)}});
+    CHECK(host.errors.empty());
+    CHECK(inst->get("Small").i == 8 && inst->get("Signed").i == -56 && inst->get("Big").i == -294967296 && inst->get("Pt").field(0)->i == 200);  // (300 -> 44, + 220 -> 8)
+    CHECK(inst->get("Hash").i == 4294967295);  // (4000000000 - 4000000001)
+    CHECK(inst->set("Small", logic::Value::integer(-1)) && inst->get("Small").i == 255 && inst->set("Signed", logic::Value::number(1e30)) && inst->get("Signed").i == -1);
+    std::vector<logic::Value> results;
+    CHECK(inst->call("Twice", {logic::Value::integer(65537 + 255)}, results) && results.size() == 1 && results[0].i == 0);  // (65792 as I16 is 256, as U8 0)
+    CHECK(inst->call("Twice", {logic::Value::integer(40000)}, results) && results.size() == 1 && results[0].i == 64);  // (40000 as I16 is -25536, as U8 64)
+  }
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph h;
+    std::string e;
+    const bool is_read = logic::from_cpp("struct B : kern::Blueprint {\n" + body + "};\n", h, nullptr, &e);
+    for (const logic::Issue& i : is_read ? logic::check(h) : std::vector<logic::Issue>())
+      if (i.error) e += " | " + i.text;
+    const bool right = e.find(why) != std::string::npos;
+    if (!right) std::printf("expected \"%s\", got: %s\n", why, e.empty() ? "(nothing is wrong with it)" : e.c_str());
+    return right;
+  };
+  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = kern::to<I8>(value);\n  }\n", "kern::to<Int>, not kern::to<I8>"));
+  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = value;\n  }\n", "this is Float, the input is Int: write kern::to<Int>(...)"));
+  CHECK(says("  U8 Bad = 256;\n", "256 is no U8 (it would hold 0)"));
+  CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
+  CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
+  CHECK(says("  Map<Int, U32> Bad = Map<Int, U32>{};\n", "Int of a fixed width"));
+  CHECK(says("  List<U8> Bytes = List<U8>{};\n", "a list of Ints of a fixed width is no type of the language yet"));
+  {
+    // ... and a graph that says it wrong
+    logic::Graph h;
+    h.variables.push_back({"W", logic::PinType::integer, json::Value(70000.0), {}, "u16"});
+    h.variables.push_back({"X", logic::PinType::integer, json::Value(-1.0), {}, "u32"});
+    std::string all;
+    for (const logic::Issue& i : logic::check(h)) all += i.text + "\n";
+    CHECK(all.find("variable \"W\" is U16, its default 70000 is none of its values (0 .. 65535)") != std::string::npos && all.find("variable \"X\"") != std::string::npos);
+  }
+}
+
 TEST(logic_fixed_lists) {
   // A place can be declared as a list of a fixed length - Fixed<Float, 3>, std::array in a
   // Blueprint's C++: a variable, a field, an input, an output, a local variable. What flows
@@ -5092,8 +5168,8 @@ TEST(logic_maps_and_sets) {
   // what the notation and the check refuse - with the reason
   CHECK(says("  Map<Float, Int> Wrong = Map<Float, Int>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
   CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
-  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
-  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)"));
+  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)"));
   CHECK(says("  Map<Int, Float> Twice = Map<Int, Float>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
   CHECK(says(in_event("    map_add(Scores, 2);\n    list_add(Scores, 1.0);"), "Scores"));
   CHECK(says("  void Touch(Cell& c) {\n    map_add(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    map_add(Cells, \"a\");\n    Touch(Cells[0]);"), "an entry that is held stays where it is"));
@@ -5298,7 +5374,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<Float> Other = List<Int>{1};", "this is List<Int>, but List<Float> is needed (like List<Float>{})");
   refused("  List<Float> Other = List<Float>{1.0, \"a\"};", "a list's item: this is Text, but Float is needed");
   refused("  List<Float> Other = 1.0;", "this is Float, but List<Float> is needed");
-  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<U8> ... List<I32>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
   refused("  List<List<Float>> Other;", "\"List\" is no type a list holds");
   refused("  List<Float> Other = List<Float>;", "a list written out is List<Float>{...}");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
@@ -6426,6 +6502,37 @@ TEST(engine_calls_every_node) {
   CHECK(objects.size() == 0);
 }
 
+namespace {
+void job_double(kern::Span<const u8> in, std::vector<u8>& out) {
+  out.assign(in.begin(), in.end());
+  out.insert(out.end(), in.begin(), in.end());
+}
+}  // namespace
+KERN_JOB(61, job_double);
+
+TEST(jobs_reset_begins_again) {
+  // after reset the jobs are as when the program starts: none waits, none is done, the next is numbered 1 - with the
+  // threads and without (it waits for what they run); what is defined and the switch stay
+  for (const bool threaded : {false, true}) {
+    jobs::set_threads(threaded);
+    const u32 a = jobs::submit(61, {1, 2});
+    jobs::submit(61, {3});
+    if (!threaded) jobs::pump(1000);
+    jobs::reset();
+    CHECK(jobs::pending() == 0);
+    CHECK(jobs::threads() == threaded);
+    std::vector<u8> out;
+    CHECK(!jobs::take(a, out));   // (forgotten, done or not)
+    jobs::set_threads(false);
+    const u32 b = jobs::submit(61, {7});
+    CHECK(b == 1);
+    jobs::pump(1000);
+    CHECK(jobs::take(b, out) && out == std::vector<u8>({7, 7}));
+    jobs::reset();
+  }
+  jobs::set_threads(true);
+}
+
 TEST(engine_stand_in_fixed_length) {
   using logic::Value;
   // a field that is an array of C++ (`f32 m[16]` of Mat4) has as many entries in the form - and so in every answer of
@@ -6439,6 +6546,49 @@ TEST(engine_stand_in_fixed_length) {
     CHECK(out.size() == 2 && out[1].rows && out[1].rows->size() == 1 && (*out[1].rows)[0].list &&
           std::get<std::vector<f64>>(*(*out[1].rows)[0].list).size() == 16);
   }
+}
+
+TEST(engine_stand_in_makes_an_object) {
+  using logic::Value;
+  // a maker gives the handle of the object it made - a constructor of C++ always makes one: the form `h`, and the
+  // stand-in never answers the handle 0 (which names none: `std::make_unique<SoundBank>(...)` is never empty)
+  int makers = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions()) {
+    const std::string type = f.type;
+    // (a maker: "engine.<class>.make", the n-th of a class "....make_<n>")
+    const std::size_t at = type.rfind(".make");
+    if (at == std::string::npos) continue;
+    const std::string rest = type.substr(at + 5);
+    if (!rest.empty() && (rest[0] != '_' || rest.size() < 2 || rest.find_first_not_of("0123456789", 1) != std::string::npos)) continue;
+    CHECK(f.outputs.size() == 1 && std::string(f.outputs[0].shape) == "h");
+    logic::EngineStandIn s;
+    for (int k = 0; k < 16; ++k) {
+      std::vector<Value> in;
+      for (const logic::EnginePin& p : f.inputs) in.push_back(Value::zero(p.type));
+      if (!in.empty() && in[0].type == logic::PinType::integer) in[0] = Value::integer(k);
+      std::vector<Value> out{Value::zero(logic::PinType::integer)};
+      CHECK(s.engine(type, in, out) && out.size() == 1 && out[0].as_int() > 0);
+    }
+    ++makers;
+  }
+  CHECK(makers > 10);
+}
+
+TEST(engine_stand_in_one_or_none) {
+  using logic::Value;
+  // what may be there or not (`std::optional<Message> Client::receive`, the std::optional components of a level's actor)
+  // is a list of no entry or one in the form - `[?item]` - and so in every answer of the stand-in: never two
+  const logic::EngineFunction* f = logic::engine_function("engine.client.receive");
+  CHECK(f && f->outputs.size() == 1 && std::string(f->outputs[0].shape).starts_with("[?{"));
+  logic::EngineStandIn s;
+  bool none = false, one = false;
+  for (i64 channel = 0; channel < 40; ++channel) {
+    std::vector<Value> out(1);
+    CHECK(s.engine("engine.client.receive", {Value::integer(1), Value::integer(channel)}, out));
+    CHECK(out.size() == 1 && out[0].type == logic::PinType::structure_list && out[0].size() <= 1);
+    (out[0].size() == 0 ? none : one) = true;
+  }
+  CHECK(none && one);
 }
 
 TEST(engine_calls_mixer_is_the_mixer) {

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "../src/rules.h"
+#include "kern/core/jobs.h"
 #include "kern/core/json.h"
 #include "kern/logic/engine_api.h"
 #include "kern/logic/engine_host.h"
@@ -28,10 +29,15 @@ inline bool real_engine() {
   }();
   return real;
 }
-/// The engine's objects of one side, as a call being compared begins with them.
+/// The engine of one side, as a call being compared begins with it: its objects - and what the engine holds of its
+/// own beyond them, its jobs (kern/core/jobs.h): none, the next numbered 1, run where the program pumps them, so that
+/// when a job runs is fixed by the calls alone. Every side begins the same (a job's number is no count of the sides
+/// that ran before it).
 inline void fresh_engine(kern::logic::EngineObjects& objects) {
   objects.clear();
   objects.on_missing(kern::logic::engine_make_default);
+  kern::jobs::set_threads(false);
+  kern::jobs::reset();
 }
 /// How many calls of the engine itself (real_engine) were refused since the call being compared began
 /// (converted::Watch sets it to zero; a call of the source in which one was is not compared - Tally::take).

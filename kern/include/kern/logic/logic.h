@@ -428,6 +428,39 @@ struct TypeRef {
 };
 /// The longest list of a fixed length a place can be declared as.
 inline constexpr u32 kLongestFixed = 65536;
+/// Whole numbers of a fixed width. What a place is declared as - a variable, a field of a struct,
+/// an input, an output or a local variable of a function - can be an Int of a fixed width:
+/// TypeRef::of beside PinType::integer names it - "u8", "u16", "u32" (0 .. 2^w - 1) and "i8",
+/// "i16", "i32" (-2^(w-1) .. 2^(w-1) - 1); in a Blueprint's C++ it is U8 ... I32 (std::uint8_t ...).
+/// What flows through a pin is an Int: a pin has no width. What such a place is given, it holds as
+/// C++ holds it when it stores an integer there (static_cast<u32>(x)): the low w bits of the Int,
+/// of a signed width as two's complement. Every value of a width is a whole number below 2^32 in
+/// size, which a double holds exactly - so the interpreter and the JIT, whose numbers are doubles,
+/// hold it exactly too.
+inline constexpr std::string_view kWidthNames[] = {"u8", "u16", "u32", "i8", "i16", "i32"};
+/// The bits of the width `of` names (8, 16, 32; negative: a signed width); 0: it names none.
+constexpr int width_bits(std::string_view of) {
+  constexpr int kBits[] = {8, 16, 32, -8, -16, -32};
+  for (std::size_t k = 0; k < sizeof kBits / sizeof kBits[0]; ++k)
+    if (of == kWidthNames[k]) return kBits[k];
+  return 0;
+}
+/// Is the place an Int of a fixed width (or a list of such)?
+constexpr bool has_width(PinType t, std::string_view of) { return element_of(t) == PinType::integer && width_bits(of) != 0; }
+inline bool has_width(const TypeRef& t) { return has_width(t.type, t.of); }
+/// What a place of the width `of` holds when it is given the Int x: its low bits (none: x).
+constexpr i64 wrapped(i64 x, std::string_view of) {
+  const u64 bits = static_cast<u64>(x);
+  switch (width_bits(of)) {
+    case 8: return static_cast<i64>(static_cast<u8>(bits));
+    case 16: return static_cast<i64>(static_cast<u16>(bits));
+    case 32: return static_cast<i64>(static_cast<u32>(bits));
+    case -8: return static_cast<i64>(static_cast<i8>(static_cast<u8>(bits)));
+    case -16: return static_cast<i64>(static_cast<i16>(static_cast<u16>(bits)));
+    case -32: return static_cast<i64>(static_cast<i32>(static_cast<u32>(bits)));
+    default: return x;
+  }
+}
 /// Can what comes out of a pin of type `from` go into one of type `to`? (convertible, and two
 /// enums are the same enum, two structs the same struct.)
 bool fits(const TypeRef& from, const TypeRef& to);
