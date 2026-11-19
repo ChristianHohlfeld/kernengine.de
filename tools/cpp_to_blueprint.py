@@ -13692,7 +13692,7 @@ def main(argv):
             # reason it gave first there - a function written in one round and waiting in the next, or one that waits in
             # each with another reason (what it names first changes with what the others give): each its own, the same
             # whatever the order in which the round's jobs are done.
-            more = {}
+            pinned = {}
             for u in sorted(new):
                 ring = [v for at, v in visited[u] if at >= met[state]]
                 tabs = [gave[u][v][0] for v in ring]
@@ -13702,9 +13702,9 @@ def main(argv):
                     outcomes = [(t[k]["wait"] if k in t else "absent") for t in tabs]
                     waits = [w for w in outcomes if w and w != "absent"]
                     if len(set(outcomes)) > 1 and waits:
-                        more.setdefault(u, {})[k] = f"{waits[0]} (it went round with {u})"
-            if more:
-                for u, ks in sorted(more.items()):
+                        pinned.setdefault(u, {})[k] = f"{waits[0]} (it went round with {u})"
+            if pinned:
+                for u, ks in sorted(pinned.items()):
                     held.setdefault(u, {}).update(ks)
                     for k, why in ks.items():
                         print(f"{u}: {tables[u][k]['cpp'] if k in tables.get(u, {}) else k}() waits for good - the rounds went round: {why}", flush=True)
