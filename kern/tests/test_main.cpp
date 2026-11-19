@@ -5270,14 +5270,17 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a +; }, 1.0);"), "the formula:");
-  // (a formula of whole numbers, [](Int a) -> Int: only where Formula::whole holds, every input a wire from an Int as it is)
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a + 1.0; }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(kern::math::div(a, 2.0), 3.0); }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "this one is a formula of Floats");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::band(a, 3.0); }, Count));"), "(a formula with Int inputs gives an Int)");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "(the inputs of a formula of whole numbers are Int");
-  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "an input of a formula of whole numbers is an Int");
+  // (Int inputs only where Formula::int_input holds, an Int result only where Formula::whole_result holds and - by +, - or * -
+  // everything that reads it is an Int; every Int input a wire from an Int as it is)
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::div(a, 2.0); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return a < 3.0 ? a : 1.0; }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a < 3.0; }, Count));"), "-> Int is a formula whose value is a whole number");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 1.0) + 2.0; }, Count));"), "-> Int is a formula whose value is a whole number");
+  refused(in_event("    Heat = kern::formula([](Int a) -> Int { return a + 1.0; }, Count);"), "this formula gives an Int by +, - or *, and this reads it as Float");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a Float input gives a Float: -> Float");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an Int");
   refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, kern::to<Float>(Count)));"), "an Int as it is: no kern::to");
   refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
   // (a list of a fixed length written out on an input says the input's length: Fixed<Float, 3> for a field of three)
