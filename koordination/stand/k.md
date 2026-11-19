@@ -4,8 +4,26 @@
 
 | Abweichung | Ursache | Commit | Beleg | Stand |
 |---|---|---|---|---|
-| mp_hud_json 7/20 (Stellv.), 4/20 (Engine): "connected" Quelle false / Blueprint true; gegen die Engine „source asks server.running, Blueprint server.connected_clients“ | Reihenfolge: ein Argument mit Schritten (`esc(net_.status())` → `a_2 = Session_status(net_)` gehoben) lief vor den Argumenten links davon (hosting(), connected() standen in der Anweisung) – status() ruft connected() und die Engine | ed63dca3 (operand: Eingänge von Aufrufen des Programms/der Engine/Formaten von links; Links-Stehendes, das die Schritte sehen/ändern können oder das selbst ruft, wird vorher gehalten) | work-k-vergleich-073648-13858 (läuft) | gebaut |
+| mp_hud_json 7/20 (Stellv.), 4/20 (Engine): "connected" Quelle false / Blueprint true; gegen die Engine „source asks server.running, Blueprint server.connected_clients“ | Reihenfolge: ein Argument mit Schritten (`esc(net_.status())` → `a_2 = Session_status(net_)` gehoben) lief vor den Argumenten links davon (hosting(), connected() standen in der Anweisung) – status() ruft connected() und die Engine | ed63dca3 (operand: Eingänge von Aufrufen des Programms/der Engine/Formaten von links; Links-Stehendes, das die Schritte sehen/ändern können oder das selbst ruft, wird vorher gehalten) | work-k-vergleich-075447-11897 (läuft; 073648 abgebrochen, ungestartet) | gebaut |
+| Terrain_run_job 13/300 (Stellv.), 48/300 (Engine): jobs.submit, Bytes ab 16 | Test-Schreiber: `memcpy(bytes, &win, sizeof win)` einer Struktur mit f32 kopierte die Anordnung des Tests (f32 = double) – nur memcpy(&rec, bytes) war behandelt | 4e72f8b4 (converted::layout::to_bytes) | work-k-vergleich-075447-11897 | gebaut |
+| Session_update 1/56, life_hud 1/33 (Engine) | in 043356 (mit den Fixen des Koordinators) keine Abweichung mehr, nur cost | – | work-zusammen-suite-alle-043356-8771 | erledigt (Einzel-Lauf auf neuem Level bestätigt) |
 | draw_events 9/20 (`.combat_art_.parts_[0].transforms`) | kein Konverterfehler: die abweichenden Matrizen sind Pfosten der Renn-Tore (CombatArt::gate, box). Der Test gibt `combat_kGates` (7, 12) vor, `combat_rules_g_gates` aber weder vor noch vergleicht er es – Blueprint: leere Liste (Tor = Nullen), Quelle: `g_gates[k]` einer Liste, die kGates nicht entspricht (jenseits des Endes / Rest früherer Aufrufe) | – | Einzelausgabe 043356 | BEFUND FÜR t1 |
+
+### ENTSCHEIDUNG NÖTIG (Aufgabe 5, größter Grund): „an entry of a list handed to change to a function that may run handlers“ (8 Funktionen, 811 Zeilen) – und vermutlich ein Teil von „~Car … not written yet“
+- Das ist keine Regel des Konverters, sondern die Prüfung der SPRACHE (kern/src/logic/notation.cpp places_ok, ~Z. 875): ein Eintrag einer Liste beliebiger
+  Länge / einer Map / eines besessenen Werts (unique_ptr = Liste 0/1) darf nicht als Referenz an eine Funktion gehen, die Handler laufen lassen kann
+  (Call on Actor, Call Event: `raises`) – „Give it the entry's index instead, or the value“. Der Konverter folgt ihr: Referenz zum Ändern → Wait;
+  const-Referenz → er übergibt eine KOPIE (place_arg, raising). Die Kopie ist bei Typen mit Destruktor falsch: C++ bindet nur, beendet nichts – der Blueprint
+  müsste ~Car() der Kopie laufen lassen (detach(): Engine-Aufrufe!). Vermutung: draw_vehicles/draw_remote_vehicles/swarm_draw_vehicles warten darum an „~Car“
+  (`art_.car(…, *c.car, …)`; Kleinstfall /tmp/k_car ohne Handler: als Platz geschrieben, kein ~Car). Unbelegt, ob VehicleArt::car `raises` hat.
+- C++ selbst: die Referenz bleibt; ändert ein Handler die Länge der Liste, ist das UB. Wo C++ ein Verhalten hat (die Liste bleibt), hält die Referenz.
+- Möglichkeiten: (A) Sprache: ein gehaltener Eintrag über einen Schritt mit `raises` ist erlaubt; jede Stufe (Interpreter, JIT, Klasse) prüft, dass die Liste
+  in der Zeit ihre Länge/ihren Speicher behält, sonst bricht der Lauf mit Fehler ab – genau dort, wo C++ UB hat (Kosten in der Klasse: ein Vergleich nach dem
+  Aufruf). (B) Sprache, statisch: Call on Actor nennt die Funktion nur beim Namen, das Ziel ist zur Laufzeit beliebig – statisch nicht entscheidbar, verworfen.
+  (C) Absenkung der 8 Funktionen (Index statt Referenz; Game-Dateien von g1/g2) mit Differenztest „zwei Bauten“. (D) Kopie hinein/heraus – ändert das Verhalten,
+  wenn der Handler den Eintrag ändert: verworfen.
+- Mein Vorschlag: (A) – allgemein, ohne Absenkung, ohne Kopie; gehört zur Sprache (Paket d/Koordinator), nicht zum Konverter. Danach fällt im Konverter der
+  Zweig raising in place_arg weg (Wait und Kopie).
 
 ### BEFUND FÜR t1 (07:35) – draw_events
 - `gate(i)` = `g_gates[((i % kGates) + kGates) % kGates]` (combat_rules.cpp:478); Vorbedingung des Programms: kGates == g_gates.size() (bind_race setzt beides).

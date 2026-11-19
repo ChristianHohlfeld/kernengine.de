@@ -1,3 +1,84 @@
+# Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
+
+Zweig work-p, Kopf **50e21923** (gepusht; work-zusammen 821208ac eingemischt). Messung: Level von `work-zusammen-voll-055004-6649`
+($S/p/lvl2), `tools/blueprint_bench.sh … --check 1.10 15` (beide Sperren), Rohdaten $S/p/heute.txt (vorher), $S/p/nach_text.txt (Kopf).
+Schnell-Neubau ohne neue Klassen: $S/p/rb.sh <runden> [fall…] (CL=Ordner mit classes.h, RD=Bauordner, XF=-g).
+
+## ENTWURF 4 (für Chris, Bit-Fälle) – 19.11. 08:10. Zahlen: Bestzeiten Klasse/C++ (f32-Spalte; 64-Bit-Spalte noch nicht gebaut)
+Projektionen = Messungen eines veränderten Klassentexts/Headers (nur zum Messen): B = alle 2^53-Prüfungen weg, P = Punkt 2, W = Wächter aus.
+**(a) Breite an Variable/Feld/Parameter.** Weg 1 – feste Breiten als Typen (u8 u16 u32 i8 i16 i32; Speichern wickelt wie C++): Interpreter/JIT
+bleiben exakt in double, weil jeder Wert ≤ 2^32 ist; nur × muss als Knoten ganzzahlig rechnen (2^32·2^32 ist in double nicht exakt; heute mul32).
+Neu: Pin-/Variablen-Typen, Wandlungsregeln, Leser/Schreiber, Editor-Farben, check(). Der Konverter muss nicht mehr nach jeder Operation
+wrap32/band schreiben (Fehlerklasse G7 entfällt), u32-Quelle wird u32-Blueprint. „Kein Float32, Zahlen 64 Bit“ bleibt unberührt (ganze Zahlen,
+kein neuer Gleitkommatyp). Weg 2 – Bereichsangabe am Int (`Int [0, 2^32)`): Bedeutung wie heute plus eine Behauptung, die jede Stufe beim
+Speichern prüfen (oder wickeln?) müsste – entweder neue Bedeutung (wickeln = Weg 1 in anderer Schreibweise) oder neue Fehlerart (verletzt);
+der Konverter schreibt weiter wrap32/band. Projektion (B bzw. P+B, Obergrenze für den Wegfall der Prüfungen, nicht für echte u32-Operationen):
+rng_next 1,65 → 0,98; rng_unit 1,79 → 1,08; sha256 6,5 → 3,0; qr_encode 5,0 → 2,3; gf_mul 3,4 → 1,3; rs_remainder 5,1 → 1,6; mulm 6,6 → 5,4;
+from_hex 5,1 → 4,1; wire_get 3,9 → 2,4. Echte u32-Operationen ohne wrap32/band (Weg 1) dürften weiter sinken – nicht gemessen.
+Empfehlung: Weg 1 (feste Breiten), weil er dieselbe Gestalt hat wie die Quelle und G7 an der Wurzel beseitigt.
+**(b) Schleifenwächter.** Ohne Textänderung geht es nicht: `while (loop(c))`/`flow_for` haben keinen Platz für einen Zähler im Register, und ein
+Aufruf im Rumpf liest denselben Zähler (gleicher Durchlauf in jeder Stufe). Was der Text sagen müsste: eine Schleife ohne Aufruf im Rumpf
+(am Graphen feststellbar) als `for (auto it = flow_for_local(n, a, b); …)`, das den Rest des Budgets beim Eintritt liest, lokal herunterzählt und
+beim Verlassen zurückschreibt – dieselbe Stelle des Abbruchs. Gemessen W (aus): wrap_pi 1,50 → 0,85, mulm 6,6 → 5,6, gf_mul (mit P) 2,9 → 1,8,
+ring_area (mit P) 2,8 → 2,5; sonst < 5 %. Empfehlung: bauen, aber erst nach (a), weil es mit (a) zusammen erst trägt.
+**(c) Bytes-Typ.** Heute List<Int>: 8 Byte je Byte, je Byte eine Prüfung und Whole. Ein Typ `Bytes` (u8-Einträge, Lesen außerhalb gibt 0 wie heute
+byte_at) – mit (a) ist das List<u8>, kein eigener Typ nötig. Projektion für wire_*/mvt: nicht gemessen (wire_put 1,5 und mvt_read 2,5 hängen auch an
+Anhängen je Element). Empfehlung: als List<u8> aus (a), kein eigener Typ.
+**Wie viele der 29 danach unter 1,10 (geschätzt, die 64-Bit-Spalte fehlt noch):** heute 4. Mit E17 vermutlich + die 7 Float-Fälle (in W/P/B
+unverändert – ob sie gegen die 64-Bit-Quelle ≤ 1,10 liegen, zeigt erst die Spalte). Mit (a)+(b)+Punkt 2 zusätzlich wahrscheinlich rng_next,
+rng_unit, wrap_pi, gf_mul (≈ 14). Trotzdem darüber nach den Projektionen: sha256 (3,0), qr_encode (2,3), rs_remainder (1,6), mulm (5,4),
+from_hex (4,1), wire_get/put, mvt_read/ring_area, settings_escape (3,4: Formeln je Zeichen), lamps_near, lamps_grid_key, settings_num –
+diese brauchen je eigene Ursachenarbeit (Int64-Knoten, Text je Zeichen, Map), was die Projektionen nicht abdecken.
+
+## Gebaut (UNBELEGT, Beleg: engine + vergleich settings auf mag folgt)
+- 50e21923 Text::Appending: `O = text_append(std::move(O), x, y)` hängt an Ort und Stelle an (ein Zeichen = push_back); Text of Code ohne
+  Umweg. Text der Klasse unverändert. settings_escape 7,59 → 3,37. g++ -fsyntax-only der Bench-Klassen ok.
+
+## Zeit-Test heute (Bestzeiten Klasse/C++; „vorher“ = 821208ac, „Kopf“ = 50e21923) – 25 von 29 über 1,10 (vorher 25)
+Versuchsspalten (nur Messung, nicht gebaut; je gegen „vorher“): W = Schleifenwächter aus; P = Projektion von Punkt 2 (Int ± Zahl und Vergleich
+mit Vorzeichen ganzzahlig, per Ersetzung im Klassentext, Prüfsummen gleich); P+W; B = alle Bereichsprüfungen 2^53 weg (Obergrenze, falsche
+Bedeutung – nur, um den Anteil zu sehen); P+B.
+| Fall | vorher | Kopf | W | P | P+W | B | P+B | Ursache (Hauptanteil zuerst) | nächster Schritt |
+|---|---|---|---|---|---|---|---|---|---|
+| qr_encode | 5,00 | 4,97 | 4,77 | 3,27 | 3,24 | 4,28 | 2,33 | Int-Arithmetik als Float-Formel (i±1, Vergleiche), Bereichsprüfungen, Listen | Punkt 2, dann Bereich (s. u.) |
+| qr_gf_mul | 3,43 | 3,47 | 3,29 | 2,93 | 1,79 | 3,65 | 1,33 | `i - 1.0` als Float-Kette (14 Takte je Durchlauf), Wächter, Prüfungen; C++ rollt die 8 Durchläufe ab | Punkt 2 + Wächter |
+| qr_rs_remainder | 5,08 | 5,04 | 4,87 | 3,28 | 2,82 | 4,23 | 1,59 | wie gf_mul + Vergleich `(i<0)!=(n<0)…` je Durchlauf | Punkt 2 |
+| nostr_sha256 | 6,51 | 6,52 | 6,18 | 5,84 | 6,24 | 3,82 | 3,04 | Bereichsprüfungen je Bit-Funktion/Summe; Indizes `index - 15.0` als Float; rotr als Aufruf | Bereich an der Variable (Sprache), Punkt 2 |
+| nostr_mulm | 6,55 | 8,56 | 5,56 | 7,15 | 5,59 | 5,40 | 6,48 | Int64-Knoten, `i - 1.0`, Wächter, Fixed-Zugriff (schwankt stark 6,6–8,6) | Punkt 2 + Int64 lesen |
+| nostr_from_hex | 5,12 | 5,14 | 4,89 | 5,20 | 4,98 | 4,07 | 4,55 | Text je Zeichen über Float-Formeln (`a>=128?a-256:a`, `2*index`), from_hex_v als Aufruf | Punkt 2 (Wurzel ×, Vergleich) |
+| common_rng_next | 1,64 | 1,65 | 1,68 | 1,70 | 1,65 | 0,99 | 0,98 | nur die Bereichsprüfungen (bits_of/normal) in der Kette | Bereich an der Variable (Sprache) |
+| common_rng_unit | 1,80 | 1,79 | 1,77 | 1,81 | 1,80 | 1,08 | 1,08 | wie rng_next; dazu `n10 = Rng_next(self)` als Mitglied (BEFUND FÜR e) | Bereich; e |
+| wire_get_u32 | 3,91 | 3,93 | 3,87 | 3,00 | 3,04 | 3,98 | 2,40 | Vergleich/`at + 4.0` als Float-Formel, Bytes als List<Int> (byte_at je Byte geprüft) | Punkt 2; Bytes |
+| wire_put_u32 / _f32 | 1,52/1,51 | 1,51/1,54 | ~1,5 | ~1,5 | ~1,5 | ~1,5 | ~1,5 | Bytes als List<Int> (8 Byte je Byte, Anhängen je Element) | Bytes (eigener Entwurf nötig) |
+| mvt_read_geometry | 2,53 | 2,45 | 2,30 | 1,98 | 1,74 | 2,48 | 1,70 | Bytes als List<Int>, Float-Formeln | Punkt 2; Bytes |
+| mvt_ring_area | 3,44 | 3,46 | 3,17 | 2,80 | 2,50 | 2,35 | 1,66 | Vergleich als Float-Formel, Wächter, `i += 1` (whole_add), Listenprüfung | Punkt 2 + Wächter |
+| settings_escape | 7,59 | **3,37** | 7,38 | 7,94 | 7,76 | – | – | (behoben: Anhängen) Rest: Float-Formeln je Zeichen | Punkt 2 |
+| lamps_near | 2,64 | 2,61 | 2,22 | 2,01 | 2,60 | 2,56 | 2,36 | Map/Liste, schwankt 1,8–4,2 zwischen Läufen | erst Rauschen klären |
+| lamps_grid_key | 1,37 | 1,41 | 1,37 | 1,41 | 1,37 | 1,42 | 1,42 | Float→Int64 (Wandlung mit Prüfung) | Int64-Wandlung lesen |
+| settings_num | 1,30 | 1,28 | 1,29 | 1,24 | 1,26 | 1,24 | 1,25 | text_format<"%g"> gegen snprintf | lesen |
+| common_wrap_pi | 1,50 | 1,24 | **0,85** | 1,29 | 0,88 | 1,33 | 1,55 | Wächter (Float gegen f32) | Wächter |
+| Float gegen f32-Quelle: qnormalize 1,20, slerp 1,19, to_local 1,34, person_hit 1,43, perf_governor 1,43, audio_render 1,38, lamps_place_road 1,23 | | | ≈ | ≈ | ≈ | ≈ | ≈ | 64 Bit (Entscheidung 1) gegen das f32 der Quelle; kein Klassen-Anteil messbar | **Entscheidung: Maßstab** |
+| unter 1,10: tiles_key_hash 1,04, mvt_zigzag 1,01, damp_alpha 1,03, person_sphere 0,98 | | | | | | | | | |
+Ohne Wirkung gemessen (verworfen): formula immer einbetten (always_inline), seltene Wege von whole/normal/bits_of/whole_add ausgelagert
+(cold/noinline), Platz-neben-der-Liste ausgelagert, bits_of(Int) ohne Umweg (rng 1,65 → 1,89: cmov in der Kette).
+
+## Ehrlich: was mit dem heutigen Aufbau grundsätzlich nicht unter 1,10 kommt
+1. **Die 7 Float-Fälle (1,19–1,46)**: die Quelle rechnet f32, die Klasse 64 Bit (Entscheidung 1, nicht verhandelbar). Kein Klassen-Anteil
+   messbar (W, P, B ändern nichts). Unter 1,10 nur, wenn der Maßstab die Quelle in den Zahlen der Sprache ist (wie der Vergleichstest sie
+   übersetzt: f32 = double, kern::math) → **Entscheidung nötig** (Koordinator/Chris), dann misst die Bench beide Spalten.
+2. **Bit-Fälle (sha256, rng, qr, mulm)**: selbst mit Punkt 2 UND ohne jede Bereichsprüfung bleiben sha256 3,0, qr 2,3, mulm 5,4. Jede
+   Bit-Funktion und jede Summe muss heute die 2^53-Grenze prüfen (Bedeutung des Interpreters). Wo der Wert aus derselben Formel kommt
+   (wrap32 …), faltet der Compiler die Prüfung schon weg; was bleibt, sind Prüfungen an Werten aus Variablen/Feldern (Rng.s, a…k in sha256),
+   deren Bereich der Klasse unbekannt ist (Int ist i64). Nötig: (a) Punkt 2; (b) ein Bereich an der Variable – ein 32-Bit-Typ der Sprache oder
+   eine Bereichsangabe (Schreibweise und Sprache, nur mit Entscheidung Chris/Koordinator); (c) der Wächter je Durchlauf (Zähler im Speicher)
+   verhindert Abrollen/Register: ohne Textänderung nicht wegzubekommen, weil ein Aufruf im Rumpf denselben Zähler liest.
+3. **Bytes als List<Int>** (wire_*, mvt_read_geometry 1,5–2,5): 8 Byte je Byte und Prüfung je Byte; unter 1,10 nur mit einem Bytes-Typ der
+   Sprache (Entwurf möglich, groß).
+
+## BEFUND FÜR e
+- `n10 = Rng_next(self);` in Rng_unit (und alle `nNN = f(...)`): der Wert eines Schritts als Mitglied der Klasse = Speicher-Schreiben je Aufruf
+  und kein Halten im Register; rng_unit liegt 0,15 über rng_next. Nach E16 neu messen.
+
 # Stand Paket p (Leistung der exportierten Klasse) – 18.11.2026, 23:05
 
 Zweig work-p, letzter Commit 85d60a1d (gepusht; CI 44416542751 rot an logic_fixed_lists – E10-Leser lehnte Fixed an einem Eingang ohne Länge mit anderem Text ab, behoben; aede1c3e: format_arg(const char*) – CI 44407872390 war rot: g++ fand text_format("abcdef") mehrdeutig nach 25a7318f; behoben, alle 43 Engine-Fälle als Klasse mit g++ übersetzt; dazu Switch on Text ohne Liste, alt/neu lokal gleich über 121 Paare).

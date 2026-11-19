@@ -1,4 +1,14 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 08:10 **mag:** der volle Lauf 070328 ist nach der Konvertierung abgebrochen (seine Suite liefe nacheinander; **engine rc=? – seine Engine-Suite war noch nicht
+  fertig, mein Abbruch kam zu früh**; neu: `work-zusammen-engine-075558-13914` auf 821208ac). Danach startete 6 Minuten nichts: der Ordner des abgebrochenen
+  Laufs zählt auf mag weiter mit 56 Kernen (ein Prozess darin lebt noch). Budget darum **cap = 140** (84 echte + 56) – wer `stand` mit deutlich über 84 laufenden
+  Kernen sieht: mir melden. Zwei in dem Moment angenommene Aufträge gingen verloren (`…-alle-074913-6919`, `work-e-engine-074752-4918`) – neu abgelegt.
+  **Einzel-Lauf aller Tests auf dem neuen Level: `ergebnis-work-zusammen-voll-070328-32111-alle-080335-20196`** (Start 08:04, Liste ~08:50).
+  · **Entscheidung E17 (p, vorläufig – Chris kann widersprechen):** der Zeit-Test misst gegen die Quelle in den Zahlen der Sprache (f32 = double, wie der
+    Vergleichstest sie baut); die Bench zeigt beide Spalten, `--check` prüft die 64-Bit-Spalte. Grund: 7 Float-Fälle liegen nur wegen f32 gegen 64 Bit über 1,10.
+    p baut: E17, Punkt 2 (Int-Formeln ganz), Punkt 3 (getypter Einstieg für func_call_on). **Entwurf 4 (feste Breiten u8…i32 als Typen, Schleifenform ohne
+    Wächter im Speicher, List<u8>) liegt bei Chris** – p's ehrliche Projektion: heute 4 von 29 Fällen unter 1,10, mit allem etwa 14; sha256, qr, mulm, from_hex,
+    wire/mvt u. a. bleiben darüber.
 - 07:50 **GÜLTIG: `work-zusammen-voll-070328-32111` auf 821208ac – convert rc=0 (07:40).** „1725 of 1844 functions … written (22779 of 30978 lines)“,
   „1682 … compared“; 2 Zeilen „cannot compare it yet“; 18 „waits for good“ (055004: 1707 / 1664 / 3). `grundlage` für `vergleich` ist dieser Lauf.
   Was die 119 übrigen aufhält: **`$S/wartet_070328.txt`** (neu sichtbar: „an entry of a list handed to change to a function that may run handlers“ 13;

@@ -1,4 +1,10 @@
 # Stand d (18.11., Nachfolger)
+
+## Nachfolger 6 (ab 07:45, 19.11.)
+- **Aufgabe 1 Uhren gegen die Engine – Fix gebaut:** Zweig **work-d-uhr = 4b7074b1** (ein Commit auf work-zusammen 821208ac; nur tests/rule_blueprint.h + converted.h).
+  sc::Clocks: die Antworten einer Uhr (EngineFunction::clock, aus KERN_CLOCK) an die Quelle je Stelle ihrer Aufzeichnung; ein Blueprint-Aufruf an derselben
+  Stelle mit demselben Aufruftext bekommt sie, sonst fragt er die Engine (Reihenfolge wird wie immer verglichen). Watch beginnt neu. Stellvertreter unverändert.
+  Beleg läuft: `work-d-uhr-vergleich-075109-9150` (city_stream, terrain, mvt, game_look).
 - fertig+bewiesen+gemergt: Stufe 4 (d) (CI 44337346531)
 
 ## A – rote Engine-Suite (R129): Fix gebaut, Beweis läuft
