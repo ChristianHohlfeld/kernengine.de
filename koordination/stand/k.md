@@ -4,8 +4,8 @@
 
 | Abweichung | Ursache | Commit | Beleg | Stand |
 |---|---|---|---|---|
-| mp_hud_json 7/20 (Stellv.), 4/20 (Engine): "connected" Quelle false / Blueprint true; gegen die Engine „source asks server.running, Blueprint server.connected_clients“ | Reihenfolge: ein Argument mit Schritten (`esc(net_.status())` → `a_2 = Session_status(net_)` gehoben) lief vor den Argumenten links davon (hosting(), connected() standen in der Anweisung) – status() ruft connected() und die Engine | ed63dca3 (operand: Eingänge von Aufrufen des Programms/der Engine/Formaten von links; Links-Stehendes, das die Schritte sehen/ändern können oder das selbst ruft, wird vorher gehalten) | work-k-vergleich-075447-11897 (läuft; 073648 abgebrochen, ungestartet) | gebaut |
-| Terrain_run_job 13/300 (Stellv.), 48/300 (Engine): jobs.submit, Bytes ab 16 | Test-Schreiber: `memcpy(bytes, &win, sizeof win)` einer Struktur mit f32 kopierte die Anordnung des Tests (f32 = double) – nur memcpy(&rec, bytes) war behandelt | 4e72f8b4 (converted::layout::to_bytes) | work-k-vergleich-075447-11897 | gebaut |
+| mp_hud_json 7/20 (Stellv.), 4/20 (Engine): "connected" Quelle false / Blueprint true; gegen die Engine „source asks server.running, Blueprint server.connected_clients“ | Reihenfolge: ein Argument mit Schritten (`esc(net_.status())` → `a_2 = Session_status(net_)` gehoben) lief vor den Argumenten links davon (hosting(), connected() standen in der Anweisung) – status() ruft connected() und die Engine | ed63dca3 (operand: Eingänge von Aufrufen des Programms/der Engine/Formaten von links; Links-Stehendes, das die Schritte sehen/ändern können oder das selbst ruft, wird vorher gehalten) | 081204-23050: mp_hud_json NICHT geschrieben (Probe: mp_local_ready → MpLocal::init in mp_art.cpp fehlte); neu work-k-vergleich-091538-11174 (+mp_art, combat_art) | gebaut |
+| Terrain_run_job 13/300 (Stellv.), 48/300 (Engine): jobs.submit, Bytes ab 16 | Test-Schreiber: `memcpy(bytes, &win, sizeof win)` einer Struktur mit f32 kopierte die Anordnung des Tests (f32 = double) – nur memcpy(&rec, bytes) war behandelt | 4e72f8b4 (converted::layout::to_bytes) | work-k-vergleich-081204-23050 (3878258a): Stellvertreter 58/58 ok, converted_terrain_cpp ok – Terrain::run_job geschrieben und verglichen; gegen die Engine 57/58: run_job 35/237 nur noch j.id (BEFUND FÜR d) | **belegt (Stellvertreter)** |
 | Session_update 1/56, life_hud 1/33 (Engine) | in 043356 (mit den Fixen des Koordinators) keine Abweichung mehr, nur cost | – | work-zusammen-suite-alle-043356-8771 | erledigt (Einzel-Lauf auf neuem Level bestätigt) |
 | draw_events 9/20 (`.combat_art_.parts_[0].transforms`) | kein Konverterfehler: die abweichenden Matrizen sind Pfosten der Renn-Tore (CombatArt::gate, box). Der Test gibt `combat_kGates` (7, 12) vor, `combat_rules_g_gates` aber weder vor noch vergleicht er es – Blueprint: leere Liste (Tor = Nullen), Quelle: `g_gates[k]` einer Liste, die kGates nicht entspricht (jenseits des Endes / Rest früherer Aufrufe) | – | Einzelausgabe 043356 | BEFUND FÜR t1 |
 
@@ -24,6 +24,15 @@
   wenn der Handler den Eintrag ändert: verworfen.
 - Mein Vorschlag: (A) – allgemein, ohne Absenkung, ohne Kopie; gehört zur Sprache (Paket d/Koordinator), nicht zum Konverter. Danach fällt im Konverter der
   Zweig raising in place_arg weg (Wait und Kopie).
+
+### BEFUND FÜR d (08:55) – „a member of Int is set“ (vr_comfort, look_draw, begin_roads; 3 Funktionen)
+- Beispiel vr_comfort: `kern::TextureDesc td; td.rgba = px; td.width = 64; …` – TextureDesc ist wegen `const u8* rgba` ein Objekt der Engine mit Handle
+  (engine.texture_desc.make/release in engine_api.gen.cpp), im Blueprint Int; ein Feld dahinter zu setzen hat keinen Knoten. Allgemein: Felder eines
+  Engine-Objekts lesen/setzen (oder TextureDesc als Daten mit Zeiger = Liste+Platz) – Gebiet Engine-Objekte (d), keine Regel des Konverters.
+
+### BEFUND FÜR d (09:20) – Terrain_run_job gegen die Engine (work-k-vergleich-081204-23050: 35 von 237)
+- Gegen den Stellvertreter ok. Gegen die Engine weicht nur `j.id` ab (Quelle 4, Interpreter 6, Klasse 5; bzw. 7/9/8): jeder Durchgang reicht bei der ECHTEN
+  Engine einen Job ein (kern::jobs::submit), ihr Zähler läuft weiter – wie die echte Uhr (clock_ms). Kein Konverterfehler.
 
 ### BEFUND FÜR t1 (07:35) – draw_events
 - `gate(i)` = `g_gates[((i % kGates) + kGates) % kGates]` (combat_rules.cpp:478); Vorbedingung des Programms: kGates == g_gates.size() (bind_race setzt beides).

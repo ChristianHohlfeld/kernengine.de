@@ -16,6 +16,14 @@
   las engine_table() Einträge mit place gar nicht (alle Platz-Knoten „its pins differ“), Schritt 7 lief also nie an einer Quelle. Generator reproduziert.
   Beleg läuft: `work-d-vergleich-082602-26333` (game.cpp + game_events, game_lamps, game_look, game_foot_rounds, game_military, game_town, game_ui). Danach konvert 9, Engine-Suite.
 
+- **Aufgabe 2 (Einzel-Lauf `ergebnis-work-zusammen-voll-070328-32111-alle-080335-20196`, 821208ac ohne Uhren-Fix), 09:35:** Stellvertreter 115 ok / 3 FAIL / 34 ZEIT,
+  Engine selbst 115 ok / 4 FAIL / 33 ZEIT, 0 LECK, 0 ABBRUCH in beiden; kein „refused“, kein „only N calls could be compared“, kein „this build has no“.
+  Nur gegen die Engine rot: converted_city_stream_cpp (select_cells, step_time 300/300 und 237/237, take_requests, update_collision 55/112 – erste Abweichung jeweils
+  an einer Zeit: .vis_ms_, .ms_.t_collision, .near_.at_ms) und converted_game_look_cpp (clock_ms) – alles Uhren, im Lauf work-d-uhr-vergleich-075109-9150 dieselben
+  Funktionen (auch step_time 267 Aufrufe, update_collision 159) ohne Abweichung → mit work-d-uhr (in cf71d466) erledigt. Rest ist in BEIDEN Durchgängen rot, nicht
+  von d: Terrain_run_job (k, Bytes von jobs.submit), number_at (8 bzw. 17/300, t1), converted_game_details_cpp, die ZEIT der Game-Tests (t1). Nur gegen den Stellvertreter:
+  Session_update (k), ZEIT converted_Game__mp_rules_cpp. **Für d bleibt aus dieser Liste nichts.**
+
 ## BEREIT ZUM MERGEN (d, 08:30): work-d-uhr 4b7074b1 – Beleg work-d-uhr-vergleich-075109-9150
 - Ein Commit auf work-zusammen 821208ac, nur Testrahmen (rule_blueprint.h sc::Clocks + test_engine; converted.h Watch eine Zeile). Keine Engine-Änderung → keine Engine-Suite nötig.
 - In work-d eingemischt (e757c565; Konflikte mit dem Platz der Engine: @get/@set-Zeile + g_places.clear() behalten).

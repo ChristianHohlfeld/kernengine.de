@@ -1,5 +1,13 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+## BEREIT ZUM MERGEN: 9c315bf2 (50e21923 Text::Appending + 9c315bf2 E17 Zeit-Test) – Belege (09:40)
+- Engine-Suite `work-p-engine-075125-9242` auf 50e21923: engine rc=0, blueprint_native_test ok (60 Blueprints, 14102 Aufrufe – darin append_in_place),
+  game_native_test ok.
+- vergleich `work-p-vergleich-092919-18986` (src/settings.cpp, Kopf 9c315bf2, Grundlage 070328): 6 ok von 6 in beiden Durchgängen, keine Abweichung;
+  cost-Zeilen dieselben wie vor der Änderung (work-p-vergleich-230429-15316: bind_settings, find_opt, opt_spec, Settings_new/reset_section/
+  schema_json/set) – keine neue.
+- E17 berührt nur die Bench (tests/bench, tools/blueprint_bench.sh); Beleg ist die Messung $S/p/e17_1.txt (29/29 gleich64).
+
 Zweig work-p, Kopf **50e21923** (gepusht; work-zusammen 821208ac eingemischt). Messung: Level von `work-zusammen-voll-055004-6649`
 ($S/p/lvl2), `tools/blueprint_bench.sh … --check 1.10 15` (beide Sperren), Rohdaten $S/p/heute.txt (vorher), $S/p/nach_text.txt (Kopf).
 Schnell-Neubau ohne neue Klassen: $S/p/rb.sh <runden> [fall…] (CL=Ordner mit classes.h, RD=Bauordner, XF=-g).
@@ -46,14 +54,15 @@ diese brauchen je eigene Ursachenarbeit (Int64-Knoten, Text je Zeichen, Map), wa
 - lamps_grid_key (1,4): Float → Int64 (Wandlung mit Prüfung) – nicht untersucht.
 - settings_num (1,3): text_format<"%g"> gegen snprintf in einen Puffer – Klasse (eigener Formatweg), nicht untersucht.
 
-## Plan E17 (64-Bit-Spalte) – noch NICHT gebaut
-Der Vergleichstest hält die Quelle in tests/converted/test_<einheit>.cpp (namespace converted_<einheit>, bis zur Zeile
-`using converted::arg; …` vor dem Testrahmen), übersetzt mit ../converted.h (wide::f32 = double, kern::math). Nur die Fälle mit f32 („f32“ in der
-Spalte gleich: wrap_pi, damp_alpha, qnormalize, slerp, to_local, person_hit, person_sphere, perf_governor, audio_render, lamps_place_road) rechnen
-dort anders; Int-/Text-Fälle sind in beiden Spalten dieselbe Quelle. Bau: blueprint_bench.sh nimmt die tests/converted desselben Laufs wie das
-Level (Option `--tests <ordner>`), schneidet je Einheit den Quellteil aus (ein Schnitt an der Marke, keine Namensliste), übersetzt ihn mit
-converted.h; cases.h bekommt je f32-Fall eine dritte Funktion src64_<fall> (Eingaben wie die Klasse, double). Achtung: der Quellteil enthält
-converted::at (Prüfung, wo C++ es offenlässt) – das kostet wie die Listenprüfung der Klasse; im Bericht nennen.
+## E17 gebaut: 9c315bf2 (lokal gemessen, Beleg = dieser Lauf; engine auf mag folgt mit dem nächsten Auftrag)
+Messung $S/p/e17_1.txt (Level+Tests 055004, Kopf 9c315bf2): gleich64 29/29 „=“. **Über 1,10: 25 von 29 gegen die Quelle (f32), 23 von 29 gegen
+die Quelle in 64 Bit.** min/min64: qr_encode 4,96/3,57, gf_mul 3,46/3,39, rs 5,09/3,94, sha256 6,64/7,06, mulm 6,08/3,45, from_hex 5,09/5,01,
+rng_next 1,67/1,63, tiles 1,03/1,03, grid_key 1,37/1,04, zigzag 1,00/1,00, read_geometry 2,51/1,44, put_u32 1,53/1,54, get_u32 3,89/3,57,
+escape 3,30/3,33, num 1,28/1,29, wrap_pi 1,48/1,67, damp 1,04/1,00, qnormalize 1,20/1,26, slerp 1,17/1,01, to_local 1,32/1,16, rng_unit 1,82/1,90,
+person_hit 1,46/1,28, sphere 0,97/1,00, put_f32 1,54/1,52, ring_area 3,44/1,27, governor 1,46/1,42, audio 1,40/1,27, place_road 1,41/1,28, near 4,55/3,38.
+Achtung: die 64-Bit-Quelle ist die Kopie des Tests samt converted::at (Prüfung, wo C++ es offenlässt) – bei qr/mulm/mvt ist sie dadurch langsamer,
+nicht die Klasse schneller. BEFUND FÜR t1: die Kopie einer Klasse im Test hält nur, was die geschriebenen Funktionen nutzen (Field::all,
+Governor::tier/fps fehlen) – place_road/perf_governor lesen ihre Prüfsumme darum auf allen Seiten über near/update.
 
 ## Gebaut (UNBELEGT, Beleg: engine + vergleich settings auf mag folgt)
 - 50e21923 Text::Appending: `O = text_append(std::move(O), x, y)` hängt an Ort und Stelle an (ein Zeichen = push_back); Text of Code ohne

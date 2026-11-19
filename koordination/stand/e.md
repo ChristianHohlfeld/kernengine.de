@@ -32,3 +32,13 @@ Entwurf und Begründung: siehe Bericht an main (Handback), gleichlautend unten n
   settings_escape (Klasse gleich, nur C++-Zeit schwankt), lamps_near 2,4→2,85. lamps_near: in Field_near ändert sich nur n14 (Schleife lokal);
   Gegenproben ($S/e/bench/exp2, exp3, je 5× abwechselnd): neu mit n14 als Member 42,0 µs, neu 35,2, alt 31,0, alt mit n14 lokal 36,6 – die Lage
   des Codes (LTO) streut ±15–30 %, n14 allein erklärt es nicht. Ehrlich: lamps_near ist im Mittel langsamer, Ursache nicht eindeutig.
+- 08:40 Koordinator: nur Schritt 1 belegen, dann Ende. Schritt 2 war schon gebaut: Zweig work-e-tramp @ b482049a (NICHT belegt, nicht mergen
+  ohne Suiten) – alles für Schritt 2–5 in uebergabe/e.md.
+
+## 09:20 – Schritte 2–5 gebaut auf work-e-tramp (auf work-e b7abff9d), letzter Commit 26212023
+- Engine-Suite Schritt 1: work-e-engine-080904-22468 rc=1, einziger Fehler logic_libraries (erwarteter Garage-Text in alter Form) →
+  b7abff9d korrigiert; gezielte Probe work-e-engine-084557-30600 läuft.
+- Schritt 2 Interpreter (3e351c85, b482049a): siehe uebergabe/e.md. Schritt 4 Leser/Fälle/Doku (733f19bd, 26212023). Schritt 3 JIT (4352dd1f):
+  Stapel über Zelle + Wachsen, Call Function als Rahmen. Schritt 5 Konverter (6ee40d65): Rekursion im Teil, Anlehnen über Teile, pin_circles.
+- CI 44483698325 auf 4352dd1f: **Logic JIT: alle 47 Fälle Interpreter = JIT** (auch recursion_direct/through/deep/endless); JIT 178× schneller als
+  Interpreter wie zuvor. native rot nur an zwei alten Erwartungen (Fact-Verbot, gekürzter Fehlertext) → 26212023. native-spawncity/e2e/input liefen noch.

@@ -153,3 +153,18 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
 - 07:25 B3 (09dd6818) BELEGT für rocket_smoke_emit/gaps_guided (work-k-vergleich-062739-13858; real-FAIL nur LECK von d) → BEREIT ZUM MERGEN 09dd6818.
   Nächster Schritt für den Nachfolger: nach dem vollen Lauf des Koordinators spawn_squad/spawn_tank, life_hud, draw_events, mp_hud_json prüfen;
   Engine-Suite mit der neuen Engine-Tabelle (5d804704) prüfen.
+
+# NACHFOLGER 3 (ab 07:30, 19.11.) – Aufgaben mp_hud_json, draw_events, Session_update/life_hud, Terrain_run_job, Warteliste
+- work-k: Merge work-zusammen 821208ac; **ed63dca3** Reihenfolge der Argumente (operand/calm/unmoved, in invoke, engine(), format_values): braucht ein
+  Argument Schritte (hoist), werden Argumente links davon, die die Schritte sehen/ändern können oder selbst rufen, vorher in `arg`-Variablen gehalten.
+  Ursache mp_hud_json: `esc(net_.status())` → `a_2 = Session_status(net_)` vor hosting()/connected(). Kleinstfall /tmp/k_ord/src/o.cpp (pair(peek(c), bump(c))).
+  **3878258a**: die Menge der Hilfsvariablen heißt `self.temps` (`self.made` überdeckte die Methode made → TypeError, Lauf 075447 convert rc=1).
+  **4e72f8b4** (Test-Schreiber, wie B1): `memcpy(bytes, &rec, sizeof rec)` einer Struktur mit f32 → converted::layout::to_bytes (Bytes des Programms).
+  Ursache Terrain_run_job (jobs.submit, DemWindow-Bytes ab 16). Kleinstfall /tmp/k_mc/t.cpp.
+- draw_events: kein Konverterfehler – Test gibt combat_kGates, nicht combat_rules_g_gates → BEFUND FÜR t1 (stand/k.md).
+- Session_update, life_hud: in 043356 ohne Abweichung (nur cost).
+- Beleg-Auftrag: work-k-vergleich-081204-23050 (game_net, net_session, combat_rules, game_events, terrain, game.cpp auf 3878258a).
+- Aufgabe 5: „may run handlers“ ist eine Prüfung der Sprache (notation.cpp places_ok) → ENTSCHEIDUNG NÖTIG in stand/k.md (Vorschlag A: Laufzeitprüfung).
+  Der Konverter gibt bei const-Referenz eine Kopie (place_arg raising) – bei Car (Destruktor mit Rumpf) falsch; vermutlich Ursache der ~Car-Wartenden
+  draw_vehicles/draw_remote_vehicles/swarm_draw_vehicles (unbelegt). „a member of Int is set“ (vr_comfort, look_draw, begin_roads): Engine-Struktur
+  (TextureDesc mit `const u8* rgba`/MeshLook?) wird als Int geführt – nicht untersucht, eher Paket d.
