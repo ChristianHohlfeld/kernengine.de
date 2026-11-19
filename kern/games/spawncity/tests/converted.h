@@ -1170,12 +1170,13 @@ void take(const T*& to, const Value& v) {
   to = kept.back().data();
   rooms()[to] = kept.back().size();
 }
-/// As many entries as a count says, from a pointer the source hands the engine: where the pointer is one the test took
-/// from the stand-in (data() of an object of the engine), no more than are there - the stand-in answers its size()
-/// on its own; the engine's stand-in, too, gets no more than the list the Blueprint hands it holds.
+/// How many entries the source hands the engine from a pointer, a count beside it: as many as the count says - but where
+/// the pointer is one the test took from the stand-in (data() of an object of the engine), the numbers it holds, all
+/// of them: the Blueprint hands the engine the list that node gave it, and the stand-in answers size() on its own
+/// (the count is handed beside them, and compared as well).
 template <class T> std::size_t room(const T* p, std::size_t count) {
   const auto it = rooms().find(static_cast<const void*>(p));
-  return it == rooms().end() ? count : std::min(count, it->second);
+  return it == rooms().end() ? count : it->second;
 }
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
