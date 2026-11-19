@@ -13618,6 +13618,7 @@ def main(argv):
                 for place, piece in pieces.items():
                     w.pieces.setdefault(place, piece)
         w.wanted = None if u in program else set(wanted[u])
+        w.bars = dict(held.get(u, {}))   # (what waits for good: see `held`)
         return (u, sources.get(part_of.get(u, u)), files_, namespace, flags, w, test)
 
     # ---- the Blueprints, each after those it calls ----
@@ -13636,13 +13637,21 @@ def main(argv):
     given = {}                              # a Blueprint -> what it was given when it was converted last
     gave = collections.defaultdict(list)    # a Blueprint -> what it has given (its table, its exports), each once
     version = {}                            # a Blueprint -> which of those it gives now (an index into gave)
-    met, rounds, took = set(), 0, {}
+    met, rounds, took = {}, 0, {}   # (met: a state -> the round that began from it)
+    # When the rounds go round (the same state twice), what turns in them is what one Blueprint gives taking from what
+    # another gives: a function written in one round and waiting in the next, or waiting with another reason each time. Such a
+    # function of a Blueprint that goes round waits for good from then on (World.bars), with the reason it gave first in those
+    # rounds and the Blueprint it went round with; its Blueprint is given that, and what it gives no longer turns on it. Each
+    # time the rounds go round more wait for good - there are only so many functions -, so the rounds end. Rounds that do not
+    # go round never come to this: what they write stays as it was.
+    held = {}                               # a Blueprint -> its functions that wait for good: key -> why
+    visited = collections.defaultdict(list) # a Blueprint -> (the round, the version it gave then), round by round
 
     def asked_of(u, needs):
         """What a Blueprint is given, told by what it is made of: its files, the functions to write, and which
         of what they gave the Blueprints it may call give now."""
         return (tuple(sorted(unit_files[u])), None if u in program else tuple(sorted(wanted[u])),
-                tuple((d, version.get(d)) for d in sorted(needs[u])))
+                tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())))
 
     while True:
         needs = {u: need_of(u) for u in deps}
@@ -13666,9 +13675,43 @@ def main(argv):
                     exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
+            for u in sorted(new):
+                # (what it gave in the rounds that went round: of two versions one after the other, what differs - the values)
+                ring = [v for at, v in visited[u] if at >= met[state]]
+                for a, b in sorted({(x, y) for x, y in zip(ring, ring[1:]) if x != y}):
+                    (ta, ea), (tb, eb) = gave[u][a], gave[u][b]
+                    for k in sorted(set(ta) | set(tb)):
+                        if ta.get(k) != tb.get(k):
+                            print(f"goes round: {u}: v{a} -> v{b}: table {k}: {repr(ta.get(k))[:600]} -> {repr(tb.get(k))[:600]}", flush=True)
+                    for i, (da, db) in enumerate(zip(ea, eb)):
+                        if isinstance(da, dict) and isinstance(db, dict):
+                            for k in sorted(set(da) | set(db), key=str):
+                                if da.get(k) != db.get(k):
+                                    print(f"goes round: {u}: v{a} -> v{b}: exports[{i}] {k}: {repr(da.get(k))[:900]} -> {repr(db.get(k))[:900]}", flush=True)
+            # What turns in the rounds that went round and waits in one of them waits for good (World.bars), with the
+            # reason it gave first there - a function written in one round and waiting in the next, or one that waits in
+            # each with another reason (what it names first changes with what the others give): each its own, the same
+            # whatever the order in which the round's jobs are done.
+            pinned = {}
+            for u in sorted(new):
+                ring = [v for at, v in visited[u] if at >= met[state]]
+                tabs = [gave[u][v][0] for v in ring]
+                for k in sorted(set().union(*tabs)):
+                    if k in held.get(u, {}):
+                        continue
+                    outcomes = [(t[k]["wait"] if k in t else "absent") for t in tabs]
+                    waits = [w for w in outcomes if w and w != "absent"]
+                    if len(set(outcomes)) > 1 and waits:
+                        pinned.setdefault(u, {})[k] = f"{waits[0]} (it went round with {u})"
+            if pinned:
+                for u, ks in sorted(pinned.items()):
+                    held.setdefault(u, {}).update(ks)
+                    for k, why in ks.items():
+                        print(f"{u}: {tables[u][k]['cpp'] if k in tables.get(u, {}) else k}() waits for good - the rounds went round: {why}", flush=True)
+                continue
             raise SystemExit("these Blueprints give, round after round, what they gave before (what one writes takes from the other what "
                              "it writes): " + ", ".join(sorted(new)))
-        met.add(state)
+        met[state] = rounds + 1
         now = sorted(u for u in new if all(d not in new or u in needs[d] for d in needs[u]))
         rounds += 1
         print(f"round {rounds}: {len(now)} Blueprints", flush=True)
@@ -13693,6 +13736,7 @@ def main(argv):
             if value not in gave[u]:
                 gave[u].append(value)
             version[u] = gave[u].index(value)
+            visited[u].append((rounds, version[u]))
         for u in now:
             # What it would call of a Blueprint that has no such function written: that Blueprint is one it calls
             # (the plan may not have known it, or not the call) - and of a header of the engine, one more
