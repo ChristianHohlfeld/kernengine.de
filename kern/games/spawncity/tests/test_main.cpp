@@ -210,6 +210,10 @@ int main(int argc, char** argv) {
     const pid_t child = fork();
     if (child == 0) {
       close(pipe_fd[0]);
+      // (the test's own counts: the child begins with what the tests before it added up - without this each test
+      // gave the sum so far once more, the sum doubled from test to test, and one failure failed every test after it)
+      sct::checks = 0;
+      sct::failures = 0;
       c.fn();
       counts[0] = sct::checks;
       counts[1] = sct::failures;
