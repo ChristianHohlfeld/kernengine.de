@@ -6082,10 +6082,64 @@ class Emit:
         rec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), None)
         method = next((c for c in kids(rec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
         body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
+        if method is None:
+            template = next((c for c in kids(rec or {}) if c.get("kind") == "FunctionTemplateDecl" and c.get("name") == "operator()"), None)
+            if template is not None:
+                return self.local_template(v, lam, rec, template)
         if body is None:
-            # (a lambda with auto inputs is a template: a function for each type it is called with - one that takes
-            # functions is one for each function it is given; the language has no function values)
-            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+            raise Wait("a function value (lambda / std::function) of another shape: a lambda without a body")
+        return self.local_one(v, lam, rec, method, body)
+
+    @staticmethod
+    def closure(t):
+        """Is this C++ type the class of a lambda (`(lambda at tiles.cpp:249:23)`, also as const or a reference)?"""
+        return "(lambda at " in (t or "")
+
+    def local_template(self, v, lam, rec, template):
+        """`auto f = [&](const char* layer, auto kind_of) { ... kind_of(l, f, kind) ... };` - a lambda with auto inputs
+        is a template: C++ makes a function of it for each set of types it is called with (its specializations, which
+        clang lists after the pattern). Each one becomes a function of the Blueprint, as a lambda does. An input that is
+        itself a lambda has one function in each specialization - the one its type names: no value is handed, the
+        specialization calls that lambda's function (lifted as a local function too, before it). Such a lambda captures
+        nothing: what it would capture is named where it is written, after the template. A call names its
+        specialization (the call operator it refers to); the inputs that are lambdas are left out of it."""
+        made = [c for c in kids(template) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"
+                and any(x.get("kind") == "CompoundStmt" for x in kids(c)) and not any("auto" in qtype(x).split() for x in kids(c) if x.get("kind") == "ParmVarDecl")]
+        lines = []
+        for spec in made:
+            params = [x for x in kids(spec) if x.get("kind") == "ParmVarDecl"]
+            drop = []
+            for i, prm in enumerate(params):
+                if not self.closure(qtype(prm)):
+                    continue
+                kind = re.search(r"\(lambda at [^)]*\)", qtype(prm)).group(0)
+                given = [x for x in walk(self.f.decl) if x.get("kind") == "LambdaExpr" and qtype(x) == kind]
+                if len(given) != 1:
+                    raise Wait("a lambda with auto inputs handed a lambda that is not written in its function")
+                grec = next((c for c in kids(given[0]) if c.get("kind") == "CXXRecordDecl"), None)
+                if any(c.get("kind") == "FieldDecl" for c in kids(grec or {})):
+                    raise Wait("a lambda with auto inputs handed a lambda that captures something")
+                gop = next((c for c in kids(grec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
+                if gop is None:
+                    raise Wait("a lambda with auto inputs handed a lambda with auto inputs")
+                if gop["id"] not in self.u.lambdas:
+                    lines += self.local_one({"name": prm.get("name") or "given"}, given[0], grec, gop,
+                                            next((c for c in kids(gop) if c.get("kind") == "CompoundStmt"), None))
+                drop.append(i)
+            body = next(c for c in kids(spec) if c.get("kind") == "CompoundStmt")
+            lines += self.local_one(v, lam, rec, spec, body, drop)
+        if not made:
+            raise Wait("a lambda with auto inputs that is never called")
+        if v.get("id"):
+            self.u.lambda_vars.pop(v["id"], None)   # (a template is no one function an algorithm could be handed)
+        return lines
+
+    def local_one(self, v, lam, rec, method, body, drop=()):
+        """One function of the Blueprint of a lambda's call operator (local_function); `drop`: the positions of its
+        inputs that are lambdas (local_template) - neither inputs of the function nor arguments of its calls."""
+        u, tree = self.u, self.tree
+        if body is None:
+            raise Wait("a function value (lambda / std::function) of another shape: a lambda without a body")
         fields = [qtype(c) for c in kids(rec) if c.get("kind") == "FieldDecl"]
         this_used = uses_this(body)
         values = [t for t in fields if not (this_used and t.rstrip().endswith("*") and "&" not in t)]
@@ -6139,6 +6193,9 @@ class Emit:
                 args.append({"kind": "_Text", "_text": snap, "_type": self.types[i]})
         outer = self.f.decl
         raw_type = qtype(method)
+        if drop:
+            raw_type = re.sub(r"\(lambda at [^)]*\)", "\x00", raw_type)
+            raw_type = re.sub(r"\s*,\s*[^,()]*\x00[^,()]*(?=[,)])|(?<=\()\s*[^,()]*\x00[^,()]*,?\s*", "", raw_type)
         trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
         if trailing:   # (a lambda without its own list of inputs, `[&] { ... }`: its type is spelled "auto () const -> void")
             raw_type = f"{trailing.group(2)} {trailing.group(1)}"
@@ -6146,12 +6203,12 @@ class Emit:
             raw_type = re.sub(r"\s*\bconst\s*$", "", raw_type) + (" const" if not self.f.mutates else "")
         synth = {"id": method["id"], "_mine": True, "kind": "CXXMethodDecl" if this_used else "FunctionDecl", "name": f"{outer.get('name', 'f')}_{v.get('name', 'local')}",
                  "type": {"qualType": raw_type}, "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)),
-                 "inner": params + [c for c in kids(method) if c.get("kind") == "ParmVarDecl"] + [body]}
+                 "inner": params + [c for i, c in enumerate(x for x in kids(method) if x.get("kind") == "ParmVarDecl") if i not in drop] + [body]}
         tree.body[method["id"]] = synth
         tree.scope_of[method["id"]] = tree.scope_of.get(outer["id"], "")
         if this_used:
             tree.owner[method["id"]] = tree.owner.get(outer["id"])
-        u.lambdas[method["id"]] = {"free": free, "args": args, "snapshots": not by_ref}
+        u.lambdas[method["id"]] = {"free": free, "args": args, "snapshots": not by_ref, "drop": tuple(drop)}
         if v.get("id"):
             u.lambda_vars[v["id"]] = lam
         g = u.function(method["id"])
@@ -6179,6 +6236,9 @@ class Emit:
             raise Wait("a Callback of a lambda that uses an object outside a method")
         outer = self.f.decl
         raw_type = qtype(method)
+        if drop:
+            raw_type = re.sub(r"\(lambda at [^)]*\)", "\x00", raw_type)
+            raw_type = re.sub(r"\s*,\s*[^,()]*\x00[^,()]*(?=[,)])|(?<=\()\s*[^,()]*\x00[^,()]*,?\s*", "", raw_type)
         trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
         if trailing:
             raw_type = f"{trailing.group(2)} {trailing.group(1)}"
@@ -6280,6 +6340,9 @@ class Emit:
         first = dict(params[0], type={"qualType": "const " + owner + " &"})
         outer = self.f.decl
         raw_type = qtype(method)
+        if drop:
+            raw_type = re.sub(r"\(lambda at [^)]*\)", "\x00", raw_type)
+            raw_type = re.sub(r"\s*,\s*[^,()]*\x00[^,()]*(?=[,)])|(?<=\()\s*[^,()]*\x00[^,()]*,?\s*", "", raw_type)
         trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
         if trailing:
             raw_type = f"{trailing.group(2)} {trailing.group(1)}"
@@ -6304,7 +6367,8 @@ class Emit:
     def local_call(self, n):
         """A call of a local function: (text, type) of what it gives, as `invoke` has it."""
         info = self.u.lambdas[callee(n)["referencedDecl"]["id"]]
-        return self.invoke(self.u.function(callee(n)["referencedDecl"]["id"]), info["args"] + kids(n)[2:])
+        given = [x for i, x in enumerate(kids(n)[2:]) if i not in info.get("drop", ())]
+        return self.invoke(self.u.function(callee(n)["referencedDecl"]["id"]), info["args"] + given)
 
     def is_local_call(self, n):
         return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
