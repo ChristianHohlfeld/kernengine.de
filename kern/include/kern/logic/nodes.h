@@ -174,13 +174,20 @@ template <class T> struct Sized {
   constexpr Sized(math::Exact x) : Sized(Whole(x)) {}                                // NOLINT
   template <char Op, class A, class B> Sized(const Sum<Op, A, B>& x) : Sized(Whole(x)) {}  // NOLINT
   constexpr operator Whole() const { Whole r; r.v = static_cast<i64>(v); return r; }  // NOLINT (implicit: it is that Int)
-  constexpr explicit operator i64() const { return static_cast<i64>(v); }  // (its number: static_cast<i64>, as of a std::uint8_t)
+  // (its number, as a std::uint8_t converts to one: handed to every function of whole numbers that takes an i64)
+  constexpr operator i64() const { return static_cast<i64>(v); }  // NOLINT
   Sized& operator+=(Whole amount) {
     v = static_cast<T>(static_cast<u64>(static_cast<i64>(v)) + static_cast<u64>(amount.v));
     return *this;
   }
   u64 hash() const { return KeyHash<i64>{}(static_cast<i64>(v)); }
   friend constexpr bool operator==(Sized a, Sized b) { return a.v == b.v; }
+  // (compared with a whole number: as their numbers - one way, not two)
+  friend constexpr bool operator==(Sized a, Whole b) { return static_cast<i64>(a.v) == b.v; }
+  template <class U> friend constexpr bool operator==(Sized a, Sized<U> b) { return static_cast<i64>(a.v) == static_cast<i64>(b.v); }
+  template <class I>
+    requires std::is_integral_v<I>
+  friend constexpr bool operator==(Sized a, I b) { return static_cast<i64>(a.v) == static_cast<i64>(b); }
 };
 /// What a pin reads from a value it is handed (a Formula's input): an Int of a fixed width is the Int it holds,
 /// anything else is itself.
@@ -2432,7 +2439,6 @@ struct PureNodes {
   static Bool int64_less_unsigned(Int64 a, Int64 b) { return a.bits < b.bits; }
   /// An Int as 64 bits: an i64 (a whole number below 0 is its two's complement).
   static Int64 int64_of_int(Int a) { return Int64(static_cast<u64>(static_cast<i64>(a))); }
-  template <class T> static Int64 int64_of_int(Sized<T> a) { return int64_of_int(static_cast<i64>(a)); }  // (an Int of a fixed width: its number)
   /// The bits as an i64 / a u64, as an Int holds that (exact up to 2^53, beyond: the nearest).
   static Int int64_to_int(Int64 a) { return normal(static_cast<i64>(a.bits)); }
   static Int int64_to_int_unsigned(Int64 a) { return whole(static_cast<f64>(a.bits)); }

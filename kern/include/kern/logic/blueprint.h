@@ -629,6 +629,7 @@ struct BlueprintCore : logic::PureNodes {
     return logic::format::text_of(Format.view(), args, sizeof...(V), most);
   }
   static logic::format::Arg format_arg(Int v) { return logic::format::arg(static_cast<i64>(v)); }
+  template <class T> static logic::format::Arg format_arg(logic::Sized<T> v) { return logic::format::arg(static_cast<i64>(v)); }  // (an Int of a fixed width: its Int)
   static logic::format::Arg format_arg(Float v) { return logic::format::arg(v); }
   static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
   /// (a text that is no Text - what int64_text, int64_text_signed ... give: a view of that value itself, which
