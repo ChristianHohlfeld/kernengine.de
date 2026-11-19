@@ -1525,20 +1525,22 @@ struct Tally {
   /// as kWork has room for, but twenty at least. (What the source says nothing for is drawn again.)
   /// The work of a call is counted, not timed - a test gives the same verdict in every run, on any machine: the
   /// values it is given and its object holds (weight: what is drawn, handed to the Blueprints, read back and
-  /// compared) and the loop passes of the class (Runtime::budget counts them - the same in every tier).
+  /// compared - one each) and the loop passes of the class (Runtime::budget counts them, the same in every tier) -
+  /// one for ten in the class, a hundred for one in the interpreter. (In units of about a microsecond: measured
+  /// with work-t1-vergleich-101036-32705 - a value about 1.3 µs, a pass of the class 0.12 µs, of the interpreter 90-280 µs.)
   bool more(int tried) const {
     drawn = tried;
     if (compared >= kCalls || tried >= kCalls * 20) return false;
     if (compared >= 20) return work < kWork;
     return compared < 5 || work < kLongWork;
   }
-  static constexpr long long kWork = 200000;
+  static constexpr long long kWork = 1000000;
   /// A function whose calls are each a great deal of work (a number raised to a 256-bit power, limb by limb): five
   /// compared calls at least, and as many more, up to twenty, as kLongWork has room for.
-  static constexpr long long kLongWork = 200000000;
+  static constexpr long long kLongWork = 20000000;
   /// A call in whose class loops pass more often than this would take the interpreter minutes: it is compared with
   /// the class alone, and the function's line says so (~Tally).
-  static constexpr long long kInterpreterPasses = 50000;
+  static constexpr long long kInterpreterPasses = 5000;
   double seconds() const { return std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count(); }
   /// One call. `want`: what the source gives, computed with the Blueprint language's numbers;
   /// `left`: the source divided by zero or left the numbers on the way - nothing to compare.
@@ -1596,10 +1598,11 @@ struct Tally {
     const long class_asks = g_class_asks;
     const long long looped = bp.native->counters()[3];   // (the loop passes of this call - the runtime counts from zero for a call from outside)
     passes += looped;
-    work += looped;
+    work += looped / 10;
     most_passes = std::max(most_passes, looped);
     class_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
     const bool both = looped <= kInterpreterPasses;
+    if (both) work += looped * 100;
     if (both) bp.before_call(false);
     const auto interpreter_began = std::chrono::steady_clock::now();
     const bool ia = both ? bp.interp->call(function, args, a) : ib;
