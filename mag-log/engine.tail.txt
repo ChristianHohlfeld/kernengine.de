@@ -1,0 +1,80 @@
+ok   lehrer_ppo_learns_to_reach
+  reach (2 collectors): return -5.163 -> -0.886
+ok   lehrer_ppo_learns_from_collectors_elsewhere
+ok   determinism_is_bit_identical_across_builds_and_platforms
+ok   lehrer_runs_the_same_on_any_number_of_workers
+    servo calibration: fit 125.77 -> 1.397 mrad, held out 93.75 -> 1.269 mrad (481 runs)
+    K 0.433 (0.443) D 0.0674 (0.0689) F 0.0064 (0.0072) T 0.919 (0.867) A 0.00216 (0.00216) delay 0.029 (0.030)
+ok   lehrer_calibrates_a_servo_from_bench_logs
+    robot log, 120 ticks: same servos 0.0000 rad, nominal servos joints 0.0045 rad, gyro 0.0166 rad/s
+ok   lehrer_replays_robot_logs_against_the_simulation
+ok   lehrer_exports_onnx_like_pollens_networks
+ok   micro_duck_jumps_for_real_in_the_studio
+ok   game_level_keeps_learned_motions
+ok   micro_duck_plays_the_motions_its_level_taught
+ok   micro_duck_jumps_with_a_network_trained_in_kern
+ok   micro_duck_observation_between_ticks_is_what_its_controller_sees
+ok   lehrer_free_scenario_defines_physics_goals_and_rewards
+  headless duck: 512 control ticks/s (10.2x real time, sanitizer build)
+ok   lehrer_duck_env_runs_episodes_headless
+ok   micro_duck_walks_with_the_robot_daemons_action_profile
+ok   micro_duck_walks_on_its_alpha_gait
+ok   micro_duck_runs_every_move_of_its_set
+ok   micro_duck_servo_load_drives_its_sound
+ok   micro_duck_steps_and_taps_sound
+ok   micro_duck_joints_stay_in_their_ranges
+ok   micro_duck_speaks_with_its_own_voice
+ok   micro_duck_picks_up_a_sock
+ok   micro_duck_answers_and_melts_when_petted
+ok   micro_duck_camera_sees_the_floor_in_front_when_looking_down
+ok   physics_materials_of_meshes_and_the_ground
+ok   micro_duck_plays_with_a_ball_on_its_own
+ok   micro_duck_plays_ball_as_pollens_brain_does
+ok   micro_duck_pickup_detector_matches_onnxruntime
+ok   micro_duck_pauses_in_the_hand_and_walks_when_put_down
+ok   micro_duck_goes_for_a_sock_and_bites
+ok   micro_duck_roams_on_its_own_with_its_tof
+ok   micro_duck_looks_around_when_left_alone
+ok   micro_duck_blueprint_nodes_drive_and_sense
+ok   micro_duck_example_level_runs
+ok   studio_robot_template_compiles
+ok   micro_duck_builds_from_its_mjcf
+ok   studio_player_presets_and_gameplay_blocks
+ok   game_gameplay_blocks
+ok   studio_shortcuts_follow_the_keyboard_layout
+ok   studio_logic_functions
+ok   studio_logic_local_variables
+ok   studio_logic_reference_inputs
+ok   studio_logic_libraries
+ok   studio_logic_call_on_actor
+ok   studio_logic_project_types
+ok   studio_logic_cpp_view
+ok   studio_logic_editor_commands
+ok   studio_logic_lists
+ok   studio_logic_enums
+ok   studio_logic_structs
+ok   studio_blueprint_breakpoints_pause_the_game
+ok   studio_blueprint_comments_reroutes_promote
+ok   studio_multiplayer_play
+ok   studio_shortcuts_and_commands
+ok   studio_outliner_hierarchy
+ok   studio_play_orb_run
+    orbRun: worst on-screen shake 0.026 deg
+    physicsLab: worst on-screen shake 0.020 deg
+ok   studio_fast_player_does_not_shake_on_screen
+ok   studio_simulate_keep_changes
+ok   studio_save_load_and_textures
+    seed 19088743: 30 history steps, 9 actors
+    seed 12648430: 76 history steps, 43 actors
+    seed 20261022: 103 history steps, 31 actors
+ok   studio_undo_redo_is_exact_and_deterministic
+ok   studio_undo_transactions_and_dirty_state
+ok   studio_autosave_only_while_unsaved
+ok   studio_user_settings
+ok   studio_player_only
+ok   app_input_and_args
+54627 checks, 2 failures
+
+real	7m20,234s
+user	20m16,312s
+sys	0m49,442s
