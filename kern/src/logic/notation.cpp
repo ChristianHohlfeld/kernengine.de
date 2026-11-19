@@ -5082,6 +5082,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "  " + name + " self;\n" +
                   running +
                   "  void attach(const kern::logic::BlueprintWorld& world) override { self.kern_world = world; }\n"
+                  "  void* object(const void* type) override { return type == &kern::logic::class_key<" + name + "> ? &self : nullptr; }\n"
                   "  void run(int node, int entry) override {\n"
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
                   events +

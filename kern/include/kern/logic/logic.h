@@ -1076,7 +1076,17 @@ class NativeBlueprint {
   virtual bool call(std::string_view function, std::span<const Value> args, Results& results) = 0;
   virtual bool get(std::string_view variable, Value& out) const = 0;
   virtual bool set(std::string_view variable, const Value& value) = 0;
+  /// The class's object, where `type` is the key of its class (class_key): what the program's own C++
+  /// calls directly (kern/logic/blueprint_class.h). Null for the key of any other class - and from a
+  /// NativeBlueprint that is no Blueprint's class.
+  virtual void* object(const void* type) {
+    (void)type;
+    return nullptr;
+  }
 };
+/// The key of the class T, one in the whole program (an inline variable has one address): what
+/// NativeBlueprint::object is asked by.
+template <class T> inline constexpr char class_key = 0;
 using NativeBlueprintFactory = std::unique_ptr<NativeBlueprint> (*)();
 /// The order of a function's inputs: those by reference come first. An input by value has a
 /// default (`Float by = 0.5`), a reference has none (the call names its place) - and in C++ every
@@ -1244,6 +1254,9 @@ class Instance {
   /// interpreter.
   bool compiled() const { return blueprint_ || jit_fn_ >= 0; }
   const char* tier() const { return blueprint_ ? "native C++" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter"; }
+  /// Where it runs as its compiled class T, the object of that class (null: it runs otherwise, or as
+  /// another class) - what the program's own C++ calls directly (kern/logic/blueprint_class.h).
+  template <class T> T* native_object() const { return blueprint_ ? static_cast<T*>(blueprint_->object(&class_key<T>)) : nullptr; }
   i32 id() const { return id_; }
 
   // ---- generated code support (the JIT's modules call these) ----

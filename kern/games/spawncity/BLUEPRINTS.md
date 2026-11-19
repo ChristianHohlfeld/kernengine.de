@@ -286,8 +286,8 @@ In dieser Reihenfolge (klein nach groß; jede Datei verschwindet, ihre Tests ble
   Das C++ des Spiels hält seinen Zustand in 32 Bit; dort ist „0,1“ die Zahl 0,100000001490116…
   – unverändert weitergereicht läge sie knapp jenseits einer Schwelle 0,1, auf der sie genau
   steht. Darum geht jede 32-Bit-Zahl als die Dezimalzahl hinüber, für die sie steht
-  (`rules::number`, `rules::decimal` in `blueprint_call.h`: die kürzeste Dezimalzahl, die genau
-  diese 32-Bit-Zahl ist). Damit antwortet jeder Vergleich einer Zahl des Spiels mit einer
+  (`rules::decimal` in `blueprint_call.h`: die kürzeste Dezimalzahl, die genau diese 32-Bit-Zahl
+  ist); zurück wird eine Zahl des Blueprints mit `static_cast<f32>` wieder eine 32-Bit-Zahl. Damit antwortet jeder Vergleich einer Zahl des Spiels mit einer
   Schwelle genau wie vorher in 32 Bit – auf der Schwelle und auf beiden Seiten; der Weg ist
   eineindeutig (zurück in 32 Bit ist es dieselbe Zahl) und erhält die Ordnung. Geprüft im Test
   `controls_numbers_cross_exactly`: 29 Schwellen der Regeln mit je vier 32-Bit-Nachbarn zu beiden
@@ -887,6 +887,56 @@ Was als Nächstes dazukommt, in der Reihenfolge der Zeilen, die darauf warten:
 Eine Datei schaltet um, sobald sie ganz durchläuft: Ihr C++ wird gelöscht, das Spiel läuft auf
 ihrem Blueprint, und ihre bisherigen Tests prüfen den Blueprint. Bis dahin ist das C++ die Quelle,
 aus der der Konverter den Blueprint schreibt, und der Vergleichstest hält beide gleich.
+
+**Wie (festgelegt 18.11.2026).** Das übrige C++ ruft eine umgeschaltete Datei als ihre Klasse –
+direkt, typisiert, mit den Typen des Blueprints:
+
+- **Wo sie steht.** Der Blueprint einer umgeschalteten Datei steht im Level im Ordner „Program“
+  (die übrigen im Ordner „Source“, die Regeln in „Rules“). „Source“ gehört dem Konverter: Ein
+  voller Lauf schreibt dort alles neu und verwirft, was er nicht mehr schreibt. Ein Blueprint eines
+  anderen Ordners ist eine Quelle für sich – der Lauf schreibt ihn nicht und verwirft ihn nicht;
+  was er von den Bibliotheken in „Source“ benutzt (Typen wie die Zeile einer Liste von Listen,
+  Funktionen), schreibt der Lauf weiter, sonst bleibt das Level, wie es war, und der Lauf sagt,
+  was fehlt (`tools/cpp_to_blueprint.py`, `kept_by_others`).
+- **Ein Typ.** Das Spiel nimmt die Typen der Klasse – einen Typ je Struktur, keinen zweiten des
+  Spiels daneben, keine Umwandlung von Strukturen oder Listen je Aufruf; eine Referenz bindet
+  direkt (`blueprints::qr_code::qr_Code code;` und `encode(text, code)`). An der Grenze zu C++,
+  das noch nicht umgeschaltet ist, bleiben nur einzelne Zahlen (siehe „Zahlen an der Grenze“:
+  hinein `rules::decimal`, heraus `static_cast<f32>`; eine ganze Zahl ist ein `Int`, das jede
+  ganze Zahl von C++ nimmt und gibt). Die Grenze verschwindet, wenn der Aufrufer umschaltet.
+- **Ein Header aus dem Level.** `tools/blueprint_cpp.sh level.klevel src/level_blueprints.cpp
+  src/level_blueprints.h Program` – derselbe Generator, der alle Blueprints als Klassen schreibt –
+  schreibt die Klassen der Blueprints des Ordners und der Bibliotheken, die sie benutzen, in den
+  Header: je einmal, unter ihren Namen im Namensraum `blueprints` (`blueprints::qr_code_cpp`), dazu
+  `blueprints::bind`. `build.sh` und `tests/run_tests.sh` schreiben ihn; der Konverter mit
+  `--classes src/level_blueprints.h=Program` ebenso, bevor er die Quellen liest.
+- **Ein Objekt je Klasse, einmal gebunden.** Das Objekt ist das, als das die Logik des Levels den
+  Blueprint ausführt: `blueprints::bind(logic)` bindet beim Start jede Klasse an die Instanz, die
+  als sie läuft (`kern::logic::bind_blueprint`, `kern/logic/blueprint_class.h`, einmal gesucht);
+  danach ist jeder Aufruf ein gewöhnlicher Aufruf einer Methode:
+  `kern::logic::blueprint<blueprints::qr_code_cpp>().encode(text, code)`. Nichts wird beim Namen
+  nachgeschlagen, kein Wert verpackt, kein Actor je Aufruf gesucht.
+- **Die Schleifengrenze** (`Runtime::budget`) setzt das Spiel wie der Test: `rules::kLoopBudget`
+  (`blueprint_call.h`) – die Funktionen des Spiels schleifen lange (ein Code Bit für Bit, ein Klang
+  Abtastwert für Abtastwert). Der Vergleichstest, der Differenztest und das Spiel nehmen dieselbe.
+- **Die Tests der Datei** prüfen den Blueprint: Sie binden die Klasse an eine Laufzeit, in der der
+  Blueprint läuft (`RuleBlueprint`), und rufen sie wie das Spiel. Ihr Vergleichstest
+  (`tests/converted/test_<datei>.cpp`) entfällt mit dem C++, mit dem er verglich.
+- **Zahlen:** Die Datei rechnet jetzt in den Zahlen der Sprache (64 Bit) – was das Original
+  rechnet. Wo ein Test deshalb einen anderen Wert sieht, wird er nicht weich gemacht: Die Stelle
+  wird mit beiden Werten gemeldet; das Maß ist spawncity.de.
+
+Umgeschaltet:
+- [x] **`qr_code`** (`qr_code.h`, `qr_code.cpp`): die Blueprints `qr_code` (die Struktur `qr_Code`,
+  `Code_dark`) und `qr_code_cpp` (der Kodierer: `encode`, `read_format`). Das Spiel ruft sie im
+  Befehl `qr` (`game_net.cpp`), der Test `mp_qr_code_structure` prüft den Blueprint.
+
+Was das Umschalten der übrigen Dateien braucht:
+- Der Konverter schreibt einen Aufruf des übrigen C++ in eine umgeschaltete Datei noch nicht als
+  Aufruf ihrer Bibliothek (`qr_code_cpp::encode(text, code)`): Er liest die Klassen des Headers
+  nicht (sie stehen außerhalb der Namensräume des Programms), eine Funktion mit einem solchen
+  Aufruf wartet. Heute betrifft das nur `Game::net_command`, die ohnehin wartet.
+- Dateien, die die Engine rufen, brauchen die Engine-Aufrufe direkt in der Klasse (Schritt 6 (d)).
 
 ### 6 – Das Projekt laden
 Das Projekt ist die Datei des Levels: `level/spawncity.klevel` mit den Actors, ihren Blueprints,

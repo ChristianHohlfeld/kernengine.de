@@ -8,7 +8,7 @@ in the notation, function by function:
 
   tools/cpp_to_blueprint.py --convert <namespace> --level <level.klevel> [--folder <name>]
       [--test <dir>] [--texts <dir>] [--program <folder>=<namespace>[,<namespace>...]]...
-      <include flags...> -- <file.cpp>...
+      [--classes <header.h>=<folder>] <include flags...> -- <file.cpp>...
 
   - the program is the folders of the sources, in the namespace given - and the further folders named
     with --program, each with the namespaces its files declare (vendored code the program includes:
@@ -36,7 +36,17 @@ in the notation, function by function:
     the functions of numbers are kern::math's), and calls it, the Blueprint in the interpreter and
     the Blueprint as its compiled class with the same arguments: what the three give must be the
     same bit for bit;
-  - --texts writes each Blueprint's text into a directory, to read.
+  - --texts writes each Blueprint's text into a directory, to read;
+  - the Blueprints of the level are the program's sources where they stand outside the folder this tool
+    writes (--folder, "Source"): a file that is a Blueprint now - its C++ is gone, the Blueprint in the
+    level is its one source (BLUEPRINTS.md, "5 - Umschalten") - stands in a folder of its own. A run
+    neither rewrites nor drops such a Blueprint (a run over the whole program drops, of its own folder,
+    what it does not write any more). The program's C++ calls it as its class: --classes names the
+    header the build writes their classes into (tools/blueprint_cpp, the same tool, from the same
+    level) and their folder (default: level_blueprints.h=Program, as build.sh writes it). Where the
+    level has Blueprints in that folder, the run writes the header from the level into a folder of its
+    own before it reads the sources, and that folder comes first on the include path; a test includes it
+    by its name (TestWriter: a header that is not in the sources' folder is the build's);
 
 How the Blueprint computes is the Blueprint language's own arithmetic: numbers are 64-bit and
 whole numbers exact, a division by zero gives 0, a vector's components are 32-bit. It is the same
@@ -1320,6 +1330,9 @@ def is_nothing(n):
     return b.get("kind") in ("CXXNullPtrLiteralExpr", "GNUNullExpr") or re.sub(r"^const\s+", "", (b.get("type") or {}).get("qualType", "")) in ("std::nullopt_t", "std::nullptr_t", "nullptr_t")
 
 
+# The header of the Blueprints the program calls as their classes, and their folder in the level, as the build
+# writes it (build.sh: tools/blueprint_cpp.sh <level> <out.cpp> <out.h> <folder>; --classes says other ones).
+CLASSES = ["level_blueprints.h", "Program"]
 SHAPES = "shapes"   # the library of the types the converter makes of the notation's own (a row of a list of lists, a pair)
 
 
@@ -13508,6 +13521,8 @@ class TestWriter:
                     system.append(f"#include <{m.group(2)}>")
             elif m.group(2).startswith("kern/"):
                 own.append(f'#include "{m.group(2)}"')
+            elif m.group(2) == os.path.basename(CLASSES[0]):
+                own.append(f'#include "{m.group(2)}"')   # (the build's header of the Blueprints' classes: by its name, on the include path)
             else:
                 own.append(f'#include "{self.source_dir}/{m.group(2)}"')
         # of the file's own `using` lines only those of the standard library: the program's names are the test's own here
@@ -14258,6 +14273,57 @@ def apply_to_level(level, folder, blueprints, prune=False):
     shutil.rmtree(scratch, ignore_errors=True)
 
 
+def kept_by_others(level, folder):
+    """What the Blueprints of the level outside `folder` use of the Blueprints of `folder` (the folder this
+    tool writes): {library: {"types": {name: its struct or enum as the level holds it}, "functions": {names},
+    "users": {who uses it}}}. A file that is a Blueprint now (its C++ gone: "5 - Umschalten") still uses the
+    libraries of the files that are not - their types (a shape: a row of a list of lists), their functions. A
+    run keeps what they use: it writes it, or it says why it cannot."""
+    doc = json.load(open(level, encoding="utf-8"))
+    mine = {a["name"] for a in doc.get("actors", []) if a.get("folder") == folder}
+    out = {}
+    for a in doc.get("actors", []):
+        g = (a.get("components") or {}).get("logic")
+        if not g or a.get("folder") == folder:
+            continue
+        for kind in ("structs", "enums"):
+            for t in g.get(kind, []):
+                if t.get("from") in mine:
+                    e = out.setdefault(t["from"], {"types": {}, "functions": set(), "users": set()})
+                    e["types"][t["name"]] = (kind, t)
+                    e["users"].add(a["name"])
+        for f in g.get("functions", []):
+            if f.get("from") in mine:
+                e = out.setdefault(f["from"], {"types": {}, "functions": set(), "users": set()})
+                e["functions"].add(f["name"].split("::")[-1])
+                e["users"].add(a["name"])
+    return out
+
+
+def shape_line(name, struct):
+    """The declaration of a shape (a type this tool makes of the notation's own - a row of a list, a pair) as
+    the level holds it, written as this tool writes it (Unit.element, Unit.pair). None: it is no such shape."""
+    def notation(f):
+        t = f.get("type", "float")
+        base = t[:-5] if t.endswith("_list") else t
+        word = {"int": "Int", "float": "Float", "bool": "Bool", "vector": "Vector", "text": "Text", "int64": "Int64", "actor": "Actor"}.get(base)
+        if word is None and base == "struct":
+            word = f.get("of")
+        if not word:
+            return None
+        return f"List<{word}>" if t.endswith("_list") else word
+    fields = struct.get("fields", [])
+    kinds = [notation(f) for f in fields]
+    if None in kinds:
+        return None
+    if [f["name"] for f in fields] == ["items"] and kinds[0].startswith("List<"):
+        n = fields[0].get("count")
+        return f"  KERN_STRUCT({name}) {{ {Unit.fixed_type(kinds[0], n)} items = {kinds[0]}{{}}; }};"
+    if [f["name"] for f in fields] == ["first", "second"] and all(k in ZERO for k in kinds):
+        return f"  KERN_STRUCT({name}) {{ {kinds[0]} first = {ZERO[kinds[0]]}; {kinds[1]} second = {ZERO[kinds[1]]}; }};"
+    return None
+
+
 def plan_names(world, types, units):
     """What every type of the program is called (World.type_names, World.taken): its own name - and where
     two types have the same one, or a type the name of a Blueprint, they are told apart by where they
@@ -14294,12 +14360,19 @@ def main(argv):
     cut = argv.index("--")
     opts, files = argv[3:cut], argv[cut + 1:]
     level = folder = test = texts = None
+    classes = tuple(CLASSES)
     flags, more = [], []
     i = 0
     while i < len(opts):
-        if opts[i] in ("--level", "--folder", "--test", "--texts", "--program"):
+        if opts[i] in ("--level", "--folder", "--test", "--texts", "--program", "--classes"):
             v = opts[i + 1]
             if opts[i] == "--level": level = v
+            elif opts[i] == "--classes":
+                # the header of the Blueprints the program calls as their classes, and the folder they stand in
+                header, _, of = v.partition("=")
+                if not header or not of:
+                    raise SystemExit(f"--classes {v}: give the header and the folder, <header.h>=<folder>")
+                classes = (header, of)
             elif opts[i] == "--folder": folder = v
             elif opts[i] == "--test": test = v
             elif opts[i] == "--program":
@@ -14314,7 +14387,28 @@ def main(argv):
             flags.append(opts[i])
             i += 1
     folder = folder or "Source"
-    whole = len(files) > 20   # (a run over the whole program: what it does not write any more goes)
+    # (a run over the whole program: what it does not write any more goes - of its own folder; a Blueprint of
+    # another folder is a source of its own, and the run leaves it as it is)
+    whole = len(files) > 20
+    CLASSES[:] = classes   # (the tests include the header by its name: TestWriter)
+    if classes[1] == folder:
+        raise SystemExit(f"--classes {classes[0]}={classes[1]}: that is the folder this run writes - the Blueprints the program calls as their classes stand in another")
+    if level and any(a.get("folder") == classes[1] for a in json.load(open(level, encoding="utf-8")).get("actors", [])):
+        # The Blueprints the program calls as their classes: their header, as the build writes it (from the level,
+        # by tools/blueprint_cpp) - the sources that call them include it, and the compiler reads them with it. It
+        # is written for this run, into a folder of its own that comes first on the include path (nothing is kept
+        # between runs). One the build left in a folder of the sources is found before it (#include "..." looks
+        # beside the file first): it has to be the same.
+        made = tempfile.mkdtemp(prefix="kern-cpp-to-blueprint-classes-", dir=os.environ.get("TMPDIR") or None)
+        header = os.path.join(made, os.path.basename(classes[0]))
+        r = subprocess.run([os.path.join(ROOT, "tools", "blueprint_cpp.sh"), level, os.path.join(made, "classes.cpp"), header, classes[1]], capture_output=True, text=True)
+        if r.returncode != 0:
+            raise SystemExit(f"the header {classes[0]} of the Blueprints the program calls as their classes is not to be had (tools/blueprint_cpp.sh): " + (r.stderr or r.stdout).strip()[:2000])
+        for d in sorted({os.path.dirname(os.path.abspath(f)) for f in files}):
+            left = os.path.join(d, os.path.basename(classes[0]))
+            if os.path.exists(left) and open(left, encoding="utf-8").read() != open(header, encoding="utf-8").read():
+                raise SystemExit(f"{left} was written from another state of the level than {level} (the build writes it again)")
+        flags.insert(0, "-I" + made)
     workers = max(1, min(len(files), int(os.environ.get("KERN_JOBS") or os.cpu_count() or 1)))
     import concurrent.futures
     # the names of the engine's nodes: the engine's own tool says them
@@ -14704,6 +14798,15 @@ def main(argv):
             if name in declared and declared[name][1] != line:
                 raise SystemExit(f"the type {name} is not the same in every Blueprint:\n{declared[name][1]}\n{line} (in {u})")
             declared.setdefault(name, (home, line, list(parts)))
+    # What the Blueprints of the level's other folders use of this run's (files that are Blueprints now): a shape
+    # they name stays in the library of shapes, made as this tool makes it, also where no source names it any more.
+    others = kept_by_others(level, folder) if level and mode == "--convert" else {}
+    for name, (kind, t) in others.get(SHAPES, {}).get("types", {}).items():
+        if name not in declared:
+            line = shape_line(name, t)
+            if line is None:
+                raise SystemExit(f"{', '.join(sorted(others[SHAPES]['users']))} use the type {name} of {SHAPES}, which this run does not make")
+            declared[name] = (None, line, [f["of"] for f in t.get("fields", []) if f.get("of")])
     written = {u for u, r in blue.items() if r["written"]}
     def components(name):
         """The Blueprints the types stand in that a type is made of (a shape: those its parts are made of)."""
@@ -14802,6 +14905,17 @@ def main(argv):
         for u in order:
             open(os.path.join(texts, u + ".cpp"), "w").write(blueprints[u])
     if level and mode == "--convert":
+        # What the Blueprints of the other folders use of this run's Blueprints is there - or the level stays as
+        # it is, and it is said (a library they use is not dropped, a type or function of it does not go missing).
+        for lib, kept in sorted(others.items()):
+            if lib not in blueprints:
+                if whole:
+                    raise SystemExit(f"{', '.join(sorted(kept['users']))} use the Blueprint {lib}, which this run does not write any more: the level is as it was")
+                continue   # (a run over some files: it leaves the Blueprints it does not write as they are)
+            missing = sorted(n for n in kept["types"] if not (n in declared and home_of(n) == lib))
+            missing += sorted(f"{n}()" for n in kept["functions"] if not any(e["name"] == n and not e["wait"] for e in tables.get(lib, {}).values()))
+            if missing:
+                raise SystemExit(f"{', '.join(sorted(kept['users']))} use {', '.join(missing)} of the Blueprint {lib}, which this run does not write: the level is as it was")
         apply_to_level(level, folder, [(u, blueprints[u]) for u in order], prune=whole)
     for f in nowhere:   # (a header's function that needs a source file which is not among those converted)
         if world.program(f["file"]):

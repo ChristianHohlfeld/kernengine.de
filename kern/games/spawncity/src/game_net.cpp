@@ -10,10 +10,10 @@
 
 #include "game.h"
 #include "game_world.h"
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes: qr_code, qr_code_cpp
 #include "person_hit.h"
 #include "mp_art.h"
 #include "mp_rules.h"
-#include "qr_code.h"
 #include "tiles.h"
 
 namespace sc {
@@ -1179,13 +1179,14 @@ std::string Game::net_command(const std::string& cmd) {
     return on ? "set" : "cleared";
   }
   if (starts("qr ")) {
-    // The share panel's join code (qr_pairing.mjs renderQr): rows of 0 / 1.
-    qr::Code c;
-    if (!qr::encode(cmd.substr(3), c)) return "{}";
+    // The share panel's join code (qr_pairing.mjs renderQr): rows of 0 / 1. The encoder is the level's
+    // Blueprint qr_code_cpp (its code: qr_code), called as its class.
+    blueprints::qr_code::qr_Code c;
+    if (!kern::logic::blueprint<blueprints::qr_code_cpp>().encode(cmd.substr(3), c).Result) return "{}";
     std::string o = "{\"size\":" + std::to_string(c.size) + ",\"version\":" + std::to_string(c.version) + ",\"rows\":[";
-    for (i32 y = 0; y < c.size; ++y) {
+    for (i64 y = 0; y < c.size; ++y) {
       o += y ? ",\"" : "\"";
-      for (i32 x = 0; x < c.size; ++x) o += c.dark(x, y) ? '1' : '0';
+      for (i64 x = 0; x < c.size; ++x) o += kern::logic::blueprint<blueprints::qr_code>().Code_dark(c, x, y).Result ? '1' : '0';
       o += "\"";
     }
     return o + "]}";
