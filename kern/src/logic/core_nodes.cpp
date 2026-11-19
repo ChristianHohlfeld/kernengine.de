@@ -18,6 +18,22 @@ namespace {
 PinDef exec_in(std::string id = "exec", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
 PinDef exec_out(std::string id = "then", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
 PinDef data(std::string id, std::string label, PinType t, json::Value def = {}) { return {std::move(id), std::move(label), t, std::move(def)}; }
+/// An input that reads a list of Ints of any width as it is (kAnyWidth: List<Int>, List<U8> ...).
+PinDef any_ints(std::string id, std::string label) {
+  PinDef p = data(std::move(id), std::move(label), PinType::integer_list, json::Value::array());
+  p.of = std::string(kAnyWidth);
+  return p;
+}
+/// The width of the Ints a list place of the node holds ("u8" ... - empty: none), as C++ stores an item there.
+std::string width_of_place(Context& c) {
+  Variable named;
+  return c.instance().graph().place_of(c.node(), named) && has_width(named.type, named.of) ? named.of : std::string();
+}
+/// An item as a list of the width `of` holds it (an Int of no width: as it is).
+Value stored_as(Value item, const std::string& of) {
+  if (!of.empty() && item.type == PinType::integer) item.i = wrapped(item.i, of);
+  return item;
+}
 
 NodeDef make(std::string type, std::string label, std::string category, NodeKind kind, std::string help, std::string keywords = {}) {
   NodeDef d;
@@ -80,6 +96,7 @@ std::string place_title(const Node& n) { return (n.param("bound").empty() ? n.pa
 ParamDef type_param(bool with_lists) {
   ParamDef p = param("type", "Type", ParamDef::Kind::type, "float");
   p.with_lists = with_lists;
+  p.widths = true;
   return p;
 }
 /// The setting "Enum" of an enum node: which enum of the Blueprint.
@@ -634,10 +651,12 @@ void add_lists(Library& lib) {
     };
     d.run = [](Context& c) {
       const std::size_t count = c.input_count();
+      const TypeRef e = item_type(c.node(), c.instance().graph());
+      const std::string of = has_width(e) ? e.of : std::string();  // (List<U8>{a, b}: each stored as a U8)
       with_items(element_of(c.output(0).type), [&](auto type) {
         using T = typename decltype(type)::type;
         std::vector<T> items;
-        for (std::size_t k = 0; k < count; ++k) items.push_back(from_value<T>(c.in(k)));
+        for (std::size_t k = 0; k < count; ++k) items.push_back(from_value<T>(stored_as(c.in(k), of)));
         c.out(std::size_t{0}, Value::of(std::move(items)));
       });
       return kStop;
@@ -773,7 +792,7 @@ void add_lists(Library& lib) {
                      {data("index", "Index", PinType::integer)});
     d.title = [](const NodeDef&, const Node& n) { return "Add to " + place_title(n); };
     d.run = [on_list](Context& c) {
-      const Value item = c.in("item");
+      const Value item = stored_as(c.in("item"), width_of_place(c));
       on_list(c, [&](Value& v) {
         with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
@@ -790,7 +809,7 @@ void add_lists(Library& lib) {
     d.title = [](const NodeDef&, const Node& n) { return "Insert into " + place_title(n); };
     d.run = [on_list](Context& c) {
       const i64 index = c.in_int("index");
-      const Value item = c.in("item");
+      const Value item = stored_as(c.in("item"), width_of_place(c));
       on_list(c, [&](Value& v) {
         with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
@@ -839,7 +858,7 @@ void add_lists(Library& lib) {
     d.title = [](const NodeDef&, const Node& n) { return "Set Length of " + place_title(n); };
     d.run = [on_list](Context& c) {
       const i64 length = c.in_int("length");
-      const Value value = c.in("value");
+      const Value value = stored_as(c.in("value"), width_of_place(c));
       on_list(c, [&](Value& v) {
         with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
@@ -976,8 +995,13 @@ void add_lists(Library& lib) {
     d.run = [on_list](Context& c) {
       const i64 index = c.in_int("index");
       const std::string text = c.in_text("text");
+      const std::string of = width_of_place(c);  // (a list of a width holds each byte as C++ stores it there: an I8 128 .. 255 as -128 .. -1)
       on_list(c, [&](Value& v) {
-        if (v.type == PinType::integer_list) texts::insert_bytes(v.template edit<i64>(), index, text);
+        if (v.type != PinType::integer_list) return;
+        std::vector<i64>& items = v.template edit<i64>();
+        texts::insert_bytes(items, index, text);
+        if (!of.empty())
+          for (i64& x : items) x = wrapped(x, of);
       });
       return 0;
     };
@@ -1012,14 +1036,14 @@ void add_lists(Library& lib) {
                      "its length); an item some of whose bytes are written keeps the others. Items are read as they were (a list into itself, as memmove).",
                      "memcpy memmove bytes binary serialize wire buffer float array copy");
     d.params = {param("variable", "List", ParamDef::Kind::variable), local_of(), path_of(), code_param("code", "Number"), code_param("from_code", "Number of Items")};
-    d.inputs = {exec_in(), data("at", "At", PinType::integer, 0), data("items", "Items", PinType::integer_list), data("from", "From", PinType::integer, 0),
+    d.inputs = {exec_in(), data("at", "At", PinType::integer, 0), any_ints("items", "Items"), data("from", "From", PinType::integer, 0),
                 data("count", "Count", PinType::integer, 0)};
     d.outputs = {exec_out()};
     d.title = [](const NodeDef&, const Node& n) { return "Copy Bytes into " + place_title(n); };
     d.shape = [list_of_code](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) {
       const bytes::Code of = bytes::code_of(n.param("from_code", "u8"));
       for (PinDef& p : in)
-        if (p.id == "items" && of != bytes::Code::none && of != bytes::Code::boolean) retype(p, TypeRef{list_of_code(of), ""}, g);
+        if (p.id == "items" && of != bytes::Code::none && of != bytes::Code::boolean) retype(p, TypeRef{list_of_code(of), bytes::whole(of) ? std::string(kAnyWidth) : ""}, g);
     };
     d.problem = [](const Node& n, const Graph& g) -> std::string {
       const bytes::Code into = bytes::code_of(n.param("code", "u8")), of = bytes::code_of(n.param("from_code", "u8"));
@@ -1031,6 +1055,9 @@ void add_lists(Library& lib) {
       if (v && !bytes::suits_list(into, element_of(v->type)))
         return "\"" + v->name + "\" is a list of " + std::string(pin_type_name(element_of(v->type))) + ": its numbers are not " + n.param("code", "u8") +
                " (an Int is u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+      // (a list of Ints of a width holds numbers of that width: the bytes written are of them)
+      if (v && has_width(v->type, v->of) && n.param("code", "u8") != v->of)
+        return "\"" + v->name + "\" is a list of " + type_label({PinType::integer, v->of}) + ": its numbers are " + v->of + ", not " + n.param("code", "u8");
       return {};
     };
     d.run = [](Context& c) {
@@ -1549,9 +1576,10 @@ void add_structs(Library& lib) {
     if (st->fields.size() != l.count)
       return "the layout has " + std::to_string(l.count) + " field(s), " + st->name + " has " + std::to_string(st->fields.size());
     for (std::size_t k = 0; k < l.count; ++k)
-      if (st->fields[k].type.count || !bytes::suits(l.fields[k].code, st->fields[k].type.type))
+      if (st->fields[k].type.count || !bytes::suits(l.fields[k].code, st->fields[k].type.type) ||
+          (has_width(st->fields[k].type) && bytes::code_of(st->fields[k].type.of) != l.fields[k].code))
         return "the layout's field " + std::to_string(k + 1) + " does not suit " + st->name + "." + st->fields[k].name +
-               " (a Bool is bool; an Int u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+               " (a Bool is bool; an Int u8 .. i32; an Int64 u64, i64; a Float f32, f64; a U8 ... I32 its own width)";
     return {};
   };
   auto layout_param = [] { return param("layout", "Layout", ParamDef::Kind::text, "4: i32@0"); };
@@ -1593,7 +1621,7 @@ void add_structs(Library& lib) {
                      "where the list has none, it is 0.",
                      "bit cast memcpy binary bytes deserialize parse wire packet");
     d.params = {struct_param(), layout_param()};
-    d.inputs = {data("bytes", "Bytes", PinType::integer_list), data("at", "At", PinType::integer, 0)};
+    d.inputs = {any_ints("bytes", "Bytes"), data("at", "At", PinType::integer, 0)};
     d.outputs = {data("value", "Value", PinType::structure)};
     d.title = [](const NodeDef&, const Node& n) { return n.param("struct", "?") + " of Bytes"; };
     d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
@@ -1846,6 +1874,32 @@ void add_math(Library& lib) {
   lib.add(pure("text.of_code", "Text of Code", "Text", {data("code", "Code", K::integer, 65)}, data("result", "", K::text), of(&P::text_of_code),
                "A text of one byte: Code cut to 8 bits", "char character byte ascii"));
   {
+    // Set Code: one byte of a text variable set where it stands - what `s[i] = c` does to a std::string (Text::set_at)
+    NodeDef d = make("text.set_code", "Set Code", "Text", NodeKind::action,
+                     "Sets the byte at Index of a text variable - or of a text at a place in one - to Code (cut to 8 bits), where it stands: the text keeps its "
+                     "length, the other bytes stay. An index outside the text changes nothing.",
+                     "char character byte ascii index replace write string");
+    d.params = {param("variable", "Text", ParamDef::Kind::variable), local_of(), path_of()};
+    d.inputs = {exec_in(), data("index", "Index", PinType::integer, 0), data("code", "Code", PinType::integer, 32)};
+    d.outputs = {exec_out()};
+    d.title = [](const NodeDef&, const Node& n) { return "Set Code in " + place_title(n); };
+    d.problem = [](const Node& n, const Graph& g) -> std::string {
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && v->type != PinType::text) return "needs a text variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      return {};
+    };
+    d.run = [](Context& c) {
+      const i64 index = c.in_int("index"), code = c.in_int("code");
+      const std::vector<i64> at = c.path();  // (its indices, read after its inputs - as every step on a place)
+      c.instance().change(c.node(), at, [&](Value& v) {
+        if (v.type == PinType::text && index >= 0 && static_cast<u64>(index) < v.s.size()) v.s[static_cast<std::size_t>(index)] = static_cast<char>(static_cast<u8>(code));
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
     NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,
                      "A text from a format as C's printf has it: %d %u %x %o %c take an Int, %f %e %g a Float, %s a Text; flags - + space 0 #, width and "
@@ -1930,7 +1984,7 @@ void add_math(Library& lib) {
     lib.add(pure("text.reserve", "Reserve Text", "Text", {data("a", "Text", K::text, ""), data("count", "Count", K::integer, 0)}, text, of(&P::text_reserve),
                  "The text as it is - in a Blueprint's class with room for Count characters, so that what is appended to it fits (std::string::reserve)",
                  "reserve capacity room string"));
-    lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {data("bytes", "Bytes", K::integer_list), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
+    lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {any_ints("bytes", "Bytes"), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
                  of(&P::text_of_bytes), "Count bytes of the list from At on as a text, each cut to 8 bits (beyond the list: up to its end)",
                  "bytes chars string decode utf8 buffer"));
     // Numbers read from a text at a place, as C reads them (scan, nodes.h): Value, and End - the place just

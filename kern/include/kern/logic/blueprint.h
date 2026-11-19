@@ -339,12 +339,13 @@ struct BlueprintCore : logic::PureNodes {
   // (the values read the entries where they stand - of a List or of a Fixed: logic::Items)
   template <class T> static Int list_length(logic::Items<T> list) { return static_cast<i64>(list.size()); }
   template <class T> static const T& list_get(logic::Items<T> list, Int index) { return list[index]; }
-  template <class T> static Int list_find(logic::Items<T> list, const std::type_identity_t<T>& item) {
+  // (an item is sought as C++ compares it: of a list of U8 the number, an Int - logic::Sought)
+  template <class T> static Int list_find(logic::Items<T> list, const logic::Sought<T>& item) {
     for (std::size_t k = 0; k < list.size(); ++k)
-      if (list.first[k] == item) return static_cast<i64>(k);
+      if (logic::equal_item(list.first[k], item)) return static_cast<i64>(k);
     return -1;
   }
-  template <class T> static Bool list_contains(logic::Items<T> list, const std::type_identity_t<T>& item) { return list_find<T>(list, item) >= 0; }
+  template <class T> static Bool list_contains(logic::Items<T> list, const logic::Sought<T>& item) { return list_find<T>(list, item) >= 0; }
   // (the same on a place of the engine - the list the engine holds: read where it stands, as the interpreter
   // reads it; its length without reading it)
   template <class X> static decltype(auto) read_of(const X& x) {
@@ -353,8 +354,8 @@ struct BlueprintCore : logic::PureNodes {
   }
   template <class T, logic::engine_values::NamesPlace P> static Int list_length(const P& place) { return static_cast<i64>(place.ref().kern_count()); }
   template <class T, logic::engine_values::NamesPlace P> static T list_get(const P& place, Int index) { return list_get<T>(read_of(place), index); }
-  template <class T, logic::engine_values::NamesPlace P> static Int list_find(const P& place, const std::type_identity_t<T>& item) { return list_find<T>(read_of(place), item); }
-  template <class T, logic::engine_values::NamesPlace P> static Bool list_contains(const P& place, const std::type_identity_t<T>& item) { return list_find<T>(read_of(place), item) >= 0; }
+  template <class T, logic::engine_values::NamesPlace P> static Int list_find(const P& place, const logic::Sought<T>& item) { return list_find<T>(read_of(place), item); }
+  template <class T, logic::engine_values::NamesPlace P> static Bool list_contains(const P& place, const logic::Sought<T>& item) { return list_find<T>(read_of(place), item) >= 0; }
   /// Lists Equal: as many items, and each equal to the one at its place (the == of two std::vector).
   template <class T, class A, class B>
     requires(logic::engine_values::NamesPlace<A> || logic::engine_values::NamesPlace<B>)
@@ -369,8 +370,8 @@ struct BlueprintCore : logic::PureNodes {
   template <class N, class T> static void list_add(N& n, List<T>& list, std::type_identity_t<T> item) { n.index = logic::list::add(list, std::move(item)); }
   template <class T> static void list_insert(List<T>& list, Int index, std::type_identity_t<T> item) { logic::list::insert(list, index, std::move(item)); }
   template <class T> static void list_remove_at(List<T>& list, Int index) { logic::list::remove_at(list, index); }
-  template <class T> static void list_remove(List<T>& list, const std::type_identity_t<T>& item) { logic::list::remove(list, item); }
-  template <class N, class T> static void list_remove(N& n, List<T>& list, const std::type_identity_t<T>& item) { n.removed = logic::list::remove(list, item); }
+  template <class T> static void list_remove(List<T>& list, const logic::Sought<T>& item) { logic::list::remove(list, item); }
+  template <class N, class T> static void list_remove(N& n, List<T>& list, const logic::Sought<T>& item) { n.removed = logic::list::remove(list, item); }
   template <class T> static void list_clear(List<T>& list) { logic::list::clear(list); }
   /// (in one go: what std::vector does in one request for memory - resize, insert of a range, reserve)
   template <class T> static void list_resize(List<T>& list, Int length, const std::type_identity_t<T>& value) { logic::list::resize(list, length, value); }
@@ -462,13 +463,14 @@ struct BlueprintCore : logic::PureNodes {
   /// (each the number of the first) from `at` on: what std::memcpy between lists of numbers does
   /// (logic::bytes::copy, nodes.h - the interpreter's function). On a list or a list of a fixed length.
   template <logic::bytes::Code C> using BytesNumber = std::conditional_t<logic::bytes::whole(C), Int, std::conditional_t<logic::bytes::wide(C), Int64, Float>>;
-  template <Setting Into, Setting Of, class T>
-  static void list_copy_bytes(List<T>& list, Int at, logic::Items<BytesNumber<logic::bytes::code_of(Of.view())>> items, Int from, Int count) {
-    copy_bytes<Into, Of, T>(list.data(), list.size(), at, items, from, count);
+  // (Items: a list of Ints of any width, Int or U8 ... I32 - its numbers as they are; of Int64s, of Floats)
+  template <Setting Into, Setting Of, class T, class L>
+  static void list_copy_bytes(List<T>& list, Int at, const L& items, Int from, Int count) {
+    copy_bytes<Into, Of, T>(list.data(), list.size(), at, logic::items_of(items), from, count);
   }
-  template <Setting Into, Setting Of, class T, std::size_t N>
-  static void list_copy_bytes(Fixed<T, N>& list, Int at, logic::Items<BytesNumber<logic::bytes::code_of(Of.view())>> items, Int from, Int count) {
-    copy_bytes<Into, Of, T>(list.items.data(), N, at, items, from, count);
+  template <Setting Into, Setting Of, class T, std::size_t N, class L>
+  static void list_copy_bytes(Fixed<T, N>& list, Int at, const L& items, Int from, Int count) {
+    copy_bytes<Into, Of, T>(list.items.data(), N, at, logic::items_of(items), from, count);
   }
   template <Setting Into, Setting Of, class L, logic::engine_values::NamesPlace P>
   static void list_copy_bytes(L& list, Int at, const P& items, Int from, Int count) {
@@ -480,6 +482,7 @@ struct BlueprintCore : logic::PureNodes {
     static_assert(kInto != logic::bytes::Code::none && kInto != logic::bytes::Code::boolean && kOf != logic::bytes::Code::none && kOf != logic::bytes::Code::boolean,
                   "Copy Bytes: a number is one of u8 i8 u16 i16 u32 i32 u64 i64 f32 f64");
     static_assert(logic::bytes::suits_list(kInto, logic::pin_type_of<T>()), "Copy Bytes: the place's numbers are an Int's (u8 .. i32), an Int64's (u64, i64) or a Float's (f32, f64)");
+    static_assert(logic::bytes::suits_list(kOf, logic::pin_type_of<S>()), "Copy Bytes: the numbers of Items are an Int's (u8 .. i32), an Int64's (u64, i64) or a Float's (f32, f64)");
     logic::bytes::copy(to, size, kInto, at, items.first, items.count, kOf, from, count);
   }
 
@@ -520,6 +523,9 @@ struct BlueprintCore : logic::PureNodes {
     const std::string_view v = a.view();
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
   }
+  /// Set Code: text_set_code(text, index, code) - the character at the index becomes the one of that code (0 .. 255; the
+  /// low byte), where it stands: what `s[i] = c` does to a std::string. An index outside the text changes nothing.
+  static void text_set_code(Text& text, Int index, Int code) { text.set_at(static_cast<i64>(index), static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
   static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
   // (what std::string and std::string_view do, on the characters where they are - logic::texts)
   static Int text_find(const Text& a, const Text& b, Int from) { return logic::texts::find(a.view(), b.view(), from); }
@@ -551,8 +557,8 @@ struct BlueprintCore : logic::PureNodes {
     return t;
   }
   /// Text of Bytes: the text a list of bytes is, from At on (one request for memory, as std::string makes it).
-  static Text text_of_bytes(logic::Items<Int> bytes, Int at, Int count) { return logic::texts::of_bytes(bytes, at, count); }
-  template <logic::engine_values::NamesPlace P> static Text text_of_bytes(const P& bytes, Int at, Int count) { return text_of_bytes(read_of(bytes), at, count); }
+  /// (of a list of Ints of any width - Int, U8 ... I32: each number's last 8 bits; of a place of the engine: read where it stands)
+  template <class L> static Text text_of_bytes(const L& bytes, Int at, Int count) { return logic::texts::of_bytes(logic::items_of(read_of(bytes)), at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
   /// Bytes of Text: its bytes, 0 .. 255 (one request for memory, as std::vector of the text's range makes it).
   static List<Int> text_bytes(const Text& a) {
@@ -561,7 +567,8 @@ struct BlueprintCore : logic::PureNodes {
     return r;
   }
   /// Insert Text Bytes: the bytes of a text into a list where it stands (std::vector::insert of the text's range).
-  static void list_insert_text(List<Int>& list, Int index, const Text& text) { logic::texts::insert_bytes(list, index, text.view()); }
+  /// (into a list of Ints of a width: each byte as C++ stores it there - an I8 holds 255 as -1)
+  template <class T> static void list_insert_text(List<T>& list, Int index, const Text& text) { logic::texts::insert_bytes(list, index, text.view()); }
   /// Reserve Text: the same text, with room for Count characters (std::string::reserve, at most 2^24) - handed on
   /// with std::move, where it is: the appends after it fill that room.
   static Text text_reserve(Text a, Int count) {
@@ -745,8 +752,9 @@ struct BlueprintCore : logic::PureNodes {
     logic::structs::fields(value, [&](const auto&... field) { (put_bytes(out.items.data(), kLayout.fields[k++], field), ...); });
     return out;
   }
-  template <class S, Setting Layout, logic::engine_values::NamesPlace P> static S struct_of_bytes(const P& bytes, Int at) { return struct_of_bytes<S, Layout>(read_of(bytes), at); }
-  template <class S, Setting Layout> static S struct_of_bytes(logic::Items<Int> bytes, Int at) {
+  template <class S, Setting Layout, class L> static S struct_of_bytes(const L& list, Int at) {
+    decltype(auto) held = read_of(list);   // (a place of the engine: read where it stands)
+    const auto bytes = logic::items_of(held);  // (a list of Ints of any width: each number's last 8 bits)
     static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
     static_assert(kLayout.error == nullptr, "the layout of Struct of Bytes cannot be read");
     static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
@@ -763,6 +771,8 @@ struct BlueprintCore : logic::PureNodes {
   static void put_bytes(Int* out, const logic::bytes::Field& f, Float v) { logic::bytes::put(out, f, logic::bytes::bits(f.code, v)); }
   template <class B> static void take_bytes(Bool& to, const logic::bytes::Field& f, B&& byte) { to = logic::bytes::take(f, byte) != 0; }
   template <class B> static void take_bytes(Int& to, const logic::bytes::Field& f, B&& byte) { to = static_cast<i64>(logic::bytes::take(f, byte)); }
+  // (a field of a width: the layout gives it its own width - the number fits)
+  template <class T, class B> static void take_bytes(logic::Sized<T>& to, const logic::bytes::Field& f, B&& byte) { to = logic::Sized<T>(static_cast<i64>(logic::bytes::take(f, byte))); }
   template <class B> static void take_bytes(logic::Int64& to, const logic::bytes::Field& f, B&& byte) { to = logic::Int64(logic::bytes::take(f, byte)); }
   template <class B> static void take_bytes(Float& to, const logic::bytes::Field& f, B&& byte) {
     const u64 b = logic::bytes::take(f, byte);

@@ -1148,7 +1148,12 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
   }
   if (logic::element_of(t.type) != PinType::structure) {
     const logic::EnumType* e = g.enumeration(t.of);
-    return samples(t.type, e ? e->values.size() : 0);
+    std::vector<Value> r = samples(t.type, e ? e->values.size() : 0);
+    // (a list of Ints of a width holds its values only - a C++ caller hands over a List<U8>, which holds no -1; one Int of a
+    // width is handed over as an Int, the input holds its low bits)
+    if (t.type == PinType::integer_list && logic::has_width(t))
+      for (Value& v : r) v = logic::fitted(v, t, g);
+    return r;
   }
   std::vector<Value> items;
   if (const logic::StructType* s = g.structure(t.of)) {
@@ -1202,13 +1207,15 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   for (const logic::PinDef& p : in) {
     if (p.type == PinType::exec) continue;
     const std::string name = "i" + std::to_string(f.inputs.size());
-    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of({p.type, p.of}, g).to_json(g, p.of) : p.def, p.of});
+    const logic::TypeRef held = logic::place_type(p);  // (an input of a list of any width: a List<Int> is given)
+    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of(held, g).to_json(g, held.of) : p.def, held.of});
     g.links.push_back({entry.id, name, node.id, p.id});
   }
   for (const logic::PinDef& p : out) {
     if (p.type == PinType::exec) continue;
     const std::string name = "o" + std::to_string(f.outputs.size());
-    f.outputs.push_back({name, p.type, logic::zero_of({p.type, p.of}, g).to_json(g, p.of), p.of});
+    const logic::TypeRef held = logic::place_type(p);
+    f.outputs.push_back({name, p.type, logic::zero_of(held, g).to_json(g, held.of), held.of});
     g.links.push_back({node.id, p.id, give.id, name});
   }
   g.functions.push_back(f);
@@ -1791,6 +1798,7 @@ inline std::string cpp_type(PinType t, const std::string& of = {}, const std::st
     auto part = [&](const logic::TypeRef& p) { return p.type == PinType::integer ? std::string("kern::logic::Whole") : cpp_type(p.type, p.of, owner); };
     return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
   }
+  if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
