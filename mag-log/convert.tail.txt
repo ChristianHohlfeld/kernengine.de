@@ -1,0 +1,80 @@
+    Reader::get_i8 (7): written
+    Reader::get_u16 (7): written
+    Reader::get_i16 (7): written
+    Reader::get_u32 (7): written
+    Reader::get_i32 (7): written
+    Reader::get_u64 (7): written
+    Reader::get_i64 (7): written
+    Reader::get_f32 (7): written
+    Reader::get_f64 (7): written
+    Reader::get_vec3 (7): written
+    Reader::get_quat (7): written
+    Reader::get_bytes (7): written
+    Reader::done (1): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_gaps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_net_session_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+618 of 918 functions of the program are written as Blueprints (4286 of 17873 lines), and 22 of the engine's headers that they call: 105 Blueprints - 26 of source files, 1 of states, 78 of headers and of shapes
+574 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-t1-probe-164101-28331/pt/converted - each once, in the Blueprint it stands in; 3 give nothing
+
+what the others wait for: functions (lines)
+    24 (  1144)   it calls CityStream::ground_height(), which waits
+    11 (   953)   stars() is defined in another file
+     7 (   693)   json() is defined in another file
+     7 (   665)   it calls Game::mp_local_ready(), which waits
+    21 (   567)   it calls Session::to_host(), which waits
+     1 (   472)   set_remote_animals() is defined in another file
+     6 (   333)   lane_signature() is defined in another file
+     5 (   305)   unit_hash() is defined in another file
+     4 (   296)   step() is defined in another file
+     4 (   255)   ensure() is defined in another file
+     8 (   253)   claim() is defined in another file
+     5 (   237)   update() is defined in another file
+     4 (   234)   frighten() is defined in another file
+     2 (   234)   it calls Ragdolls::~Ragdolls(), which waits
+     2 (   212)   it calls Ragdolls::bone_body(), which waits
+     6 (   206)   add() is defined in another file
+     6 (   194)   reset() is defined in another file
+     1 (   191)   look_curve_strength() is defined in another file
+     2 (   184)   active() is defined in another file
+     1 (   182)   it calls Game::life_hud(), which waits
+     3 (   173)   the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+     1 (   171)   damage_of() is defined in another file
+     1 (   171)   it calls tyre(), which waits
+     4 (   165)   init() is defined in another file
+     1 (   158)   day_lighting() is defined in another file
+     3 (   156)   cooldown() is defined in another file
+     1 (   150)   a pointer
+     6 (   144)   begin() is defined in another file
+     2 (   141)   it calls Devices::touch_down(), which waits
+     7 (   135)   put() is defined in another file
+     2 (   134)   heli() is defined in another file
+     2 (   131)   has_collision() is defined in another file
+     1 (   124)   kind_of() is defined in another file
+     2 (   121)   a reference to something it changes
+     1 (   111)   it calls register_node(), which waits
+     2 (   109)   sample() is defined in another file
+     1 (   103)   it calls Game::gaps_hud(), which waits
+     1 (   103)   push() is defined in another file
+     2 (   101)   it calls Game::spawn_unseen(), which waits
+     1 (   101)   flak_cell() is defined in another file
+
+real	46m46,942s
+user	330m38,604s
+sys	11m52,450s
