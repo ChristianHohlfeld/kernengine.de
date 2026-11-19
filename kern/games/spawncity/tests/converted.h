@@ -588,6 +588,19 @@ template <class T, std::size_t N> inline constexpr bool is_list<std::array<T, N>
 template <class T> inline constexpr bool is_box = false;
 template <class T> inline constexpr bool is_box<std::unique_ptr<T>> = !std::is_base_of_v<EngineObject, T>;
 template <class T> inline constexpr bool is_box<std::optional<T>> = true;
+// (a callback of the source - std::function, or a struct of the engine that is one: fn + user, as kern::HeightSampler -: declared
+// before the templates that use them, as the lists are below - their types stand in std and kern, not here)
+template <class S> concept FnAndUser = requires(const S& s) { s.fn; s.user; } && std::is_pointer_v<decltype(S::fn)>;
+template <class R, class... A> Value arg(const std::function<R(A...)>& f);
+template <FnAndUser S> Value arg(const S& s);
+template <class R, class... A> bool same(const std::function<R(A...)>& want, const Value& got);
+template <FnAndUser S> bool same(const S& want, const Value& got);
+template <FnAndUser S> bool defined(const S&);
+template <FnAndUser S> std::string text(const S& s);
+template <class R, class... A> void take(std::function<R(A...)>& to, const Value& v);
+template <class R, class... A> bool defined(const std::function<R(A...)>&);
+template <class R, class... A> std::string text(const std::function<R(A...)>& f);
+template <FnAndUser S> void take(S& to, const Value& v);
 template <class T> Value arg(const std::vector<T>& v);
 template <class T> bool same(const std::vector<T>& want, const Value& got);
 template <class T> bool defined(const std::vector<T>& v);
@@ -1141,6 +1154,16 @@ template <class T> void take(kern::Span<T>& to, const Value& v) {
   to = kern::Span<T>(kept.back().data(), kept.back().size());
 }
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
+/// Numbers the engine gives at a place of its own (`const f64* RoadStream::data()`): the test keeps those its stand-in
+/// answers, and the source reads them where the pointer points - as long as the test runs.
+template <class T>
+  requires std::is_arithmetic_v<T>
+void take(const T*& to, const Value& v) {
+  static std::deque<std::vector<T>> kept;
+  kept.emplace_back();
+  take(kept.back(), v);
+  to = kept.back().data();
+}
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
 };
@@ -1375,7 +1398,6 @@ inline bool same_value(const Value& a, const Value& b) {
 // ---- callbacks: a function the engine calls back (std::function<R(A...)>, or a struct of the engine that is one -
 // `struct HeightSampler { f64 (*fn)(void* user, f64 x, f64 y); void* user; }`). In the Blueprint a Callback
 // (PinType::callback): a function of a library and the place it is bound to; only the engine calls it. ----
-template <class S> concept FnAndUser = requires(const S& s) { s.fn; s.user; } && std::is_pointer_v<decltype(S::fn)>;
 template <class T> struct CallbackSig;
 template <class R, class... A> struct CallbackSig<std::function<R(A...)>> { using Result = R; using Args = std::tuple<A...>; };
 template <class R, class... A> struct CallbackSig<R (*)(void*, A...)> { using Result = R; using Args = std::tuple<A...>; };

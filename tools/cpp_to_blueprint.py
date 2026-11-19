@@ -11749,6 +11749,11 @@ class TestWriter:
         if m:   # (a view of a list: of entries the test keeps - converted::kept_span; as constant as the source says)
             const, inner = self.span_of(raw, m.group(1))
             return f"converted::wide::Span<{const}{self.spell(inner)}>"
+        m = re.fullmatch(r"const\s+(.+?)\s*\*\s*(?:const)?", raw.strip())
+        if m and self.u.clean(m.group(1)) in ("float", "double", "long double", *NUMBER):
+            # (numbers the engine gives at a place of its own - RoadStream::data(): the test keeps the ones its stand-in
+            # answers and points at them, converted::take of a const T*)
+            return f"const {self.spell(m.group(1))}*"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
         if count_per(c) is not None:
