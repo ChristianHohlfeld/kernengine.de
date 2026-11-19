@@ -12115,6 +12115,9 @@ class TestWriter:
                 return
             G.records.add(t)
             todo.append(("record", d))
+            for c in kids(d):   # (a destructor that does something of its own runs where a value of the class ends: held with it)
+                if c.get("kind") == "CXXDestructorDecl" and ends_itself(tree.body.get(c["id"], c)):
+                    want_function(c["id"])
         def want_unnamed(i):
             """An enum without a name whose values the source names (they are numbers in the Blueprint): its
             declaration is part of the source."""
@@ -12172,7 +12175,7 @@ class TestWriter:
                 return take(i)
             if d["id"] in G.functions or d["id"] in u.lambdas or d.get("_at", (None, None))[1] is None:
                 return
-            if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
+            if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl") and not ends_itself(d):
                 return
             if d.get("isImplicit"):
                 return   # (what the compiler makes of a class - its copy, its assignment: it makes it in the test too; its place is the class's name, no source)
