@@ -1,0 +1,80 @@
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_gaps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+407 of 486 functions of the program are written as Blueprints (2178 of 4781 lines), and 12 of the engine's headers that they call: 63 Blueprints - 5 of source files, 1 of states, 57 of headers and of shapes
+356 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (   268)   ctl_command() is defined in another file
+     6 (   247)   it calls CityStream::ground_height(), which waits
+     2 (   185)   stars() is defined in another file
+     5 (   144)   gaps_riding() is defined in another file
+     1 (   136)   vr_menu_json() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (   104)   send_swarm() is defined in another file
+     1 (   103)   it calls Game::gaps_hud(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     2 (    87)   detach() is defined in another file
+     1 (    87)   look_begin() is defined in another file
+     1 (    75)   unit_hash() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     2 (    66)   car_rest_pose() is defined in another file
+     1 (    58)   horn_low() is defined in another file
+     1 (    52)   inside() is defined in another file
+     1 (    49)   it calls People::hurt(), which waits
+     1 (    46)   gaps_lamps_init() is defined in another file
+     1 (    41)   a reference to something it changes
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    33)   gaps_lamps_remote() is defined in another file
+     1 (    31)   cone_half_angle() is defined in another file
+     1 (    27)   begin() is defined in another file
+     1 (    22)   osfx() is defined in another file
+     1 (    22)   gaps_ride_camera() is defined in another file
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     2 (    17)   send_fx() is defined in another file
+     1 (    17)   heli() is defined in another file
+     1 (    14)   footprints_overlap() is defined in another file
+     1 (    14)   send_swarm_hit() is defined in another file
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    11)   init() is defined in another file
+     1 (    11)   it calls Car::~Car(), which waits
+     1 (     9)   update() is defined in another file
+     1 (     8)   it calls Game::gaps_spawn_viewers(), which waits
+
+real	9m28,264s
+user	28m49,063s
+sys	1m24,126s
