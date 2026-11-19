@@ -84,6 +84,11 @@ ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::str
 }
 /// The setting of a node that names a variable: the function whose local variable it is (empty:
 /// a variable of the Blueprint).
+/// A node that reads or changes the world it runs in (NodeDef::world).
+NodeDef worldly(NodeDef d) {
+  d.world = true;
+  return d;
+}
 ParamDef local_of() { return param("scope", "Local of", ParamDef::Kind::scope); }
 /// The setting "path" of a node that names a place: from its variable through fields and list
 /// entries (ParamDef::Kind::path).
@@ -441,6 +446,7 @@ void add_flow(Library& lib) {
   {
     NodeDef d = make("flow.call", "Call Event", "Flow", NodeKind::action,
                      "Raises a Custom Event: on Target's graph, or on every graph when Target is empty. Also switches state machine transitions with that name.");
+    d.world = true;
     d.inputs = {exec_in(), data("target", "Target", PinType::actor, 0), data("actor", "Actor", PinType::actor, 0), data("value", "Value", PinType::number, 0),
                 data("text", "Text", PinType::text, "")};
     d.params = {param("name", "Event", ParamDef::Kind::event, "MyEvent")};
@@ -1784,18 +1790,18 @@ void add_math(Library& lib) {
   lib.add(pure("math.round", "Round", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_round)));
   lib.add(pure("math.floor", "Floor", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_floor)));
   // Random: every node has a sequence of its own (logic::random), from the Blueprint's seed.
-  lib.add(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number), [](Context& c) {
+  lib.add(worldly(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number), [](Context& c) {
     const f64 lo = c.in_number("min"), hi = c.in_number("max");
     return Value::number(random::number(&c.slot(0), c.instance().seed(), c.node().id, lo, hi));
-  }, "Deterministic per world", "rand")));
-  lib.add(fresh(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
+  }, "Deterministic per world", "rand"))));
+  lib.add(worldly(fresh(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
     const i64 lo = c.in_int("min"), hi = c.in_int("max");
     return Value::integer(random::whole_number(&c.slot(0), c.instance().seed(), c.node().id, lo, hi));
-  }, "Min to Max inclusive", "rand")));
-  lib.add(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean), [](Context& c) {
+  }, "Min to Max inclusive", "rand"))));
+  lib.add(worldly(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean), [](Context& c) {
     const f64 chance = c.in_number("chance");
     return Value::boolean(random::chance(&c.slot(0), c.instance().seed(), c.node().id, chance));
-  }, "True with the given chance (0..1)", "rand coin")));
+  }, "True with the given chance (0..1)", "rand coin"))));
   {
     NodeDef d = pure("math.compare", "Compare", "Logic", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, boolean, [](Context& c) {
       const f64 a = c.in_number("a"), b = c.in_number("b");
@@ -2075,9 +2081,10 @@ void add_math(Library& lib) {
     lib.add(std::move(d));
   }
   // Time.
-  lib.add(pure("time.now", "Game Time", "Utilities", {}, data("result", "Seconds", K::number), [](Context& c) { return Value::number(c.host().time()); }, "Seconds since play started", "clock elapsed"));
+  lib.add(worldly(pure("time.now", "Game Time", "Utilities", {}, data("result", "Seconds", K::number), [](Context& c) { return Value::number(c.host().time()); }, "Seconds since play started", "clock elapsed")));
   {
     NodeDef d = make("debug.print", "Print", "Utilities", NodeKind::action, "Writes text to the log (and on screen).");
+    d.world = true;
     d.inputs = {exec_in(), data("text", "Text", K::text, "Hello"), data("screen", "On Screen", K::boolean, true)};
     d.outputs = {exec_out()};
     d.keywords = "log debug message string";
@@ -2216,6 +2223,7 @@ void add_functions(Library& lib) {
                      "Runs a function of another actor's Blueprint to its end, then continues: Target's, or the Level's when Target is empty. This Blueprint says what the "
                      "function looks like (My Blueprint: a function \"of another Blueprint\", or one of its own with the same name and pins). Where the target has no such "
                      "function, the outputs are their defaults.");
+    d.world = true;
     d.params = {param("function", "Function", ParamDef::Kind::function)};
     d.inputs = {exec_in(), data("this", "Target", PinType::actor, 0)};  // ("this": a word of C++ - no pin of a function has that name)
     d.outputs = {exec_out()};
@@ -2242,6 +2250,7 @@ void add_functions(Library& lib) {
     NodeDef d = make("func.get_on", "Get Variable on Actor", "Functions", NodeKind::pure,
                      "What the variable of the name holds in the Blueprint of Target (the Level's when Target is empty), as a value of the type the setting says. Where Target has no such "
                      "variable of that type: the zero of the type.");
+    d.world = true;
     d.params = {param("variable", "Variable", ParamDef::Kind::text, ""), type_param(true)};
     d.inputs = {data("this", "Target", PinType::actor, 0)};
     d.outputs = {data("value", "Value", PinType::number)};
@@ -2260,6 +2269,7 @@ void add_functions(Library& lib) {
     NodeDef d = make("func.has_blueprint", "Has Blueprint", "Functions", NodeKind::pure,
                      "True when Target (the Level when Target is empty) has a Blueprint that runs: one without errors that has not been stopped. Call on Actor and Get "
                      "Variable on Actor reach it; where it has none, they give their defaults.");
+    d.world = true;
     d.inputs = {data("target", "Target", PinType::actor, 0)};
     d.outputs = {data("result", "Has Blueprint", PinType::boolean)};
     d.keywords = "has blueprint logic running valid other actor remote bound";
@@ -2278,6 +2288,37 @@ void add_functions(Library& lib) {
     d.keywords = "call pure function value compute";
     d.run = [call](Context& c) {
       call(c);
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // Make Callback: a function of a library as a value that only the engine calls (a height lookup, a test a
+    // builder asks) - with the place its first input names, where that is a const reference
+    NodeDef d = make("func.callback", "Make Callback", "Functions", NodeKind::pure,
+                     "A function of a library as a value the engine calls - while one of its nodes runs, or later, while the object of the engine it was "
+                     "given to lives. Its first input, where that is a const reference, is bound to the place this node names (read when the engine calls). "
+                     "The function needs nothing of the world: it only computes. A Blueprint does not call a Callback itself.");
+    d.params = {param("function", "Function", ParamDef::Kind::function), local_of()};
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const Function* f = g.function(n.param("function"));
+      out.push_back({"callback", "Callback", PinType::callback, {}, false, f ? callback_of(*f) : std::string("()")});
+      if (!f || f->inputs.empty() || !f->inputs[0].ref) return;
+      const FunctionPin& p = f->inputs[0];
+      const std::size_t entries = path_indices(n.param(ref_key(p.name, "path")));
+      for (std::size_t k = 0; k < entries; ++k)
+        in.push_back({ref_key(p.name, path_pin(k)), p.name + (entries > 1 ? " index " + std::to_string(k + 1) : std::string(" index")), PinType::integer, json::Value(0), false, {}});
+    };
+    d.title = [](const NodeDef&, const Node& n) { return "Callback " + n.param("function", "?"); };
+    d.color = 0x6d3fc4;
+    d.keywords = "callback function value engine calls sampler handler";
+    d.run = [](Context& c) {
+      const Function* f = c.instance().graph().function(c.param("function"));
+      if (!f) return kStop;
+      Instance::Spot place;
+      const bool bound = !f->inputs.empty() && f->inputs[0].ref;
+      if (bound) place = c.spot(ref_key(f->inputs[0].name, ""));  // (the place, as the node names it now)
+      c.out(std::size_t{0}, Value::callback(c.instance().callable(f->name, bound, std::move(place))));
       return kStop;
     };
     lib.add(std::move(d));

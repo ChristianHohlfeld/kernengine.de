@@ -89,6 +89,14 @@ struct EngineStandIn {
   std::vector<std::string> calls;  // "engine.world.pose(1, {2, 0})" ...
   std::map<std::string, Value> places;  // "engine.game_world.shots(1)" -> what is there
   bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
+  /// The Callbacks a call hands it are called - three times each, with inputs drawn from the call - and what they
+  /// give is written down with the call and goes into its answer. Handed to an object of the engine (the call's first
+  /// input is its handle), they stay with it: every later call on that object calls them again, until it is released.
+  struct Kept {
+    std::string shape;  // (its form: cn(nn))
+    Value callback;
+  };
+  std::map<i64, std::map<std::string, Kept>> kept;
 };
 /// A value as the stand-in writes it down: every number with all its digits.
 std::string engine_shown(const Value& v);

@@ -203,6 +203,26 @@ template <class X, class Y> struct Direct<Pair<X, Y>> {
   }
 };
 
+/// A Callback of the class as the engine takes it: the thunk and its place as the function pointer and its void* -
+/// the same two words (kern::HeightSampler: fn, user) -, or a std::function that calls them (it holds the two words:
+/// no memory is asked for). Unbound: the engine's nothing.
+template <class R, class... A> struct Direct<Callback<R(A...)>> {
+  template <class B, class C> static void from(EngineObjects&, const B& b, C& c) {
+    if constexpr (callback_detail::is_function<C>) {
+      if (b.fn) c = [b](auto... a) { return b(a...); };
+      else c = nullptr;
+    } else {
+      auto& [fn, user] = c;
+      static_assert(std::is_same_v<std::remove_cvref_t<decltype(fn)>, decltype(b.fn)>, "a Callback whose function the engine calls with other types than the class's");
+      fn = b.fn;
+      user = b.place;
+    }
+  }
+  /// (a Callback the engine gives: unbound - the class calls none)
+  template <class B, class C> static B make(EngineObjects&, const C&) { return B{}; }
+  template <class C> static void pass(EngineObjects&, const C&) {}
+};
+
 namespace direct {
 template <class B> inline constexpr bool is_fixed = false;
 template <class T, std::size_t N> inline constexpr bool is_fixed<Fixed<T, N>> = true;
