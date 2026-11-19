@@ -2464,7 +2464,9 @@ class Unit:
             f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
             f.pointers = list(e["pointers"])
             f.logic = list(e.get("logic", ()))
-            if not f.wait and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
+            # (one it leans on has no test yet whose source is handed on: when it is written, it has - and this one is
+            # converted again with it, main)
+            if not f.wait and not leans and f.open and d["id"] not in self.tree.body and self.world.closures is not None and key not in self.world.closures:
                 # A function is written when its test compares it, and the test holds the source of all it
                 # calls once more: what stands in another source file, as the test of that file hands it on.
                 f.wait = "what it calls stands in another source file, whose test does not hand its source on"
