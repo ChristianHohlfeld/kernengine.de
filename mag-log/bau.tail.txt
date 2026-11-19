@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:33827:10: warning: unused variable 'playing' [-Wunused-variable]
+ 33827 |     Bool playing = false;
+       |          ^~~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:39009:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 39009 |     Bool remove = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:39045:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 39045 |     Bool remove = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:42171:10: warning: variable 'set_visible' set but not used [-Wunused-but-set-variable]
+ 42171 |     Bool set_visible = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:42172:10: warning: variable 'update_instances' set but not used [-Wunused-but-set-variable]
+ 42172 |     Bool update_instances = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:42173:10: warning: variable 'set_visible_2' set but not used [-Wunused-but-set-variable]
+ 42173 |     Bool set_visible_2 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:42196:10: warning: variable 'remove' set but not used [-Wunused-but-set-variable]
+ 42196 |     Bool remove = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/tests/converted/test_facades.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:52014:11: warning: unused variable 'sim_time' [-Wunused-variable]
+ 52014 |     Float sim_time = 0.0;
+       |           ^~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:52066:10: warning: unused variable 'xr' [-Wunused-variable]
+ 52066 |     Bool xr = false;
+       |          ^~
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:52118:10: warning: variable 'actor_matrix' set but not used [-Wunused-but-set-variable]
+ 52118 |     Bool actor_matrix = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:52166:10: warning: variable 'set_mode' set but not used [-Wunused-but-set-variable]
+ 52166 |     Bool set_mode = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:52174:10: warning: variable 'teleport' set but not used [-Wunused-but-set-variable]
+ 52174 |     Bool teleport = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/src/level_blueprints.cpp:52175:10: warning: variable 'set_actor_velocity' set but not used [-Wunused-but-set-variable]
+ 52175 |     Bool set_actor_velocity = false;
+       |          ^
+1 warning generated.
+1 warning generated.
+1 warning generated.
+3 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+1 warning generated.
+4 warnings generated.
+20 warnings generated.
+/usr/bin/ld: /dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/tmp/sc-tests/obj/_dev_shm_spawncity-jobs-chris_work-d-belege2-vergleich-050059-20415_kern_src_app_app.cpp-037ed7bd3d78-750ba5636435.o: in function `engine_instance()':
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/src/app/app.cpp:156:(.text+0x170e): undefined reference to `kern::c_api_renderer()'
+/usr/bin/ld: /dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/tmp/sc-tests/obj/_dev_shm_spawncity-jobs-chris_work-d-belege2-vergleich-050059-20415_kern_src_app_app.cpp-037ed7bd3d78-750ba5636435.o: in function `kern_app_set_args':
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/src/app/app.cpp:156:(.text+0x1794): undefined reference to `kern::c_api_renderer()'
+/usr/bin/ld: /dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/tmp/sc-tests/obj/_dev_shm_spawncity-jobs-chris_work-d-belege2-vergleich-050059-20415_kern_src_app_app.cpp-037ed7bd3d78-750ba5636435.o: in function `kern_app_start':
+/dev/shm/spawncity-jobs-chris/work-d-belege2-vergleich-050059-20415/kern/src/app/app.cpp:156:(.text+0x1aea): undefined reference to `kern::c_api_renderer()'
+clang++-18: error: linker command failed with exit code 1 (use -v to see invocation)
+
+real	11m1,809s
+user	83m48,874s
+sys	1m32,079s
