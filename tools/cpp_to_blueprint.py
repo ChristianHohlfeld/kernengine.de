@@ -2714,16 +2714,18 @@ class Const:
         return kids(f)[-1] if kids(f) and f.get("hasInClassInitializer") else {"kind": "ImplicitValueInitExpr"}
 
     def inlined(self, n):
-        """A call of a constexpr function that returns one expression of its parameters
-        (`constexpr Vec3 hex_color(u32 h) { return {...}; }`), with constants for them: that expression,
-        the parameters standing for what the call gives - worked out as the compiler works it out at
-        compile time. None: the call is none such."""
+        """A call of a function that returns one expression of its parameters (`constexpr Vec3 hex_color(u32 h)
+        { return {...}; }`, `Vec3 rgb(u32 h) { return {...}; }`), with constants for them: that expression, the
+        parameters standing for what the call gives - worked out as the compiler works it out at compile time.
+        (Constexpr or not, such a function gives the same value of the same arguments - the program works it out
+        when it begins, `const Vec3 kWall = rgb(0xe9e4da);` -: what the expression is is worked out as a constant
+        - `number`, `literal` -, or the constant waits.) None: the call is none such."""
         n = bare(n)
         if n.get("kind") != "CallExpr":
             return None
         c = callee(n)
         d = self.unit.tree.body.get(c.get("referencedDecl", {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
-        if d is None or not d.get("constexpr") or d.get("kind") != "FunctionDecl":
+        if d is None or d.get("kind") != "FunctionDecl":
             return None
         body = next((x for x in kids(d) if x.get("kind") == "CompoundStmt"), None)
         stmts = kids(body) if body is not None else []
@@ -2734,6 +2736,14 @@ class Const:
         if len(args) != len(params) or any(a.get("kind") == "CXXDefaultArgExpr" for a in args):
             return None
         by = {p["id"]: a for p, a in zip(params, args)}
+        if not d.get("constexpr"):
+            # (what it reads besides its parameters: constants only - a variable may have changed when it is called)
+            for x in walk(kids(stmts[0])[0]):
+                r = x.get("referencedDecl") or {}
+                if x.get("kind") == "DeclRefExpr" and r.get("kind") == "VarDecl" and r.get("id") not in by:
+                    v = self.unit.tree.decl.get(r.get("id"), {})
+                    if not (v.get("constexpr") or re.search(r"\bconst\b", qtype(v))):
+                        return None
         out = copy.deepcopy(kids(stmts[0])[0])
         for x in walk(out):
             if x.get("kind") == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in by:
