@@ -202,3 +202,10 @@
   → Zweig **work-d-release = 28b67b2b**: release eines Handles ohne Objekt beendet das, das on_missing dort macht (LightPool hat einen Macher).
 - Beleg-Zweig work-d-belege2 = 7b1a05ed (+key, +release). Läuft: `work-d-belege2-vergleich-055045-6922` (city_stream, game_controls, game, net_session,
   game_look). Danach Engine-Suite auf work-d-belege2.
+- **Beleg 06:21:** `work-d-belege2-vergleich-055045-6922` (7b1a05ed = work-zusammen 12438d1c + leck + weld + app + key + release; city_stream, game_controls,
+  game, net_session, game_look): convert/bau rc=0; **Stellvertreter 52/53 ok, Engine selbst 52/53 ok, 0 LECK, 0 ABBRUCH, kein „refused“ mehr in
+  irgendeinem Test** (vorher: key/update_camera … „this build has no function“, client.release / LightPool-release abgewiesen). converted_city_stream(_cpp),
+  converted_Game__game_cpp, converted_game_controls_cpp, converted_net_session(_cpp) ok in beiden Durchgängen.
+  Einziges FAIL: converted_Game__game_look_cpp in BEIDEN Durchgängen – SEGV strlen(nullptr) in look_apply_tier (Testtext :5610, std::string aus nullptr);
+  genauso in der Basis 032626 und 043356 → nicht von d (Familie „std::string aus nullptr“ wie converted_life_cpp, t1).
+- Engine-Suite läuft: `work-d-belege2-engine-062159-12230`.

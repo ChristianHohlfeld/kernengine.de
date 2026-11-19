@@ -1,5 +1,10 @@
 # Paket k – Stand (neuer Auftrag 04:40: B0–B3)
 
+## BEREIT ZUM MERGEN: 5d804704 (B1 cdcd2f51 + B2 5d804704, auf B0) – Beleg work-k-vergleich-054057-841
+- vergleich sound_fx.cpp, game_life.cpp, game.cpp auf 5d804704: convert rc=0, bau rc=0, Stellvertreter 46/46 ok, Engine selbst 46/46 ok, keine Abweichung.
+  Mat4::perspective, projection_matrix, SoundFx::drive, SoundFx::update geschrieben und verglichen. life_hud (Game/game_life_cpp) war in der Probe nicht
+  geschrieben (0/11, Teile fehlen) – zeigt erst der volle Lauf. 5d804704 ändert die Engine-Tabelle (8 voice-Eingänge Int64): Engine-Suite im vollen Lauf.
+
 ## BEREIT ZUM MERGEN: 8b8c0e10 (B0 kQuiet) – Beleg work-k-konvert-044336-12397
 - konvert origin/work-k (8b8c0e10, mit work-zusammen 12438d1c + work-t1 c5b8ab99): **convert rc=0** (05:40, 56 min auf 9 Kernen).
   1695 von 1844 Funktionen geschrieben (21450 von 30978 Zeilen; 020121: 1637 / 19218), 1652 verglichen (020121: 1594).
@@ -17,11 +22,23 @@
 | Abweichung | Ursache | Commit | Beleg | Stand |
 |---|---|---|---|---|
 | B0 kQuiet (convert rc=1) | dateieigene Konstanten zweier Teile nach Namen zusammengeführt | 8b8c0e10 | work-k-konvert-044336-12397: convert rc=0, 1695/1652, 20 wartend | belegt |
-| B1 Mat4_perspective 300/300, projection_matrix 62/300 (.m[15] Quelle 1) | Test-Schreiber: `memset(r.m, 0, sizeof r.m)` → sizeof des Programms (64), im Test sind die 16 f32 aber 64-bittig: nur m[0..7] genullt | cdcd2f51 (converted::layout::set_bytes) | – | gebaut, unbelegt |
-| B2 SoundFx_drive/update `.l.voice` | qtype löste `VoiceId` (= u64) zu `unsigned long` → Int; Engine-Tabelle ebenso (voice-Eingänge der Mixer-Knoten Int) | 5d804704 (WIDE_NAMES; engine_api neu erzeugt: 8 Eingänge Int64) | – | gebaut, unbelegt (braucht auch Engine-Suite) |
+| B1 Mat4_perspective 300/300, projection_matrix 62/300 (.m[15] Quelle 1) | Test-Schreiber: `memset(r.m, 0, sizeof r.m)` → sizeof des Programms (64), im Test sind die 16 f32 aber 64-bittig: nur m[0..7] genullt | cdcd2f51 (converted::layout::set_bytes) | work-k-vergleich-054057-841: beide Durchgänge 46/46 ok (Mat4::perspective, projection_matrix geschrieben und verglichen) | belegt |
+| B2 SoundFx_drive/update `.l.voice` | qtype löste `VoiceId` (= u64) zu `unsigned long` → Int; Engine-Tabelle ebenso (voice-Eingänge der Mixer-Knoten Int) | 5d804704 (WIDE_NAMES; engine_api neu erzeugt: 8 Eingänge Int64) | work-k-vergleich-054057-841: SoundFx::drive/update verglichen, beide Durchgänge ok; Level las die Texte (convert rc=0) | belegt (Engine-Suite noch offen) |
 | B3 rocket_smoke_emit 2/20, spawn_squad 10/20, spawn_tank 5/20 (rng_.s), vermutl. gaps_guided | Name für einen Eintrag, dessen Index etwas ändert (`r = g.a[g.cur++ % n]`, `L = lanes[rng_.next() % n]`): steps_in sah Änderungen an Feldern des Objekts / hinter *ptr nicht → Index je Nutzung neu (4× ++, mehrere rng-Züge) | 09dd6818 | – | gebaut, unbelegt |
 | B3 life_hud 1/33 (gegen die Engine) | `"bubbles"` x 0.5578/0.5579 – projection_matrix im Test der Quelle (B1) | cdcd2f51 | – | vermutlich mit B1 |
 | B3 number_at 8/300, game_details `.Result` | kein Konverterfehler: alle 8 Fälle mit from > s.size() – `s.c_str() + from` jenseits des Endes (UB) | – | Einzelausgabe 032626 | BEFUND FÜR t1 |
+
+## BEFUND FÜR t1 (06:05, aus work-zusammen-suite-alle-043356-8771)
+- **converted_Game__game_equipment_cpp ASan SEGV** in Game::ui_radio (strlen(nullptr) in `std::string(…) + MusicSynth::kStations[ui_.station].name`):
+  `ui_.station` kommt als beliebige Zahl aus dem Test; nur 0 ≤ station < station_count() ist ein Zustand des Programms (ein negativer Rest von
+  `(station + dir + n) % n` bzw. station ≥ n liest außerhalb der Tabelle). Dasselbe Bild (strlen/operator+) bei look_apply_tier (game_look_cpp).
+  Kein Konverterfehler – Testeingaben bzw. Tabelle im Test (t1).
+
+## OFFEN (k, nicht weiter verfolgt)
+- mp_hud_json 7/20 (Stellvertreter), 4/20 (Engine): `"connected"` Quelle false, Blueprint true (Session::connected: `client_ && client_->connected()
+  && have_origin_`). Text des Blueprints und des Tests stimmen in der Gestalt; Verdacht: Zahl/Reihenfolge der Aufrufe engine.client.connected vor
+  dieser Stelle (Antworten des Stellvertreters der Reihe nach) – zuerst mit dem Lauf nach 09dd6818 erneut ansehen.
+- draw_events 9/20: `.combat_art_.parts_[0].transforms[45]` +0.5, [12]/[79] −0.2465 – Ursache nicht gefunden (Wrack-Schleife im Text richtig).
 
 ## BEFUND FÜR t1 (04:55)
 - **number_at 8/300 (converted_game_details_cpp):** `number_at(s, from, …)` liest `strtoll(s.c_str() + from, …)`; alle abweichenden Fälle haben

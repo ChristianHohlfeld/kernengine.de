@@ -1,4 +1,11 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 06:30 **GÜLTIG: `work-zusammen-voll-055004-6649` auf fe83683e – convert rc=0 (06:19).** „1707 of 1844 functions of the program are written as Blueprints (22249 of
+  30978 lines)“, „1664 functions … compared with their source“; **nur noch 3 Zeilen „cannot compare it yet“** (2 × get_u8, Graph) – 020121: 1637 / 1594 / ~116.
+  `grundlage` für `vergleich` ist jetzt dieser Lauf. Die Suiten rechnen (Ergebnis ~07:10).
+  · **work-zusammen = f03f0f53** (+ k 5d804704: 64-Bit-Aliase bleiben Int64 – voice-Eingänge der Mixer-Knoten; memset im Test → Mat4 .m[15]; Beleg
+    `work-k-vergleich-054057-841` 46 von 46 ok in beiden Durchgängen). Engine-Suite dazu: `work-zusammen-engine-060116-9012` (läuft).
+  · k arbeitet an B3 (09dd6818: ein Name für einen Eintrag mit Schritt im Index wurde je Nutzung neu ausgewertet – rocket_smoke_emit, spawn_squad, spawn_tank,
+    gaps_guided; Beleg `work-k-vergleich-060032-8835` läuft). d: Lecks/weld/Maker (Belege laufen bzw. warten). t1 beendet (Nachfolger nach der Suite).
 - 05:45 **Fortschritt, alles belegt:**
   · **Engine-Fix cpp_names (12438d1c): `work-zusammen-engine-043403-8808` rc=0**, und im Kontrolllauf `work-zusammen-suite-alle-043356-8771` kommt „Game runs as its
     C++ class“ nicht mehr vor: **Stellvertreter 138 ok / 12 FAIL / 1 ZEIT (vorher 113/35/4); Engine selbst 127 ok / 23 FAIL / 11 LECK / 1 ZEIT.** Auswertung t1:
