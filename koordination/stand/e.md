@@ -24,3 +24,11 @@ Entwurf und Begründung: siehe Bericht an main (Handback), gleichlautend unten n
   angenommen (Konverter-Texte, alte Texte = derselbe Blueprint); Deklaration im falschen Rumpf abgewiesen. Engine-Fall
   logic_notation_values_of_a_call; Doku „Werte eines Aufrufs“. Lokal: alle 43 logic_cases + Fib-Graph Rundreise = Fixpunkt.
 - Belege laufen: mag work-e-engine-074752-4918; Bench vorher/nachher lokal ($S/e/bench/base.txt, neu.txt). Danach vergleich car/drone/city_stream.
+- 08:10: Engine-Auftrag neu: work-e-engine-080904-22468 (074752 war verloren). Level der Grundlage: das .klevel hält Graphen (JSON), keine
+  Klassentexte – die Form ist dort nicht gespeichert; blueprint_cpp meines Stands schrieb alle Klassen aus dem alten Level ($S/p/lvl) ohne Fehler
+  (Bench). Konverter-Texte (Member-Form) liest der Leser weiter. Kein konvert nötig.
+- Bench (29 Fälle, 9 Runden, je beide Stände nacheinander unter beiden Sperren; $S/e/bench/base.txt, neu.txt): geom. Mittel Klasse/C++ (min)
+  2,100 → 2,086. Besser >5 %: nostr_mulm 7,1→6,1, nostr_from_hex, common_rng_next, common_wrap_pi, common_slerp. Schlechter >5 %: lamps_grid_key,
+  settings_escape (Klasse gleich, nur C++-Zeit schwankt), lamps_near 2,4→2,85. lamps_near: in Field_near ändert sich nur n14 (Schleife lokal);
+  Gegenproben ($S/e/bench/exp2, exp3, je 5× abwechselnd): neu mit n14 als Member 42,0 µs, neu 35,2, alt 31,0, alt mit n14 lokal 36,6 – die Lage
+  des Codes (LTO) streut ±15–30 %, n14 allein erklärt es nicht. Ehrlich: lamps_near ist im Mittel langsamer, Ursache nicht eindeutig.

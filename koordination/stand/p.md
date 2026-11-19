@@ -30,6 +30,31 @@ rng_unit, wrap_pi, gf_mul (≈ 14). Trotzdem darüber nach den Projektionen: sha
 from_hex (4,1), wire_get/put, mvt_read/ring_area, settings_escape (3,4: Formeln je Zeichen), lamps_near, lamps_grid_key, settings_num –
 diese brauchen je eigene Ursachenarbeit (Int64-Knoten, Text je Zeichen, Map), was die Projektionen nicht abdecken.
 
+## Fälle, die auch nach (a)+(b)+Punkt 2 über 1,10 blieben – Ursache nach heutiger Kenntnis (08:20)
+- sha256 (P+B 3,0): rotr als Funktionsaufruf mit Result-Struktur, Indizes `4.0 * index` u. ä. als Float-Formel (von P nicht erfasst), Fixed<Int,64>
+  mit Prüfung je Zugriff, `w = List<Int>{}` je Block; Summen über Sum mit Prüfung je Stufe. Klasse (Formeln mit ×, Einbetten) – teils behebbar; Rest weiß ich noch nicht.
+- qr_encode (2,3) / rs_remainder (1,6): Listen mit erase(0)+push_back wie die Quelle, Vergleich je Durchlauf, gf_mul nicht abgerollt (Wächter).
+  Mit (a)+(b) vermutlich nahe; Rest: weiß ich noch nicht.
+- mulm (5,4): Int64-Knoten (int64_add/of_int/low) je Schritt, `i - 1.0`; die Int64-Umsetzung habe ich nicht gelesen – weiß ich noch nicht.
+- from_hex (4,1): je Zeichen `a >= 128 ? a - 256 : a` und `2*index` als Float-Formel, from_hex_v als Aufruf mit Result; Punkt 2 mit Vergleich
+  und × an der Wurzel sollte viel davon nehmen (Klasse/Schreibweise, allgemein); Rest weiß ich noch nicht.
+- wire_get/put_u32, put_f32 (1,5–3,9): Bytes als List<Int> (Aufbau der Sprache, (c)), Anhängen je Element statt eines Bereichs (Konverter/Quelle).
+- mvt_read_geometry (1,7) / ring_area (1,66): Bytes als List<Int>; ring_area: Listenprüfung je ring[i], whole_add für `i += 1`. Behebbar teils mit
+  E2.3 (Index am Graphen bewiesen, zurückgestellt) – sonst Aufbau.
+- settings_escape (3,4): Float-Formeln je Zeichen (`a >= 128 ? …`, Vergleich mit 34/92/32), text_of_code als Text je Zeichen. Punkt 2 + Klasse.
+- lamps_near (1,8–4,2, Rauschen groß): Map/Liste – nicht untersucht, weiß ich noch nicht.
+- lamps_grid_key (1,4): Float → Int64 (Wandlung mit Prüfung) – nicht untersucht.
+- settings_num (1,3): text_format<"%g"> gegen snprintf in einen Puffer – Klasse (eigener Formatweg), nicht untersucht.
+
+## Plan E17 (64-Bit-Spalte) – noch NICHT gebaut
+Der Vergleichstest hält die Quelle in tests/converted/test_<einheit>.cpp (namespace converted_<einheit>, bis zur Zeile
+`using converted::arg; …` vor dem Testrahmen), übersetzt mit ../converted.h (wide::f32 = double, kern::math). Nur die Fälle mit f32 („f32“ in der
+Spalte gleich: wrap_pi, damp_alpha, qnormalize, slerp, to_local, person_hit, person_sphere, perf_governor, audio_render, lamps_place_road) rechnen
+dort anders; Int-/Text-Fälle sind in beiden Spalten dieselbe Quelle. Bau: blueprint_bench.sh nimmt die tests/converted desselben Laufs wie das
+Level (Option `--tests <ordner>`), schneidet je Einheit den Quellteil aus (ein Schnitt an der Marke, keine Namensliste), übersetzt ihn mit
+converted.h; cases.h bekommt je f32-Fall eine dritte Funktion src64_<fall> (Eingaben wie die Klasse, double). Achtung: der Quellteil enthält
+converted::at (Prüfung, wo C++ es offenlässt) – das kostet wie die Listenprüfung der Klasse; im Bericht nennen.
+
 ## Gebaut (UNBELEGT, Beleg: engine + vergleich settings auf mag folgt)
 - 50e21923 Text::Appending: `O = text_append(std::move(O), x, y)` hängt an Ort und Stelle an (ein Zeichen = push_back); Text of Code ohne
   Umweg. Text der Klasse unverändert. settings_escape 7,59 → 3,37. g++ -fsyntax-only der Bench-Klassen ok.

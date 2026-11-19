@@ -5,6 +5,22 @@
   sc::Clocks: die Antworten einer Uhr (EngineFunction::clock, aus KERN_CLOCK) an die Quelle je Stelle ihrer Aufzeichnung; ein Blueprint-Aufruf an derselben
   Stelle mit demselben Aufruftext bekommt sie, sonst fragt er die Engine (Reihenfolge wird wie immer verglichen). Watch beginnt neu. Stellvertreter unverändert.
   Beleg läuft: `work-d-uhr-vergleich-075109-9150` (city_stream, terrain, mvt, game_look).
+- **Beleg 08:25:** `work-d-uhr-vergleich-075109-9150` (4b7074b1; city_stream, terrain, mvt, game_look): convert/bau rc=0; **Stellvertreter 46/47 ok, Engine selbst
+  46/47 ok, 0 LECK, 0 ABBRUCH**. clock_ms (vorher real 300/300), CityStream_select_cells (300/300), CityStream_take_requests (88/287, 92/300) weichen gegen die Engine
+  nicht mehr ab (converted_game_look_cpp, converted_city_stream(_cpp) ok). Einziges FAIL in BEIDEN Durchgängen: converted_terrain_cpp Terrain_run_job (13/300 bzw. 48/300) –
+  jede gezeigte Abweichung ist „call 1 … engine.jobs.submit(3, [Bytes])“: die Quelle legt andere Bytes in den Auftrag als der Blueprint (Anordnung/Breite der Zahlen) =
+  die Regel von Paket k, keine Uhr. (Die 2 LECK in 070253 waren vor den gemergten Fixen.)
+
+- **Aufgabe 3 (Platz der Engine, Schritt 7):** work-d = e757c565 = 9949fd00 + origin/work-zusammen 821208ac (7297dc01; Konflikt EngineObjects::end: leck-Fassung + ++generation_)
+  + work-d-uhr. Die Wartestelle aus 1007cb7e („the node that binds it is not written yet“) ist entfernt – Emit.engine() bindet den Platz (e02ea240). Befund: vor 1007cb7e
+  las engine_table() Einträge mit place gar nicht (alle Platz-Knoten „its pins differ“), Schritt 7 lief also nie an einer Quelle. Generator reproduziert.
+  Beleg läuft: `work-d-vergleich-082602-26333` (game.cpp + game_events, game_lamps, game_look, game_foot_rounds, game_military, game_town, game_ui). Danach konvert 9, Engine-Suite.
+
+## BEREIT ZUM MERGEN (d, 08:30): work-d-uhr 4b7074b1 – Beleg work-d-uhr-vergleich-075109-9150
+- Ein Commit auf work-zusammen 821208ac, nur Testrahmen (rule_blueprint.h sc::Clocks + test_engine; converted.h Watch eine Zeile). Keine Engine-Änderung → keine Engine-Suite nötig.
+- In work-d eingemischt (e757c565; Konflikte mit dem Platz der Engine: @get/@set-Zeile + g_places.clear() behalten).
+- BEFUND FÜR k: Terrain_run_job – Bytes von engine.jobs.submit weichen in beiden Durchgängen ab (siehe oben; real 48/300, Stellvertreter 13/300).
+- Hinweis (nicht abbrechbar für mich): `work-d-belege2-vergleich-055022-6799` (Vorgänger, überholt durch 055045) wartet noch auf mag – bitte herausnehmen.
 - fertig+bewiesen+gemergt: Stufe 4 (d) (CI 44337346531)
 
 ## A – rote Engine-Suite (R129): Fix gebaut, Beweis läuft

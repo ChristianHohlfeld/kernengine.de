@@ -940,3 +940,43 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   IDs in /home/claude/agenten.txt. **Noch nicht gestartet:** Nachfolger k (Abweichungen draw_events, mp_hud_json, Session_update, life_hud + Regeln der Warteliste),
   d („Platz der Engine“ auf work-d belegen: Schritt 7 Konverter; einmischen nach dem ersten grünen Stand), c (Rückrufe), s5 (Umschalten), Abschluss (Abschnitt 12).
 - **Quote (Chris):** 53 % um 06:34 (42 % um 22:31; Wochengrenze, neu am 25.11. 13:00). Höchstens ~5 Agenten.
+
+### 16.24 Stand 08:45 (19.11.) – QUOTE KNAPP: 58 % der Woche, Fable (der Koordinator) 74 % seines Anteils; gedrosselt auf den Weg zum ersten grünen Stand
+- **Quote (Chris, 08:37):** Woche 58 % (06:34: 53 % – 5 Punkte in 2 h mit sechs Agenten), Zurücksetzung Mittwoch 25.11. 13:00; „Fable: bis zu 50 % des
+  Wochenlimits – 74 % verwendet“ (das ist der Koordinator; die Agenten laufen auf Opus). Die App: „bei diesem Tempo erreichst du dein Limit heute Nacht“.
+  Monatliches Ausgabenlimit 72,08 $, 0 $ verbraucht: über dem Planlimit würden Credits automatisch verwendet – **Chris ist gefragt, ob er das will.**
+  **Das Projekt wird vor dem Limit nicht fertig.** Folge: (1) Koordinator sparsam – Kontrollen etwa stündlich, kurze Befehle, keine großen Ausgaben lesen;
+  (2) nur noch der Weg zum ersten grünen Stand in `work`: t1 (Rahmen nebeneinander, Zeiten), k (Abweichungen), d (Durchgang gegen die Engine); t2 beendet E15;
+  (3) **p und e bringen nur ihren laufenden Schritt zu Ende und übergeben** (p: 50e21923 Text::Appending + E17-Spalte; e: Schritt 1 neue Form der Klasse) –
+  Nachfolger erst nach Chris' Wort bzw. nach dem 25.11.; c (Rückrufe), s5 (Umschalten) nicht starten.
+- **work-zusammen = cf71d466** (+ d work-d-uhr 4b7074b1: im Durchgang gegen die Engine gibt eine Uhr – Schalter clock der Tabelle – den Blueprints, was sie der
+  Quelle gab; Beleg 075109: beide Durchgänge 46 von 47, nur Terrain_run_job rot → k). `work` unverändert (42831863).
+- **Gültiger Lauf `work-zusammen-voll-070328-32111` (821208ac): convert rc=0 – 1725 von 1844 geschrieben (22779 von 30978 Zeilen), 1682 verglichen, 2 „cannot
+  compare it yet“, 18 „waits for good“.** `grundlage` = dieser Lauf. Warteliste: `$S/wartet_070328.txt`. Seine Suite habe ich abgebrochen (nacheinander),
+  **seine Engine-Suite dabei zu früh mit beendet (engine rc=?)** → `work-zusammen-engine-075558-13914` auf 821208ac läuft. Einzel-Lauf aller Tests auf seinem
+  Level: `ergebnis-work-zusammen-voll-070328-32111-alle-080335-20196` (Start 08:04) → Liste nach Gebieten an k, d, t1.
+- **mag:** nach dem Abbruch zählt der Ordner des Laufs 070328 weiter mit 56 Kernen (ein Prozess darin lebt; Chris ist informiert) → Datei `cap` im Zweig
+  mag/auftrag = 140 (84 echte + 56). Zählt er nicht mehr mit (dann laufen deutlich mehr als 84 Kerne): cap zurück auf 84. Zwei Aufträge gingen in dem Moment
+  verloren und sind neu abgelegt. `mag.sh vergleich` braucht Pfade `src/<datei>.cpp`.
+- **t1 (Nachfolger 6):** gebaut aa75a63c + 9396fec9 (Kinder nebeneinander: SC_TEST_JOBS/KERN_JOBS; `ok <test> (W s, CPU C s)`; Summe der CPU je Durchgang),
+  `--name <ganzer Name>` (genauer Filter – das mag-Skript `einzeln()` darauf umstellen, sobald gemergt: heute läuft ein Test doppelt, wenn sein Name Anfang
+  eines anderen ist), aad9efae (Zeiger hinter das Ende eines Texts → markiert; number_at). Beleg läuft: `work-t1-zeit-spiel-072523-9219` (ganze Suite, beide
+  Durchgänge, 9 Kerne). Befund: die 31 Game-Tests brauchen einzeln je 2–8 min, nacheinander 1,5–2 h je Durchgang. **Offene Entscheidung (t1, Zweig
+  work-t1-mass 05d97435):** der Rahmen entscheidet heute an der Uhr (5-ms-Regel, more(), long_calls) – darum gibt derselbe Test je Lauf verschiedene Urteile;
+  Vorschlag: ein gezähltes Maß statt der Uhr. Erst mit den Zeiten entscheiden; die CI (45 Minuten, wenige Kerne) braucht danach Aufteilung auf mehrere Jobs
+  oder eine Entscheidung zur Zahl der Aufrufe (Chris).
+- **Entscheidungen seit 16.23:** E15 (Graph im Test Feld für Feld; t2 baut, Beleg `work-t2-vergleich-072818-9855`), **E16 (Rekursion in der Sprache:** als Schritt;
+  Grenze 65.536 in Interpreter/JIT, Sprungbrett statt Maschinenstapel; Klasse = Methodenaufruf; neue Form der Klasse allgemein – Schrittwert lokal, wenn nur auf
+  dem Weg seiner Funktion gelesen; e baut Schritt 1 = a020e227, unbelegt; Entwurf und Reihenfolge 1–5 in stand/KOORDINATOR.md 07:35 und stand/e.md), **E17
+  (Zeit-Test gegen die Quelle in 64-Bit-Zahlen, beide Spalten sichtbar – vorläufig, Chris kann widersprechen).** **Bei Chris offen:** Entwurf 4 von p (ganze
+  Zahlen fester Breite u8…i32 als Typen der Sprache, Schleifenform mit lokalem Wächter, List<u8>) – p's Projektion: heute 4 von 29 Fällen unter 1,10, mit allem
+  etwa 14; sha256 (3,0), qr (2,3), mulm (5,4), from_hex (4,1), wire/mvt u. a. bleiben darüber (stand/p.md „ENTWURF 4“).
+- **Offene Abweichungen (k, Nachfolger 3):** Terrain_run_job 13/300 (Bytes von engine.jobs.submit), mp_hud_json, draw_events, Session_update, life_hud;
+  Beleg läuft `work-k-vergleich-075447-11897`. **d (Nachfolger 6):** nach den Uhren: Liste des Einzel-Laufs (nur gegen die Engine Rotes), dann „Platz der Engine“
+  Schritt 7 auf work-d (nicht einmischen vor dem ersten grünen Stand).
+- **Agenten-IDs:** /home/claude/agenten.txt (t1 afa7…, t2 a5c3…, k a5fb…, d a2ff…, p a92f…, e ae1b…). Nach einem Server-Neustart per SendMessage an die ID wecken.
+- **Wenn das Limit greift oder eine neue Koordinator-Sitzung übernimmt:** alles ist gepusht (koordination, work-zusammen cf71d466, Zweige der Pakete). Einstieg:
+  dieser Abschnitt, dann stand/KOORDINATOR.md oben, dann die stand/<paket>.md. Nächste Schritte in dieser Reihenfolge: (1) t1s Rahmen einmischen, sobald
+  `work-t1-zeit-spiel-072523-9219` grün belegt; `einzeln()` in lauf2.sh auf `--name` umstellen; (2) Liste des Einzel-Laufs 080335 an k/d/t1; (3) Belegtes von k, d,
+  t2 einmischen; (4) voller Lauf als Kandidat (`MAG_NOWAIT=1 ./mag.sh voll origin/work-zusammen` – die Engine-Suite des Laufs abwarten!) → bei convert rc=0,
+  suite rc=0, engine rc=0 nach `work` (Abschnitt 10), CI.

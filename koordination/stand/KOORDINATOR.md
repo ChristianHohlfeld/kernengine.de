@@ -1,4 +1,8 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 08:45 **QUOTE KNAPP (Woche 58 %, laut App heute Nacht erreicht).** Ab jetzt nur der Weg zum ersten grünen Stand: t1 (Rahmen), k (Abweichungen), d (gegen die
+  Engine); t2 beendet E15. **p und e: nur den laufenden Schritt belegen, „BEREIT ZUM MERGEN“ melden, Übergabe schreiben, enden.** Alle: sparsam – keine
+  Proben „zur Sicherheit“, kurze Berichte, Stand und Übergabe immer aktuell (jeder Lauf kann der letzte vor der Pause sein). Stand des Ganzen: UEBERGABE 16.24.
+  · **work-zusammen = cf71d466** (+ d work-d-uhr 4b7074b1: Uhren im Durchgang gegen die Engine). Wer auf work-zusammen aufsetzt: einmischen.
 - 08:10 **mag:** der volle Lauf 070328 ist nach der Konvertierung abgebrochen (seine Suite liefe nacheinander; **engine rc=? – seine Engine-Suite war noch nicht
   fertig, mein Abbruch kam zu früh**; neu: `work-zusammen-engine-075558-13914` auf 821208ac). Danach startete 6 Minuten nichts: der Ordner des abgebrochenen
   Laufs zählt auf mag weiter mit 56 Kernen (ein Prozess darin lebt noch). Budget darum **cap = 140** (84 echte + 56) – wer `stand` mit deutlich über 84 laufenden
