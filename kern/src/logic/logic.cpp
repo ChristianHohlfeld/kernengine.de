@@ -2661,7 +2661,12 @@ struct InstanceCallable final : Callable {
       places.push_back(place);
       places.resize(args.size() + 1);
     }
-    in.insert(in.end(), args.begin(), args.end());
+    // (each as the type of its input: what the engine hands over is a value of the signature)
+    const Function* fn = inst->graph().function(function);
+    for (std::size_t k = 0; k < args.size(); ++k) {
+      const std::size_t at = k + (bound ? 1 : 0);
+      in.push_back(fn && at < fn->inputs.size() && args[k].type != fn->inputs[at].type ? args[k].converted(fn->inputs[at].type) : args[k]);
+    }
     const bool known = bound ? inst->call_inside(function, in, out, places) : inst->call_inside(function, in, out);
     if (!out.empty()) result = std::move(out[0]);
     return known;

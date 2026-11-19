@@ -45,10 +45,11 @@ const LG_STRUCT_COLOR = "#3f6fd6";
 let lgStructNames = new Set();  // the structs of the Blueprint that is shown (lgNormalize)
 const lgBuiltin = t => t in LG_TYPE_NAMES;
 const lgIsStruct = t => lgStructNames.has(lgIsList(t) ? lgItemType(t) : t);
-const lgColor = t => LG_TYPE_COLORS[t] || (lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
+const lgColor = t => LG_TYPE_COLORS[t] || (lgIsCallback(t) ? LG_CALLBACK_COLOR : lgIsKeyed(t) ? LG_MAP_COLOR : lgIsStruct(t) ? LG_STRUCT_COLOR : t ? LG_ENUM_COLOR : "#aaa");
 const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsKeyed(t) ? lgKeyedName(t) : lgIsList(t) ? lgItemType(t) + " List" : String(t ?? ""));
 const lgTyped = x => {
   if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "int") + ">"; return; }  // (a map, a set: "map<int>float>", as the engine names it)
+  if (x && x.type === "callback") { x.type = "callback<" + (x.of || "()") + ">"; return; }  // (a Callback: "callback<float(float,float)>" - only its own signature fits it)
   if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of;
 };
 // A map of values under keys, a set of keys - in the order the keys came: a type by the engine's
@@ -58,6 +59,9 @@ const lgTyped = x => {
 const LG_MAP_COLOR = "#c77d2a";
 const LG_KEY_TYPES = ["int", "int64", "text", "bool"];  // (and the Blueprint's enums)
 const lgIsKeyed = t => typeof t === "string" && /^(map|set)<.*>$/.test(t);
+/** A Callback: a function of a library the engine calls - "callback<float(float,float)>" (Make Callback). */
+const LG_CALLBACK_COLOR = "#8f6bd8";
+const lgIsCallback = t => typeof t === "string" && /^callback<.*>$/.test(t);
 const lgFromNamed = s => { const [kind, of] = String(s).split(":"); return of === undefined ? kind : kind.endsWith("_list") ? of + "_list" : of; };
 const lgKeyed = t => {
   const inner = t.slice(4, -1), at = inner.indexOf(">");

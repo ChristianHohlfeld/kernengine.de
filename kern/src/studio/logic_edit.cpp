@@ -892,7 +892,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   for (const auto& d : lib.all()) {
     if (variable_step(*d) || enum_node(*d) || struct_node(*d)) continue;                 // per variable, per enum, per struct below
     if (d->type == "flow.reroute" || d->type == "value.reroute") continue;               // from a wire, below
-    if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure" || d->type == "func.call_on") continue;  // per function below
+    if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure" || d->type == "func.call_on" || d->type == "func.callback") continue;  // per function below
     Entry e{d->label, d->category, d->help, d->type, {}};
     if (from_pin && from_type.type != logic::PinType::exec) {
       // a generic node comes in the type that fits the wire (Length of a Text List, Select of a Vector)
@@ -1027,6 +1027,8 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       if (f.external || !f.from.empty()) continue;
       const std::string full = logic::library_function(used, f.name);
       consider({full, "Library " + used, f.help.empty() ? "Calls the function " + f.name + " of the library " + used : f.help, f.pure ? "func.pure" : "func.call", {{"function", full}}});
+      if (f.outputs.size() <= 1)  // (a function of a library as a value the engine calls: Make Callback)
+        consider({"Callback " + full, "Library " + used, "A Callback of " + f.name + ": a value the engine calls (its first input, a const reference, bound to a place)", "func.callback", {{"function", full}}});
     }
   }
   for (const logic::Function& f : g->functions) {
@@ -1036,6 +1038,8 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     if (f.external) continue;  // (a function of another Blueprint has no body here)
     consider({f.name, "Functions", f.help.empty() ? "Calls the function " + f.name : f.help, f.pure ? "func.pure" : "func.call", {{"function", f.name}}});
     consider({"Return (" + f.name + ")", "Functions", "Ends " + f.name + " and gives its outputs to the caller", "func.return", {{"function", f.name}}});
+    if (g->library && f.outputs.size() <= 1)
+      consider({"Callback " + f.name, "Functions", "A Callback of " + f.name + ": a value the engine calls (its first input, a const reference, bound to a place)", "func.callback", {{"function", f.name}}});
   }
   for (const std::string& ev : event_names(level_)) {
     consider({"Call " + ev, "Events", "Raises the custom event " + ev, "flow.call", {{"name", ev}}});

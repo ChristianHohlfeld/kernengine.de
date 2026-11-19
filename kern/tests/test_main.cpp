@@ -4049,6 +4049,7 @@ static logic::Graph every_node_graph(bool wired) {
   for (const std::string& type : types) {
     const logic::NodeDef* def = lib.find(type);
     if (type == "func.entry" || type == "func.return") continue;
+    if (type == "func.callback") continue;  // (it names a function of a library: a Blueprint of its own uses one - logic_callbacks)
     // (the engine's functions name the engine's structs: a Blueprint of their own declares those and calls
     // every one of them - the case Engine of blueprint_native.h, read from its text and written again)
     if (logic::engine_function(type)) continue;
