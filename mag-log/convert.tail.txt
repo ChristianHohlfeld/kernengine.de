@@ -1,0 +1,80 @@
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+381 of 504 functions of the program are written as Blueprints (1717 of 6918 lines), and 15 of the engine's headers that they call: 62 Blueprints - 5 of source files, 1 of states, 56 of headers and of shapes
+333 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+    13 (   594)   it calls CityStream::ground_height(), which waits
+     3 (   397)   ui_equipment_command() is defined in another file
+     6 (   351)   gaps_riding() is defined in another file
+     5 (   334)   stars() is defined in another file
+     4 (   296)   step() is defined in another file
+     1 (   191)   look_curve_strength() is defined in another file
+     1 (   158)   project_screen() is defined in another file
+     2 (   141)   it calls Devices::touch_down(), which waits
+     1 (   136)   vr_menu_json() is defined in another file
+     1 (   117)   heli() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     2 (   111)   lane_signature() is defined in another file
+     1 (   101)   flak_cell() is defined in another file
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     2 (    89)   clear() is defined in another file
+     2 (    87)   detach() is defined in another file
+     1 (    87)   look_begin() is defined in another file
+     1 (    81)   update() is defined in another file
+     1 (    80)   a reference to something it changes
+     2 (    77)   look_blast() is defined in another file
+     1 (    72)   the struct Feat (its field pts: a pointer)
+     2 (    69)   it calls Game::clear_spot(), which waits
+     2 (    67)   vr_hand_ray() is defined in another file
+     1 (    65)   aim_ellipse() is defined in another file
+     2 (    65)   begin() is defined in another file
+     3 (    65)   town_car_remote() is defined in another file
+     2 (    62)   it calls Devices::key(), which waits
+     1 (    60)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'focus_position')
+     1 (    55)   it calls Game::launch_jets(), which waits
+     2 (    51)   the engine's sound_cues() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+     1 (    50)   blast() is defined in another file
+     1 (    47)   take_pressed() is defined in another file
+     1 (    46)   gaps_lamps_reset() is defined in another file
+     1 (    42)   held() is defined in another file
+     1 (    42)   gaps_boardable() is defined in another file
+     1 (    37)   mate_foci() is defined in another file
+     1 (    36)   combat_sfx() is defined in another file
+     1 (    36)   ui_jetpack() is defined in another file
+     2 (    35)   gaps_seat_press() is defined in another file
+
+real	12m27,047s
+user	58m20,557s
+sys	2m25,783s
