@@ -456,6 +456,7 @@ template <class D, class S, class C, class B> struct FieldsOf<D, Struct<S>, C, B
 /// What a place is named for: read (the Blueprint's value), set, added to, its entries and its length -
 /// each on what stands there now (D::ref()).
 template <class D, class Tag, class C, class B> struct PlaceOps {
+  using kern_place_value = B;   // (what stands there, read - kern::to reads it first)
   operator B() const { return self().ref().kern_read(); }
   /// A Set: what is set (the Blueprint's value, as the interpreter's Set gives it).
   template <class X> B operator=(const X& x) const {
@@ -510,7 +511,8 @@ template <class Tag, class C, class B> struct Ref : RefCore<Tag, C, B>, PlaceOps
 template <class D, class Tag, class C, class B, class CF, class BF, CF C::*Cm, BF B::*Bm>
 struct Field : PlaceOps<Field<D, Tag, C, B, CF, BF, Cm, Bm>, Tag, CF, BF>, FieldsOf<Field<D, Tag, C, B, CF, BF, Cm, Bm>, Tag, CF, BF> {
   explicit Field(D* d) : FieldsOf<Field, Tag, CF, BF>(this), kern_parent(d) {}
-  Field(const Field&) = delete;
+  /// (handed on by value - an argument of kern::formula: the same field of the same place, its fields its own)
+  Field(const Field& f) : FieldsOf<Field, Tag, CF, BF>(this), kern_parent(f.kern_parent) {}
   using PlaceOps<Field, Tag, CF, BF>::operator=;
   BF operator=(const Field& f) const { return PlaceOps<Field, Tag, CF, BF>::operator=(BF(f)); }
   RefCore<Tag, CF, BF> ref() const { return kern_parent->ref().template kern_step<Tag>(Cm, Bm); }
