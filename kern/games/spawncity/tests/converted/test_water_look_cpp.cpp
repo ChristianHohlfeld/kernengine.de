@@ -128,7 +128,7 @@ void WaterLook::bind(const Program& p) { u_time_ = p.location("uWaterTime"); }
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const ExtensionAttribute& s) { return converted::Value::structure({arg(s.key), arg(s.size), arg(s.glsl)}); }
-[[maybe_unused]] static bool same(const ExtensionAttribute& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.key, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.glsl, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const ExtensionAttribute& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.key, (*got.rows)[0]), ".key") && converted::at_place(same(want.size, (*got.rows)[1]), ".size") && converted::at_place(same(want.glsl, (*got.rows)[2]), ".glsl"); }
 [[maybe_unused]] static bool defined(const ExtensionAttribute& s) { return defined(s.key) && defined(s.size) && defined(s.glsl); }
 [[maybe_unused]] static std::string text(const ExtensionAttribute& s) { return std::string("{") + text(s.key) + ", " + text(s.size) + ", " + text(s.glsl) + "}"; }
 [[maybe_unused]] static void take(ExtensionAttribute& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<const char*>(s.key, (*v.rows)[0]); converted::take_as<unsigned int>(s.size, (*v.rows)[1]); converted::take_as<const char*>(s.glsl, (*v.rows)[2]); }
@@ -139,7 +139,7 @@ void WaterLook::bind(const Program& p) { u_time_ = p.location("uWaterTime"); }
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const WaterLook& s) { return converted::Value::structure({arg(s.time), arg(s.u_time_)}); }
-[[maybe_unused]] static bool same(const WaterLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.time, (*got.rows)[0]) && same(want.u_time_, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const WaterLook& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.time, (*got.rows)[0]), ".time") && converted::at_place(same(want.u_time_, (*got.rows)[1]), ".u_time_"); }
 [[maybe_unused]] static bool defined(const WaterLook& s) { return defined(s.time) && defined(s.u_time_); }
 [[maybe_unused]] static std::string text(const WaterLook& s) { return std::string("{") + text(s.time) + ", " + text(s.u_time_) + "}"; }
 [[maybe_unused]] static void take(WaterLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.time, (*v.rows)[0]); converted::take_as<unsigned int>(s.u_time_, (*v.rows)[1]); }
@@ -158,7 +158,9 @@ SC_TEST(converted_water_look_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -176,7 +178,9 @@ SC_TEST(converted_water_look_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -194,7 +198,9 @@ SC_TEST(converted_water_look_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -212,7 +218,9 @@ SC_TEST(converted_water_look_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -230,7 +238,9 @@ SC_TEST(converted_water_look_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -240,7 +250,7 @@ SC_TEST(converted_water_look_cpp) {
   {  // WaterLook::bind
     converted::Tally tally("WaterLook_bind");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] WaterLook a0, [[maybe_unused]] const Program& a1) { converted::counted([&] { return a0.bind(a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] WaterLook& a0, [[maybe_unused]] const Program& a1) { converted::counted([&] { return a0.bind(a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       WaterLook a0 = draw_WaterLook(draw);
       const Program& a1 = *converted::engine_object<Program>(1 + draw.below(6));
@@ -250,7 +260,9 @@ SC_TEST(converted_water_look_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1);
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
