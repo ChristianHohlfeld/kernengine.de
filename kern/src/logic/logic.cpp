@@ -2531,6 +2531,33 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
     for (std::size_t i = 0; i < nodes_.size(); ++i)
       if (nodes_[i].def && nodes_[i].def->type == "func.entry" && nodes_[i].node->param("function") == graph_.functions[f].name) { fn_entry_[f] = static_cast<int>(i); break; }
   }
+  // Per function the steps of its body - what the exec wires reach from its entry (also after a
+  // wait) - that hold something of a call: what they give, what a loop keeps while it runs (not
+  // what a node keeps from one call to the next: Do Once, Gate, a wait, Random).
+  fn_running_.assign(graph_.functions.size(), 0);
+  fn_nodes_.assign(graph_.functions.size(), {});
+  for (std::size_t f = 0; f < graph_.functions.size(); ++f) {
+    if (fn_entry_[f] < 0) continue;
+    std::vector<u8> seen(nodes_.size(), 0);
+    std::vector<int> todo{fn_entry_[f]};
+    seen[static_cast<std::size_t>(fn_entry_[f])] = 1;
+    while (!todo.empty()) {
+      const int x = todo.back();
+      todo.pop_back();
+      const CNode& c = nodes_[static_cast<std::size_t>(x)];
+      if (x != fn_entry_[f] && c.def && (!c.def->memory || c.def->loop)) fn_nodes_[f].push_back(x);
+      for (int t : c.exec_out)
+        if (t >= 0 && !seen[static_cast<std::size_t>(t)]) {
+          seen[static_cast<std::size_t>(t)] = 1;
+          todo.push_back(t);
+        }
+    }
+    std::sort(fn_nodes_[f].begin(), fn_nodes_[f].end());
+  }
+  calls_fn_.assign(nodes_.size(), -1);
+  for (std::size_t i = 0; i < nodes_.size(); ++i)
+    if (nodes_[i].def && nodes_[i].def->type == "func.call")
+      if (auto it = fn_index_.find(nodes_[i].node->param("function")); it != fn_index_.end()) calls_fn_[i] = it->second;
 }
 
 bool Instance::call(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results) { return call_function(function, args, results, false); }
@@ -2575,14 +2602,50 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
   if (it == fn_index_.end()) return false;
   const int f = it->second;
   const Function& fn = graph_.functions[static_cast<std::size_t>(f)];
-  results.reserve(fn.outputs.size());
-  for (const FunctionPin& p : fn.outputs) results.push_back(Value::from_json(p.value, declared(p), graph_));
   const int entry = fn_entry_[static_cast<std::size_t>(f)];
-  if (entry < 0 || disabled_) return false;
-  // (A function does not call itself - check() refuses that. An event it raises may reach a
-  // handler that calls it again while it runs: a call like any other, as in the Blueprint's C++.
-  // Its parameters are the inner call's then; Runtime::fire gives the outer call its own back.)
+  if (entry < 0 || disabled_) {
+    for (const FunctionPin& p : fn.outputs) results.push_back(Value::from_json(p.value, declared(p), graph_));
+    return false;
+  }
+  if (rt_.calls_ >= Runtime::kCallsDeep) {
+    rt_.host().error(name_ + ": function calls nest more than " + std::to_string(Runtime::kCallsDeep) + " deep - the chain is stopped");
+    disabled_ = true;
+    for (const FunctionPin& p : fn.outputs) results.push_back(Value::from_json(p.value, declared(p), graph_));
+    return false;
+  }
+  Frame frame;
+  enter_call(f, args, places, inside, frame);
+  frames_.push_back(std::move(frame));
+  rt_.run_from(*this, entry, 0, inside ? Runtime::Chain::call_inside : Runtime::Chain::call);
+  Frame done = std::move(frames_.back());
+  frames_.pop_back();
+  results = std::move(done.results);
+  leave_call(done);
+  // (from outside: what the function made of its reference inputs stands behind its outputs)
+  if (!places)
+    for (const FunctionPin& in : fn.inputs)
+      if (in.ref && !in.constant) results.push_back(held(fn.name + "." + in.name));
+  return true;
+}
+
+bool Instance::enter_call(int f, const std::vector<Value>& args, const std::vector<Spot>* places, bool inside, Frame& frame) {
+  const Function& fn = graph_.functions[static_cast<std::size_t>(f)];
+  const int entry = fn_entry_[static_cast<std::size_t>(f)];
   CNode& e = nodes_[static_cast<std::size_t>(entry)];
+  // A function that is running already (it calls itself, directly or through others, or an
+  // event it raised reaches it again): the call it interrupts keeps its own values (Kept).
+  if (fn_running_[static_cast<std::size_t>(f)] > 0) {
+    frame.kept = std::make_unique<Kept>();
+    Kept& k = *frame.kept;
+    k.parameters = e.outputs;
+    for (const Local& l : locals_[static_cast<std::size_t>(f)]) k.locals.push_back(held(l.key));
+    k.nodes.reserve(fn_nodes_[static_cast<std::size_t>(f)].size());
+    for (int x : fn_nodes_[static_cast<std::size_t>(f)]) k.nodes.push_back({nodes_[static_cast<std::size_t>(x)].outputs, nodes_[static_cast<std::size_t>(x)].state});
+  }
+  ++fn_running_[static_cast<std::size_t>(f)];
+  ++rt_.calls_;
+  frame.results.reserve(fn.outputs.size());
+  for (const FunctionPin& p : fn.outputs) frame.results.push_back(Value::from_json(p.value, declared(p), graph_));
   // The inputs by value are the entry node's outputs. A reference input is the place the call
   // names (`places`) - or, called from outside, a variable of its own that starts as the argument.
   std::vector<Spot> bound(fn.inputs.size());
@@ -2603,28 +2666,87 @@ bool Instance::call_function(std::string_view function, const std::vector<Value>
       e.outputs[o] = k < args.size() ? from_outside(args[k], {e.out[o].type, e.out[o].of, in.count}, graph_) : Value::from_json(in.value, declared(in), graph_).converted(e.out[o].type);
     }
   }
-  std::vector<Spot> outer = std::move(refs_[static_cast<std::size_t>(f)]);
+  frame.outer_refs = std::move(refs_[static_cast<std::size_t>(f)]);
   refs_[static_cast<std::size_t>(f)] = std::move(bound);
   // A call from outside any chain (the engine's C++ asking a rule) is a step of its own for the
   // loop guard: the budget counts what one step runs, and a paused world has no ticks to start
   // a new count while its systems keep asking.
   if (rt_.depth_ == 0) rt_.step_starts();
   for (const Local& l : locals_[static_cast<std::size_t>(f)]) hold(l.key, l.init);  // (every call starts with its locals' defaults)
-  Frame frame;
   frame.function = f;
   frame.depth = rt_.depth_ + (inside ? 0 : 1);  // (the depth its own chain runs at)
   frame.stack_base = stack_[0];
-  frame.results = std::move(results);
-  frames_.push_back(std::move(frame));
-  rt_.run_from(*this, entry, 0, inside ? Runtime::Chain::call_inside : Runtime::Chain::call);
-  results = std::move(frames_.back().results);
-  frames_.pop_back();
-  // (from outside: what the function made of its reference inputs stands behind its outputs)
-  if (!places)
-    for (const FunctionPin& in : fn.inputs)
-      if (in.ref && !in.constant) results.push_back(held(fn.name + "." + in.name));
-  refs_[static_cast<std::size_t>(f)] = std::move(outer);
   return true;
+}
+
+void Instance::leave_call(Frame& frame) {
+  const std::size_t f = static_cast<std::size_t>(frame.function);
+  refs_[f] = std::move(frame.outer_refs);
+  --fn_running_[f];
+  --rt_.calls_;
+  if (!frame.kept) return;
+  Kept& k = *frame.kept;
+  nodes_[static_cast<std::size_t>(fn_entry_[f])].outputs = std::move(k.parameters);
+  for (std::size_t i = 0; i < locals_[f].size() && i < k.locals.size(); ++i) hold(locals_[f][i].key, k.locals[i]);
+  for (std::size_t i = 0; i < fn_nodes_[f].size() && i < k.nodes.size(); ++i) {
+    CNode& c = nodes_[static_cast<std::size_t>(fn_nodes_[f][i])];
+    c.outputs = std::move(k.nodes[i].first);
+    c.state = std::move(k.nodes[i].second);
+  }
+}
+
+int Instance::begin_call(int& n, std::vector<std::pair<int, int>>& stack) {
+  const int f = calls_fn_[static_cast<std::size_t>(n)];
+  const Function& fn = graph_.functions[static_cast<std::size_t>(f)];
+  const int entry = fn_entry_[static_cast<std::size_t>(f)];
+  if (entry < 0) {
+    // (a function without a body gives the defaults of its outputs, as call_function does)
+    Context c(rt_, *this, n, 0);
+    for (const FunctionPin& p : fn.outputs) c.out(p.name, Value::from_json(p.value, declared(p), graph_));
+    return 0;
+  }
+  if (rt_.calls_ >= Runtime::kCallsDeep) {
+    rt_.host().error(name_ + ": function calls nest more than " + std::to_string(Runtime::kCallsDeep) + " deep - the chain is stopped");
+    disabled_ = true;
+    return -1;
+  }
+  // (what the node gives the function: its inputs as they are now, the places it names for the references)
+  std::vector<Value> args;
+  std::vector<Spot> places(fn.inputs.size());
+  args.reserve(fn.inputs.size());
+  {
+    Context c(rt_, *this, n, 0);
+    for (std::size_t k = 0; k < fn.inputs.size(); ++k) {
+      const FunctionPin& p = fn.inputs[k];
+      if (p.ref) places[k] = c.spot(ref_key(p.name, ""));
+      args.push_back(p.ref ? Value() : c.in(p.name));
+    }
+  }
+  Frame frame;
+  enter_call(f, args, &places, true, frame);
+  frame.trampoline = true;
+  frame.call_node = n;
+  stack.push_back({n, kAfterCall});
+  frame.base = stack.size();
+  frames_.push_back(std::move(frame));
+  n = entry;
+  return 1;
+}
+
+int Instance::end_call(int n, int& entry) {
+  Frame done = std::move(frames_.back());
+  frames_.pop_back();
+  std::vector<Value> results = std::move(done.results);
+  leave_call(done);
+  const Function& fn = graph_.functions[static_cast<std::size_t>(done.function)];
+  {
+    Context c(rt_, *this, n, 0);
+    for (std::size_t k = 0; k < fn.outputs.size() && k < results.size(); ++k) c.out(fn.outputs[k].name, results[k]);
+  }
+  const CNode& c = nodes_[static_cast<std::size_t>(n)];
+  if (c.exec_out.empty()) return -1;
+  entry = c.exec_out_entry[0];
+  return c.exec_out[0];
 }
 
 f64 Instance::call_number(std::string_view function, std::initializer_list<f64> args, f64 fallback) {
@@ -3366,26 +3488,60 @@ void Runtime::run_from(Instance& inst, int start, int entry, Chain chain) {
     if (counts) --depth_;
     return;
   }
-  // A Return node ended the function call this chain is (Instance::return_values).
-  auto returned = [&] { return !inst.frames_.empty() && inst.frames_.back().returned && inst.frames_.back().depth == depth_; };
+  // A Return node ended the function call this chain is (Instance::return_values) - one that
+  // call_function runs; a call of the chain's own (Frame::trampoline) ends at its mark.
+  auto returned = [&] { return !inst.frames_.empty() && !inst.frames_.back().trampoline && inst.frames_.back().returned && inst.frames_.back().depth == depth_; };
+  auto own_returned = [&] { return !inst.frames_.empty() && inst.frames_.back().trampoline && inst.frames_.back().returned; };
   std::vector<std::pair<int, int>> stack{{start, entry}};
+  const std::size_t frames_before = inst.frames_.size();
   ++inst.active_;
   while (!stack.empty() && !inst.disabled_ && !returned()) {
     auto [n, e] = stack.back();
     stack.pop_back();
+    if (e == Instance::kAfterCall) {
+      // (a call of the chain's own is over: on after its node - traced when it is done, as a step is)
+      if (tracing && trace_.size() < 4096) trace_.push_back({inst.name(), inst.nodes_[static_cast<std::size_t>(n)].node->id, host_.time()});
+      n = inst.end_call(n, e);
+    }
     while (n >= 0 && !inst.disabled_) {
       ++executed_;
       Instance::CNode& c = inst.nodes_[static_cast<std::size_t>(n)];
       if (!c.def) break;
+      if (inst.calls_fn_[static_cast<std::size_t>(n)] >= 0) {
+        // Call Function: the chain goes on in the function (a frame, not a call of C++)
+        const int at = n;
+        const int began = inst.begin_call(n, stack);
+        if (began > 0) {
+          e = 0;
+          continue;
+        }
+        if (tracing && trace_.size() < 4096) trace_.push_back({inst.name(), inst.nodes_[static_cast<std::size_t>(at)].node->id, host_.time()});
+        if (began < 0) break;
+        if (c.exec_out.empty()) break;
+        e = c.exec_out_entry[0];
+        n = c.exec_out[0];
+        continue;
+      }
       Context ctx(*this, inst, n, e);
       const int r = c.def->run ? c.def->run(ctx) : 0;
       if (tracing && trace_.size() < 4096) trace_.push_back({inst.name(), c.node->id, host_.time()});
+      if (own_returned()) {
+        // (a Return of the chain's own call: nothing of the call is left to go on with - its mark is next)
+        stack.resize(inst.frames_.back().base);
+        break;
+      }
       if (returned()) break;
       for (auto it = ctx.continuations_.rbegin(); it != ctx.continuations_.rend(); ++it) stack.push_back(*it);
       if (r < 0 || static_cast<std::size_t>(r) >= c.exec_out.size()) break;
       e = c.exec_out_entry[static_cast<std::size_t>(r)];
       n = c.exec_out[static_cast<std::size_t>(r)];
     }
+  }
+  // (a chain stopped in the middle of calls of its own: they end with it)
+  while (inst.frames_.size() > frames_before && inst.frames_.back().trampoline) {
+    Instance::Frame done = std::move(inst.frames_.back());
+    inst.frames_.pop_back();
+    inst.leave_call(done);
   }
   chain_ends(inst);
   if (counts) --depth_;

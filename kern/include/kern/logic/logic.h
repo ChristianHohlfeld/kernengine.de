@@ -1286,13 +1286,42 @@ class Instance {
   struct Local { std::string key; Value init; };
   std::vector<std::vector<Local>> locals_;                // per function: its local variables
   std::unordered_map<std::string, TypeRef> var_types_;    // what is held under a key
+  /// What a call of a function that is already running (it calls itself, directly or through
+  /// others, or an event it raised reaches it again) keeps of the call it interrupts: that call's
+  /// parameters, local variables, and what its steps gave and its loops keep. The interrupted
+  /// call has them back when the inner one is over - as the Blueprint's class has them in its
+  /// method's own parameters and locals.
+  struct Kept {
+    std::vector<Value> parameters, locals;
+    std::vector<std::pair<std::vector<Value>, NodeState>> nodes;  // (by fn_nodes_)
+  };
   struct Frame {                     // a function call that is running
     int function = -1;               // index in graph_.functions
     int depth = 0;                   // Runtime::depth_ of the call's own chain
     i32 stack_base = 0;              // generated code: continuation depth when the call began
     bool returned = false;
     std::vector<Value> results;
+    // A call a node of the graph makes (Call Function) runs in the chain of the caller: no call of
+    // C++, a frame - the chain goes on at the function's entry, and where the call's continuations
+    // begin (`base`) a mark stands that ends the call (kAfterCall). So how deep functions call each
+    // other does not depend on the machine's stack.
+    bool trampoline = false;
+    int call_node = -1;
+    std::size_t base = 0;
+    std::vector<Spot> outer_refs;
+    std::unique_ptr<Kept> kept;
   };
+  static constexpr int kAfterCall = -1000;  // the entry of the mark that ends a call (Frame::trampoline)
+  /// The call's beginning and end (call_function, and the chain's own frames): the inputs bound,
+  /// what an interrupted call of the same function has kept, its locals at their defaults.
+  bool enter_call(int f, const std::vector<Value>& args, const std::vector<Spot>* places, bool inside, Frame& frame);
+  void leave_call(Frame& frame);
+  /// Call Function at node `n` in a chain of the interpreter: 1 the call began (the chain goes on
+  /// at the entry, `n` is that), 0 no call (the function has no body: on after the node), -1 the
+  /// chain is stopped (calls nest too deep).
+  int begin_call(int& n, std::vector<std::pair<int, int>>& stack);
+  /// The mark of a call is reached: its results on the node's outputs; the node to go on at.
+  int end_call(int n, int& entry);
   Runtime& rt_;
   Graph graph_;
   ActorRef self_ = 0;
@@ -1304,6 +1333,9 @@ class Instance {
   std::vector<Machine> machines_;
   std::unordered_map<std::string, int> fn_index_;  // function name -> index in graph_.functions
   std::vector<int> fn_entry_;         // per function: compiled index of its entry node (-1 none)
+  std::vector<int> fn_running_;       // per function: its calls that are running now
+  std::vector<std::vector<int>> fn_nodes_;  // per function: the steps of its body (what a call that interrupts another keeps of it)
+  std::vector<int> calls_fn_;         // per node: the function a Call Function node calls (-1: none, or another node)
   std::vector<int> events_;           // the event nodes, by node id: the order handlers of one event run in
   std::vector<Frame> frames_;
   std::vector<f64> slots_;            // fixed size: generated code holds absolute addresses
@@ -1448,6 +1480,12 @@ class Runtime {
   std::vector<Trace> trace_;
   u64 executed_ = 0, tick_start_ = 0, serial_ = 0;
   int depth_ = 0;
+  int calls_ = 0;  // function calls that are running, one in another (at most kCallsDeep)
+ public:
+  /// How deep calls of a Blueprint's functions may nest in the interpreter and with the JIT
+  /// (docs/blueprint_cpp.md): the call past it stops the chain and the Blueprint.
+  static constexpr int kCallsDeep = 65536;
+ private:
   i32 counters_[5] = {0, 200000, 0, 0, 0};     // shared with generated code: [0] nodes run, [1] the limit of loop
                                                // passes per step, [2] tracing, [3] loop passes this step, [4] a loop
                                                // of the running compiled chain was refused a pass
