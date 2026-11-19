@@ -1,0 +1,24 @@
+struct drone : virtual kern::Library, virtual Arondight45_FirmwareRuntime, virtual common {
+  // ---- types ----
+  KERN_STRUCT(DroneParams) { Float span = 0.225; Float prop_d = 0.127; Float kv = 2300.0; Float R = 0.08; Float J = 1.1e-05; Float Ct = 0.105; Float Cq = 0.012; Float motor_limit_a = 45.0; Float esc_limit_a = 45.0; Float cells = 4.0; Float capacity_ah = 1.5; Float battery_r = 0.055; Float battery_max_a = 180.0; Float rho = 1.225; Float drag_scale = 0.35; Float ground_effect = 0.18; Vector wind = Vector{0.0, 0.0, 0.0}; Float m_frame = 0.18; Float m_motor = 0.035; Float m_prop = 0.005; Float m_battery = 0.2; Float m_esc = 0.03; Float m_fc_rx = 0.02; Float m_cam_vtx = 0.03; Float m_wiring = 0.1; Float battery_x = 0.015; Float battery_z = -0.015; Float camera_x = -0.07; Float camera_z = 0.028; };
+  KERN_STRUCT(DroneTelemetry) { Bool armed = false; Bool calibrating = true; Bool fault = false; Bool game = false; Bool nav_valid = false; Int state = 0; Fixed<Int, 4> pulses = List<Int>{}; Fixed<Float, 4> omega = List<Float>{}; Fixed<Float, 4> motor_torque = List<Float>{}; Fixed<Float, 4> prop_torque = List<Float>{}; Float battery_v = 0.0; Float battery_soc = 1.0; Float current_a = 0.0; Float agl = 0.0; Float speed = 0.0; Float vz = 0.0; Fixed<Float, 3> attitude_deg = List<Float>{}; };
+  KERN_STRUCT(Drone) { DroneParams p_ = DroneParams{0.225, 0.127, 2300.0, 0.08, 1.1e-05, 0.105, 0.012, 45.0, 45.0, 4.0, 1.5, 0.055, 180.0, 1.225, 0.35, 0.18, Vector{0.0, 0.0, 0.0}, 0.18, 0.035, 0.005, 0.2, 0.03, 0.02, 0.03, 0.1, 0.015, -0.015, -0.07, 0.028}; fc_FirmwareRuntime fw_ = fc_FirmwareRuntime{fc_StateRuntime{fc_Runtime{fc_Filters{List<fc_PT1>{fc_PT1{100.0, 0.0, false}, fc_PT1{100.0, 0.0, false}, fc_PT1{100.0, 0.0, false}}, List<fc_PT1>{fc_PT1{30.0, 0.0, false}, fc_PT1{30.0, 0.0, false}, fc_PT1{30.0, 0.0, false}}}, fc_Controller{fc_Attitude{0.0, 0.0, 0.0}, fc_PID{fc_Gains{0.003, 0.0007, 1e-05, 0.18, 0.38, 55.0}, fc_PT1{55.0, 0.0, false}, 0.0, 0.0, false}, fc_PID{fc_Gains{0.003, 0.0007, 1e-05, 0.18, 0.38, 55.0}, fc_PT1{55.0, 0.0, false}, 0.0, 0.0, false}, fc_PID{fc_Gains{0.0015, 0.0007, 0.0, 0.14, 0.28, 40.0}, fc_PT1{40.0, 0.0, false}, 0.0, 0.0, false}}, fc_ArmState{false, false, Int64{0x0}}, false, 0, fc_V3{0.0, 0.0, 0.0}, fc_V3{0.0, 0.0, 0.0}, fc_V3{0.0, 0.0, 0.0}, fc_V3{0.0, 0.0, 0.0}, 0, fc_FaultCode::kFaultNone, false}, fc_StateController{0.0, false, false, false, false, false, false, false, 0.0, fc_V3{0.0, 0.0, 0.0}, fc_V3{0.0, 0.0, 0.0}, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.39, fc_StateControllerDebug{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}}, 0.0, false}, fc_RC{List<Int>{}, false, false, false, Int64{0x0}}, fc_NavigationState{fc_V3{0.0, 0.0, 0.0}, 0.0, false, false, false, 0.0, false}, Int64{0x0}, 0, false}; Fixed<Vector, 4> motor_pos_ = List<Vector>{}; Fixed<Float, 4> omega_ = List<Float>{}; Fixed<Float, 4> current_ = List<Float>{}; Fixed<Float, 4> rotor_angle_ = List<Float>{}; Fixed<Float, 4> motor_torque_ = List<Float>{}; Fixed<Float, 4> prop_torque_ = List<Float>{}; Float soc_ = 1.0; Float vbatt_ = 16.8; Float ibatt_ = 0.0; Float back_emf_ = 0.0; Float d4_ = 0.0; Float d5_ = 0.0; Vector cdA_ = Vector{0.0, 0.0, 0.0}; Fixed<Int, 4> pulses_ = List<Int>{1000, 1000, 1000, 1000}; Vector prev_velocity_ = Vector{0.0, 0.0, 0.0}; Vector world_accel_ = Vector{0.0, 0.0, 0.0}; Vector prev_omega_body_ = Vector{0.0, 0.0, 0.0}; Bool have_prev_ = false; Float now_us_ = 0.0; Int sequence_ = 1; Float sbus_elapsed_ = 0.01; Float nav_elapsed_ = 0.01; Vector nav_filtered_ = Vector{0.0, 0.0, 0.0}; Int nav_seq_ = 1; Bool reset_flag_ = true; Rng noise_ = Rng{1168318247, 0.0, false}; Rng nav_noise_ = Rng{1905503009, 0.0, false}; Rng heading_noise_ = Rng{1168232869, 0.0, false}; Fixed<Float, 3> gyro_bias_ = List<Float>{0.08, -0.05, 0.04}; Fixed<Float, 3> acc_bias_ = List<Float>{0.001, -0.0015, 0.002}; Int parked_steps_ = 0; Bool parked_ = false; DroneTelemetry tele_ = DroneTelemetry{false, true, false, false, false, 0, List<Int>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, List<Float>{}}; };
+
+  // ---- functions ----
+  struct Drone_motor_positionResult { Vector Result = Vector{0.0, 0.0, 0.0}; };
+  KERN_PURE Drone_motor_positionResult Drone_motor_position(const Drone& self, Int i = 0) {
+    return {self.motor_pos_[i]};
+  }
+
+  struct Drone_rotor_angleResult { Float Result = 0.0; };
+  /// Rotor angle (radians) for drawing the props.
+  KERN_PURE Drone_rotor_angleResult Drone_rotor_angle(const Drone& self, Int i = 0) {
+    return {self.rotor_angle_[i]};
+  }
+
+  struct Drone_parkedResult { Bool Result = false; };
+  /// The motors are stopped and the body is at rest (parked: nothing to simulate).
+  KERN_PURE Drone_parkedResult Drone_parked(const Drone& self) {
+    return {self.parked_};
+  }
+};
