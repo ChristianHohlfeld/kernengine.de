@@ -64,12 +64,12 @@ struct GeoProjector {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const GeoProjector& s) { return converted::Value::structure({arg(s.lon0), arg(s.lat0), arg(s.cos_lat)}); }
-[[maybe_unused]] static bool same(const GeoProjector& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.lon0, (*got.rows)[0]) && same(want.lat0, (*got.rows)[1]) && same(want.cos_lat, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const GeoProjector& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.lon0, (*got.rows)[0]), ".lon0") && converted::at_place(same(want.lat0, (*got.rows)[1]), ".lat0") && converted::at_place(same(want.cos_lat, (*got.rows)[2]), ".cos_lat"); }
 [[maybe_unused]] static bool defined(const GeoProjector& s) { return defined(s.lon0) && defined(s.lat0) && defined(s.cos_lat); }
 [[maybe_unused]] static std::string text(const GeoProjector& s) { return std::string("{") + text(s.lon0) + ", " + text(s.lat0) + ", " + text(s.cos_lat) + "}"; }
 [[maybe_unused]] static void take(GeoProjector& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.lon0, (*v.rows)[0]); converted::take_as<double>(s.lat0, (*v.rows)[1]); converted::take_as<double>(s.cos_lat, (*v.rows)[2]); }
 struct Out_GeoProjector_project { double x; double y; };
-[[maybe_unused]] static bool same(const Out_GeoProjector_project& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_GeoProjector_project& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y"); }
 [[maybe_unused]] static bool defined(const Out_GeoProjector_project& s) { return defined(s.x) && defined(s.y); }
 [[maybe_unused]] static std::string text(const Out_GeoProjector_project& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + "}"; }
 
@@ -78,7 +78,7 @@ SC_TEST(converted_engine_geo_roads) {
   {  // GeoProjector::project
     converted::Tally tally("GeoProjector_project");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GeoProjector a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.project(std::move(a1), std::move(a2), a3, a4); }); return Out_GeoProjector_project{std::move(a3), std::move(a4)}; };
+    const auto run = [&]([[maybe_unused]] GeoProjector& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return a0.project(std::move(a1), std::move(a2), a3, a4); }); return Out_GeoProjector_project{std::move(a3), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
       GeoProjector a0 = draw_kern__GeoProjector(draw);
       double a1 = draw.number();
@@ -91,7 +91,9 @@ SC_TEST(converted_engine_geo_roads) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

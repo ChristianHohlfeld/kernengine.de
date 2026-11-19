@@ -96,7 +96,7 @@ namespace mvt { struct Decoder {
 }
 namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mvt::Piece& s) { return converted::Value::structure({arg(s.at), arg(s.end)}); }
-[[maybe_unused]] static bool same(const mvt::Piece& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.end, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const mvt::Piece& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.at, (*got.rows)[0]), ".at") && converted::at_place(same(want.end, (*got.rows)[1]), ".end"); }
 [[maybe_unused]] static bool defined(const mvt::Piece& s) { return defined(s.at) && defined(s.end); }
 [[maybe_unused]] static std::string text(const mvt::Piece& s) { return std::string("{") + text(s.at) + ", " + text(s.end) + "}"; }
 [[maybe_unused]] static void take(mvt::Piece& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned long>(s.at, (*v.rows)[0]); converted::take_as<unsigned long>(s.end, (*v.rows)[1]); }
@@ -111,7 +111,7 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 }
 namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mvt::Value& s) { return converted::Value::structure({arg(s.kind), arg(s.s), arg(s.n), arg(s.b)}); }
-[[maybe_unused]] static bool same(const mvt::Value& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.kind, (*got.rows)[0]) && same(want.s, (*got.rows)[1]) && same(want.n, (*got.rows)[2]) && same(want.b, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const mvt::Value& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.s, (*got.rows)[1]), ".s") && converted::at_place(same(want.n, (*got.rows)[2]), ".n") && converted::at_place(same(want.b, (*got.rows)[3]), ".b"); }
 [[maybe_unused]] static bool defined(const mvt::Value& s) { return defined(s.kind) && defined(s.s) && defined(s.n) && defined(s.b); }
 [[maybe_unused]] static std::string text(const mvt::Value& s) { return std::string("{") + text(s.kind) + ", " + text(s.s) + ", " + text(s.n) + ", " + text(s.b) + "}"; }
 [[maybe_unused]] static void take(mvt::Value& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<mvt::Value::Kind>(s.kind, (*v.rows)[0]); converted::take_as<std::string>(s.s, (*v.rows)[1]); converted::take_as<double>(s.n, (*v.rows)[2]); converted::take_as<bool>(s.b, (*v.rows)[3]); }
@@ -126,7 +126,7 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 }
 namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mvt::Feature& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id)), arg(s.type), arg(s.tags), arg(s.parts)}); }
-[[maybe_unused]] static bool same(const mvt::Feature& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]) && same(want.type, (*got.rows)[1]) && same(want.tags, (*got.rows)[2]) && same(want.parts, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const mvt::Feature& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id") && converted::at_place(same(want.type, (*got.rows)[1]), ".type") && converted::at_place(same(want.tags, (*got.rows)[2]), ".tags") && converted::at_place(same(want.parts, (*got.rows)[3]), ".parts"); }
 [[maybe_unused]] static bool defined(const mvt::Feature& s) { return defined(converted::shaped<converted::Whole>(s.id)) && defined(s.type) && defined(s.tags) && defined(s.parts); }
 [[maybe_unused]] static std::string text(const mvt::Feature& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + ", " + text(s.type) + ", " + text(s.tags) + ", " + text(s.parts) + "}"; }
 [[maybe_unused]] static void take(mvt::Feature& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); converted::take_as<mvt::GeomType>(s.type, (*v.rows)[1]); converted::take_as<std::vector<std::pair<unsigned int, unsigned int>>>(s.tags, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.parts, (*v.rows)[3]); }
@@ -142,7 +142,7 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 }
 namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mvt::Layer& s) { return converted::Value::structure({arg(s.name), arg(s.extent), arg(s.keys), arg(s.values), arg(s.features)}); }
-[[maybe_unused]] static bool same(const mvt::Layer& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.name, (*got.rows)[0]) && same(want.extent, (*got.rows)[1]) && same(want.keys, (*got.rows)[2]) && same(want.values, (*got.rows)[3]) && same(want.features, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const mvt::Layer& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.extent, (*got.rows)[1]), ".extent") && converted::at_place(same(want.keys, (*got.rows)[2]), ".keys") && converted::at_place(same(want.values, (*got.rows)[3]), ".values") && converted::at_place(same(want.features, (*got.rows)[4]), ".features"); }
 [[maybe_unused]] static bool defined(const mvt::Layer& s) { return defined(s.name) && defined(s.extent) && defined(s.keys) && defined(s.values) && defined(s.features); }
 [[maybe_unused]] static std::string text(const mvt::Layer& s) { return std::string("{") + text(s.name) + ", " + text(s.extent) + ", " + text(s.keys) + ", " + text(s.values) + ", " + text(s.features) + "}"; }
 [[maybe_unused]] static void take(mvt::Layer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<unsigned int>(s.extent, (*v.rows)[1]); converted::take_as<std::vector<std::string>>(s.keys, (*v.rows)[2]); converted::take_as<std::vector<mvt::Value>>(s.values, (*v.rows)[3]); converted::take_as<std::vector<mvt::Feature>>(s.features, (*v.rows)[4]); }
@@ -154,7 +154,7 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 }
 namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mvt::Tile& s) { return converted::Value::structure({arg(s.layers)}); }
-[[maybe_unused]] static bool same(const mvt::Tile& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.layers, (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const mvt::Tile& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.layers, (*got.rows)[0]), ".layers"); }
 [[maybe_unused]] static bool defined(const mvt::Tile& s) { return defined(s.layers); }
 [[maybe_unused]] static std::string text(const mvt::Tile& s) { return std::string("{") + text(s.layers) + "}"; }
 [[maybe_unused]] static void take(mvt::Tile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<mvt::Layer>>(s.layers, (*v.rows)[0]); }
@@ -173,7 +173,7 @@ namespace mvt { using converted::arg; using converted::same; using converted::de
 }
 namespace mvt { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mvt::Decoder& s) { return converted::Value::structure({arg(s.layers_), arg(s.features_), arg(s.layer_), arg(s.feature_), arg(s.layer_open_), arg(s.done_), arg(s.failed_), arg(s.tile_)}); }
-[[maybe_unused]] static bool same(const mvt::Decoder& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.layers_, (*got.rows)[0]) && same(want.features_, (*got.rows)[1]) && same(want.layer_, (*got.rows)[2]) && same(want.feature_, (*got.rows)[3]) && same(want.layer_open_, (*got.rows)[4]) && same(want.done_, (*got.rows)[5]) && same(want.failed_, (*got.rows)[6]) && same(want.tile_, (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const mvt::Decoder& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.layers_, (*got.rows)[0]), ".layers_") && converted::at_place(same(want.features_, (*got.rows)[1]), ".features_") && converted::at_place(same(want.layer_, (*got.rows)[2]), ".layer_") && converted::at_place(same(want.feature_, (*got.rows)[3]), ".feature_") && converted::at_place(same(want.layer_open_, (*got.rows)[4]), ".layer_open_") && converted::at_place(same(want.done_, (*got.rows)[5]), ".done_") && converted::at_place(same(want.failed_, (*got.rows)[6]), ".failed_") && converted::at_place(same(want.tile_, (*got.rows)[7]), ".tile_"); }
 [[maybe_unused]] static bool defined(const mvt::Decoder& s) { return defined(s.layers_) && defined(s.features_) && defined(s.layer_) && defined(s.feature_) && defined(s.layer_open_) && defined(s.done_) && defined(s.failed_) && defined(s.tile_); }
 [[maybe_unused]] static std::string text(const mvt::Decoder& s) { return std::string("{") + text(s.layers_) + ", " + text(s.features_) + ", " + text(s.layer_) + ", " + text(s.feature_) + ", " + text(s.layer_open_) + ", " + text(s.done_) + ", " + text(s.failed_) + ", " + text(s.tile_) + "}"; }
 [[maybe_unused]] static void take(mvt::Decoder& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<std::vector<mvt::Piece>>(s.layers_, (*v.rows)[0]); converted::take_as<std::vector<mvt::Piece>>(s.features_, (*v.rows)[1]); converted::take_as<unsigned long>(s.layer_, (*v.rows)[2]); converted::take_as<unsigned long>(s.feature_, (*v.rows)[3]); converted::take_as<bool>(s.layer_open_, (*v.rows)[4]); converted::take_as<bool>(s.done_, (*v.rows)[5]); converted::take_as<bool>(s.failed_, (*v.rows)[6]); converted::take_as<mvt::Tile>(s.tile_, (*v.rows)[7]); }
@@ -184,7 +184,7 @@ SC_TEST(converted_mvt) {
   {  // Decoder::done
     converted::Tally tally("Decoder_done");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] mvt::Decoder a0) { return converted::counted([&] { return a0.done(); }); };
+    const auto run = [&]([[maybe_unused]] mvt::Decoder& a0) { return converted::counted([&] { return a0.done(); }); };
     for (int i = 0; tally.more(i); ++i) {
       mvt::Decoder a0 = draw_mvt__Decoder(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -193,7 +193,9 @@ SC_TEST(converted_mvt) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -203,7 +205,7 @@ SC_TEST(converted_mvt) {
   {  // Decoder::failed
     converted::Tally tally("Decoder_failed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] mvt::Decoder a0) { return converted::counted([&] { return a0.failed(); }); };
+    const auto run = [&]([[maybe_unused]] mvt::Decoder& a0) { return converted::counted([&] { return a0.failed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       mvt::Decoder a0 = draw_mvt__Decoder(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -212,7 +214,9 @@ SC_TEST(converted_mvt) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
