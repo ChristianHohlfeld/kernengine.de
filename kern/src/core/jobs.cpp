@@ -214,6 +214,26 @@ bool threads() {
 #endif
 }
 
+void reset() {
+  State& s = S();
+#if !defined(__wasm__)
+  const bool was = threads();
+  set_threads(false);  // (waits for the jobs the threads run)
+#endif
+  {
+#if !defined(__wasm__)
+    std::lock_guard<std::mutex> lock(s.mutex);
+#endif
+    s.queue.clear();
+    s.jobs.clear();
+    s.handout.clear();
+    s.next_id = 1;
+  }
+#if !defined(__wasm__)
+  set_threads(was);
+#endif
+}
+
 const std::vector<u8>& take_queued() {
   State& s = S();
 #if !defined(__wasm__)

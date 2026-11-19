@@ -11,6 +11,7 @@
 #include "gl_stub.h"
 #include "kern/kern.h"
 #include "kern/physics/physics.h"
+#include "kern/core/jobs.h"
 #include "kern/core/json.h"
 #include "kern/game/demos.h"
 #include "kern/audio/synth.h"
@@ -6370,6 +6371,37 @@ TEST(engine_calls_every_node) {
   CHECK(objects.size() == 0);
 }
 
+namespace {
+void job_double(kern::Span<const u8> in, std::vector<u8>& out) {
+  out.assign(in.begin(), in.end());
+  out.insert(out.end(), in.begin(), in.end());
+}
+}  // namespace
+KERN_JOB(61, job_double);
+
+TEST(jobs_reset_begins_again) {
+  // after reset the jobs are as when the program starts: none waits, none is done, the next is numbered 1 - with the
+  // threads and without (it waits for what they run); what is defined and the switch stay
+  for (const bool threaded : {false, true}) {
+    jobs::set_threads(threaded);
+    const u32 a = jobs::submit(61, {1, 2});
+    jobs::submit(61, {3});
+    if (!threaded) jobs::pump(1000);
+    jobs::reset();
+    CHECK(jobs::pending() == 0);
+    CHECK(jobs::threads() == threaded);
+    std::vector<u8> out;
+    CHECK(!jobs::take(a, out));   // (forgotten, done or not)
+    jobs::set_threads(false);
+    const u32 b = jobs::submit(61, {7});
+    CHECK(b == 1);
+    jobs::pump(1000);
+    CHECK(jobs::take(b, out) && out == std::vector<u8>({7, 7}));
+    jobs::reset();
+  }
+  jobs::set_threads(true);
+}
+
 TEST(engine_stand_in_fixed_length) {
   using logic::Value;
   // a field that is an array of C++ (`f32 m[16]` of Mat4) has as many entries in the form - and so in every answer of
@@ -6383,6 +6415,23 @@ TEST(engine_stand_in_fixed_length) {
     CHECK(out.size() == 2 && out[1].rows && out[1].rows->size() == 1 && (*out[1].rows)[0].list &&
           std::get<std::vector<f64>>(*(*out[1].rows)[0].list).size() == 16);
   }
+}
+
+TEST(engine_stand_in_one_or_none) {
+  using logic::Value;
+  // what may be there or not (`std::optional<Message> Client::receive`, the std::optional components of a level's actor)
+  // is a list of no entry or one in the form - `[?item]` - and so in every answer of the stand-in: never two
+  const logic::EngineFunction* f = logic::engine_function("engine.client.receive");
+  CHECK(f && f->outputs.size() == 1 && std::string(f->outputs[0].shape).starts_with("[?{"));
+  logic::EngineStandIn s;
+  bool none = false, one = false;
+  for (i64 channel = 0; channel < 40; ++channel) {
+    std::vector<Value> out(1);
+    CHECK(s.engine("engine.client.receive", {Value::integer(1), Value::integer(channel)}, out));
+    CHECK(out.size() == 1 && out[0].rows && out[0].rows->size() <= 1);
+    (out[0].rows && out[0].rows->empty() ? none : one) = true;
+  }
+  CHECK(none && one);
 }
 
 TEST(engine_calls_mixer_is_the_mixer) {

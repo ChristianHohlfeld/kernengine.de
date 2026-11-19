@@ -43,6 +43,10 @@ bool external();
 /// waits for the jobs the threads are running. (On the web there are no threads: always off.)
 void set_threads(bool on);
 bool threads();
+/// Forgets every job - waiting, running (it waits for those the threads run) or done - and numbers the next one 1
+/// again, as when the program starts; what is defined and the switches stay. (A test that plays calls of a program
+/// on several sides from the same beginning: each side begins with the jobs as the others did.)
+void reset();
 
 // ---- host interface (kern/web/jobs.mjs) ----
 /// Queued jobs not yet handed out, as one buffer: u32 count, then per job u32 id, u32 kind,

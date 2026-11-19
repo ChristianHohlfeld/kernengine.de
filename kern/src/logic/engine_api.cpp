@@ -142,12 +142,15 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
       return Value::structure(std::move(fields));
     }
     case '[': {
-      // ([N item]: a list of a fixed length - `f32 m[16]` -, exactly N entries, as C++ holds them; [item]: 0 to 2)
+      // ([N item]: a list of a fixed length - `f32 m[16]` -, exactly N entries, as C++ holds them; [?item]: what may be
+      // there or not - std::optional, std::unique_ptr of a value -, no entry or one; [item]: 0 to 2)
       u64 fixed = 0;
       bool sized = false;
       while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') { fixed = fixed * 10 + static_cast<u64>(shape[at++] - '0'); sized = true; }
+      const bool maybe = !sized && at < shape.size() && shape[at] == '?';
+      if (maybe) ++at;
       const std::size_t item = at;
-      const std::size_t count = static_cast<std::size_t>(sized ? fixed : std::min<u64>(next(state) % 3, most));
+      const std::size_t count = static_cast<std::size_t>(sized ? fixed : std::min<u64>(next(state) % (maybe ? 2 : 3), most));
       std::vector<Value> items;
       std::size_t end = at;
       for (std::size_t k = 0; k < count; ++k) {

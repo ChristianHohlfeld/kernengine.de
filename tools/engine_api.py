@@ -81,7 +81,7 @@ def table_text(api, functions):
                 t, of = api.pin(bt)
                 count = f.get("counts", {}).get(name) if ps is f["outs"] else None   # (an output list the engine writes through a pointer: its count)
                 per = f.get("per", {}).get(name, 1) if count else 1                  # (... and how many numbers each it counts is)
-                out.append(f"{{{c_text(name)}, PinType::{t}, {c_text(of)}, {c_text(api.shape(bt))}" + (f", {c_text(count)}" if count else "") + (f", {per}" if per != 1 else "") + "}")
+                out.append(f"{{{c_text(name)}, PinType::{t}, {c_text(of)}, {c_text(api.shape(bt, f.get('raws', {}).get(name)))}" + (f", {c_text(count)}" if count else "") + (f", {per}" if per != 1 else "") + "}")
             return "{" + ", ".join(out) + "}"
         lines.append(f"      {{{c_text(f['type'])}, {c_text(f['cpp'])}, {c_text(f['label'])}, {c_text(f['category'])}, {c_text(f['help'])}, {'true' if f['value'] else 'false'},")
         lines.append(f"       {pins(f['ins'])},")
