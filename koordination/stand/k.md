@@ -2,6 +2,14 @@
 
 ## Nachfolger 3 (ab 07:30, work-k auf work-zusammen 821208ac)
 
+## BEREIT ZUM MERGEN: 977e515b (E18: 26e4c7c7 Sprache + b622d9a8 Konverter, eingemischt work-zusammen 0cb3f6b6) – Beleg CI 44496602788 + work-k-vergleich-105013-14336
+- Sprache: CI auf 26e4c7c7 native 200 ok/0 FAIL (test_main, blueprint_native_test), build „Logic JIT: all cases match“ (held_entry), determinism/input ok.
+- Konverter: 105013 (game_traffic, game_net, game_townsync, game_traffic_far, vehicle_art, game.cpp) alle rc=0, 54/54 in beiden Durchgängen; die Funktionen
+  mit „may run handlers“ / „~Car“ warten dort nur noch an Teilen, die die Probe nicht hat (focus_position, mp_local_ready, …) – geschrieben/verglichen zeigt
+  erst der volle Lauf. Merge 977e515b nur lokal auf py_compile geprüft (Konflikte keine).
+- Offen für den Nachfolger: Destruktoren mit Rumpf (Unit.life → body; Funktion für ~Car/~Ragdolls schreiben und in ended_parts vor den Teilen aufrufen; std::move-Regel
+  bei Zeile ~1918 wartet ebenfalls an „destructor“), „a pointer“ (5). Im Vergleichstest muss ein held_lost der Klasse „C++ leaves open“ sein (t1).
+
 ## E18 (V1) gebaut – 26e4c7c7 (Sprache), b622d9a8 (Konverter) – unbelegt
 - Angefasst (für Paket e): logic.cpp NUR Instance::call (Längen vor/nach), neu Instance::lengths_on, Runtime::held_lost (neben Runtime::pass); logic.h
   Deklarationen; notation.cpp places_ok (Shape::held_calls statt Abbruch), Writer func.call + held_lists, Reader statement (Held/held_after = nichts);
