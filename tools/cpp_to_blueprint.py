@@ -3385,7 +3385,7 @@ class Emit:
                 continue
             raw = qtype(p)
             if exported:
-                words += wire_words(p, words)
+                words += wire_words(p, words, self.tree.aliases)
             if u.is_logic(raw):
                 # the logic the Blueprint runs in: its own - no input (Unit.is_logic)
                 if re.search(r"\bconst\b", raw):
@@ -3498,7 +3498,7 @@ class Emit:
         if exported:
             # (a function the program gives its host under its C name - KERN_EXPORT: the same name, and how its
             # values cross, one word for each input, from the C signature - Function::exported, Function::wire)
-            gives = wire_out(d)
+            gives = wire_out(d, self.tree.aliases)
             if len(words) != len(f.params) or list(f.order()) != list(range(len(f.params))):
                 raise Wait(f"the export {exported}: its inputs are not its C parameters one by one")
             mark = f"KERN_EXPORT_AS({text_literal(exported)}, {text_literal(' '.join([*words, *(['->', gives] if gives else [])]))}) "
@@ -14157,24 +14157,37 @@ def export_name(d):
     return name if name in exported_names(d.get("_file") or "") else None
 
 
-C_WORDS = {"int": "i32", "unsigned int": "u32", "float": "f32", "double": "f64"}
+C_WORDS = {"int": "i32", "unsigned int": "u32", "float": "f32", "double": "f64",
+           "int32_t": "i32", "uint32_t": "u32", "std::int32_t": "i32", "std::uint32_t": "u32"}
+C_BYTES = ("unsigned char", "uint8_t", "std::uint8_t")
 
 
-def c_type(n):
-    """The C type of a value, as the compiler works it out (kern::u32: unsigned int)."""
+def c_type(n, aliases):
+    """The C type of a value, the names the program and the engine give types resolved (`kern::u32`: through
+    `using u32 = std::uint32_t;` - Tree.aliases), spaces as the compiler writes them."""
     t = n.get("type") or {}
-    return re.sub(r"\s+", " ", t.get("desugaredQualType") or t.get("qualType") or "").strip()
+    t = re.sub(r"\s+", " ", t.get("desugaredQualType") or t.get("qualType") or "").strip()
+    for _ in range(8):
+        def one(m):
+            name = m.group(0).split("::")[-1]
+            got = aliases.get(name)
+            return got if got and m.group(0) not in C_WORDS and m.group(0) not in C_BYTES else m.group(0)
+        u = re.sub(r"(?:\w+::)*\w+", one, t)
+        if u == t:
+            break
+        t = re.sub(r"\s+", " ", u).strip()
+    return t
 
 
-def wire_words(p, before):
+def wire_words(p, before, aliases):
     """How a parameter of an exported function crosses from the host - one word for each input of the Blueprint it
     is (Function::wire): a number by its C type, a `const char*` text, a pointer to bytes `bytes at` (a pointer is a
     list and the place in it - Unit.pointed: from the host the place is 0), and a u32 right after a text or bytes
     their len."""
-    t = c_type(p)
+    t = c_type(p, aliases)
     if t in ("const char *", "const char *const"):
         return ["text"]
-    if re.fullmatch(r"const (?:unsigned char|uint8_t) \*(?:const)?", t):
+    if re.fullmatch(r"const (?:unsigned char|(?:std::)?uint8_t) \*(?: ?const)?", t):
         return ["bytes", "at"]
     if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] == ["bytes", "at"]):
         return ["len"]
@@ -14183,9 +14196,9 @@ def wire_words(p, before):
     raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)")
 
 
-def wire_out(d):
+def wire_out(d, aliases):
     """What an exported function gives its host (the word after ->), or None."""
-    t = re.sub(r"\(.*$", "", c_type(d)).strip()
+    t = re.sub(r"\(.*$", "", c_type(d, aliases)).strip()
     if t == "void":
         return None
     if t in ("const char *", "const char *const"):
