@@ -61,7 +61,9 @@ struct WeldStats {
 /// Merges vertices whose position, normal, colour, uv and extra stream are
 /// bit-identical (IEEE-754 patterns, never rounded), producing an indexed
 /// mesh. Hard edges stay hard. Keeps the soup when indexing would not save
-/// bytes (`min_saving`). The mesh must be a triangle soup.
+/// bytes (`min_saving`). The mesh must be a triangle soup whose streams have one
+/// entry per vertex (positions, normals and colours 3, uvs 2, extra `extra_size`);
+/// one that does not stays as it is (nothing indexed).
 WeldStats weld(MeshData& mesh, std::size_t min_saving = 0);
 
 /// FNV-1a over the bit patterns of all float streams (and indices).

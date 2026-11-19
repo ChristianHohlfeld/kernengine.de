@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include "blueprint_native.h"
+#include "kern/app/app.h"
 #include "cost.h"
 #include "rule_blueprint.h"
 #include "rules.h"
@@ -183,6 +184,10 @@ static blueprint_native::Case jet_seats_case() {
   for (const Value& t : {none, one, two, rows({row(1, 2, 253)}), rows({row(1, 1, 1)}), rows({row(1, 1, 3), row(2, 2, 3)}), rows({row(1, 1, 253), row(1, 1, 253)})}) c.calls.push_back({"Valid", {t}});
   return c;
 }
+
+// The app runtime is linked in as the game links it (its Engine and Input are objects of the engine the source
+// calls - run_tests.sh); it asks the program for its App: the tests have none (main.cpp is the game's).
+kern::App* kern_create_app() { return nullptr; }
 
 int main(int argc, char** argv) {
   // spawncity_tests --emit-native <dir>: the Wanted Blueprint as its C++ text, calls to it and

@@ -225,6 +225,16 @@ TEST(weld_and_hash) {
   CHECK(soup.indices.size() == 36);
   CHECK(s.bytes_after < s.bytes_before);
   CHECK(content_hash(soup) != hash);
+  // a soup whose streams do not have one entry per vertex is not read past its ends: it stays as it is
+  for (int cut = 0; cut < 4; ++cut) {
+    MeshData bad;
+    for (u32 i : cube.indices) bad.push(Vec3::load(&cube.positions[i * 3]), Vec3::load(&cube.normals[i * 3]), {1, 1, 1}, {0, 0});
+    std::vector<f32>* streams[4] = {&bad.normals, &bad.colors, &bad.uvs, &bad.positions};
+    streams[cut]->resize(cut == 3 ? streams[cut]->size() - 1 : 1);
+    const u32 before = content_hash(bad);
+    const WeldStats w = weld(bad);
+    CHECK(!w.indexed && w.unique_vertices == 0 && bad.indices.empty() && content_hash(bad) == before);
+  }
   MeshData a = primitives::box({1, 1, 1}), b = primitives::box({1, 1, 1});
   CHECK(content_hash(a) == content_hash(b));
   b.positions[0] += 1e-3f;
@@ -6428,6 +6438,34 @@ TEST(engine_calls_default_objects_made_with) {
   CHECK(o.size() == 2);   // (the transport and the renderer have no handle)
   out.clear();
   CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  // a handle it has no object of names one as C++ makes it - releasing it ends that one (nothing is left)
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(9)}, out) && o.size() == 1);
+  o.clear();
+  CHECK(o.size() == 0);
+  // without a maker (a host that keeps its own objects) a handle without an object is not released
+  logic::EngineObjects host;
+  CHECK(!logic::call_engine(host, "engine.client.release", {logic::Value::integer(9)}, out) && host.error.find("Client") != std::string::npos);
+}
+
+TEST(engine_calls_default_objects_by_class) {
+  // a test's handles are numbers kept by class (the stand-in's objects): where the same number names an object
+  // of one class and is then asked for as another, the second is made beside the first - neither replaces nor
+  // loses the other, and each ends with the objects (ASan: nothing left)
+  logic::EngineObjects o;
+  o.on_missing(logic::engine_make_default);
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.mixer.init", {logic::Value::integer(3), logic::Value::integer(44100), logic::Value::integer(8)}, out) && out[0].b);
+  out = {logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out) && !out[0].b);
+  CHECK(o.size() == 2);
+  out = {logic::Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(3)}, out) && out[0].i == 44100);
+  out.clear();
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  out = {logic::Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(3)}, out) && out[0].i == 44100);
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out = {logic::Value::zero(logic::PinType::boolean)}));
+  CHECK(o.size() == 2);
   o.clear();
   CHECK(o.size() == 0);
 }
@@ -13683,6 +13721,11 @@ TEST(app_input_and_args) {
   in.key(Key::a, true);
   in.set_focus(false);
   CHECK(!in.down(Key::a));
+  // a key past the last one (Key::count, or any value of the type beyond it) is never down, and keeping it changes nothing
+  for (Key past : {Key::count, static_cast<Key>(200)}) {
+    in.key(past, true);
+    CHECK(!in.down(past) && !in.pressed(past) && !in.released(past));
+  }
   in.touch(7, 0, {10, 10});
   in.touch(8, 0, {20, 20});
   CHECK(in.touch_count() == 2);

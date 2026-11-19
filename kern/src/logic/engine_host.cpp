@@ -26,31 +26,51 @@ void EngineObjects::place(i64 handle, Kinds kinds, void (*end)(void*), void* own
   e.owner = owner;
   e.kinds = std::move(kinds);
   for (const auto& [kind, where] : e.kinds) by_object_[where].push_back({kind, handle});
-  entries_[handle] = std::move(e);
-  order_.push_back(handle);
+  order_.push_back({handle, e.at});
+  entries_[handle].push_back(std::move(e));
   if (handle >= next_) next_ = handle + 1;
 }
 
 void* EngineObjects::find(i64 handle, Kind k) const {
   const auto it = entries_.find(handle);
   if (it == entries_.end()) return nullptr;
-  for (const auto& [kind, where] : it->second.kinds)
-    if (kind == k) return where;
+  for (const Entry& e : it->second)
+    for (const auto& [kind, where] : e.kinds)
+      if (kind == k) return where;
   return nullptr;
 }
 
+namespace {
+// The entry of `at` at a handle, taken out (false: none there).
+template <class Entries, class Entry> bool take(Entries& entries, i64 handle, const void* at, Entry& e) {
+  const auto it = entries.find(handle);
+  if (it == entries.end()) return false;
+  auto& v = it->second;
+  for (auto x = v.begin(); x != v.end(); ++x)
+    if (x->at == at) {
+      e = std::move(*x);
+      v.erase(x);
+      if (v.empty()) entries.erase(it);
+      return true;
+    }
+  return false;
+}
+}  // namespace
+
 bool EngineObjects::end(i64 handle, Kind k) {
   const auto it = entries_.find(handle);
-  if (it == entries_.end() || it->second.kinds.front().first != k || !it->second.end) return false;
+  if (it == entries_.end()) return false;
+  const auto x = std::find_if(it->second.begin(), it->second.end(), [&](const Entry& e) { return e.kinds.front().first == k; });
+  if (x == it->second.end() || !x->end) return false;
   ++generation_;
-  Entry e = std::move(it->second);
-  entries_.erase(it);
-  order_.erase(std::find(order_.begin(), order_.end(), handle));
+  Entry e;
+  take(entries_, handle, x->at, e);
+  order_.erase(std::find(order_.begin(), order_.end(), std::pair<i64, void*>{handle, e.at}));
   for (const auto& [kind, where] : e.kinds) {
     auto o = by_object_.find(where);
     if (o == by_object_.end()) continue;
     auto& v = o->second;
-    v.erase(std::remove_if(v.begin(), v.end(), [&](const auto& x) { return x.second == handle; }), v.end());
+    v.erase(std::remove_if(v.begin(), v.end(), [&](const auto& y) { return y.second == handle; }), v.end());
     if (v.empty()) by_object_.erase(o);
   }
   e.end(e.owner ? e.owner : e.at);
@@ -61,12 +81,10 @@ void EngineObjects::clear() {
   ++generation_;
   // (what it owns ends in the reverse order it came - what came later may hold what came before)
   while (!order_.empty()) {
-    const i64 handle = order_.back();
+    const auto [handle, at] = order_.back();
     order_.pop_back();
-    const auto it = entries_.find(handle);
-    if (it == entries_.end()) continue;
-    Entry e = std::move(it->second);
-    entries_.erase(it);
+    Entry e;
+    if (!take(entries_, handle, at, e)) continue;
     if (e.end) e.end(e.owner ? e.owner : e.at);
   }
   entries_.clear();
@@ -74,7 +92,11 @@ void EngineObjects::clear() {
   next_ = 1;
 }
 
-std::size_t EngineObjects::size() const { return entries_.size(); }
+std::size_t EngineObjects::size() const {
+  std::size_t n = 0;
+  for (const auto& [handle, v] : entries_) n += v.size();
+  return n;
+}
 
 namespace {
 const EngineCalls*& first_calls() {

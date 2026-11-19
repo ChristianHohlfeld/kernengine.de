@@ -2178,6 +2178,7 @@ template <class Core> struct EngineNodesOf : Core {
     if (this->kern_world.host) this->kern_world.host->engine_failed(function);
   }
 
+  /// (a key past the last one - Key::count, or any value of the type beyond it - is never down)
   template <class T1> Bool engine_input_down(Int input, const T1& k) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -8459,7 +8460,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.upsert", {to_value(renderer), to_value(id), to_value(mesh), to_value(look), to_value(transforms), to_value(tints)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  /// Merges vertices whose position, normal, colour, uv and extra stream are bit-identical (IEEE-754 patterns, never rounded), producing an indexed mesh. Hard edges stay hard. Keeps the soup when indexing would not save bytes (`min_saving`). The mesh must be a triangle soup.
+  /// Merges vertices whose position, normal, colour, uv and extra stream are bit-identical (IEEE-754 patterns, never rounded), producing an indexed mesh. Hard edges stay hard. Keeps the soup when indexing would not save bytes (`min_saving`). The mesh must be a triangle soup whose streams have one entry per vertex (positions, normals and colours 3, uvs 2, extra `extra_size`); one that does not stays as it is (nothing indexed).
   template <class T1> void engine_weld(const T1& mesh, Int min_saving) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
