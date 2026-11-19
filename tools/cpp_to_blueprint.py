@@ -4323,10 +4323,52 @@ class Emit:
         return [f"{count} = {kind}_length<{row}>({lv});",   # (Length gives an Int)
                 *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
+    @staticmethod
+    def goes_to(n, label):
+        """Does this code hold a goto to the label (its declaration's id)?"""
+        return any(x.get("kind") == "GotoStmt" and x.get("targetLabelDeclId") == label for x in walk(n))
+
+    def labels_of(self, stmts):
+        """The labels of a block that a goto before them in the block goes to (forward, out of an if or a block,
+        not out of a loop, a switch or a lambda): each gets a flag of its own - set where the goto is, and what
+        stands between the goto and its label runs only while it is not set (block_of). Gives the steps that
+        clear the flags where the block begins."""
+        out = []
+        for j, s in enumerate(stmts):
+            if s.get("kind") != "LabelStmt":
+                continue
+            label = s.get("declId")
+            if label in self.goto_flags:
+                continue   # (the rest of its block, written again: the flag it has)
+            if any(self.goes_to(x, label) for x in stmts[j:]):
+                raise Wait("a goto back (a loop of its own)")
+            if not any(self.goes_to(x, label) for x in stmts[:j]):
+                continue
+            for x in stmts[:j]:
+                for y in walk(x):
+                    if y.get("kind") in ("ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt", "SwitchStmt", "LambdaExpr") and self.goes_to(y, label):
+                        raise Wait("a goto out of a loop, a switch or a lambda")
+            flag = self.temp(f"to_{s.get('name') or 'label'}", "Bool")
+            self.goto_flags[label] = flag
+            out.append(f"{flag} = false;")
+        return out
+
     def block_of(self, stmts):
         """The statements of a block, and whether it always returns (then its objects are released by the return)."""
-        out = []
-        for i, s in enumerate(stmts):
+        if not isinstance(self.goto_flags, dict):
+            self.goto_flags, self.goto_live = {}, set()
+        known = set(self.goto_flags)
+        try:
+            return self.block_steps(stmts)
+        finally:
+            self.goto_live -= set(self.goto_flags) - known   # (the labels of this block: no goto reaches them from outside it)
+
+    def block_steps(self, stmts):
+        out = self.labels_of(stmts)
+        self.goto_live |= set(self.goto_flags)
+        i = 0
+        while i < len(stmts):
+            s = stmts[i]
             if not isinstance(self.named_places, set):
                 self.named_places = set()
             self.name_references(stmts, i)
@@ -4336,12 +4378,32 @@ class Emit:
                 return out, True
             if s.get("kind") in ("BreakStmt", "ContinueStmt"):
                 break
+            jumped = [label for label in self.goto_live if s.get("kind") != "GotoStmt" and self.goes_to(s, label)]
+            if len(jumped) > 1:
+                raise Wait("gotos to several labels from one statement")
+            if jumped:
+                # (after a statement with a goto: up to its label - or to the end of this block, the label stands
+                # further out - only while the goto has not gone)
+                at = next((j for j in range(i + 1, len(stmts)) if stmts[j].get("kind") == "LabelStmt" and stmts[j].get("declId") == jumped[0]), None)
+                rest = self.block(stmts[i + 1:at if at is not None else len(stmts)])
+                if rest:
+                    out += [f"if (logic_not({self.goto_flags[jumped[0]]})) {{", *["  " + ln for ln in rest], "}"]
+                if at is None:
+                    break
+                i = at
+                continue
+            if s.get("kind") == "GotoStmt":
+                break   # (what follows a goto in its block does not run)
             if self.loops and any(self.jumps(s)):   # (after a statement that may break or continue: the rest only if it did not)
                 rest = self.block(stmts[i + 1:])
                 if rest:
                     out += [f"if ({self.going()}) {{", *["  " + ln for ln in rest], "}"]
                 break
+            i += 1
         return out, False
+
+    goto_flags = None
+    goto_live = None
 
     def continues(self, s):
         """Does a statement end with continue - in a switch in a loop, a case that goes on with the loop's next round
@@ -4597,6 +4659,12 @@ class Emit:
             return self.for_each(s), False
         if k == "SwitchStmt":
             return self.switch(s)
+        if k == "GotoStmt":
+            if s.get("targetLabelDeclId") not in (self.goto_flags or {}):
+                raise Wait("GotoStmt")
+            return [f"{self.goto_flags[s['targetLabelDeclId']]} = true;"], False
+        if k == "LabelStmt":
+            return self.stmt(kids(s)[0]) if kids(s) else ([], False)
         if k in ("BreakStmt", "ContinueStmt"):
             if not self.loops or not self.loops[-1]["stop" if k == "BreakStmt" else "skip"]:
                 raise Wait("a break outside a loop")
