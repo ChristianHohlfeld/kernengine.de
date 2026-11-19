@@ -6347,8 +6347,8 @@ TEST(engine_stand_in_one_or_none) {
   for (i64 channel = 0; channel < 40; ++channel) {
     std::vector<Value> out(1);
     CHECK(s.engine("engine.client.receive", {Value::integer(1), Value::integer(channel)}, out));
-    CHECK(out.size() == 1 && out[0].rows && out[0].rows->size() <= 1);
-    (out[0].rows && out[0].rows->empty() ? none : one) = true;
+    CHECK(out.size() == 1 && out[0].type == logic::PinType::structure_list && out[0].size() <= 1);
+    (out[0].size() == 0 ? none : one) = true;
   }
   CHECK(none && one);
 }
