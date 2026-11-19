@@ -4931,7 +4931,7 @@ class Emit:
             inner = self.unwrap(kids(b)[-1])
             if inner.get("kind") == "CallExpr" and callee_name(inner) in C_PARSE and C_PARSE[callee_name(inner)][0] in ("long", "unsigned") and not self.own(callee(inner).get("referencedDecl", {}).get("id")):
                 bits = self.parsed(inner, callee_name(inner), kids(inner)[1:], bits=True)[0]
-                return self.narrow(f"int64_low({bits})", "unsigned int", self.ctype(b), None), "Int"
+                return self.cut_low(f"int64_low({bits})", self.ctype(b)), "Int"
         return None
 
     def parsed(self, b, name, a, bits=False):
@@ -4952,7 +4952,7 @@ class Emit:
         if bits:
             return f"{call}.value", "Int64"
         if kind == "int":   # (atoi: the long strtol reads, cut to an int)
-            return self.narrow(f"int64_low({call}.value)", "unsigned int", "int", None), "Int"
+            return self.cut_low(f"int64_low({call}.value)", "int"), "Int"
         return f"int64_to_int({call}.value)", "Int"   # (a long: its bits read with their sign, as a Blueprint holds every long)
 
     def scanned(self, a, used=True):
@@ -8885,6 +8885,12 @@ class Emit:
         if b.get("kind") in CAST and kids(b) and self.ctype(kids(b)[-1]) in ("unsigned int", "unsigned short", "unsigned char", "bool"):
             return True
         return False
+
+    def cut_low(self, low, want):
+        """The low 32 bits of a 64-bit pattern (`low`: an Int, as int64_low gives them), as the C type `want` keeps
+        them - a step of its own: what `narrow` gives is a formula's text, it stands in a formula."""
+        cut = self.narrow("x", "unsigned int", want, None)
+        return low if cut == "x" else f"kern::to<Int>(kern::formula([](Float x) -> Float {{ return {cut}; }}, kern::to<Float>({low})))"
 
     def narrow(self, text, have, want, inner):
         """A whole number converted to a C++ type that holds less of it: what that type keeps."""
