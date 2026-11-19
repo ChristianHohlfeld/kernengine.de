@@ -10756,8 +10756,9 @@ class TestWriter:
 
     def logic_value(self, q):
         """Is `q` a class of the engine's logic that is a value of the language - plain data (Unit.engine_object):
-        a Graph, a Node - and not its machinery (Runtime, ActorBlueprint, Instance: in a test the engine's own)?"""
-        return q.startswith(ENGINE + "::logic::") and q in self.tree.records and not self.u.engine_object(q)
+        a Graph, a Node - and not its machinery (Runtime, Instance: objects; ActorBlueprint: in the language not a
+        value but Call on Actor, Unit.actor_type - in a test the engine's own)?"""
+        return q.startswith(ENGINE + "::logic::") and q in self.tree.records and not self.u.engine_object(q) and not self.u.actor_type(q)
 
     def hands_logic(self, d, seen=None):
         """What the function `d` - or a function of the program it calls - hands to the engine's logic itself (a
@@ -12512,6 +12513,12 @@ class TestWriter:
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
         for o, text, pair in aliases:
             put(o, {"kind": "alias", "text": text, "pairs": [pair]})
+        # a function declared here whose body another file's test handed on: its declaration - what C++ takes from it
+        # (its default arguments: `render(Kind k, u32 variant, u32 rate = kSampleRate)`) goes on with the body, to a
+        # test whose file does not see that declaration
+        for d in G.declared.values():
+            if d.get("_at", (None, None))[1] is not None:
+                put(d, {"kind": "declaration", "text": self.in_spaces(d, self.piece(d) + ";", local_of(d))})
         # a method declared in its class here whose body another file's test handed on: that it is a member, for
         # the test that takes these pieces (its class's text holds the declaration) - and of a class this tree does
         # not have either, the place of the member in the piece of the file that has it
