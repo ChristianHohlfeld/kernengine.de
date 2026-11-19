@@ -181,33 +181,17 @@ void Destruction::fracture(const Broken& b, Vec3 center, Vec3 offset, f32 boost,
     at = at + offset;
     const Vec2 radial = norm2({at.x - center.x, at.y - center.y}, outward);
     const f32 speed = (9 + 30 * I) * rng.range(0.55f, 1.2f) * boost;
-    // (each draw named in the order the game's compiler takes them - from the left: the operands of + are
-    // unsequenced ([intro.execution]/10), the arguments of a call indeterminately sequenced ([expr.call]/8))
-    const f32 vx = radial.x * speed + rng.range(-5, 5);
-    const f32 vy = radial.y * speed + rng.range(-5, 5);
-    const f32 up = rng.range(2, 8);
-    const Vec3 v{vx, vy, up + 8 * I * rng.range(0.2f, 1)};
+    const Vec3 v{radial.x * speed + rng.range(-5, 5), radial.y * speed + rng.range(-5, 5), rng.range(2, 8) + 8 * I * rng.range(0.2f, 1)};
     spawn(at, v, size, yaw, tint, rng);
   };
   auto tint = [&](f32 ember) { const f32 u = rng.unit(); return u < ember ? kEmber : u < 0.35f ? kDim : kConcrete; };
   for (u32 f = 0; f < floors; ++f)
     for (std::size_t i = f % stride; i < segs.size(); i += stride) {
       const Seg& s = segs[i];
-      // ([expr.call]/8: C++ leaves open in which order the arguments of launch are worked out - size and tint both
-      // draw from rng. clang, which builds the game, and the original in JS take them from the left (size, then the
-      // tint); GCC from the right (the tint first). Named here in the game's order, so no compiler decides.)
-      const Vec3 size{s.len * rng.range(0.85f, 1), 0.45f, band * rng.range(0.8f, 1)};
-      const Vec3 col = tint(0.18f);
-      launch({s.m.x, s.m.y, b.new_top + band * (static_cast<f32>(f) + 0.5f)}, size, s.yaw, col);
+      launch({s.m.x, s.m.y, b.new_top + band * (static_cast<f32>(f) + 0.5f)}, {s.len * rng.range(0.85f, 1), 0.45f, band * rng.range(0.8f, 1)}, s.yaw, tint(0.18f));
     }
-  for (u32 i = 0; i < roof; ++i) {
-    // (as above: the place, the size, the yaw and the tint each draw from rng - from the left, as clang and the original)
-    const Vec3 at{rng.range(b.lo.x, b.hi.x), rng.range(b.lo.y, b.hi.y), b.top - 0.3f};
-    const Vec3 size{rng.range(3, 7), rng.range(3, 7), 0.5f};
-    const f32 yaw = rng.unit() * 6.28f;
-    const Vec3 col = tint(0.25f);
-    launch(at, size, yaw, col);
-  }
+  for (u32 i = 0; i < roof; ++i)
+    launch({rng.range(b.lo.x, b.hi.x), rng.range(b.lo.y, b.hi.y), b.top - 0.3f}, {rng.range(3, 7), rng.range(3, 7), 0.5f}, rng.unit() * 6.28f, tint(0.25f));
 }
 
 void Destruction::spawn(Vec3 at, Vec3 v, Vec3 size, f32 yaw, Vec3 tint, Rng& rng) {
