@@ -239,7 +239,7 @@ namespace qr { bool read_format(const Code& c, u32& level_bits, u32& mask) {
 }
 namespace qr { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const qr::Grid& s) { return converted::Value::structure({arg(s.size), arg(s.m), arg(s.fn)}); }
-[[maybe_unused]] static bool same(const qr::Grid& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.size, (*got.rows)[0]) && same(want.m, (*got.rows)[1]) && same(want.fn, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const qr::Grid& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.size, (*got.rows)[0]), ".size") && converted::at_place(same(want.m, (*got.rows)[1]), ".m") && converted::at_place(same(want.fn, (*got.rows)[2]), ".fn"); }
 [[maybe_unused]] static bool defined(const qr::Grid& s) { return defined(s.size) && defined(s.m) && defined(s.fn); }
 [[maybe_unused]] static std::string text(const qr::Grid& s) { return std::string("{") + text(s.size) + ", " + text(s.m) + ", " + text(s.fn) + "}"; }
 [[maybe_unused]] static void take(qr::Grid& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.size, (*v.rows)[0]); converted::take_as<std::vector<unsigned char>>(s.m, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.fn, (*v.rows)[2]); }
@@ -253,17 +253,17 @@ namespace qr { using converted::arg; using converted::same; using converted::def
 }
 namespace qr { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const qr::Code& s) { return converted::Value::structure({arg(s.version), arg(s.size), arg(s.modules)}); }
-[[maybe_unused]] static bool same(const qr::Code& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.version, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.modules, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const qr::Code& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.version, (*got.rows)[0]), ".version") && converted::at_place(same(want.size, (*got.rows)[1]), ".size") && converted::at_place(same(want.modules, (*got.rows)[2]), ".modules"); }
 [[maybe_unused]] static bool defined(const qr::Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
 [[maybe_unused]] static std::string text(const qr::Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
 [[maybe_unused]] static void take(qr::Code& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.version, (*v.rows)[0]); converted::take_as<int>(s.size, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.modules, (*v.rows)[2]); }
 }
 struct Out_encode { bool Result; qr::Code out; };
-[[maybe_unused]] static bool same(const Out_encode& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_encode& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_encode& s) { return defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_encode& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_read_format { bool Result; unsigned int level_bits; unsigned int mask; };
-[[maybe_unused]] static bool same(const Out_read_format& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.level_bits, (*got.rows)[1]) && same(want.mask, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_read_format& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.level_bits, (*got.rows)[1]), ".level_bits") && converted::at_place(same(want.mask, (*got.rows)[2]), ".mask"); }
 [[maybe_unused]] static bool defined(const Out_read_format& s) { return defined(s.Result) && defined(s.level_bits) && defined(s.mask); }
 [[maybe_unused]] static std::string text(const Out_read_format& s) { return std::string("{") + text(s.Result) + ", " + text(s.level_bits) + ", " + text(s.mask) + "}"; }
 
@@ -272,7 +272,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // raw_modules
     converted::Tally tally("raw_modules");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::raw_modules(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::raw_modules(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -281,7 +281,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -291,7 +293,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // data_codewords
     converted::Tally tally("data_codewords");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::data_codewords(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::data_codewords(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -300,7 +302,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -310,7 +314,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // gf_mul
     converted::Tally tally("gf_mul");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned char a0, [[maybe_unused]] unsigned char a1) { return converted::counted([&] { return converted_qr_code_cpp::qr::gf_mul(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned char& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return converted_qr_code_cpp::qr::gf_mul(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned char a0 = static_cast<unsigned char>(draw.below(40));
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -320,7 +324,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -330,7 +336,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // rs_divisor
     converted::Tally tally("rs_divisor");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::rs_divisor(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::rs_divisor(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -339,7 +345,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -349,7 +357,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // rs_remainder
     converted::Tally tally("rs_remainder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<unsigned char> a1) { return converted::counted([&] { return converted_qr_code_cpp::qr::rs_remainder(a0, a1); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { return converted::counted([&] { return converted_qr_code_cpp::qr::rs_remainder(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -359,7 +367,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -369,7 +379,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // alignment_positions
     converted::Tally tally("alignment_positions");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::alignment_positions(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_qr_code_cpp::qr::alignment_positions(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -378,7 +388,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -388,7 +400,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // Grid::set
     converted::Tally tally("Grid_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] qr::Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] qr::Grid& a0, [[maybe_unused]] int& a1, [[maybe_unused]] int& a2, [[maybe_unused]] bool& a3) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       qr::Grid a0 = draw_qr__Grid(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -400,7 +412,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -410,7 +424,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // finder
     converted::Tally tally("finder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] qr::Grid a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { converted::counted([&] { return converted_qr_code_cpp::qr::finder(a0, std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] qr::Grid& a0, [[maybe_unused]] int& a1, [[maybe_unused]] int& a2) { converted::counted([&] { return converted_qr_code_cpp::qr::finder(a0, std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       qr::Grid a0 = draw_qr__Grid(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -421,7 +435,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -431,7 +447,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // format_bits
     converted::Tally tally("format_bits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] qr::Grid a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return converted_qr_code_cpp::qr::format_bits(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] qr::Grid& a0, [[maybe_unused]] unsigned int& a1) { converted::counted([&] { return converted_qr_code_cpp::qr::format_bits(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       qr::Grid a0 = draw_qr__Grid(draw);
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -441,7 +457,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -451,7 +469,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // encode
     converted::Tally tally("encode");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::string a0, [[maybe_unused]] qr::Code a1) { auto r = converted::counted([&] { return converted_qr_code_cpp::qr::encode(a0, a1); }); return Out_encode{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] std::string& a0, [[maybe_unused]] qr::Code& a1) { auto r = converted::counted([&] { return converted_qr_code_cpp::qr::encode(a0, a1); }); return Out_encode{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::string a0 = draw.word();
       qr::Code a1 = draw_qr__Code(draw);
@@ -461,7 +479,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -471,7 +491,7 @@ SC_TEST(converted_qr_code_cpp) {
   {  // read_format
     converted::Tally tally("read_format");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] qr::Code a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { auto r = converted::counted([&] { return converted_qr_code_cpp::qr::read_format(a0, a1, a2); }); return Out_read_format{std::move(r), std::move(a1), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] qr::Code& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] unsigned int& a2) { auto r = converted::counted([&] { return converted_qr_code_cpp::qr::read_format(a0, a1, a2); }); return Out_read_format{std::move(r), std::move(a1), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       qr::Code a0 = draw_qr__Code(draw);
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -482,7 +502,9 @@ SC_TEST(converted_qr_code_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

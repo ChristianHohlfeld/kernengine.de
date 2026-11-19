@@ -36,9 +36,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Bvh;
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct HeightSampler : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -82,6 +84,7 @@ enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -101,6 +104,7 @@ namespace logic { enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 }; }
+struct EngineValue;
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -116,10 +120,14 @@ struct FunctionPin : converted::EngineObject {
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Host : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -323,7 +331,7 @@ static void play_at(Mixer& mixer, audio::ClipId clip, Vec3 at, f32 volume, f32 p
 
 [[maybe_unused]] static audio::SynthPatch draw_kern__audio__SynthPatch(converted::Draw& draw) {
   audio::SynthPatch s{};
-  s.wave = static_cast<audio::Wave>(draw.below(7));
+  s.wave = converted::enum_value<audio::Wave>(draw.below(7));
   s.volume = draw.number();
   s.attack = draw.number();
   s.sustain = draw.number();
@@ -354,7 +362,7 @@ static void play_at(Mixer& mixer, audio::ClipId clip, Vec3 at, f32 volume, f32 p
 }
 namespace audio { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const audio::SynthPatch& s) { return converted::Value::structure({arg(s.wave), arg(s.volume), arg(s.attack), arg(s.sustain), arg(s.punch), arg(s.release), arg(s.frequency), arg(s.slide), arg(s.slide_accel), arg(s.min_frequency), arg(s.vibrato_depth), arg(s.vibrato_rate), arg(s.arp_ratio), arg(s.arp_time), arg(s.duty), arg(s.duty_sweep), arg(s.fm_ratio), arg(s.fm_depth), arg(s.lowpass), arg(s.lowpass_sweep), arg(s.resonance), arg(s.highpass), arg(s.tremolo_depth), arg(s.tremolo_rate), arg(s.repeat), arg(s.bitcrush), arg(s.seed)}); }
-[[maybe_unused]] static bool same(const audio::SynthPatch& want, const converted::Value& got) { return got.rows && got.rows->size() == 27 && same(want.wave, (*got.rows)[0]) && same(want.volume, (*got.rows)[1]) && same(want.attack, (*got.rows)[2]) && same(want.sustain, (*got.rows)[3]) && same(want.punch, (*got.rows)[4]) && same(want.release, (*got.rows)[5]) && same(want.frequency, (*got.rows)[6]) && same(want.slide, (*got.rows)[7]) && same(want.slide_accel, (*got.rows)[8]) && same(want.min_frequency, (*got.rows)[9]) && same(want.vibrato_depth, (*got.rows)[10]) && same(want.vibrato_rate, (*got.rows)[11]) && same(want.arp_ratio, (*got.rows)[12]) && same(want.arp_time, (*got.rows)[13]) && same(want.duty, (*got.rows)[14]) && same(want.duty_sweep, (*got.rows)[15]) && same(want.fm_ratio, (*got.rows)[16]) && same(want.fm_depth, (*got.rows)[17]) && same(want.lowpass, (*got.rows)[18]) && same(want.lowpass_sweep, (*got.rows)[19]) && same(want.resonance, (*got.rows)[20]) && same(want.highpass, (*got.rows)[21]) && same(want.tremolo_depth, (*got.rows)[22]) && same(want.tremolo_rate, (*got.rows)[23]) && same(want.repeat, (*got.rows)[24]) && same(want.bitcrush, (*got.rows)[25]) && same(want.seed, (*got.rows)[26]); }
+[[maybe_unused]] static bool same(const audio::SynthPatch& want, const converted::Value& got) { return converted::rows_of(got, 27) && converted::at_place(same(want.wave, (*got.rows)[0]), ".wave") && converted::at_place(same(want.volume, (*got.rows)[1]), ".volume") && converted::at_place(same(want.attack, (*got.rows)[2]), ".attack") && converted::at_place(same(want.sustain, (*got.rows)[3]), ".sustain") && converted::at_place(same(want.punch, (*got.rows)[4]), ".punch") && converted::at_place(same(want.release, (*got.rows)[5]), ".release") && converted::at_place(same(want.frequency, (*got.rows)[6]), ".frequency") && converted::at_place(same(want.slide, (*got.rows)[7]), ".slide") && converted::at_place(same(want.slide_accel, (*got.rows)[8]), ".slide_accel") && converted::at_place(same(want.min_frequency, (*got.rows)[9]), ".min_frequency") && converted::at_place(same(want.vibrato_depth, (*got.rows)[10]), ".vibrato_depth") && converted::at_place(same(want.vibrato_rate, (*got.rows)[11]), ".vibrato_rate") && converted::at_place(same(want.arp_ratio, (*got.rows)[12]), ".arp_ratio") && converted::at_place(same(want.arp_time, (*got.rows)[13]), ".arp_time") && converted::at_place(same(want.duty, (*got.rows)[14]), ".duty") && converted::at_place(same(want.duty_sweep, (*got.rows)[15]), ".duty_sweep") && converted::at_place(same(want.fm_ratio, (*got.rows)[16]), ".fm_ratio") && converted::at_place(same(want.fm_depth, (*got.rows)[17]), ".fm_depth") && converted::at_place(same(want.lowpass, (*got.rows)[18]), ".lowpass") && converted::at_place(same(want.lowpass_sweep, (*got.rows)[19]), ".lowpass_sweep") && converted::at_place(same(want.resonance, (*got.rows)[20]), ".resonance") && converted::at_place(same(want.highpass, (*got.rows)[21]), ".highpass") && converted::at_place(same(want.tremolo_depth, (*got.rows)[22]), ".tremolo_depth") && converted::at_place(same(want.tremolo_rate, (*got.rows)[23]), ".tremolo_rate") && converted::at_place(same(want.repeat, (*got.rows)[24]), ".repeat") && converted::at_place(same(want.bitcrush, (*got.rows)[25]), ".bitcrush") && converted::at_place(same(want.seed, (*got.rows)[26]), ".seed"); }
 [[maybe_unused]] static bool defined(const audio::SynthPatch& s) { return defined(s.wave) && defined(s.volume) && defined(s.attack) && defined(s.sustain) && defined(s.punch) && defined(s.release) && defined(s.frequency) && defined(s.slide) && defined(s.slide_accel) && defined(s.min_frequency) && defined(s.vibrato_depth) && defined(s.vibrato_rate) && defined(s.arp_ratio) && defined(s.arp_time) && defined(s.duty) && defined(s.duty_sweep) && defined(s.fm_ratio) && defined(s.fm_depth) && defined(s.lowpass) && defined(s.lowpass_sweep) && defined(s.resonance) && defined(s.highpass) && defined(s.tremolo_depth) && defined(s.tremolo_rate) && defined(s.repeat) && defined(s.bitcrush) && defined(s.seed); }
 [[maybe_unused]] static std::string text(const audio::SynthPatch& s) { return std::string("{") + text(s.wave) + ", " + text(s.volume) + ", " + text(s.attack) + ", " + text(s.sustain) + ", " + text(s.punch) + ", " + text(s.release) + ", " + text(s.frequency) + ", " + text(s.slide) + ", " + text(s.slide_accel) + ", " + text(s.min_frequency) + ", " + text(s.vibrato_depth) + ", " + text(s.vibrato_rate) + ", " + text(s.arp_ratio) + ", " + text(s.arp_time) + ", " + text(s.duty) + ", " + text(s.duty_sweep) + ", " + text(s.fm_ratio) + ", " + text(s.fm_depth) + ", " + text(s.lowpass) + ", " + text(s.lowpass_sweep) + ", " + text(s.resonance) + ", " + text(s.highpass) + ", " + text(s.tremolo_depth) + ", " + text(s.tremolo_rate) + ", " + text(s.repeat) + ", " + text(s.bitcrush) + ", " + text(s.seed) + "}"; }
 [[maybe_unused]] static void take(audio::SynthPatch& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 27) return; converted::take_as<audio::Wave>(s.wave, (*v.rows)[0]); converted::take_as<double>(s.volume, (*v.rows)[1]); converted::take_as<double>(s.attack, (*v.rows)[2]); converted::take_as<double>(s.sustain, (*v.rows)[3]); converted::take_as<double>(s.punch, (*v.rows)[4]); converted::take_as<double>(s.release, (*v.rows)[5]); converted::take_as<double>(s.frequency, (*v.rows)[6]); converted::take_as<double>(s.slide, (*v.rows)[7]); converted::take_as<double>(s.slide_accel, (*v.rows)[8]); converted::take_as<double>(s.min_frequency, (*v.rows)[9]); converted::take_as<double>(s.vibrato_depth, (*v.rows)[10]); converted::take_as<double>(s.vibrato_rate, (*v.rows)[11]); converted::take_as<double>(s.arp_ratio, (*v.rows)[12]); converted::take_as<double>(s.arp_time, (*v.rows)[13]); converted::take_as<double>(s.duty, (*v.rows)[14]); converted::take_as<double>(s.duty_sweep, (*v.rows)[15]); converted::take_as<double>(s.fm_ratio, (*v.rows)[16]); converted::take_as<double>(s.fm_depth, (*v.rows)[17]); converted::take_as<double>(s.lowpass, (*v.rows)[18]); converted::take_as<double>(s.lowpass_sweep, (*v.rows)[19]); converted::take_as<double>(s.resonance, (*v.rows)[20]); converted::take_as<double>(s.highpass, (*v.rows)[21]); converted::take_as<double>(s.tremolo_depth, (*v.rows)[22]); converted::take_as<double>(s.tremolo_rate, (*v.rows)[23]); converted::take_as<double>(s.repeat, (*v.rows)[24]); converted::take_as<double>(s.bitcrush, (*v.rows)[25]); converted::take_as<unsigned int>(s.seed, (*v.rows)[26]); }
@@ -368,7 +376,7 @@ namespace audio { using converted::arg; using converted::same; using converted::
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const WorldSounds& s) { return converted::Value::structure({arg(s.ready), arg(s.splash), arg(s.splash_small), arg(s.horn)}); }
-[[maybe_unused]] static bool same(const WorldSounds& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.ready, (*got.rows)[0]) && same(want.splash, (*got.rows)[1]) && same(want.splash_small, (*got.rows)[2]) && same(want.horn, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const WorldSounds& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.ready, (*got.rows)[0]), ".ready") && converted::at_place(same(want.splash, (*got.rows)[1]), ".splash") && converted::at_place(same(want.splash_small, (*got.rows)[2]), ".splash_small") && converted::at_place(same(want.horn, (*got.rows)[3]), ".horn"); }
 [[maybe_unused]] static bool defined(const WorldSounds& s) { return defined(s.ready) && defined(s.splash) && defined(s.splash_small) && defined(s.horn); }
 [[maybe_unused]] static std::string text(const WorldSounds& s) { return std::string("{") + text(s.ready) + ", " + text(s.splash) + ", " + text(s.splash_small) + ", " + text(s.horn) + "}"; }
 [[maybe_unused]] static void take(WorldSounds& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.ready, (*v.rows)[0]); converted::take_as<unsigned int>(s.splash, (*v.rows)[1]); converted::take_as<unsigned int>(s.splash_small, (*v.rows)[2]); converted::take_as<unsigned int>(s.horn, (*v.rows)[3]); }
@@ -378,7 +386,7 @@ namespace audio { using converted::arg; using converted::same; using converted::
   s.pitch = draw.number();
   s.pan = draw.number();
   s.loop = draw.flag();
-  s.bus = static_cast<audio::Bus>(draw.below(7));
+  s.bus = converted::enum_value<audio::Bus>(draw.below(7));
   s.fade_in = draw.number();
   s.start = draw.number();
   s.priority = static_cast<int>(draw.whole());
@@ -387,14 +395,14 @@ namespace audio { using converted::arg; using converted::same; using converted::
   s.velocity = draw.vector();
   s.min_distance = draw.number();
   s.max_distance = draw.number();
-  s.rolloff = static_cast<audio::Rolloff>(draw.below(3));
+  s.rolloff = converted::enum_value<audio::Rolloff>(draw.below(3));
   s.spread = draw.number();
   s.doppler = draw.number();
   return s;
 }
 namespace audio { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const audio::PlayParams& s) { return converted::Value::structure({arg(s.volume), arg(s.pitch), arg(s.pan), arg(s.loop), arg(s.bus), arg(s.fade_in), arg(s.start), arg(s.priority), arg(s.spatial), arg(s.position), arg(s.velocity), arg(s.min_distance), arg(s.max_distance), arg(s.rolloff), arg(s.spread), arg(s.doppler)}); }
-[[maybe_unused]] static bool same(const audio::PlayParams& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.volume, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.pan, (*got.rows)[2]) && same(want.loop, (*got.rows)[3]) && same(want.bus, (*got.rows)[4]) && same(want.fade_in, (*got.rows)[5]) && same(want.start, (*got.rows)[6]) && same(want.priority, (*got.rows)[7]) && same(want.spatial, (*got.rows)[8]) && same(want.position, (*got.rows)[9]) && same(want.velocity, (*got.rows)[10]) && same(want.min_distance, (*got.rows)[11]) && same(want.max_distance, (*got.rows)[12]) && same(want.rolloff, (*got.rows)[13]) && same(want.spread, (*got.rows)[14]) && same(want.doppler, (*got.rows)[15]); }
+[[maybe_unused]] static bool same(const audio::PlayParams& want, const converted::Value& got) { return converted::rows_of(got, 16) && converted::at_place(same(want.volume, (*got.rows)[0]), ".volume") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.pan, (*got.rows)[2]), ".pan") && converted::at_place(same(want.loop, (*got.rows)[3]), ".loop") && converted::at_place(same(want.bus, (*got.rows)[4]), ".bus") && converted::at_place(same(want.fade_in, (*got.rows)[5]), ".fade_in") && converted::at_place(same(want.start, (*got.rows)[6]), ".start") && converted::at_place(same(want.priority, (*got.rows)[7]), ".priority") && converted::at_place(same(want.spatial, (*got.rows)[8]), ".spatial") && converted::at_place(same(want.position, (*got.rows)[9]), ".position") && converted::at_place(same(want.velocity, (*got.rows)[10]), ".velocity") && converted::at_place(same(want.min_distance, (*got.rows)[11]), ".min_distance") && converted::at_place(same(want.max_distance, (*got.rows)[12]), ".max_distance") && converted::at_place(same(want.rolloff, (*got.rows)[13]), ".rolloff") && converted::at_place(same(want.spread, (*got.rows)[14]), ".spread") && converted::at_place(same(want.doppler, (*got.rows)[15]), ".doppler"); }
 [[maybe_unused]] static bool defined(const audio::PlayParams& s) { return defined(s.volume) && defined(s.pitch) && defined(s.pan) && defined(s.loop) && defined(s.bus) && defined(s.fade_in) && defined(s.start) && defined(s.priority) && defined(s.spatial) && defined(s.position) && defined(s.velocity) && defined(s.min_distance) && defined(s.max_distance) && defined(s.rolloff) && defined(s.spread) && defined(s.doppler); }
 [[maybe_unused]] static std::string text(const audio::PlayParams& s) { return std::string("{") + text(s.volume) + ", " + text(s.pitch) + ", " + text(s.pan) + ", " + text(s.loop) + ", " + text(s.bus) + ", " + text(s.fade_in) + ", " + text(s.start) + ", " + text(s.priority) + ", " + text(s.spatial) + ", " + text(s.position) + ", " + text(s.velocity) + ", " + text(s.min_distance) + ", " + text(s.max_distance) + ", " + text(s.rolloff) + ", " + text(s.spread) + ", " + text(s.doppler) + "}"; }
 [[maybe_unused]] static void take(audio::PlayParams& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<double>(s.volume, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.pan, (*v.rows)[2]); converted::take_as<bool>(s.loop, (*v.rows)[3]); converted::take_as<audio::Bus>(s.bus, (*v.rows)[4]); converted::take_as<double>(s.fade_in, (*v.rows)[5]); converted::take_as<double>(s.start, (*v.rows)[6]); converted::take_as<int>(s.priority, (*v.rows)[7]); converted::take_as<bool>(s.spatial, (*v.rows)[8]); converted::take_as<Vec3>(s.position, (*v.rows)[9]); converted::take_as<Vec3>(s.velocity, (*v.rows)[10]); converted::take_as<double>(s.min_distance, (*v.rows)[11]); converted::take_as<double>(s.max_distance, (*v.rows)[12]); converted::take_as<audio::Rolloff>(s.rolloff, (*v.rows)[13]); converted::take_as<double>(s.spread, (*v.rows)[14]); converted::take_as<double>(s.doppler, (*v.rows)[15]); }
@@ -411,7 +419,7 @@ SC_TEST(converted_game_world_cpp) {
   {  // one_shot
     converted::Tally tally("one_shot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<audio::SynthPatch> a0, [[maybe_unused]] unsigned int a1) { return converted::listed(a0, [&](std::initializer_list<audio::SynthPatch> l0) { return converted::counted([&] { return converted_game_world_cpp::one_shot(l0, std::move(a1)); }); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<audio::SynthPatch>& a0, [[maybe_unused]] unsigned int& a1) { return converted::listed(a0, [&](std::initializer_list<audio::SynthPatch> l0) { return converted::counted([&] { return converted_game_world_cpp::one_shot(l0, std::move(a1)); }); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<audio::SynthPatch> a0 = converted::draw_few(draw, [&]() -> audio::SynthPatch { return draw_kern__audio__SynthPatch(draw); });
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -421,7 +429,9 @@ SC_TEST(converted_game_world_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -431,7 +441,7 @@ SC_TEST(converted_game_world_cpp) {
   {  // init_world_sounds
     converted::Tally tally("init_world_sounds");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mixer& a0, [[maybe_unused]] WorldSounds a1) { converted::counted([&] { return converted_game_world_cpp::init_world_sounds(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] Mixer& a0, [[maybe_unused]] WorldSounds& a1) { converted::counted([&] { return converted_game_world_cpp::init_world_sounds(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       Mixer& a0 = *converted::engine_object<Mixer>(1 + draw.below(6));
       WorldSounds a1 = draw_WorldSounds(draw);
@@ -441,7 +451,9 @@ SC_TEST(converted_game_world_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

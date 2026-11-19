@@ -86,15 +86,15 @@ namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 f
 #pragma GCC diagnostic pop
 
 struct Out_box_entry { bool Result; double t_out; };
-[[maybe_unused]] static bool same(const Out_box_entry& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.t_out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_box_entry& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.t_out, (*got.rows)[1]), ".t_out"); }
 [[maybe_unused]] static bool defined(const Out_box_entry& s) { return defined(s.Result) && defined(s.t_out); }
 [[maybe_unused]] static std::string text(const Out_box_entry& s) { return std::string("{") + text(s.Result) + ", " + text(s.t_out) + "}"; }
 struct Out_sphere_entry { bool Result; double t_out; };
-[[maybe_unused]] static bool same(const Out_sphere_entry& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.t_out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_sphere_entry& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.t_out, (*got.rows)[1]), ".t_out"); }
 [[maybe_unused]] static bool defined(const Out_sphere_entry& s) { return defined(s.Result) && defined(s.t_out); }
 [[maybe_unused]] static std::string text(const Out_sphere_entry& s) { return std::string("{") + text(s.Result) + ", " + text(s.t_out) + "}"; }
 struct Out_hit { BodyPart Result; double t_out; };
-[[maybe_unused]] static bool same(const Out_hit& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.t_out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_hit& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.t_out, (*got.rows)[1]), ".t_out"); }
 [[maybe_unused]] static bool defined(const Out_hit& s) { return defined(s.Result) && defined(s.t_out); }
 [[maybe_unused]] static std::string text(const Out_hit& s) { return std::string("{") + text(s.Result) + ", " + text(s.t_out) + "}"; }
 
@@ -103,7 +103,7 @@ SC_TEST(converted_person_hit) {
   {  // lean
     converted::Tally tally("lean");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_person_hit::person_hit::lean(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_person_hit::person_hit::lean(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -112,7 +112,9 @@ SC_TEST(converted_person_hit) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -122,7 +124,7 @@ SC_TEST(converted_person_hit) {
   {  // box_entry
     converted::Tally tally("box_entry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] double a7) { auto r = converted::counted([&] { return converted_person_hit::person_hit::box_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), a7); }); return Out_box_entry{std::move(r), std::move(a7)}; };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] Vec3& a3, [[maybe_unused]] Vec3& a4, [[maybe_unused]] Vec3& a5, [[maybe_unused]] Vec3& a6, [[maybe_unused]] double& a7) { auto r = converted::counted([&] { return converted_person_hit::person_hit::box_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), a7); }); return Out_box_entry{std::move(r), std::move(a7)}; };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       Vec3 a1 = draw.vector();
@@ -138,7 +140,9 @@ SC_TEST(converted_person_hit) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6, a7))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6, a7); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -148,7 +152,7 @@ SC_TEST(converted_person_hit) {
   {  // sphere_entry
     converted::Tally tally("sphere_entry");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { auto r = converted::counted([&] { return converted_person_hit::person_hit::sphere_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_sphere_entry{std::move(r), std::move(a4)}; };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4) { auto r = converted::counted([&] { return converted_person_hit::person_hit::sphere_entry(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4); }); return Out_sphere_entry{std::move(r), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       Vec3 a1 = draw.vector();
@@ -161,7 +165,9 @@ SC_TEST(converted_person_hit) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -171,7 +177,7 @@ SC_TEST(converted_person_hit) {
   {  // hit
     converted::Tally tally("hit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6, [[maybe_unused]] double a7) { auto r = converted::counted([&] { return converted_person_hit::person_hit::hit(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5, std::move(a6), std::move(a7)); }); return Out_hit{std::move(r), std::move(a5)}; };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] Vec3& a3, [[maybe_unused]] Vec3& a4, [[maybe_unused]] double& a5, [[maybe_unused]] double& a6, [[maybe_unused]] double& a7) { auto r = converted::counted([&] { return converted_person_hit::person_hit::hit(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5, std::move(a6), std::move(a7)); }); return Out_hit{std::move(r), std::move(a5)}; };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       double a1 = draw.number();
@@ -187,7 +193,9 @@ SC_TEST(converted_person_hit) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6, a7))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6, a7); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

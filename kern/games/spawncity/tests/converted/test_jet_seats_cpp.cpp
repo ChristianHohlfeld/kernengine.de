@@ -40,7 +40,7 @@ namespace logic { enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 }; }
-namespace seats { bool bind(::kern::logic::Runtime& logic); }
+namespace seats { bool bind(kern::logic::Runtime& logic); }
 namespace seats { constexpr u8 kNone = 253; }
 namespace seats { enum class Seat : u8 { pilot = 0, passenger = 1 }; }
 namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
@@ -70,7 +70,7 @@ namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
   using ActorBlueprint::ActorBlueprint;
 }; }
 namespace seats { rules::Blueprint g_rules{"JetSeats"}; }
-namespace seats { bool bind(::kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
+namespace seats { bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
 namespace seats { std::string result_name(Result r) {
   std::string name;
   g_rules.call("ResultName", std::tie(name), r);
@@ -139,7 +139,7 @@ namespace seats { bool Table::load(u32 revision, const std::vector<Row>& rows) {
 }
 namespace seats { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const seats::Row& s) { return converted::Value::structure({arg(s.owner), arg(s.pilot), arg(s.passenger)}); }
-[[maybe_unused]] static bool same(const seats::Row& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.owner, (*got.rows)[0]) && same(want.pilot, (*got.rows)[1]) && same(want.passenger, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const seats::Row& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.pilot, (*got.rows)[1]), ".pilot") && converted::at_place(same(want.passenger, (*got.rows)[2]), ".passenger"); }
 [[maybe_unused]] static bool defined(const seats::Row& s) { return defined(s.owner) && defined(s.pilot) && defined(s.passenger); }
 [[maybe_unused]] static std::string text(const seats::Row& s) { return std::string("{") + text(s.owner) + ", " + text(s.pilot) + ", " + text(s.passenger) + "}"; }
 [[maybe_unused]] static void take(seats::Row& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<unsigned char>(s.pilot, (*v.rows)[1]); converted::take_as<unsigned char>(s.passenger, (*v.rows)[2]); }
@@ -152,29 +152,29 @@ namespace seats { using converted::arg; using converted::same; using converted::
 }
 namespace seats { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const seats::Table& s) { return converted::Value::structure({arg(s.rows_), arg(s.revision_)}); }
-[[maybe_unused]] static bool same(const seats::Table& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.rows_, (*got.rows)[0]) && same(want.revision_, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const seats::Table& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.rows_, (*got.rows)[0]), ".rows_") && converted::at_place(same(want.revision_, (*got.rows)[1]), ".revision_"); }
 [[maybe_unused]] static bool defined(const seats::Table& s) { return defined(s.rows_) && defined(s.revision_); }
 [[maybe_unused]] static std::string text(const seats::Table& s) { return std::string("{") + text(s.rows_) + ", " + text(s.revision_) + "}"; }
 [[maybe_unused]] static void take(seats::Table& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<seats::Row>>(s.rows_, (*v.rows)[0]); converted::take_as<unsigned int>(s.revision_, (*v.rows)[1]); }
 }
 struct Out_Table_seat_of { bool Result; seats::Row row; seats::Seat seat; };
-[[maybe_unused]] static bool same(const Out_Table_seat_of& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.row, (*got.rows)[1]) && same(want.seat, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_Table_seat_of& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.row, (*got.rows)[1]), ".row") && converted::at_place(same(want.seat, (*got.rows)[2]), ".seat"); }
 [[maybe_unused]] static bool defined(const Out_Table_seat_of& s) { return defined(s.Result) && defined(s.row) && defined(s.seat); }
 [[maybe_unused]] static std::string text(const Out_Table_seat_of& s) { return std::string("{") + text(s.Result) + ", " + text(s.row) + ", " + text(s.seat) + "}"; }
 struct Out_Table_claim { seats::Table Self; seats::Result Result; };
-[[maybe_unused]] static bool same(const Out_Table_claim& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Table_claim& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Table_claim& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Table_claim& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Table_release { seats::Table Self; seats::Result Result; };
-[[maybe_unused]] static bool same(const Out_Table_release& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Table_release& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Table_release& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Table_release& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Table_drop { seats::Table Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_Table_drop& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Table_drop& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Table_drop& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Table_drop& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Table_load { seats::Table Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_Table_load& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Table_load& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Table_load& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Table_load& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -192,7 +192,9 @@ SC_TEST(converted_jet_seats_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -202,16 +204,18 @@ SC_TEST(converted_jet_seats_cpp) {
   {  // result_name
     converted::Tally tally("result_name");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] seats::Result a0) { return converted::counted([&] { return converted_jet_seats_cpp::seats::result_name(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] seats::Result& a0) { return converted::counted([&] { return converted_jet_seats_cpp::seats::result_name(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      seats::Result a0 = static_cast<seats::Result>(draw.below(8));
+      seats::Result a0 = converted::enum_value<seats::Result>(draw.below(8));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -221,7 +225,7 @@ SC_TEST(converted_jet_seats_cpp) {
   {  // Table::get
     converted::Tally tally("Table_get");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] seats::Table a0, [[maybe_unused]] unsigned char a1) { return converted::counted([&] { return a0.get(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] seats::Table& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return a0.get(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       seats::Table a0 = draw_seats__Table(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -231,7 +235,9 @@ SC_TEST(converted_jet_seats_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -241,19 +247,21 @@ SC_TEST(converted_jet_seats_cpp) {
   {  // Table::seat_of
     converted::Tally tally("Table_seat_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] seats::Table a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] seats::Row a2, [[maybe_unused]] seats::Seat a3) { auto r = converted::counted([&] { return a0.seat_of(std::move(a1), a2, a3); }); return Out_Table_seat_of{std::move(r), std::move(a2), std::move(a3)}; };
+    const auto run = [&]([[maybe_unused]] seats::Table& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] seats::Row& a2, [[maybe_unused]] seats::Seat& a3) { auto r = converted::counted([&] { return a0.seat_of(std::move(a1), a2, a3); }); return Out_Table_seat_of{std::move(r), std::move(a2), std::move(a3)}; };
     for (int i = 0; tally.more(i); ++i) {
       seats::Table a0 = draw_seats__Table(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       seats::Row a2 = draw_seats__Row(draw);
-      seats::Seat a3 = static_cast<seats::Seat>(draw.below(2));
+      seats::Seat a3 = converted::enum_value<seats::Seat>(draw.below(2));
       const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a3), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -263,19 +271,21 @@ SC_TEST(converted_jet_seats_cpp) {
   {  // Table::claim
     converted::Tally tally("Table_claim");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] seats::Table a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] unsigned char a2, [[maybe_unused]] seats::Seat a3) { auto r = converted::counted([&] { return a0.claim(std::move(a1), std::move(a2), std::move(a3)); }); return Out_Table_claim{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] seats::Table& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] seats::Seat& a3) { auto r = converted::counted([&] { return a0.claim(std::move(a1), std::move(a2), std::move(a3)); }); return Out_Table_claim{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       seats::Table a0 = draw_seats__Table(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       unsigned char a2 = static_cast<unsigned char>(draw.below(40));
-      seats::Seat a3 = static_cast<seats::Seat>(draw.below(2));
+      seats::Seat a3 = converted::enum_value<seats::Seat>(draw.below(2));
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -285,19 +295,21 @@ SC_TEST(converted_jet_seats_cpp) {
   {  // Table::release
     converted::Tally tally("Table_release");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] seats::Table a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] unsigned char a2, [[maybe_unused]] seats::Seat a3) { auto r = converted::counted([&] { return a0.release(std::move(a1), std::move(a2), std::move(a3)); }); return Out_Table_release{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] seats::Table& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] seats::Seat& a3) { auto r = converted::counted([&] { return a0.release(std::move(a1), std::move(a2), std::move(a3)); }); return Out_Table_release{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       seats::Table a0 = draw_seats__Table(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
       unsigned char a2 = static_cast<unsigned char>(draw.below(40));
-      seats::Seat a3 = static_cast<seats::Seat>(draw.below(2));
+      seats::Seat a3 = converted::enum_value<seats::Seat>(draw.below(2));
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -307,7 +319,7 @@ SC_TEST(converted_jet_seats_cpp) {
   {  // Table::drop
     converted::Tally tally("Table_drop");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] seats::Table a0, [[maybe_unused]] unsigned char a1) { auto r = converted::counted([&] { return a0.drop(std::move(a1)); }); return Out_Table_drop{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] seats::Table& a0, [[maybe_unused]] unsigned char& a1) { auto r = converted::counted([&] { return a0.drop(std::move(a1)); }); return Out_Table_drop{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       seats::Table a0 = draw_seats__Table(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -317,7 +329,9 @@ SC_TEST(converted_jet_seats_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -327,7 +341,7 @@ SC_TEST(converted_jet_seats_cpp) {
   {  // Table::load
     converted::Tally tally("Table_load");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] seats::Table a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] std::vector<seats::Row> a2) { auto r = converted::counted([&] { return a0.load(std::move(a1), a2); }); return Out_Table_load{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] seats::Table& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] std::vector<seats::Row>& a2) { auto r = converted::counted([&] { return a0.load(std::move(a1), a2); }); return Out_Table_load{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       seats::Table a0 = draw_seats__Table(draw);
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -338,7 +352,9 @@ SC_TEST(converted_jet_seats_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
