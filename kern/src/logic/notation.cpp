@@ -586,16 +586,20 @@ struct Shape {
         else users.push_back(y);
       }
       if (!here) continue;
-      // from the function's entry on, the paths that do not pass the step reach none of them
+      // from the function's entry on, the paths that do not pass the step reach none of them (a loop gives
+      // its values in its body: what follows Completed may read what it gave in an earlier call - a loop
+      // that made no pass in this one)
+      const bool loop = x.def->loop;
       std::vector<u8> reach(n.size(), 0);
       std::vector<int> walk{e};
       reach[static_cast<std::size_t>(e)] = 1;
       while (!walk.empty()) {
         const int y = walk.back();
         walk.pop_back();
-        for (const auto& d : at(y).dst) {
-          const int t = d.first;
-          if (t < 0 || t == i || reach[static_cast<std::size_t>(t)] || at(t).place != x.place) continue;
+        for (std::size_t k = 0; k < at(y).dst.size(); ++k) {
+          const int t = at(y).dst[k].first;
+          if (y == i && k == 0) continue;  // (its body: only through the loop)
+          if (t < 0 || (t == i && !loop) || reach[static_cast<std::size_t>(t)] || at(t).place != x.place) continue;
           reach[static_cast<std::size_t>(t)] = 1;
           walk.push_back(t);
         }

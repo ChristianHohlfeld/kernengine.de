@@ -1484,7 +1484,9 @@ und was eine Schleife der Funktion sich merkt, während sie läuft (Index, Eintr
 Wert in C++: Es steht lokal in der Methode – als erste Zeilen ihres Rumpfs, nach den lokalen Variablen, nach
 Ids –, wenn jeder Schritt, der es liest (auch über Werte), auf dem Weg dieser Funktion steht und erst nach ihm
 kommt: Kein Weg vom Function Entry zu einem Leser geht an dem Schritt vorbei (eine Schleife, deren Rumpf vor ihm
-liest, ein anderer Ausgang einer Sequence oder eines Branch tun das). Sonst bleibt es ein Member der Klasse:
+liest, ein anderer Ausgang einer Sequence oder eines Branch tun das). Eine Schleife gibt ihre Werte in ihrem Rumpf:
+was nach Completed ihren Index liest, liest nach einer Schleife ohne Durchlauf, was sie in einem früheren Aufruf gab –
+ihr Zustand bleibt dann ein Member. Sonst bleibt es ein Member der Klasse:
 gelesen in einem anderen Rumpf (`go<id>`, ein Event, ein Wert mehrerer Rümpfe), nach einem Warten, oder wo der
 Schritt in diesem Aufruf noch nicht gelaufen sein kann (dann liest man, was er im letzten Aufruf gab – in jeder
 Stufe). Was ein Knoten über Aufrufe hinweg behält (Do Once, Gate, Flip Flop, Wartezeit, Zufallsfolge), bleibt
