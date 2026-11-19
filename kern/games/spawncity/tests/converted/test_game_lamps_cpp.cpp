@@ -200,7 +200,7 @@ std::vector<f32> clang_pcm(u32 rate) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::array_list(want.m), (*got.rows)[0]), ".m"); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
 [[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
@@ -210,7 +210,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // yaw_at
     converted::Tally tally("yaw_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_game_lamps_cpp::yaw_at(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_game_lamps_cpp::yaw_at(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       double a1 = draw.number();
@@ -220,7 +220,9 @@ SC_TEST(converted_game_lamps_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -230,7 +232,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::rgb(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_game_lamps_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -239,7 +241,9 @@ SC_TEST(converted_game_lamps_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -249,7 +253,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // glass_pcm
     converted::Tally tally("glass_pcm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::glass_pcm(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_game_lamps_cpp::glass_pcm(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -258,7 +262,9 @@ SC_TEST(converted_game_lamps_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -268,7 +274,7 @@ SC_TEST(converted_game_lamps_cpp) {
   {  // clang_pcm
     converted::Tally tally("clang_pcm");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_lamps_cpp::clang_pcm(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_game_lamps_cpp::clang_pcm(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -277,7 +283,9 @@ SC_TEST(converted_game_lamps_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

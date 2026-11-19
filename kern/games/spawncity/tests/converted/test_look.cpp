@@ -61,7 +61,7 @@ namespace look { inline f32 lamp_glow(f32 night) { return clampf((night - 0.15) 
 }
 namespace look { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const look::Stabilizer& s) { return converted::Value::structure({arg(s.init), arg(s.pos), arg(s.target), arg(s.up), arg(s.lag)}); }
-[[maybe_unused]] static bool same(const look::Stabilizer& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.init, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.target, (*got.rows)[2]) && same(want.up, (*got.rows)[3]) && same(want.lag, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const look::Stabilizer& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.init, (*got.rows)[0]), ".init") && converted::at_place(same(want.pos, (*got.rows)[1]), ".pos") && converted::at_place(same(want.target, (*got.rows)[2]), ".target") && converted::at_place(same(want.up, (*got.rows)[3]), ".up") && converted::at_place(same(want.lag, (*got.rows)[4]), ".lag"); }
 [[maybe_unused]] static bool defined(const look::Stabilizer& s) { return defined(s.init) && defined(s.pos) && defined(s.target) && defined(s.up) && defined(s.lag); }
 [[maybe_unused]] static std::string text(const look::Stabilizer& s) { return std::string("{") + text(s.init) + ", " + text(s.pos) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.lag) + "}"; }
 [[maybe_unused]] static void take(look::Stabilizer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<bool>(s.init, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.target, (*v.rows)[2]); converted::take_as<Vec3>(s.up, (*v.rows)[3]); converted::take_as<double>(s.lag, (*v.rows)[4]); }
@@ -72,7 +72,7 @@ SC_TEST(converted_look) {
   {  // impact_trauma
     converted::Tally tally("impact_trauma");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_look::look::impact_trauma(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_look::look::impact_trauma(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -81,7 +81,9 @@ SC_TEST(converted_look) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -91,7 +93,7 @@ SC_TEST(converted_look) {
   {  // Stabilizer::reset
     converted::Tally tally("Stabilizer_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] look::Stabilizer a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] look::Stabilizer& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       look::Stabilizer a0 = draw_look__Stabilizer(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -100,7 +102,9 @@ SC_TEST(converted_look) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -110,7 +114,7 @@ SC_TEST(converted_look) {
   {  // lamp_glow
     converted::Tally tally("lamp_glow");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_look::look::lamp_glow(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_look::look::lamp_glow(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -119,7 +123,9 @@ SC_TEST(converted_look) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

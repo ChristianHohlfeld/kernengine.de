@@ -60,8 +60,8 @@ struct HeightSampler : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Shape { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
@@ -174,7 +174,7 @@ inline RayResult cast(const World& w, Vec3 origin, Vec3 dir, f32 max_len, physic
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -185,7 +185,7 @@ inline RayResult cast(const World& w, Vec3 origin, Vec3 dir, f32 max_len, physic
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -199,7 +199,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const BodyState& s) { return converted::Value::structure({arg(s.position), arg(s.velocity), arg(s.angular), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const BodyState& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.position, (*got.rows)[0]) && same(want.velocity, (*got.rows)[1]) && same(want.angular, (*got.rows)[2]) && same(want.rotation, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const BodyState& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.velocity, (*got.rows)[1]), ".velocity") && converted::at_place(same(want.angular, (*got.rows)[2]), ".angular") && converted::at_place(same(want.rotation, (*got.rows)[3]), ".rotation"); }
 [[maybe_unused]] static bool defined(const BodyState& s) { return defined(s.position) && defined(s.velocity) && defined(s.angular) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const BodyState& s) { return std::string("{") + text(s.position) + ", " + text(s.velocity) + ", " + text(s.angular) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(BodyState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Vec3>(s.velocity, (*v.rows)[1]); converted::take_as<Vec3>(s.angular, (*v.rows)[2]); converted::take_as<Quat>(s.rotation, (*v.rows)[3]); }
@@ -211,7 +211,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Rng& s) { return converted::Value::structure({arg(s.s), arg(s.spare_), arg(s.has_spare_)}); }
-[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.s, (*got.rows)[0]) && same(want.spare_, (*got.rows)[1]) && same(want.has_spare_, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.s, (*got.rows)[0]), ".s") && converted::at_place(same(want.spare_, (*got.rows)[1]), ".spare_") && converted::at_place(same(want.has_spare_, (*got.rows)[2]), ".has_spare_"); }
 [[maybe_unused]] static bool defined(const Rng& s) { return defined(s.s) && defined(s.spare_) && defined(s.has_spare_); }
 [[maybe_unused]] static std::string text(const Rng& s) { return std::string("{") + text(s.s) + ", " + text(s.spare_) + ", " + text(s.has_spare_) + "}"; }
 [[maybe_unused]] static void take(Rng& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); converted::take_as<double>(s.spare_, (*v.rows)[1]); converted::take_as<bool>(s.has_spare_, (*v.rows)[2]); }
@@ -224,7 +224,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const RayResult& s) { return converted::Value::structure({arg(s.hit), arg(s.distance), arg(s.point), arg(s.normal)}); }
-[[maybe_unused]] static bool same(const RayResult& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.hit, (*got.rows)[0]) && same(want.distance, (*got.rows)[1]) && same(want.point, (*got.rows)[2]) && same(want.normal, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const RayResult& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.hit, (*got.rows)[0]), ".hit") && converted::at_place(same(want.distance, (*got.rows)[1]), ".distance") && converted::at_place(same(want.point, (*got.rows)[2]), ".point") && converted::at_place(same(want.normal, (*got.rows)[3]), ".normal"); }
 [[maybe_unused]] static bool defined(const RayResult& s) { return defined(s.hit) && defined(s.distance) && defined(s.point) && defined(s.normal); }
 [[maybe_unused]] static std::string text(const RayResult& s) { return std::string("{") + text(s.hit) + ", " + text(s.distance) + ", " + text(s.point) + ", " + text(s.normal) + "}"; }
 [[maybe_unused]] static void take(RayResult& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.hit, (*v.rows)[0]); converted::take_as<double>(s.distance, (*v.rows)[1]); converted::take_as<Vec3>(s.point, (*v.rows)[2]); converted::take_as<Vec3>(s.normal, (*v.rows)[3]); }
@@ -236,7 +236,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[1]), ".rotation"); }
 [[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
@@ -250,7 +250,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::QueryFilter& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(converted::shaped<converted::Whole>(s.category_bits))}); }
-[[maybe_unused]] static bool same(const physics::QueryFilter& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[0]) && same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::QueryFilter& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[0]), ".mask_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[1]), ".category_bits"); }
 [[maybe_unused]] static bool defined(const physics::QueryFilter& s) { return defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(converted::shaped<converted::Whole>(s.category_bits)); }
 [[maybe_unused]] static std::string text(const physics::QueryFilter& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + "}"; }
 [[maybe_unused]] static void take(physics::QueryFilter& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[0]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[1]); }
@@ -262,7 +262,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Shape& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Shape& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Shape& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Shape& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -279,7 +279,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::RayHit& s) { return converted::Value::structure({arg(s.hit), arg(s.shape), arg(s.body), arg(s.point), arg(s.normal), arg(s.fraction)}); }
-[[maybe_unused]] static bool same(const physics::RayHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.hit, (*got.rows)[0]) && same(want.shape, (*got.rows)[1]) && same(want.body, (*got.rows)[2]) && same(want.point, (*got.rows)[3]) && same(want.normal, (*got.rows)[4]) && same(want.fraction, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const physics::RayHit& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.hit, (*got.rows)[0]), ".hit") && converted::at_place(same(want.shape, (*got.rows)[1]), ".shape") && converted::at_place(same(want.body, (*got.rows)[2]), ".body") && converted::at_place(same(want.point, (*got.rows)[3]), ".point") && converted::at_place(same(want.normal, (*got.rows)[4]), ".normal") && converted::at_place(same(want.fraction, (*got.rows)[5]), ".fraction"); }
 [[maybe_unused]] static bool defined(const physics::RayHit& s) { return defined(s.hit) && defined(s.shape) && defined(s.body) && defined(s.point) && defined(s.normal) && defined(s.fraction); }
 [[maybe_unused]] static std::string text(const physics::RayHit& s) { return std::string("{") + text(s.hit) + ", " + text(s.shape) + ", " + text(s.body) + ", " + text(s.point) + ", " + text(s.normal) + ", " + text(s.fraction) + "}"; }
 [[maybe_unused]] static void take(physics::RayHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.hit, (*v.rows)[0]); converted::take_as<physics::Shape>(s.shape, (*v.rows)[1]); converted::take_as<physics::Body>(s.body, (*v.rows)[2]); converted::take_as<Vec3>(s.point, (*v.rows)[3]); converted::take_as<Vec3>(s.normal, (*v.rows)[4]); converted::take_as<double>(s.fraction, (*v.rows)[5]); }
@@ -289,19 +289,19 @@ inline Vec3 World::linear_velocity(const physics::Body& body) const { const std:
 inline Vec3 World::angular_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.angular_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline physics::RayHit World::cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter, const physics::Body& ignore) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.cast_ray", {converted::value_of(*this), converted::value_of(origin), converted::value_of(translation), converted::value_of(filter), converted::value_of(ignore)}); physics::RayHit kern_result = converted::quiet<physics::RayHit>(); converted::take_as<physics::RayHit>(kern_result, kern_out[0]); return kern_result; }
 struct Out_Rng_next { Rng Self; unsigned int Result; };
-[[maybe_unused]] static bool same(const Out_Rng_next& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Rng_next& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Rng_next& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Rng_next& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Rng_unit { Rng Self; double Result; };
-[[maybe_unused]] static bool same(const Out_Rng_unit& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Rng_unit& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Rng_unit& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Rng_unit& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Rng_range { Rng Self; double Result; };
-[[maybe_unused]] static bool same(const Out_Rng_range& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Rng_range& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Rng_range& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Rng_range& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Rng_gaussian { Rng Self; double Result; };
-[[maybe_unused]] static bool same(const Out_Rng_gaussian& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Rng_gaussian& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Rng_gaussian& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Rng_gaussian& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -310,7 +310,7 @@ SC_TEST(converted_common) {
   {  // clampf
     converted::Tally tally("clampf");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_common::clampf(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_common::clampf(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -321,7 +321,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -331,7 +333,7 @@ SC_TEST(converted_common) {
   {  // sign0
     converted::Tally tally("sign0");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_common::sign0(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_common::sign0(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -340,7 +342,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -350,7 +354,7 @@ SC_TEST(converted_common) {
   {  // rate_limit
     converted::Tally tally("rate_limit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_common::rate_limit(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_common::rate_limit(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -361,7 +365,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -371,7 +377,7 @@ SC_TEST(converted_common) {
   {  // damp_alpha
     converted::Tally tally("damp_alpha");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_common::damp_alpha(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_common::damp_alpha(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -381,7 +387,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -391,7 +399,7 @@ SC_TEST(converted_common) {
   {  // wrap_pi
     converted::Tally tally("wrap_pi");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_common::wrap_pi(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_common::wrap_pi(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -400,7 +408,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -410,7 +420,7 @@ SC_TEST(converted_common) {
   {  // conj
     converted::Tally tally("conj");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_common::conj(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0) { return converted::counted([&] { return converted_common::conj(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -419,7 +429,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -429,7 +441,7 @@ SC_TEST(converted_common) {
   {  // to_local
     converted::Tally tally("to_local");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_common::to_local(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0, [[maybe_unused]] Vec3& a1) { return converted::counted([&] { return converted_common::to_local(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       Vec3 a1 = draw.vector();
@@ -439,7 +451,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -449,7 +463,7 @@ SC_TEST(converted_common) {
   {  // qnormalize
     converted::Tally tally("qnormalize");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_common::qnormalize(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0) { return converted::counted([&] { return converted_common::qnormalize(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -458,7 +472,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -468,7 +484,7 @@ SC_TEST(converted_common) {
   {  // yaw_quat
     converted::Tally tally("yaw_quat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_common::yaw_quat(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_common::yaw_quat(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -477,7 +493,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -487,7 +505,7 @@ SC_TEST(converted_common) {
   {  // heading_of
     converted::Tally tally("heading_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_common::heading_of(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0) { return converted::counted([&] { return converted_common::heading_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -496,7 +514,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -506,7 +526,7 @@ SC_TEST(converted_common) {
   {  // slerp
     converted::Tally tally("slerp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_common::slerp(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0, [[maybe_unused]] Quat& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_common::slerp(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       Quat a1 = draw_kern__Quat(draw);
@@ -517,7 +537,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -527,7 +549,7 @@ SC_TEST(converted_common) {
   {  // read_body
     converted::Tally tally("read_body");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] physics::Body a1) { return converted::counted([&] { return converted_common::read_body(a0, std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] physics::Body& a1) { return converted::counted([&] { return converted_common::read_body(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const World& a0 = *converted::engine_object<World>(1 + draw.below(6));
       physics::Body a1 = draw_kern__physics__Body(draw);
@@ -537,7 +559,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -547,7 +571,7 @@ SC_TEST(converted_common) {
   {  // Rng::seeded
     converted::Tally tally("Rng_seeded");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return Rng::seeded(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return Rng::seeded(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -556,7 +580,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -566,7 +592,7 @@ SC_TEST(converted_common) {
   {  // Rng::next
     converted::Tally tally("Rng_next");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0) { auto r = converted::counted([&] { return a0.next(); }); return Out_Rng_next{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] Rng& a0) { auto r = converted::counted([&] { return a0.next(); }); return Out_Rng_next{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       Rng a0 = draw_Rng(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -575,7 +601,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -585,7 +613,7 @@ SC_TEST(converted_common) {
   {  // Rng::unit
     converted::Tally tally("Rng_unit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0) { auto r = converted::counted([&] { return a0.unit(); }); return Out_Rng_unit{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] Rng& a0) { auto r = converted::counted([&] { return a0.unit(); }); return Out_Rng_unit{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       Rng a0 = draw_Rng(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -594,7 +622,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -604,7 +634,7 @@ SC_TEST(converted_common) {
   {  // Rng::range
     converted::Tally tally("Rng_range");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.range(std::move(a1), std::move(a2)); }); return Out_Rng_range{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] Rng& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.range(std::move(a1), std::move(a2)); }); return Out_Rng_range{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       Rng a0 = draw_Rng(draw);
       double a1 = draw.number();
@@ -615,7 +645,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -625,7 +657,7 @@ SC_TEST(converted_common) {
   {  // Rng::gaussian
     converted::Tally tally("Rng_gaussian");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Rng a0) { auto r = converted::counted([&] { return a0.gaussian(); }); return Out_Rng_gaussian{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] Rng& a0) { auto r = converted::counted([&] { return a0.gaussian(); }); return Out_Rng_gaussian{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       Rng a0 = draw_Rng(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -634,7 +666,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -644,7 +678,7 @@ SC_TEST(converted_common) {
   {  // cast
     converted::Tally tally("cast");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] physics::Body a4, [[maybe_unused]] u64 a5) { return converted::counted([&] { return converted_common::cast(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
+    const auto run = [&]([[maybe_unused]] const World& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3, [[maybe_unused]] physics::Body& a4, [[maybe_unused]] u64& a5) { return converted::counted([&] { return converted_common::cast(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       const World& a0 = *converted::engine_object<World>(1 + draw.below(6));
       Vec3 a1 = draw.vector();
@@ -658,7 +692,9 @@ SC_TEST(converted_common) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
