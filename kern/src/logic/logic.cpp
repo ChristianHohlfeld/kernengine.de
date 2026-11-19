@@ -2641,6 +2641,10 @@ bool Instance::enter_call(int f, const std::vector<Value>& args, const std::vect
     for (const Local& l : locals_[static_cast<std::size_t>(f)]) k.locals.push_back(held(l.key));
     k.nodes.reserve(fn_nodes_[static_cast<std::size_t>(f)].size());
     for (int x : fn_nodes_[static_cast<std::size_t>(f)]) k.nodes.push_back({nodes_[static_cast<std::size_t>(x)].outputs, nodes_[static_cast<std::size_t>(x)].state});
+    k.slots.reserve((fn_nodes_[static_cast<std::size_t>(f)].size() + 1) * CodeLayout::kNodeSlots);
+    auto keep = [&](int x) { for (int s = 0; s < CodeLayout::kNodeSlots; ++s) k.slots.push_back(slots_[static_cast<std::size_t>(node_slot(x) + s)]); };
+    keep(entry);
+    for (int x : fn_nodes_[static_cast<std::size_t>(f)]) keep(x);
   }
   ++fn_running_[static_cast<std::size_t>(f)];
   ++rt_.calls_;
@@ -2693,6 +2697,10 @@ void Instance::leave_call(Frame& frame) {
     c.outputs = std::move(k.nodes[i].first);
     c.state = std::move(k.nodes[i].second);
   }
+  std::size_t at = 0;
+  auto give = [&](int x) { for (int s = 0; s < CodeLayout::kNodeSlots && at < k.slots.size(); ++s) slots_[static_cast<std::size_t>(node_slot(x) + s)] = k.slots[at++]; };
+  give(fn_entry_[f]);
+  for (int x : fn_nodes_[f]) give(x);
 }
 
 int Instance::begin_call(int& n, std::vector<std::pair<int, int>>& stack) {

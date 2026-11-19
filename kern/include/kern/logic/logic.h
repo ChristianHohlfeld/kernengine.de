@@ -1294,6 +1294,7 @@ class Instance {
   struct Kept {
     std::vector<Value> parameters, locals;
     std::vector<std::pair<std::vector<Value>, NodeState>> nodes;  // (by fn_nodes_)
+    std::vector<f64> slots;  // their slots (a loop's index, what generated code reads), the entry's first
   };
   struct Frame {                     // a function call that is running
     int function = -1;               // index in graph_.functions
