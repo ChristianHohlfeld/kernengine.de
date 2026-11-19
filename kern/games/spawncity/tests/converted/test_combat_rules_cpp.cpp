@@ -392,7 +392,7 @@ namespace combat { std::string race_time(f32 s) {
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::MilitaryClock& s) { return converted::Value::structure({arg(s.active), arg(s.since5), arg(s.alert_at), arg(s.next_reinforce)}); }
-[[maybe_unused]] static bool same(const combat::MilitaryClock& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.active, (*got.rows)[0]) && same(want.since5, (*got.rows)[1]) && same(want.alert_at, (*got.rows)[2]) && same(want.next_reinforce, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const combat::MilitaryClock& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.since5, (*got.rows)[1]), ".since5") && converted::at_place(same(want.alert_at, (*got.rows)[2]), ".alert_at") && converted::at_place(same(want.next_reinforce, (*got.rows)[3]), ".next_reinforce"); }
 [[maybe_unused]] static bool defined(const combat::MilitaryClock& s) { return defined(s.active) && defined(s.since5) && defined(s.alert_at) && defined(s.next_reinforce); }
 [[maybe_unused]] static std::string text(const combat::MilitaryClock& s) { return std::string("{") + text(s.active) + ", " + text(s.since5) + ", " + text(s.alert_at) + ", " + text(s.next_reinforce) + "}"; }
 [[maybe_unused]] static void take(combat::MilitaryClock& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<double>(s.since5, (*v.rows)[1]); converted::take_as<double>(s.alert_at, (*v.rows)[2]); converted::take_as<double>(s.next_reinforce, (*v.rows)[3]); }
@@ -409,7 +409,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::ZombieRounds& s) { return converted::Value::structure({arg(s.active), arg(s.round), arg(s.to_spawn), arg(s.points), arg(s.next_spawn), arg(s.break_until)}); }
-[[maybe_unused]] static bool same(const combat::ZombieRounds& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.active, (*got.rows)[0]) && same(want.round, (*got.rows)[1]) && same(want.to_spawn, (*got.rows)[2]) && same(want.points, (*got.rows)[3]) && same(want.next_spawn, (*got.rows)[4]) && same(want.break_until, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const combat::ZombieRounds& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.round, (*got.rows)[1]), ".round") && converted::at_place(same(want.to_spawn, (*got.rows)[2]), ".to_spawn") && converted::at_place(same(want.points, (*got.rows)[3]), ".points") && converted::at_place(same(want.next_spawn, (*got.rows)[4]), ".next_spawn") && converted::at_place(same(want.break_until, (*got.rows)[5]), ".break_until"); }
 [[maybe_unused]] static bool defined(const combat::ZombieRounds& s) { return defined(s.active) && defined(s.round) && defined(s.to_spawn) && defined(s.points) && defined(s.next_spawn) && defined(s.break_until); }
 [[maybe_unused]] static std::string text(const combat::ZombieRounds& s) { return std::string("{") + text(s.active) + ", " + text(s.round) + ", " + text(s.to_spawn) + ", " + text(s.points) + ", " + text(s.next_spawn) + ", " + text(s.break_until) + "}"; }
 [[maybe_unused]] static void take(combat::ZombieRounds& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<int>(s.round, (*v.rows)[1]); converted::take_as<int>(s.to_spawn, (*v.rows)[2]); converted::take_as<int>(s.points, (*v.rows)[3]); converted::take_as<double>(s.next_spawn, (*v.rows)[4]); converted::take_as<double>(s.break_until, (*v.rows)[5]); }
@@ -426,14 +426,14 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::Rounds& s) { return converted::Value::structure({arg(s.active), arg(s.round), arg(s.to_spawn), arg(s.points), arg(s.next_spawn), arg(s.break_until)}); }
-[[maybe_unused]] static bool same(const combat::Rounds& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.active, (*got.rows)[0]) && same(want.round, (*got.rows)[1]) && same(want.to_spawn, (*got.rows)[2]) && same(want.points, (*got.rows)[3]) && same(want.next_spawn, (*got.rows)[4]) && same(want.break_until, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const combat::Rounds& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.round, (*got.rows)[1]), ".round") && converted::at_place(same(want.to_spawn, (*got.rows)[2]), ".to_spawn") && converted::at_place(same(want.points, (*got.rows)[3]), ".points") && converted::at_place(same(want.next_spawn, (*got.rows)[4]), ".next_spawn") && converted::at_place(same(want.break_until, (*got.rows)[5]), ".break_until"); }
 [[maybe_unused]] static bool defined(const combat::Rounds& s) { return defined(s.active) && defined(s.round) && defined(s.to_spawn) && defined(s.points) && defined(s.next_spawn) && defined(s.break_until); }
 [[maybe_unused]] static std::string text(const combat::Rounds& s) { return std::string("{") + text(s.active) + ", " + text(s.round) + ", " + text(s.to_spawn) + ", " + text(s.points) + ", " + text(s.next_spawn) + ", " + text(s.break_until) + "}"; }
 [[maybe_unused]] static void take(combat::Rounds& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<int>(s.round, (*v.rows)[1]); converted::take_as<int>(s.to_spawn, (*v.rows)[2]); converted::take_as<int>(s.points, (*v.rows)[3]); converted::take_as<double>(s.next_spawn, (*v.rows)[4]); converted::take_as<double>(s.break_until, (*v.rows)[5]); }
 }
 [[maybe_unused]] static combat::EnemySpec draw_combat__EnemySpec(converted::Draw& draw) {
   combat::EnemySpec s{};
-  s.name = draw.word();
+  s.name = draw.said_word({"EnemyHitChance"});
   s.hp = draw.number();
   s.speed = draw.number();
   s.range = draw.number();
@@ -449,7 +449,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::EnemySpec& s) { return converted::Value::structure({arg(s.name), arg(s.hp), arg(s.speed), arg(s.range), arg(s.shot_s), arg(s.burst), arg(s.dmg), arg(s.acc), arg(s.score), arg(s.scale), arg(s.color), arg(s.stripe)}); }
-[[maybe_unused]] static bool same(const combat::EnemySpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.name, (*got.rows)[0]) && same(want.hp, (*got.rows)[1]) && same(want.speed, (*got.rows)[2]) && same(want.range, (*got.rows)[3]) && same(want.shot_s, (*got.rows)[4]) && same(want.burst, (*got.rows)[5]) && same(want.dmg, (*got.rows)[6]) && same(want.acc, (*got.rows)[7]) && same(want.score, (*got.rows)[8]) && same(want.scale, (*got.rows)[9]) && same(want.color, (*got.rows)[10]) && same(want.stripe, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const combat::EnemySpec& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.hp, (*got.rows)[1]), ".hp") && converted::at_place(same(want.speed, (*got.rows)[2]), ".speed") && converted::at_place(same(want.range, (*got.rows)[3]), ".range") && converted::at_place(same(want.shot_s, (*got.rows)[4]), ".shot_s") && converted::at_place(same(want.burst, (*got.rows)[5]), ".burst") && converted::at_place(same(want.dmg, (*got.rows)[6]), ".dmg") && converted::at_place(same(want.acc, (*got.rows)[7]), ".acc") && converted::at_place(same(want.score, (*got.rows)[8]), ".score") && converted::at_place(same(want.scale, (*got.rows)[9]), ".scale") && converted::at_place(same(want.color, (*got.rows)[10]), ".color") && converted::at_place(same(want.stripe, (*got.rows)[11]), ".stripe"); }
 [[maybe_unused]] static bool defined(const combat::EnemySpec& s) { return defined(s.name) && defined(s.hp) && defined(s.speed) && defined(s.range) && defined(s.shot_s) && defined(s.burst) && defined(s.dmg) && defined(s.acc) && defined(s.score) && defined(s.scale) && defined(s.color) && defined(s.stripe); }
 [[maybe_unused]] static std::string text(const combat::EnemySpec& s) { return std::string("{") + text(s.name) + ", " + text(s.hp) + ", " + text(s.speed) + ", " + text(s.range) + ", " + text(s.shot_s) + ", " + text(s.burst) + ", " + text(s.dmg) + ", " + text(s.acc) + ", " + text(s.score) + ", " + text(s.scale) + ", " + text(s.color) + ", " + text(s.stripe) + "}"; }
 [[maybe_unused]] static void take(combat::EnemySpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<double>(s.hp, (*v.rows)[1]); converted::take_as<double>(s.speed, (*v.rows)[2]); converted::take_as<double>(s.range, (*v.rows)[3]); converted::take_as<double>(s.shot_s, (*v.rows)[4]); converted::take_as<int>(s.burst, (*v.rows)[5]); converted::take_as<double>(s.dmg, (*v.rows)[6]); converted::take_as<double>(s.acc, (*v.rows)[7]); converted::take_as<int>(s.score, (*v.rows)[8]); converted::take_as<double>(s.scale, (*v.rows)[9]); converted::take_as<Vec3>(s.color, (*v.rows)[10]); converted::take_as<Vec3>(s.stripe, (*v.rows)[11]); }
@@ -464,7 +464,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::Chaos& s) { return converted::Value::structure({arg(s.score), arg(s.combo), arg(s.combo_until), arg(s.flow)}); }
-[[maybe_unused]] static bool same(const combat::Chaos& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.score, (*got.rows)[0]) && same(want.combo, (*got.rows)[1]) && same(want.combo_until, (*got.rows)[2]) && same(want.flow, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const combat::Chaos& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.score, (*got.rows)[0]), ".score") && converted::at_place(same(want.combo, (*got.rows)[1]), ".combo") && converted::at_place(same(want.combo_until, (*got.rows)[2]), ".combo_until") && converted::at_place(same(want.flow, (*got.rows)[3]), ".flow"); }
 [[maybe_unused]] static bool defined(const combat::Chaos& s) { return defined(s.score) && defined(s.combo) && defined(s.combo_until) && defined(s.flow); }
 [[maybe_unused]] static std::string text(const combat::Chaos& s) { return std::string("{") + text(s.score) + ", " + text(s.combo) + ", " + text(s.combo_until) + ", " + text(s.flow) + "}"; }
 [[maybe_unused]] static void take(combat::Chaos& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<int>(s.score, (*v.rows)[0]); converted::take_as<int>(s.combo, (*v.rows)[1]); converted::take_as<double>(s.combo_until, (*v.rows)[2]); converted::take_as<double>(s.flow, (*v.rows)[3]); }
@@ -479,7 +479,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::ChaosRun& s) { return converted::Value::structure({arg(s.score), arg(s.combo), arg(s.combo_until), arg(s.flow)}); }
-[[maybe_unused]] static bool same(const combat::ChaosRun& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.score, (*got.rows)[0]) && same(want.combo, (*got.rows)[1]) && same(want.combo_until, (*got.rows)[2]) && same(want.flow, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const combat::ChaosRun& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.score, (*got.rows)[0]), ".score") && converted::at_place(same(want.combo, (*got.rows)[1]), ".combo") && converted::at_place(same(want.combo_until, (*got.rows)[2]), ".combo_until") && converted::at_place(same(want.flow, (*got.rows)[3]), ".flow"); }
 [[maybe_unused]] static bool defined(const combat::ChaosRun& s) { return defined(s.score) && defined(s.combo) && defined(s.combo_until) && defined(s.flow); }
 [[maybe_unused]] static std::string text(const combat::ChaosRun& s) { return std::string("{") + text(s.score) + ", " + text(s.combo) + ", " + text(s.combo_until) + ", " + text(s.flow) + "}"; }
 [[maybe_unused]] static void take(combat::ChaosRun& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<int>(s.score, (*v.rows)[0]); converted::take_as<int>(s.combo, (*v.rows)[1]); converted::take_as<double>(s.combo_until, (*v.rows)[2]); converted::take_as<double>(s.flow, (*v.rows)[3]); }
@@ -508,7 +508,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::Fun& s) { return converted::Value::structure({arg(s.score), arg(s.at_risk), arg(s.high_score), arg(s.stars), arg(s.max_stars), arg(s.combo), arg(s.best_combo), arg(s.momentum), arg(s.combo_expires), arg(s.overdrive_until), arg(s.contract_index), arg(s.contract_progress), arg(s.contracts_completed), arg(s.mercy), arg(s.last_award), arg(s.run_damage), arg(s.contract_complete), arg(s.last_label)}); }
-[[maybe_unused]] static bool same(const combat::Fun& want, const converted::Value& got) { return got.rows && got.rows->size() == 18 && same(want.score, (*got.rows)[0]) && same(want.at_risk, (*got.rows)[1]) && same(want.high_score, (*got.rows)[2]) && same(want.stars, (*got.rows)[3]) && same(want.max_stars, (*got.rows)[4]) && same(want.combo, (*got.rows)[5]) && same(want.best_combo, (*got.rows)[6]) && same(want.momentum, (*got.rows)[7]) && same(want.combo_expires, (*got.rows)[8]) && same(want.overdrive_until, (*got.rows)[9]) && same(want.contract_index, (*got.rows)[10]) && same(want.contract_progress, (*got.rows)[11]) && same(want.contracts_completed, (*got.rows)[12]) && same(want.mercy, (*got.rows)[13]) && same(want.last_award, (*got.rows)[14]) && same(want.run_damage, (*got.rows)[15]) && same(want.contract_complete, (*got.rows)[16]) && same(want.last_label, (*got.rows)[17]); }
+[[maybe_unused]] static bool same(const combat::Fun& want, const converted::Value& got) { return converted::rows_of(got, 18) && converted::at_place(same(want.score, (*got.rows)[0]), ".score") && converted::at_place(same(want.at_risk, (*got.rows)[1]), ".at_risk") && converted::at_place(same(want.high_score, (*got.rows)[2]), ".high_score") && converted::at_place(same(want.stars, (*got.rows)[3]), ".stars") && converted::at_place(same(want.max_stars, (*got.rows)[4]), ".max_stars") && converted::at_place(same(want.combo, (*got.rows)[5]), ".combo") && converted::at_place(same(want.best_combo, (*got.rows)[6]), ".best_combo") && converted::at_place(same(want.momentum, (*got.rows)[7]), ".momentum") && converted::at_place(same(want.combo_expires, (*got.rows)[8]), ".combo_expires") && converted::at_place(same(want.overdrive_until, (*got.rows)[9]), ".overdrive_until") && converted::at_place(same(want.contract_index, (*got.rows)[10]), ".contract_index") && converted::at_place(same(want.contract_progress, (*got.rows)[11]), ".contract_progress") && converted::at_place(same(want.contracts_completed, (*got.rows)[12]), ".contracts_completed") && converted::at_place(same(want.mercy, (*got.rows)[13]), ".mercy") && converted::at_place(same(want.last_award, (*got.rows)[14]), ".last_award") && converted::at_place(same(want.run_damage, (*got.rows)[15]), ".run_damage") && converted::at_place(same(want.contract_complete, (*got.rows)[16]), ".contract_complete") && converted::at_place(same(want.last_label, (*got.rows)[17]), ".last_label"); }
 [[maybe_unused]] static bool defined(const combat::Fun& s) { return defined(s.score) && defined(s.at_risk) && defined(s.high_score) && defined(s.stars) && defined(s.max_stars) && defined(s.combo) && defined(s.best_combo) && defined(s.momentum) && defined(s.combo_expires) && defined(s.overdrive_until) && defined(s.contract_index) && defined(s.contract_progress) && defined(s.contracts_completed) && defined(s.mercy) && defined(s.last_award) && defined(s.run_damage) && defined(s.contract_complete) && defined(s.last_label); }
 [[maybe_unused]] static std::string text(const combat::Fun& s) { return std::string("{") + text(s.score) + ", " + text(s.at_risk) + ", " + text(s.high_score) + ", " + text(s.stars) + ", " + text(s.max_stars) + ", " + text(s.combo) + ", " + text(s.best_combo) + ", " + text(s.momentum) + ", " + text(s.combo_expires) + ", " + text(s.overdrive_until) + ", " + text(s.contract_index) + ", " + text(s.contract_progress) + ", " + text(s.contracts_completed) + ", " + text(s.mercy) + ", " + text(s.last_award) + ", " + text(s.run_damage) + ", " + text(s.contract_complete) + ", " + text(s.last_label) + "}"; }
 [[maybe_unused]] static void take(combat::Fun& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 18) return; converted::take_as<int>(s.score, (*v.rows)[0]); converted::take_as<int>(s.at_risk, (*v.rows)[1]); converted::take_as<int>(s.high_score, (*v.rows)[2]); converted::take_as<int>(s.stars, (*v.rows)[3]); converted::take_as<int>(s.max_stars, (*v.rows)[4]); converted::take_as<int>(s.combo, (*v.rows)[5]); converted::take_as<int>(s.best_combo, (*v.rows)[6]); converted::take_as<int>(s.momentum, (*v.rows)[7]); converted::take_as<double>(s.combo_expires, (*v.rows)[8]); converted::take_as<double>(s.overdrive_until, (*v.rows)[9]); converted::take_as<int>(s.contract_index, (*v.rows)[10]); converted::take_as<int>(s.contract_progress, (*v.rows)[11]); converted::take_as<int>(s.contracts_completed, (*v.rows)[12]); converted::take_as<int>(s.mercy, (*v.rows)[13]); converted::take_as<int>(s.last_award, (*v.rows)[14]); converted::take_as<double>(s.run_damage, (*v.rows)[15]); converted::take_as<bool>(s.contract_complete, (*v.rows)[16]); converted::take_as<std::string>(s.last_label, (*v.rows)[17]); }
@@ -537,7 +537,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::FunRun& s) { return converted::Value::structure({arg(s.score), arg(s.at_risk), arg(s.high_score), arg(s.stars), arg(s.max_stars), arg(s.combo), arg(s.best_combo), arg(s.momentum), arg(s.combo_expires), arg(s.overdrive_until), arg(s.contract_index), arg(s.contract_progress), arg(s.contracts_completed), arg(s.mercy), arg(s.last_award), arg(s.run_damage), arg(s.contract_complete), arg(s.last_label)}); }
-[[maybe_unused]] static bool same(const combat::FunRun& want, const converted::Value& got) { return got.rows && got.rows->size() == 18 && same(want.score, (*got.rows)[0]) && same(want.at_risk, (*got.rows)[1]) && same(want.high_score, (*got.rows)[2]) && same(want.stars, (*got.rows)[3]) && same(want.max_stars, (*got.rows)[4]) && same(want.combo, (*got.rows)[5]) && same(want.best_combo, (*got.rows)[6]) && same(want.momentum, (*got.rows)[7]) && same(want.combo_expires, (*got.rows)[8]) && same(want.overdrive_until, (*got.rows)[9]) && same(want.contract_index, (*got.rows)[10]) && same(want.contract_progress, (*got.rows)[11]) && same(want.contracts_completed, (*got.rows)[12]) && same(want.mercy, (*got.rows)[13]) && same(want.last_award, (*got.rows)[14]) && same(want.run_damage, (*got.rows)[15]) && same(want.contract_complete, (*got.rows)[16]) && same(want.last_label, (*got.rows)[17]); }
+[[maybe_unused]] static bool same(const combat::FunRun& want, const converted::Value& got) { return converted::rows_of(got, 18) && converted::at_place(same(want.score, (*got.rows)[0]), ".score") && converted::at_place(same(want.at_risk, (*got.rows)[1]), ".at_risk") && converted::at_place(same(want.high_score, (*got.rows)[2]), ".high_score") && converted::at_place(same(want.stars, (*got.rows)[3]), ".stars") && converted::at_place(same(want.max_stars, (*got.rows)[4]), ".max_stars") && converted::at_place(same(want.combo, (*got.rows)[5]), ".combo") && converted::at_place(same(want.best_combo, (*got.rows)[6]), ".best_combo") && converted::at_place(same(want.momentum, (*got.rows)[7]), ".momentum") && converted::at_place(same(want.combo_expires, (*got.rows)[8]), ".combo_expires") && converted::at_place(same(want.overdrive_until, (*got.rows)[9]), ".overdrive_until") && converted::at_place(same(want.contract_index, (*got.rows)[10]), ".contract_index") && converted::at_place(same(want.contract_progress, (*got.rows)[11]), ".contract_progress") && converted::at_place(same(want.contracts_completed, (*got.rows)[12]), ".contracts_completed") && converted::at_place(same(want.mercy, (*got.rows)[13]), ".mercy") && converted::at_place(same(want.last_award, (*got.rows)[14]), ".last_award") && converted::at_place(same(want.run_damage, (*got.rows)[15]), ".run_damage") && converted::at_place(same(want.contract_complete, (*got.rows)[16]), ".contract_complete") && converted::at_place(same(want.last_label, (*got.rows)[17]), ".last_label"); }
 [[maybe_unused]] static bool defined(const combat::FunRun& s) { return defined(s.score) && defined(s.at_risk) && defined(s.high_score) && defined(s.stars) && defined(s.max_stars) && defined(s.combo) && defined(s.best_combo) && defined(s.momentum) && defined(s.combo_expires) && defined(s.overdrive_until) && defined(s.contract_index) && defined(s.contract_progress) && defined(s.contracts_completed) && defined(s.mercy) && defined(s.last_award) && defined(s.run_damage) && defined(s.contract_complete) && defined(s.last_label); }
 [[maybe_unused]] static std::string text(const combat::FunRun& s) { return std::string("{") + text(s.score) + ", " + text(s.at_risk) + ", " + text(s.high_score) + ", " + text(s.stars) + ", " + text(s.max_stars) + ", " + text(s.combo) + ", " + text(s.best_combo) + ", " + text(s.momentum) + ", " + text(s.combo_expires) + ", " + text(s.overdrive_until) + ", " + text(s.contract_index) + ", " + text(s.contract_progress) + ", " + text(s.contracts_completed) + ", " + text(s.mercy) + ", " + text(s.last_award) + ", " + text(s.run_damage) + ", " + text(s.contract_complete) + ", " + text(s.last_label) + "}"; }
 [[maybe_unused]] static void take(combat::FunRun& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 18) return; converted::take_as<int>(s.score, (*v.rows)[0]); converted::take_as<int>(s.at_risk, (*v.rows)[1]); converted::take_as<int>(s.high_score, (*v.rows)[2]); converted::take_as<int>(s.stars, (*v.rows)[3]); converted::take_as<int>(s.max_stars, (*v.rows)[4]); converted::take_as<int>(s.combo, (*v.rows)[5]); converted::take_as<int>(s.best_combo, (*v.rows)[6]); converted::take_as<int>(s.momentum, (*v.rows)[7]); converted::take_as<double>(s.combo_expires, (*v.rows)[8]); converted::take_as<double>(s.overdrive_until, (*v.rows)[9]); converted::take_as<int>(s.contract_index, (*v.rows)[10]); converted::take_as<int>(s.contract_progress, (*v.rows)[11]); converted::take_as<int>(s.contracts_completed, (*v.rows)[12]); converted::take_as<int>(s.mercy, (*v.rows)[13]); converted::take_as<int>(s.last_award, (*v.rows)[14]); converted::take_as<double>(s.run_damage, (*v.rows)[15]); converted::take_as<bool>(s.contract_complete, (*v.rows)[16]); converted::take_as<std::string>(s.last_label, (*v.rows)[17]); }
@@ -560,37 +560,37 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::Race& s) { return converted::Value::structure({arg(s.started), arg(s.finished), arg(s.lap), arg(s.next), arg(s.race_start), arg(s.lap_start), arg(s.finish_time), arg(s.last_lap), arg(s.best_lap), arg(s.last_pass), arg(s.have_prev), arg(s.prev)}); }
-[[maybe_unused]] static bool same(const combat::Race& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.started, (*got.rows)[0]) && same(want.finished, (*got.rows)[1]) && same(want.lap, (*got.rows)[2]) && same(want.next, (*got.rows)[3]) && same(want.race_start, (*got.rows)[4]) && same(want.lap_start, (*got.rows)[5]) && same(want.finish_time, (*got.rows)[6]) && same(want.last_lap, (*got.rows)[7]) && same(want.best_lap, (*got.rows)[8]) && same(want.last_pass, (*got.rows)[9]) && same(want.have_prev, (*got.rows)[10]) && same(want.prev, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const combat::Race& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.started, (*got.rows)[0]), ".started") && converted::at_place(same(want.finished, (*got.rows)[1]), ".finished") && converted::at_place(same(want.lap, (*got.rows)[2]), ".lap") && converted::at_place(same(want.next, (*got.rows)[3]), ".next") && converted::at_place(same(want.race_start, (*got.rows)[4]), ".race_start") && converted::at_place(same(want.lap_start, (*got.rows)[5]), ".lap_start") && converted::at_place(same(want.finish_time, (*got.rows)[6]), ".finish_time") && converted::at_place(same(want.last_lap, (*got.rows)[7]), ".last_lap") && converted::at_place(same(want.best_lap, (*got.rows)[8]), ".best_lap") && converted::at_place(same(want.last_pass, (*got.rows)[9]), ".last_pass") && converted::at_place(same(want.have_prev, (*got.rows)[10]), ".have_prev") && converted::at_place(same(want.prev, (*got.rows)[11]), ".prev"); }
 [[maybe_unused]] static bool defined(const combat::Race& s) { return defined(s.started) && defined(s.finished) && defined(s.lap) && defined(s.next) && defined(s.race_start) && defined(s.lap_start) && defined(s.finish_time) && defined(s.last_lap) && defined(s.best_lap) && defined(s.last_pass) && defined(s.have_prev) && defined(s.prev); }
 [[maybe_unused]] static std::string text(const combat::Race& s) { return std::string("{") + text(s.started) + ", " + text(s.finished) + ", " + text(s.lap) + ", " + text(s.next) + ", " + text(s.race_start) + ", " + text(s.lap_start) + ", " + text(s.finish_time) + ", " + text(s.last_lap) + ", " + text(s.best_lap) + ", " + text(s.last_pass) + ", " + text(s.have_prev) + ", " + text(s.prev) + "}"; }
 [[maybe_unused]] static void take(combat::Race& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<bool>(s.started, (*v.rows)[0]); converted::take_as<bool>(s.finished, (*v.rows)[1]); converted::take_as<int>(s.lap, (*v.rows)[2]); converted::take_as<int>(s.next, (*v.rows)[3]); converted::take_as<double>(s.race_start, (*v.rows)[4]); converted::take_as<double>(s.lap_start, (*v.rows)[5]); converted::take_as<double>(s.finish_time, (*v.rows)[6]); converted::take_as<double>(s.last_lap, (*v.rows)[7]); converted::take_as<double>(s.best_lap, (*v.rows)[8]); converted::take_as<double>(s.last_pass, (*v.rows)[9]); converted::take_as<bool>(s.have_prev, (*v.rows)[10]); converted::take_as<Vec3>(s.prev, (*v.rows)[11]); }
 }
 struct Out_MilitaryClock_update { combat::MilitaryClock Self; combat::MilEvent Result; };
-[[maybe_unused]] static bool same(const Out_MilitaryClock_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_MilitaryClock_update& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_MilitaryClock_update& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_MilitaryClock_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_flak_cell { bool Result; unsigned int seed; };
-[[maybe_unused]] static bool same(const Out_flak_cell& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_flak_cell& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.seed, (*got.rows)[1]), ".seed"); }
 [[maybe_unused]] static bool defined(const Out_flak_cell& s) { return defined(s.Result) && defined(s.seed); }
 [[maybe_unused]] static std::string text(const Out_flak_cell& s) { return std::string("{") + text(s.Result) + ", " + text(s.seed) + "}"; }
 struct Out_ZombieRounds_update { combat::ZombieRounds Self; combat::ZombieEvent Result; };
-[[maybe_unused]] static bool same(const Out_ZombieRounds_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_ZombieRounds_update& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_ZombieRounds_update& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_ZombieRounds_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Chaos_award { combat::Chaos Self; int Result; };
-[[maybe_unused]] static bool same(const Out_Chaos_award& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Chaos_award& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Chaos_award& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Chaos_award& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Fun_apply { combat::Fun Self; std::string Result; };
-[[maybe_unused]] static bool same(const Out_Fun_apply& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Fun_apply& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Fun_apply& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Fun_apply& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_gate_axes { Vec2 normal; Vec2 right; };
-[[maybe_unused]] static bool same(const Out_gate_axes& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.normal, (*got.rows)[0]) && same(want.right, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_gate_axes& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.normal, (*got.rows)[0]), ".normal") && converted::at_place(same(want.right, (*got.rows)[1]), ".right"); }
 [[maybe_unused]] static bool defined(const Out_gate_axes& s) { return defined(s.normal) && defined(s.right); }
 [[maybe_unused]] static std::string text(const Out_gate_axes& s) { return std::string("{") + text(s.normal) + ", " + text(s.right) + "}"; }
 struct Out_Race_update { combat::Race Self; int Result; };
-[[maybe_unused]] static bool same(const Out_Race_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Race_update& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Race_update& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Race_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -604,7 +604,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // MilitaryClock::update
     converted::Tally tally("MilitaryClock_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::MilitaryClock a0, [[maybe_unused]] double a1, [[maybe_unused]] int a2, [[maybe_unused]] double a3, [[maybe_unused]] bool a4) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_MilitaryClock_update{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] combat::MilitaryClock& a0, [[maybe_unused]] double& a1, [[maybe_unused]] int& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_MilitaryClock_update{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       combat::MilitaryClock a0 = draw_combat__MilitaryClock(draw);
       double a1 = draw.number();
@@ -617,7 +617,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -627,7 +629,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // heli_hit_chance
     converted::Tally tally("heli_hit_chance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::heli_hit_chance(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::heli_hit_chance(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -637,7 +639,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -647,7 +651,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // soldier_hit_chance
     converted::Tally tally("soldier_hit_chance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::soldier_hit_chance(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::soldier_hit_chance(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -657,7 +661,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -667,7 +673,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // tank_aim_error
     converted::Tally tally("tank_aim_error");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::tank_aim_error(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::tank_aim_error(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -677,7 +683,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -687,7 +695,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // gangster_hit_chance
     converted::Tally tally("gangster_hit_chance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::gangster_hit_chance(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::gangster_hit_chance(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -697,7 +705,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -707,7 +717,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // strike_launch_time
     converted::Tally tally("strike_launch_time");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::strike_launch_time(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::strike_launch_time(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -716,7 +726,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -726,7 +738,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // flak_burst_damage
     converted::Tally tally("flak_burst_damage");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::flak_burst_damage(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::flak_burst_damage(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -735,7 +747,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -745,7 +759,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // hash_text
     converted::Tally tally("hash_text");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::hash_text(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::string& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::hash_text(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::string a0 = draw.word();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -754,7 +768,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -764,7 +780,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // cell_rand
     converted::Tally tally("cell_rand");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::cell_rand(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_rules_cpp::combat::cell_rand(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -774,7 +790,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -784,7 +802,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // flak_cell
     converted::Tally tally("flak_cell");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] i64 a0, [[maybe_unused]] i64 a1, [[maybe_unused]] unsigned int a2) { auto r = converted::counted([&] { return converted_combat_rules_cpp::combat::flak_cell(std::move(a0), std::move(a1), a2); }); return Out_flak_cell{std::move(r), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] i64& a0, [[maybe_unused]] i64& a1, [[maybe_unused]] unsigned int& a2) { auto r = converted::counted([&] { return converted_combat_rules_cpp::combat::flak_cell(std::move(a0), std::move(a1), a2); }); return Out_flak_cell{std::move(r), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       i64 a0 = static_cast<i64>(draw.bits());
       i64 a1 = static_cast<i64>(draw.bits());
@@ -795,7 +813,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -805,7 +825,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // agent_random
     converted::Tally tally("agent_random");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::agent_random(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::agent_random(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -814,7 +834,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -824,7 +846,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // temper_of
     converted::Tally tally("temper_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::temper_of(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::temper_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -833,7 +855,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -843,7 +867,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // arms_of
     converted::Tally tally("arms_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::arms_of(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::arms_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -852,7 +876,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -862,7 +888,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // rounds_of
     converted::Tally tally("rounds_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::ZombieRounds a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::rounds_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] combat::ZombieRounds& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::rounds_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::ZombieRounds a0 = draw_combat__ZombieRounds(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -871,7 +897,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -881,7 +909,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // take
     converted::Tally tally("take");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Rounds a0, [[maybe_unused]] combat::ZombieRounds a1) { converted::counted([&] { return converted_combat_rules_cpp::combat::take(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] combat::Rounds& a0, [[maybe_unused]] combat::ZombieRounds& a1) { converted::counted([&] { return converted_combat_rules_cpp::combat::take(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       combat::Rounds a0 = draw_combat__Rounds(draw);
       combat::ZombieRounds a1 = draw_combat__ZombieRounds(draw);
@@ -891,7 +919,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -901,7 +931,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // ZombieRounds::update
     converted::Tally tally("ZombieRounds_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::ZombieRounds a0, [[maybe_unused]] double a1, [[maybe_unused]] bool a2, [[maybe_unused]] int a3) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3)); }); return Out_ZombieRounds_update{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] combat::ZombieRounds& a0, [[maybe_unused]] double& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] int& a3) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3)); }); return Out_ZombieRounds_update{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       combat::ZombieRounds a0 = draw_combat__ZombieRounds(draw);
       double a1 = draw.number();
@@ -913,7 +943,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -923,7 +955,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // ZombieRounds::spawned
     converted::Tally tally("ZombieRounds_spawned");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::ZombieRounds a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.spawned(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] combat::ZombieRounds& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return a0.spawned(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       combat::ZombieRounds a0 = draw_combat__ZombieRounds(draw);
       double a1 = draw.number();
@@ -933,7 +965,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -943,7 +977,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // ZombieRounds::next_round
     converted::Tally tally("ZombieRounds_next_round");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::ZombieRounds a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.next_round(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] combat::ZombieRounds& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return a0.next_round(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       combat::ZombieRounds a0 = draw_combat__ZombieRounds(draw);
       double a1 = draw.number();
@@ -953,7 +987,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -963,7 +999,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // ZombieRounds::hp
     converted::Tally tally("ZombieRounds_hp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::ZombieRounds a0) { return converted::counted([&] { return a0.hp(); }); };
+    const auto run = [&]([[maybe_unused]] combat::ZombieRounds& a0) { return converted::counted([&] { return a0.hp(); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::ZombieRounds a0 = draw_combat__ZombieRounds(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -972,7 +1008,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -982,7 +1020,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // ZombieRounds::speed
     converted::Tally tally("ZombieRounds_speed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::ZombieRounds a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return a0.speed(std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] combat::ZombieRounds& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return a0.speed(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::ZombieRounds a0 = draw_combat__ZombieRounds(draw);
       double a1 = draw.number();
@@ -993,7 +1031,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1003,7 +1043,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // choose_enemy
     converted::Tally tally("choose_enemy");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] double a1, [[maybe_unused]] int a2) { return converted::counted([&] { return converted_combat_rules_cpp::combat::choose_enemy(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0, [[maybe_unused]] double& a1, [[maybe_unused]] int& a2) { return converted::counted([&] { return converted_combat_rules_cpp::combat::choose_enemy(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       double a1 = draw.number();
@@ -1014,7 +1054,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1024,7 +1066,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // enemy_hit_chance
     converted::Tally tally("enemy_hit_chance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::EnemySpec a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_rules_cpp::combat::enemy_hit_chance(a0, std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] combat::EnemySpec& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_combat_rules_cpp::combat::enemy_hit_chance(a0, std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::EnemySpec a0 = draw_combat__EnemySpec(draw);
       double a1 = draw.number();
@@ -1035,7 +1077,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1045,7 +1089,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // enemy_budget
     converted::Tally tally("enemy_budget");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::enemy_budget(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::enemy_budget(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1054,7 +1098,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1064,7 +1110,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // run_of
     converted::Tally tally("run_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Chaos a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::run_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] combat::Chaos& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::run_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::Chaos a0 = draw_combat__Chaos(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1073,7 +1119,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1083,7 +1131,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // take
     converted::Tally tally("take_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::ChaosRun a0, [[maybe_unused]] combat::Chaos a1) { converted::counted([&] { return converted_combat_rules_cpp::combat::take(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] combat::ChaosRun& a0, [[maybe_unused]] combat::Chaos& a1) { converted::counted([&] { return converted_combat_rules_cpp::combat::take(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       combat::ChaosRun a0 = draw_combat__ChaosRun(draw);
       combat::Chaos a1 = draw_combat__Chaos(draw);
@@ -1093,7 +1141,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1103,7 +1153,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Chaos::award
     converted::Tally tally("Chaos_award");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Chaos a0, [[maybe_unused]] int a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.award(std::move(a1), std::move(a2)); }); return Out_Chaos_award{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] combat::Chaos& a0, [[maybe_unused]] int& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.award(std::move(a1), std::move(a2)); }); return Out_Chaos_award{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       combat::Chaos a0 = draw_combat__Chaos(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -1114,7 +1164,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1124,7 +1176,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Chaos::tick
     converted::Tally tally("Chaos_tick");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Chaos a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.tick(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] combat::Chaos& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.tick(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       combat::Chaos a0 = draw_combat__Chaos(draw);
       double a1 = draw.number();
@@ -1135,7 +1187,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1145,7 +1199,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // run_of
     converted::Tally tally("run_of_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Fun a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::run_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] combat::Fun& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::run_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::Fun a0 = draw_combat__Fun(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1154,7 +1208,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1164,7 +1220,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // take
     converted::Tally tally("take_3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::FunRun a0, [[maybe_unused]] combat::Fun a1) { converted::counted([&] { return converted_combat_rules_cpp::combat::take(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] combat::FunRun& a0, [[maybe_unused]] combat::Fun& a1) { converted::counted([&] { return converted_combat_rules_cpp::combat::take(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       combat::FunRun a0 = draw_combat__FunRun(draw);
       combat::Fun a1 = draw_combat__Fun(draw);
@@ -1174,7 +1230,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1184,7 +1242,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Fun::apply
     converted::Tally tally("Fun_apply");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Fun a0, [[maybe_unused]] combat::FunEvent a1, [[maybe_unused]] double a2, [[maybe_unused]] int a3, [[maybe_unused]] double a4) { auto r = converted::counted([&] { return a0.apply(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_Fun_apply{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] combat::Fun& a0, [[maybe_unused]] combat::FunEvent& a1, [[maybe_unused]] double& a2, [[maybe_unused]] int& a3, [[maybe_unused]] double& a4) { auto r = converted::counted([&] { return a0.apply(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_Fun_apply{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       combat::Fun a0 = draw_combat__Fun(draw);
       combat::FunEvent a1 = static_cast<combat::FunEvent>(draw.below(12));
@@ -1197,7 +1255,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1207,7 +1267,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Fun::multiplier
     converted::Tally tally("Fun_multiplier");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Fun a0, [[maybe_unused]] double a1) { return converted::counted([&] { return a0.multiplier(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] combat::Fun& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return a0.multiplier(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::Fun a0 = draw_combat__Fun(draw);
       double a1 = draw.number();
@@ -1217,7 +1277,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1227,7 +1289,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Fun::police_damage_scale
     converted::Tally tally("Fun_police_damage_scale");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Fun a0) { return converted::counted([&] { return a0.police_damage_scale(); }); };
+    const auto run = [&]([[maybe_unused]] combat::Fun& a0) { return converted::counted([&] { return a0.police_damage_scale(); }); };
     for (int i = 0; tally.more(i); ++i) {
       combat::Fun a0 = draw_combat__Fun(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1236,7 +1298,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1246,7 +1310,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // gate_axes
     converted::Tally tally("gate_axes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2) { converted::counted([&] { return converted_combat_rules_cpp::combat::gate_axes(std::move(a0), a1, a2); }); return Out_gate_axes{std::move(a1), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] int& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] Vec2& a2) { converted::counted([&] { return converted_combat_rules_cpp::combat::gate_axes(std::move(a0), a1, a2); }); return Out_gate_axes{std::move(a1), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       Vec2 a1 = draw.vector2();
@@ -1257,7 +1321,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1267,7 +1333,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Race::reset
     converted::Tally tally("Race_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Race a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] combat::Race& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       combat::Race a0 = draw_combat__Race(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1276,7 +1342,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1286,7 +1354,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Race::crossed
     converted::Tally tally("Race_crossed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2) { return converted::counted([&] { return combat::Race::crossed(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2) { return converted::counted([&] { return combat::Race::crossed(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       Vec3 a1 = draw.vector();
@@ -1297,7 +1365,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1307,7 +1377,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // Race::update
     converted::Tally tally("Race_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat::Race a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2)); }); return Out_Race_update{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] combat::Race& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2)); }); return Out_Race_update{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       combat::Race a0 = draw_combat__Race(draw);
       Vec3 a1 = draw.vector();
@@ -1318,7 +1388,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1328,7 +1400,7 @@ SC_TEST(converted_combat_rules_cpp) {
   {  // race_time
     converted::Tally tally("race_time");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::race_time(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_combat_rules_cpp::combat::race_time(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1337,7 +1409,9 @@ SC_TEST(converted_combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

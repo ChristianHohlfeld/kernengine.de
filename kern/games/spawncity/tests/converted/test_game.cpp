@@ -120,7 +120,7 @@ struct PadState {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const PadState& s) { return converted::Value::structure({arg(s.connected), arg(s.lx), arg(s.ly), arg(s.rx), arg(s.ry), arg(s.lt), arg(s.rt), arg(s.buttons), arg(s.pressed), arg(s.active)}); }
-[[maybe_unused]] static bool same(const PadState& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.connected, (*got.rows)[0]) && same(want.lx, (*got.rows)[1]) && same(want.ly, (*got.rows)[2]) && same(want.rx, (*got.rows)[3]) && same(want.ry, (*got.rows)[4]) && same(want.lt, (*got.rows)[5]) && same(want.rt, (*got.rows)[6]) && same(want.buttons, (*got.rows)[7]) && same(want.pressed, (*got.rows)[8]) && same(want.active, (*got.rows)[9]); }
+[[maybe_unused]] static bool same(const PadState& want, const converted::Value& got) { return converted::rows_of(got, 10) && converted::at_place(same(want.connected, (*got.rows)[0]), ".connected") && converted::at_place(same(want.lx, (*got.rows)[1]), ".lx") && converted::at_place(same(want.ly, (*got.rows)[2]), ".ly") && converted::at_place(same(want.rx, (*got.rows)[3]), ".rx") && converted::at_place(same(want.ry, (*got.rows)[4]), ".ry") && converted::at_place(same(want.lt, (*got.rows)[5]), ".lt") && converted::at_place(same(want.rt, (*got.rows)[6]), ".rt") && converted::at_place(same(want.buttons, (*got.rows)[7]), ".buttons") && converted::at_place(same(want.pressed, (*got.rows)[8]), ".pressed") && converted::at_place(same(want.active, (*got.rows)[9]), ".active"); }
 [[maybe_unused]] static bool defined(const PadState& s) { return defined(s.connected) && defined(s.lx) && defined(s.ly) && defined(s.rx) && defined(s.ry) && defined(s.lt) && defined(s.rt) && defined(s.buttons) && defined(s.pressed) && defined(s.active); }
 [[maybe_unused]] static std::string text(const PadState& s) { return std::string("{") + text(s.connected) + ", " + text(s.lx) + ", " + text(s.ly) + ", " + text(s.rx) + ", " + text(s.ry) + ", " + text(s.lt) + ", " + text(s.rt) + ", " + text(s.buttons) + ", " + text(s.pressed) + ", " + text(s.active) + "}"; }
 [[maybe_unused]] static void take(PadState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<bool>(s.connected, (*v.rows)[0]); converted::take_as<double>(s.lx, (*v.rows)[1]); converted::take_as<double>(s.ly, (*v.rows)[2]); converted::take_as<double>(s.rx, (*v.rows)[3]); converted::take_as<double>(s.ry, (*v.rows)[4]); converted::take_as<double>(s.lt, (*v.rows)[5]); converted::take_as<double>(s.rt, (*v.rows)[6]); converted::take_as<unsigned int>(s.buttons, (*v.rows)[7]); converted::take_as<unsigned int>(s.pressed, (*v.rows)[8]); converted::take_as<bool>(s.active, (*v.rows)[9]); }
@@ -130,7 +130,7 @@ SC_TEST(converted_game) {
   {  // PadState::down
     converted::Tally tally("PadState_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.down(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] PadState& a0, [[maybe_unused]] int& a1) { return converted::counted([&] { return a0.down(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       PadState a0 = draw_PadState(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -140,7 +140,9 @@ SC_TEST(converted_game) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -150,7 +152,7 @@ SC_TEST(converted_game) {
   {  // PadState::hit
     converted::Tally tally("PadState_hit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PadState a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.hit(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] PadState& a0, [[maybe_unused]] int& a1) { return converted::counted([&] { return a0.hit(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       PadState a0 = draw_PadState(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -160,7 +162,9 @@ SC_TEST(converted_game) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

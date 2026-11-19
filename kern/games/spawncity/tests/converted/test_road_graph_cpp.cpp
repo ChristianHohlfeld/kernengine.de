@@ -8,7 +8,7 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <queue>
+#include <utility>
 #include "../../src/road_graph.h"
 #include "../converted.h"
 
@@ -55,7 +55,7 @@ struct RoadGraph {
   i32 nearest(Vec2 p, f32 max_m = 80) const;
   /// A* from the street closest to `from` to the one closest to `to`; `out` gets the points
   /// (starting at `from`'s projection, ending at `to`). False when no route exists.
-  
+  bool path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const;
   /// Pure pursuit: the point `look` metres further along `path` from the projection of `p`.
   static Vec2 pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look);
   /// Signature of the lane set it was built from (rebuild when it differs).
@@ -74,6 +74,33 @@ u64 lane_signature(const std::vector<Lane>& lanes);
 constexpr f32 kCell = 3.5;
 u64 cell_key(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); }
 f32 dist(Vec2 a, Vec2 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
+using Item = std::pair<f32, i32>;
+bool before(const Item& x, const Item& y) { return x.first < y.first || (!(y.first < x.first) && x.second < y.second); }
+void heap_push(std::vector<Item>& h, Item x) {
+  std::size_t i = h.size();
+  h.push_back(x);
+  while (i > 0) {
+    const std::size_t up = converted::quot((converted::minus(i, 1)), 2);
+    if (!before(converted::at(h, i), converted::at(h, up))) break;
+    std::swap(converted::at(h, i), converted::at(h, up));
+    i = up;
+  }
+}
+Item heap_pop(std::vector<Item>& h) {
+  const Item top = converted::at(h, 0);
+  converted::at(h, 0) = converted::back(h);
+  converted::pop_back(h);
+  std::size_t i = 0;
+  while (converted::plus(converted::times(2, i), 1) < h.size()) {
+    const std::size_t l = converted::plus(converted::times(2, i), 1), r = converted::plus(l, 1);
+    std::size_t m = before(converted::at(h, l), converted::at(h, i)) ? l : i;
+    if (r < h.size() && before(converted::at(h, r), converted::at(h, m))) m = r;
+    if (m == i) break;
+    std::swap(converted::at(h, i), converted::at(h, m));
+    i = m;
+  }
+  return top;
+}
 u64 lane_signature(const std::vector<Lane>& lanes) {
   u64 h = 1469598103934665603ull;
   for (std::size_t i = 0; i < lanes.size(); converted::pre_inc(i)) {
@@ -125,6 +152,40 @@ i32 RoadGraph::nearest(Vec2 p, f32 max_m) const {
   }
   return best;
 }
+bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const {
+  out.clear();
+  const i32 a = nearest(from), b = nearest(to);
+  if (a < 0 || b < 0) return false;
+  const std::size_t n = nodes_.size();
+  std::vector<f32> g(converted::count(n), 1e30);
+  std::vector<i32> came(converted::count(n), -1);
+  std::vector<u8> closed(converted::count(n), 0);
+  std::vector<Item> open;
+  converted::at(g, a) = 0;
+  heap_push(open, {dist(converted::at(nodes_, a).p, converted::at(nodes_, b).p), a});
+  u32 expanded = 0;
+  while (!open.empty()) {
+    const i32 cur = heap_pop(open).second;
+    if (converted::at(closed, cur)) continue;
+    converted::at(closed, cur) = 1;
+    if (cur == b || ++expanded > 20000) break;
+    for (const auto& [nb, len] : converted::at(nodes_, cur).edges) {
+      const f32 ng = converted::at(g, cur) + len;
+      if (ng < converted::at(g, nb)) {
+        converted::at(g, nb) = ng;
+        converted::at(came, nb) = cur;
+        heap_push(open, {ng + dist(converted::at(nodes_, nb).p, converted::at(nodes_, b).p), nb});
+      }
+    }
+  }
+  if (a != b && converted::at(came, b) < 0) return false;
+  std::vector<Vec2> rev;
+  for (i32 c = b; c >= 0; c = c == a ? -1 : converted::at(came, c)) rev.push_back(converted::at(nodes_, c).p);
+  out.push_back(from);
+  for (std::size_t k = 0; k < rev.size(); converted::pre_inc(k)) out.push_back(converted::at(rev, converted::minus(converted::minus(rev.size(), 1), k)));  // (from the start on)
+  out.push_back(to);
+  return true;
+}
 Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   if (path.empty()) return p;
   if (path.size() < 2) return converted::at(path, 0);
@@ -160,7 +221,7 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.points, (*got.rows)[0]), ".points") && converted::at_place(same(want.width, (*got.rows)[1]), ".width") && converted::at_place(same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]), ".tile") && converted::at_place(same(want.alive, (*got.rows)[3]), ".alive"); }
 [[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.alive); }
 [[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.alive) + "}"; }
 [[maybe_unused]] static void take(Lane& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<double>(s.width, (*v.rows)[1]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[2]); converted::take_as<bool>(s.alive, (*v.rows)[3]); }
@@ -171,7 +232,7 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const RoadGraph::Node& s) { return converted::Value::structure({arg(s.p), arg(s.edges)}); }
-[[maybe_unused]] static bool same(const RoadGraph::Node& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.p, (*got.rows)[0]) && same(want.edges, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const RoadGraph::Node& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.edges, (*got.rows)[1]), ".edges"); }
 [[maybe_unused]] static bool defined(const RoadGraph::Node& s) { return defined(s.p) && defined(s.edges); }
 [[maybe_unused]] static std::string text(const RoadGraph::Node& s) { return std::string("{") + text(s.p) + ", " + text(s.edges) + "}"; }
 [[maybe_unused]] static void take(RoadGraph::Node& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<std::vector<std::pair<int, double>>>(s.edges, (*v.rows)[1]); }
@@ -183,21 +244,29 @@ Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const RoadGraph& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.nodes_), arg(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_))}); }
-[[maybe_unused]] static bool same(const RoadGraph& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.nodes_, (*got.rows)[1]) && same(converted::shaped<converted::wide::Map<converted::Whole, int>>(want.cells_), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const RoadGraph& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]), ".built_from") && converted::at_place(same(want.nodes_, (*got.rows)[1]), ".nodes_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, int>>(want.cells_), (*got.rows)[2]), ".cells_"); }
 [[maybe_unused]] static bool defined(const RoadGraph& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.nodes_) && defined(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)); }
 [[maybe_unused]] static std::string text(const RoadGraph& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.nodes_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)) + "}"; }
 [[maybe_unused]] static void take(RoadGraph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<std::vector<RoadGraph::Node>>(s.nodes_, (*v.rows)[1]); converted::take_as<converted::wide::Map<converted::Whole, int>>(s.cells_, (*v.rows)[2]); }
+struct Out_heap_pop { std::pair<double, int> Result; std::vector<std::pair<double, int>> h; };
+[[maybe_unused]] static bool same(const Out_heap_pop& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.h, (*got.rows)[1]), ".h"); }
+[[maybe_unused]] static bool defined(const Out_heap_pop& s) { return defined(s.Result) && defined(s.h); }
+[[maybe_unused]] static std::string text(const Out_heap_pop& s) { return std::string("{") + text(s.Result) + ", " + text(s.h) + "}"; }
 struct Out_RoadGraph_node_at { RoadGraph Self; int Result; };
-[[maybe_unused]] static bool same(const Out_RoadGraph_node_at& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_RoadGraph_node_at& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_RoadGraph_node_at& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_RoadGraph_node_at& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_RoadGraph_path { bool Result; std::vector<Vec2> out; };
+[[maybe_unused]] static bool same(const Out_RoadGraph_path& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
+[[maybe_unused]] static bool defined(const Out_RoadGraph_path& s) { return defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_RoadGraph_path& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 
 SC_TEST(converted_road_graph_cpp) {
   converted::Blueprint bp("road_graph_cpp");
   {  // cell_key
     converted::Tally tally("cell_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_road_graph_cpp::cell_key(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0, [[maybe_unused]] int& a1) { return converted::counted([&] { return converted_road_graph_cpp::cell_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       int a1 = static_cast<int>(draw.whole());
@@ -207,7 +276,9 @@ SC_TEST(converted_road_graph_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -217,7 +288,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // dist
     converted::Tally tally("dist");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return converted_road_graph_cpp::dist(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec2& a0, [[maybe_unused]] Vec2& a1) { return converted::counted([&] { return converted_road_graph_cpp::dist(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec2 a0 = draw.vector2();
       Vec2 a1 = draw.vector2();
@@ -227,17 +298,84 @@ SC_TEST(converted_road_graph_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
+  {  // before
+    converted::Tally tally("before");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::pair<double, int>& a0, [[maybe_unused]] std::pair<double, int>& a1) { return converted::counted([&] { return converted_road_graph_cpp::before(a0, a1); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::pair<double, int> a0 = std::pair<double, int>(draw.number(), static_cast<int>(draw.whole()));
+      std::pair<double, int> a1 = std::pair<double, int>(draw.number(), static_cast<int>(draw.whole()));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // heap_push
+    converted::Tally tally("heap_push");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<std::pair<double, int>>& a0, [[maybe_unused]] std::pair<double, int>& a1) { converted::counted([&] { return converted_road_graph_cpp::heap_push(a0, std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<std::pair<double, int>> a0 = draw_list(draw, [&]() -> std::pair<double, int> { return std::pair<double, int>(draw.number(), static_cast<int>(draw.whole())); });
+      std::pair<double, int> a1 = std::pair<double, int>(draw.number(), static_cast<int>(draw.whole()));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // heap_pop
+    converted::Tally tally("heap_pop");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<std::pair<double, int>>& a0) { auto r = converted::counted([&] { return converted_road_graph_cpp::heap_pop(a0); }); return Out_heap_pop{std::move(r), std::move(a0)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<std::pair<double, int>> a0 = draw_list(draw, [&]() -> std::pair<double, int> { return std::pair<double, int>(draw.number(), static_cast<int>(draw.whole())); });
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
   {  // lane_signature
     converted::Tally tally("lane_signature");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Lane> a0) { return converted::counted([&] { return converted_road_graph_cpp::lane_signature(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<Lane>& a0) { return converted::counted([&] { return converted_road_graph_cpp::lane_signature(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<Lane> a0 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -246,7 +384,9 @@ SC_TEST(converted_road_graph_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -256,7 +396,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // RoadGraph::node_at
     converted::Tally tally("RoadGraph_node_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1) { auto r = converted::counted([&] { return a0.node_at(std::move(a1)); }); return Out_RoadGraph_node_at{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] RoadGraph& a0, [[maybe_unused]] Vec2& a1) { auto r = converted::counted([&] { return a0.node_at(std::move(a1)); }); return Out_RoadGraph_node_at{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       RoadGraph a0 = draw_RoadGraph(draw);
       Vec2 a1 = draw.vector2();
@@ -266,7 +406,9 @@ SC_TEST(converted_road_graph_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -276,7 +418,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // RoadGraph::rebuild
     converted::Tally tally("RoadGraph_rebuild");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] std::vector<Lane> a1) { converted::counted([&] { return a0.rebuild(a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] RoadGraph& a0, [[maybe_unused]] std::vector<Lane>& a1) { converted::counted([&] { return a0.rebuild(a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       RoadGraph a0 = draw_RoadGraph(draw);
       std::vector<Lane> a1 = draw_list(draw, [&]() -> Lane { return draw_Lane(draw); });
@@ -286,7 +428,9 @@ SC_TEST(converted_road_graph_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -296,7 +440,7 @@ SC_TEST(converted_road_graph_cpp) {
   {  // RoadGraph::nearest
     converted::Tally tally("RoadGraph_nearest");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return converted::counted([&] { return a0.nearest(std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] RoadGraph& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return a0.nearest(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       RoadGraph a0 = draw_RoadGraph(draw);
       Vec2 a1 = draw.vector2();
@@ -307,17 +451,43 @@ SC_TEST(converted_road_graph_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
+  {  // RoadGraph::path
+    converted::Tally tally("RoadGraph_path");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] RoadGraph& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] Vec2& a2, [[maybe_unused]] std::vector<Vec2>& a3) { auto r = converted::counted([&] { return a0.path(std::move(a1), std::move(a2), a3); }); return Out_RoadGraph_path{std::move(r), std::move(a3)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      RoadGraph a0 = draw_RoadGraph(draw);
+      Vec2 a1 = draw.vector2();
+      Vec2 a2 = draw.vector2();
+      std::vector<Vec2> a3 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
   {  // RoadGraph::pursuit_point
     converted::Tally tally("RoadGraph_pursuit_point");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { return converted::counted([&] { return RoadGraph::pursuit_point(a0, std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2>& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return RoadGraph::pursuit_point(a0, std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       Vec2 a1 = draw.vector2();
@@ -328,7 +498,9 @@ SC_TEST(converted_road_graph_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

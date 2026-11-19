@@ -34,9 +34,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Renderer;
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
+struct Renderer;
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -79,7 +81,7 @@ struct MpArt {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MpArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
-[[maybe_unused]] static bool same(const MpArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const MpArt::Part& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.transforms, (*got.rows)[1]), ".transforms") && converted::at_place(same(want.tints, (*got.rows)[2]), ".tints"); }
 [[maybe_unused]] static bool defined(const MpArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
 [[maybe_unused]] static std::string text(const MpArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
 [[maybe_unused]] static void take(MpArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
@@ -97,7 +99,7 @@ struct MpArt {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MpArt& s) { return converted::Value::structure({arg(s.r_), arg(s.post_), arg(s.gem_), arg(s.ring_), arg(s.tracer_), arg(s.flash_), arg(s.canopy_), arg(s.led_), arg(s.shield_)}); }
-[[maybe_unused]] static bool same(const MpArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.r_, (*got.rows)[0]) && same(want.post_, (*got.rows)[1]) && same(want.gem_, (*got.rows)[2]) && same(want.ring_, (*got.rows)[3]) && same(want.tracer_, (*got.rows)[4]) && same(want.flash_, (*got.rows)[5]) && same(want.canopy_, (*got.rows)[6]) && same(want.led_, (*got.rows)[7]) && same(want.shield_, (*got.rows)[8]); }
+[[maybe_unused]] static bool same(const MpArt& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.r_, (*got.rows)[0]), ".r_") && converted::at_place(same(want.post_, (*got.rows)[1]), ".post_") && converted::at_place(same(want.gem_, (*got.rows)[2]), ".gem_") && converted::at_place(same(want.ring_, (*got.rows)[3]), ".ring_") && converted::at_place(same(want.tracer_, (*got.rows)[4]), ".tracer_") && converted::at_place(same(want.flash_, (*got.rows)[5]), ".flash_") && converted::at_place(same(want.canopy_, (*got.rows)[6]), ".canopy_") && converted::at_place(same(want.led_, (*got.rows)[7]), ".led_") && converted::at_place(same(want.shield_, (*got.rows)[8]), ".shield_"); }
 [[maybe_unused]] static bool defined(const MpArt& s) { return defined(s.r_) && defined(s.post_) && defined(s.gem_) && defined(s.ring_) && defined(s.tracer_) && defined(s.flash_) && defined(s.canopy_) && defined(s.led_) && defined(s.shield_); }
 [[maybe_unused]] static std::string text(const MpArt& s) { return std::string("{") + text(s.r_) + ", " + text(s.post_) + ", " + text(s.gem_) + ", " + text(s.ring_) + ", " + text(s.tracer_) + ", " + text(s.flash_) + ", " + text(s.canopy_) + ", " + text(s.led_) + ", " + text(s.shield_) + "}"; }
 [[maybe_unused]] static void take(MpArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<MpArt::Part>(s.post_, (*v.rows)[1]); converted::take_as<MpArt::Part>(s.gem_, (*v.rows)[2]); converted::take_as<MpArt::Part>(s.ring_, (*v.rows)[3]); converted::take_as<MpArt::Part>(s.tracer_, (*v.rows)[4]); converted::take_as<MpArt::Part>(s.flash_, (*v.rows)[5]); converted::take_as<MpArt::Part>(s.canopy_, (*v.rows)[6]); converted::take_as<MpArt::Part>(s.led_, (*v.rows)[7]); converted::take_as<MpArt::Part>(s.shield_, (*v.rows)[8]); }
@@ -107,7 +109,7 @@ SC_TEST(converted_mp_art) {
   {  // MpArt::ready
     converted::Tally tally("MpArt_ready");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0) { return converted::counted([&] { return a0.ready(); }); };
+    const auto run = [&]([[maybe_unused]] MpArt& a0) { return converted::counted([&] { return a0.ready(); }); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -116,7 +118,9 @@ SC_TEST(converted_mp_art) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

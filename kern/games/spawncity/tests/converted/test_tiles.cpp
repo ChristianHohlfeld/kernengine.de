@@ -53,7 +53,7 @@ struct TileKey {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TileKey& s) { return converted::Value::structure({arg(s.z), arg(s.x), arg(s.y)}); }
-[[maybe_unused]] static bool same(const TileKey& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.z, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const TileKey& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.z, (*got.rows)[0]), ".z") && converted::at_place(same(want.x, (*got.rows)[1]), ".x") && converted::at_place(same(want.y, (*got.rows)[2]), ".y"); }
 [[maybe_unused]] static bool defined(const TileKey& s) { return defined(s.z) && defined(s.x) && defined(s.y); }
 [[maybe_unused]] static std::string text(const TileKey& s) { return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
 [[maybe_unused]] static void take(TileKey& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.z, (*v.rows)[0]); converted::take_as<int>(s.x, (*v.rows)[1]); converted::take_as<int>(s.y, (*v.rows)[2]); }
@@ -63,7 +63,7 @@ SC_TEST(converted_tiles) {
   {  // TileKey::operator==
     converted::Tally tally("TileKey_equal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey a0, [[maybe_unused]] TileKey a1) { return converted::counted([&] { return a0.operator==(a1); }); };
+    const auto run = [&]([[maybe_unused]] TileKey& a0, [[maybe_unused]] TileKey& a1) { return converted::counted([&] { return a0.operator==(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       TileKey a0 = draw_TileKey(draw);
       TileKey a1 = draw_TileKey(draw);
@@ -73,7 +73,9 @@ SC_TEST(converted_tiles) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -83,7 +85,7 @@ SC_TEST(converted_tiles) {
   {  // TileKey::hash
     converted::Tally tally("TileKey_hash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TileKey a0) { return converted::counted([&] { return a0.hash(); }); };
+    const auto run = [&]([[maybe_unused]] TileKey& a0) { return converted::counted([&] { return a0.hash(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TileKey a0 = draw_TileKey(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -92,7 +94,9 @@ SC_TEST(converted_tiles) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);

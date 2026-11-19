@@ -92,7 +92,7 @@ SC_TEST(converted_game_net_cpp) {
   {  // esc
     converted::Tally tally("esc");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_game_net_cpp::esc(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::string& a0) { return converted::counted([&] { return converted_game_net_cpp::esc(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::string a0 = draw.word();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -101,7 +101,9 @@ SC_TEST(converted_game_net_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -111,7 +113,7 @@ SC_TEST(converted_game_net_cpp) {
   {  // hex
     converted::Tally tally("hex");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_game_net_cpp::hex(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_game_net_cpp::hex(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -120,7 +122,9 @@ SC_TEST(converted_game_net_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -130,7 +134,7 @@ SC_TEST(converted_game_net_cpp) {
   {  // mp_weapon
     converted::Tally tally("mp_weapon");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] weapons::Id a0) { return converted::counted([&] { return converted_game_net_cpp::mp_weapon(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] weapons::Id& a0) { return converted::counted([&] { return converted_game_net_cpp::mp_weapon(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       weapons::Id a0 = static_cast<weapons::Id>(draw.below(14));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -139,7 +143,9 @@ SC_TEST(converted_game_net_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

@@ -99,7 +99,7 @@ struct GpsLive {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const GpsLive& s) { return converted::Value::structure({arg(s.view), arg(s.rejected), arg(s.accepted), arg(s.active_), arg(s.has_fix_), arg(s.has_shown_), arg(s.has_compass_), arg(s.started_), arg(s.last_fix_), arg(s.x_), arg(s.y_), arg(s.vx_), arg(s.vy_), arg(s.speed_), arg(s.speed_avg_), arg(s.heading_), arg(s.distance_), arg(s.accuracy_), arg(s.compass_), arg(s.shown_)}); }
-[[maybe_unused]] static bool same(const GpsLive& want, const converted::Value& got) { return got.rows && got.rows->size() == 20 && same(want.view, (*got.rows)[0]) && same(want.rejected, (*got.rows)[1]) && same(want.accepted, (*got.rows)[2]) && same(want.active_, (*got.rows)[3]) && same(want.has_fix_, (*got.rows)[4]) && same(want.has_shown_, (*got.rows)[5]) && same(want.has_compass_, (*got.rows)[6]) && same(want.started_, (*got.rows)[7]) && same(want.last_fix_, (*got.rows)[8]) && same(want.x_, (*got.rows)[9]) && same(want.y_, (*got.rows)[10]) && same(want.vx_, (*got.rows)[11]) && same(want.vy_, (*got.rows)[12]) && same(want.speed_, (*got.rows)[13]) && same(want.speed_avg_, (*got.rows)[14]) && same(want.heading_, (*got.rows)[15]) && same(want.distance_, (*got.rows)[16]) && same(want.accuracy_, (*got.rows)[17]) && same(want.compass_, (*got.rows)[18]) && same(want.shown_, (*got.rows)[19]); }
+[[maybe_unused]] static bool same(const GpsLive& want, const converted::Value& got) { return converted::rows_of(got, 20) && converted::at_place(same(want.view, (*got.rows)[0]), ".view") && converted::at_place(same(want.rejected, (*got.rows)[1]), ".rejected") && converted::at_place(same(want.accepted, (*got.rows)[2]), ".accepted") && converted::at_place(same(want.active_, (*got.rows)[3]), ".active_") && converted::at_place(same(want.has_fix_, (*got.rows)[4]), ".has_fix_") && converted::at_place(same(want.has_shown_, (*got.rows)[5]), ".has_shown_") && converted::at_place(same(want.has_compass_, (*got.rows)[6]), ".has_compass_") && converted::at_place(same(want.started_, (*got.rows)[7]), ".started_") && converted::at_place(same(want.last_fix_, (*got.rows)[8]), ".last_fix_") && converted::at_place(same(want.x_, (*got.rows)[9]), ".x_") && converted::at_place(same(want.y_, (*got.rows)[10]), ".y_") && converted::at_place(same(want.vx_, (*got.rows)[11]), ".vx_") && converted::at_place(same(want.vy_, (*got.rows)[12]), ".vy_") && converted::at_place(same(want.speed_, (*got.rows)[13]), ".speed_") && converted::at_place(same(want.speed_avg_, (*got.rows)[14]), ".speed_avg_") && converted::at_place(same(want.heading_, (*got.rows)[15]), ".heading_") && converted::at_place(same(want.distance_, (*got.rows)[16]), ".distance_") && converted::at_place(same(want.accuracy_, (*got.rows)[17]), ".accuracy_") && converted::at_place(same(want.compass_, (*got.rows)[18]), ".compass_") && converted::at_place(same(want.shown_, (*got.rows)[19]), ".shown_"); }
 [[maybe_unused]] static bool defined(const GpsLive& s) { return defined(s.view) && defined(s.rejected) && defined(s.accepted) && defined(s.active_) && defined(s.has_fix_) && defined(s.has_shown_) && defined(s.has_compass_) && defined(s.started_) && defined(s.last_fix_) && defined(s.x_) && defined(s.y_) && defined(s.vx_) && defined(s.vy_) && defined(s.speed_) && defined(s.speed_avg_) && defined(s.heading_) && defined(s.distance_) && defined(s.accuracy_) && defined(s.compass_) && defined(s.shown_); }
 [[maybe_unused]] static std::string text(const GpsLive& s) { return std::string("{") + text(s.view) + ", " + text(s.rejected) + ", " + text(s.accepted) + ", " + text(s.active_) + ", " + text(s.has_fix_) + ", " + text(s.has_shown_) + ", " + text(s.has_compass_) + ", " + text(s.started_) + ", " + text(s.last_fix_) + ", " + text(s.x_) + ", " + text(s.y_) + ", " + text(s.vx_) + ", " + text(s.vy_) + ", " + text(s.speed_) + ", " + text(s.speed_avg_) + ", " + text(s.heading_) + ", " + text(s.distance_) + ", " + text(s.accuracy_) + ", " + text(s.compass_) + ", " + text(s.shown_) + "}"; }
 [[maybe_unused]] static void take(GpsLive& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 20) return; converted::take_as<GpsLive::View>(s.view, (*v.rows)[0]); converted::take_as<unsigned int>(s.rejected, (*v.rows)[1]); converted::take_as<unsigned int>(s.accepted, (*v.rows)[2]); converted::take_as<bool>(s.active_, (*v.rows)[3]); converted::take_as<bool>(s.has_fix_, (*v.rows)[4]); converted::take_as<bool>(s.has_shown_, (*v.rows)[5]); converted::take_as<bool>(s.has_compass_, (*v.rows)[6]); converted::take_as<double>(s.started_, (*v.rows)[7]); converted::take_as<double>(s.last_fix_, (*v.rows)[8]); converted::take_as<double>(s.x_, (*v.rows)[9]); converted::take_as<double>(s.y_, (*v.rows)[10]); converted::take_as<double>(s.vx_, (*v.rows)[11]); converted::take_as<double>(s.vy_, (*v.rows)[12]); converted::take_as<double>(s.speed_, (*v.rows)[13]); converted::take_as<double>(s.speed_avg_, (*v.rows)[14]); converted::take_as<double>(s.heading_, (*v.rows)[15]); converted::take_as<double>(s.distance_, (*v.rows)[16]); converted::take_as<double>(s.accuracy_, (*v.rows)[17]); converted::take_as<double>(s.compass_, (*v.rows)[18]); converted::take_as<Vec2>(s.shown_, (*v.rows)[19]); }
@@ -109,7 +109,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::stop
     converted::Tally tally("GpsLive_stop");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { converted::counted([&] { return a0.stop(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { converted::counted([&] { return a0.stop(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -118,7 +118,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -128,7 +130,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::active
     converted::Tally tally("GpsLive_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.active(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.active(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -137,7 +139,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -147,7 +151,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::compass
     converted::Tally tally("GpsLive_compass");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.compass(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return a0.compass(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       double a1 = draw.number();
@@ -157,7 +161,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -167,7 +173,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::has_fix
     converted::Tally tally("GpsLive_has_fix");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.has_fix(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.has_fix(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -176,7 +182,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -186,7 +194,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::shown
     converted::Tally tally("GpsLive_shown");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.shown(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.shown(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -195,7 +203,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -205,7 +215,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::position
     converted::Tally tally("GpsLive_position");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.position(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.position(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -214,7 +224,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -224,7 +236,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::heading
     converted::Tally tally("GpsLive_heading");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.heading(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.heading(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -233,7 +245,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -243,7 +257,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::speed
     converted::Tally tally("GpsLive_speed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.speed(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.speed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -252,7 +266,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -262,7 +278,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::distance
     converted::Tally tally("GpsLive_distance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.distance(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.distance(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -271,7 +287,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -281,7 +299,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::accuracy
     converted::Tally tally("GpsLive_accuracy");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0) { return converted::counted([&] { return a0.accuracy(); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0) { return converted::counted([&] { return a0.accuracy(); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -290,7 +308,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -300,7 +320,7 @@ SC_TEST(converted_gps_live) {
   {  // GpsLive::elapsed
     converted::Tally tally("GpsLive_elapsed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] GpsLive a0, [[maybe_unused]] double a1) { return converted::counted([&] { return a0.elapsed(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] GpsLive& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return a0.elapsed(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       GpsLive a0 = draw_GpsLive(draw);
       double a1 = draw.number();
@@ -310,7 +330,9 @@ SC_TEST(converted_gps_live) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
