@@ -5537,6 +5537,8 @@ class Emit:
             return self.entry_pointer_set(self.unwrap(kids(n)[0])["referencedDecl"]["id"], kids(n)[1])   # (a pointer to an entry is given one, or none)
         if k == "BinaryOperator" and n.get("opcode") == "=" and self.asked_or_none(kids(n)[0]) is not None:
             return self.text_or_none_set(self.unwrap(kids(n)[0])["referencedDecl"], kids(n)[1])   # (a text or none is given one, or none)
+        if k == "BinaryOperator" and n.get("opcode") == "=" and (done := self.callback_field_set(*kids(n))) is not None:
+            return done
         if k == "BinaryOperator" and n.get("opcode") == "=":
             a, b = kids(n)
             inner = self.unwrap(b)
@@ -6085,6 +6087,99 @@ class Emit:
         self.f.calls.append(g)
         name = g.name if "::" in g.name else f"{u.name}::{g.name}"
         return f"callback<&{name}>({self.self_name if this_used else ''})", want
+
+    def callback_field_set(self, a, b):
+        """A Callback set field by field, as C++ sets the struct of the engine that is one (callback_record: the
+        pointer to a function and the void* it hands it): `s.user = const_cast<Terrain*>(this);` names the place
+        (the function's object), `s.fn = [](void* u, f64 x, f64 y) { return static_cast<const Terrain*>(u)->height(...); };`
+        the function - a lambda that captures nothing and reads its void* as that object. Then s is
+        callback<&Lib::fn>(self): the lambda a function of the Blueprint whose first input is the object, a const
+        reference. None: no such assignment."""
+        m = self.unwrap(a)
+        if m.get("kind") != "MemberExpr" or m.get("isArrow") or not kids(m):
+            return None
+        var = self.unwrap(kids(m)[0])
+        if var.get("kind") != "DeclRefExpr":
+            return None
+        q = None
+        try:
+            q = self.u.find_type(self.u.clean(self.ctype(var)))
+        except Wait:
+            return None
+        cb = self.u.callback_record(q) if q else None
+        if not cb:
+            return None
+        rec = self.tree.records[q]
+        fn_field, user_field = [c.get("name") for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        vid = var["referencedDecl"]["id"]
+        places = self.__dict__.setdefault("callback_places", {})
+        if m.get("name") == user_field:
+            obj = self.unwrap(b)
+            while obj.get("kind") in CAST + ("CXXConstCastExpr", "ParenExpr") and kids(obj):
+                obj = self.unwrap(kids(obj)[0])
+            if obj.get("kind") != "CXXThisExpr" or self.f.self_type is None:
+                raise Wait("a Callback's void* that is not the object of its function (this)")
+            places[vid] = self.tree.owner.get(self.f.decl["id"])
+            return []
+        if m.get("name") != fn_field:
+            return None
+        if vid not in places:
+            raise Wait("a Callback's function set before its void* (the place it is handed)")
+        lam = self.lambda_of(b)
+        if lam is None:
+            raise Wait("a Callback's function that is no lambda")
+        owner = places[vid]
+        lrec = next((c for c in kids(lam) if c.get("kind") == "CXXRecordDecl"), None)
+        method = next((c for c in kids(lrec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
+        body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
+        params = [c for c in kids(method or {}) if c.get("kind") == "ParmVarDecl"]
+        if body is None or not params or any(c.get("kind") == "FieldDecl" for c in kids(lrec)) or qtype(params[0]).replace(" ", "") != "void*":
+            raise Wait("a Callback's function that captures something or takes no void* first")
+        pid = params[0]["id"]
+        obj_type = {"qualType": "const " + owner}
+        body = copy.deepcopy(body)
+        def is_place(x):
+            x = self.unwrap(x)
+            if x.get("kind") not in CAST + ("CXXConstCastExpr", "CXXReinterpretCastExpr") or not kids(x):
+                return False
+            inner = self.unwrap(kids(x)[0])
+            return inner.get("kind") == "DeclRefExpr" and (inner.get("referencedDecl") or {}).get("id") == pid
+        def place_ref():
+            return {"kind": "DeclRefExpr", "type": dict(obj_type), "valueCategory": "lvalue", "referencedDecl": {"id": pid, "kind": "ParmVarDecl", "name": params[0].get("name", "u"), "type": dict(obj_type)}}
+        def mend(x):
+            for i, c in enumerate(x.get("inner", []) or []):
+                if c.get("kind") == "MemberExpr" and c.get("isArrow") and kids(c) and is_place(kids(c)[0]):
+                    c["isArrow"] = False
+                    c["inner"][0] = place_ref()
+                elif c.get("kind") == "UnaryOperator" and c.get("opcode") == "*" and kids(c) and is_place(kids(c)[0]):
+                    x["inner"][i] = c = place_ref()
+                mend(c)
+        mend(body)
+        if any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == pid and x.get("type", {}).get("qualType") != obj_type["qualType"] for x in walk(body)):
+            raise Wait("a Callback's void* read otherwise than as its object (static_cast<const T*>(u)->...)")
+        first = dict(params[0], type={"qualType": "const " + owner + " &"})
+        outer = self.f.decl
+        raw_type = qtype(method)
+        trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
+        if trailing:
+            raw_type = f"{trailing.group(2)} {trailing.group(1)}"
+        raw_type = re.sub(r"\(\s*void\s*\*\s*,?", "(const " + owner + " &" + ("," if len(params) > 1 else ""), raw_type, count=1)
+        synth = {"id": method["id"], "_mine": True, "kind": "FunctionDecl", "name": f"{outer.get('name', 'f')}_callback", "type": {"qualType": re.sub(r"\s*\bconst\s*$", "", raw_type)},
+                 "_file": lam.get("_file", ""), "_at": lam.get("_at", (None, None)), "inner": [first] + params[1:] + [body]}
+        if self.u.state is not None:
+            raise Wait("a Callback in a Blueprint that keeps something (a Callback names a function of a library)")
+        self.tree.body[method["id"]] = synth
+        self.tree.scope_of[method["id"]] = self.tree.scope_of.get(outer["id"], "")
+        g = self.u.function(method["id"])
+        g.lifted = True
+        if not g.pure:
+            raise Wait(f"a Callback of a lambda that changes something ({g.name})")
+        made = f"Callback<{g.value or 'void'}({', '.join(t for _, t in g.params[1:])})>"
+        if made != cb:
+            raise Wait(f"a lambda that is {made} where a {cb} is wanted")
+        self.f.calls.append(g)
+        name = g.name if "::" in g.name else f"{self.u.name}::{g.name}"
+        return self.store(var, lambda t: f"callback<&{name}>({self.self_name})")
 
     def local_call(self, n):
         """A call of a local function: (text, type) of what it gives, as `invoke` has it."""
