@@ -83,3 +83,14 @@ Entscheidungen beim Bau (nach den Zielen, ohne Freigabe – Chris).
 - Noch wartend (kein Funktionswert): CityStream::fail, go_offline, request_around (→ update): „an owned value that holds objects of the engine,
   replaced where it is no place“ (Map von unique_ptr<Tile> mit Engine-Objekten – Besitz/Destruktoren, nicht c). extract: Beleg läuft
   (tiles+mvt, layer() steht in mvt.cpp).
+
+## Stand 18:50 – work-c = ce74f7d4 (gepusht)
+- 0ba56431: Merge work-zusammen a424629f – Lambda mit auto-Eingängen nur noch in k's Fassung (c's entfernt; doppelt gebaut). Gemeldet.
+- 174554 (9c1907e8; tiles, mvt): extract geschrieben, 8/8 ok in beiden Durchgängen.
+- 180303 (0ba56431; city_stream, terrain): begin_roads/relay/sampler geschrieben; Stellvertreter-Durchgang: city_stream UB „offset 16 to null
+  pointer“ (Quelle liest size() Einträge aus data() des Stellvertreters, der beide getrennt beantwortet) → ce74f7d4 converted::room.
+  terrain (beide Durchgänge): UB „reference binding to null pointer CorridorSet“ nach Terrain_normal (auch schon 164339, nicht in der Basis 162208):
+  der Test von Terrain_sampler ruft den Callback der Quelle auf dem gezogenen Terrain; gezogen werden auch leere unique_ptr in corridors_, die
+  Terrain::corridor_set (`*corridors_[i]`) ohne Prüfung liest. **BEFUND FÜR t1:** ein leerer unique_ptr, den die Quelle dereferenziert, ist
+  ein Ort, den C++ offen lässt (wie ein Eintrag außerhalb der Liste) – der Rahmen fängt ihn nicht (open_read) → Abbruch durch UBSan.
+- Läuft: work-c-vergleich-184821-26350 (ce74f7d4; city_stream, terrain).

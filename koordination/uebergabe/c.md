@@ -62,3 +62,19 @@ Entscheidungen beim Bau stehen in stand/c.md. Der Entwurf vom 18.11. (Stellen, B
 Stellen: HeightSampler (RoadBuilder::begin behält, build_terrain_tile ruft während), RoadOptions::deformed (std::function),
 jobs::Fn (Teil 2). Spiel: Terrain::sampler, CityStream::begin_roads (daran finish_features, relay, work, update);
 fail/go_offline warten an anderem (remove/erase). register_node (game.cpp) ist kein Rückruf (Stufe 6, eigener Entwurf).
+
+## Nachfolger 19.11. (ab 15:00) – Stand 18:25, work-c = 0ba56431
+- Gebaut: Tabelle der Engine liest Callback-Pins (begin_roads „pins differ“); Callback als Kopie / `HeightSampler{}` (ungebunden); data() eines
+  Engine-Objekts = sein Knoten (road_stream.data; eine Kopie des Stroms je begin_roads – entfällt mit „Platz der Engine“, d); Regel Callback:
+  Schleife erlaubt (memory && !loop, wie Bibliotheksregel; Test logic_callbacks „Loops“); Test-Schreiber (converted.h): Callback-Überladungen vor
+  den Vorlagen deklariert (ADL), `const T*`-Ergebnis eines Stellvertreters (gehaltene Zahlen); Spell `const f64*`.
+- Lambda mit auto-Eingängen: k hatte dieselbe Fähigkeit gebaut → beim Merge a424629f nur k's Fassung behalten (c's local_template entfernt).
+- Belege: work-c-vergleich-164339-32470 (9c1907e8): begin_roads, relay, finish_features, Terrain::sampler geschrieben+verglichen, ohne Abweichung;
+  Rot nur aus der Basis (work-zusammen-vergleich-162208-17909: feed_terrain, plan_dem, plan_windows – gleiche Zahlen). 174554 (tiles+mvt): extract
+  geschrieben, 8/8 ok in beiden Durchgängen. CI 44547268243: native/build/determinism/input grün, e2e nur „int64 (voice)“ (Basis).
+  Ausstehend: work-c-vergleich-180303-21611 (0ba56431; city_stream, terrain) – Beleg nach dem Merge.
+- Wartet, kein Funktionswert: CityStream::fail, go_offline, request_around (→ update): „an owned value that holds objects of the engine, replaced
+  where it is no place“.
+- Offen (später, soweit das Spiel es braucht): NativeCallable hält das Lebenszeichen der Instanz nicht; JIT-Fall mit Bibliothek; Jobs (KERN_JOB);
+  BEFUND s5: ShaderExtension (Fassaden/Wasser), App-Ereignisse – Engine ruft Funktionen/Ereignisse eines Blueprints (eigener Entwurf nötig).
+- Kleinstfälle: /tmp/c_gl/k (generisches Lambda), /tmp/c_gl/r (RoadStream/RoadBuilder), /tmp/c_gl/cs (lokal city_stream+terrain, STAND_INS=1).

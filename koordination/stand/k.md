@@ -12,7 +12,22 @@
 - 0679bafe: `T& r = c ? a : b;` → Rest des Blocks als if (c) {r=a} else {r=b} (Emit.either_place). gaps_draw. Kleinstfall /tmp/k_or.
 - 54dcd7cd: Lambda mit auto-Eingängen → je Spezialisierung eine lokale Funktion, übergebenes Lambda = eigene lokale Funktion (Emit.instance).
   extract (tiles.cpp). Kleinstfall /tmp/k_gl.
-- Beleg läuft: work-k-vergleich-163507-23262 (0679bafe; car, terrain, game_gaps, game_controls, game_weapons, game.cpp).
+- BELEGT work-k-vergleich-171851-19774 (3af75896): gegen die Engine 54/54 ok (terrain mit set_water_cell, plan_dem, plan_windows,
+  build_water_chunk, update geschrieben+verglichen); Durchgang 1: 53/54, terrain bricht in build_water_chunk an UBSan ab
+  („signed integer overflow 2142622876 * 80“ in der QUELLE, ci*per mit gezogenem ci) → BEFUND FÜR t1 (Testeingaben treiben die Quelle in UB).
+- BELEGT work-k-vergleich-175551-12446 (e1362b36 ⊇ 3af75896; city_stream, terrain, car, ragdoll, life): 18/18 ok in BEIDEN Durchgängen,
+  Terrain::build_water_chunk, Car::step, tyre geschrieben und verglichen. CityStream::feed_terrain wartet in der Probe an road_is_water (andere Datei).
+- plan_dem/plan_windows (Frage Koordinator 17:50): Ursache 1cb0e7e1 (Schlüssel von dem_tiles_[k.hash()] vor `k = …` berechnet) – behoben 3af75896.
+- t1-Befund ~Car/~Ragdolls (928b7571): e1362b36 (fehlende closures → missing) wirkt NICHT (Tests halten keinen Destruktor) → 5ce2b49c
+  zurückgenommen. ÜBERGEBEN AN t1: im Test der Klasse (car, life) fehlt die Methode, die der Destruktor ruft (detach/clear, Rumpf in car.cpp/
+  ragdoll.cpp); der Test-Schreiber fällt auf „without the member ~Car“ zurück. Stelle: TestWriter gather/want_function (Methoden-Rumpf in
+  anderer Datei, nur vom Destruktor gerufen).
+- 4e562137: either_place nimmt `*gaps_`/p->x als festen Platz (gaps_draw wartete danach mit „a reference to something it changes“).
+  Beleg läuft: work-k-vergleich-182152-5898 (game_gaps, game_barricades, game.cpp).
+
+## BEREIT ZUM MERGEN: 4e562137 (+ c684e716, 521274be, 0679bafe, 54dcd7cd, 3af75896 schon gemergt) – Beleg 171851-19774, 175551-12446;
+   4e562137 selbst unbelegt bis zum laufenden vergleich (gaps_draw).
+- Beleg (alt): work-k-vergleich-163507-23262 (0679bafe; car, terrain, game_gaps, game_controls, game_weapons, game.cpp).
 - Nicht meins (Liste 143319): mp_local_ready/round_meets_mate/melee_hit/gaps_hud = Test-Schreiber (t1, „undeclared identifier Game“);
   step_heli/hit_scan/look_blast/explosion/CityStream::work = Rekursion (E16, gemergt); step_cop/handle_shots/run_buildings = Platz der Engine (d);
   register_node (NodeDef mit std::function-Feldern: Rückrufe, c); build_level (kern::game::Level als lokales Objekt der Engine, d);

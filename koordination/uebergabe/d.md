@@ -306,3 +306,12 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
 - **15:45 (Nachfolger 7):** work-d e2f1dc6f (work-zusammen 4ac2e4f9 eingemischt + Fix Feld eines Platzes als Wert). Laufen: `work-d-vergleich-154229-25045`
   (game*.cpp + people.cpp), `work-d-konvert-125538-27289` (275d3ddf). Danach: Engine-Suite `./mag.sh engine origin/work-d` → BEREIT ZUM MERGEN. Gebaut, unbelegt:
   work-d-fail 5500074b (printf-Knoten; Beleg: vergleich src/city_stream.cpp + Engine-Suite). Entwurf Felder von Engine-Objekten: stand/d.md „Nachfolger 7“.
+- **18:10 (Nachfolger 7, Ende):** work-d 739ca173: Teil-Beleg grün (154229: 99/99; Engine-Suite 163715 rc=0), aber Rückfall im ganzen Spiel (konvert 125538: 1633 statt 1725,
+  370× „was written and waits now“, „with a Blueprint's numbers“, run_buildings/b.chunks()). Nächstes: `./mag.sh holen work-d-probe-173035-30178` → Fehler mit TEST_ERRORS
+  lesen (convert.log.xz, „error:“), Stellvertreter des Platzes (TestWriter.stand_in, f.get("place") / converted::engine_place) für die Quelle mit Blueprint-Zahlen richten;
+  Gegenprobe work-zusammen-voll-143319 (zeigt sie den Rückfall auch, ist es nicht d). Dann konvert 9 neu → BEREIT. work-d-fail: Engine-Suite 170043 holen → BEREIT.
+  Nicht gebaut: Felder von Engine-Objekten (Entwurf stand/d.md „Nachfolger 7“). Offener alter Auftrag work-d-belege2-vergleich-055022-6799 (veraltet) wartet noch –
+  abbrechen durfte ich nicht (Rechte).
+- **19:00:** work-d e9ed65ca (Feld-Plätze + run_buildings-Fix, unbelegt). Offen: Engine-Suite `work-d-engine-185841-1710` holen; dann
+  `./mag.sh vergleich origin/work-d src/game*.cpp src/people.cpp src/city_jobs.cpp`; work-d-fail: Engine-Suite `work-d-fail-engine-170043-6435` holen →
+  BEREIT (vorher work-zusammen einmischen, c änderte engine_api.py). Platz als Ganzes BEREIT erst mit konvert ohne den fremden Rückfall (t1).

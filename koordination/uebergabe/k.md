@@ -243,3 +243,7 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
   * 163507-23262 (0679bafe): tyre und Car::step geschrieben, converted_car_cpp ok in beiden Durchgängen. build_water_chunk ist geschrieben, aber terrain ist rot (Ursache war 3af75896).
   * Beleg 171851-19774 (3af75896) läuft: terrain, tiles, game_swarm, game_gaps, game_barricades, game.cpp.
 - Offen bzw. nicht meins: siehe stand/k.md „Nachfolger 6“. minimap_json ist ein BEFUND für g (Absenkung).
+- 18:20 Nachträge: 3af75896 und c684e716…54dcd7cd sind gemergt (work-zusammen a424629f). Belegt sind 171851-19774 und 175551-12446 (18/18 in beiden Durchgängen).
+  4e562137: either_place mit *gaps_/p->x. Der Beleg work-k-vergleich-182152-5898 läuft (gaps_draw).
+  e1362b36 wirkte nicht und ist mit 5ce2b49c zurückgenommen. Das Problem ~Car/~Ragdolls im Test ist an t1 übergeben (stand/k.md).
+  BEFUND t1: UB in der Quelle durch gezogene Eingaben (build_water_chunk ci*80).

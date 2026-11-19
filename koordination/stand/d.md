@@ -1,5 +1,13 @@
 # Stand d (18.11., Nachfolger)
 
+- **19:00 (Nachfolger 7):** work-d = **e9ed65ca** (+ work-zusammen 789f8463 Rückrufe c: 2ff9ce33, Konflikt nur Doku/engine_case.gen.h; + e9ed65ca).
+  (2) **run_buildings behoben:** der Stellvertreter eines Platzes gab den Typ ohne `&` zurück (spell) – `auto& chunks = b.chunks()` band ein Temporäres. Lokal
+  (Konverter über city_jobs.cpp, TEST_ERRORS): run_buildings geschrieben, übersetzt. (3) **Feld-Plätze gebaut** (Entwurf oben): Api.fields → 46 Knoten
+  engine.<klasse>.<feld> (EngineFunction::field: Binden ohne Aufruf), Konverter Emit.engine_field (lesen/setzen/als Platz), Stellvertreter-Felder +
+  converted::FieldSync, Doku „Felder eines Objekts der Engine“. Unbelegt; Engine-Suite `work-d-engine-185841-1710` abgelegt; danach vergleich über
+  game*.cpp + people.cpp + city_jobs.cpp (look_view_models, look_command, vr_comfort, run_buildings).
+  BEFUND FÜR t1: keine – die Probe 173035 kam nicht mehr zum Zug (abgebrochen); der fremde Rückfall ist laut Koordinator nicht von d.
+
 ## Nachfolger 7 (ab 15:00, 19.11.; nach Server-Neustart 15:40 weiter)
 - work-d = **e2f1dc6f** = 275d3ddf + work-zusammen 0f7f5a46 (0651fb31; Konflikt Emit.engine: asks_engine behalten, Wartestelle bleibt weg) + work-zusammen 4ac2e4f9
   (7e836a51; blueprint.h Sought<T>/Listen jeder Breite (p) + Platz-Fassungen/read_of (d); is_local/writable bound + sees_state) + Fix e2f1dc6f.
@@ -14,6 +22,18 @@
   td.width = …): ein öffentliches Feld eines Objekts mit Handle ist ein Platz der Engine wie `T& f() { return f_; }` (Knoten engine.<klasse>.<feld>, @get/@set).
   Offen ist die Quellseite im Test: `m->visible` lässt sich in C++ nicht abfangen → Stellvertreter-Felder als echte Glieder, abgeglichen wie converted::engine_place
   (vor jedem Engine-Aufruf setzen, danach lesen); das Binden eines Felds ist kein Aufruf.
+
+- **18:10 Stand (Nachfolger 7):** work-d = **739ca173** (+ work-zusammen fb51251f Rekursion, ohne Konflikt, Generator unverändert).
+  Belege: `work-d-vergleich-154229-25045` (e2f1dc6f; alle game*.cpp + people.cpp): convert/bau rc=0, **99/99 ok in beiden Durchgängen, 0 LECK**; Game::ui_mix_cues
+  (sound_cues()-Platz, Einträge am Platz geändert) geschrieben, 20/20 Aufrufe verglichen. Engine-Suite `work-d-engine-163715-25680` (739ca173) rc=0, 55620 checks, 0 failures.
+  **NICHT BEREIT – Rückfall im ganzen Spiel:** `work-d-konvert-125538-27289` (275d3ddf): convert rc=0, aber **1633 statt 1725 geschrieben, 370× „was written and waits now“**
+  (Läufe 070328/100601/123021: 0) – „its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game' … that went with Car / Server“
+  (86 Funktionen) und run_buildings „non-const lvalue reference to type 'vector<...>' cannot bind to a temporary“ (auto& chunks = b.chunks() – ein Platz). Verdacht:
+  der Stellvertreter eines Platzes (converted::engine_place) passt nicht zur Quelle mit den Zahlen des Blueprints. Probe mit TEST_ERRORS:
+  `work-d-probe-173035-30178` (src/city_jobs.cpp) wartet auf mag. Gegenprobe ohne d: `work-zusammen-voll-143319-13859` (0f7f5a46) läuft noch.
+  Shots()/handle_shots/look_lighting im ganzen Spiel erst nach diesem Fix belegbar.
+- **work-d-fail 5500074b:** `work-d-fail-vergleich-163726-27574` (src/city_stream.cpp): 10/10 beide Durchgänge, GeoProjector::init geschrieben (converted_engine_geo_roads ok);
+  Engine-Suite `work-d-fail-engine-170043-6435` wartet auf mag.
 
 ## Nachfolger 6 (ab 07:45, 19.11.)
 - **Aufgabe 1 Uhren gegen die Engine – Fix gebaut:** Zweig **work-d-uhr = 4b7074b1** (ein Commit auf work-zusammen 821208ac; nur tests/rule_blueprint.h + converted.h).

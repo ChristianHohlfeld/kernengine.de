@@ -1,41 +1,50 @@
-# Lücken des Wegs „nur aus Blueprints“ – Level level/spawncity.klevel, Protokoll convert.log.xz
-# Funktionen ohne Blueprint: 123 (geschrieben 1727 von 1844) · Exporte ohne Blueprint: 25 von 25 · Engine ruft Programm: 3 Klassen, 1 Funktionswerte · Einstieg in C++: 1
+# Lücken des Wegs „nur aus Blueprints“ – Level ../kernengine.de/koordination/s5/l143/spawncity.klevel, Protokoll convert.log.xz
+# Funktionen ohne Blueprint: 146 (geschrieben 1706 von 1846) · Exporte ohne Blueprint: 25 von 25 · Engine ruft Programm: 3 Klassen, 1 Funktionswerte · Einstieg in C++: 1
 
 ## 1. Funktionen ohne Blueprint (Blueprint: Funktion (Zeilen): Grund)
 Game/game_audio_web_cpp: Game::web_audio_command (19 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_audio_web_cpp)
-Game/game_controls_cpp: Game::read_input (61 lines): it calls Game::ctl_strike_confirm(), which waits
-Game/game_controls_cpp: Game::ctl_discrete (95 lines): it calls Game::ctl_strike_confirm(), which waits
+Game/game_controls_cpp: Game::read_input (61 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_controls_cpp: Game::ctl_discrete (95 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_controls_cpp: Game::ctl_grenade (47 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
 Game/game_controls_cpp: Game::foot_input (191 lines): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
+Game/game_controls_cpp: Game::ctl_view_json (158 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_controls_cpp: Game::ctl_touch_shot (29 lines): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_controls_cpp)
 Game/game_controls_cpp: Game::drone_input (116 lines): it calls Game::hit_scan(), which waits
-Game/game_controls_cpp: Game::jet_input (62 lines): it calls Game::hit_scan(), which waits
+Game/game_controls_cpp: Game::jet_input (62 lines): a constant computed with kern_musl_cosf()
+Game/game_controls_cpp: Game::ctl_hud_json (33 lines): it calls Game::ctl_view_json(), which waits
+Game/game_controls_cpp: Game::ctl_command (136 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_cpp: register_node (18 lines): an object of the engine (NodeDef) copied or moved as a whole
-Game/game_cpp: Game::Game (1 lines): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+Game/game_cpp: Game::Game (1 lines): the end of the state: its field cars_ is a list, a map or an array of what ends with it
 Game/game_cpp: Game::build_level (99 lines): an object of the engine as a local that is not made by a constructor of it
 Game/game_cpp: Game::start (111 lines): it calls register_node(), which waits
-Game/game_cpp: Game::stop (4 lines): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
-Game/game_cpp: Game::place_world (43 lines): it calls Game::ctl_strike_confirm(), which waits
-Game/game_cpp: Game::fixed_step (34 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_cpp: Game::drive_traffic (86 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_cpp: Game::manage_traffic (98 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_cpp: Game::update (87 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_cpp: Game::draw_vehicles (27 lines): the end of a Car runs its destructor ~Car(), which is not written yet
+Game/game_cpp: Game::place_world (43 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_cpp: Game::fixed_step (34 lines): it calls tyre(), which waits
+Game/game_cpp: Game::drive_traffic (86 lines): it calls tyre(), which waits
+Game/game_cpp: Game::update (87 lines): it calls Game::mp_local_ready(), which waits
+Game/game_cpp: Game::draw_vehicles (27 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no matching constructor for initialization of 'kern::net::Client[8]' - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_cpp: Game::audio_render (13 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_cpp: Game::update_sound (38 lines): the engine's sound_cues() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
-Game/game_cpp: Game::hud_json (136 lines): a loop that changes the characters of a text
-Game/game_cpp: Game::command (268 lines): it calls Game::ctl_strike_confirm(), which waits
+Game/game_cpp: Game::hud_json (136 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_cpp: Game::command (268 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_details_cpp: Game::update_details (60 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_details_cpp)
 Game/game_events_cpp: Game::update_fighters_back (80 lines): the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
 Game/game_events_cpp: Game::update_enemies (94 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_events_cpp)
 Game/game_events_cpp: Game::update_combat (24 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_events_cpp)
+Game/game_events_cpp: Game::combat_command (151 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_foot_rounds_cpp: Game::round_meets_mate (7 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_foot_rounds_cpp: Game::foot_round_step (100 lines): it calls Game::round_meets_mate(), which waits
 Game/game_foot_rounds_cpp: Game::foot_rounds_update (60 lines): the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+Game/game_foot_rounds_cpp: Game::melee_hit (46 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_foot_rounds_cpp: Game::melee_attack (61 lines): it calls Game::melee_hit(), which waits
 Game/game_gaps_cpp: Game::gaps_update (155 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_gaps_cpp)
 Game/game_gaps_cpp: Game::gaps_sirens (58 lines): tuple / variant
 Game/game_gaps_cpp: Game::gaps_jet_audio (57 lines): a pointer
 Game/game_gaps_cpp: Game::gaps_draw (41 lines): a pointer
-Game/game_guided_cpp: Game::update_guided (37 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game/game_gaps_cpp: Game::gaps_hud (30 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_gaps_cpp: Game::gaps_command (103 lines): it calls Game::gaps_hud(), which waits
+Game/game_guided_cpp: Game::update_guided (37 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_lamps_cpp: Game::gaps_lamps_update (33 lines): the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
-Game/game_life_cpp: Game::life_update (230 lines): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+Game/game_life_cpp: Game::life_update (230 lines): a pointer
 Game/game_life_cpp: Game::life_command (182 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_life_cpp)
 Game/game_look_cpp: Game::look_lighting (158 lines): the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
 Game/game_look_cpp: Game::look_draw (63 lines): a member of Int is set
@@ -47,13 +56,31 @@ Game/game_military_cpp: Game::step_heli (69 lines): Game::explosion() of the Blu
 Game/game_military_cpp: Game::step_soldier (71 lines): the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
 Game/game_military_cpp: Game::update_military (81 lines): it calls Game::step_heli(), which waits
 Game/game_military_cpp: Game::update_jets (55 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_military_cpp)
+Game/game_net_cpp: Game::mp_local_ready (4 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::voice_mic_on (1 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::world_rule_locked (5 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::net_world_rules (23 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::world_rules_json (12 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::my_state (93 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_net_cpp: Game::rebase_origin (25 lines): it calls GeoProjector::init(), which waits
-Game/game_net_cpp: Game::update_net (196 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_net_cpp: Game::draw_remote_vehicles (55 lines): the end of a Car runs its destructor ~Car(), which is not written yet
-Game/game_net_cpp: Game::net_command (225 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game/game_net_cpp: Game::update_net (196 lines): it calls Game::mp_local_ready(), which waits
+Game/game_net_cpp: Game::mp_input (14 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::voice_capture (5 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::mix_voice (4 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::remote_on_segment (65 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::hit_remotes (40 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::blast_shown (9 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::blast_remotes (19 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::draw_remote_people (76 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::draw_remote_vehicles (55 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no matching constructor for initialization of 'kern::net::Client[8]' - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::update_nav (34 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::project_screen (24 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::mp_hud_json (133 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::bigmap_json (69 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_net_cpp: Game::net_command (225 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_swarm_cpp: Game::swarm_apply_hit (49 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_swarm_cpp)
 Game/game_swarm_cpp: Game::swarm_update (104 lines): algorithm: std::find_if in a list that is no place of the function
-Game/game_swarm_cpp: Game::swarm_draw_vehicles (11 lines): the end of a Car runs its destructor ~Car(), which is not written yet
+Game/game_swarm_cpp: Game::swarm_draw_vehicles (11 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no viable conversion from 'converted_Game__game_swarm_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_town_cpp: Game::handle_shots (80 lines): a reference to something it changes
 Game/game_town_cpp: Game::wreck_car (32 lines): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_town_cpp)
 Game/game_town_cpp: Game::explosion (45 lines): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_town_cpp)
@@ -61,35 +88,36 @@ Game/game_town_cpp: Game::step_cop (81 lines): the engine's shots() (it gives a 
 Game/game_town_cpp: Game::police_drone_mate_hit (16 lines): it calls Game::explosion(), which waits
 Game/game_town_cpp: Game::update_police_drones (111 lines): it calls Game::explosion(), which waits
 Game/game_town_cpp: Game::update_police (65 lines): it calls Game::step_cop(), which waits
-Game/game_town_cpp: Game::update_town (88 lines): it calls Game::ctl_strike_confirm(), which waits
+Game/game_town_cpp: Game::update_town (88 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_town_cpp: Game::draw_town (38 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_town_cpp: Game::minimap_json (72 lines): the struct Feat (its field pts: a pointer)
-Game/game_townsync_cpp: Game::townsync_update (124 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_traffic_cpp: Game::traffic_rules (26 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game/game_townsync_cpp: Game::townsync_update (124 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: non-const lvalue reference to type 'CarHit' cannot bind to a value of unrelated type 'town::PersonHit')
 Game/game_traffic_cpp: Game::update_traffic_world (99 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_traffic_cpp)
-Game/game_traffic_cpp: Game::step_tow (140 lines): the end of a Car runs its destructor ~Car(), which is not written yet
-Game/game_traffic_cpp: Game::traffic_json (22 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_traffic_far_cpp: Game::traffic_far_switch (33 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_traffic_far_cpp: Game::traffic_far_step (55 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
-Game/game_ui_cpp: Game::ui_command (115 lines): it calls Game::ctl_strike_confirm(), which waits
+Game/game_traffic_cpp: Game::step_tow (140 lines): it calls tyre(), which waits
+Game/game_ui_cpp: Game::ui_command (115 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_ui_cpp: Game::ui_move_world (7 lines): it calls GeoProjector::init(), which waits
-Game/game_ui_cpp: Game::ui_gps_update (14 lines): it calls Game::ctl_strike_confirm(), which waits
-Game/game_ui_cpp: Game::ui_apply_settings (21 lines): it calls Game::ctl_strike_confirm(), which waits
+Game/game_ui_cpp: Game::ui_gps_update (14 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_ui_cpp: Game::ui_apply_settings (21 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_ui_cpp: Game::ui_update (20 lines): it calls Game::ui_apply_settings(), which waits
 Game/game_ui_cpp: Game::ui_mix_audio (17 lines): an assignment to CXXMemberCallExpr
 Game/game_ui_cpp: Game::ui_mix_cues (13 lines): the engine's sound_cues() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
-Game/game_ui_cpp: Game::ui_reset (46 lines): it calls Game::ctl_strike_confirm(), which waits
-Game/game_vr_cpp: Game::vr_melee (81 lines): an assignment inside an expression
-Game/game_vr_cpp: Game::vr_menu_input (115 lines): it calls Game::ctl_strike_confirm(), which waits
-Game/game_vr_cpp: Game::vr_foot (82 lines): it calls Game::ctl_strike_confirm(), which waits
+Game/game_ui_cpp: Game::ui_reset (46 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_vr_cpp: Game::vr_melee (81 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_vr_cpp: Game::vr_menu_input (115 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_vr_cpp: Game::vr_menu_json (15 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
+Game/game_vr_cpp: Game::vr_foot (82 lines): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Client: no viable conversion from 'converted_Game__game_net_cpp::CarSpec' to 'u64' (aka 'unsigned long'))
 Game/game_vr_cpp: Game::vr_comfort (88 lines): a member of Int is set
 Game/game_weapons_cpp: Game::hit_scan (86 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_weapons_cpp)
-Game/game_weapons_cpp: Game::update_projectiles (61 lines): GotoStmt
+Game/game_weapons_cpp: Game::update_projectiles (61 lines): it calls Game::round_meets_mate(), which waits
+Game/game_weapons_cpp: Game::foot_attack (43 lines): it calls Game::melee_hit(), which waits
 Game/game_weapons_cpp: Game::drone_attack (32 lines): it calls Game::hit_scan(), which waits
-Game/game_weapons_cpp: Game::jet_attack (49 lines): it calls Game::hit_scan(), which waits
-Game/game_world_cpp: Game::update_world (39 lines): algorithm: std::remove_if with a function value that is no lambda
-Game/game_world_cpp: Game::step_world (35 lines): the end of a Car runs its destructor ~Car(), which is not written yet
-Game/game_world_cpp: Game::world_command (76 lines): an entry of a list handed to change to a function that may run handlers (it calls on an actor's Blueprint)
+Game/game_weapons_cpp: Game::jet_attack (49 lines): a constant computed with kern_musl_cosf()
+Game/game_world_cpp: Game::update_world (39 lines): Game::look_blast() of the Blueprint Game is not written (it went round with Game/game_world_cpp)
+Game/game_world_cpp: Game::step_world (35 lines): it calls tyre(), which waits
+Game/game_world_cpp: Game::world_command (76 lines): Game::explosion() of the Blueprint Game is not written (it went round with Game/game_world_cpp)
 Game/game_worldsync_cpp: Game::worldsync_update (472 lines): the struct List (its field g: a pointer)
+car_cpp: tyre (12 lines): a constant computed with kern_musl_tanf()
+car_cpp: Car::step (171 lines): it calls tyre(), which waits
 city_jobs_cpp: run_tile (36 lines): it calls GeoProjector::init(), which waits
 city_jobs_cpp: run_buildings (29 lines): a reference to something it changes
 city_jobs_cpp: buildings_input (14 lines): a place in a list of another shape
@@ -111,9 +139,6 @@ engine_logic_logic: Instance::tier (1 lines): a function of Instance, an object 
 engine_logic_logic: Runtime::instances (1 lines): a function of Runtime, an object of the engine (a handle in a Blueprint), that is no node of it
 facades_cpp: Facades::frame_uniforms (1 lines): the type kern::Renderer is only declared here (its definition is in another file)
 game_cpp: game (4 lines): the state of the Blueprint Game (its one object is that Blueprint, no value)
-interiors_cpp: Interiors::build (306 lines): a vector constant written as CallExpr
-interiors_cpp: Interiors::activate (44 lines): it calls Interiors::build(), which waits
-interiors_cpp: Interiors::update (55 lines): it calls Interiors::activate(), which waits
 mvt_cpp: Decoder::step (30 lines): a reference to something it changes
 mvt_cpp: decode (7 lines): it calls Decoder::step(), which waits
 mvt_cpp: Writer::end_layer (21 lines): a pointer
@@ -123,41 +148,39 @@ terrain_cpp: Terrain::build_water_chunk (117 lines): build_water_chunk_at(): it 
 terrain_cpp: Terrain::update (81 lines): it calls Terrain::build_water_chunk(), which waits
 tiles_cpp: extract (120 lines): a function value (lambda / std::function) of another shape: a lambda with auto inputs
 water_look_cpp: WaterLook::frame_uniforms (1 lines): the type kern::Renderer is only declared here (its definition is in another file)
-world_marks_cpp: Marks::update (13 lines): algorithm: std::remove_if with a function value that is no lambda
-world_marks_cpp: Marks::prune_walls (22 lines): algorithm: std::remove_if with a function value that is no lambda
 
 ## 2. Exporte des Programms, die kein Blueprint gibt (Name: wo das C++ ihn erklärt)
-sc_audio_init: src/main.cpp:162
-sc_audio_render: src/main.cpp:163
-sc_command: src/main.cpp:138
-sc_dem_data: src/main.cpp:96
-sc_dem_failed: src/main.cpp:99
-sc_dem_requests: src/main.cpp:94
-sc_gamepad: src/main.cpp:109
-sc_hud: src/main.cpp:137
-sc_image_data: src/main.cpp:103
-sc_image_failed: src/main.cpp:106
-sc_image_requests: src/main.cpp:102
-sc_mouse: src/main.cpp:124
-sc_net_push: src/main.cpp:142
-sc_net_take: src/main.cpp:146
-sc_offline: src/main.cpp:91
-sc_pointer_lock: src/main.cpp:125
-sc_result_length: src/main.cpp:83
-sc_tile_data: src/main.cpp:87
-sc_tile_failed: src/main.cpp:90
-sc_tile_requests: src/main.cpp:86
-sc_touch: src/main.cpp:131
-sc_touch_frame: src/main.cpp:127
-sc_touch_view: src/main.cpp:134
-sc_voice_push: src/main.cpp:159
-sc_vr_hand: src/main.cpp:119
+sc_audio_init: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:162
+sc_audio_render: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:163
+sc_command: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:138
+sc_dem_data: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:96
+sc_dem_failed: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:99
+sc_dem_requests: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:94
+sc_gamepad: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:109
+sc_hud: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:137
+sc_image_data: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:103
+sc_image_failed: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:106
+sc_image_requests: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:102
+sc_mouse: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:124
+sc_net_push: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:142
+sc_net_take: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:146
+sc_offline: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:91
+sc_pointer_lock: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:125
+sc_result_length: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:83
+sc_tile_data: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:87
+sc_tile_failed: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:90
+sc_tile_requests: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:86
+sc_touch: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:131
+sc_touch_frame: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:127
+sc_touch_view: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:134
+sc_voice_push: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:159
+sc_vr_hand: ../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:119
 
 ## 3. Die Engine ruft das Programm (Klassen aus Klassen der Engine; Funktionswerte)
-src/blueprint_call.h:52: Blueprint : kern::logic::ActorBlueprint
-src/main.cpp:19: SpawnCityApp : kern::App
-src/shader_look.h:13: LookExtension : kern::ShaderExtension
-src/terrain.cpp:657: s.fn = [](void* u, f64 x, f64 y) -> f64 { return static_cast<const Terrain*>(u)->height(static_cast<f32>(x), static_cast
+../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/blueprint_call.h:47: Blueprint : kern::logic::ActorBlueprint
+../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:19: SpawnCityApp : kern::App
+../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/shader_look.h:13: LookExtension : kern::ShaderExtension
+../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/terrain.cpp:657: s.fn = [](void* u, f64 x, f64 y) -> f64 { return static_cast<const Terrain*>(u)->height(static_cast<f32>(x), static_cast
 
 ## 4. Einstieg (die App des Programms in C++)
-src/main.cpp:77
+../kernengine.de/koordination/s5/l143/kern/games/spawncity/src/main.cpp:77
