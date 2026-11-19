@@ -10915,6 +10915,8 @@ class Held:
 
 
 class TestWriter:
+    # the logic the level's Blueprints run in, and the program's way to call them: the test's own (converted::Blueprint, RuleBlueprint)
+    OWN_LOGIC = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
     """The test of one converted file (see tests/converted.h of the game). It holds the source of the
     file's converted functions once more, compiled with the numbers and the mathematics of the
     Blueprint language - classes and constants along with them - and calls each function there and
@@ -12087,6 +12089,11 @@ class TestWriter:
         the stand-in answers. `plain`: a method of plain data (the test's own struct, MeshData::as_input) - the
         struct is its first value, and what a method that is not const makes of it, the first it takes."""
         d = f["decl"]
+        for raw in [qtype(p) for p in kids(d) if p.get("kind") == "ParmVarDecl"] + [re.sub(r"\(.*$", "", qtype(d))]:
+            if self.u.object_of(raw) in self.OWN_LOGIC:
+                # (the logic the level's Blueprints run in is the test's own, no stand-in: GameWorld::logic_runtime
+                # gives it - the stand-in of the engine has none to give, a function that asks for it is not compared)
+                raise Wait(f"it hands the logic the Blueprints run in ({self.u.object_of(raw).split('::')[-1]}) between the program and a stand-in of the engine")
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["converted::value_of(*this)"] if cls else []), []
         if plain and not qtype(d).rstrip().endswith("const"):
@@ -12246,7 +12253,7 @@ class TestWriter:
                     defs.append((("engine", f["decl"]["id"]), b))
         # (the logic the level's Blueprints run in, and the program's way to call them, are the test's own: it
         # runs the actors' Blueprints in a real one - converted::Blueprint, RuleBlueprint)
-        own_logic = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
+        own_logic = self.OWN_LOGIC
         objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
         for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
             for b in self.engine_bases(q):
