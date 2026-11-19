@@ -662,9 +662,31 @@ inline Value arg(std::string_view x) { return Value::text(std::string(x)); }
 template <class T>
   requires(std::is_integral_v<T> && !std::is_same_v<T, bool>)
 Value arg(T x) { return Value::integer(static_cast<kern::i64>(x)); }
+/// The values of an enum, as the Blueprint has them: by their place in the enum (0, 1, 2 ...), not by the number C++ gives
+/// them. Where those differ (`enum class ClientState : i8 { denied = -3, ... }`), the test says the numbers in their order
+/// (converted::number_enum, written by the test); otherwise a value's place is its number.
+template <class E> struct EnumNumbers { static inline std::vector<kern::i64> numbers; };
+template <class E> bool number_enum(std::initializer_list<kern::i64> numbers) {
+  EnumNumbers<E>::numbers.assign(numbers);
+  return true;
+}
+/// The place of a value of the source (-1: a number that is no value of the enum - the Blueprint has none such).
+template <class E> kern::i64 enum_place(E e) {
+  const std::vector<kern::i64>& n = EnumNumbers<E>::numbers;
+  if (n.empty()) return static_cast<kern::i64>(e);
+  for (std::size_t k = 0; k < n.size(); ++k)
+    if (n[k] == static_cast<kern::i64>(e)) return static_cast<kern::i64>(k);
+  return -1;
+}
+/// The value at a place (a place the enum does not have: that number, as the source would read it).
+template <class E> E enum_value(kern::i64 place) {
+  const std::vector<kern::i64>& n = EnumNumbers<E>::numbers;
+  if (!n.empty() && place >= 0 && place < static_cast<kern::i64>(n.size())) return static_cast<E>(n[static_cast<std::size_t>(place)]);
+  return static_cast<E>(place);
+}
 template <class E>
   requires std::is_enum_v<E>
-Value arg(E e) { return Value::enumeration(static_cast<kern::i64>(e)); }
+Value arg(E e) { return Value::enumeration(enum_place(e)); }
 /// A pair - a row of a map: the struct of its two parts.
 template <class A, class B> Value arg(const std::pair<A, B>& p) { return Value::structure({arg(p.first), arg(p.second)}); }
 template <class T> Value arg(const std::vector<T>& v) {
@@ -676,7 +698,7 @@ template <class T> Value arg(const std::vector<T>& v) {
     return Value::of(std::vector<kern::i64>(v.begin(), v.end()));
   } else if constexpr (std::is_enum_v<T>) {
     std::vector<kern::i64> out;
-    for (const T& x : v) out.push_back(static_cast<kern::i64>(x));
+    for (const T& x : v) out.push_back(enum_place(x));
     return Value::enumerations(std::move(out));
   } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
     return Value::of(std::vector<std::string>(v.begin(), v.end()));
@@ -774,7 +796,7 @@ bool same(T want, const Value& got) {
 template <class E>
   requires std::is_enum_v<E>
 bool same(E want, const Value& got) {
-  return got.i == static_cast<kern::i64>(want) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want)); }, [&] { return std::to_string(got.i); });
+  return got.i == enum_place(want) || differ_at([&] { return std::to_string(enum_place(want)); }, [&] { return std::to_string(got.i); });
 }
 template <class A, class B> bool same(const std::pair<A, B>& want, const Value& got) {
   return rows_of(got, 2) && at_place(same(want.first, (*got.rows)[0]), ".first") && at_place(same(want.second, (*got.rows)[1]), ".second");
@@ -793,8 +815,9 @@ template <class T> bool same(const std::vector<T>& want, const Value& got) {
   } else if constexpr (std::is_integral_v<T> || std::is_enum_v<T>) {
     const auto& g = got.items<kern::i64>();
     if (!lengths(want.size(), g.size())) return false;
+    const auto as_held = [](const T& x) -> kern::i64 { if constexpr (std::is_enum_v<T>) return enum_place(x); else return static_cast<kern::i64>(x); };
     for (std::size_t i = 0; i < want.size(); ++i)
-      if (!at_place(g[i] == static_cast<kern::i64>(want[i]) || differ_at([&] { return std::to_string(static_cast<kern::i64>(want[i])); }, [&] { return std::to_string(g[i]); }), "[" + std::to_string(i) + "]"))
+      if (!at_place(g[i] == as_held(want[i]) || differ_at([&] { return std::to_string(as_held(want[i])); }, [&] { return std::to_string(g[i]); }), "[" + std::to_string(i) + "]"))
         return false;
     return true;
   } else if constexpr (std::is_same_v<T, std::string> || std::is_same_v<T, std::string_view>) {
@@ -1032,7 +1055,7 @@ template <class T>
 void take(T& to, const Value& v) { to = static_cast<T>(v.as_int()); }
 template <class E>
   requires std::is_enum_v<E>
-void take(E& to, const Value& v) { to = static_cast<E>(v.i); }
+void take(E& to, const Value& v) { to = enum_value<E>(v.i); }
 template <class T>
   requires std::is_base_of_v<EngineObject, T>
 void take(T*& to, const Value& v) { to = engine_object<std::remove_const_t<T>>(v.as_int()); }   // (one the source may only read: the same object)
