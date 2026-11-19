@@ -48,6 +48,9 @@ struct Whole;
 template <char Op, class A, class B> struct Sum;
 template <class T> inline constexpr bool is_sum = false;
 template <char Op, class A, class B> inline constexpr bool is_sum<Sum<Op, A, B>> = true;
+template <class T> struct Sized;
+template <class T> inline constexpr bool is_sized = false;
+template <class T> inline constexpr bool is_sized<Sized<T>> = true;
 }  // namespace logic
 
 /// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
@@ -97,6 +100,7 @@ inline i64 bits_of(f64 a) {
   return a > 0 ? std::numeric_limits<i64>::max() : std::numeric_limits<i64>::min();
 }
 inline i64 bits_of(const logic::Whole& a);  // (an Int: as the double it is - below, where Whole is)
+template <class T> inline i64 bits_of(logic::Sized<T> a);  // (an Int of a fixed width: the Int it is)
 /// The whole number one of these functions gives (band bor bxor shl shr wrap32 wrap32s mul32):
 /// it stands for the double static_cast<f64>(v) - that is what it is everywhere a number is
 /// asked for. Handed on to another of these functions, the number is taken as it is where that
@@ -111,7 +115,7 @@ inline i64 bits_of(Exact a) {
   return a.v >= -exact && a.v <= exact ? a.v : bits_of(static_cast<f64>(a.v));
 }
 /// (what these functions take: a number, or the whole number another of them gave)
-template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || logic::is_sum<T> || std::is_arithmetic_v<T>;
+template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || logic::is_sum<T> || logic::is_sized<T> || std::is_arithmetic_v<T>;
 template <Bits A, Bits B> inline Exact band(A a, B b) { return {bits_of(a) & bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bor(A a, B b) { return {bits_of(a) | bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bxor(A a, B b) { return {bits_of(a) ^ bits_of(b)}; }
@@ -153,7 +157,33 @@ struct Whole {
   u64 hash() const { return KeyHash<i64>{}(v); }  // (a key of a Map, a Set)
 };
 }  // namespace logic
+namespace logic {
+/// `U8` ... `I32` in a Blueprint's C++: an Int place of a fixed width (logic::kWidthNames). It holds
+/// what it is given as C++ stores an integer in a T (static_cast<T>: the low bits, two's complement
+/// for a signed T) - from any whole number, an Int, another width; read, it is an Int (Whole). Adding
+/// to it (Add to Variable, `Count += 1`) adds the low bits, as C++'s += on a T stores the sum.
+template <class T> struct Sized {
+  static_assert(std::is_integral_v<T> && sizeof(T) <= 4);
+  T v = 0;
+  constexpr Sized() = default;
+  template <class I>
+    requires std::is_integral_v<I>
+  constexpr Sized(I x) : v(static_cast<T>(static_cast<u64>(static_cast<i64>(x)))) {}  // NOLINT (implicit: C++ stores it so)
+  constexpr Sized(Whole x) : v(static_cast<T>(static_cast<u64>(x.v))) {}            // NOLINT
+  template <class U> constexpr Sized(Sized<U> x) : v(static_cast<T>(static_cast<u64>(static_cast<i64>(x.v)))) {}  // NOLINT
+  constexpr Sized(math::Exact x) : Sized(Whole(x)) {}                                // NOLINT
+  template <char Op, class A, class B> Sized(const Sum<Op, A, B>& x) : Sized(Whole(x)) {}  // NOLINT
+  constexpr operator Whole() const { Whole r; r.v = static_cast<i64>(v); return r; }  // NOLINT (implicit: it is that Int)
+  Sized& operator+=(Whole amount) {
+    v = static_cast<T>(static_cast<u64>(static_cast<i64>(v)) + static_cast<u64>(amount.v));
+    return *this;
+  }
+  u64 hash() const { return KeyHash<i64>{}(static_cast<i64>(v)); }
+  friend constexpr bool operator==(Sized a, Sized b) { return a.v == b.v; }
+};
+}  // namespace logic
 namespace math {
+template <class T> inline i64 bits_of(logic::Sized<T> a) { return static_cast<i64>(a.v); }
 /// An Int handed to band ... mul32 (a formula of whole numbers): its bits are those of the double
 /// it is (bits_of(double(v))) - as Exact's, without the way through the double.
 inline i64 bits_of(const logic::Whole& a) { return bits_of(Exact{a.v}); }
@@ -318,6 +348,13 @@ class Text {
   std::string str() && { return holds_ ? std::move(made_) : std::string(written_); }
   friend bool operator==(const Text& a, const Text& b) { return a.view() == b.view(); }
   friend auto operator<=>(const Text& a, const Text& b) { return a.view() <=> b.view(); }
+  /// Set Code: the character at `index` becomes `c`, where it stands (a text of the program is first made the
+  /// text's own). An index outside the text changes nothing.
+  void set_at(i64 index, char c) {
+    if (index < 0 || static_cast<u64>(index) >= size()) return;
+    if (!holds_) hold(std::string(written_));
+    made_[static_cast<std::size_t>(index)] = c;
+  }
 
  private:
   /// (appended where its characters are - one character as std::string's += of a char adds it)
@@ -498,6 +535,10 @@ template <> struct Held<Whole> {
   static constexpr PinType type = PinType::integer;
   static Whole from(const Value& v) { return v.as_int(); }
 };
+template <class T> struct Held<Sized<T>> {
+  static constexpr PinType type = PinType::integer;
+  static Sized<T> from(const Value& v) { return Sized<T>(v.as_int()); }
+};
 template <> struct Held<f64> {
   static constexpr PinType type = PinType::number;
   static f64 from(const Value& v) { return v.as_number(); }
@@ -622,6 +663,7 @@ template <class T> bool is_value(const Value& v) {
 inline Value to_value(bool v) { return Value::boolean(v); }
 inline Value to_value(i64 v) { return Value::integer(v); }
 inline Value to_value(Whole v) { return Value::integer(v); }
+template <class T> Value to_value(Sized<T> v) { return Value::integer(static_cast<i64>(v.v)); }
 inline Value to_value(f64 v) { return Value::number(v); }
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
@@ -945,6 +987,7 @@ struct Arg {
 };
 inline Arg arg(i64 v) { return {Arg::Kind::whole, v, 0, {}}; }
 inline Arg arg(Whole v) { return arg(static_cast<i64>(v)); }
+template <class T> Arg arg(Sized<T> v) { return arg(static_cast<i64>(v.v)); }
 inline Arg arg(f64 v) { return {Arg::Kind::number, 0, v, {}}; }
 inline Arg arg(std::string_view v) { return {Arg::Kind::text, 0, 0, v}; }
 /// One conversion of a format.
@@ -2141,11 +2184,13 @@ constexpr u64 widened(Code c, u64 w) {
 /// as it is wide - as C++ converts), an Int64's, a Float's as a float or a double.
 inline u64 entry_bits(Code, i64 v) { return static_cast<u64>(v); }
 inline u64 entry_bits(Code, Whole v) { return static_cast<u64>(static_cast<i64>(v)); }
+template <class T> u64 entry_bits(Code, Sized<T> v) { return static_cast<u64>(static_cast<i64>(v.v)); }
 inline u64 entry_bits(Code, Int64 v) { return v.bits; }
 inline u64 entry_bits(Code c, f64 v) { return bits(c, v); }
 /// The entry those bits of the number `c` are.
 inline void set_entry(i64& to, Code c, u64 w) { to = static_cast<i64>(widened(c, w)); }
 inline void set_entry(Whole& to, Code c, u64 w) { to = Whole(static_cast<i64>(widened(c, w))); }
+template <class T> void set_entry(Sized<T>& to, Code c, u64 w) { to = Sized<T>(static_cast<i64>(widened(c, w))); }
 inline void set_entry(Int64& to, Code, u64 w) { to = Int64(w); }
 inline void set_entry(f64& to, Code c, u64 w) { to = c == Code::f32 ? single_value(static_cast<u32>(w)) : std::bit_cast<f64>(w); }
 /// Where the numbers of a list may lie for Copy Bytes: an entry or a byte beyond every list (a list
@@ -2260,6 +2305,7 @@ template <class T> T native_out(const Instance& instance, int node, int out) { r
 inline void native_set(bool& variable, const Value& v) { variable = v.as_number() != 0; }
 inline void native_set(i64& variable, const Value& v) { variable = whole(v.as_number()); }
 inline void native_set(Whole& variable, const Value& v) { variable = whole(v.as_number()); }
+template <class T> void native_set(Sized<T>& variable, const Value& v) { variable = Sized<T>(whole(v.as_number())); }
 inline void native_set(f64& variable, const Value& v) { variable = v.as_number(); }
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
@@ -2693,6 +2739,7 @@ template <> struct To<Whole> : To<i64> {
   static Whole from(math::Exact v) { return Whole(v); }  // (a formula of whole numbers: whole(double(v)) is normal(v))
 };
 template <> struct To<f64> {
+  template <class T> static f64 from(Sized<T> v) { return static_cast<f64>(v.v); }
   static f64 from(bool v) { return v ? 1 : 0; }
   static f64 from(i64 v) { return static_cast<f64>(v); }
   static f64 from(f64 v) { return v; }

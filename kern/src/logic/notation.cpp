@@ -37,7 +37,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "List", "Fixed", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "loop", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -81,6 +81,14 @@ const char* cpp_type(PinType t) {
     default: return "void";
   }
 }
+/// An Int of a fixed width as the notation writes it: "u32" is U32.
+std::string width_cpp(std::string_view of) { return of.empty() ? std::string() : std::string(1, static_cast<char>(of[0] - 'a' + 'A')) + std::string(of.substr(1)); }
+/// The width a C++ name of one names (U32: "u32"; none: empty).
+std::string width_of_cpp(std::string_view name) {
+  for (std::string_view w : kWidthNames)
+    if (name == width_cpp(w)) return std::string(w);
+  return {};
+}
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
@@ -89,6 +97,7 @@ std::string cpp_type(const TypeRef& t) {
   if (t.type == PinType::set) return "Set<" + cpp_type(key_type(t)) + ">";
   // (a list of a fixed length, as a place is declared: Fixed<Float, 16>)
   if (t.count && is_list(t.type)) return "Fixed<" + cpp_type(TypeRef{element_of(t.type), t.of}) + ", " + std::to_string(t.count) + ">";
+  if (has_width(t)) return is_list(t.type) ? "List<" + width_cpp(t.of) + ">" : width_cpp(t.of);  // (an Int of a fixed width: U32, List<U8>)
   if (element_of(t.type) != PinType::enumeration && element_of(t.type) != PinType::structure) return cpp_type(t.type);
   return is_list(t.type) ? "List<" + t.of + ">" : t.of;
 }
@@ -870,7 +879,7 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" ||
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" || t == "text.set_code" ||
              // (a map's or a set's steps put entries in or take them out - and move the others: a map's values are its entries)
              t == "map.set" || t == "map.add" || t == "map.remove" || t == "map.remove_at" || t == "map.clear" || t == "map.reserve" ||
              t == "set.add" || t == "set.remove" || t == "set.remove_at" || t == "set.clear" || t == "set.reserve";
@@ -935,7 +944,7 @@ struct Shape {
         w.root = at(x).node->param("variable");
         if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
         // (a Take puts the zero where something stood, like a Set; Sort puts other items there, Copy Bytes other bytes)
-        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes";
+        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes" && t != "text.set_code";
         w.node = x;
         own[f].push_back(std::move(w));
       }
@@ -1242,7 +1251,7 @@ struct Shape {
       for (int k : x.data_out) {
         const std::string& id = x.out[static_cast<std::size_t>(k)].id;
         PinType type;
-        if (id.empty() || !is_start(id[0]) || cpp_keyword(id) || type_of_cpp(id, type) || !std::all_of(id.begin(), id.end(), is_part))
+        if (id.empty() || !is_start(id[0]) || cpp_keyword(id) || type_of_cpp(id, type) || !width_of_cpp(id).empty() || !std::all_of(id.begin(), id.end(), is_part))
           return fail(title(i) + ": the output \"" + id + "\" has no name C++ can write", i);
       }
     }
@@ -2120,8 +2129,8 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
-const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, Int64, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
-const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>";
+const char* const kTypes = "a type (Bool, Int, U8 ... I32, Float, Vector, Text, Actor, Int64, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
+const char* const kListTypes = "List<Bool>, List<Int>, List<U8> ... List<I32>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>";
 
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
@@ -2578,6 +2587,11 @@ struct Reader {
     if (!literal_here(v, &of, &count)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
     if (failed()) return false;
     if (v.type == PinType::integer && want.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
+    if (v.type == PinType::integer && want.type == PinType::integer && has_width(want) && of.empty()) {
+      // (an Int of a fixed width: a whole number it holds - C++ would store another there)
+      if (wrapped(v.i, want.of) != v.i) return fail(at, what + ": " + std::to_string(v.i) + " is no " + cpp_type(want) + " (it would hold " + std::to_string(wrapped(v.i, want.of)) + ")");
+      of = want.of;
+    }
     if (want.count && !count && v.type == want.type && of == want.of) {
       // A list written out, for a place of a fixed length: the place's entries (C++ takes it the same
       // way; the text of the graph says Fixed<Float, 3>{...}). It says no more than the place has.
@@ -2597,6 +2611,11 @@ struct Reader {
     t = {};
     if (peek().kind != Tok::id) return false;
     if (type_of_cpp(peek().s, t.type)) { ++p; return true; }
+    if (std::string w = width_of_cpp(peek().s); !w.empty()) {  // (an Int of a fixed width: U8 ... I32)
+      t = {PinType::integer, std::move(w)};
+      ++p;
+      return true;
+    }
     if (g.enumeration(peek().s) || g.structure(peek().s)) {
       t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
       t.of = toks[p++].s;
@@ -2609,10 +2628,11 @@ struct Reader {
       const std::size_t at = p;
       p += 2;
       TypeRef key, value;
-      if (!type_here(key) || !key_type_ok(key.type) || key.count) return fail(at + 2, "the keys of a map or a set are Bool, Int, Int64, Text or an enum");
+      if (!type_here(key) || !key_type_ok(key.type) || key.count || has_width(key)) return fail(at + 2, "the keys of a map or a set are Bool, Int, Int64, Text or an enum");
       if (map) {
         if (!expect(",")) return false;
-        if (!type_here(value) || is_keyed(value.type) || value.count) return fail(p, "the values of a map are a type a variable can be, but no map, set or list of a fixed length");
+        if (!type_here(value) || is_keyed(value.type) || value.count || has_width(value))
+          return fail(p, "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)");
       }
       t = {map ? PinType::map : PinType::set, keyed_of(key, map ? &value : nullptr)};
       return expect(">");
@@ -2623,11 +2643,12 @@ struct Reader {
       const bool fixed = is("Fixed");
       const Tok inner = peek(2);
       PinType item = PinType::number;
-      const bool value = inner.kind == Tok::id && type_of_cpp(inner.s, item);
+      const std::string width = inner.kind == Tok::id ? width_of_cpp(inner.s) : std::string();
+      const bool value = inner.kind == Tok::id && (type_of_cpp(inner.s, item) || !width.empty());
       const bool of_enum = inner.kind == Tok::id && g.enumeration(inner.s), of_struct = inner.kind == Tok::id && g.structure(inner.s);
       if ((!value && !of_enum && !of_struct) || !is(fixed ? "," : ">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
       p += 4;
-      t = value ? TypeRef{list_of(item), {}} : TypeRef{of_enum ? PinType::enumeration_list : PinType::structure_list, inner.s};
+      t = !width.empty() ? TypeRef{PinType::integer_list, width} : value ? TypeRef{list_of(item), {}} : TypeRef{of_enum ? PinType::enumeration_list : PinType::structure_list, inner.s};
       if (!fixed) return true;
       const Tok length = peek();
       const u64 entries = length.kind == Tok::number && !length.real ? std::strtoull(length.s.c_str(), nullptr, 10) : 0;
@@ -3370,7 +3391,9 @@ struct Reader {
     if (src.count && src.count != pin.count)
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(TypeRef{pin.type, pin.of, pin.count}) + ", this is " +
                                cpp_type(TypeRef{v.type, src.of, src.count}));
-    if (v.type != pin.type || src.of != pin.of)
+    // (what flows into a pin is an Int: one of a fixed width is the place's - the place holds its low bits)
+    const bool any_int = v.type == PinType::integer && pin.type == PinType::integer && src.of.empty() && has_width(pin.type, pin.of);
+    if (v.type != pin.type || (src.of != pin.of && !any_int))
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
     m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, pin.of}));
@@ -3474,6 +3497,7 @@ struct Reader {
         TypeRef to;
         if (!expect("<")) return s;
         if (!type_here(to)) { fail(p, "kern::to<Type>: a type expected, not " + shown(peek())); return s; }
+        if (has_width(to)) { fail(p - 1, "a wire converts to an Int, the place holds its low bits: kern::to<Int>, not kern::to<" + cpp_type(to) + ">"); return s; }
         if (!expect(">") || !expect("(")) return s;
         Src inner = value();
         if (failed() || !expect(")")) return s;
@@ -4635,7 +4659,9 @@ struct Reader {
       for (const PinDef& pd : to.in) if (pd.id == w.in) in = &pd;
       if (!in) continue;
       const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
-      const std::string need = cpp_type(to_type), have = cpp_type(from_type);
+      const std::string need = cpp_type(TypeRef{to_type.type, to_type.type == PinType::integer ? std::string() : to_type.of}), have = cpp_type(from_type);
+      // (an Int is an Int, whatever width the place it comes from or goes to has: the place holds its low bits)
+      const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer);
       if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::integer)
         return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
       if (int_inputs.count({w.to, w.in})) {
@@ -4646,10 +4672,10 @@ struct Reader {
         continue;
       }
       if (w.from.cast) {
-        if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (from_type == to_type ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
-        if (from_type == to_type) return fail(w.from.tok, "the value is " + need + " already: no kern::to");
+        if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (same ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
+        if (same) return fail(w.from.tok, "the value is " + (from_type == to_type ? need : "an Int") + " already: no kern::to");
         if (!fits(from_type, to_type)) return fail(w.from.tok, "a " + have + " cannot become a " + need);
-      } else if (!(from_type == to_type)) {
+      } else if (!same) {
         if (!fits(from_type, to_type)) return fail(w.from.tok, "this is " + have + ", the input is " + need + ": the two do not convert");
         return fail(w.from.tok, "this is " + have + ", the input is " + need + ": write kern::to<" + need + ">(...)");
       }

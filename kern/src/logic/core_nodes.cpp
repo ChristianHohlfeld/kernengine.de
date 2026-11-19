@@ -533,10 +533,16 @@ void add_variables(Library& lib) {
     d.run = [](Context& c) {
       const f64 amount = c.in_number("amount");
       const std::vector<i64> at = c.path();
+      Variable named;
+      const Graph& g = c.instance().graph();
+      const TypeRef type = g.place_of(c.node(), named) ? declared(named) : TypeRef{};
       Value now;
       c.instance().change(c.node(), at, [&](Value& v) {
-        // (the number where it is: a whole number stays one - as a variable's slot holds it)
-        v = v.type == PinType::integer ? Value::integer(whole(v.as_number() + amount)) : Value::number(v.as_number() + amount);
+        // (the number where it is: a whole number stays one - as a variable's slot holds it; one of a
+        // fixed width holds the low bits of the sum, as C++'s += stores them: the sum's low bits are
+        // those of the two numbers' low bits added)
+        if (v.type == PinType::integer && has_width(type)) v.i = wrapped(static_cast<i64>(static_cast<u64>(v.i) + static_cast<u64>(whole(amount))), type.of);
+        else v = v.type == PinType::integer ? Value::integer(whole(v.as_number() + amount)) : Value::number(v.as_number() + amount);
         now = v;
       });
       c.out("value", now);
@@ -1506,7 +1512,7 @@ void add_structs(Library& lib) {
       const StructType* s = g.structure(c.param("struct"));
       std::vector<Value> fields;
       // (the fields one after the other, in their order - a list of a fixed length at its length)
-      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(s && k < s->fields.size() && s->fields[k].type.count ? fitted(c.in(k), s->fields[k].type, g) : c.in(k));
+      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(s && k < s->fields.size() && (s->fields[k].type.count || has_width(s->fields[k].type)) ? fitted(c.in(k), s->fields[k].type, g) : c.in(k));
       c.out(std::size_t{0}, structs::make(std::move(fields)));
       return kStop;
     };
@@ -1839,6 +1845,32 @@ void add_math(Library& lib) {
   lib.add(pure("text.of_code", "Text of Code", "Text", {data("code", "Code", K::integer, 65)}, data("result", "", K::text), of(&P::text_of_code),
                "A text of one byte: Code cut to 8 bits", "char character byte ascii"));
   {
+    // Set Code: one byte of a text variable set where it stands - what `s[i] = c` does to a std::string (Text::set_at)
+    NodeDef d = make("text.set_code", "Set Code", "Text", NodeKind::action,
+                     "Sets the byte at Index of a text variable - or of a text at a place in one - to Code (cut to 8 bits), where it stands: the text keeps its "
+                     "length, the other bytes stay. An index outside the text changes nothing.",
+                     "char character byte ascii index replace write string");
+    d.params = {param("variable", "Text", ParamDef::Kind::variable), local_of(), path_of()};
+    d.inputs = {exec_in(), data("index", "Index", PinType::integer, 0), data("code", "Code", PinType::integer, 32)};
+    d.outputs = {exec_out()};
+    d.title = [](const NodeDef&, const Node& n) { return "Set Code in " + place_title(n); };
+    d.problem = [](const Node& n, const Graph& g) -> std::string {
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && v->type != PinType::text) return "needs a text variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      return {};
+    };
+    d.run = [](Context& c) {
+      const i64 index = c.in_int("index"), code = c.in_int("code");
+      const std::vector<i64> at = c.path();  // (its indices, read after its inputs - as every step on a place)
+      c.instance().change(c.node(), at, [&](Value& v) {
+        if (v.type == PinType::text && index >= 0 && static_cast<u64>(index) < v.s.size()) v.s[static_cast<std::size_t>(index)] = static_cast<char>(static_cast<u8>(code));
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
+  {
     // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
     NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,
                      "A text from a format as C's printf has it: %d %u %x %o %c take an Int, %f %e %g a Float, %s a Text; flags - + space 0 #, width and "
@@ -2128,7 +2160,7 @@ void add_functions(Library& lib) {
       const Function* f = c.instance().graph().function(c.param("function"));
       std::vector<std::pair<std::string, Value>> values;
       if (f)
-        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, p.count ? fitted(c.in(p.name), declared(p), c.instance().graph()) : c.in(p.name));
+        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, (p.count || has_width(declared(p))) ? fitted(c.in(p.name), declared(p), c.instance().graph()) : c.in(p.name));
       c.instance().return_values(c.param("function"), values);
       return kStop;
     };

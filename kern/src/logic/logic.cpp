@@ -51,7 +51,7 @@ std::string type_text(const TypeRef& t) {
   if (is_keyed(t.type)) return std::string(pin_type_name(t.type)) + "<" + t.of + ">";  // ("map<int>float>", "set<text>")
   // (a list of a fixed length says its length: "float_list[16]" - in messages; a setting names no such type)
   const std::string length = t.count ? "[" + std::to_string(t.count) + "]" : std::string();
-  if (!declared_type(t.type)) return pin_type_name(t.type) + length;
+  if (!declared_type(t.type) && !has_width(t)) return pin_type_name(t.type) + length;
   return (is_list(t.type) ? t.of + "_list" : t.of) + length;
 }
 bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
@@ -60,11 +60,12 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
     if (text.size() > head.size() + 2 && text.substr(0, head.size()) == head && text[head.size()] == '<' && text.back() == '>') {
       TypeRef t{keyed, std::string(text.substr(head.size() + 1, text.size() - head.size() - 2))};
       const TypeRef key = key_type(t);
-      if (!key_type_ok(key.type) || (key.type == PinType::enumeration && !g.enumeration(key.of))) return false;
+      // (a map's keys and values are of no fixed width - an Int of a width is a place's, see kWidthNames)
+      if (!key_type_ok(key.type) || has_width(key) || (key.type == PinType::enumeration && !g.enumeration(key.of))) return false;
       if (keyed == PinType::map) {
         const TypeRef value = value_type(t);
         TypeRef named;
-        if (value.type == PinType::exec || is_keyed(value.type) || !type_from_text(type_text(value), g, named)) return false;
+        if (value.type == PinType::exec || is_keyed(value.type) || !type_from_text(type_text(value), g, named) || has_width(named)) return false;
       } else if (t.of.find('>') != std::string::npos) {
         return false;
       }
@@ -81,6 +82,10 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
   }
   const bool listed = text.size() > 5 && text.substr(text.size() - 5) == "_list";
   const std::string_view item = listed ? text.substr(0, text.size() - 5) : text;
+  if (width_bits(item) != 0) {  // (an Int of a fixed width: "u32", "u8_list")
+    out = {listed ? PinType::integer_list : PinType::integer, std::string(item)};
+    return true;
+  }
   if (g.enumeration(text) || g.structure(text)) {
     out = {g.enumeration(text) ? PinType::enumeration : PinType::structure, std::string(text)};
     return true;
@@ -96,13 +101,17 @@ std::string type_label(const TypeRef& t) {
   if (t.type == PinType::set) return "Set of " + type_label(key_type(t));
   static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor", "Enum", "Struct", "Int64"};
   const PinType e = element_of(t.type);
-  const std::string name = declared_type(e) ? (!t.of.empty() ? t.of : e == PinType::enumeration ? std::string("Enum") : std::string("Struct")) : static_cast<u32>(e) < 10 ? kLabels[static_cast<u32>(e)] : "?";
+  std::string name = declared_type(e) ? (!t.of.empty() ? t.of : e == PinType::enumeration ? std::string("Enum") : std::string("Struct")) : static_cast<u32>(e) < 10 ? kLabels[static_cast<u32>(e)] : "?";
+  if (has_width(t)) name = std::string(1, static_cast<char>(t.of[0] - 'a' + 'A')) + t.of.substr(1);  // ("U32", "I8")
   return is_list(t.type) ? name + " List" : name;
 }
 
 bool fits(const TypeRef& from, const TypeRef& to) {
   if (is_keyed(from.type) || is_keyed(to.type)) return from.type == to.type && from.of == to.of;  // (the same keys, the same values)
   if (!convertible(from.type, to.type)) return false;
+  // (a list of Ints of a fixed width is a list of that width and nothing else - U8 is no Int in a list:
+  // in C++ a List<U8> is no List<Int>; one Int of a width is an Int, the place it goes to holds it)
+  if (from.type == PinType::integer_list && to.type == PinType::integer_list) return width_bits(from.of) == width_bits(to.of);
   return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
 }
 
@@ -616,14 +625,14 @@ Value zero_of(const TypeRef& t, const Graph& g) {
 }
 Value Value::from_json(const json::Value& j, const TypeRef& declared, const Graph& g) { return read_value(j, declared, g, struct_depth(g)); }
 bool has_fixed(const TypeRef& t, const Graph& g) {
-  if (t.count) return true;
+  if (t.count || has_width(t)) return true;
   if (element_of(t.type) != PinType::structure) return false;
   // (a struct holds structs declared above it: no deeper than there are structs)
   std::vector<const StructType*> todo;
   if (const StructType* s = g.structure(t.of)) todo.push_back(s);
   for (std::size_t seen = 0; seen < todo.size() && seen <= g.structs.size(); ++seen)
     for (const StructField& f : todo[seen]->fields) {
-      if (f.type.count) return true;
+      if (f.type.count || has_width(f.type)) return true;
       if (element_of(f.type.type) != PinType::structure) continue;
       const StructType* inner = g.structure(f.type.of);
       if (inner && std::find(todo.begin(), todo.end(), inner) == todo.end()) todo.push_back(inner);
@@ -634,6 +643,16 @@ namespace {
 void fit(Value& v, const TypeRef& t, const Graph& g, int depth) {
   if (v.type != t.type) return;
   at_length(v, t, g);
+  if (has_width(t)) {  // (what a place of a fixed width holds: the low bits, as C++ stores them)
+    if (t.type == PinType::integer) v.i = wrapped(v.i, t.of);
+    else {
+      bool all = true;
+      for (i64 x : v.items<i64>()) all = all && wrapped(x, t.of) == x;
+      if (!all)
+        for (i64& x : v.edit<i64>()) x = wrapped(x, t.of);
+    }
+    return;
+  }
   if (element_of(t.type) != PinType::structure || depth <= 0) return;
   const StructType* s = g.structure(t.of);
   if (!s || !has_fixed(TypeRef{PinType::structure, t.of}, g)) return;
@@ -1641,6 +1660,10 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       TypeRef t;
       return type_from_text(type_text({type, of}), g, t);
     }
+    if (element_of(type) == PinType::integer) {  // (an Int of a fixed width: "of" names it)
+      of = v["of"].as_string();
+      return of.empty() || width_bits(of) != 0;
+    }
     if (!declared_type(type)) return true;
     of = v["of"].as_string();
     return element_of(type) == PinType::enumeration ? g.enumeration(of) != nullptr : g.structure(of) != nullptr;
@@ -2023,6 +2046,22 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     if (value.is_array() && value.size() > t.count)
       err(0, what + " is a list of " + std::to_string(t.count) + " entries, its default has " + std::to_string(value.size()));
   };
+  // An Int of a fixed width: its default is one of its values (C++ would store another there).
+  auto width_ok = [&](const std::string& what, const TypeRef& t, const json::Value& value) {
+    if (!has_width(t)) return;
+    if (t.type == PinType::integer_list) { err(0, what + " is a list of " + type_label({PinType::integer, t.of}) + ": a list of Ints of a fixed width is no type of the language yet"); return; }
+    const Value v = Value::from_json(value, PinType::integer);
+    const int bits = width_bits(t.of);
+    const i64 lo = bits > 0 ? 0 : -(i64{1} << (-bits - 1)), hi = bits > 0 ? (i64{1} << bits) - 1 : (i64{1} << (-bits - 1)) - 1;
+    if (wrapped(v.i, t.of) != v.i)
+      err(0, what + " is " + type_label(t) + ", its default " + std::to_string(v.i) + " is none of its values (" + std::to_string(lo) + " .. " + std::to_string(hi) + ")");
+  };
+  for (const StructType& st : g.structs)
+    for (const StructField& f : st.fields) width_ok("struct \"" + st.name + "\": the field \"" + f.name + "\"", f.type, f.value);
+  for (const Variable& v : g.variables) width_ok("variable \"" + v.name + "\"", declared(v), v.value);
+  for (const Function& f : g.functions)
+    for (const auto* pins_of : {&f.inputs, &f.outputs, &f.locals})
+      for (const FunctionPin& fp : *pins_of) width_ok("function \"" + f.name + "\": \"" + fp.name + "\"", declared(fp), fp.value);
   for (const StructType& st : g.structs)
     for (const StructField& f : st.fields) length_ok("struct \"" + st.name + "\": the field \"" + f.name + "\"", f.type, f.value);
   for (const Variable& v : g.variables) length_ok("variable \"" + v.name + "\"", declared(v), v.value);
@@ -2339,7 +2378,12 @@ bool Instance::inline_node(int node) const {
   if (t == "flow.branch" || t == "flow.sequence" || t == "flow.for" || t == "flow.while" || t == "flow.do_once" || t == "flow.do_n" || t == "flow.gate" ||
       t == "flow.flip_flop")
     return true;
-  if (t == "var.set" || t == "var.add") return var_slot(*c.node) >= 0 && c.node->param("path").empty();
+  if (t == "var.set" || t == "var.add") {
+    if (var_slot(*c.node) < 0 || !c.node->param("path").empty()) return false;
+    // (an Int of a fixed width holds the low bits of what it is given: the node's own function stores it)
+    const auto it = var_types_.find(key_of(*c.node));
+    return it == var_types_.end() || !has_width(it->second);
+  }
   return false;
 }
 
@@ -2854,7 +2898,9 @@ bool Instance::hold(const std::string& key, const Value& v) {
   auto t = var_types_.find(key);
   if (t == var_types_.end()) return false;
   if (const int k = var_slot(key); k >= 0) {
-    slots_[static_cast<std::size_t>(k)] = to_type(v.as_number(), t->second.type);
+    f64 x = to_type(v.as_number(), t->second.type);
+    if (has_width(t->second)) x = static_cast<f64>(wrapped(whole(x), t->second.of));  // (an Int of a fixed width: its low bits)
+    slots_[static_cast<std::size_t>(k)] = x;
     return true;
   }
   auto it = vars_.find(key);

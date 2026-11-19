@@ -29,6 +29,9 @@ const LG_TYPE_NAMES = {exec: "Exec", bool: "Boolean", int: "Integer", float: "Fl
 // (An Int64 is its 64 bits: in the document the text of their u64 - more than a number of JSON
 // holds -, so here a text too: "18446744073709551615", "0x1f".)
 const LG_VALUE_TYPES = ["bool", "int", "float", "vector", "text", "actor", "int64"];
+// Ints of a fixed width (U8 ... I32): a place holds the low bits of the Int it is given; a pin is an Int.
+const LG_WIDTHS = ["u8", "u16", "u32", "i8", "i16", "i32"];
+for (const w of LG_WIDTHS) { LG_TYPE_COLORS[w] = LG_TYPE_COLORS.int; LG_TYPE_NAMES[w] = w.toUpperCase(); }
 for (const t of LG_VALUE_TYPES) { LG_TYPE_COLORS[t + "_list"] = LG_TYPE_COLORS[t]; LG_TYPE_NAMES[t + "_list"] = LG_TYPE_NAMES[t] + " List"; }
 const LG_DATA_TYPES = [...LG_VALUE_TYPES, ...LG_VALUE_TYPES.map(t => t + "_list")];
 const lgIsList = t => typeof t === "string" && t.endsWith("_list");
@@ -50,6 +53,7 @@ const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsKeyed(t) ? lgKeyedName(t) : lgI
 const lgTyped = x => {
   if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "int") + ">"; return; }  // (a map, a set: "map<int>float>", as the engine names it)
   if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of;
+  if (x?.of && x.type === "int" && LG_WIDTHS.includes(x.of)) x.type = x.of;  // (an Int of a fixed width: "u32")
 };
 // A map of values under keys, a set of keys - in the order the keys came: a type by the engine's
 // name for it, "map<int>float>", "map<enum:Kind>struct_list:Cell>", "set<text>". Its keys and
@@ -917,8 +921,8 @@ export class LogicEditor {
   /** The types a variable, a function's pin or a struct's field can have: the value types, this
    *  Blueprint's enums and structs (`without`: the structs that are none of them), and a list of each. */
   typeOptions(current, without = [], keyed = true) {
-    const values = [...LG_VALUE_TYPES, ...(this.data?.enums || []).map(e => e.name), ...(this.data?.structs || []).map(s => s.name).filter(n => !without.includes(n))];
-    const all = [...values, ...values.map(t => t + "_list")];
+    const values = [...LG_VALUE_TYPES, ...LG_WIDTHS, ...(this.data?.enums || []).map(e => e.name), ...(this.data?.structs || []).map(s => s.name).filter(n => !without.includes(n))];
+    const all = [...values, ...values.filter(t => !LG_WIDTHS.includes(t)).map(t => t + "_list")];  // (List<U8> comes with its own step)
     // (a map or a set: the one it is, else one of Integer keys - its keys and values are chosen beside it, keyOptions)
     if (keyed) all.push(lgIsKeyed(current) && current.startsWith("map") ? current : "map<int>float>", lgIsKeyed(current) && current.startsWith("set") ? current : "set<int>");
     return all.map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgIsKeyed(t) ? (t.startsWith("map") ? "Map…" : "Set…") : lgTypeName(t))}</option>`).join("");
@@ -2157,10 +2161,10 @@ export class LogicEditor {
     if ([from, to].some(t => t === "int64" || t === "int64_list")) return false;  // (64 bits: the Int64 nodes say what they are as another type)
     if (to === "text") return true;
     if (lgIsList(from) || lgIsList(to)) return false;
-    const numeric = t => t === "int" || t === "float" || t === "bool";
+    const numeric = t => t === "int" || LG_WIDTHS.includes(t) || t === "float" || t === "bool";  // (an Int of a fixed width is an Int on a wire)
     if (numeric(from) && numeric(to)) return true;
     if (to === "bool" && from === "actor") return true;
-    if (to === "vector" && (from === "int" || from === "float")) return true;
+    if (to === "vector" && (from === "int" || LG_WIDTHS.includes(from) || from === "float")) return true;
     return false;
   }
 
