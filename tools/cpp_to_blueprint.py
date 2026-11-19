@@ -13014,6 +13014,12 @@ class TestWriter:
         if warned:
             print(f"    (test_{stem}: compiles with {len(warned)} kind(s) of warning, as in the suite: {warned[0]}{' …' if len(warned) > 1 else ''})")
         if r.returncode != 0:
+            if os.environ.get("TEST_ERRORS"):   # (to look at: the first errors as the compiler says them, with the test's text there)
+                said = [x for x in r.stderr.split("\n") if x.strip()]
+                firsts = [i for i, x in enumerate(said) if re.search(r"\berror: ", x)][:3]
+                for i in firsts:
+                    for x in said[max(0, i - 2):i + 3]:
+                        sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
             mine = re.compile(re.escape(path) + r":(\d+):")
