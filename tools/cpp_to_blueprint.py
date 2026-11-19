@@ -1845,7 +1845,7 @@ class Unit:
             return None
         inner = m.group(1).strip()
         if inner == "void":
-            return "Int"   # (a pointer to raw memory: what C++ can read through it are bytes - BYTE_POINTER)
+            return "U8"   # (a pointer to raw memory: what C++ can read through it are bytes - BYTE_POINTER: a List<U8>)
         if "*" in inner or "&" in inner:
             return None
         t = self.place(inner)
@@ -7504,7 +7504,7 @@ class Emit:
         lt = f"List<{entries}>"
         if self.nothing(a):   # (null: no place - in a list of nothing)
             return [self.temp("none", lt, fixed), "-1"]
-        held = addressed_record(self.tree, a) if entries == "Int" else None
+        held = addressed_record(self.tree, a) if entries in ("U8", "Int") else None
         if held is not None:
             # the address of a value handed to a pointer to bytes (`crc(&frame, n)`): the value's bytes - as many
             # as it has, a list of that fixed length, made where the call is (Bytes of Struct)
