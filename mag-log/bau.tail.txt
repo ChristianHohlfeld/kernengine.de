@@ -1,0 +1,80 @@
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:39409:10: warning: unused variable 'playing' [-Wunused-variable]
+ 39409 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:47449:9: warning: unused variable 'count' [-Wunused-variable]
+ 47449 |     Int count = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:47450:9: warning: unused variable 'at_5' [-Wunused-variable]
+ 47450 |     Int at_5 = 0;
+       |         ^~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:47451:9: warning: unused variable 'end_4' [-Wunused-variable]
+ 47451 |     Int end_4 = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:55317:10: warning: unused variable 'running' [-Wunused-variable]
+ 55317 |     Bool running = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:55320:10: warning: unused variable 'connected' [-Wunused-variable]
+ 55320 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:55351:10: warning: unused variable 'connected' [-Wunused-variable]
+ 55351 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:55394:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 55394 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:55593:9: warning: unused variable 'max_clients' [-Wunused-variable]
+ 55593 |     Int max_clients = 0;
+       |         ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:55596:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 55596 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56123:10: warning: unused variable 'connected' [-Wunused-variable]
+ 56123 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56126:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 56126 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56181:10: warning: unused variable 'connected' [-Wunused-variable]
+ 56181 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56184:10: warning: unused variable 'send' [-Wunused-variable]
+ 56184 |     Bool send = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56229:10: warning: unused variable 'connected' [-Wunused-variable]
+ 56229 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56232:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 56232 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56251:10: warning: unused variable 'connected' [-Wunused-variable]
+ 56251 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56254:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 56254 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56273:10: warning: unused variable 'connected' [-Wunused-variable]
+ 56273 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56276:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 56276 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56903:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 56903 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56932:21: warning: unused variable 'state' [-Wunused-variable]
+ 56932 |     net_ClientState state = net_ClientState::denied;
+       |                     ^~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:56946:10: warning: variable 'send_2' set but not used [-Wunused-but-set-variable]
+ 56946 |     Bool send_2 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-092919-18986/kern/games/spawncity/src/level_blueprints.cpp:57218:9: warning: unused variable 'connected_clients' [-Wunused-variable]
+ 57218 |     Int connected_clients = 0;
+       |         ^~~~~~~~~~~~~~~~~
+4 warnings generated.
+28 warnings generated.
+0 tests, 0 checks, 0 failures
+
+real	5m19,623s
+user	31m55,432s
+sys	0m50,446s
