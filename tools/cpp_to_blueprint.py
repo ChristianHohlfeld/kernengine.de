@@ -12603,8 +12603,8 @@ class TestWriter:
             before = chain(d)
             owner = tree.owner.get(d["id"]) or next((tree.owner[x["id"]] for x in before if x["id"] in tree.owner), None)
             return any(not here(x) for x in before) or (owner is not None and not here(tree.records.get(owner, {})))
-        def own(d):   # (of this file alone)
-            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl") and outside(d))
+        def own(d):   # (of this file alone - not the definition of what a header declares: a function, or a variable `extern i32 kGates;`)
+            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl", "VarDecl") and outside(d))
         def namespace_level(d):
             return tree.owner.get(d["id"]) is None and tree.scope_of.get(d["id"], "").rstrip(":") not in tree.records
         def local_of(d):   # (the namespace a piece of this file alone stands in, in the test that takes it)
@@ -12722,7 +12722,11 @@ class TestWriter:
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
-            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs, **self.statement_of(d),
+            # (the definition of a variable of the program a header declares - `i32 kGates = 0;` to `extern i32 kGates;` -
+            # stands where the header puts it, not among this file's own: one variable. A test that takes it and has it already
+            # from that declaration - its own, drawn, set and compared (const_pieces) - leaves this piece out: "program")
+            program = d.get("kind") == "VarDecl" and here(d) and outside(d) and tree.owner.get(d["id"]) is None
+            put(d, {"kind": "const", "program": program, "text": text, "names": [self.ident(x) for x in said], "pairs": pairs, **self.statement_of(d),
                     "actors": ["::".join(self.local_path(tree.scope_of.get(x["id"], ""), local_of(x)) + [x["name"]]) for x in said if self.actor_blueprint(qtype(x))]})
         for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
@@ -12875,7 +12879,10 @@ class TestWriter:
         first = min((tree.place(d) for d in [*functions.values(), *templates.values(), *G.consts.values(), *decls, *(tree.enums[q] for q in enums), *G.declared.values()]
                      if os.path.abspath(d.get("_file") or "?") == main), default=(10 ** 9 + 1, 0))
         foreign_chunks = []
+        own_said = {a for gives in const_gives.values() for a in gives}
         for i, (place, piece) in enumerate(G.foreign.items()):
+            if piece.get("program") and any(a in own_said for a, _ in piece.get("pairs", ())):
+                continue   # (a variable of the program this test has from its header's declaration: once)
             if piece["kind"] in ("const", "unnamed"):
                 if self.widen(piece["text"]) in said_consts:
                     continue
