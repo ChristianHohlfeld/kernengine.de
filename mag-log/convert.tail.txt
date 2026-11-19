@@ -1,0 +1,80 @@
+    LookAxis::step (7): written
+    touch_look_delta (7): written
+    fps_aim_assist (10): written
+    aim_ellipse (1): written
+    gamepad_axis (1): written
+    hard_cut (1): written
+    height_axis (1): written
+    phone_axis (1): written
+    game_state_stick_magnitude (1): written
+    inverse_game_state_stick_magnitude (1): written
+    apply_game_stick_left (7): written
+    apply_game_stick_right (7): written
+    clearance_pad_axis (1): written
+    RateStick::step (4): written
+    WorldLook::add (5): written
+    WorldLook::set (5): written
+    WorldLook::release (5): written
+    WorldLook::step (5): written
+    CarHeadSpring::step (7): written
+    ViewButton::step (11): written
+    VoiceChord::step (5): written
+    ReleaseLatch::step (7): written
+    GrenadeCook::pull (7): written
+    GrenadeCook::drag (1): written
+    GrenadeCook::release (7): written
+    GrenadeCook::step (7): written
+    GrenadeCook::left (1): written
+    GrenadeCook::speed (1): written
+    grenade_fuse (1): written
+    Devices::platform (6): written
+    Devices::input (6): written
+    hint_line (5): written
+drone                           5 /    5 functions        5 /      5 lines
+    Drone::telemetry (1): a name for a place - written where it is called
+    Drone::params (1): a name for a place - written where it is called
+    Drone::motor_position (1): written
+    Drone::rotor_angle (1): written
+    Drone::parked (1): written
+drone_cpp                      12 /   13 functions      211 /    342 lines
+    battery_ocv (4): written
+    battery_under_load (3): written
+    encode_sbus (10): written
+    put_be16 (6): written
+    quat_yaw_deg (3): written
+    clearance_rate (6): written
+    clearance_lead (6): written
+    Drone::Drone (12): written
+    Drone::rigid_spec (75): written
+    Drone::reset (22): written
+    Drone::imu_bytes (25): written
+    Drone::motor_tick (39): written
+    Drone::step (131): it calls encode_navigation_wire(), which waits
+engine_math_math                2 /    2 functions       10 /     10 lines   (what the program calls of it)
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+engine_physics_physics          2 /    2 functions        2 /      2 lines   (what the program calls of it)
+    Body::valid (1): written
+    QueryFilter::QueryFilter (1): written
+rigid_spec                      3 /    3 functions       51 /     51 lines
+    capsule_between (14): written
+    create_body (29): written
+    box_inertia (8): written
+
+198 of 217 functions of the program are written as Blueprints (1612 of 2076 lines), and 4 of the engine's headers that they call: 15 Blueprints - 3 of source files, 0 of states, 12 of headers and of shapes
+192 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     2 (   136)   it calls encode_navigation_wire(), which waits
+     3 (   104)   it calls decode_sbus(), which waits
+     2 (    67)   state outside the function is changed
+     2 (    58)   it calls crc16_ccitt(), which waits
+     6 (    49)   state outside a function (a variable of the file: a library keeps nothing)
+     1 (    23)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_DroneFC_Core::converted_Arondight45_DroneFC_Core()::<lambda(const std::vector<unsigned char>&, long long int&, converted_Arondight45_DroneFC_Core::fc)
+     1 (    14)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&, converted_Arondight45_HardwareSe)
+     1 (    10)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&, long unsigned int&)>) (std::vect)
+     1 (     3)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no match for call to ‘(const converted_Arondight45_HardwareSensors::converted_Arondight45_HardwareSensors()::<lambda(const std::vector<unsigned char>&, long long int&)>) (std::vector<unsigned char>&, )
+
+real	1m55,511s
+user	4m8,082s
+sys	0m17,025s
