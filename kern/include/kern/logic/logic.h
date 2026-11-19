@@ -1213,6 +1213,16 @@ class Instance {
   bool inline_pure(int node) const;
   f64* slots() { return slots_.data(); }
   i32* stack() { return stack_.data(); }
+  /// Where generated code finds the stack: {its address, its capacity} - the stack grows (a
+  /// function that calls itself leaves something open in every call), so the code reads them here.
+  i32* stack_cell() { return stack_cell_; }
+  /// A Call Function node: the function's index (-1: another node), and the node its body begins at.
+  int calls_fn(int node) const { return calls_fn_[static_cast<std::size_t>(node)]; }
+  int fn_entry(int f) const { return fn_entry_[static_cast<std::size_t>(f)]; }
+  /// call_node's answer for a Call Function node whose call began: go on at the function's entry.
+  static constexpr int kEnterCall = 1000;
+  /// call_node(-2): generated code found its stack full - make it larger.
+  static constexpr int kGrowStack = -2;
   /// How many continuations the stack holds: as many as this graph can ever leave open (a node
   /// leaves some at most once in each running chain, and chains nest 64 events deep at most) -
   /// generated code never runs out of it where the interpreter and the Blueprint's class go on.
@@ -1342,6 +1352,10 @@ class Instance {
   std::vector<f64> slots_;            // fixed size: generated code holds absolute addresses
   std::vector<i32> stack_;            // [0] = depth, then (pc, entry) pairs
   int stack_capacity_ = CodeLayout::kStack;
+  i32 stack_cell_[2] = {0, 0};          // {address of stack_, stack_capacity_}: what generated code reads
+  void stack_moved();                  // (stack_ was assigned: the cell again)
+  void grow_stack();                   // twice the capacity, what it holds kept
+  void push_cont(int node, int entry); // a continuation onto stack_ (it grows)
   bool jit_fits_ = true;              // (false: the graph could need more than kStackMost - it stays in the interpreter)
   std::vector<i32> exec_table_;       // per node: (target, entry) per exec output
   std::vector<int> exec_table_offset_;

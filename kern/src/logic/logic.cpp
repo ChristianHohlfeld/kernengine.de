@@ -2344,22 +2344,59 @@ bool Instance::inline_node(int node) const {
 }
 
 int Instance::call_node(int node, int entry) {
+  if (node == kGrowStack) {
+    grow_stack();
+    return 0;
+  }
   if (node < 0 || static_cast<std::size_t>(node) >= nodes_.size() || disabled_) return kStop;
   CNode& c = nodes_[static_cast<std::size_t>(node)];
   if (!c.def) return kStop;
   ++rt_.executed_;
+  if (calls_fn_[static_cast<std::size_t>(node)] >= 0) {
+    // Call Function: a frame, as in the interpreter (run_from) - the generated code goes on at the
+    // function's entry (kEnterCall); the mark (node, kAfterCall) on its stack ends the call.
+    if (entry == kAfterCall) {
+      if (rt_.tracing && rt_.trace_.size() < 4096) rt_.trace_.push_back({name_, c.node->id, rt_.host().time()});
+      int e = 0;
+      end_call(node, e);
+      return 0;
+    }
+    std::vector<std::pair<int, int>> mark;
+    int n = node;
+    const int began = begin_call(n, mark);
+    if (began <= 0) {
+      if (rt_.tracing && rt_.trace_.size() < 4096) rt_.trace_.push_back({name_, c.node->id, rt_.host().time()});
+      if (began < 0) stack_[0] = 0;  // (the chain is stopped: nothing of it goes on)
+      return began < 0 ? kStop : 0;
+    }
+    push_cont(node, kAfterCall);
+    frames_.back().base = static_cast<std::size_t>(stack_[0]);
+    frames_.back().stack_base = stack_[0];  // (a Return leaves the mark: it is what comes next)
+    return kEnterCall;
+  }
   Context ctx(rt_, *this, node, entry);
   ctx.compiled_ = true;
   const int r = c.def->run ? c.def->run(ctx) : 0;
   if (rt_.tracing && rt_.trace_.size() < 4096) rt_.trace_.push_back({name_, c.node->id, rt_.host().time()});
   // Continuations (Sequence-like C++ nodes, loops) go onto the generated code's stack, last first.
-  for (auto it = ctx.continuations_.rbegin(); it != ctx.continuations_.rend(); ++it) {
-    if (stack_[0] >= stack_capacity_) break;
-    stack_[static_cast<std::size_t>(1 + 2 * stack_[0])] = it->first;
-    stack_[static_cast<std::size_t>(2 + 2 * stack_[0])] = it->second;
-    ++stack_[0];
-  }
+  for (auto it = ctx.continuations_.rbegin(); it != ctx.continuations_.rend(); ++it) push_cont(it->first, it->second);
   return r;
+}
+
+void Instance::stack_moved() {
+  stack_cell_[0] = static_cast<i32>(reinterpret_cast<uintptr_t>(stack_.data()));
+  stack_cell_[1] = stack_capacity_;
+}
+void Instance::grow_stack() {
+  stack_capacity_ *= 2;
+  stack_.resize(static_cast<std::size_t>(1 + 2 * stack_capacity_), 0);
+  stack_moved();
+}
+void Instance::push_cont(int node, int entry) {
+  if (stack_[0] >= stack_capacity_) grow_stack();
+  stack_[static_cast<std::size_t>(1 + 2 * stack_[0])] = node;
+  stack_[static_cast<std::size_t>(2 + 2 * stack_[0])] = entry;
+  ++stack_[0];
 }
 
 f64 Instance::read_pin(int node, int pin) {
@@ -2384,6 +2421,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
   node_slot_base_ = numeric_vars;
   slots_.assign(static_cast<std::size_t>(numeric_vars) + graph_.nodes.size() * CodeLayout::kNodeSlots, 0.0);
   stack_.assign(1 + 2 * CodeLayout::kStack, 0);
+  stack_moved();
   {
     int k = 0;
     for (const Variable& v : graph_.variables) {
@@ -2524,6 +2562,7 @@ Instance::Instance(Runtime& rt, const Graph& graph, ActorRef self, std::string n
     jit_fits_ = needed <= CodeLayout::kStackMost;
     stack_capacity_ = static_cast<int>(clamp<i64>(needed, CodeLayout::kStack, CodeLayout::kStackMost));
     stack_.assign(static_cast<std::size_t>(1 + 2 * stack_capacity_), 0);
+    stack_moved();
   }
   fn_entry_.assign(graph_.functions.size(), -1);
   for (std::size_t f = 0; f < graph_.functions.size(); ++f) {
@@ -3491,7 +3530,14 @@ void Runtime::run_from(Instance& inst, int start, int entry, Chain chain) {
   }
   if (inst.compiled()) {
     ++inst.active_;
+    const std::size_t frames_before = inst.frames_.size();
     run_compiled(inst, start, entry);
+    // (a chain stopped in the middle of calls of its own: they end with it)
+    while (inst.frames_.size() > frames_before && inst.frames_.back().trampoline) {
+      Instance::Frame done = std::move(inst.frames_.back());
+      inst.frames_.pop_back();
+      inst.leave_call(done);
+    }
     chain_ends(inst);
     if (counts) --depth_;
     return;
