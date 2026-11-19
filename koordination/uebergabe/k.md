@@ -201,3 +201,21 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
   * List.g (worldsync_update): `Game* g` in einer lokalen Struktur = Zeiger auf das eine Objekt des Zustands; Methoden der Struktur greifen auf den
     Zustand zu. Feat.pts (minimap_json): Zeiger auf fremde Liste – ohne Kopie nicht abbildbar.
   * gaps_sirens: tuple mit Zeiger; swarm_update: find_if auf r.units mit r = swarms_[key] (spot mit pre); extract: Lambda mit auto.
+
+# NACHFOLGER 5 (19.11., ab 13:40) – Wartestellen worldsync_update … extract
+- Commits (work-k, auf work-zusammen fc8752ab):
+  * 4d14f00c Unit.state_pointer/Emit.at_state/Function.sees_state (`Game* g` einer lokalen Struktur einer Zustandsmethode = der Zustand;
+    worldsync_update); Methoden lokaler Strukturen: Tree.body (local types), World.part_of_function (bei ihrer Funktion), Unit.function
+    f.lifted, main `mine` ohne sie (nicht gezählt – ihre Zeilen zählt die Funktion schon); name_references `.back()/.front()` (Decoder::step);
+    Emit.each_place `for (T* p : {&a,&b})` (gaps_draw).
+  * 4e8ae7d1 Emit.bytes_pointer (end_layer), entry_pointer_set mit &Eintrag/&back() (Emit.loop_entries; gaps_jet_audio), each_place mit
+    std::tuple (gaps_sirens, gaps_jet_audio). block_steps setzt self.rest_stmts (für bytes_pointer: changed_while_named).
+  * 1cb0e7e1 name_references `V& r = m[key]` (kern::Map: Zeile einmal, `_steady`-Index; swarm_update).
+  * da0e0f6f SPRACHE text.set_code (core_nodes, blueprint.h, nodes.h Text::set_at, notation writes_place, test_main VT, logic_cases
+    text_set_code) – Engine-Suite: CI 44532859846 auf dd3bd1c5.
+  * dd3bd1c5 for_each_char mit `char&` (Emit.char_places; hud_json); narrow: char wie signed char.
+- Kleinstfälle: /tmp/k_sp (state pointer), /tmp/k_back, /tmp/k_ep, /tmp/k_by, /tmp/k_fa, /tmp/k_tu, /tmp/k_ms, /tmp/k_ch.
+- Offen, nicht gebaut:
+  * extract (tiles.cpp:227): generisches Lambda `[&](const char*, auto kind_of)`, je Aufruf mit einem anderen Lambda – Instanz je Aufruf
+    (FunctionTemplateDecl-Spezialisierungen), kind_of als lokale Funktion der Instanz. Berührt Funktionswerte (Paket c)? – nicht begonnen.
+  * minimap_json (Feat.pts: Zeiger in eine fremde Liste) – nicht untersucht über den Vorgänger hinaus.

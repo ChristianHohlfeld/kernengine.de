@@ -286,3 +286,13 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
 - **Befunde 10:05:** work-d-opt 2226dbe9 (optional = `[?item]`, höchstens ein Eintrag im Stellvertreter), work-d-jobs a12da91a (fresh_engine: jobs::reset + set_threads(false);
   neues kern::jobs::reset). Beleg-Zweig work-d-belege3 20eeaaf0; vergleich `work-d-belege3-vergleich-101159-615` (terrain, city_stream, game.cpp), danach Engine-Suite.
   Danach beide in work-d mischen (Generator neu laufen lassen: engine_api.gen.cpp, engine_case.gen.h).
+- **13:55:** belege3 gemergt (work-zusammen dc4229b5). **work-d-make 49e5c319** (auf dc4229b5): Ergebnis jedes Machers hat die Form `h` (1–7, nie 0; Api.maker
+  „shapes“, engine_api.py, answer) – Befund k audio_init 1/20 (Stellvertreter gab sound_bank.make Handle 0 → bank_ leer). Engine-Test engine_stand_in_makes_an_object.
+  Beleg läuft `work-d-make-vergleich-131505-2655` (game, game_equipment, sound_fx, game_details, equipment, combat_audio) → dann `./mag.sh engine origin/work-d-make`
+  → BEREIT ZUM MERGEN. Zwei eigene Aufträge zugleich sind vom Koordinator erlaubt.
+- Platz: `work-d-konvert-125538-27289` (konvert origin/work-d 9 auf 275d3ddf) läuft: zeigen, ob die 8 Funktionen mit shots()/sound_cues() geschrieben werden
+  (xzgrep in convert.log.xz: foot_rounds_update, gaps_lamps_update, handle_shots, look_lighting, step_cop, step_soldier, ui_mix_cues, update_fighters_back,
+  update_sound). Danach vergleich über alle src/game*.cpp + game.cpp und Engine-Suite auf work-d; work-d vorher mit origin/work-zusammen (fc8752ab+) mischen.
+- Danach aus ks Liste (Koordinator 13:45): GeoProjector::init (fail variadisch → Engine-Knoten fail(Text)), look_* (`kern::Mesh*`), handle_shots/run_buildings
+  (Platz), „a member of Int is set“ (TextureDesc als Engine-Objekt mit Handle) – Entwurf selbst entscheiden.
+- Hinweis: zwei Merge-Commits (3c10e298 auf work-d-belege3, 275d3ddf auf work-d) tragen den Standardtext ohne Attribution (gepusht, kein Force-Push).

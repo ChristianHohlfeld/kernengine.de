@@ -45,6 +45,11 @@
   Sonst: number_at 14/300 (t1), converted_game_details_cpp real (bekannt). Engine-Suite läuft: `work-d-belege3-engine-120959-12020`.
 - work-d = **fa753bcb** (work-zusammen 6998a56e eingemischt: Konflikt logic.h/.cpp – bound_now und lengths_on (e) beide behalten; + belege3; Generator neu). Syntax ✓.
 
+## BEREIT ZUM MERGEN (d, 14:57): work-d-make 49e5c319 (Macher geben nie Handle 0, Form `h`) – auf work-zusammen dc4229b5
+- Belege: `work-d-make-vergleich-131505-2655` (game, game_equipment, sound_fx, game_details, equipment, combat_audio): **52/52 ok in beiden Durchgängen, keine
+  Abweichung** (audio_init vorher 1/20); Engine-Suite `work-d-make-engine-141127-4668` rc=0 (55404 checks, 0 failures; engine_stand_in_makes_an_object ok).
+- Beim Mischen Generator neu (engine_api.gen.cpp).
+
 ## BEREIT ZUM MERGEN (d, 12:56): work-d-belege3 3c10e298 = work-d-opt cbed8b27 (2226dbe9 + Testfix) + work-d-jobs a12da91a auf work-zusammen 18526372
 - Belege: `work-d-belege3-vergleich-101159-615` (terrain, city_stream, game: 48/48 beide Durchgänge, Terrain_run_job gegen die Engine gleich – vorher j.id),
   `work-d-belege3-vergleich-110539-22562` (audio_init: Engine 0, Stellvertreter 1/20 statt 8/20 – Rest anderer Art, s. o.), Engine-Suite

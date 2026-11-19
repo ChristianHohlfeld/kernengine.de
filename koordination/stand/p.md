@@ -2,6 +2,13 @@
 
 
 
+## E20 Schritt 3 gebaut: 0c57a404 (List<U8> … List<I32>; Bytes-Knoten nehmen Listen jeder Breite) – Belege laufen (13:50)
+- Commits 18c636be (Schritt 3), 0c57a404 (Leser: List<Int>{…} in einem Eingang jeder Breite). Was und warum: uebergabe/p.md „Nachfolger 5“.
+- Lokal: Fall fixed_width_lists – Klasse == Interpreter == echtes C++ (std::vector<u8>/<int8_t>/<uint32_t>); Fixpunkt aller logic_cases gleich;
+  logic_fixed_widths (Leser-Fälle, Werte) grün.
+- Belege: engine `work-p-engine-134721-25503`, CI https://github.com/ChristianHohlfeld/kernengine.de/actions/runs/44527163767.
+- Konverter und Spiel unberührt (kein konvert/vergleich nötig; Klassentexte des Spiels ändern sich nicht) → Zeit-Test unverändert.
+
 ## BEREIT ZUM MERGEN: 62229851 (E20 Schritte 1+2: U8 … I32 – Sprache, Leser/Schreiber, Interpreter, JIT, Klasse, Editor, Doku) – Belege (13:25)
 - Commits: 31d75912 (Schritt 1), 15c8ad52 (Schritt 2: Klasse logic::Sized<T>, Fall fixed_widths), 1d4cdd6e (Meldungserwartung Map),
   62229851 (e2e: Typwahl +6 Breiten).

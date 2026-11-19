@@ -27,7 +27,12 @@ Entscheidungen beim Bau stehen in stand/c.md. Der Entwurf vom 18.11. (Stellen, B
 
 ## Belege
 - Lokal (logic+core gebaut, /tmp/cbk – Kleinstfall): logic_callbacks 0 Fehler; Ground/Site Interpreter = Klasse Zeichen für Zeichen.
-- CI 44523773375 (edefcb08) und mag `work-c-vergleich-132846-9096` (city_stream, terrain): Ergebnis in stand/c.md.
+- CI 44526990074 (a137ba34): native grün (54577 Prüfungen, blueprint_native 64 Blueprints/14111 Aufrufe inkl. Ground/Site und
+  Engine mit RoadOptions-Struct), build grün (logic_wasm_test), determinism grün. native-spawncity/e2e/input liefen noch.
+- Ausstehend: mag `work-c-vergleich-132846-9096` (city_stream, terrain) – `./mag.sh holen work-c-vergleich-132846-9096`.
+  Der mag-Auftrag `work-c-engine-125735-29671` ist abgebrochen (die CI hat die Engine-Suite gerechnet).
+- Lokaler Kleinstfall-Bau: /tmp/cbk (build.sh, re.sh: logic+core + Test-Hauptprogramm; nat.cpp/cls.cpp: Ground/Site als
+  Interpreter und als übersetzte Klasse) – nicht im Repo.
 
 ## Unbewiesen / offen (in dieser Reihenfolge)
 - **Engine-Suite**: `work-c-engine-125735-29671` rechnet f54c7738+Test (nur Schritt 1/2); danach eine Engine-Suite auf dem
@@ -35,17 +40,20 @@ Entscheidungen beim Bau stehen in stand/c.md. Der Entwurf vom 18.11. (Stellen, B
 - Regel „kein Listeneintrag (Liste ohne feste Länge) und kein Map-Eintrag auf dem Weg des gebundenen Platzes“ gebaut (87163668),
   nur am Weg des Knotens selbst – über die Referenz-Eingänge der Aufrufer hinweg nicht (wie C++: der Aufrufer nennt den Platz).
 - Weltregel für Funktionen einer anderen Bibliothek: nur wo ihr Rumpf im Graphen ist (gelinkt); ungelinkt prüft sie niemand.
+- Klasse ohne RTTI: NativeCallable wird an `Callable::native_kind` erkannt.
 - Risiko Stellvertreter: ein behaltener NativeCallable (Klasse durch die Tür) zeigt nach dem Ende der Klasse ins Leere, wenn
   das Objekt der Engine nicht freigegeben wurde – NativeCallable sollte das Lebenszeichen der Instanz halten.
 - **Test-Schreiber (Quelle im Test)**: HeightSampler/RoadOptions sind jetzt Werte. Die Stubs der Quelle brauchen den echten
   Typ (HeightSampler {fn,user}, RoadOptions mit std::function) und `arg()` → `Value::callback(Callable um den C++-Zeiger /
   die std::function)`; `same()` eines zurückgegebenen Callbacks (Terrain::sampler) = beide rufen und vergleichen. Stelle:
   stand_ins() ~Z. 11580 cpp_to_blueprint.py, converted.h (arg/same).
-- **Konverter (das Spiel)**: (a) GEBAUT (Emit.callback_lambda, Aufruf in Emit.ex bei want = Callback<…>; unbelegt): `ro.deformed = [this](f64 x, f64 y, f64 r) { … }` → Lambda heben zu einer Funktion der
+- **Konverter (das Spiel)**: (a) GEBAUT (Emit.callback_lambda, Aufruf in Emit.ex bei want = Callback<…>): `ro.deformed = [this](f64 x, f64 y, f64 r) { … }` → Lambda heben zu einer Funktion der
   Bibliothek der Datei mit `const CityStream& self` vorn, `ro.deformed = callback<&lib::fn>(self)`; Captures nur `this`.
-  (b) Terrain::sampler: `s.user = const_cast<T*>(this); s.fn = [](void* u, …) { static_cast<const T*>(u)->… }` →
-  `return {callback<&lib::fn>(self)}` (Feld für Feld zu einem Wert des Callback-Structs). Beides allgemein: „ein Lambda an
-  einem Platz vom Typ Callback“. Danach vergleich über city_stream, terrain (beide Durchgänge).
+  (b) GEBAUT (Emit.callback_field_set, aus Emit.effect): Terrain::sampler – `s.user = this` merkt den Platz, `s.fn = Lambda
+  (void* u, …)` hebt das Lambda (der Rumpf als Kopie, `static_cast<const T*>(u)->` → `u.`), `s = callback<&lib::fn>(self)`.
+  Ein Callback ohne Argumente gemacht = ungebunden (Emit, „made here“). Lokale Probe (nur 2 Dateien, Level von
+  work-zusammen): sampler wartet nur an Terrain::height, begin_roads an road_palette (beide andere Datei) – Beleg über das
+  Level: mag `work-c-vergleich-132846-9096` (abgelegt 13:28, rechnet den Stand beim Start).
 - Teil 2 Jobs (`KERN_JOB(kind, &Lib::fn);`, jobs::Fn ohne void*) – nicht begonnen.
 - engine_api.py: nur `tag()` (3 Zeilen) berührt; Paket d arbeitet dort – beim Einmischen auf Konflikte in den erzeugten
   Dateien achten (neu erzeugen statt mischen).

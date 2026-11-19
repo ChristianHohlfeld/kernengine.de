@@ -20,15 +20,22 @@ Entscheidungen beim Bau (nach den Zielen, ohne Freigabe – Chris).
   eines Objekts der Engine wird mit dem Objekt gehalten (je Objekt und Pin der letzte), einer freien Funktion nur während
   des Aufrufs.
 
-## Stand 13:30 (work-c, letzter Commit siehe git log)
-- Gebaut: Sprache, Knoten, Text, Klasse, Tür, direkte Form, Generator (HeightSampler/std::function → Callback; RoadOptions
-  Struct der Engine; 814 Knoten), Stellvertreter ruft Callbacks (dreimal, gewürfelt, behalten je Objekt), nativer Fall
-  Ground/Site, Test logic_callbacks, Doku, Editor, Konverter-Regel „Lambda an einem Callback-Platz“.
-- **Lokal belegt** (Kleinstfall, logic+core gebaut): logic_callbacks 0 Fehler; Ground/Site Interpreter = Klasse (übersetzter
-  Text), Zeichen für Zeichen (3.5/true, 3.75; nach Again 7.25/7.75).
-- Läuft: CI 44523773375 auf edefcb08 (Engine-Suite inkl. JIT/WebAssembly, native, determinism);
-  mag `work-c-vergleich-132846-9096` (city_stream, terrain – Rückschritte durch HeightSampler/RoadOptions als Werte?).
-- Offen (uebergabe/c.md): Terrain::sampler (Felder fn/user mit void*), Test-Schreiber der Quelle für Callback-Werte,
-  Regel „kein Listeneintrag auf dem Weg des Platzes“, Teil 2 Jobs.
-- **Berührt Paket d:** tools/engine_api.py nur `tag()` (3 Zeilen); erzeugte Dateien (engine_api.gen.cpp, engine_nodes.gen.h,
-  engine_case.gen.h, src/geo/engine_calls.gen.cpp) neu – beim Mischen mit d neu erzeugen statt Text mischen.
+## Stand 14:35 – work-c = a137ba34 (gepusht)
+- **Engine-Suite grün (CI 44526990074 auf a137ba34):** native: 54577 Prüfungen, 0 Fehler (logic_callbacks,
+  logic_notation_every_node_type, tier cases …); `blueprint_native_test` ok (64 Blueprints als ihr C++, 14111 Aufrufe – darunter
+  Ground/Site mit Callbacks und der Fall Engine mit RoadOptions als Struct, Callback-Pins); build ok (logic_wasm_test: alle
+  Fälle Interpreter = WebAssembly); determinism ok. native-spawncity/e2e/input liefen noch.
+- Lokal (Kleinstfall): logic_callbacks 0 Fehler; Ground/Site Interpreter = Klasse (übersetzter Text) Zeichen für Zeichen.
+- JIT: func.callback ist kein Inline-Knoten – der JIT ruft seine C++-Funktion (call_node), wie der Interpreter. Ein eigener
+  WebAssembly-Fall fehlt (logic_cases.h sind Einzel-Graphen, ein Callback braucht eine Bibliothek).
+- Konverter: CityStream::begin_roads (Lambda [this] → Funktion der Bibliothek, callback<…>(self)) und Terrain::sampler (Felder
+  fn/user) werden geschrieben, soweit lokal ohne Level sichtbar; **Beleg ausstehend:** mag `work-c-vergleich-132846-9096`
+  (city_stream, terrain; abgelegt 13:28, mag voll – rechnet den Stand beim Start).
+- Kein „BEREIT ZUM MERGEN“, bis der vergleich in beiden Durchgängen ohne Abweichung ist. Erwartete Lücke dort: der
+  Test-Schreiber der Quelle kennt Callback-Werte noch nicht (HeightSampler/RoadOptions sind jetzt Werte: arg/same/draw für
+  fn+void* und std::function fehlen in converted.h/stand_ins) – dann warten sampler/begin_roads „am Test“.
+- **Berührt Paket d (Besitzer engine_api.py):** dort nur `Calls.tag` (+3 Zeilen); Api/Unit-Erweiterung in cpp_to_blueprint.py
+  (callback_record/sig/type, btype, zero, Api.pin/shape); erzeugte Dateien neu (engine_api.gen.cpp, engine_nodes.gen.h,
+  engine_case.gen.h, src/geo/engine_calls.gen.cpp) – beim Mischen neu erzeugen. EngineStandIn (engine_api.cpp) ruft jetzt
+  Callbacks; EngineObjects hält sie (engine_host.h).
+- Regel berührt: keine. (Neu in der Sprache: Typ callback, Knoten func.callback, NodeDef::world – allgemein, für jedes Spiel.)

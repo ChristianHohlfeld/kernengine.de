@@ -112,3 +112,45 @@ ruft heute genau diese Methode nach dem Umwandeln. Beleg: Engine-Suite; vergleic
   * type_choices(): Breiten anbieten (nicht bei keys_only/enums_only/structs_only), with_lists → „u8_list“; check(): Fehler „noch kein
     Typ“ (logic.cpp width_ok) entfernen; logic.mjs typeOptions: Listen der Breiten wieder zulassen; e2e-Zahlen dann +6.
   * Klasse: List<U8> = logic::List<Sized<u8>> – detail::Entry<Sized<T>>, Held<std::vector<Sized<T>>>, to_value(vector<Sized>), list_type_of.
+
+## Nachfolger 5 (19.11., ab ~13:00) – E20 Schritt 3 gebaut, Schritt 4 vorbereitet
+- work-zusammen 73c2ac07 eingemischt (vorgespult). **Schritt 3 = 18c636be + 0c57a404** (gepusht). Entscheidungen (selbst, nach den Zielen):
+  * List<U8> … List<I32> ist eigener Typ (fits: Breite gleich); **Eingänge, die die Zahlen einer Liste lesen, wie sie sind** (Text of Bytes,
+    Struct of Bytes, Items von Copy Bytes) haben `of = kAnyWidth` ("*", logic.h) – fits/Leser (`same`, Literal `List<Int>{…}`)/Editor
+    (logic_edit.cpp: generic "int_list u8_list …") nehmen jede Int-Liste; Klasse: `logic::items_of(L)` (nodes.h) → Items<T>, Funktionen als
+    Vorlagen über die Liste (text_of_bytes, struct_of_bytes, list_copy_bytes, list_insert_text).
+  * Speichern wickelt (core_nodes.cpp `stored_as`, `width_of_place`): list.add/insert/resize-Wert, list.make (Typ u8), insert_text (I8 → −128..−1).
+    Find/Contains/Remove Item vergleichen die ZAHL (C++: std::find eines int in vector<u8> wickelt nicht) – Klasse `logic::Sought<T>` = Whole bei
+    Sized, `equal_item`; Interpreter unverändert. Copy Bytes in eine Liste einer Breite: code muss die Breite sein (problem()); Anordnung: ein
+    Feld einer Breite hat seine Breite (layout_problem).
+  * Typwahl: `ParamDef::widths` (in type_param): Breiten als Item-Typ (type_param(false)), nur Breiten-LISTEN bei with_lists (Select/Reroute/
+    get_on: ein einzelnes U8 am Pin wäre eine andere Zahl); Map-Werte nie. Sized: `explicit operator i64`.
+  * Schreiber: Vorgabe `List<U8>{…}` (notation.cpp literal). Web: typeOptions mit Breitenlisten, lgTyped "u8_list"; e2e +6 (28/30/32/34).
+- Lokal belegt: Fall l/c.txt (p-tmp/w20/l): Klasse == Interpreter == echtes C++ (std::vector<u8>/<int8_t>/<uint32_t>, l/real.cpp);
+  Fixpunkt aller logic_cases (chk) bad=0; logic_fixed_widths (body.inc, Leser-Fälle + Werte von fixed_width_lists) bad=0.
+  Werkzeug: p-tmp/w20/mk.sh baut case/mk (Text → Klasse, JSON, Glue: `case/mk in.txt out.h out.json glue.h`) und case/run.
+- Belege laufen: engine `work-p-engine-134721-25503` (0c57a404), CI 44527163767. (18c636be-CI 44525141992: native rot an
+  logic_notation_every_node_type – Literal List<Int>{} in Copy-Bytes-Items; behoben in 0c57a404.)
+
+### Bauplan Schritt 4 (Konverter, tools/cpp_to_blueprint.py) – NICHT begonnen
+- Typen: NUMBER (Z.143) bleibt die Typ-Tabelle der AUSDRÜCKE (Draht = Int). Neu nur für PLÄTZE: unsigned char/short/int, signed char,
+  short, int → U8/U16/U32/I8/I16/I32 (Entscheidung offen: `int` → I32? C++-treu ja – i32 ist int, ALIAS macht beides gleich; Folge: fast jede
+  Funktion ändert sich, Klasse schneller (Sized speichert ohne normal()), Interpreter wickelt in hold()). Stellen, wo Plätze ihren Typ
+  bekommen (btype-Aufrufe): Felder 2225 (state_fields) / 1863, Variablen der Datei 2108, geteilte 2253, Lokale 3066 (`local`), Rückgabe 3109,
+  Parameter 3200, Listen-Einträge `entry`/`element` 1545/1556 (List<U8>), Struct-Felder der Tupel 1573. tp()/held_type (2987/2997) geben den
+  ERKLÄRTEN Typ zurück → 211 Vergleiche `== "Int"` brechen für U8-Plätze: tp() muss für einzelne Breiten "Int" geben (Draht), für Listen
+  `List<U8>` behalten; Listen-Stellen, die "List<Int>" erwarten (10 Literale, z. B. 5750 bytes-Temp, BYTE_FIELD 539), auf Listen jeder Breite.
+- Typisierte Listenknoten schreiben den Item-Typ: `list_get<U8>`, `flow_for_each<U8>` (Knotenmitglied `U8 item`).
+- wrap32/band entfallen nur beim SPEICHERN: `narrow()` (8973) gibt den Text unverändert, wenn das Ziel ein Platz der Breite `want` ist
+  (Zuweisung, Initialisierung, return, list_add/insert/resize in List<U8>, Feld). Innerhalb eines Ausdrucks bleibt wrap32/mul32 (der Draht ist
+  ein Int; Vergleiche/Shifts/Division danach brauchen die gewickelte Zahl). Dafür braucht fx() die Breite des Ziels an der Wurzel
+  (z. B. `self.store_width`), nur auf der obersten Ebene (+,−: wrap32 weg; ×: mul32 bleibt – 2^32·2^32 ist in double nicht exakt; <<: wrap32
+  weg nur, wenn das Produkt < 2^53 bleibt, sonst bleibt shl+wrap).
+- BYTE_CODES (531): Copy Bytes nach/von std::vector<u8> → List<U8> mit code u8 (problem() verlangt es jetzt).
+- Beleg: `./mag.sh konvert origin/work-p 9` (convert rc=0) + vergleich über src/nostr.cpp src/qr_code.cpp src/common.cpp src/wire.cpp
+  (bzw. src/mvt.cpp src/settings.cpp der Bench-Fälle), beide Durchgänge; danach Zeit-Test (rb.sh / blueprint_bench.sh --check 1.10).
+- t1 (Test-Schreiber): converted.h `namespace wide` hat u8…u32 schon als die echten Typen (nur f32 = double) – zu prüfen ist, ob der
+  erzeugte Test die Argumente/Ergebnisse einer U32-Stelle als Int (Value::integer) übergibt und vergleicht: das passt, solange die Werte im
+  Bereich liegen; ein Argument außerhalb (Zufallszahl > 2^32 an einen u32-Parameter) gibt der Quelle die gewickelte Zahl (C++-Umwandlung beim
+  Aufruf) – der Blueprint wickelt am Eingang (fitted) genauso. Kein Befund, solange der Test die Zahl über die C++-Signatur reicht.
+- Danach Schritt 5 (Schleife mit lokalem Wächter, ENTWURF 4 (b)) und (b) Struktur-Argumente ohne Heap (Bauplan oben).

@@ -1,5 +1,39 @@
 # Paket k – Stand
 
+## Nachfolger 5 (19.11., ab 13:40; work-k = work-zusammen fc8752ab + eigene Commits)
+- 4d14f00c: (1) Unit.state_pointer – `Game* g` einer Struktur aus dem Rumpf einer Methode des Zustands, jeder Wert dort mit
+  `this` gemacht (geprüft: Klammerlisten, Kopien; Feld nur zum Erreichen gelesen; keine Liste/optional/Zeiger der Struktur)
+  → kein Feld; `g->x` sind die Variablen des Blueprints (Emit.at_state, Function.sees_state = Schritt). Methoden lokaler
+  Strukturen: Tree.body, stehen bei ihrer Funktion (part_of_function), f.lifted (mit ihr verglichen, nicht gezählt).
+  worldsync_update. (2) `T& r = v.back()/front()` → Index beim Binden gehalten (Decoder::step). (3) each_place: `for (T* p :
+  {&a, &b})` ausgerollt, break/continue über Schleifen-Flags (gaps_draw).
+- 4e8ae7d1: bytes_pointer (`reinterpret_cast<const u8*>(&x)`, x Zahl → Liste ihrer Bytes; end_layer); entry_pointer_set mit
+  `&q` (Eintrag eines Durchgangs) und `&list.back()` (gaps_jet_audio); each_place für Tupel mit Zeigern (gaps_sirens,
+  gaps_jet_audio).
+- 1cb0e7e1: `V& r = m[key]` (kern::Map) – Zeile einmal finden und halten, steady (swarm_update, find_if über r.units).
+- Kleinstfälle: /tmp/k_sp, /tmp/k_back, /tmp/k_ep, /tmp/k_by, /tmp/k_fa, /tmp/k_tu, /tmp/k_ms (alle lokal „written“, Text geprüft).
+- Lokal (game_worldsync, game.cpp, net_session, mvt): Decoder::step written; worldsync_update kommt bis set_remote_animals (life.cpp
+  fehlt in der lokalen Probe).
+- work-k-vergleich-135928-32635 (4d14f00c): convert/bau/alle rc=0, 53/53 ok in beiden Durchgängen (kein Rückschritt). worldsync_update
+  wartet dort nur noch an report() (andere Datei), gaps_draw an gaps_barricades_draw() (andere Datei); Decoder::step geschrieben, aber
+  „its test cannot compare it yet (… an entry by a pointer)“ – der Wächter sah den eingesetzten Index statt `.back()` → ff6e5a89 (_call).
+- da0e0f6f SPRACHE text.set_code + dd3bd1c5 for (char& c : text) (hud_json). CI 44532859846 auf dd3bd1c5: build (logic JIT: all cases
+  match), native (test_main samt Rundreise, logic_cases text_set_code, blueprint_native_test, game_native_test) ok, determinism, input ok.
+- ff6e5a89 _call für .back()/m[key]. work-k-vergleich-142617-9783 (mvt, game_swarm, game_gaps, game_barricades, game_worldsync, game.cpp):
+  Decoder::step und Writer::end_layer GESCHRIEBEN UND VERGLICHEN, ohne Abweichung in beiden Durchgängen (converted_mvt, converted_mvt_cpp ok).
+  Aber gaps_barricade_doors 1/20 (vorher gleich) – Ursache meine m[key]-Regel bei `st = gaps_->planks[key]` + `planks.erase(it)` →
+  798186ff (nicht halten, wenn die Map wieder genannt wird). worldsync_update/swarm_update/gaps_jet_audio/gaps_sirens/hud_json warten in
+  der Probe nur an Teilen anderer Dateien (send_world_to, send_swarm, gaps_riding, horn_low, vr_menu_json) – zeigt der volle Lauf.
+  gaps_draw wartet jetzt an `GapsState::Part& part = p.ember ? g.ember : g.disc;` (Referenz auf einen von zwei Plätzen – neue Wartestelle,
+  vorher verdeckt; nicht gebaut).
+- Beleg läuft: work-k-vergleich-145547-26283 (mvt, game_swarm, game_gaps, game_barricades, game.cpp auf 798186ff).
+
+### BEFUND (Quelltext des Spiels, für den Koordinator) – gaps_barricade_doors (game_barricades.cpp:39–43)
+- `std::vector<u8>& st = gaps_->planks[key];` lebt über `gaps_->planks.erase(it)` hinweg (mehr als 400 Gebäude): kern::Map hält die Einträge
+  in einem std::vector, erase verschiebt die folgenden – st ist danach ungültig (C++ lässt offen, was st[i] dann gibt; ist key der letzte
+  Eintrag, zeigt st auf einen zerstörten Wert). Der Konverter findet den Eintrag dort wie bisher bei jeder Verwendung neu (das meint der
+  Quelltext). Eine Absenkung (st nach dem erase neu binden) bräuchte einen Differenztest – nicht von mir gemacht.
+
 ## Nachfolger 4 (ab 11:55, work-k = work-zusammen 6998a56e + eigene Commits)
 - cd69e381 Destruktor mit Rumpf = Funktion <Klasse>_end, in ended_parts/state_ended vor den Feldern gerufen; moved_from: Klasse mit
   Destruktor und ohne Kopie/Verschiebung → std::move kopiert. Vergleich work-k-vergleich-120450-8326 (car, ragdoll, game_world,
