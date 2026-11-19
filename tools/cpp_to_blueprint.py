@@ -13656,6 +13656,7 @@ def convert_unit(job):
         # variable is called what the Blueprint has in the end (a constant met after it was named): then,
         # too, it is converted again, with those names known.
         barred, reserved = {}, set()
+        exported = ({}, {})
         while True:
             writer = None
             unit = Unit(tree, name, world, part)
@@ -13685,12 +13686,25 @@ def convert_unit(job):
             writer.path = main_file
             writer.test_dir = test
             unit.test = writer.write()
+            # (the source of a function is what it is, whether its test compares it yet or not: the tests of other files
+            # that call it hold it - in a circle of functions over files, each test needs the others' source before any
+            # test of them compares)
+            tried = writer.exports()
+            for k, v in tried[0].items():
+                exported[0].setdefault(k, v)
+            for k, v in tried[1].items():
+                exported[1].setdefault(k, v)
             more = {f.decl["id"]: f"its test cannot compare it yet ({why})" for f, why in unit.test[1] if why != "it gives nothing" and f.decl["id"] not in barred}
             if not more:
                 break
             barred.update(more)
-        # what the tests of other files need of this one to hold the source of its functions they call
+        # what the tests of other files need of this one to hold the source of its functions they call - also of those
+        # whose own test does not compare them yet (exported: every try's)
         exports = writer.exports() if writer is not None else ({}, {})
+        for k, v in exported[0].items():
+            exports[0].setdefault(k, v)
+        for k, v in exported[1].items():
+            exports[1].setdefault(k, v)
     finally:
         sys.stderr = keep
         if scratch:
