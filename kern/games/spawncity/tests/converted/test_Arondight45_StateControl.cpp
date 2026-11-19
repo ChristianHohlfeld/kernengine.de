@@ -1198,7 +1198,7 @@ private:
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::V3& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z)}); }
-[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z"); }
 [[maybe_unused]] static bool defined(const fc::V3& s) { return defined(s.x) && defined(s.y) && defined(s.z); }
 [[maybe_unused]] static std::string text(const fc::V3& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + "}"; }
 [[maybe_unused]] static void take(fc::V3& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); }
@@ -1216,7 +1216,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::NavigationState& s) { return converted::Value::structure({arg(s.velocity_world_mps), arg(s.agl_m), arg(s.valid), arg(s.velocity_valid), arg(s.agl_valid), arg(s.heading_deg), arg(s.heading_valid)}); }
-[[maybe_unused]] static bool same(const fc::NavigationState& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.velocity_world_mps, (*got.rows)[0]) && same(want.agl_m, (*got.rows)[1]) && same(want.valid, (*got.rows)[2]) && same(want.velocity_valid, (*got.rows)[3]) && same(want.agl_valid, (*got.rows)[4]) && same(want.heading_deg, (*got.rows)[5]) && same(want.heading_valid, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const fc::NavigationState& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.velocity_world_mps, (*got.rows)[0]), ".velocity_world_mps") && converted::at_place(same(want.agl_m, (*got.rows)[1]), ".agl_m") && converted::at_place(same(want.valid, (*got.rows)[2]), ".valid") && converted::at_place(same(want.velocity_valid, (*got.rows)[3]), ".velocity_valid") && converted::at_place(same(want.agl_valid, (*got.rows)[4]), ".agl_valid") && converted::at_place(same(want.heading_deg, (*got.rows)[5]), ".heading_deg") && converted::at_place(same(want.heading_valid, (*got.rows)[6]), ".heading_valid"); }
 [[maybe_unused]] static bool defined(const fc::NavigationState& s) { return defined(s.velocity_world_mps) && defined(s.agl_m) && defined(s.valid) && defined(s.velocity_valid) && defined(s.agl_valid) && defined(s.heading_deg) && defined(s.heading_valid); }
 [[maybe_unused]] static std::string text(const fc::NavigationState& s) { return std::string("{") + text(s.velocity_world_mps) + ", " + text(s.agl_m) + ", " + text(s.valid) + ", " + text(s.velocity_valid) + ", " + text(s.agl_valid) + ", " + text(s.heading_deg) + ", " + text(s.heading_valid) + "}"; }
 [[maybe_unused]] static void take(fc::NavigationState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<fc::V3>(s.velocity_world_mps, (*v.rows)[0]); converted::take_as<double>(s.agl_m, (*v.rows)[1]); converted::take_as<bool>(s.valid, (*v.rows)[2]); converted::take_as<bool>(s.velocity_valid, (*v.rows)[3]); converted::take_as<bool>(s.agl_valid, (*v.rows)[4]); converted::take_as<double>(s.heading_deg, (*v.rows)[5]); converted::take_as<bool>(s.heading_valid, (*v.rows)[6]); }
@@ -1232,7 +1232,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::RC& s) { return converted::Value::structure({arg(std::vector<unsigned short>(s.ch.begin(), s.ch.end())), arg(s.lost), arg(s.failsafe), arg(s.valid), arg(converted::shaped<converted::Whole>(s.us))}); }
-[[maybe_unused]] static bool same(const fc::RC& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(std::vector<unsigned short>(want.ch.begin(), want.ch.end()), (*got.rows)[0]) && same(want.lost, (*got.rows)[1]) && same(want.failsafe, (*got.rows)[2]) && same(want.valid, (*got.rows)[3]) && same(converted::shaped<converted::Whole>(want.us), (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::RC& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(std::vector<unsigned short>(want.ch.begin(), want.ch.end()), (*got.rows)[0]), ".ch") && converted::at_place(same(want.lost, (*got.rows)[1]), ".lost") && converted::at_place(same(want.failsafe, (*got.rows)[2]), ".failsafe") && converted::at_place(same(want.valid, (*got.rows)[3]), ".valid") && converted::at_place(same(converted::shaped<converted::Whole>(want.us), (*got.rows)[4]), ".us"); }
 [[maybe_unused]] static bool defined(const fc::RC& s) { return defined(std::vector<unsigned short>(s.ch.begin(), s.ch.end())) && defined(s.lost) && defined(s.failsafe) && defined(s.valid) && defined(converted::shaped<converted::Whole>(s.us)); }
 [[maybe_unused]] static std::string text(const fc::RC& s) { return std::string("{") + text(std::vector<unsigned short>(s.ch.begin(), s.ch.end())) + ", " + text(s.lost) + ", " + text(s.failsafe) + ", " + text(s.valid) + ", " + text(converted::shaped<converted::Whole>(s.us)) + "}"; }
 [[maybe_unused]] static void take(fc::RC& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.ch); ++k) converted::take_as<unsigned short>(s.ch[k], items.item(k)); } converted::take_as<bool>(s.lost, (*v.rows)[1]); converted::take_as<bool>(s.failsafe, (*v.rows)[2]); converted::take_as<bool>(s.valid, (*v.rows)[3]); converted::take_as<converted::Whole>(s.us, (*v.rows)[4]); }
@@ -1250,7 +1250,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateIntent& s) { return converted::Value::structure({arg(s.right_mps), arg(s.forward_mps), arg(s.yaw_rate_dps), arg(s.body_pitch_deg), arg(s.clearance_m), arg(s.arm), arg(s.game_mode)}); }
-[[maybe_unused]] static bool same(const fc::StateIntent& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.right_mps, (*got.rows)[0]) && same(want.forward_mps, (*got.rows)[1]) && same(want.yaw_rate_dps, (*got.rows)[2]) && same(want.body_pitch_deg, (*got.rows)[3]) && same(want.clearance_m, (*got.rows)[4]) && same(want.arm, (*got.rows)[5]) && same(want.game_mode, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const fc::StateIntent& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.right_mps, (*got.rows)[0]), ".right_mps") && converted::at_place(same(want.forward_mps, (*got.rows)[1]), ".forward_mps") && converted::at_place(same(want.yaw_rate_dps, (*got.rows)[2]), ".yaw_rate_dps") && converted::at_place(same(want.body_pitch_deg, (*got.rows)[3]), ".body_pitch_deg") && converted::at_place(same(want.clearance_m, (*got.rows)[4]), ".clearance_m") && converted::at_place(same(want.arm, (*got.rows)[5]), ".arm") && converted::at_place(same(want.game_mode, (*got.rows)[6]), ".game_mode"); }
 [[maybe_unused]] static bool defined(const fc::StateIntent& s) { return defined(s.right_mps) && defined(s.forward_mps) && defined(s.yaw_rate_dps) && defined(s.body_pitch_deg) && defined(s.clearance_m) && defined(s.arm) && defined(s.game_mode); }
 [[maybe_unused]] static std::string text(const fc::StateIntent& s) { return std::string("{") + text(s.right_mps) + ", " + text(s.forward_mps) + ", " + text(s.yaw_rate_dps) + ", " + text(s.body_pitch_deg) + ", " + text(s.clearance_m) + ", " + text(s.arm) + ", " + text(s.game_mode) + "}"; }
 [[maybe_unused]] static void take(fc::StateIntent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.right_mps, (*v.rows)[0]); converted::take_as<double>(s.forward_mps, (*v.rows)[1]); converted::take_as<double>(s.yaw_rate_dps, (*v.rows)[2]); converted::take_as<double>(s.body_pitch_deg, (*v.rows)[3]); converted::take_as<double>(s.clearance_m, (*v.rows)[4]); converted::take_as<bool>(s.arm, (*v.rows)[5]); converted::take_as<bool>(s.game_mode, (*v.rows)[6]); }
@@ -1277,7 +1277,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateControllerDebug& s) { return converted::Value::structure({arg(s.desired_forward_mps), arg(s.measured_forward_mps), arg(s.desired_right_mps), arg(s.measured_right_mps), arg(s.target_yaw_deg), arg(s.measured_yaw_deg), arg(s.target_agl_m), arg(s.measured_agl_m), arg(s.target_vz_mps), arg(s.throttle), arg(s.roll_command), arg(s.pitch_command), arg(s.yaw_command), arg(s.forward_accel_mps2), arg(s.right_accel_mps2), arg(s.vertical_accel_mps2)}); }
-[[maybe_unused]] static bool same(const fc::StateControllerDebug& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.desired_forward_mps, (*got.rows)[0]) && same(want.measured_forward_mps, (*got.rows)[1]) && same(want.desired_right_mps, (*got.rows)[2]) && same(want.measured_right_mps, (*got.rows)[3]) && same(want.target_yaw_deg, (*got.rows)[4]) && same(want.measured_yaw_deg, (*got.rows)[5]) && same(want.target_agl_m, (*got.rows)[6]) && same(want.measured_agl_m, (*got.rows)[7]) && same(want.target_vz_mps, (*got.rows)[8]) && same(want.throttle, (*got.rows)[9]) && same(want.roll_command, (*got.rows)[10]) && same(want.pitch_command, (*got.rows)[11]) && same(want.yaw_command, (*got.rows)[12]) && same(want.forward_accel_mps2, (*got.rows)[13]) && same(want.right_accel_mps2, (*got.rows)[14]) && same(want.vertical_accel_mps2, (*got.rows)[15]); }
+[[maybe_unused]] static bool same(const fc::StateControllerDebug& want, const converted::Value& got) { return converted::rows_of(got, 16) && converted::at_place(same(want.desired_forward_mps, (*got.rows)[0]), ".desired_forward_mps") && converted::at_place(same(want.measured_forward_mps, (*got.rows)[1]), ".measured_forward_mps") && converted::at_place(same(want.desired_right_mps, (*got.rows)[2]), ".desired_right_mps") && converted::at_place(same(want.measured_right_mps, (*got.rows)[3]), ".measured_right_mps") && converted::at_place(same(want.target_yaw_deg, (*got.rows)[4]), ".target_yaw_deg") && converted::at_place(same(want.measured_yaw_deg, (*got.rows)[5]), ".measured_yaw_deg") && converted::at_place(same(want.target_agl_m, (*got.rows)[6]), ".target_agl_m") && converted::at_place(same(want.measured_agl_m, (*got.rows)[7]), ".measured_agl_m") && converted::at_place(same(want.target_vz_mps, (*got.rows)[8]), ".target_vz_mps") && converted::at_place(same(want.throttle, (*got.rows)[9]), ".throttle") && converted::at_place(same(want.roll_command, (*got.rows)[10]), ".roll_command") && converted::at_place(same(want.pitch_command, (*got.rows)[11]), ".pitch_command") && converted::at_place(same(want.yaw_command, (*got.rows)[12]), ".yaw_command") && converted::at_place(same(want.forward_accel_mps2, (*got.rows)[13]), ".forward_accel_mps2") && converted::at_place(same(want.right_accel_mps2, (*got.rows)[14]), ".right_accel_mps2") && converted::at_place(same(want.vertical_accel_mps2, (*got.rows)[15]), ".vertical_accel_mps2"); }
 [[maybe_unused]] static bool defined(const fc::StateControllerDebug& s) { return defined(s.desired_forward_mps) && defined(s.measured_forward_mps) && defined(s.desired_right_mps) && defined(s.measured_right_mps) && defined(s.target_yaw_deg) && defined(s.measured_yaw_deg) && defined(s.target_agl_m) && defined(s.measured_agl_m) && defined(s.target_vz_mps) && defined(s.throttle) && defined(s.roll_command) && defined(s.pitch_command) && defined(s.yaw_command) && defined(s.forward_accel_mps2) && defined(s.right_accel_mps2) && defined(s.vertical_accel_mps2); }
 [[maybe_unused]] static std::string text(const fc::StateControllerDebug& s) { return std::string("{") + text(s.desired_forward_mps) + ", " + text(s.measured_forward_mps) + ", " + text(s.desired_right_mps) + ", " + text(s.measured_right_mps) + ", " + text(s.target_yaw_deg) + ", " + text(s.measured_yaw_deg) + ", " + text(s.target_agl_m) + ", " + text(s.measured_agl_m) + ", " + text(s.target_vz_mps) + ", " + text(s.throttle) + ", " + text(s.roll_command) + ", " + text(s.pitch_command) + ", " + text(s.yaw_command) + ", " + text(s.forward_accel_mps2) + ", " + text(s.right_accel_mps2) + ", " + text(s.vertical_accel_mps2) + "}"; }
 [[maybe_unused]] static void take(fc::StateControllerDebug& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<double>(s.desired_forward_mps, (*v.rows)[0]); converted::take_as<double>(s.measured_forward_mps, (*v.rows)[1]); converted::take_as<double>(s.desired_right_mps, (*v.rows)[2]); converted::take_as<double>(s.measured_right_mps, (*v.rows)[3]); converted::take_as<double>(s.target_yaw_deg, (*v.rows)[4]); converted::take_as<double>(s.measured_yaw_deg, (*v.rows)[5]); converted::take_as<double>(s.target_agl_m, (*v.rows)[6]); converted::take_as<double>(s.measured_agl_m, (*v.rows)[7]); converted::take_as<double>(s.target_vz_mps, (*v.rows)[8]); converted::take_as<double>(s.throttle, (*v.rows)[9]); converted::take_as<double>(s.roll_command, (*v.rows)[10]); converted::take_as<double>(s.pitch_command, (*v.rows)[11]); converted::take_as<double>(s.yaw_command, (*v.rows)[12]); converted::take_as<double>(s.forward_accel_mps2, (*v.rows)[13]); converted::take_as<double>(s.right_accel_mps2, (*v.rows)[14]); converted::take_as<double>(s.vertical_accel_mps2, (*v.rows)[15]); }
@@ -1307,7 +1307,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateController& s) { return converted::Value::structure({arg(s.agl_estimate_m_), arg(s.agl_estimate_valid_), arg(s.active_), arg(s.heading_source_valid_), arg(s.manual_pitch_active_), arg(s.acceleration_estimator_valid_), arg(s.horizontal_target_initialized_), arg(s.vertical_accel_initialized_), arg(s.acceleration_sample_dt_s_), arg(s.previous_velocity_world_mps_), arg(s.measured_acceleration_world_mps2_), arg(s.horizontal_integral_forward_mps2_), arg(s.horizontal_integral_right_mps2_), arg(s.commanded_forward_mps_), arg(s.commanded_right_mps_), arg(s.vertical_accel_state_mps2_), arg(s.target_yaw_deg_), arg(s.hover_trim_), arg(s.debug_)}); }
-[[maybe_unused]] static bool same(const fc::StateController& want, const converted::Value& got) { return got.rows && got.rows->size() == 19 && same(want.agl_estimate_m_, (*got.rows)[0]) && same(want.agl_estimate_valid_, (*got.rows)[1]) && same(want.active_, (*got.rows)[2]) && same(want.heading_source_valid_, (*got.rows)[3]) && same(want.manual_pitch_active_, (*got.rows)[4]) && same(want.acceleration_estimator_valid_, (*got.rows)[5]) && same(want.horizontal_target_initialized_, (*got.rows)[6]) && same(want.vertical_accel_initialized_, (*got.rows)[7]) && same(want.acceleration_sample_dt_s_, (*got.rows)[8]) && same(want.previous_velocity_world_mps_, (*got.rows)[9]) && same(want.measured_acceleration_world_mps2_, (*got.rows)[10]) && same(want.horizontal_integral_forward_mps2_, (*got.rows)[11]) && same(want.horizontal_integral_right_mps2_, (*got.rows)[12]) && same(want.commanded_forward_mps_, (*got.rows)[13]) && same(want.commanded_right_mps_, (*got.rows)[14]) && same(want.vertical_accel_state_mps2_, (*got.rows)[15]) && same(want.target_yaw_deg_, (*got.rows)[16]) && same(want.hover_trim_, (*got.rows)[17]) && same(want.debug_, (*got.rows)[18]); }
+[[maybe_unused]] static bool same(const fc::StateController& want, const converted::Value& got) { return converted::rows_of(got, 19) && converted::at_place(same(want.agl_estimate_m_, (*got.rows)[0]), ".agl_estimate_m_") && converted::at_place(same(want.agl_estimate_valid_, (*got.rows)[1]), ".agl_estimate_valid_") && converted::at_place(same(want.active_, (*got.rows)[2]), ".active_") && converted::at_place(same(want.heading_source_valid_, (*got.rows)[3]), ".heading_source_valid_") && converted::at_place(same(want.manual_pitch_active_, (*got.rows)[4]), ".manual_pitch_active_") && converted::at_place(same(want.acceleration_estimator_valid_, (*got.rows)[5]), ".acceleration_estimator_valid_") && converted::at_place(same(want.horizontal_target_initialized_, (*got.rows)[6]), ".horizontal_target_initialized_") && converted::at_place(same(want.vertical_accel_initialized_, (*got.rows)[7]), ".vertical_accel_initialized_") && converted::at_place(same(want.acceleration_sample_dt_s_, (*got.rows)[8]), ".acceleration_sample_dt_s_") && converted::at_place(same(want.previous_velocity_world_mps_, (*got.rows)[9]), ".previous_velocity_world_mps_") && converted::at_place(same(want.measured_acceleration_world_mps2_, (*got.rows)[10]), ".measured_acceleration_world_mps2_") && converted::at_place(same(want.horizontal_integral_forward_mps2_, (*got.rows)[11]), ".horizontal_integral_forward_mps2_") && converted::at_place(same(want.horizontal_integral_right_mps2_, (*got.rows)[12]), ".horizontal_integral_right_mps2_") && converted::at_place(same(want.commanded_forward_mps_, (*got.rows)[13]), ".commanded_forward_mps_") && converted::at_place(same(want.commanded_right_mps_, (*got.rows)[14]), ".commanded_right_mps_") && converted::at_place(same(want.vertical_accel_state_mps2_, (*got.rows)[15]), ".vertical_accel_state_mps2_") && converted::at_place(same(want.target_yaw_deg_, (*got.rows)[16]), ".target_yaw_deg_") && converted::at_place(same(want.hover_trim_, (*got.rows)[17]), ".hover_trim_") && converted::at_place(same(want.debug_, (*got.rows)[18]), ".debug_"); }
 [[maybe_unused]] static bool defined(const fc::StateController& s) { return defined(s.agl_estimate_m_) && defined(s.agl_estimate_valid_) && defined(s.active_) && defined(s.heading_source_valid_) && defined(s.manual_pitch_active_) && defined(s.acceleration_estimator_valid_) && defined(s.horizontal_target_initialized_) && defined(s.vertical_accel_initialized_) && defined(s.acceleration_sample_dt_s_) && defined(s.previous_velocity_world_mps_) && defined(s.measured_acceleration_world_mps2_) && defined(s.horizontal_integral_forward_mps2_) && defined(s.horizontal_integral_right_mps2_) && defined(s.commanded_forward_mps_) && defined(s.commanded_right_mps_) && defined(s.vertical_accel_state_mps2_) && defined(s.target_yaw_deg_) && defined(s.hover_trim_) && defined(s.debug_); }
 [[maybe_unused]] static std::string text(const fc::StateController& s) { return std::string("{") + text(s.agl_estimate_m_) + ", " + text(s.agl_estimate_valid_) + ", " + text(s.active_) + ", " + text(s.heading_source_valid_) + ", " + text(s.manual_pitch_active_) + ", " + text(s.acceleration_estimator_valid_) + ", " + text(s.horizontal_target_initialized_) + ", " + text(s.vertical_accel_initialized_) + ", " + text(s.acceleration_sample_dt_s_) + ", " + text(s.previous_velocity_world_mps_) + ", " + text(s.measured_acceleration_world_mps2_) + ", " + text(s.horizontal_integral_forward_mps2_) + ", " + text(s.horizontal_integral_right_mps2_) + ", " + text(s.commanded_forward_mps_) + ", " + text(s.commanded_right_mps_) + ", " + text(s.vertical_accel_state_mps2_) + ", " + text(s.target_yaw_deg_) + ", " + text(s.hover_trim_) + ", " + text(s.debug_) + "}"; }
 [[maybe_unused]] static void take(fc::StateController& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<double>(s.agl_estimate_m_, (*v.rows)[0]); converted::take_as<bool>(s.agl_estimate_valid_, (*v.rows)[1]); converted::take_as<bool>(s.active_, (*v.rows)[2]); converted::take_as<bool>(s.heading_source_valid_, (*v.rows)[3]); converted::take_as<bool>(s.manual_pitch_active_, (*v.rows)[4]); converted::take_as<bool>(s.acceleration_estimator_valid_, (*v.rows)[5]); converted::take_as<bool>(s.horizontal_target_initialized_, (*v.rows)[6]); converted::take_as<bool>(s.vertical_accel_initialized_, (*v.rows)[7]); converted::take_as<double>(s.acceleration_sample_dt_s_, (*v.rows)[8]); converted::take_as<fc::V3>(s.previous_velocity_world_mps_, (*v.rows)[9]); converted::take_as<fc::V3>(s.measured_acceleration_world_mps2_, (*v.rows)[10]); converted::take_as<double>(s.horizontal_integral_forward_mps2_, (*v.rows)[11]); converted::take_as<double>(s.horizontal_integral_right_mps2_, (*v.rows)[12]); converted::take_as<double>(s.commanded_forward_mps_, (*v.rows)[13]); converted::take_as<double>(s.commanded_right_mps_, (*v.rows)[14]); converted::take_as<double>(s.vertical_accel_state_mps2_, (*v.rows)[15]); converted::take_as<double>(s.target_yaw_deg_, (*v.rows)[16]); converted::take_as<double>(s.hover_trim_, (*v.rows)[17]); converted::take_as<fc::StateControllerDebug>(s.debug_, (*v.rows)[18]); }
@@ -1323,7 +1323,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Command& s) { return converted::Value::structure({arg(s.roll), arg(s.pitch), arg(s.throttle), arg(s.yaw), arg(s.arm)}); }
-[[maybe_unused]] static bool same(const fc::Command& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.roll, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.throttle, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.arm, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::Command& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.roll, (*got.rows)[0]), ".roll") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.throttle, (*got.rows)[2]), ".throttle") && converted::at_place(same(want.yaw, (*got.rows)[3]), ".yaw") && converted::at_place(same(want.arm, (*got.rows)[4]), ".arm"); }
 [[maybe_unused]] static bool defined(const fc::Command& s) { return defined(s.roll) && defined(s.pitch) && defined(s.throttle) && defined(s.yaw) && defined(s.arm); }
 [[maybe_unused]] static std::string text(const fc::Command& s) { return std::string("{") + text(s.roll) + ", " + text(s.pitch) + ", " + text(s.throttle) + ", " + text(s.yaw) + ", " + text(s.arm) + "}"; }
 [[maybe_unused]] static void take(fc::Command& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.roll, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.throttle, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<bool>(s.arm, (*v.rows)[4]); }
@@ -1337,7 +1337,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::PT1& s) { return converted::Value::structure({arg(s.cutoff_hz_), arg(s.y_), arg(s.initialized_)}); }
-[[maybe_unused]] static bool same(const fc::PT1& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.cutoff_hz_, (*got.rows)[0]) && same(want.y_, (*got.rows)[1]) && same(want.initialized_, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::PT1& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.cutoff_hz_, (*got.rows)[0]), ".cutoff_hz_") && converted::at_place(same(want.y_, (*got.rows)[1]), ".y_") && converted::at_place(same(want.initialized_, (*got.rows)[2]), ".initialized_"); }
 [[maybe_unused]] static bool defined(const fc::PT1& s) { return defined(s.cutoff_hz_) && defined(s.y_) && defined(s.initialized_); }
 [[maybe_unused]] static std::string text(const fc::PT1& s) { return std::string("{") + text(s.cutoff_hz_) + ", " + text(s.y_) + ", " + text(s.initialized_) + "}"; }
 [[maybe_unused]] static void take(fc::PT1& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.cutoff_hz_, (*v.rows)[0]); converted::take_as<double>(s.y_, (*v.rows)[1]); converted::take_as<bool>(s.initialized_, (*v.rows)[2]); }
@@ -1350,7 +1350,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Filters& s) { return converted::Value::structure({arg(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())), arg(std::vector<fc::PT1>(s.accel.begin(), s.accel.end()))}); }
-[[maybe_unused]] static bool same(const fc::Filters& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(std::vector<fc::PT1>(want.gyro.begin(), want.gyro.end()), (*got.rows)[0]) && same(std::vector<fc::PT1>(want.accel.begin(), want.accel.end()), (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const fc::Filters& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(std::vector<fc::PT1>(want.gyro.begin(), want.gyro.end()), (*got.rows)[0]), ".gyro") && converted::at_place(same(std::vector<fc::PT1>(want.accel.begin(), want.accel.end()), (*got.rows)[1]), ".accel"); }
 [[maybe_unused]] static bool defined(const fc::Filters& s) { return defined(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())) && defined(std::vector<fc::PT1>(s.accel.begin(), s.accel.end())); }
 [[maybe_unused]] static std::string text(const fc::Filters& s) { return std::string("{") + text(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())) + ", " + text(std::vector<fc::PT1>(s.accel.begin(), s.accel.end())) + "}"; }
 [[maybe_unused]] static void take(fc::Filters& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.gyro); ++k) converted::take_as<fc::PT1>(s.gyro[k], items.item(k)); } { const converted::Value& items = (*v.rows)[1]; for (std::size_t k = 0; k < items.size() && k < std::size(s.accel); ++k) converted::take_as<fc::PT1>(s.accel[k], items.item(k)); } }
@@ -1364,7 +1364,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Attitude& s) { return converted::Value::structure({arg(s.roll), arg(s.pitch), arg(s.yaw)}); }
-[[maybe_unused]] static bool same(const fc::Attitude& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.roll, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::Attitude& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.roll, (*got.rows)[0]), ".roll") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw"); }
 [[maybe_unused]] static bool defined(const fc::Attitude& s) { return defined(s.roll) && defined(s.pitch) && defined(s.yaw); }
 [[maybe_unused]] static std::string text(const fc::Attitude& s) { return std::string("{") + text(s.roll) + ", " + text(s.pitch) + ", " + text(s.yaw) + "}"; }
 [[maybe_unused]] static void take(fc::Attitude& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.roll, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); }
@@ -1381,7 +1381,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Gains& s) { return converted::Value::structure({arg(s.kp), arg(s.ki), arg(s.kd), arg(s.integral_limit), arg(s.output_limit), arg(s.d_cutoff_hz)}); }
-[[maybe_unused]] static bool same(const fc::Gains& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.kp, (*got.rows)[0]) && same(want.ki, (*got.rows)[1]) && same(want.kd, (*got.rows)[2]) && same(want.integral_limit, (*got.rows)[3]) && same(want.output_limit, (*got.rows)[4]) && same(want.d_cutoff_hz, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const fc::Gains& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.kp, (*got.rows)[0]), ".kp") && converted::at_place(same(want.ki, (*got.rows)[1]), ".ki") && converted::at_place(same(want.kd, (*got.rows)[2]), ".kd") && converted::at_place(same(want.integral_limit, (*got.rows)[3]), ".integral_limit") && converted::at_place(same(want.output_limit, (*got.rows)[4]), ".output_limit") && converted::at_place(same(want.d_cutoff_hz, (*got.rows)[5]), ".d_cutoff_hz"); }
 [[maybe_unused]] static bool defined(const fc::Gains& s) { return defined(s.kp) && defined(s.ki) && defined(s.kd) && defined(s.integral_limit) && defined(s.output_limit) && defined(s.d_cutoff_hz); }
 [[maybe_unused]] static std::string text(const fc::Gains& s) { return std::string("{") + text(s.kp) + ", " + text(s.ki) + ", " + text(s.kd) + ", " + text(s.integral_limit) + ", " + text(s.output_limit) + ", " + text(s.d_cutoff_hz) + "}"; }
 [[maybe_unused]] static void take(fc::Gains& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.kp, (*v.rows)[0]); converted::take_as<double>(s.ki, (*v.rows)[1]); converted::take_as<double>(s.kd, (*v.rows)[2]); converted::take_as<double>(s.integral_limit, (*v.rows)[3]); converted::take_as<double>(s.output_limit, (*v.rows)[4]); converted::take_as<double>(s.d_cutoff_hz, (*v.rows)[5]); }
@@ -1397,7 +1397,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::PID& s) { return converted::Value::structure({arg(s.gains_), arg(s.d_filter_), arg(s.integral_), arg(s.previous_), arg(s.have_previous_)}); }
-[[maybe_unused]] static bool same(const fc::PID& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.gains_, (*got.rows)[0]) && same(want.d_filter_, (*got.rows)[1]) && same(want.integral_, (*got.rows)[2]) && same(want.previous_, (*got.rows)[3]) && same(want.have_previous_, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::PID& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.gains_, (*got.rows)[0]), ".gains_") && converted::at_place(same(want.d_filter_, (*got.rows)[1]), ".d_filter_") && converted::at_place(same(want.integral_, (*got.rows)[2]), ".integral_") && converted::at_place(same(want.previous_, (*got.rows)[3]), ".previous_") && converted::at_place(same(want.have_previous_, (*got.rows)[4]), ".have_previous_"); }
 [[maybe_unused]] static bool defined(const fc::PID& s) { return defined(s.gains_) && defined(s.d_filter_) && defined(s.integral_) && defined(s.previous_) && defined(s.have_previous_); }
 [[maybe_unused]] static std::string text(const fc::PID& s) { return std::string("{") + text(s.gains_) + ", " + text(s.d_filter_) + ", " + text(s.integral_) + ", " + text(s.previous_) + ", " + text(s.have_previous_) + "}"; }
 [[maybe_unused]] static void take(fc::PID& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<fc::Gains>(s.gains_, (*v.rows)[0]); converted::take_as<fc::PT1>(s.d_filter_, (*v.rows)[1]); converted::take_as<double>(s.integral_, (*v.rows)[2]); converted::take_as<double>(s.previous_, (*v.rows)[3]); converted::take_as<bool>(s.have_previous_, (*v.rows)[4]); }
@@ -1412,7 +1412,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Controller& s) { return converted::Value::structure({arg(s.attitude), arg(s.roll_pid_), arg(s.pitch_pid_), arg(s.yaw_pid_)}); }
-[[maybe_unused]] static bool same(const fc::Controller& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.attitude, (*got.rows)[0]) && same(want.roll_pid_, (*got.rows)[1]) && same(want.pitch_pid_, (*got.rows)[2]) && same(want.yaw_pid_, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const fc::Controller& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.attitude, (*got.rows)[0]), ".attitude") && converted::at_place(same(want.roll_pid_, (*got.rows)[1]), ".roll_pid_") && converted::at_place(same(want.pitch_pid_, (*got.rows)[2]), ".pitch_pid_") && converted::at_place(same(want.yaw_pid_, (*got.rows)[3]), ".yaw_pid_"); }
 [[maybe_unused]] static bool defined(const fc::Controller& s) { return defined(s.attitude) && defined(s.roll_pid_) && defined(s.pitch_pid_) && defined(s.yaw_pid_); }
 [[maybe_unused]] static std::string text(const fc::Controller& s) { return std::string("{") + text(s.attitude) + ", " + text(s.roll_pid_) + ", " + text(s.pitch_pid_) + ", " + text(s.yaw_pid_) + "}"; }
 [[maybe_unused]] static void take(fc::Controller& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<fc::Attitude>(s.attitude, (*v.rows)[0]); converted::take_as<fc::PID>(s.roll_pid_, (*v.rows)[1]); converted::take_as<fc::PID>(s.pitch_pid_, (*v.rows)[2]); converted::take_as<fc::PID>(s.yaw_pid_, (*v.rows)[3]); }
@@ -1426,7 +1426,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::ArmState& s) { return converted::Value::structure({arg(s.armed_), arg(s.saw_low_), arg(converted::shaped<converted::Whole>(s.since_us_))}); }
-[[maybe_unused]] static bool same(const fc::ArmState& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.armed_, (*got.rows)[0]) && same(want.saw_low_, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.since_us_), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::ArmState& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.armed_, (*got.rows)[0]), ".armed_") && converted::at_place(same(want.saw_low_, (*got.rows)[1]), ".saw_low_") && converted::at_place(same(converted::shaped<converted::Whole>(want.since_us_), (*got.rows)[2]), ".since_us_"); }
 [[maybe_unused]] static bool defined(const fc::ArmState& s) { return defined(s.armed_) && defined(s.saw_low_) && defined(converted::shaped<converted::Whole>(s.since_us_)); }
 [[maybe_unused]] static std::string text(const fc::ArmState& s) { return std::string("{") + text(s.armed_) + ", " + text(s.saw_low_) + ", " + text(converted::shaped<converted::Whole>(s.since_us_)) + "}"; }
 [[maybe_unused]] static void take(fc::ArmState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<bool>(s.armed_, (*v.rows)[0]); converted::take_as<bool>(s.saw_low_, (*v.rows)[1]); converted::take_as<converted::Whole>(s.since_us_, (*v.rows)[2]); }
@@ -1443,13 +1443,13 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   s.accel_sum_ = draw_fc__V3(draw);
   s.gyro_bias_ = draw_fc__V3(draw);
   s.bad_timing_ = static_cast<unsigned int>(draw.below(40));
-  s.fault_ = static_cast<fc::FaultCode>(draw.below(6));
+  s.fault_ = converted::enum_value<fc::FaultCode>(draw.below(6));
   s.armed_ = draw.flag();
   return s;
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Runtime& s) { return converted::Value::structure({arg(s.filters_), arg(s.controller_), arg(s.arm_), arg(s.calibrated_), arg(s.calibration_count_), arg(s.gyro_sum_), arg(s.gyro_sq_sum_), arg(s.accel_sum_), arg(s.gyro_bias_), arg(s.bad_timing_), arg(s.fault_), arg(s.armed_)}); }
-[[maybe_unused]] static bool same(const fc::Runtime& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.filters_, (*got.rows)[0]) && same(want.controller_, (*got.rows)[1]) && same(want.arm_, (*got.rows)[2]) && same(want.calibrated_, (*got.rows)[3]) && same(want.calibration_count_, (*got.rows)[4]) && same(want.gyro_sum_, (*got.rows)[5]) && same(want.gyro_sq_sum_, (*got.rows)[6]) && same(want.accel_sum_, (*got.rows)[7]) && same(want.gyro_bias_, (*got.rows)[8]) && same(want.bad_timing_, (*got.rows)[9]) && same(want.fault_, (*got.rows)[10]) && same(want.armed_, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const fc::Runtime& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.filters_, (*got.rows)[0]), ".filters_") && converted::at_place(same(want.controller_, (*got.rows)[1]), ".controller_") && converted::at_place(same(want.arm_, (*got.rows)[2]), ".arm_") && converted::at_place(same(want.calibrated_, (*got.rows)[3]), ".calibrated_") && converted::at_place(same(want.calibration_count_, (*got.rows)[4]), ".calibration_count_") && converted::at_place(same(want.gyro_sum_, (*got.rows)[5]), ".gyro_sum_") && converted::at_place(same(want.gyro_sq_sum_, (*got.rows)[6]), ".gyro_sq_sum_") && converted::at_place(same(want.accel_sum_, (*got.rows)[7]), ".accel_sum_") && converted::at_place(same(want.gyro_bias_, (*got.rows)[8]), ".gyro_bias_") && converted::at_place(same(want.bad_timing_, (*got.rows)[9]), ".bad_timing_") && converted::at_place(same(want.fault_, (*got.rows)[10]), ".fault_") && converted::at_place(same(want.armed_, (*got.rows)[11]), ".armed_"); }
 [[maybe_unused]] static bool defined(const fc::Runtime& s) { return defined(s.filters_) && defined(s.controller_) && defined(s.arm_) && defined(s.calibrated_) && defined(s.calibration_count_) && defined(s.gyro_sum_) && defined(s.gyro_sq_sum_) && defined(s.accel_sum_) && defined(s.gyro_bias_) && defined(s.bad_timing_) && defined(s.fault_) && defined(s.armed_); }
 [[maybe_unused]] static std::string text(const fc::Runtime& s) { return std::string("{") + text(s.filters_) + ", " + text(s.controller_) + ", " + text(s.arm_) + ", " + text(s.calibrated_) + ", " + text(s.calibration_count_) + ", " + text(s.gyro_sum_) + ", " + text(s.gyro_sq_sum_) + ", " + text(s.accel_sum_) + ", " + text(s.gyro_bias_) + ", " + text(s.bad_timing_) + ", " + text(s.fault_) + ", " + text(s.armed_) + "}"; }
 [[maybe_unused]] static void take(fc::Runtime& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<fc::Filters>(s.filters_, (*v.rows)[0]); converted::take_as<fc::Controller>(s.controller_, (*v.rows)[1]); converted::take_as<fc::ArmState>(s.arm_, (*v.rows)[2]); converted::take_as<bool>(s.calibrated_, (*v.rows)[3]); converted::take_as<unsigned int>(s.calibration_count_, (*v.rows)[4]); converted::take_as<fc::V3>(s.gyro_sum_, (*v.rows)[5]); converted::take_as<fc::V3>(s.gyro_sq_sum_, (*v.rows)[6]); converted::take_as<fc::V3>(s.accel_sum_, (*v.rows)[7]); converted::take_as<fc::V3>(s.gyro_bias_, (*v.rows)[8]); converted::take_as<unsigned int>(s.bad_timing_, (*v.rows)[9]); converted::take_as<fc::FaultCode>(s.fault_, (*v.rows)[10]); converted::take_as<bool>(s.armed_, (*v.rows)[11]); }
@@ -1464,7 +1464,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateRuntime& s) { return converted::Value::structure({arg(s.runtime_), arg(s.state_controller_), arg(s.last_yaw_deg_), arg(s.game_active_)}); }
-[[maybe_unused]] static bool same(const fc::StateRuntime& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.runtime_, (*got.rows)[0]) && same(want.state_controller_, (*got.rows)[1]) && same(want.last_yaw_deg_, (*got.rows)[2]) && same(want.game_active_, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const fc::StateRuntime& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.runtime_, (*got.rows)[0]), ".runtime_") && converted::at_place(same(want.state_controller_, (*got.rows)[1]), ".state_controller_") && converted::at_place(same(want.last_yaw_deg_, (*got.rows)[2]), ".last_yaw_deg_") && converted::at_place(same(want.game_active_, (*got.rows)[3]), ".game_active_"); }
 [[maybe_unused]] static bool defined(const fc::StateRuntime& s) { return defined(s.runtime_) && defined(s.state_controller_) && defined(s.last_yaw_deg_) && defined(s.game_active_); }
 [[maybe_unused]] static std::string text(const fc::StateRuntime& s) { return std::string("{") + text(s.runtime_) + ", " + text(s.state_controller_) + ", " + text(s.last_yaw_deg_) + ", " + text(s.game_active_) + "}"; }
 [[maybe_unused]] static void take(fc::StateRuntime& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<fc::Runtime>(s.runtime_, (*v.rows)[0]); converted::take_as<fc::StateController>(s.state_controller_, (*v.rows)[1]); converted::take_as<double>(s.last_yaw_deg_, (*v.rows)[2]); converted::take_as<bool>(s.game_active_, (*v.rows)[3]); }
@@ -1474,13 +1474,13 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   for (auto& e : s.motor_us) e = static_cast<unsigned short>(draw.below(40));
   for (auto& e : s.attitude_cdeg) e = static_cast<short>(draw.whole());
   s.state = static_cast<unsigned short>(draw.below(40));
-  s.fault = static_cast<fc::FaultCode>(draw.below(6));
+  s.fault = converted::enum_value<fc::FaultCode>(draw.below(6));
   s.armed = draw.flag();
   return s;
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::RuntimeOutput& s) { return converted::Value::structure({arg(std::vector<unsigned short>(s.motor_us.begin(), s.motor_us.end())), arg(std::vector<short>(s.attitude_cdeg.begin(), s.attitude_cdeg.end())), arg(s.state), arg(s.fault), arg(s.armed)}); }
-[[maybe_unused]] static bool same(const fc::RuntimeOutput& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(std::vector<unsigned short>(want.motor_us.begin(), want.motor_us.end()), (*got.rows)[0]) && same(std::vector<short>(want.attitude_cdeg.begin(), want.attitude_cdeg.end()), (*got.rows)[1]) && same(want.state, (*got.rows)[2]) && same(want.fault, (*got.rows)[3]) && same(want.armed, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::RuntimeOutput& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(std::vector<unsigned short>(want.motor_us.begin(), want.motor_us.end()), (*got.rows)[0]), ".motor_us") && converted::at_place(same(std::vector<short>(want.attitude_cdeg.begin(), want.attitude_cdeg.end()), (*got.rows)[1]), ".attitude_cdeg") && converted::at_place(same(want.state, (*got.rows)[2]), ".state") && converted::at_place(same(want.fault, (*got.rows)[3]), ".fault") && converted::at_place(same(want.armed, (*got.rows)[4]), ".armed"); }
 [[maybe_unused]] static bool defined(const fc::RuntimeOutput& s) { return defined(std::vector<unsigned short>(s.motor_us.begin(), s.motor_us.end())) && defined(std::vector<short>(s.attitude_cdeg.begin(), s.attitude_cdeg.end())) && defined(s.state) && defined(s.fault) && defined(s.armed); }
 [[maybe_unused]] static std::string text(const fc::RuntimeOutput& s) { return std::string("{") + text(std::vector<unsigned short>(s.motor_us.begin(), s.motor_us.end())) + ", " + text(std::vector<short>(s.attitude_cdeg.begin(), s.attitude_cdeg.end())) + ", " + text(s.state) + ", " + text(s.fault) + ", " + text(s.armed) + "}"; }
 [[maybe_unused]] static void take(fc::RuntimeOutput& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.motor_us); ++k) converted::take_as<unsigned short>(s.motor_us[k], items.item(k)); } { const converted::Value& items = (*v.rows)[1]; for (std::size_t k = 0; k < items.size() && k < std::size(s.attitude_cdeg); ++k) converted::take_as<short>(s.attitude_cdeg[k], items.item(k)); } converted::take_as<unsigned short>(s.state, (*v.rows)[2]); converted::take_as<fc::FaultCode>(s.fault, (*v.rows)[3]); converted::take_as<bool>(s.armed, (*v.rows)[4]); }
@@ -1493,7 +1493,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Imu& s) { return converted::Value::structure({arg(s.a), arg(s.g)}); }
-[[maybe_unused]] static bool same(const fc::Imu& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.a, (*got.rows)[0]) && same(want.g, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const fc::Imu& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.a, (*got.rows)[0]), ".a") && converted::at_place(same(want.g, (*got.rows)[1]), ".g"); }
 [[maybe_unused]] static bool defined(const fc::Imu& s) { return defined(s.a) && defined(s.g); }
 [[maybe_unused]] static std::string text(const fc::Imu& s) { return std::string("{") + text(s.a) + ", " + text(s.g) + "}"; }
 [[maybe_unused]] static void take(fc::Imu& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<fc::V3>(s.a, (*v.rows)[0]); converted::take_as<fc::V3>(s.g, (*v.rows)[1]); }
@@ -1511,7 +1511,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::RuntimeInput& s) { return converted::Value::structure({arg(s.raw), arg(s.rc), arg(converted::shaped<converted::Whole>(s.now_us)), arg(s.dt_us), arg(s.missed_samples), arg(s.imu_valid), arg(s.rc_fresh)}); }
-[[maybe_unused]] static bool same(const fc::RuntimeInput& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.raw, (*got.rows)[0]) && same(want.rc, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.now_us), (*got.rows)[2]) && same(want.dt_us, (*got.rows)[3]) && same(want.missed_samples, (*got.rows)[4]) && same(want.imu_valid, (*got.rows)[5]) && same(want.rc_fresh, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const fc::RuntimeInput& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.raw, (*got.rows)[0]), ".raw") && converted::at_place(same(want.rc, (*got.rows)[1]), ".rc") && converted::at_place(same(converted::shaped<converted::Whole>(want.now_us), (*got.rows)[2]), ".now_us") && converted::at_place(same(want.dt_us, (*got.rows)[3]), ".dt_us") && converted::at_place(same(want.missed_samples, (*got.rows)[4]), ".missed_samples") && converted::at_place(same(want.imu_valid, (*got.rows)[5]), ".imu_valid") && converted::at_place(same(want.rc_fresh, (*got.rows)[6]), ".rc_fresh"); }
 [[maybe_unused]] static bool defined(const fc::RuntimeInput& s) { return defined(s.raw) && defined(s.rc) && defined(converted::shaped<converted::Whole>(s.now_us)) && defined(s.dt_us) && defined(s.missed_samples) && defined(s.imu_valid) && defined(s.rc_fresh); }
 [[maybe_unused]] static std::string text(const fc::RuntimeInput& s) { return std::string("{") + text(s.raw) + ", " + text(s.rc) + ", " + text(converted::shaped<converted::Whole>(s.now_us)) + ", " + text(s.dt_us) + ", " + text(s.missed_samples) + ", " + text(s.imu_valid) + ", " + text(s.rc_fresh) + "}"; }
 [[maybe_unused]] static void take(fc::RuntimeInput& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<fc::Imu>(s.raw, (*v.rows)[0]); converted::take_as<fc::RC>(s.rc, (*v.rows)[1]); converted::take_as<converted::Whole>(s.now_us, (*v.rows)[2]); converted::take_as<unsigned int>(s.dt_us, (*v.rows)[3]); converted::take_as<unsigned int>(s.missed_samples, (*v.rows)[4]); converted::take_as<bool>(s.imu_valid, (*v.rows)[5]); converted::take_as<bool>(s.rc_fresh, (*v.rows)[6]); }
@@ -1524,21 +1524,21 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateRuntimeInput& s) { return converted::Value::structure({arg(s.flight), arg(s.navigation)}); }
-[[maybe_unused]] static bool same(const fc::StateRuntimeInput& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.flight, (*got.rows)[0]) && same(want.navigation, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const fc::StateRuntimeInput& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.flight, (*got.rows)[0]), ".flight") && converted::at_place(same(want.navigation, (*got.rows)[1]), ".navigation"); }
 [[maybe_unused]] static bool defined(const fc::StateRuntimeInput& s) { return defined(s.flight) && defined(s.navigation); }
 [[maybe_unused]] static std::string text(const fc::StateRuntimeInput& s) { return std::string("{") + text(s.flight) + ", " + text(s.navigation) + "}"; }
 [[maybe_unused]] static void take(fc::StateRuntimeInput& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<fc::RuntimeInput>(s.flight, (*v.rows)[0]); converted::take_as<fc::NavigationState>(s.navigation, (*v.rows)[1]); }
 }
 struct Out_StateController_limit_vertical_accel_jerk { fc::StateController Self; double Result; };
-[[maybe_unused]] static bool same(const Out_StateController_limit_vertical_accel_jerk& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_StateController_limit_vertical_accel_jerk& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_StateController_limit_vertical_accel_jerk& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_StateController_limit_vertical_accel_jerk& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_StateController_run { fc::StateController Self; fc::Command Result; };
-[[maybe_unused]] static bool same(const Out_StateController_run& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_StateController_run& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_StateController_run& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_StateController_run& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_StateRuntime_step { fc::StateRuntime Self; fc::RuntimeOutput Result; };
-[[maybe_unused]] static bool same(const Out_StateRuntime_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_StateRuntime_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_StateRuntime_step& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_StateRuntime_step& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -1547,7 +1547,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // navigation_velocity_valid
     converted::Tally tally("navigation_velocity_valid");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::NavigationState a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::navigation_velocity_valid(a0); }); };
+    const auto run = [&]([[maybe_unused]] fc::NavigationState& a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::navigation_velocity_valid(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::NavigationState a0 = draw_fc__NavigationState(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1556,7 +1556,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1566,7 +1568,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // navigation_agl_valid
     converted::Tally tally("navigation_agl_valid");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::NavigationState a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::navigation_agl_valid(a0); }); };
+    const auto run = [&]([[maybe_unused]] fc::NavigationState& a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::navigation_agl_valid(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::NavigationState a0 = draw_fc__NavigationState(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1575,7 +1577,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1585,7 +1589,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // navigation_heading_valid
     converted::Tally tally("navigation_heading_valid");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::NavigationState a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::navigation_heading_valid(a0); }); };
+    const auto run = [&]([[maybe_unused]] fc::NavigationState& a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::navigation_heading_valid(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::NavigationState a0 = draw_fc__NavigationState(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1594,7 +1598,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1604,7 +1610,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // finite
     converted::Tally tally("finite");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::NavigationState a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::finite(a0); }); };
+    const auto run = [&]([[maybe_unused]] fc::NavigationState& a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::finite(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::NavigationState a0 = draw_fc__NavigationState(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1613,7 +1619,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1623,7 +1631,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // wrap_degrees
     converted::Tally tally("wrap_degrees");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::wrap_degrees(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::wrap_degrees(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1632,7 +1640,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1642,7 +1652,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // state_intent
     converted::Tally tally("state_intent");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::RC a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::state_intent(a0); }); };
+    const auto run = [&]([[maybe_unused]] fc::RC& a0) { return converted::counted([&] { return converted_Arondight45_StateControl::fc::state_intent(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::RC a0 = draw_fc__RC(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1651,7 +1661,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1661,7 +1673,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::reset_horizontal_state
     converted::Tally tally("StateController_reset_horizontal_state");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0) { converted::counted([&] { return a0.reset_horizontal_state(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0) { converted::counted([&] { return a0.reset_horizontal_state(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1670,7 +1682,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1680,7 +1694,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::reset_command_targets
     converted::Tally tally("StateController_reset_command_targets");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0) { converted::counted([&] { return a0.reset_command_targets(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0) { converted::counted([&] { return a0.reset_command_targets(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1689,7 +1703,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1699,7 +1715,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::reset
     converted::Tally tally("StateController_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1708,7 +1724,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1718,7 +1736,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::leave_mode
     converted::Tally tally("StateController_leave_mode");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0) { converted::counted([&] { return a0.leave_mode(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0) { converted::counted([&] { return a0.leave_mode(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1727,7 +1745,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1737,7 +1757,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::update_command_targets
     converted::Tally tally("StateController_update_command_targets");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0, [[maybe_unused]] fc::StateIntent a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.update_command_targets(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0, [[maybe_unused]] fc::StateIntent& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.update_command_targets(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       fc::StateIntent a1 = draw_fc__StateIntent(draw);
@@ -1748,7 +1768,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1758,7 +1780,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::update_acceleration_estimator
     converted::Tally tally("StateController_update_acceleration_estimator");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0, [[maybe_unused]] fc::V3 a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.update_acceleration_estimator(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0, [[maybe_unused]] fc::V3& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.update_acceleration_estimator(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       fc::V3 a1 = draw_fc__V3(draw);
@@ -1769,7 +1791,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1779,7 +1803,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::kinematic_vertical_speed
     converted::Tally tally("StateController_kinematic_vertical_speed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return fc::StateController::kinematic_vertical_speed(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return fc::StateController::kinematic_vertical_speed(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1788,7 +1812,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1798,7 +1824,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::limit_vertical_accel_jerk
     converted::Tally tally("StateController_limit_vertical_accel_jerk");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.limit_vertical_accel_jerk(std::move(a1), std::move(a2)); }); return Out_StateController_limit_vertical_accel_jerk{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.limit_vertical_accel_jerk(std::move(a1), std::move(a2)); }); return Out_StateController_limit_vertical_accel_jerk{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       double a1 = draw.number();
@@ -1809,7 +1835,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1819,7 +1847,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::clamp_horizontal_integral
     converted::Tally tally("StateController_clamp_horizontal_integral");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0) { converted::counted([&] { return a0.clamp_horizontal_integral(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0) { converted::counted([&] { return a0.clamp_horizontal_integral(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1828,7 +1856,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1838,7 +1868,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::run
     converted::Tally tally("StateController_run");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0, [[maybe_unused]] fc::RC a1, [[maybe_unused]] fc::NavigationState a2, [[maybe_unused]] double a3, [[maybe_unused]] bool a4, [[maybe_unused]] double a5, [[maybe_unused]] bool a6) { auto r = converted::counted([&] { return a0.run(a1, a2, std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return Out_StateController_run{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0, [[maybe_unused]] fc::RC& a1, [[maybe_unused]] fc::NavigationState& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] double& a5, [[maybe_unused]] bool& a6) { auto r = converted::counted([&] { return a0.run(a1, a2, std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return Out_StateController_run{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       fc::RC a1 = draw_fc__RC(draw);
@@ -1853,7 +1883,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1863,7 +1895,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::degraded_attitude_command
     converted::Tally tally("StateController_degraded_attitude_command");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0, [[maybe_unused]] fc::RC a1) { return converted::counted([&] { return a0.degraded_attitude_command(a1); }); };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0, [[maybe_unused]] fc::RC& a1) { return converted::counted([&] { return a0.degraded_attitude_command(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       fc::RC a1 = draw_fc__RC(draw);
@@ -1873,7 +1905,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1883,7 +1917,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateController::hover_trim
     converted::Tally tally("StateController_hover_trim");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateController a0) { return converted::counted([&] { return a0.hover_trim(); }); };
+    const auto run = [&]([[maybe_unused]] fc::StateController& a0) { return converted::counted([&] { return a0.hover_trim(); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateController a0 = draw_fc__StateController(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1892,7 +1926,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1902,7 +1938,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateRuntime::reset
     converted::Tally tally("StateRuntime_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateRuntime a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateRuntime& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateRuntime a0 = draw_fc__StateRuntime(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1911,7 +1947,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1929,7 +1967,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1939,7 +1979,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateRuntime::update_attitude
     converted::Tally tally("StateRuntime_update_attitude");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateRuntime a0, [[maybe_unused]] fc::RuntimeOutput a1) { converted::counted([&] { return a0.update_attitude(a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] fc::StateRuntime& a0, [[maybe_unused]] fc::RuntimeOutput& a1) { converted::counted([&] { return a0.update_attitude(a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateRuntime a0 = draw_fc__StateRuntime(draw);
       fc::RuntimeOutput a1 = draw_fc__RuntimeOutput(draw);
@@ -1949,7 +1989,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1959,7 +2001,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateRuntime::step
     converted::Tally tally("StateRuntime_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateRuntime a0, [[maybe_unused]] fc::StateRuntimeInput a1) { auto r = converted::counted([&] { return a0.step(std::move(a1)); }); return Out_StateRuntime_step{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] fc::StateRuntime& a0, [[maybe_unused]] fc::StateRuntimeInput& a1) { auto r = converted::counted([&] { return a0.step(std::move(a1)); }); return Out_StateRuntime_step{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateRuntime a0 = draw_fc__StateRuntime(draw);
       fc::StateRuntimeInput a1 = draw_fc__StateRuntimeInput(draw);
@@ -1969,7 +2011,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1979,7 +2023,7 @@ SC_TEST(converted_Arondight45_StateControl) {
   {  // StateRuntime::game_active
     converted::Tally tally("StateRuntime_game_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::StateRuntime a0) { return converted::counted([&] { return a0.game_active(); }); };
+    const auto run = [&]([[maybe_unused]] fc::StateRuntime& a0) { return converted::counted([&] { return a0.game_active(); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::StateRuntime a0 = draw_fc__StateRuntime(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1988,7 +2032,9 @@ SC_TEST(converted_Arondight45_StateControl) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

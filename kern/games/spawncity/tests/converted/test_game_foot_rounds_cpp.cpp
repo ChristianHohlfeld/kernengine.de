@@ -48,16 +48,18 @@ SC_TEST(converted_game_foot_rounds_cpp) {
   {  // foot_round
     converted::Tally tally("foot_round");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] weapons::Id a0) { return converted::counted([&] { return converted_game_foot_rounds_cpp::foot_round(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] weapons::Id& a0) { return converted::counted([&] { return converted_game_foot_rounds_cpp::foot_round(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      weapons::Id a0 = static_cast<weapons::Id>(draw.below(14));
+      weapons::Id a0 = converted::enum_value<weapons::Id>(draw.below(14));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
