@@ -1470,7 +1470,7 @@ struct Tally {
   std::string first_refused;         // (the first such call of the source: said in the note)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
-  double class_seconds = 0, interpreter_seconds = 0;   // (where the function's time went: said in its "time:" line)
+  double class_seconds = 0, interpreter_seconds = 0, take_seconds = 0;   // (where the function's time went: said in its "time:" line)
   mutable int drawn = 0;                               // (the calls drawn: what more() was asked for)
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(const char* f) : function(f) { cost::tracing = cost::where() && std::strcmp(cost::where(), f) == 0; }
@@ -1498,6 +1498,11 @@ struct Tally {
   template <class Want, class Describe>
   void take(Blueprint& bp, const std::vector<Value>& args, const Want& want, bool left, Describe describe, const std::vector<int>& order = {}, const Variables* state = nullptr,
             bool changes = false) {
+    struct Took {   // (the whole of take: what the Blueprints' variables, the calls and the comparing cost)
+      double& sum;
+      std::chrono::steady_clock::time_point at = std::chrono::steady_clock::now();
+      ~Took() { sum += std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count(); }
+    } const took_all{take_seconds};
     if (!bp.interp || !bp.native) return;
     if (left || !defined(want)) { ++outside; return; }
     // The engine itself (SC_ENGINE=real) refused a call the source made: what the source got there is the
@@ -1598,11 +1603,11 @@ struct Tally {
   void given_up() { ++outside; }
   ~Tally() {
     cost::tracing = false;
-    // (a function that takes the test a second or more: where the time went - the class, the interpreter, or the rest: drawing the
-    // arguments and the object, setting the Blueprints' variables, the source's call, comparing)
+    // (a function that takes the test a second or more: where the time went - the class, the interpreter, setting and reading the
+    // Blueprints' variables and comparing, or drawing the arguments and the object and the source's call)
     if (seconds() >= 1.0)
-      std::printf("  time: %s: %.1f s (the class %.1f s, the interpreter %.1f s, the rest %.1f s) - %d calls drawn, %d compared\n", function, seconds(), class_seconds,
-                  interpreter_seconds, seconds() - class_seconds - interpreter_seconds, drawn, compared);
+      std::printf("  time: %s: %.1f s (the class %.1f s, the interpreter %.1f s, the Blueprints' variables and comparing %.1f s, drawing and the source %.1f s) - %d calls drawn, %d compared\n",
+                  function, seconds(), class_seconds, interpreter_seconds, take_seconds - class_seconds - interpreter_seconds, seconds() - take_seconds, drawn, compared);
     if (class_only > 0)
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
