@@ -66,7 +66,9 @@ enum class Opt : u8 {
 };
 struct Settings {
  public:
-  /// Every setting at its default (as the table bound at this moment has it).
+  /// Every setting at 0 (as an empty table has it).
+  Settings() = default;
+  /// Every setting at its default (as the table has it).
   
   f32 get(Opt o) const { return converted::at(v_, static_cast<u32>(o)); }
   bool on(Opt o) const { return get(o) > 0.5; }
@@ -82,7 +84,7 @@ struct Settings {
   
 
  private:
-  f32 v_[static_cast<u32>(Opt::count)];
+  f32 v_[static_cast<u32>(Opt::count)] = {};
   u32 version_ = 1;
 };
 #undef private
@@ -96,7 +98,7 @@ struct Settings {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Settings& s) { return converted::Value::structure({arg(converted::array_list(s.v_)), arg(s.version_)}); }
-[[maybe_unused]] static bool same(const Settings& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::array_list(want.v_), (*got.rows)[0]) && same(want.version_, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Settings& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(converted::array_list(want.v_), (*got.rows)[0]), ".v_") && converted::at_place(same(want.version_, (*got.rows)[1]), ".version_"); }
 [[maybe_unused]] static bool defined(const Settings& s) { return defined(converted::array_list(s.v_)) && defined(s.version_); }
 [[maybe_unused]] static std::string text(const Settings& s) { return std::string("{") + text(converted::array_list(s.v_)) + ", " + text(s.version_) + "}"; }
 [[maybe_unused]] static void take(Settings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.v_, items); } converted::take_as<unsigned int>(s.version_, (*v.rows)[1]); }
@@ -106,17 +108,19 @@ SC_TEST(converted_settings) {
   {  // Settings::get
     converted::Tally tally("Settings_get");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return converted::counted([&] { return a0.get(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Settings& a0, [[maybe_unused]] Opt& a1) { return converted::counted([&] { return a0.get(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Settings a0 = draw_Settings(draw);
-      Opt a1 = static_cast<Opt>(draw.below(61));
+      Opt a1 = converted::enum_value<Opt>(draw.below(61));
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -126,17 +130,19 @@ SC_TEST(converted_settings) {
   {  // Settings::on
     converted::Tally tally("Settings_on");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Settings a0, [[maybe_unused]] Opt a1) { return converted::counted([&] { return a0.on(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Settings& a0, [[maybe_unused]] Opt& a1) { return converted::counted([&] { return a0.on(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Settings a0 = draw_Settings(draw);
-      Opt a1 = static_cast<Opt>(draw.below(61));
+      Opt a1 = converted::enum_value<Opt>(draw.below(61));
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -146,7 +152,7 @@ SC_TEST(converted_settings) {
   {  // Settings::version
     converted::Tally tally("Settings_version");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Settings a0) { return converted::counted([&] { return a0.version(); }); };
+    const auto run = [&]([[maybe_unused]] Settings& a0) { return converted::counted([&] { return a0.version(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Settings a0 = draw_Settings(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -155,7 +161,9 @@ SC_TEST(converted_settings) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

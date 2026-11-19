@@ -53,7 +53,7 @@ struct StructField : converted::EngineObject {
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 namespace spawn { bool bind(::kern::logic::Runtime& logic); }
 namespace spawn { f32 default_far(); }
 namespace spawn { struct Viewer {
@@ -123,7 +123,7 @@ namespace spawn { bool footprints_overlap(const Footprint& a, const Footprint& b
 }
 namespace spawn { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const spawn::Viewer& s) { return converted::Value::structure({arg(s.eye), arg(s.forward), arg(s.half_angle), arg(s.far), arg(s.local)}); }
-[[maybe_unused]] static bool same(const spawn::Viewer& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.eye, (*got.rows)[0]) && same(want.forward, (*got.rows)[1]) && same(want.half_angle, (*got.rows)[2]) && same(want.far, (*got.rows)[3]) && same(want.local, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const spawn::Viewer& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.eye, (*got.rows)[0]), ".eye") && converted::at_place(same(want.forward, (*got.rows)[1]), ".forward") && converted::at_place(same(want.half_angle, (*got.rows)[2]), ".half_angle") && converted::at_place(same(want.far, (*got.rows)[3]), ".far") && converted::at_place(same(want.local, (*got.rows)[4]), ".local"); }
 [[maybe_unused]] static bool defined(const spawn::Viewer& s) { return defined(s.eye) && defined(s.forward) && defined(s.half_angle) && defined(s.far) && defined(s.local); }
 [[maybe_unused]] static std::string text(const spawn::Viewer& s) { return std::string("{") + text(s.eye) + ", " + text(s.forward) + ", " + text(s.half_angle) + ", " + text(s.far) + ", " + text(s.local) + "}"; }
 [[maybe_unused]] static void take(spawn::Viewer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<Vec3>(s.eye, (*v.rows)[0]); converted::take_as<Vec3>(s.forward, (*v.rows)[1]); converted::take_as<double>(s.half_angle, (*v.rows)[2]); converted::take_as<double>(s.far, (*v.rows)[3]); converted::take_as<bool>(s.local, (*v.rows)[4]); }
@@ -139,7 +139,7 @@ namespace spawn { using converted::arg; using converted::same; using converted::
 }
 namespace spawn { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const spawn::Looker& s) { return converted::Value::structure({arg(s.eye), arg(s.forward), arg(s.half_angle), arg(s.far), arg(s.local)}); }
-[[maybe_unused]] static bool same(const spawn::Looker& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.eye, (*got.rows)[0]) && same(want.forward, (*got.rows)[1]) && same(want.half_angle, (*got.rows)[2]) && same(want.far, (*got.rows)[3]) && same(want.local, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const spawn::Looker& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.eye, (*got.rows)[0]), ".eye") && converted::at_place(same(want.forward, (*got.rows)[1]), ".forward") && converted::at_place(same(want.half_angle, (*got.rows)[2]), ".half_angle") && converted::at_place(same(want.far, (*got.rows)[3]), ".far") && converted::at_place(same(want.local, (*got.rows)[4]), ".local"); }
 [[maybe_unused]] static bool defined(const spawn::Looker& s) { return defined(s.eye) && defined(s.forward) && defined(s.half_angle) && defined(s.far) && defined(s.local); }
 [[maybe_unused]] static std::string text(const spawn::Looker& s) { return std::string("{") + text(s.eye) + ", " + text(s.forward) + ", " + text(s.half_angle) + ", " + text(s.far) + ", " + text(s.local) + "}"; }
 [[maybe_unused]] static void take(spawn::Looker& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<Vec3>(s.eye, (*v.rows)[0]); converted::take_as<Vec3>(s.forward, (*v.rows)[1]); converted::take_as<double>(s.half_angle, (*v.rows)[2]); converted::take_as<double>(s.far, (*v.rows)[3]); converted::take_as<bool>(s.local, (*v.rows)[4]); }
@@ -153,7 +153,7 @@ namespace spawn { using converted::arg; using converted::same; using converted::
 }
 namespace spawn { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const spawn::Footprint& s) { return converted::Value::structure({arg(s.center), arg(s.yaw), arg(s.half)}); }
-[[maybe_unused]] static bool same(const spawn::Footprint& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.center, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]) && same(want.half, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const spawn::Footprint& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.center, (*got.rows)[0]), ".center") && converted::at_place(same(want.yaw, (*got.rows)[1]), ".yaw") && converted::at_place(same(want.half, (*got.rows)[2]), ".half"); }
 [[maybe_unused]] static bool defined(const spawn::Footprint& s) { return defined(s.center) && defined(s.yaw) && defined(s.half); }
 [[maybe_unused]] static std::string text(const spawn::Footprint& s) { return std::string("{") + text(s.center) + ", " + text(s.yaw) + ", " + text(s.half) + "}"; }
 [[maybe_unused]] static void take(spawn::Footprint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.center, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); converted::take_as<Vec2>(s.half, (*v.rows)[2]); }
@@ -167,7 +167,7 @@ namespace spawn { using converted::arg; using converted::same; using converted::
 }
 namespace spawn { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const spawn::Print& s) { return converted::Value::structure({arg(s.center), arg(s.yaw), arg(s.half)}); }
-[[maybe_unused]] static bool same(const spawn::Print& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.center, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]) && same(want.half, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const spawn::Print& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.center, (*got.rows)[0]), ".center") && converted::at_place(same(want.yaw, (*got.rows)[1]), ".yaw") && converted::at_place(same(want.half, (*got.rows)[2]), ".half"); }
 [[maybe_unused]] static bool defined(const spawn::Print& s) { return defined(s.center) && defined(s.yaw) && defined(s.half); }
 [[maybe_unused]] static std::string text(const spawn::Print& s) { return std::string("{") + text(s.center) + ", " + text(s.yaw) + ", " + text(s.half) + "}"; }
 [[maybe_unused]] static void take(spawn::Print& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.center, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); converted::take_as<Vec3>(s.half, (*v.rows)[2]); }
@@ -179,7 +179,7 @@ SC_TEST(converted_spawn_guard_cpp) {
   {  // looker_of
     converted::Tally tally("looker_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] spawn::Viewer a0) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::looker_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] spawn::Viewer& a0) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::looker_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       spawn::Viewer a0 = draw_spawn__Viewer(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -188,7 +188,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -198,7 +200,7 @@ SC_TEST(converted_spawn_guard_cpp) {
   {  // print_of
     converted::Tally tally("print_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] spawn::Footprint a0) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::print_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] spawn::Footprint& a0) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::print_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       spawn::Footprint a0 = draw_spawn__Footprint(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -207,7 +209,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -225,7 +229,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -243,7 +249,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -253,7 +261,7 @@ SC_TEST(converted_spawn_guard_cpp) {
   {  // cone_half_angle
     converted::Tally tally("cone_half_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::cone_half_angle(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::cone_half_angle(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -263,7 +271,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -273,7 +283,7 @@ SC_TEST(converted_spawn_guard_cpp) {
   {  // seen_by
     converted::Tally tally("seen_by");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] spawn::Viewer a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::seen_by(a0, std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] spawn::Viewer& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::seen_by(a0, std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       spawn::Viewer a0 = draw_spawn__Viewer(draw);
       Vec3 a1 = draw.vector();
@@ -285,7 +295,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -295,7 +307,7 @@ SC_TEST(converted_spawn_guard_cpp) {
   {  // can_spawn
     converted::Tally tally("can_spawn");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<spawn::Viewer> a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::can_spawn(a0, std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<spawn::Viewer>& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::can_spawn(a0, std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<spawn::Viewer> a0 = draw_list(draw, [&]() -> spawn::Viewer { return draw_spawn__Viewer(draw); });
       Vec3 a1 = draw.vector();
@@ -307,7 +319,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -317,7 +331,7 @@ SC_TEST(converted_spawn_guard_cpp) {
   {  // footprints_overlap
     converted::Tally tally("footprints_overlap");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] spawn::Footprint a0, [[maybe_unused]] spawn::Footprint a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::footprints_overlap(a0, a1, std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] spawn::Footprint& a0, [[maybe_unused]] spawn::Footprint& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_spawn_guard_cpp::spawn::footprints_overlap(a0, a1, std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       spawn::Footprint a0 = draw_spawn__Footprint(draw);
       spawn::Footprint a1 = draw_spawn__Footprint(draw);
@@ -328,7 +342,9 @@ SC_TEST(converted_spawn_guard_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

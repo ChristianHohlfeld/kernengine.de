@@ -40,7 +40,7 @@ struct Vec4 {
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
@@ -151,6 +151,7 @@ struct Mat4 {
 
 
 };
+struct Bvh;
 constexpr u32 kMaxExtensionAttributes = 2;
 constexpr u32 kMaxMaterialParams = 8;
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
@@ -192,6 +193,7 @@ struct BloomPass : converted::EngineObject {
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -232,6 +234,7 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 struct MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
@@ -258,8 +261,8 @@ struct RoadStream : converted::EngineObject {
 };
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
@@ -802,7 +805,7 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const LifeArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
-[[maybe_unused]] static bool same(const LifeArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const LifeArt::Part& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.transforms, (*got.rows)[1]), ".transforms") && converted::at_place(same(want.tints, (*got.rows)[2]), ".tints"); }
 [[maybe_unused]] static bool defined(const LifeArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
 [[maybe_unused]] static std::string text(const LifeArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
 [[maybe_unused]] static void take(LifeArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
@@ -812,7 +815,7 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::array_list(want.m), (*got.rows)[0]), ".m"); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
 [[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
@@ -827,7 +830,7 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Draw& s) { return converted::Value::structure({arg(s.m), arg(s.tint), arg(s.sphere), arg(s.bone), arg(s.doll), arg(s.pose)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Draw& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.m, (*got.rows)[0]) && same(want.tint, (*got.rows)[1]) && same(want.sphere, (*got.rows)[2]) && same(want.bone, (*got.rows)[3]) && same(want.doll, (*got.rows)[4]) && same(want.pose, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls::Draw& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.m, (*got.rows)[0]), ".m") && converted::at_place(same(want.tint, (*got.rows)[1]), ".tint") && converted::at_place(same(want.sphere, (*got.rows)[2]), ".sphere") && converted::at_place(same(want.bone, (*got.rows)[3]), ".bone") && converted::at_place(same(want.doll, (*got.rows)[4]), ".doll") && converted::at_place(same(want.pose, (*got.rows)[5]), ".pose"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Draw& s) { return defined(s.m) && defined(s.tint) && defined(s.sphere) && defined(s.bone) && defined(s.doll) && defined(s.pose); }
 [[maybe_unused]] static std::string text(const Ragdolls::Draw& s) { return std::string("{") + text(s.m) + ", " + text(s.tint) + ", " + text(s.sphere) + ", " + text(s.bone) + ", " + text(s.doll) + ", " + text(s.pose) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Draw& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Mat4>(s.m, (*v.rows)[0]); converted::take_as<Vec3>(s.tint, (*v.rows)[1]); converted::take_as<bool>(s.sphere, (*v.rows)[2]); converted::take_as<unsigned char>(s.bone, (*v.rows)[3]); converted::take_as<unsigned int>(s.doll, (*v.rows)[4]); converted::take_as<Mat4>(s.pose, (*v.rows)[5]); }
@@ -842,7 +845,7 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const LifeArt& s) { return converted::Value::structure({arg(s.r_), arg(s.box_), arg(s.ball_), arg(s.cyl_), arg(s.glow_), arg(s.bones_)}); }
-[[maybe_unused]] static bool same(const LifeArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.r_, (*got.rows)[0]) && same(want.box_, (*got.rows)[1]) && same(want.ball_, (*got.rows)[2]) && same(want.cyl_, (*got.rows)[3]) && same(want.glow_, (*got.rows)[4]) && same(want.bones_, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const LifeArt& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.r_, (*got.rows)[0]), ".r_") && converted::at_place(same(want.box_, (*got.rows)[1]), ".box_") && converted::at_place(same(want.ball_, (*got.rows)[2]), ".ball_") && converted::at_place(same(want.cyl_, (*got.rows)[3]), ".cyl_") && converted::at_place(same(want.glow_, (*got.rows)[4]), ".glow_") && converted::at_place(same(want.bones_, (*got.rows)[5]), ".bones_"); }
 [[maybe_unused]] static bool defined(const LifeArt& s) { return defined(s.r_) && defined(s.box_) && defined(s.ball_) && defined(s.cyl_) && defined(s.glow_) && defined(s.bones_); }
 [[maybe_unused]] static std::string text(const LifeArt& s) { return std::string("{") + text(s.r_) + ", " + text(s.box_) + ", " + text(s.ball_) + ", " + text(s.cyl_) + ", " + text(s.glow_) + ", " + text(s.bones_) + "}"; }
 [[maybe_unused]] static void take(LifeArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<LifeArt::Part>(s.box_, (*v.rows)[1]); converted::take_as<LifeArt::Part>(s.ball_, (*v.rows)[2]); converted::take_as<LifeArt::Part>(s.cyl_, (*v.rows)[3]); converted::take_as<LifeArt::Part>(s.glow_, (*v.rows)[4]); converted::take_as<std::vector<Ragdolls::Draw>>(s.bones_, (*v.rows)[5]); }
@@ -858,7 +861,7 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
-[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.positions, (*got.rows)[0]), ".positions") && converted::at_place(same(want.normals, (*got.rows)[1]), ".normals") && converted::at_place(same(want.colors, (*got.rows)[2]), ".colors") && converted::at_place(same(want.uvs, (*got.rows)[3]), ".uvs") && converted::at_place(same(want.extra, (*got.rows)[4]), ".extra") && converted::at_place(same(want.extra_size, (*got.rows)[5]), ".extra_size") && converted::at_place(same(want.indices, (*got.rows)[6]), ".indices"); }
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
 [[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
@@ -872,14 +875,14 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Vec4& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
   Material s{};
   s.color = draw_kern__Vec4(draw);
-  s.alpha = static_cast<AlphaMode>(draw.below(3));
+  s.alpha = converted::enum_value<AlphaMode>(draw.below(3));
   s.alpha_cutoff = draw.number();
   s.roughness = draw.number();
   s.metalness = draw.number();
@@ -895,7 +898,7 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
-[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.color, (*got.rows)[0]) && same(want.alpha, (*got.rows)[1]) && same(want.alpha_cutoff, (*got.rows)[2]) && same(want.roughness, (*got.rows)[3]) && same(want.metalness, (*got.rows)[4]) && same(want.emissive, (*got.rows)[5]) && same(want.unlit, (*got.rows)[6]) && same(want.double_sided, (*got.rows)[7]) && same(want.cast_shadow, (*got.rows)[8]) && same(want.frustum_culled, (*got.rows)[9]) && same(want.viewmodel, (*got.rows)[10]) && same(want.linear_colors, (*got.rows)[11]) && same(want.lines, (*got.rows)[12]) && same(converted::array_list(want.params), (*got.rows)[13]); }
+[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
 [[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
 [[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
 [[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
@@ -908,7 +911,7 @@ void LifeArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -919,7 +922,7 @@ void LifeArt::end() {
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -954,7 +957,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Cow& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.meadow), arg(s.home), arg(s.off), arg(s.pos), arg(s.yaw), arg(s.hp), arg(s.phase), arg(s.next_moo), arg(s.flee_until), arg(s.flinch_at), arg(s.last_hit), arg(s.flee_v), arg(s.color), arg(s.rot), arg(s.dead), arg(s.walking), arg(s.carried), arg(s.carried_still), arg(s.body), arg(s.net_to), arg(s.net_v), arg(s.net_at), arg(s.net_rot), arg(s.net_dead)}); }
-[[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.meadow, (*got.rows)[1]) && same(want.home, (*got.rows)[2]) && same(want.off, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.yaw, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.next_moo, (*got.rows)[8]) && same(want.flee_until, (*got.rows)[9]) && same(want.flinch_at, (*got.rows)[10]) && same(want.last_hit, (*got.rows)[11]) && same(want.flee_v, (*got.rows)[12]) && same(want.color, (*got.rows)[13]) && same(want.rot, (*got.rows)[14]) && same(want.dead, (*got.rows)[15]) && same(want.walking, (*got.rows)[16]) && same(want.carried, (*got.rows)[17]) && same(want.carried_still, (*got.rows)[18]) && same(want.body, (*got.rows)[19]) && same(want.net_to, (*got.rows)[20]) && same(want.net_v, (*got.rows)[21]) && same(want.net_at, (*got.rows)[22]) && same(want.net_rot, (*got.rows)[23]) && same(want.net_dead, (*got.rows)[24]); }
+[[maybe_unused]] static bool same(const Life::Cow& want, const converted::Value& got) { return converted::rows_of(got, 25) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(want.meadow, (*got.rows)[1]), ".meadow") && converted::at_place(same(want.home, (*got.rows)[2]), ".home") && converted::at_place(same(want.off, (*got.rows)[3]), ".off") && converted::at_place(same(want.pos, (*got.rows)[4]), ".pos") && converted::at_place(same(want.yaw, (*got.rows)[5]), ".yaw") && converted::at_place(same(want.hp, (*got.rows)[6]), ".hp") && converted::at_place(same(want.phase, (*got.rows)[7]), ".phase") && converted::at_place(same(want.next_moo, (*got.rows)[8]), ".next_moo") && converted::at_place(same(want.flee_until, (*got.rows)[9]), ".flee_until") && converted::at_place(same(want.flinch_at, (*got.rows)[10]), ".flinch_at") && converted::at_place(same(want.last_hit, (*got.rows)[11]), ".last_hit") && converted::at_place(same(want.flee_v, (*got.rows)[12]), ".flee_v") && converted::at_place(same(want.color, (*got.rows)[13]), ".color") && converted::at_place(same(want.rot, (*got.rows)[14]), ".rot") && converted::at_place(same(want.dead, (*got.rows)[15]), ".dead") && converted::at_place(same(want.walking, (*got.rows)[16]), ".walking") && converted::at_place(same(want.carried, (*got.rows)[17]), ".carried") && converted::at_place(same(want.carried_still, (*got.rows)[18]), ".carried_still") && converted::at_place(same(want.body, (*got.rows)[19]), ".body") && converted::at_place(same(want.net_to, (*got.rows)[20]), ".net_to") && converted::at_place(same(want.net_v, (*got.rows)[21]), ".net_v") && converted::at_place(same(want.net_at, (*got.rows)[22]), ".net_at") && converted::at_place(same(want.net_rot, (*got.rows)[23]), ".net_rot") && converted::at_place(same(want.net_dead, (*got.rows)[24]), ".net_dead"); }
 [[maybe_unused]] static bool defined(const Life::Cow& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.meadow) && defined(s.home) && defined(s.off) && defined(s.pos) && defined(s.yaw) && defined(s.hp) && defined(s.phase) && defined(s.next_moo) && defined(s.flee_until) && defined(s.flinch_at) && defined(s.last_hit) && defined(s.flee_v) && defined(s.color) && defined(s.rot) && defined(s.dead) && defined(s.walking) && defined(s.carried) && defined(s.carried_still) && defined(s.body) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at) && defined(s.net_rot) && defined(s.net_dead); }
 [[maybe_unused]] static std::string text(const Life::Cow& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.meadow) + ", " + text(s.home) + ", " + text(s.off) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.next_moo) + ", " + text(s.flee_until) + ", " + text(s.flinch_at) + ", " + text(s.last_hit) + ", " + text(s.flee_v) + ", " + text(s.color) + ", " + text(s.rot) + ", " + text(s.dead) + ", " + text(s.walking) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.body) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + ", " + text(s.net_rot) + ", " + text(s.net_dead) + "}"; }
 [[maybe_unused]] static void take(Life::Cow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<int>(s.meadow, (*v.rows)[1]); converted::take_as<Vec2>(s.home, (*v.rows)[2]); converted::take_as<Vec2>(s.off, (*v.rows)[3]); converted::take_as<Vec3>(s.pos, (*v.rows)[4]); converted::take_as<double>(s.yaw, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<double>(s.next_moo, (*v.rows)[8]); converted::take_as<double>(s.flee_until, (*v.rows)[9]); converted::take_as<double>(s.flinch_at, (*v.rows)[10]); converted::take_as<double>(s.last_hit, (*v.rows)[11]); converted::take_as<Vec2>(s.flee_v, (*v.rows)[12]); converted::take_as<Vec3>(s.color, (*v.rows)[13]); converted::take_as<Quat>(s.rot, (*v.rows)[14]); converted::take_as<bool>(s.dead, (*v.rows)[15]); converted::take_as<bool>(s.walking, (*v.rows)[16]); converted::take_as<bool>(s.carried, (*v.rows)[17]); converted::take_as<double>(s.carried_still, (*v.rows)[18]); converted::take_as<physics::Body>(s.body, (*v.rows)[19]); converted::take_as<Vec3>(s.net_to, (*v.rows)[20]); converted::take_as<Vec3>(s.net_v, (*v.rows)[21]); converted::take_as<double>(s.net_at, (*v.rows)[22]); converted::take_as<Quat>(s.net_rot, (*v.rows)[23]); converted::take_as<bool>(s.net_dead, (*v.rows)[24]); }
@@ -971,7 +974,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::LooseBird& s) { return converted::Value::structure({arg(s.id), arg(s.pos), arg(s.vel), arg(s.yaw), arg(s.flap), arg(s.t), arg(s.held), arg(converted::shaped<converted::Whole>(s.net))}); }
-[[maybe_unused]] static bool same(const Life::LooseBird& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.id, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.vel, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.flap, (*got.rows)[4]) && same(want.t, (*got.rows)[5]) && same(want.held, (*got.rows)[6]) && same(converted::shaped<converted::Whole>(want.net), (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const Life::LooseBird& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.pos, (*got.rows)[1]), ".pos") && converted::at_place(same(want.vel, (*got.rows)[2]), ".vel") && converted::at_place(same(want.yaw, (*got.rows)[3]), ".yaw") && converted::at_place(same(want.flap, (*got.rows)[4]), ".flap") && converted::at_place(same(want.t, (*got.rows)[5]), ".t") && converted::at_place(same(want.held, (*got.rows)[6]), ".held") && converted::at_place(same(converted::shaped<converted::Whole>(want.net), (*got.rows)[7]), ".net"); }
 [[maybe_unused]] static bool defined(const Life::LooseBird& s) { return defined(s.id) && defined(s.pos) && defined(s.vel) && defined(s.yaw) && defined(s.flap) && defined(s.t) && defined(s.held) && defined(converted::shaped<converted::Whole>(s.net)); }
 [[maybe_unused]] static std::string text(const Life::LooseBird& s) { return std::string("{") + text(s.id) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.yaw) + ", " + text(s.flap) + ", " + text(s.t) + ", " + text(s.held) + ", " + text(converted::shaped<converted::Whole>(s.net)) + "}"; }
 [[maybe_unused]] static void take(Life::LooseBird& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<int>(s.id, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.vel, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.flap, (*v.rows)[4]); converted::take_as<double>(s.t, (*v.rows)[5]); converted::take_as<bool>(s.held, (*v.rows)[6]); converted::take_as<converted::Whole>(s.net, (*v.rows)[7]); }
@@ -982,7 +985,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Joint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Joint& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -995,7 +998,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[1]), ".rotation"); }
 [[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
@@ -1011,7 +1014,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Colors& s) { return converted::Value::structure({arg(s.shirt), arg(s.pants), arg(s.skin), arg(s.hair), arg(s.cap), arg(s.vest)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Colors& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.shirt, (*got.rows)[0]) && same(want.pants, (*got.rows)[1]) && same(want.skin, (*got.rows)[2]) && same(want.hair, (*got.rows)[3]) && same(want.cap, (*got.rows)[4]) && same(want.vest, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls::Colors& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.shirt, (*got.rows)[0]), ".shirt") && converted::at_place(same(want.pants, (*got.rows)[1]), ".pants") && converted::at_place(same(want.skin, (*got.rows)[2]), ".skin") && converted::at_place(same(want.hair, (*got.rows)[3]), ".hair") && converted::at_place(same(want.cap, (*got.rows)[4]), ".cap") && converted::at_place(same(want.vest, (*got.rows)[5]), ".vest"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Colors& s) { return defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.hair) && defined(s.cap) && defined(s.vest); }
 [[maybe_unused]] static std::string text(const Ragdolls::Colors& s) { return std::string("{") + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.hair) + ", " + text(s.cap) + ", " + text(s.vest) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Colors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Vec3>(s.shirt, (*v.rows)[0]); converted::take_as<Vec3>(s.pants, (*v.rows)[1]); converted::take_as<Vec3>(s.skin, (*v.rows)[2]); converted::take_as<Vec3>(s.hair, (*v.rows)[3]); converted::take_as<bool>(s.cap, (*v.rows)[4]); converted::take_as<bool>(s.vest, (*v.rows)[5]); }
@@ -1036,7 +1039,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Doll& s) { return converted::Value::structure({arg(s.active), arg(s.recover), arg(s.getting_up), arg(converted::shaped<converted::Whole>(s.key)), arg(converted::array_list(s.bodies)), arg(converted::array_list(s.joints)), arg(converted::array_list(s.pose)), arg(converted::array_list(s.from)), arg(converted::array_list(s.stand)), arg(s.colors), arg(s.born), arg(s.settled), arg(s.getup_at), arg(s.stand_yaw), arg(s.stand_feet), arg(s.group)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.active, (*got.rows)[0]) && same(want.recover, (*got.rows)[1]) && same(want.getting_up, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]) && same(converted::array_list(want.bodies), (*got.rows)[4]) && same(converted::array_list(want.joints), (*got.rows)[5]) && same(converted::array_list(want.pose), (*got.rows)[6]) && same(converted::array_list(want.from), (*got.rows)[7]) && same(converted::array_list(want.stand), (*got.rows)[8]) && same(want.colors, (*got.rows)[9]) && same(want.born, (*got.rows)[10]) && same(want.settled, (*got.rows)[11]) && same(want.getup_at, (*got.rows)[12]) && same(want.stand_yaw, (*got.rows)[13]) && same(want.stand_feet, (*got.rows)[14]) && same(want.group, (*got.rows)[15]); }
+[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return converted::rows_of(got, 16) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.recover, (*got.rows)[1]), ".recover") && converted::at_place(same(want.getting_up, (*got.rows)[2]), ".getting_up") && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]), ".key") && converted::at_place(same(converted::array_list(want.bodies), (*got.rows)[4]), ".bodies") && converted::at_place(same(converted::array_list(want.joints), (*got.rows)[5]), ".joints") && converted::at_place(same(converted::array_list(want.pose), (*got.rows)[6]), ".pose") && converted::at_place(same(converted::array_list(want.from), (*got.rows)[7]), ".from") && converted::at_place(same(converted::array_list(want.stand), (*got.rows)[8]), ".stand") && converted::at_place(same(want.colors, (*got.rows)[9]), ".colors") && converted::at_place(same(want.born, (*got.rows)[10]), ".born") && converted::at_place(same(want.settled, (*got.rows)[11]), ".settled") && converted::at_place(same(want.getup_at, (*got.rows)[12]), ".getup_at") && converted::at_place(same(want.stand_yaw, (*got.rows)[13]), ".stand_yaw") && converted::at_place(same(want.stand_feet, (*got.rows)[14]), ".stand_feet") && converted::at_place(same(want.group, (*got.rows)[15]), ".group"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Doll& s) { return defined(s.active) && defined(s.recover) && defined(s.getting_up) && defined(converted::shaped<converted::Whole>(s.key)) && defined(converted::array_list(s.bodies)) && defined(converted::array_list(s.joints)) && defined(converted::array_list(s.pose)) && defined(converted::array_list(s.from)) && defined(converted::array_list(s.stand)) && defined(s.colors) && defined(s.born) && defined(s.settled) && defined(s.getup_at) && defined(s.stand_yaw) && defined(s.stand_feet) && defined(s.group); }
 [[maybe_unused]] static std::string text(const Ragdolls::Doll& s) { return std::string("{") + text(s.active) + ", " + text(s.recover) + ", " + text(s.getting_up) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(converted::array_list(s.bodies)) + ", " + text(converted::array_list(s.joints)) + ", " + text(converted::array_list(s.pose)) + ", " + text(converted::array_list(s.from)) + ", " + text(converted::array_list(s.stand)) + ", " + text(s.colors) + ", " + text(s.born) + ", " + text(s.settled) + ", " + text(s.getup_at) + ", " + text(s.stand_yaw) + ", " + text(s.stand_feet) + ", " + text(s.group) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Doll& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<bool>(s.recover, (*v.rows)[1]); converted::take_as<bool>(s.getting_up, (*v.rows)[2]); converted::take_as<converted::Whole>(s.key, (*v.rows)[3]); { std::vector<physics::Body> items; converted::take_as<std::vector<physics::Body>>(items, (*v.rows)[4]); converted::array_from(s.bodies, items); } { std::vector<physics::Joint> items; converted::take_as<std::vector<physics::Joint>>(items, (*v.rows)[5]); converted::array_from(s.joints, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[6]); converted::array_from(s.pose, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[7]); converted::array_from(s.from, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[8]); converted::array_from(s.stand, items); } converted::take_as<Ragdolls::Colors>(s.colors, (*v.rows)[9]); converted::take_as<double>(s.born, (*v.rows)[10]); converted::take_as<double>(s.settled, (*v.rows)[11]); converted::take_as<double>(s.getup_at, (*v.rows)[12]); converted::take_as<double>(s.stand_yaw, (*v.rows)[13]); converted::take_as<Vec3>(s.stand_feet, (*v.rows)[14]); converted::take_as<int>(s.group, (*v.rows)[15]); }
@@ -1048,7 +1051,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Up& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.feet), arg(s.yaw)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Up& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.feet, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Ragdolls::Up& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(want.feet, (*got.rows)[1]), ".feet") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Up& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.feet) && defined(s.yaw); }
 [[maybe_unused]] static std::string text(const Ragdolls::Up& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.feet) + ", " + text(s.yaw) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Up& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<Vec3>(s.feet, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); }
@@ -1063,7 +1066,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls& s) { return converted::Value::structure({arg(s.world_), arg(s.dolls_), arg(s.ups_), arg(s.max_), arg(s.spawned_), arg(s.group_)}); }
-[[maybe_unused]] static bool same(const Ragdolls& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.world_, (*got.rows)[0]) && same(want.dolls_, (*got.rows)[1]) && same(want.ups_, (*got.rows)[2]) && same(want.max_, (*got.rows)[3]) && same(want.spawned_, (*got.rows)[4]) && same(want.group_, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.world_, (*got.rows)[0]), ".world_") && converted::at_place(same(want.dolls_, (*got.rows)[1]), ".dolls_") && converted::at_place(same(want.ups_, (*got.rows)[2]), ".ups_") && converted::at_place(same(want.max_, (*got.rows)[3]), ".max_") && converted::at_place(same(want.spawned_, (*got.rows)[4]), ".spawned_") && converted::at_place(same(want.group_, (*got.rows)[5]), ".group_"); }
 [[maybe_unused]] static bool defined(const Ragdolls& s) { return defined(s.world_) && defined(s.dolls_) && defined(s.ups_) && defined(s.max_) && defined(s.spawned_) && defined(s.group_); }
 [[maybe_unused]] static std::string text(const Ragdolls& s) { return std::string("{") + text(s.world_) + ", " + text(s.dolls_) + ", " + text(s.ups_) + ", " + text(s.max_) + ", " + text(s.spawned_) + ", " + text(s.group_) + "}"; }
 [[maybe_unused]] static void take(Ragdolls& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<World*>(s.world_, (*v.rows)[0]); converted::take_as<std::vector<Ragdolls::Doll>>(s.dolls_, (*v.rows)[1]); converted::take_as<std::vector<Ragdolls::Up>>(s.ups_, (*v.rows)[2]); converted::take_as<unsigned int>(s.max_, (*v.rows)[3]); converted::take_as<unsigned int>(s.spawned_, (*v.rows)[4]); converted::take_as<int>(s.group_, (*v.rows)[5]); }
@@ -1079,7 +1082,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Meadow& s) { return converted::Value::structure({arg(s.rings), arg(s.lo), arg(s.hi), arg(s.centre), arg(s.area), arg(converted::shaped<converted::Whole>(s.key)), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Life::Meadow& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.rings, (*got.rows)[0]) && same(want.lo, (*got.rows)[1]) && same(want.hi, (*got.rows)[2]) && same(want.centre, (*got.rows)[3]) && same(want.area, (*got.rows)[4]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[5]) && same(want.alive, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const Life::Meadow& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.rings, (*got.rows)[0]), ".rings") && converted::at_place(same(want.lo, (*got.rows)[1]), ".lo") && converted::at_place(same(want.hi, (*got.rows)[2]), ".hi") && converted::at_place(same(want.centre, (*got.rows)[3]), ".centre") && converted::at_place(same(want.area, (*got.rows)[4]), ".area") && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[5]), ".key") && converted::at_place(same(want.alive, (*got.rows)[6]), ".alive"); }
 [[maybe_unused]] static bool defined(const Life::Meadow& s) { return defined(s.rings) && defined(s.lo) && defined(s.hi) && defined(s.centre) && defined(s.area) && defined(converted::shaped<converted::Whole>(s.key)) && defined(s.alive); }
 [[maybe_unused]] static std::string text(const Life::Meadow& s) { return std::string("{") + text(s.rings) + ", " + text(s.lo) + ", " + text(s.hi) + ", " + text(s.centre) + ", " + text(s.area) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.alive) + "}"; }
 [[maybe_unused]] static void take(Life::Meadow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<Vec2>(s.lo, (*v.rows)[1]); converted::take_as<Vec2>(s.hi, (*v.rows)[2]); converted::take_as<Vec2>(s.centre, (*v.rows)[3]); converted::take_as<double>(s.area, (*v.rows)[4]); converted::take_as<converted::Whole>(s.key, (*v.rows)[5]); converted::take_as<bool>(s.alive, (*v.rows)[6]); }
@@ -1102,7 +1105,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Pigeon& s) { return converted::Value::structure({arg(s.o), arg(s.v), arg(s.pos), arg(s.yaw), arg(s.walk_until), arg(s.peck), arg(s.flap), arg(s.lag), arg(s.dead_at), arg(s.fall_v), arg(s.net_to), arg(s.net_v), arg(s.net_yaw), arg(s.net_at)}); }
-[[maybe_unused]] static bool same(const Life::Pigeon& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.o, (*got.rows)[0]) && same(want.v, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.walk_until, (*got.rows)[4]) && same(want.peck, (*got.rows)[5]) && same(want.flap, (*got.rows)[6]) && same(want.lag, (*got.rows)[7]) && same(want.dead_at, (*got.rows)[8]) && same(want.fall_v, (*got.rows)[9]) && same(want.net_to, (*got.rows)[10]) && same(want.net_v, (*got.rows)[11]) && same(want.net_yaw, (*got.rows)[12]) && same(want.net_at, (*got.rows)[13]); }
+[[maybe_unused]] static bool same(const Life::Pigeon& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.o, (*got.rows)[0]), ".o") && converted::at_place(same(want.v, (*got.rows)[1]), ".v") && converted::at_place(same(want.pos, (*got.rows)[2]), ".pos") && converted::at_place(same(want.yaw, (*got.rows)[3]), ".yaw") && converted::at_place(same(want.walk_until, (*got.rows)[4]), ".walk_until") && converted::at_place(same(want.peck, (*got.rows)[5]), ".peck") && converted::at_place(same(want.flap, (*got.rows)[6]), ".flap") && converted::at_place(same(want.lag, (*got.rows)[7]), ".lag") && converted::at_place(same(want.dead_at, (*got.rows)[8]), ".dead_at") && converted::at_place(same(want.fall_v, (*got.rows)[9]), ".fall_v") && converted::at_place(same(want.net_to, (*got.rows)[10]), ".net_to") && converted::at_place(same(want.net_v, (*got.rows)[11]), ".net_v") && converted::at_place(same(want.net_yaw, (*got.rows)[12]), ".net_yaw") && converted::at_place(same(want.net_at, (*got.rows)[13]), ".net_at"); }
 [[maybe_unused]] static bool defined(const Life::Pigeon& s) { return defined(s.o) && defined(s.v) && defined(s.pos) && defined(s.yaw) && defined(s.walk_until) && defined(s.peck) && defined(s.flap) && defined(s.lag) && defined(s.dead_at) && defined(s.fall_v) && defined(s.net_to) && defined(s.net_v) && defined(s.net_yaw) && defined(s.net_at); }
 [[maybe_unused]] static std::string text(const Life::Pigeon& s) { return std::string("{") + text(s.o) + ", " + text(s.v) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.walk_until) + ", " + text(s.peck) + ", " + text(s.flap) + ", " + text(s.lag) + ", " + text(s.dead_at) + ", " + text(s.fall_v) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_yaw) + ", " + text(s.net_at) + "}"; }
 [[maybe_unused]] static void take(Life::Pigeon& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec2>(s.o, (*v.rows)[0]); converted::take_as<Vec2>(s.v, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.walk_until, (*v.rows)[4]); converted::take_as<double>(s.peck, (*v.rows)[5]); converted::take_as<double>(s.flap, (*v.rows)[6]); converted::take_as<double>(s.lag, (*v.rows)[7]); converted::take_as<double>(s.dead_at, (*v.rows)[8]); converted::take_as<Vec3>(s.fall_v, (*v.rows)[9]); converted::take_as<Vec3>(s.net_to, (*v.rows)[10]); converted::take_as<Vec3>(s.net_v, (*v.rows)[11]); converted::take_as<double>(s.net_yaw, (*v.rows)[12]); converted::take_as<double>(s.net_at, (*v.rows)[13]); }
@@ -1126,7 +1129,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Flock& s) { return converted::Value::structure({arg(s.id), arg(s.air), arg(s.at), arg(s.next_flight), arg(s.t), arg(s.coo_at), arg(s.c), arg(s.from), arg(s.dest), arg(s.r), arg(s.h), arg(s.dir), arg(s.a0), arg(s.dur), arg(s.birds)}); }
-[[maybe_unused]] static bool same(const Life::Flock& want, const converted::Value& got) { return got.rows && got.rows->size() == 15 && same(want.id, (*got.rows)[0]) && same(want.air, (*got.rows)[1]) && same(want.at, (*got.rows)[2]) && same(want.next_flight, (*got.rows)[3]) && same(want.t, (*got.rows)[4]) && same(want.coo_at, (*got.rows)[5]) && same(want.c, (*got.rows)[6]) && same(want.from, (*got.rows)[7]) && same(want.dest, (*got.rows)[8]) && same(want.r, (*got.rows)[9]) && same(want.h, (*got.rows)[10]) && same(want.dir, (*got.rows)[11]) && same(want.a0, (*got.rows)[12]) && same(want.dur, (*got.rows)[13]) && same(want.birds, (*got.rows)[14]); }
+[[maybe_unused]] static bool same(const Life::Flock& want, const converted::Value& got) { return converted::rows_of(got, 15) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.air, (*got.rows)[1]), ".air") && converted::at_place(same(want.at, (*got.rows)[2]), ".at") && converted::at_place(same(want.next_flight, (*got.rows)[3]), ".next_flight") && converted::at_place(same(want.t, (*got.rows)[4]), ".t") && converted::at_place(same(want.coo_at, (*got.rows)[5]), ".coo_at") && converted::at_place(same(want.c, (*got.rows)[6]), ".c") && converted::at_place(same(want.from, (*got.rows)[7]), ".from") && converted::at_place(same(want.dest, (*got.rows)[8]), ".dest") && converted::at_place(same(want.r, (*got.rows)[9]), ".r") && converted::at_place(same(want.h, (*got.rows)[10]), ".h") && converted::at_place(same(want.dir, (*got.rows)[11]), ".dir") && converted::at_place(same(want.a0, (*got.rows)[12]), ".a0") && converted::at_place(same(want.dur, (*got.rows)[13]), ".dur") && converted::at_place(same(want.birds, (*got.rows)[14]), ".birds"); }
 [[maybe_unused]] static bool defined(const Life::Flock& s) { return defined(s.id) && defined(s.air) && defined(s.at) && defined(s.next_flight) && defined(s.t) && defined(s.coo_at) && defined(s.c) && defined(s.from) && defined(s.dest) && defined(s.r) && defined(s.h) && defined(s.dir) && defined(s.a0) && defined(s.dur) && defined(s.birds); }
 [[maybe_unused]] static std::string text(const Life::Flock& s) { return std::string("{") + text(s.id) + ", " + text(s.air) + ", " + text(s.at) + ", " + text(s.next_flight) + ", " + text(s.t) + ", " + text(s.coo_at) + ", " + text(s.c) + ", " + text(s.from) + ", " + text(s.dest) + ", " + text(s.r) + ", " + text(s.h) + ", " + text(s.dir) + ", " + text(s.a0) + ", " + text(s.dur) + ", " + text(s.birds) + "}"; }
 [[maybe_unused]] static void take(Life::Flock& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 15) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<bool>(s.air, (*v.rows)[1]); converted::take_as<Vec2>(s.at, (*v.rows)[2]); converted::take_as<double>(s.next_flight, (*v.rows)[3]); converted::take_as<double>(s.t, (*v.rows)[4]); converted::take_as<double>(s.coo_at, (*v.rows)[5]); converted::take_as<Vec2>(s.c, (*v.rows)[6]); converted::take_as<Vec2>(s.from, (*v.rows)[7]); converted::take_as<Vec2>(s.dest, (*v.rows)[8]); converted::take_as<double>(s.r, (*v.rows)[9]); converted::take_as<double>(s.h, (*v.rows)[10]); converted::take_as<double>(s.dir, (*v.rows)[11]); converted::take_as<double>(s.a0, (*v.rows)[12]); converted::take_as<double>(s.dur, (*v.rows)[13]); converted::take_as<std::vector<Life::Pigeon>>(s.birds, (*v.rows)[14]); }
@@ -1145,7 +1148,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Bird& s) { return converted::Value::structure({arg(s.seed), arg(s.pos), arg(s.yaw), arg(s.flap), arg(s.dead_until), arg(s.dying_until), arg(s.spin), arg(s.fall_v), arg(s.center), arg(s.down)}); }
-[[maybe_unused]] static bool same(const Life::Bird& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.seed, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]) && same(want.flap, (*got.rows)[3]) && same(want.dead_until, (*got.rows)[4]) && same(want.dying_until, (*got.rows)[5]) && same(want.spin, (*got.rows)[6]) && same(want.fall_v, (*got.rows)[7]) && same(want.center, (*got.rows)[8]) && same(want.down, (*got.rows)[9]); }
+[[maybe_unused]] static bool same(const Life::Bird& want, const converted::Value& got) { return converted::rows_of(got, 10) && converted::at_place(same(want.seed, (*got.rows)[0]), ".seed") && converted::at_place(same(want.pos, (*got.rows)[1]), ".pos") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw") && converted::at_place(same(want.flap, (*got.rows)[3]), ".flap") && converted::at_place(same(want.dead_until, (*got.rows)[4]), ".dead_until") && converted::at_place(same(want.dying_until, (*got.rows)[5]), ".dying_until") && converted::at_place(same(want.spin, (*got.rows)[6]), ".spin") && converted::at_place(same(want.fall_v, (*got.rows)[7]), ".fall_v") && converted::at_place(same(want.center, (*got.rows)[8]), ".center") && converted::at_place(same(want.down, (*got.rows)[9]), ".down"); }
 [[maybe_unused]] static bool defined(const Life::Bird& s) { return defined(s.seed) && defined(s.pos) && defined(s.yaw) && defined(s.flap) && defined(s.dead_until) && defined(s.dying_until) && defined(s.spin) && defined(s.fall_v) && defined(s.center) && defined(s.down); }
 [[maybe_unused]] static std::string text(const Life::Bird& s) { return std::string("{") + text(s.seed) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.flap) + ", " + text(s.dead_until) + ", " + text(s.dying_until) + ", " + text(s.spin) + ", " + text(s.fall_v) + ", " + text(s.center) + ", " + text(s.down) + "}"; }
 [[maybe_unused]] static void take(Life::Bird& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<unsigned int>(s.seed, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); converted::take_as<double>(s.flap, (*v.rows)[3]); converted::take_as<double>(s.dead_until, (*v.rows)[4]); converted::take_as<double>(s.dying_until, (*v.rows)[5]); converted::take_as<double>(s.spin, (*v.rows)[6]); converted::take_as<Vec3>(s.fall_v, (*v.rows)[7]); converted::take_as<Vec2>(s.center, (*v.rows)[8]); converted::take_as<bool>(s.down, (*v.rows)[9]); }
@@ -1161,7 +1164,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Tree& s) { return converted::Value::structure({arg(s.foot), arg(s.scale), arg(s.lane), arg(s.fell_at), arg(s.fall_dir), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.index)}); }
-[[maybe_unused]] static bool same(const Life::Tree& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.foot, (*got.rows)[0]) && same(want.scale, (*got.rows)[1]) && same(want.lane, (*got.rows)[2]) && same(want.fell_at, (*got.rows)[3]) && same(want.fall_dir, (*got.rows)[4]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[5]) && same(want.index, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const Life::Tree& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.foot, (*got.rows)[0]), ".foot") && converted::at_place(same(want.scale, (*got.rows)[1]), ".scale") && converted::at_place(same(want.lane, (*got.rows)[2]), ".lane") && converted::at_place(same(want.fell_at, (*got.rows)[3]), ".fell_at") && converted::at_place(same(want.fall_dir, (*got.rows)[4]), ".fall_dir") && converted::at_place(same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[5]), ".tile") && converted::at_place(same(want.index, (*got.rows)[6]), ".index"); }
 [[maybe_unused]] static bool defined(const Life::Tree& s) { return defined(s.foot) && defined(s.scale) && defined(s.lane) && defined(s.fell_at) && defined(s.fall_dir) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.index); }
 [[maybe_unused]] static std::string text(const Life::Tree& s) { return std::string("{") + text(s.foot) + ", " + text(s.scale) + ", " + text(s.lane) + ", " + text(s.fell_at) + ", " + text(s.fall_dir) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.index) + "}"; }
 [[maybe_unused]] static void take(Life::Tree& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<Vec3>(s.foot, (*v.rows)[0]); converted::take_as<double>(s.scale, (*v.rows)[1]); converted::take_as<unsigned int>(s.lane, (*v.rows)[2]); converted::take_as<double>(s.fell_at, (*v.rows)[3]); converted::take_as<Vec2>(s.fall_dir, (*v.rows)[4]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[5]); converted::take_as<unsigned int>(s.index, (*v.rows)[6]); }
@@ -1191,7 +1194,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Pet& s) { return converted::Value::structure({arg(s.radius), arg(s.omega), arg(s.phase), arg(s.wobble_omega), arg(s.wobble_r), arg(s.scale), arg(s.pos), arg(s.yaw), arg(s.gait), arg(s.speed), arg(s.dead_at), arg(s.shown), arg(s.has_pose), arg(s.carried), arg(s.carried_still), arg(s.off), arg(s.punches), arg(s.color), arg(s.body), arg(s.rot), arg(s.net_rot)}); }
-[[maybe_unused]] static bool same(const Life::Pet& want, const converted::Value& got) { return got.rows && got.rows->size() == 21 && same(want.radius, (*got.rows)[0]) && same(want.omega, (*got.rows)[1]) && same(want.phase, (*got.rows)[2]) && same(want.wobble_omega, (*got.rows)[3]) && same(want.wobble_r, (*got.rows)[4]) && same(want.scale, (*got.rows)[5]) && same(want.pos, (*got.rows)[6]) && same(want.yaw, (*got.rows)[7]) && same(want.gait, (*got.rows)[8]) && same(want.speed, (*got.rows)[9]) && same(want.dead_at, (*got.rows)[10]) && same(want.shown, (*got.rows)[11]) && same(want.has_pose, (*got.rows)[12]) && same(want.carried, (*got.rows)[13]) && same(want.carried_still, (*got.rows)[14]) && same(want.off, (*got.rows)[15]) && same(want.punches, (*got.rows)[16]) && same(want.color, (*got.rows)[17]) && same(want.body, (*got.rows)[18]) && same(want.rot, (*got.rows)[19]) && same(want.net_rot, (*got.rows)[20]); }
+[[maybe_unused]] static bool same(const Life::Pet& want, const converted::Value& got) { return converted::rows_of(got, 21) && converted::at_place(same(want.radius, (*got.rows)[0]), ".radius") && converted::at_place(same(want.omega, (*got.rows)[1]), ".omega") && converted::at_place(same(want.phase, (*got.rows)[2]), ".phase") && converted::at_place(same(want.wobble_omega, (*got.rows)[3]), ".wobble_omega") && converted::at_place(same(want.wobble_r, (*got.rows)[4]), ".wobble_r") && converted::at_place(same(want.scale, (*got.rows)[5]), ".scale") && converted::at_place(same(want.pos, (*got.rows)[6]), ".pos") && converted::at_place(same(want.yaw, (*got.rows)[7]), ".yaw") && converted::at_place(same(want.gait, (*got.rows)[8]), ".gait") && converted::at_place(same(want.speed, (*got.rows)[9]), ".speed") && converted::at_place(same(want.dead_at, (*got.rows)[10]), ".dead_at") && converted::at_place(same(want.shown, (*got.rows)[11]), ".shown") && converted::at_place(same(want.has_pose, (*got.rows)[12]), ".has_pose") && converted::at_place(same(want.carried, (*got.rows)[13]), ".carried") && converted::at_place(same(want.carried_still, (*got.rows)[14]), ".carried_still") && converted::at_place(same(want.off, (*got.rows)[15]), ".off") && converted::at_place(same(want.punches, (*got.rows)[16]), ".punches") && converted::at_place(same(want.color, (*got.rows)[17]), ".color") && converted::at_place(same(want.body, (*got.rows)[18]), ".body") && converted::at_place(same(want.rot, (*got.rows)[19]), ".rot") && converted::at_place(same(want.net_rot, (*got.rows)[20]), ".net_rot"); }
 [[maybe_unused]] static bool defined(const Life::Pet& s) { return defined(s.radius) && defined(s.omega) && defined(s.phase) && defined(s.wobble_omega) && defined(s.wobble_r) && defined(s.scale) && defined(s.pos) && defined(s.yaw) && defined(s.gait) && defined(s.speed) && defined(s.dead_at) && defined(s.shown) && defined(s.has_pose) && defined(s.carried) && defined(s.carried_still) && defined(s.off) && defined(s.punches) && defined(s.color) && defined(s.body) && defined(s.rot) && defined(s.net_rot); }
 [[maybe_unused]] static std::string text(const Life::Pet& s) { return std::string("{") + text(s.radius) + ", " + text(s.omega) + ", " + text(s.phase) + ", " + text(s.wobble_omega) + ", " + text(s.wobble_r) + ", " + text(s.scale) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.gait) + ", " + text(s.speed) + ", " + text(s.dead_at) + ", " + text(s.shown) + ", " + text(s.has_pose) + ", " + text(s.carried) + ", " + text(s.carried_still) + ", " + text(s.off) + ", " + text(s.punches) + ", " + text(s.color) + ", " + text(s.body) + ", " + text(s.rot) + ", " + text(s.net_rot) + "}"; }
 [[maybe_unused]] static void take(Life::Pet& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 21) return; converted::take_as<double>(s.radius, (*v.rows)[0]); converted::take_as<double>(s.omega, (*v.rows)[1]); converted::take_as<double>(s.phase, (*v.rows)[2]); converted::take_as<double>(s.wobble_omega, (*v.rows)[3]); converted::take_as<double>(s.wobble_r, (*v.rows)[4]); converted::take_as<double>(s.scale, (*v.rows)[5]); converted::take_as<Vec3>(s.pos, (*v.rows)[6]); converted::take_as<double>(s.yaw, (*v.rows)[7]); converted::take_as<double>(s.gait, (*v.rows)[8]); converted::take_as<double>(s.speed, (*v.rows)[9]); converted::take_as<double>(s.dead_at, (*v.rows)[10]); converted::take_as<bool>(s.shown, (*v.rows)[11]); converted::take_as<bool>(s.has_pose, (*v.rows)[12]); converted::take_as<bool>(s.carried, (*v.rows)[13]); converted::take_as<double>(s.carried_still, (*v.rows)[14]); converted::take_as<Vec2>(s.off, (*v.rows)[15]); converted::take_as<int>(s.punches, (*v.rows)[16]); converted::take_as<Vec3>(s.color, (*v.rows)[17]); converted::take_as<physics::Body>(s.body, (*v.rows)[18]); converted::take_as<Quat>(s.rot, (*v.rows)[19]); converted::take_as<Quat>(s.net_rot, (*v.rows)[20]); }
@@ -1211,7 +1214,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::CatAttack& s) { return converted::Value::structure({arg(s.on), arg(s.phase), arg(s.p), arg(s.from), arg(s.yaw), arg(s.start), arg(s.leap_at), arg(s.last_cry), arg(s.away_yaw), arg(s.leave_at), arg(s.cries)}); }
-[[maybe_unused]] static bool same(const Life::CatAttack& want, const converted::Value& got) { return got.rows && got.rows->size() == 11 && same(want.on, (*got.rows)[0]) && same(want.phase, (*got.rows)[1]) && same(want.p, (*got.rows)[2]) && same(want.from, (*got.rows)[3]) && same(want.yaw, (*got.rows)[4]) && same(want.start, (*got.rows)[5]) && same(want.leap_at, (*got.rows)[6]) && same(want.last_cry, (*got.rows)[7]) && same(want.away_yaw, (*got.rows)[8]) && same(want.leave_at, (*got.rows)[9]) && same(want.cries, (*got.rows)[10]); }
+[[maybe_unused]] static bool same(const Life::CatAttack& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.on, (*got.rows)[0]), ".on") && converted::at_place(same(want.phase, (*got.rows)[1]), ".phase") && converted::at_place(same(want.p, (*got.rows)[2]), ".p") && converted::at_place(same(want.from, (*got.rows)[3]), ".from") && converted::at_place(same(want.yaw, (*got.rows)[4]), ".yaw") && converted::at_place(same(want.start, (*got.rows)[5]), ".start") && converted::at_place(same(want.leap_at, (*got.rows)[6]), ".leap_at") && converted::at_place(same(want.last_cry, (*got.rows)[7]), ".last_cry") && converted::at_place(same(want.away_yaw, (*got.rows)[8]), ".away_yaw") && converted::at_place(same(want.leave_at, (*got.rows)[9]), ".leave_at") && converted::at_place(same(want.cries, (*got.rows)[10]), ".cries"); }
 [[maybe_unused]] static bool defined(const Life::CatAttack& s) { return defined(s.on) && defined(s.phase) && defined(s.p) && defined(s.from) && defined(s.yaw) && defined(s.start) && defined(s.leap_at) && defined(s.last_cry) && defined(s.away_yaw) && defined(s.leave_at) && defined(s.cries); }
 [[maybe_unused]] static std::string text(const Life::CatAttack& s) { return std::string("{") + text(s.on) + ", " + text(s.phase) + ", " + text(s.p) + ", " + text(s.from) + ", " + text(s.yaw) + ", " + text(s.start) + ", " + text(s.leap_at) + ", " + text(s.last_cry) + ", " + text(s.away_yaw) + ", " + text(s.leave_at) + ", " + text(s.cries) + "}"; }
 [[maybe_unused]] static void take(Life::CatAttack& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<bool>(s.on, (*v.rows)[0]); converted::take_as<int>(s.phase, (*v.rows)[1]); converted::take_as<Vec3>(s.p, (*v.rows)[2]); converted::take_as<Vec3>(s.from, (*v.rows)[3]); converted::take_as<double>(s.yaw, (*v.rows)[4]); converted::take_as<double>(s.start, (*v.rows)[5]); converted::take_as<double>(s.leap_at, (*v.rows)[6]); converted::take_as<double>(s.last_cry, (*v.rows)[7]); converted::take_as<double>(s.away_yaw, (*v.rows)[8]); converted::take_as<double>(s.leave_at, (*v.rows)[9]); converted::take_as<int>(s.cries, (*v.rows)[10]); }
@@ -1229,7 +1232,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Runner& s) { return converted::Value::structure({arg(s.pos), arg(s.yaw), arg(s.yaw_s), arg(s.lat), arg(s.phase), arg(s.alive), arg(s.net_to), arg(s.net_v), arg(s.net_at)}); }
-[[maybe_unused]] static bool same(const Life::Runner& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.pos, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]) && same(want.yaw_s, (*got.rows)[2]) && same(want.lat, (*got.rows)[3]) && same(want.phase, (*got.rows)[4]) && same(want.alive, (*got.rows)[5]) && same(want.net_to, (*got.rows)[6]) && same(want.net_v, (*got.rows)[7]) && same(want.net_at, (*got.rows)[8]); }
+[[maybe_unused]] static bool same(const Life::Runner& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.pos, (*got.rows)[0]), ".pos") && converted::at_place(same(want.yaw, (*got.rows)[1]), ".yaw") && converted::at_place(same(want.yaw_s, (*got.rows)[2]), ".yaw_s") && converted::at_place(same(want.lat, (*got.rows)[3]), ".lat") && converted::at_place(same(want.phase, (*got.rows)[4]), ".phase") && converted::at_place(same(want.alive, (*got.rows)[5]), ".alive") && converted::at_place(same(want.net_to, (*got.rows)[6]), ".net_to") && converted::at_place(same(want.net_v, (*got.rows)[7]), ".net_v") && converted::at_place(same(want.net_at, (*got.rows)[8]), ".net_at"); }
 [[maybe_unused]] static bool defined(const Life::Runner& s) { return defined(s.pos) && defined(s.yaw) && defined(s.yaw_s) && defined(s.lat) && defined(s.phase) && defined(s.alive) && defined(s.net_to) && defined(s.net_v) && defined(s.net_at); }
 [[maybe_unused]] static std::string text(const Life::Runner& s) { return std::string("{") + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.yaw_s) + ", " + text(s.lat) + ", " + text(s.phase) + ", " + text(s.alive) + ", " + text(s.net_to) + ", " + text(s.net_v) + ", " + text(s.net_at) + "}"; }
 [[maybe_unused]] static void take(Life::Runner& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<Vec3>(s.pos, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); converted::take_as<double>(s.yaw_s, (*v.rows)[2]); converted::take_as<double>(s.lat, (*v.rows)[3]); converted::take_as<double>(s.phase, (*v.rows)[4]); converted::take_as<bool>(s.alive, (*v.rows)[5]); converted::take_as<Vec3>(s.net_to, (*v.rows)[6]); converted::take_as<Vec3>(s.net_v, (*v.rows)[7]); converted::take_as<double>(s.net_at, (*v.rows)[8]); }
@@ -1251,7 +1254,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Chain& s) { return converted::Value::structure({arg(s.id), arg(s.path), arg(s.cum), arg(s.len), arg(s.s), arg(s.born), arg(s.next_call), arg(s.next_beat), arg(s.off), arg(s.call), arg(s.beat), arg(s.side), arg(converted::array_list(s.runners))}); }
-[[maybe_unused]] static bool same(const Life::Chain& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.id, (*got.rows)[0]) && same(want.path, (*got.rows)[1]) && same(want.cum, (*got.rows)[2]) && same(want.len, (*got.rows)[3]) && same(want.s, (*got.rows)[4]) && same(want.born, (*got.rows)[5]) && same(want.next_call, (*got.rows)[6]) && same(want.next_beat, (*got.rows)[7]) && same(want.off, (*got.rows)[8]) && same(want.call, (*got.rows)[9]) && same(want.beat, (*got.rows)[10]) && same(want.side, (*got.rows)[11]) && same(converted::array_list(want.runners), (*got.rows)[12]); }
+[[maybe_unused]] static bool same(const Life::Chain& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.path, (*got.rows)[1]), ".path") && converted::at_place(same(want.cum, (*got.rows)[2]), ".cum") && converted::at_place(same(want.len, (*got.rows)[3]), ".len") && converted::at_place(same(want.s, (*got.rows)[4]), ".s") && converted::at_place(same(want.born, (*got.rows)[5]), ".born") && converted::at_place(same(want.next_call, (*got.rows)[6]), ".next_call") && converted::at_place(same(want.next_beat, (*got.rows)[7]), ".next_beat") && converted::at_place(same(want.off, (*got.rows)[8]), ".off") && converted::at_place(same(want.call, (*got.rows)[9]), ".call") && converted::at_place(same(want.beat, (*got.rows)[10]), ".beat") && converted::at_place(same(want.side, (*got.rows)[11]), ".side") && converted::at_place(same(converted::array_list(want.runners), (*got.rows)[12]), ".runners"); }
 [[maybe_unused]] static bool defined(const Life::Chain& s) { return defined(s.id) && defined(s.path) && defined(s.cum) && defined(s.len) && defined(s.s) && defined(s.born) && defined(s.next_call) && defined(s.next_beat) && defined(s.off) && defined(s.call) && defined(s.beat) && defined(s.side) && defined(converted::array_list(s.runners)); }
 [[maybe_unused]] static std::string text(const Life::Chain& s) { return std::string("{") + text(s.id) + ", " + text(s.path) + ", " + text(s.cum) + ", " + text(s.len) + ", " + text(s.s) + ", " + text(s.born) + ", " + text(s.next_call) + ", " + text(s.next_beat) + ", " + text(s.off) + ", " + text(s.call) + ", " + text(s.beat) + ", " + text(s.side) + ", " + text(converted::array_list(s.runners)) + "}"; }
 [[maybe_unused]] static void take(Life::Chain& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.path, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.cum, (*v.rows)[2]); converted::take_as<double>(s.len, (*v.rows)[3]); converted::take_as<double>(s.s, (*v.rows)[4]); converted::take_as<double>(s.born, (*v.rows)[5]); converted::take_as<double>(s.next_call, (*v.rows)[6]); converted::take_as<double>(s.next_beat, (*v.rows)[7]); converted::take_as<double>(s.off, (*v.rows)[8]); converted::take_as<int>(s.call, (*v.rows)[9]); converted::take_as<int>(s.beat, (*v.rows)[10]); converted::take_as<int>(s.side, (*v.rows)[11]); { std::vector<Life::Runner> items; converted::take_as<std::vector<Life::Runner>>(items, (*v.rows)[12]); converted::array_from(s.runners, items); } }
@@ -1264,7 +1267,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life::Voice& s) { return converted::Value::structure({arg(s.at), arg(s.text), arg(s.mood), arg(s.until)}); }
-[[maybe_unused]] static bool same(const Life::Voice& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.at, (*got.rows)[0]) && same(want.text, (*got.rows)[1]) && same(want.mood, (*got.rows)[2]) && same(want.until, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Life::Voice& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.at, (*got.rows)[0]), ".at") && converted::at_place(same(want.text, (*got.rows)[1]), ".text") && converted::at_place(same(want.mood, (*got.rows)[2]), ".mood") && converted::at_place(same(want.until, (*got.rows)[3]), ".until"); }
 [[maybe_unused]] static bool defined(const Life::Voice& s) { return defined(s.at) && defined(s.text) && defined(s.mood) && defined(s.until); }
 [[maybe_unused]] static std::string text(const Life::Voice& s) { return std::string("{") + text(s.at) + ", " + text(s.text) + ", " + text(s.mood) + ", " + text(s.until) + "}"; }
 [[maybe_unused]] static void take(Life::Voice& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<std::string>(s.text, (*v.rows)[1]); converted::take_as<std::string>(s.mood, (*v.rows)[2]); converted::take_as<double>(s.until, (*v.rows)[3]); }
@@ -1324,7 +1327,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Life& s) { return converted::Value::structure({arg(s.loose_), arg(s.loose_serial_), arg(s.remote_animals_), arg(s.pet_anchors_), arg(s.pet_base_), arg(s.remote_animals_at_), arg(s.pet_net_to_), arg(s.pet_net_yaw_), arg(converted::shaped<std::vector<converted::Whole>>(s.loose_keys_)), arg(s.remote_joggers_), arg(s.remote_joggers_at_), arg(s.world_), arg(s.mobile_), arg(s.ragdolls_), arg(s.meadows_), arg(s.cows_), arg(converted::shaped<std::vector<converted::Whole>>(s.dead_cows_)), arg(s.herds_for_), arg(s.last_herd_check_), arg(s.last_moo_), arg(s.herds_at_), arg(s.flocks_), arg(s.flock_serial_), arg(s.trees_down_), arg(s.tree_ground_cursor_), arg(s.birds_), arg(s.trees_), arg(s.pets_), arg(s.cat_), arg(s.pet_anchor_), arg(s.epoch_), arg(s.tree_serial_), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.trees_gone_)), arg(s.chain_), arg(s.chain_alive_), arg(s.next_chain_), arg(s.streak_at_), arg(s.chain_serial_), arg(s.streak_n_), arg(s.streak_chain_), arg(s.voices_), arg(s.last_shout_), arg(s.last_honk_), arg(s.last_scream_), arg(s.last_coo_), arg(s.ambient_chirp_), arg(s.source_gap_), arg(s.cow_hits_), arg(s.bird_hits_), arg(s.shouts_), arg(s.honks_)}); }
-[[maybe_unused]] static bool same(const Life& want, const converted::Value& got) { return got.rows && got.rows->size() == 51 && same(want.loose_, (*got.rows)[0]) && same(want.loose_serial_, (*got.rows)[1]) && same(want.remote_animals_, (*got.rows)[2]) && same(want.pet_anchors_, (*got.rows)[3]) && same(want.pet_base_, (*got.rows)[4]) && same(want.remote_animals_at_, (*got.rows)[5]) && same(want.pet_net_to_, (*got.rows)[6]) && same(want.pet_net_yaw_, (*got.rows)[7]) && same(converted::shaped<std::vector<converted::Whole>>(want.loose_keys_), (*got.rows)[8]) && same(want.remote_joggers_, (*got.rows)[9]) && same(want.remote_joggers_at_, (*got.rows)[10]) && same(want.world_, (*got.rows)[11]) && same(want.mobile_, (*got.rows)[12]) && same(want.ragdolls_, (*got.rows)[13]) && same(want.meadows_, (*got.rows)[14]) && same(want.cows_, (*got.rows)[15]) && same(converted::shaped<std::vector<converted::Whole>>(want.dead_cows_), (*got.rows)[16]) && same(want.herds_for_, (*got.rows)[17]) && same(want.last_herd_check_, (*got.rows)[18]) && same(want.last_moo_, (*got.rows)[19]) && same(want.herds_at_, (*got.rows)[20]) && same(want.flocks_, (*got.rows)[21]) && same(want.flock_serial_, (*got.rows)[22]) && same(want.trees_down_, (*got.rows)[23]) && same(want.tree_ground_cursor_, (*got.rows)[24]) && same(want.birds_, (*got.rows)[25]) && same(want.trees_, (*got.rows)[26]) && same(want.pets_, (*got.rows)[27]) && same(want.cat_, (*got.rows)[28]) && same(want.pet_anchor_, (*got.rows)[29]) && same(want.epoch_, (*got.rows)[30]) && same(want.tree_serial_, (*got.rows)[31]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.trees_gone_), (*got.rows)[32]) && same(want.chain_, (*got.rows)[33]) && same(want.chain_alive_, (*got.rows)[34]) && same(want.next_chain_, (*got.rows)[35]) && same(want.streak_at_, (*got.rows)[36]) && same(want.chain_serial_, (*got.rows)[37]) && same(want.streak_n_, (*got.rows)[38]) && same(want.streak_chain_, (*got.rows)[39]) && same(want.voices_, (*got.rows)[40]) && same(want.last_shout_, (*got.rows)[41]) && same(want.last_honk_, (*got.rows)[42]) && same(want.last_scream_, (*got.rows)[43]) && same(want.last_coo_, (*got.rows)[44]) && same(want.ambient_chirp_, (*got.rows)[45]) && same(want.source_gap_, (*got.rows)[46]) && same(want.cow_hits_, (*got.rows)[47]) && same(want.bird_hits_, (*got.rows)[48]) && same(want.shouts_, (*got.rows)[49]) && same(want.honks_, (*got.rows)[50]); }
+[[maybe_unused]] static bool same(const Life& want, const converted::Value& got) { return converted::rows_of(got, 51) && converted::at_place(same(want.loose_, (*got.rows)[0]), ".loose_") && converted::at_place(same(want.loose_serial_, (*got.rows)[1]), ".loose_serial_") && converted::at_place(same(want.remote_animals_, (*got.rows)[2]), ".remote_animals_") && converted::at_place(same(want.pet_anchors_, (*got.rows)[3]), ".pet_anchors_") && converted::at_place(same(want.pet_base_, (*got.rows)[4]), ".pet_base_") && converted::at_place(same(want.remote_animals_at_, (*got.rows)[5]), ".remote_animals_at_") && converted::at_place(same(want.pet_net_to_, (*got.rows)[6]), ".pet_net_to_") && converted::at_place(same(want.pet_net_yaw_, (*got.rows)[7]), ".pet_net_yaw_") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(want.loose_keys_), (*got.rows)[8]), ".loose_keys_") && converted::at_place(same(want.remote_joggers_, (*got.rows)[9]), ".remote_joggers_") && converted::at_place(same(want.remote_joggers_at_, (*got.rows)[10]), ".remote_joggers_at_") && converted::at_place(same(want.world_, (*got.rows)[11]), ".world_") && converted::at_place(same(want.mobile_, (*got.rows)[12]), ".mobile_") && converted::at_place(same(want.ragdolls_, (*got.rows)[13]), ".ragdolls_") && converted::at_place(same(want.meadows_, (*got.rows)[14]), ".meadows_") && converted::at_place(same(want.cows_, (*got.rows)[15]), ".cows_") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(want.dead_cows_), (*got.rows)[16]), ".dead_cows_") && converted::at_place(same(want.herds_for_, (*got.rows)[17]), ".herds_for_") && converted::at_place(same(want.last_herd_check_, (*got.rows)[18]), ".last_herd_check_") && converted::at_place(same(want.last_moo_, (*got.rows)[19]), ".last_moo_") && converted::at_place(same(want.herds_at_, (*got.rows)[20]), ".herds_at_") && converted::at_place(same(want.flocks_, (*got.rows)[21]), ".flocks_") && converted::at_place(same(want.flock_serial_, (*got.rows)[22]), ".flock_serial_") && converted::at_place(same(want.trees_down_, (*got.rows)[23]), ".trees_down_") && converted::at_place(same(want.tree_ground_cursor_, (*got.rows)[24]), ".tree_ground_cursor_") && converted::at_place(same(want.birds_, (*got.rows)[25]), ".birds_") && converted::at_place(same(want.trees_, (*got.rows)[26]), ".trees_") && converted::at_place(same(want.pets_, (*got.rows)[27]), ".pets_") && converted::at_place(same(want.cat_, (*got.rows)[28]), ".cat_") && converted::at_place(same(want.pet_anchor_, (*got.rows)[29]), ".pet_anchor_") && converted::at_place(same(want.epoch_, (*got.rows)[30]), ".epoch_") && converted::at_place(same(want.tree_serial_, (*got.rows)[31]), ".tree_serial_") && converted::at_place(same(converted::shaped<converted::wide::Set<converted::Whole>>(want.trees_gone_), (*got.rows)[32]), ".trees_gone_") && converted::at_place(same(want.chain_, (*got.rows)[33]), ".chain_") && converted::at_place(same(want.chain_alive_, (*got.rows)[34]), ".chain_alive_") && converted::at_place(same(want.next_chain_, (*got.rows)[35]), ".next_chain_") && converted::at_place(same(want.streak_at_, (*got.rows)[36]), ".streak_at_") && converted::at_place(same(want.chain_serial_, (*got.rows)[37]), ".chain_serial_") && converted::at_place(same(want.streak_n_, (*got.rows)[38]), ".streak_n_") && converted::at_place(same(want.streak_chain_, (*got.rows)[39]), ".streak_chain_") && converted::at_place(same(want.voices_, (*got.rows)[40]), ".voices_") && converted::at_place(same(want.last_shout_, (*got.rows)[41]), ".last_shout_") && converted::at_place(same(want.last_honk_, (*got.rows)[42]), ".last_honk_") && converted::at_place(same(want.last_scream_, (*got.rows)[43]), ".last_scream_") && converted::at_place(same(want.last_coo_, (*got.rows)[44]), ".last_coo_") && converted::at_place(same(want.ambient_chirp_, (*got.rows)[45]), ".ambient_chirp_") && converted::at_place(same(want.source_gap_, (*got.rows)[46]), ".source_gap_") && converted::at_place(same(want.cow_hits_, (*got.rows)[47]), ".cow_hits_") && converted::at_place(same(want.bird_hits_, (*got.rows)[48]), ".bird_hits_") && converted::at_place(same(want.shouts_, (*got.rows)[49]), ".shouts_") && converted::at_place(same(want.honks_, (*got.rows)[50]), ".honks_"); }
 [[maybe_unused]] static bool defined(const Life& s) { return defined(s.loose_) && defined(s.loose_serial_) && defined(s.remote_animals_) && defined(s.pet_anchors_) && defined(s.pet_base_) && defined(s.remote_animals_at_) && defined(s.pet_net_to_) && defined(s.pet_net_yaw_) && defined(converted::shaped<std::vector<converted::Whole>>(s.loose_keys_)) && defined(s.remote_joggers_) && defined(s.remote_joggers_at_) && defined(s.world_) && defined(s.mobile_) && defined(s.ragdolls_) && defined(s.meadows_) && defined(s.cows_) && defined(converted::shaped<std::vector<converted::Whole>>(s.dead_cows_)) && defined(s.herds_for_) && defined(s.last_herd_check_) && defined(s.last_moo_) && defined(s.herds_at_) && defined(s.flocks_) && defined(s.flock_serial_) && defined(s.trees_down_) && defined(s.tree_ground_cursor_) && defined(s.birds_) && defined(s.trees_) && defined(s.pets_) && defined(s.cat_) && defined(s.pet_anchor_) && defined(s.epoch_) && defined(s.tree_serial_) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.trees_gone_)) && defined(s.chain_) && defined(s.chain_alive_) && defined(s.next_chain_) && defined(s.streak_at_) && defined(s.chain_serial_) && defined(s.streak_n_) && defined(s.streak_chain_) && defined(s.voices_) && defined(s.last_shout_) && defined(s.last_honk_) && defined(s.last_scream_) && defined(s.last_coo_) && defined(s.ambient_chirp_) && defined(s.source_gap_) && defined(s.cow_hits_) && defined(s.bird_hits_) && defined(s.shouts_) && defined(s.honks_); }
 [[maybe_unused]] static std::string text(const Life& s) { return std::string("{") + text(s.loose_) + ", " + text(s.loose_serial_) + ", " + text(s.remote_animals_) + ", " + text(s.pet_anchors_) + ", " + text(s.pet_base_) + ", " + text(s.remote_animals_at_) + ", " + text(s.pet_net_to_) + ", " + text(s.pet_net_yaw_) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.loose_keys_)) + ", " + text(s.remote_joggers_) + ", " + text(s.remote_joggers_at_) + ", " + text(s.world_) + ", " + text(s.mobile_) + ", " + text(s.ragdolls_) + ", " + text(s.meadows_) + ", " + text(s.cows_) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.dead_cows_)) + ", " + text(s.herds_for_) + ", " + text(s.last_herd_check_) + ", " + text(s.last_moo_) + ", " + text(s.herds_at_) + ", " + text(s.flocks_) + ", " + text(s.flock_serial_) + ", " + text(s.trees_down_) + ", " + text(s.tree_ground_cursor_) + ", " + text(s.birds_) + ", " + text(s.trees_) + ", " + text(s.pets_) + ", " + text(s.cat_) + ", " + text(s.pet_anchor_) + ", " + text(s.epoch_) + ", " + text(s.tree_serial_) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.trees_gone_)) + ", " + text(s.chain_) + ", " + text(s.chain_alive_) + ", " + text(s.next_chain_) + ", " + text(s.streak_at_) + ", " + text(s.chain_serial_) + ", " + text(s.streak_n_) + ", " + text(s.streak_chain_) + ", " + text(s.voices_) + ", " + text(s.last_shout_) + ", " + text(s.last_honk_) + ", " + text(s.last_scream_) + ", " + text(s.last_coo_) + ", " + text(s.ambient_chirp_) + ", " + text(s.source_gap_) + ", " + text(s.cow_hits_) + ", " + text(s.bird_hits_) + ", " + text(s.shouts_) + ", " + text(s.honks_) + "}"; }
 [[maybe_unused]] static void take(Life& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 51) return; converted::take_as<std::vector<Life::LooseBird>>(s.loose_, (*v.rows)[0]); converted::take_as<int>(s.loose_serial_, (*v.rows)[1]); converted::take_as<bool>(s.remote_animals_, (*v.rows)[2]); converted::take_as<std::vector<Vec2>>(s.pet_anchors_, (*v.rows)[3]); converted::take_as<unsigned int>(s.pet_base_, (*v.rows)[4]); converted::take_as<double>(s.remote_animals_at_, (*v.rows)[5]); converted::take_as<std::vector<Vec3>>(s.pet_net_to_, (*v.rows)[6]); converted::take_as<std::vector<double>>(s.pet_net_yaw_, (*v.rows)[7]); converted::take_as<std::vector<converted::Whole>>(s.loose_keys_, (*v.rows)[8]); converted::take_as<bool>(s.remote_joggers_, (*v.rows)[9]); converted::take_as<double>(s.remote_joggers_at_, (*v.rows)[10]); converted::take_as<World*>(s.world_, (*v.rows)[11]); converted::take_as<bool>(s.mobile_, (*v.rows)[12]); converted::take_as<Ragdolls>(s.ragdolls_, (*v.rows)[13]); converted::take_as<std::vector<Life::Meadow>>(s.meadows_, (*v.rows)[14]); converted::take_as<std::vector<Life::Cow>>(s.cows_, (*v.rows)[15]); converted::take_as<std::vector<converted::Whole>>(s.dead_cows_, (*v.rows)[16]); converted::take_as<Vec2>(s.herds_for_, (*v.rows)[17]); converted::take_as<double>(s.last_herd_check_, (*v.rows)[18]); converted::take_as<double>(s.last_moo_, (*v.rows)[19]); converted::take_as<double>(s.herds_at_, (*v.rows)[20]); converted::take_as<std::vector<Life::Flock>>(s.flocks_, (*v.rows)[21]); converted::take_as<unsigned int>(s.flock_serial_, (*v.rows)[22]); converted::take_as<unsigned int>(s.trees_down_, (*v.rows)[23]); converted::take_as<unsigned int>(s.tree_ground_cursor_, (*v.rows)[24]); converted::take_as<std::vector<Life::Bird>>(s.birds_, (*v.rows)[25]); converted::take_as<std::vector<Life::Tree>>(s.trees_, (*v.rows)[26]); converted::take_as<std::vector<Life::Pet>>(s.pets_, (*v.rows)[27]); converted::take_as<Life::CatAttack>(s.cat_, (*v.rows)[28]); converted::take_as<Vec2>(s.pet_anchor_, (*v.rows)[29]); converted::take_as<double>(s.epoch_, (*v.rows)[30]); converted::take_as<unsigned int>(s.tree_serial_, (*v.rows)[31]); converted::take_as<converted::wide::Set<converted::Whole>>(s.trees_gone_, (*v.rows)[32]); converted::take_as<Life::Chain>(s.chain_, (*v.rows)[33]); converted::take_as<bool>(s.chain_alive_, (*v.rows)[34]); converted::take_as<double>(s.next_chain_, (*v.rows)[35]); converted::take_as<double>(s.streak_at_, (*v.rows)[36]); converted::take_as<unsigned int>(s.chain_serial_, (*v.rows)[37]); converted::take_as<unsigned int>(s.streak_n_, (*v.rows)[38]); converted::take_as<unsigned int>(s.streak_chain_, (*v.rows)[39]); converted::take_as<std::vector<Life::Voice>>(s.voices_, (*v.rows)[40]); converted::take_as<double>(s.last_shout_, (*v.rows)[41]); converted::take_as<double>(s.last_honk_, (*v.rows)[42]); converted::take_as<double>(s.last_scream_, (*v.rows)[43]); converted::take_as<double>(s.last_coo_, (*v.rows)[44]); converted::take_as<double>(s.ambient_chirp_, (*v.rows)[45]); converted::take_as<std::vector<std::pair<unsigned int, double>>>(s.source_gap_, (*v.rows)[46]); converted::take_as<unsigned int>(s.cow_hits_, (*v.rows)[47]); converted::take_as<unsigned int>(s.bird_hits_, (*v.rows)[48]); converted::take_as<unsigned int>(s.shouts_, (*v.rows)[49]); converted::take_as<unsigned int>(s.honks_, (*v.rows)[50]); }
@@ -1339,7 +1342,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
-[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.material, (*got.rows)[0]) && same(want.extra_slot, (*got.rows)[1]) && same(want.texture, (*got.rows)[2]) && same(want.visible, (*got.rows)[3]) && same(want.layers, (*got.rows)[4]) && same(want.pick_bvh, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
 [[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
 [[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
 [[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
@@ -1352,11 +1355,11 @@ namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) 
 namespace primitives { inline MeshData sphere(const double& radius, const unsigned int& segments, const unsigned int& rings, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.sphere", {converted::value_of(radius), converted::value_of(segments), converted::value_of(rings), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cylinder", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 struct Out_LifeArt_make { bool Result; LifeArt::Part p; };
-[[maybe_unused]] static bool same(const Out_LifeArt_make& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.p, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_LifeArt_make& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.p, (*got.rows)[1]), ".p"); }
 [[maybe_unused]] static bool defined(const Out_LifeArt_make& s) { return defined(s.Result) && defined(s.p); }
 [[maybe_unused]] static std::string text(const Out_LifeArt_make& s) { return std::string("{") + text(s.Result) + ", " + text(s.p) + "}"; }
 struct Out_LifeArt_init { LifeArt Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_LifeArt_init& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_LifeArt_init& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_LifeArt_init& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_LifeArt_init& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -1365,7 +1368,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::put
     converted::Tally tally("LifeArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return LifeArt{}.put(a0, a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt::Part& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return LifeArt{}.put(a0, a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt::Part a0 = draw_LifeArt__Part(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -1376,7 +1379,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1386,7 +1391,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::box
     converted::Tally tally("LifeArt_box");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.box(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return a0.box(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -1397,7 +1402,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1407,7 +1414,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::ball
     converted::Tally tally("LifeArt_ball");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.ball(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return a0.ball(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -1418,7 +1425,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1428,7 +1437,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::cylinder
     converted::Tally tally("LifeArt_cylinder");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.cylinder(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return a0.cylinder(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -1439,7 +1448,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1449,7 +1460,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::glow
     converted::Tally tally("LifeArt_glow");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.glow(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return a0.glow(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -1460,7 +1471,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1470,7 +1483,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_life_art_cpp::rot(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_life_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       double a1 = draw.number();
@@ -1480,7 +1493,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1490,7 +1505,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // at
     converted::Tally tally("at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_life_art_cpp::at(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0) { return converted::counted([&] { return converted_life_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1499,7 +1514,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1509,7 +1526,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // sc3
     converted::Tally tally("sc3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_life_art_cpp::sc3(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0) { return converted::counted([&] { return converted_life_art_cpp::sc3(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1518,7 +1535,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1528,7 +1547,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_life_art_cpp::rgb(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_life_art_cpp::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1537,7 +1556,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1547,7 +1568,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::make
     converted::Tally tally("LifeArt_make");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Renderer& a0, [[maybe_unused]] LifeArt::Part a1, [[maybe_unused]] MeshData a2, [[maybe_unused]] Material a3) { auto r = converted::counted([&] { return LifeArt{}.make(a0, a1, a2, a3); }); return Out_LifeArt_make{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] Renderer& a0, [[maybe_unused]] LifeArt::Part& a1, [[maybe_unused]] MeshData& a2, [[maybe_unused]] Material& a3) { auto r = converted::counted([&] { return LifeArt{}.make(a0, a1, a2, a3); }); return Out_LifeArt_make{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       Renderer& a0 = *converted::engine_object<Renderer>(1 + draw.below(6));
       LifeArt::Part a1 = draw_LifeArt__Part(draw);
@@ -1559,7 +1580,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1569,7 +1592,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::init
     converted::Tally tally("LifeArt_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_LifeArt_init{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_LifeArt_init{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
@@ -1579,7 +1602,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1);
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1589,7 +1614,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::begin
     converted::Tally tally("LifeArt_begin");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0) { converted::counted([&] { return a0.begin(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0) { converted::counted([&] { return a0.begin(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1598,7 +1623,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1608,7 +1635,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::cow
     converted::Tally tally("LifeArt_cow");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Life::Cow a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.cow(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0, [[maybe_unused]] Life::Cow& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.cow(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       Life::Cow a1 = draw_Life__Cow(draw);
@@ -1619,7 +1646,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1629,7 +1658,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::life
     converted::Tally tally("LifeArt_life");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0, [[maybe_unused]] Life a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.life(a1, std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0, [[maybe_unused]] Life& a1, [[maybe_unused]] double& a2, [[maybe_unused]] Vec3& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return a0.life(a1, std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       Life a1 = draw_Life(draw);
@@ -1642,7 +1671,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1652,7 +1683,7 @@ SC_TEST(converted_life_art_cpp) {
   {  // LifeArt::end
     converted::Tally tally("LifeArt_end");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] LifeArt a0) { converted::counted([&] { return a0.end(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] LifeArt& a0) { converted::counted([&] { return a0.end(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       LifeArt a0 = draw_LifeArt(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1661,7 +1692,9 @@ SC_TEST(converted_life_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
