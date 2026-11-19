@@ -1,0 +1,80 @@
+    CityStream::recollide (5): written
+    CityStream::exclude_building (13): written
+    CityStream::exclusion_done (1): written
+common                         18 /   18 functions       51 /     51 lines
+    clampf (1): written
+    sign0 (1): written
+    rate_limit (1): written
+    damp_alpha (1): written
+    wrap_pi (5): written
+    conj (1): written
+    to_local (1): written
+    qnormalize (4): written
+    yaw_quat (1): written
+    heading_of (1): written
+    slerp (8): written
+    read_body (4): written
+    Rng::seeded (1): written
+    Rng::next (1): written
+    Rng::unit (1): written
+    Rng::range (1): written
+    Rng::gaussian (8): written
+    cast (10): written
+engine_geo_mesh_data            2 /    2 functions        2 /      2 lines   (what the program calls of it)
+    MeshData::vertex_count (1): written
+    MeshData::triangle_count (1): written
+engine_geo_roads                2 /    2 functions       11 /     11 lines   (what the program calls of it)
+    GeoProjector::init (7): written
+    GeoProjector::project (4): written
+engine_math_math                3 /    3 functions       11 /     11 lines   (what the program calls of it)
+    Vec4::Vec4 (1): written
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+engine_physics_physics          3 /    3 functions        3 /      3 lines   (what the program calls of it)
+    Body::valid (1): written
+    Shape::valid (1): written
+    QueryFilter::QueryFilter (1): written
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+78 of 99 functions of the program are written as Blueprints (573 of 1130 lines), and 10 of the engine's headers that they call: 13 Blueprints - 1 of source files, 0 of states, 12 of headers and of shapes
+78 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (   110)   read_features() is defined in another file
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    61)   road_is_water() is defined in another file
+     3 (    60)   remove_tints() is defined in another file
+     3 (    56)   unproject() is defined in another file
+     1 (    44)   chunk_count() is defined in another file
+     2 (    33)   it calls CityStream::remove(), which waits
+     1 (    22)   buildings_input() is defined in another file
+     1 (    19)   it calls CityStream::ground_height(), which waits
+     1 (    17)   a member of Int is set
+     1 (    14)   ready_at() is defined in another file
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    12)   add_water_polygon() is defined in another file
+     1 (     9)   tile_input() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	4m58,943s
+user	6m50,125s
+sys	0m20,974s
