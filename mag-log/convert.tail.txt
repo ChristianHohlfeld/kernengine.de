@@ -1,0 +1,80 @@
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+mvt_cpp                        27 /   30 functions      246 /    304 lines
+    Reader::more (1): written
+    Reader::varint (13): written
+    Reader::sub (7): written
+    Reader::text (7): written
+    Reader::skip (10): written
+    Reader::le32 (1): written
+    Reader::fixed64 (6): written
+    Reader::fixed32 (6): written
+    zigzag (1): written
+    read_value (18): written
+    read_geometry (21): written
+    Layer::tag (5): written
+    Layer::text (4): written
+    Layer::number (4): written
+    Tile::layer (5): written
+    ring_area (6): written
+    wanted_layer (6): written
+    open_layer (15): written
+    read_feature (22): written
+    Decoder::begin (25): written
+    Decoder::step (30): the engine's now_ms() (its node is another one in the engine: its pins differ)
+    decode (7): it calls Decoder::step(), which waits
+    put_varint (4): written
+    put_key (1): written
+    put_bytes (5): written
+    put_bytes (5): written
+    zz (1): written
+    Writer::begin_layer (5): written
+    Writer::feature (42): written
+    Writer::end_layer (21): a pointer
+ragdoll                         4 /    6 functions        4 /      6 lines
+    Ragdolls::init (1): written
+    Ragdolls::has (1): find() is defined in another file
+    Ragdolls::take_ups (1): written
+    Ragdolls::spawned (1): written
+    Ragdolls::bone_body (1): find() is defined in another file
+    Ragdolls::colors (1): a name for a place - written where it is called
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+143 of 168 functions of the program are written as Blueprints (872 of 2004 lines), and 5 of the engine's headers that they call: 13 Blueprints - 2 of source files, 0 of states, 11 of headers and of shapes
+125 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     6 (   577)   it calls CityStream::ground_height(), which waits
+     2 (   178)   it calls Life::kill_runner(), which waits
+     1 (    74)   areas_near() is defined in another file
+     2 (    73)   it calls Life::blocked(), which waits
+     2 (    62)   spawn() is defined in another file
+     2 (    40)   it calls Life::spot_near(), which waits
+     1 (    35)   furniture() is defined in another file
+     1 (    30)   the engine's now_ms() (its node is another one in the engine: its pins differ)
+     1 (    25)   clear() is defined in another file
+     1 (    21)   a pointer
+     1 (     7)   it calls Decoder::step(), which waits
+     1 (     6)   water_at() is defined in another file
+     2 (     2)   find() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	3m28,772s
+user	5m48,096s
+sys	0m18,335s

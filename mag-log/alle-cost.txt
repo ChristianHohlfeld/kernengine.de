@@ -1,0 +1,8 @@
+  cost: Life_apply_flocks: in 3 of 271 calls the class asks for memory more often than the source (up to 4 times instead of 2)
+  cost: Life_apply_flocks: in 3 of 300 calls the class asks for memory more often than the source (up to 4 times instead of 2)
+  cost: Life_kill_pet: in 1 of 43 calls the class asks for memory more often than the source (up to 92 times instead of 89)
+  cost: Life_kill_pet: in 1 of 63 calls the class asks for memory more often than the source (up to 92 times instead of 89)
+  cost: Life_net_kill_pet: in 1 of 260 calls the class asks for memory more often than the source (up to 3 times instead of 0)
+  cost: Life_net_kill_pet: in 1 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 0)
+  cost: Life_shout: in 12 of 281 calls the class asks for memory more often than the source (up to 3 times instead of 2)
+  cost: Life_shout: in 12 of 300 calls the class asks for memory more often than the source (up to 3 times instead of 2)

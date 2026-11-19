@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42093:18: warning: unused variable 'pose_2' [-Wunused-variable]
+ 42093 |     physics_Pose pose_2 = physics_Pose{Vector{0.0, 0.0, 0.0}, Quat{0.0, 0.0, 0.0, 1.0}};
+       |                  ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42097:10: warning: unused variable 'body_valid_5' [-Wunused-variable]
+ 42097 |     Bool body_valid_5 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42108:10: warning: unused variable 'body_valid_7' [-Wunused-variable]
+ 42108 |     Bool body_valid_7 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42380:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 42380 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42383:10: warning: unused variable 'body_valid_3' [-Wunused-variable]
+ 42383 |     Bool body_valid_3 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42437:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 42437 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42441:10: warning: unused variable 'body_valid_3' [-Wunused-variable]
+ 42441 |     Bool body_valid_3 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42513:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 42513 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42516:10: warning: unused variable 'body_valid_3' [-Wunused-variable]
+ 42516 |     Bool body_valid_3 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42517:10: warning: unused variable 'body_valid_4' [-Wunused-variable]
+ 42517 |     Bool body_valid_4 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42518:10: warning: unused variable 'both_2' [-Wunused-variable]
+ 42518 |     Bool both_2 = false;
+       |          ^~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42519:10: warning: unused variable 'body_valid_5' [-Wunused-variable]
+ 42519 |     Bool body_valid_5 = false;
+       |          ^~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42690:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 42690 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:42716:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 42716 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:48631:10: warning: unused variable 'playing' [-Wunused-variable]
+ 48631 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:49014:10: warning: unused variable 'playing' [-Wunused-variable]
+ 49014 |     Bool playing = false;
+       |          ^~~~~~~
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:58930:9: warning: unused variable 'count' [-Wunused-variable]
+ 58930 |     Int count = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:58931:9: warning: unused variable 'at_5' [-Wunused-variable]
+ 58931 |     Int at_5 = 0;
+       |         ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:58932:9: warning: unused variable 'end_4' [-Wunused-variable]
+ 58932 |     Int end_4 = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+/dev/shm/spawncity-jobs-chris/work-t1-vergleich-045202-16807/kern/games/spawncity/src/level_blueprints.cpp:71296:22: warning: unused variable 'body_type' [-Wunused-variable]
+ 71296 |     physics_BodyType body_type = physics_BodyType::fixed;
+       |                      ^~~~~~~~~
+4 warnings generated.
+29 warnings generated.
+0 tests, 0 checks, 0 failures
+
+real	10m19,598s
+user	45m17,467s
+sys	1m0,029s
