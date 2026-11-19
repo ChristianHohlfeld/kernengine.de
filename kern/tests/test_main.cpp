@@ -3918,7 +3918,9 @@ static logic::Graph every_node_graph(bool wired) {
                       {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
                       {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::int64, ""},        {"LX", PinType::int64_list, ""},
                       // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
-                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"}};
+                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"},
+                      // (bytes - Bytes of Text, Bytes of S: a List<U8>)
+                      {"L8", PinType::integer_list, "u8"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
