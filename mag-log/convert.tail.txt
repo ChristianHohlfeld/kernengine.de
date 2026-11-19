@@ -1,0 +1,80 @@
+    Terrain::build_water_chunk (117): build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+    Terrain::ready_at (12): written
+    Terrain::update (81): it calls Terrain::plan_windows(), which waits
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+touch_play                     16 /   16 functions       16 /     16 lines
+    TouchPlay::right_inset (1): written
+    TouchPlay::move (1): written
+    TouchPlay::look (1): written
+    TouchPlay::move_live (1): written
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+492 of 556 functions of the program are written as Blueprints (3136 of 4836 lines), and 19 of the engine's headers that they call: 52 Blueprints - 4 of source files, 0 of states, 48 of headers and of shapes
+448 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+    20 (   626)   the state of its object: the struct Game has more than 96 fields
+     7 (   186)   unproject() is defined in another file
+     1 (   117)   build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+     1 (   110)   read_features() is defined in another file
+     1 (    91)   it calls Terrain::ground_albedo(), which waits
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    81)   it calls Terrain::plan_windows(), which waits
+     2 (    73)   road_is_water() is defined in another file
+     2 (    62)   it calls GeoProjector::init(), which waits
+     1 (    44)   chunk_count() is defined in another file
+     1 (    36)   it calls Terrain::image_bounds(), which waits
+     2 (    33)   training_level() is defined in another file
+     1 (    30)   a reference to something it changes
+     1 (    22)   buildings_input() is defined in another file
+     1 (    21)   a pointer
+     1 (    17)   a member of Int is set
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (     9)   tile_input() is defined in another file
+     1 (     9)   tile_lonlat() is defined in another file
+     1 (     7)   it calls Decoder::step(), which waits
+     1 (     7)   kill() is defined in another file
+     1 (     7)   an object of the engine (HeightSampler) given back by value (C++ moves it to the caller)
+     5 (     5)   input() is defined in another file
+     4 (     4)   put() is defined in another file
+     2 (     2)   find() is defined in another file
+     1 (     1)   reset() is defined in another file
+     1 (     1)   set_mode() is defined in another file
+     1 (     1)   kill_pet() is defined in another file
+
+real	4m11,565s
+user	12m47,323s
+sys	0m45,301s
