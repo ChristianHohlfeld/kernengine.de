@@ -3935,7 +3935,18 @@ class Emit:
                 # (`_call`: the source has the call there - TestWriter.guard sees it, as it is written)
                 node.update({"kind": "ArraySubscriptExpr", "type": was, "valueCategory": "lvalue", "_bt": lt[5:-1], "inner": [lst, at], **stood, "_call": call})
             slot = self.unwrap(init)
-            if self.is_slot(bare(slot)):
+            def map_of(n):   # (the declaration a map is named by: a variable or a field)
+                n = bare(n)
+                while n.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(n):
+                    n = bare(kids(n)[0])
+                return n.get("referencedMemberDecl") if n.get("kind") == "MemberExpr" else (n.get("referencedDecl") or {}).get("id") if n.get("kind") == "DeclRefExpr" else None
+            named_map = map_of(kids(bare(slot))[1]) if self.is_slot(bare(slot)) else None
+            if named_map is not None and any(x.get("referencedMemberDecl") == named_map or (x.get("referencedDecl") or {}).get("id") == named_map
+                                             for st in stmts[i + 1:] for x in walk(st)):
+                # (the map itself is named again while the reference may live - an entry put in or taken out moves the
+                # others, and C++'s reference with them (std::vector: invalidated): found again where it is used)
+                named_map = None
+            if named_map is not None:
                 # `V& r = m[key];` - C++ finds the key's entry once, where the reference is bound (adding it when the key is
                 # new): its row, held while the reference lives - the entries of a map stand in a list, as the
                 # address C++ keeps (Unit: kern::Map). Every use of r is that entry, without finding it again.
