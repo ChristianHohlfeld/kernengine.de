@@ -3419,7 +3419,13 @@ struct Reader {
       // first input where that is a const reference
       p += 1;
       std::string owner, fn, more;
-      if (!expect("&", "(callback<&Library::function>(place))") || !word(owner, "a library") || !expect("::") || !word(fn, "a function of " + owner)) return s;
+      if (!expect("&", "(callback<&Library::function>(place))") || !word(owner, "a library")) return s;
+      if (const std::size_t at = owner.find("::"); at != std::string::npos) {  // (a name with its library, read as one: Ground::height)
+        fn = owner.substr(at + 2);
+        owner = owner.substr(0, at);
+      } else if (!expect("::") || !word(fn, "a function of " + owner)) {
+        return s;
+      }
       while (accept("::")) {
         if (!word(more, "a function")) return s;
         fn += "::" + more;
