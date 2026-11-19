@@ -4754,7 +4754,11 @@ std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Libra
       for (FunctionPin& p : pins) {
         const std::string old = p.name;
         const bool ok = cpp_name_ok(old) && !node_names.count(old) && old != "exec" && old != "then";
-        const std::string name = unique(ok ? old : better(old), [&](const std::string& x) { return used.count(x) || (inputs && taken.count(x)); });
+        // (a function held from a library has the library's pins: they are named there, among the library's names - an input of
+        // its that has the name of one of THIS Blueprint's variables stays as it is, as the reader lets it ("has the name of a
+        // variable or a function" is asked of a Blueprint's own functions). Renamed here, the Blueprint held another function
+        // than its library has: link() refused it as stale, and the Blueprint ran in the interpreter instead of as its class.)
+        const std::string name = unique(ok ? old : better(old), [&](const std::string& x) { return used.count(x) || (inputs && f.from.empty() && taken.count(x)); });
         used.insert(name);
         if (name == old) continue;
         // the pin on the function's nodes: the entry gives the inputs, the Return takes the outputs, the calls both
