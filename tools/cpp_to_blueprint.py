@@ -346,14 +346,15 @@ def c_string(v):
 
 
 # ---- the syntax tree ---------------------------------------------------------------------------
-def run_clang(path, namespace, flags):
+def run_clang(path, namespace, flags, name=False):
     """The compiler's tree of the declarations of a namespace, as it reads the file now (nothing is kept
-    between runs: a tree of another state of the sources is another tree)."""
+    between runs: a tree of another state of the sources is another tree). `name`: of the declarations whose
+    name has `namespace` in it, as it is (a function outside every namespace - see outside_dumps)."""
     # (The filter is an argument of its own: the runs for the several namespaces of one file differ in that short
     # word alone - what the compiler allocates before it reads the file is then the same in each, and so are the
     # addresses its nodes are named by - see STEADY. Written in one, `-ast-dump-filter=hwcontract::` was longer
     # than `-ast-dump-filter=fc::` by more than the allocator rounds away, and every node had another address.)
-    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", f"{namespace}::", *flags, path]
+    cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", namespace if name else f"{namespace}::", *flags, path]
     if STEADY:
         cmd = ["setarch", "-R", *cmd]
     r = subprocess.run(cmd, capture_output=True, text=True)
@@ -368,6 +369,41 @@ def run_clang(path, namespace, flags):
             break
         o, i = dec.raw_decode(s, j)
         out.append(o)
+    return out
+
+
+def exported_names(path):
+    """The names under which a source file of the program gives functions to its host: `KERN_EXPORT(name)` of
+    the engine's C API (kern/api/c_api.h) - a function with C linkage, outside every namespace."""
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return []
+    return sorted(set(re.findall(r"\b" + ENGINE.upper() + r"_EXPORT\s*\(\s*([A-Za-z_]\w*)\s*\)", text)))
+
+
+def outside_dumps(path, flags):
+    """What a source file of the program has outside every namespace for its host: each function it exports
+    (C linkage: clang names it by its own name, unmangled), dumped by that name - the dump of a namespace does
+    not have it -, and the file's own unnamed namespace outside every namespace (what those functions use there,
+    `(anonymous namespace)::`, of this file only - a declaration a dump of the program's namespace has at the
+    same place is that one). Annotated (annotate)."""
+    names = exported_names(path) if not is_header(path) else []
+    if not names:
+        return []
+    me, out = os.path.abspath(path), []
+    for name in names:
+        st = {"file": ""}
+        for o in run_clang(path, name, flags, name=True):
+            annotate(o, st)
+            if o.get("kind") == "FunctionDecl" and o.get("name") == name and o.get("mangledName") == name and os.path.abspath(o.get("_file") or "?") == me:
+                out.append(o)
+    st = {"file": ""}
+    for o in run_clang(path, "(anonymous namespace)", flags):
+        annotate(o, st)
+        mangled = o.get("mangledName")
+        if os.path.abspath(o.get("_file") or "?") == me and (mangled is None or mangled.startswith("_ZN12_GLOBAL__N_1")):
+            out.append(o)
     return out
 
 
@@ -759,6 +795,10 @@ class Tree:
             st = {"file": ""}
             for o in dumps:
                 annotate(o, st)
+        if STEADY:
+            place = lambda o: (o.get("kind"), o.get("name"), o.get("_file"), (o.get("_at") or (None,))[0])
+            had = {place(n) for o in self.dumps for n in walk(o) if n.get("kind", "").endswith("Decl")}
+            self.more.append(("", [o for o in outside_dumps(self.path, flags) if place(o) not in had]))
         # the engine the program is written against: its types and the functions its headers define
         self.engine = run_clang(path, ENGINE, flags) if STEADY and ENGINE and ENGINE != namespace else []
         st = {"file": ""}
@@ -786,7 +826,7 @@ class Tree:
             self.take(o, self.scope_from(o), seen)
         for space, dumps in self.more:
             for o in dumps:
-                self.take(o, space + "::", seen)
+                self.take(o, space + "::" if space else "", seen)
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
         for i, n in list(self.decl.items()):
@@ -1220,6 +1260,7 @@ class World:
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
+        self.getters = set()   # (keys of) the functions that give the one object of a state and nothing else - `Game& game() { static Game g; return g; }`: that Blueprint itself (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
         self.part_numbers = {} # such a part -> its number among the parts of its Blueprint (the block of its nodes' ids)
@@ -3266,10 +3307,14 @@ class Emit:
         assigned = self.assigned(body)
         self.assigned_ids = assigned
         copies = []
+        exported = export_name(d)
+        words = []   # (an export: how each input crosses from the host - wire_word)
         for p in kids(d):
             if p.get("kind") != "ParmVarDecl":
                 continue
             raw = qtype(p)
+            if exported:
+                words += wire_words(p, words)
             if u.is_logic(raw):
                 # the logic the Blueprint runs in: its own - no input (Unit.is_logic)
                 if re.search(r"\bconst\b", raw):
@@ -3295,7 +3340,9 @@ class Emit:
                 self.taken.add(aname)
                 f.pointers.append(len(f.params))
                 f.params += [(lname, f"List<{entries}>"), (aname, "Int")]
-                f.kinds += ["const", ""]
+                # (of an export the list is a value: the host's bytes, made into a list for the call - its inputs stay in
+                # the order of the C parameters)
+                f.kinds += ["" if exported else "const", ""]
                 self.pointers[p["id"]] = (lname, aname, entries)
                 continue
             t = u.btype(raw)
@@ -3376,7 +3423,15 @@ class Emit:
         takes = [u.fixed_type(f.params[i][1], f.fixed.get(i)) for i in range(len(f.params))]
         params = ", ".join(f"{takes[i]}& {f.params[i][0]}" if f.kinds[i] == "ref" else f"const {takes[i]}& {f.params[i][0]}" if f.kinds[i] == "const"
                            else f"{takes[i]} {f.params[i][0]} = {u.zero(takes[i])}" for i in f.order())
-        head.append(f"  {'KERN_PURE ' if f.pure else ''}{f.name + 'Result' if f.result is not None else 'void'} {f.name}({params}) {{")
+        mark = ""
+        if exported:
+            # (a function the program gives its host under its C name - KERN_EXPORT: the same name, and how its
+            # values cross, one word for each input, from the C signature - Function::exported, Function::wire)
+            gives = wire_out(d)
+            if len(words) != len(f.params) or list(f.order()) != list(range(len(f.params))):
+                raise Wait(f"the export {exported}: its inputs are not its C parameters one by one")
+            mark = f"KERN_EXPORT_AS({text_literal(exported)}, {text_literal(' '.join([*words, *(['->', gives] if gives else [])]))}) "
+        head.append(f"  {mark}{'KERN_PURE ' if f.pure else ''}{f.name + 'Result' if f.result is not None else 'void'} {f.name}({params}) {{")
         out = head + [f"    {self.declared(n, t)} {n} = {u.zero(self.declared(n, t))};" for n, t in self.locals] + ["    " + ln for ln in lines] + ["  }"]
         if f.state and d.get("kind") == "CXXConstructorDecl":
             # the one object of the state is made when the program begins: its Blueprint makes it when it begins
@@ -3421,6 +3476,12 @@ class Emit:
             n = bare(kids(n)[0])
         if n.get("kind") == "UnaryOperator" and n.get("opcode") == "*" and kids(n):
             return self.is_this(kids(n)[0])
+        if n.get("kind") == "CallExpr" and len(kids(n)) == 1 and self.f.state:
+            # (the getter of the one object of the state - `game()` - in a function of its Blueprint: this Blueprint)
+            rid = (callee(n).get("referencedDecl") or {}).get("id")
+            t = (self.tree.body.get(rid) or self.tree.decl.get(rid)) if rid else None
+            return t is not None and function_key(self.tree, t) in self.u.world.getters and \
+                re.sub(r"\b(const|volatile)\b|&", "", qtype(t).split("(")[0]).strip().split("::")[-1] == (self.u.state or "").split("::")[-1]
         return n.get("kind") == "CXXThisExpr"
 
     def at_state(self, n):
@@ -13988,7 +14049,7 @@ def survey_one(job):
         a, b = d.get("_at", (None, None))
         functions.append({"key": function_key(tree, d), "file": file, "at": a or 0, "calls": sorted(calls), "lines": tree.text(d["_file"]).count("\n", a, b) + 1 if a is not None else 0,
                           "name": Unit.cpp_name_of(tree, d), "owner": tree.owner.get(d["id"]), "shares": shares, "keeps": keeps, "free": d.get("kind") == "FunctionDecl" and not tree.owner.get(d["id"]),
-                          "defaulted": defaulted_maker(d)})
+                          "defaulted": defaulted_maker(d), "gives_state": gives_kept(d)})
     types = [(q, os.path.abspath(o.get("_file") or "?")) for q, o in [*tree.records.items(), *tree.enums.items()] if o.get("_file")]
     statics, made = objects_made(tree)
     # (the variables of the program's namespaces that other files name too: whether each starts at zero)
@@ -14015,6 +14076,68 @@ def survey_one(job):
     pointer_args = [(key, k, ("param", *params_of[src[1]]) if isinstance(src, tuple) and src[1] in params_of else "other" if isinstance(src, tuple) else src) for key, k, src in pointer_args]
     return {"path": path, "functions": functions, "types": types, "statics": statics, "made": made, "records": records, "pointer_args": pointer_args, "globals": starts,
             "defaulted": sorted(defaulted), "ending": sorted(ending), "constants": constants}
+
+
+def export_name(d):
+    """The C name a function of the program is exported under (exported_names: KERN_EXPORT, C linkage), or None."""
+    name = d.get("name")
+    if d.get("kind") != "FunctionDecl" or not name or d.get("mangledName") != name:
+        return None
+    return name if name in exported_names(d.get("_file") or "") else None
+
+
+C_WORDS = {"int": "i32", "unsigned int": "u32", "float": "f32", "double": "f64"}
+
+
+def c_type(n):
+    """The C type of a value, as the compiler works it out (kern::u32: unsigned int)."""
+    t = n.get("type") or {}
+    return re.sub(r"\s+", " ", t.get("desugaredQualType") or t.get("qualType") or "").strip()
+
+
+def wire_words(p, before):
+    """How a parameter of an exported function crosses from the host - one word for each input of the Blueprint it
+    is (Function::wire): a number by its C type, a `const char*` text, a pointer to bytes `bytes at` (a pointer is a
+    list and the place in it - Unit.pointed: from the host the place is 0), and a u32 right after a text or bytes
+    their len."""
+    t = c_type(p)
+    if t in ("const char *", "const char *const"):
+        return ["text"]
+    if re.fullmatch(r"const (?:unsigned char|uint8_t) \*(?:const)?", t):
+        return ["bytes", "at"]
+    if t == "unsigned int" and before and (before[-1] == "text" or before[-2:] == ["bytes", "at"]):
+        return ["len"]
+    if t in C_WORDS:
+        return [C_WORDS[t]]
+    raise Wait(f"the export {p.get('name') or '?'}: a parameter of the C type {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)")
+
+
+def wire_out(d):
+    """What an exported function gives its host (the word after ->), or None."""
+    t = re.sub(r"\(.*$", "", c_type(d)).strip()
+    if t == "void":
+        return None
+    if t in ("const char *", "const char *const"):
+        return "text"
+    if t in C_WORDS:
+        return C_WORDS[t]
+    raise Wait(f"the export {d.get('name')}: it gives a {t}, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text)")
+
+
+def gives_kept(d):
+    """Is this function's body `static T x; return x;` - what it keeps, given by reference, and nothing else?
+    (Of the one object of a state: its getter - main.)"""
+    body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
+    if body is None or len(kids(body)) != 2 or not re.search(r"&\s*\(", qtype(d)):
+        return False
+    first, last = kids(body)
+    v = kids(first)[0] if first.get("kind") == "DeclStmt" and len(kids(first)) == 1 else {}
+    if v.get("kind") != "VarDecl" or v.get("storageClass") != "static" or last.get("kind") != "ReturnStmt" or len(kids(last)) != 1:
+        return False
+    r = bare(kids(last)[0])
+    while r.get("kind") == "ImplicitCastExpr" and kids(r):
+        r = bare(kids(r)[0])
+    return r.get("kind") == "DeclRefExpr" and (r.get("referencedDecl") or {}).get("id") == v.get("id")
 
 
 def shared_variable(tree, d):
@@ -14146,7 +14269,8 @@ def convert_unit(job):
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
                 and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
                          or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part
-                and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")]   # (a method of a type of a function's body: of that function)
+                and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
+                and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
         mine.sort(key=lambda d: (not is_header(d["_file"]), os.path.abspath(d["_file"]), d.get("_at", (0, 0))[0] or 0))
         # A function is written only when its test compares it: what the test cannot compare yet waits,
         # and with it what calls it - the file is converted again without those. And no input or local
@@ -14507,12 +14631,17 @@ def main(argv):
         # (a static local variable is kept by the program as a variable of a namespace is - but the one object
         # of the state itself, `static Game g;`, is the Blueprint)
         itself = {tuple(p) for r in surveys for q, places in r["statics"].items() if q in world.states for p in places}
-        kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))) and f.get("free") and world.program(f["file"])}
+        # (a function that gives the one object and does nothing else - `Game& game() { static Game g; return g; }` - is
+        # no function of a Blueprint: what it gives is the state's Blueprint itself; who calls it reaches the state)
+        getters = {k for k, f in functions.items() if f.get("gives_state") and f.get("free") and world.program(f["file"])
+                   and f.get("keeps") and all(tuple(p) in itself for p in f["keeps"])}
+        kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))
+                                                    or any(c in getters for c in f["calls"])) and f.get("free") and world.program(f["file"]) and k not in getters}
         todo = list(kept)
         while todo:
             for k in callers.get(todo.pop(), ()):
                 f = functions[k]
-                if k not in kept and f.get("free") and world.program(f["file"]):
+                if k not in kept and k not in getters and f.get("free") and world.program(f["file"]):
                     kept.add(k)
                     todo.append(k)
         for k in kept:
@@ -14522,6 +14651,7 @@ def main(argv):
                 world.parts[part] = state
                 unit_of[k] = part
         world.state_functions = kept
+        world.getters = getters
     for blueprint in sorted(set(world.parts.values())):
         for i, part in enumerate(sorted(p for p, b in world.parts.items() if b == blueprint)):
             world.part_numbers[part] = i
@@ -14588,7 +14718,7 @@ def main(argv):
         w = World(files, flags, more)
         w.units, w.type_names, w.taken, w.nodes, w.function_units, w.source_units = world.units, world.type_names, world.taken, world.nodes, world.function_units, world.source_units
         w.actors, w.states, w.parts, w.part_numbers, w.state_members = world.actors, world.states, world.parts, world.part_numbers, world.state_members
-        w.pointer_lists, w.globals, w.state_functions = world.pointer_lists, world.globals, world.state_functions
+        w.pointer_lists, w.globals, w.state_functions, w.getters = world.pointer_lists, world.globals, world.state_functions, world.getters
         w.defaulted, w.ending, w.constant_names = world.defaulted, world.ending, world.constant_names
         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
