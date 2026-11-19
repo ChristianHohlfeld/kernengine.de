@@ -1,0 +1,22 @@
+struct look : virtual kern::Library {
+  // ---- types ----
+  KERN_STRUCT(look_Stabilizer) { Bool init = false; Vector pos = Vector{0.0, 0.0, 0.0}; Vector target = Vector{0.0, 0.0, 0.0}; Vector up = Vector{0.0, 0.0, 0.0}; Float lag = 0.0; };
+
+  // ---- functions ----
+  struct impact_traumaResult { Float Result = 0.0; };
+  /// Hard impacts of the player's car / drone (onImpact): 0 below 2.5 m/s of velocity change.
+  KERN_PURE impact_traumaResult impact_trauma(Float dv = 0.0) {
+    return {kern::formula([](Float dv, Float a) -> Float { return ((dv < 2.5) ? 0.0 : a); }, dv, kern::formula([](Float v, Float lo, Float hi) -> Float { return v < lo ? lo : (hi < v ? hi : v); }, kern::formula([](Float dv) -> Float { return kern::math::div((dv - 2.5), 14.0); }, dv), 0.0, 0.7))};
+  }
+
+  void Stabilizer_reset(look_Stabilizer& self) {
+    self.init = false;
+    self.lag = 0.0;
+  }
+
+  struct lamp_glowResult { Float Result = 0.0; };
+  /// Street lamps glow from dusk (scene_lighting.mjs): (night - 0.15) / 0.5.
+  KERN_PURE lamp_glowResult lamp_glow(Float night = 0.0) {
+    return {kern::formula([](Float a) -> Float { return a; }, kern::formula([](Float v, Float lo, Float hi) -> Float { return v < lo ? lo : (hi < v ? hi : v); }, kern::formula([](Float night) -> Float { return kern::math::div((night - 0.15), 0.5); }, night), 0.0, 1.0))};
+  }
+};
