@@ -859,3 +859,29 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - **Nächster Schritt:** Suite-Ergebnis (suite rc, engine rc in `mag/<name>/when`; suite.log) auswerten – beide Durchgänge; ist alles grün (unwahrscheinlich beim
   ersten Mal): `work-zusammen` + Commit „Level und Tests“ des Laufs nach `work` (Abschnitt 10), CI anstoßen. Sonst Liste nach Gebieten, Agenten, nächster Lauf.
 
+### 16.21 Stand 04:45 (19.11.) – erste vollständige Testliste; zwei Fehler des Rahmens bzw. der Engine vom Koordinator behoben; drei Nachfolger gestartet
+- **Suiten des gültigen Laufs 020121 (4748a503):** `engine rc=0` (02:37). `suite rc=1` (03:19) – in beiden Durchgängen nach ~26 Tests abgeschnitten: **Zählfehler im
+  Testrahmen** (das Kind erbte die Summen der Tests vor ihm: Verdopplung je Test, Überlauf in int, UBSan beendete den Durchgang; ein Fehlschlag ließ alle folgenden
+  Tests als FAIL erscheinen). **Fix Koordinator: work-zusammen d15559ba** (test_main.cpp: das Kind beginnt mit eigenen Zählern; Kleinstfall alt/neu).
+- **Erste vollständige Liste: `work-zusammen-suite-alle-032626-8142`** (Zweig `work-zusammen-suite` = Ergebnis-Zweig des Laufs + Fix; jeder der 150 Tests einzeln,
+  41 min): **Stellvertreter 113 ok / 35 FAIL / 4 ZEIT; Engine selbst 108 ok / 39 FAIL / 9 LECK / 3 ZEIT.** Arbeitsliste nach Gebieten: stand/KOORDINATOR.md, Eintrag 04:40
+  (A–E); genaue Auswertung: stand/t1.md „SUITE 020121“.
+- **33 der FAIL (alle Game-Teile) und die ZEIT-Fälle hatten EINE Ursache: Game lief im Interpreter statt als Klasse.** tools/blueprint_cpp: „the Blueprint holds the
+  function person_hit::hit as its library had it before“. Mit einer Diagnose-Ausgabe lokal gefunden: `logic::cpp_names` (Level-Lader und Werkzeug) benannte den
+  Eingang `pad` der GEHALTENEN Bibliotheks-Funktion in `pad2` um, weil Game eine Variable `pad` hat – `link()` hielt den Blueprint dann für veraltet.
+  **Fix Koordinator: work-zusammen 12438d1c** (notation.cpp: gehaltene Funktionen behalten ihre Eingangsnamen, wie der Leser es schon hält; Engine-Fall in
+  kern/tests/test_main.cpp). Lokal belegt: 173 von 173 Klassen (vorher 172, Game im Interpreter), Klassentext übersetzt mit clang. **Laufen auf mag:**
+  `work-zusammen-suite-alle-043356-8771` (dieselben Tests mit dem Fix) und `work-zusammen-engine-043403-8808` (Engine-Suite auf 12438d1c).
+  (Nebenbefund: tools/blueprint_cpp gibt mit g++ und clang++ gebaut byteweise denselben Text – der Schlüssel eines Graphen hängt nicht am Compiler.)
+- **Übrige echte Abweichungen sind wenige:** Mat4 `.m[15]` (Mat4_perspective 300/300, projection_matrix 62/300), SoundFx `.l.voice` (u64 über Float64), sechs
+  Game-Funktionen (draw_events, gaps_guided, number_at, rocket_smoke_emit, spawn_squad, spawn_tank), Session_update 1/56, game_details `.Result`; Abbrüche mvt/life
+  (Test); gegen die Engine 9 LECK, ASan in kern::weld, 14 Funktionen „0 compared“. Dazu 271 cost-Zeilen (Leistung/Speicher, Paket p später).
+- **t1b (02:41–04:30) beendet:** die Familien der ~116 wartenden Funktionen sind gebaut (work-t1 c5b8ab99; im Lauf `work-t1-konvert-034529-8942` 11 statt 87
+  Wartende) – **noch nicht gemergt**, weil sie eine Regel des Konverters sichtbar machen: „Game: two parts have a constant kQuiet that is not the same“
+  (game_projsync.cpp:25 = 0.6, game_toss.cpp:34 = 0.5) → convert rc=1. **Reihenfolge: k behebt kQuiet → `konvert` rc=0 → work-t1 + work-k einmischen → `voll`.**
+- **Gestartet 04:42 (Opus 5.5, mittlere Stufe):** **k** (Nachfolger; Regeln für alle Dateien: B0 kQuiet zuerst, dann die Abweichungen B1–B3; Zweig work-k),
+  **t1** (Nachfolger 4: get_u8 ×9, mvt, life, request_level, look_apply_tier; Auswertung des Laufs 043356; Zweig work-t1), **d** (Nachfolger 5: Lecks, weld,
+  „0 compared“ gegen die Engine; Zweig work-d). IDs: /home/claude/agenten.txt. p (Leistung) erst nach dem ersten grünen Stand.
+- Fünf Neustarts des Servers hinter der Sitzung bisher (21:30, 22:43, 02:28, 03:10, 03:52) – laufende Agenten werden dabei abgebrochen und per SendMessage an ihre
+  ID fortgesetzt (zuletzt geschah das teils automatisch); mag ist davon unberührt.
+
