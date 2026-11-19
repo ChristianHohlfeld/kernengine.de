@@ -427,6 +427,10 @@ constexpr int width_bits(std::string_view of) {
     if (of == kWidthNames[k]) return kBits[k];
   return 0;
 }
+/// The `of` of an input that reads a list of Ints of any width - Int, U8 ... I32 (`List<Int>`, `List<U8>`):
+/// a node that reads the numbers of the list as they are (Text of Bytes, Copy Bytes' Items, Struct of
+/// Bytes) - in C++ a function over the list's items (logic::Items<T>). No place and no value is of it.
+inline constexpr std::string_view kAnyWidth = "*";
 /// Is the place an Int of a fixed width (or a list of such)?
 constexpr bool has_width(PinType t, std::string_view of) { return element_of(t) == PinType::integer && width_bits(of) != 0; }
 inline bool has_width(const TypeRef& t) { return has_width(t.type, t.of); }
@@ -772,6 +776,8 @@ struct PinDef {
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
   u32 count = 0;         // a list of a fixed length: that many entries (a field's, a function's pin: TypeRef::count)
 };
+/// The type a place takes from a pin it is made for (a variable, a function's input): a pin of kAnyWidth's is a List<Int>.
+inline TypeRef place_type(const PinDef& p) { return {p.type, p.of == kAnyWidth ? std::string() : p.of}; }
 
 struct ParamDef {
   std::string key, label;
@@ -793,6 +799,10 @@ struct ParamDef {
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
   bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
   bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, Int64, an enum, Text)
+  /// Kind::type: Ints of a fixed width are among them - as the type of a list's items (U8 ... I32: what a
+  /// list holds is stored there, a wire of an item is an Int); `with_lists`: a list of them (u8_list), which a
+  /// value of the type is as it is (not a single Int of a width: on a pin it would be another number)
+  bool widths = false;
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.

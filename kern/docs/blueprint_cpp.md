@@ -490,7 +490,19 @@ und JIT halten ihn genau; der JIT überlässt Set/Add einer solchen Variablen de
 `U32`, wie C++ es rechnet, ist `kern::math::mul32(a, b)` (für `I32`: `wrap32s(mul32(a, b))`); Produkte bis 16 Bit sind
 als Int genau. In der Klasse ist `U32` `logic::Sized<u32>` (nodes.h): gelesen ein Int, gespeichert wie C++.
 Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`); Maps haben Schlüssel und Werte ohne Breite.
-Listen fester Breite (`List<U8>`) sind noch kein Typ der Sprache.
+
+**Listen fester Breite** (`List<U8>` … `List<I32>`, im Graphen `"type":"int_list","of":"u8"`, Einstellung `u8_list`) halten jeden
+Eintrag wie `std::vector<u8>`: was hineinkommt, wird gespeichert wie C++ es dort speichert – Add, Insert, der Wert von Set Length,
+`List<U8>{…}` (Make List mit Typ `u8`), Insert Text Bytes (eine `List<I8>` hält die Bytes 128 … 255 als −128 … −1), eine ganze Liste
+beim Setzen; Copy Bytes schreibt in eine Liste einer Breite nur Zahlen dieser Breite (`list_copy_bytes<"u8", …>(B, …)` bei
+`List<U8> B`). Find, Contains und Remove Item vergleichen die Zahl, wie C++ ein `std::uint8_t` mit einem `int` vergleicht
+(`std::find` von 256 in einem `std::vector<u8>` findet nichts): in der Klasse `logic::Sought<T>` (ein Int bei `Sized<T>`).
+Eine Liste einer Breite ist ein eigener Typ: sie geht nicht in einen Eingang `List<Int>` und umgekehrt (C++: kein
+`std::vector<int>` aus einem `std::vector<u8>`). Die Knoten, die die Zahlen einer Liste lesen, wie sie sind – Text of Bytes,
+Struct of Bytes, Items von Copy Bytes – nehmen eine Liste von Ints **jeder** Breite (`List<Int>`, `List<U8>` …; Eingang
+`kAnyWidth`); in der Klasse eine Funktion über die Einträge (`logic::items_of`, `Items<T>`). Ein Feld einer Breite hat in
+einer Anordnung (Bytes of Struct, Struct of Bytes) seine eigene Breite (`U16 a` ↔ `u16@0`). Die Listenknoten mit Typ
+(`list_length<U8>(B)`, `flow_for_each<U8>(n4, B)`) nennen die Breite als Typ der Einträge; ein Ausgang `item` ist dort ein `U8`.
 
 ### Int64
 
