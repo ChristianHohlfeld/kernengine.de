@@ -2,7 +2,18 @@
 
 
 
-## E20 Schritt 3 gebaut: 0c57a404 (List<U8> … List<I32>; Bytes-Knoten nehmen Listen jeder Breite) – Belege laufen (13:50)
+## BEREIT ZUM MERGEN: 1e91e798 (E20 Schritt 3: List<U8> … List<I32>; Bytes-Knoten nehmen Listen jeder Breite) – Belege (15:40)
+- Commits 18c636be, 0c57a404, 794faaa5, 6a00887f, 9dbb7749, 1e91e798 (Schritt 3 + Leser-Literal, place_type, Glue, nativer Erzeuger, Proben).
+- Engine-Suite `work-p-engine-150118-30531` auf 1e91e798: engine rc=0, 54788 checks, 0 failures; blueprint_native_test ok (64 Blueprints, 15182 Aufrufe –
+  darin fixed_width_lists und Nodes mit den Typen u8 … i32 / u8_list …); logic_fixed_widths ok.
+- CI https://github.com/ChristianHohlfeld/kernengine.de/actions/runs/44539294064: native, build (JIT == Interpreter über alle logic_cases), determinism, input
+  grün; e2e: blueprint 270 checks 0 failures (Typwahl +6), rot NUR an den 3 Stellen von work-zusammen (game_equipment_cpp/sound_fx_cpp „cannot convert
+  int to int64“, „Play runs them as machine code“). native-spawncity lief noch.
+- Kein konvert/vergleich nötig: Konverter und Spiel unberührt, kein Klassentext des Spiels ändert sich.
+- Zeit-Test: **24 von 29 über 1,10 (f32-Spalte), 23 von 29 (64-Bit-Spalte)** – unverändert, nicht neu gemessen (Klassentexte gleich bis Schritt 4).
+- Offen: Schritt 4 (Konverter) NICHT begonnen – Bauplan in uebergabe/p.md „Nachfolger 5“; Schritt 5, (b) danach. Nachfolger nötig (Kontext erschöpft).
+
+## (überholt) E20 Schritt 3 gebaut: 0c57a404 – Belege liefen (13:50)
 - Commits 18c636be (Schritt 3), 0c57a404 (Leser: List<Int>{…} in einem Eingang jeder Breite). Was und warum: uebergabe/p.md „Nachfolger 5“.
 - Lokal: Fall fixed_width_lists – Klasse == Interpreter == echtes C++ (std::vector<u8>/<int8_t>/<uint32_t>); Fixpunkt aller logic_cases gleich;
   logic_fixed_widths (Leser-Fälle, Werte) grün.

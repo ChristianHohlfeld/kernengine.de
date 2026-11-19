@@ -129,8 +129,14 @@ ruft heute genau diese Methode nach dem Umwandeln. Beleg: Engine-Suite; vergleic
 - Lokal belegt: Fall l/c.txt (p-tmp/w20/l): Klasse == Interpreter == echtes C++ (std::vector<u8>/<int8_t>/<uint32_t>, l/real.cpp);
   Fixpunkt aller logic_cases (chk) bad=0; logic_fixed_widths (body.inc, Leser-Fälle + Werte von fixed_width_lists) bad=0.
   Werkzeug: p-tmp/w20/mk.sh baut case/mk (Text → Klasse, JSON, Glue: `case/mk in.txt out.h out.json glue.h`) und case/run.
-- Belege laufen: engine `work-p-engine-134721-25503` (0c57a404), CI 44527163767. (18c636be-CI 44525141992: native rot an
-  logic_notation_every_node_type – Literal List<Int>{} in Copy-Bytes-Items; behoben in 0c57a404.)
+- **Belegt (15:40): 1e91e798** – engine `work-p-engine-150118-30531` rc=0 (54788/0, blueprint_native_test 64 Blueprints), CI 44539294064 grün bis auf
+  die 3 e2e-Stellen von work-zusammen. Nachträge nach 0c57a404: 794faaa5 `logic::place_type(PinDef)` (ein Platz nach einem kAnyWidth-Pin ist
+  List<Int>: Editor „zur Variable“, nativer Fall Nodes), 6a00887f Glue (notation.cpp type_in: List<U8> = kern::List<kern::logic::Sized<kern::u8>>),
+  9dbb7749 nativer Erzeuger cpp_type ebenso, 1e91e798 Proben einer List<U8> im nativen Test gewickelt (C++-Aufrufer übergibt eine List<U8>;
+  ein einzelnes Int einer Breite bleibt roh – das Wickeln am Eingang wird so mitgeprüft). Struktur-Proben mit Breiten-Feldern sind NICHT gewickelt
+  (kein Fall hat sie; käme einer, zeigt die Klasse die gewickelten Argumente → dort ebenso fitted).
+- Lokal: p-tmp/w20/e/em.cpp (emit aller nativen Fälle nach e/nat2, ohne den Engine-Link; Objekte in w20/o – nach einem Merge die Engine-Objekte
+  neu bauen, sonst scheitert der Fall Engine an neuen Knoten); Treiber streng übersetzen: clang++ -fsyntax-only … nat2/blueprint_native_main.cpp.
 
 ### Bauplan Schritt 4 (Konverter, tools/cpp_to_blueprint.py) – NICHT begonnen
 - Typen: NUMBER (Z.143) bleibt die Typ-Tabelle der AUSDRÜCKE (Draht = Int). Neu nur für PLÄTZE: unsigned char/short/int, signed char,
