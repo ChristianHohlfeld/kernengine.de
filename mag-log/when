@@ -1,2 +1,6 @@
 work-t1-vergleich-005119-16157: vergleich auf ecee4b5f (origin/work-t1), 14 Kerne, Start 2026-11-19 00:51:35
 werkzeuge: clang=/usr/bin/clang++-18 (Ubuntu clang version 18.1.3 (1ubuntu1)) c++=/usr/bin/c++ (c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0) python=Python 3.12.3 PATH=/home/chris/.local/bin:/home/chris/bin:/home/chris/bin:/home/chris/.local/bin:/home/chris/.grok/bin:/home/chris/.local/bin:/home/chris/.opencode/bin:/home/chris/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+grundlage: mag/ergebnis-work-zusammen-voll-203000-750 b5733adf
+convert rc=0 00:53:50
+bau rc=0 00:58:23
+alle rc=1 01:01:03 (--- 13 ok, 2 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 15 Tests; cost: 19, note: 35; real: --- 13 ok, 2 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 15 Tests; cost: 13, note: 48)
