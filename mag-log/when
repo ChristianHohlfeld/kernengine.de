@@ -1,2 +1,6 @@
 work-d-belege2-vergleich-055045-6922: vergleich auf 28b67b2b (origin/work-d-belege2), 14 Kerne, Start 2026-11-19 05:56:46
 werkzeuge: clang=/usr/bin/clang++-18 (Ubuntu clang version 18.1.3 (1ubuntu1)) c++=/usr/bin/c++ (c++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0) python=Python 3.12.3 PATH=/home/chris/.local/bin:/home/chris/bin:/home/chris/bin:/home/chris/.local/bin:/home/chris/.grok/bin:/home/chris/.local/bin:/home/chris/.opencode/bin:/home/chris/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games:/snap/bin
+grundlage: mag/ergebnis-work-zusammen-voll-020121-10802 f2306759
+convert rc=0 06:03:44
+bau rc=0 06:12:49
+alle rc=1 06:21:25 (--- 52 ok, 1 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 53 Tests; cost: 43, note: 80; real: --- 52 ok, 1 FAIL, 0 ABBRUCH, 0 LECK, 0 ZEIT, von 53 Tests; cost: 27, note: 95)
