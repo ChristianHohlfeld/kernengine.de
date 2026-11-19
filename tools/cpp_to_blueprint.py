@@ -12463,8 +12463,8 @@ class TestWriter:
             before = chain(d)
             owner = tree.owner.get(d["id"]) or next((tree.owner[x["id"]] for x in before if x["id"] in tree.owner), None)
             return any(not here(x) for x in before) or (owner is not None and not here(tree.records.get(owner, {})))
-        def own(d):   # (of this file alone)
-            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl") and outside(d))
+        def own(d):   # (of this file alone - not the definition of what a header declares: a function, or a variable `extern i32 kGates;`)
+            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl", "VarDecl") and outside(d))
         def namespace_level(d):
             return tree.owner.get(d["id"]) is None and tree.scope_of.get(d["id"], "").rstrip(":") not in tree.records
         def local_of(d):   # (the namespace a piece of this file alone stands in, in the test that takes it)
@@ -12582,6 +12582,11 @@ class TestWriter:
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
+            if d.get("kind") == "VarDecl" and here(d) and outside(d) and tree.owner.get(d["id"]) is None:
+                # the definition of a variable of the program a header declares (`i32 kGates = 0;`, `extern i32 kGates;`): the
+                # test that takes these pieces has it from that declaration - its own, drawn, set and compared (const_pieces) -,
+                # one variable; a second definition beside it, or one of this file alone, would be another
+                continue
             put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs, **self.statement_of(d),
                     "actors": ["::".join(self.local_path(tree.scope_of.get(x["id"], ""), local_of(x)) + [x["name"]]) for x in said if self.actor_blueprint(qtype(x))]})
         for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
