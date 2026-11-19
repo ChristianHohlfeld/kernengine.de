@@ -84,11 +84,16 @@ class EngineObjects {
     return nullptr;
   }
   /// Ends an object of a handle this owns (its destructor): true if it did. A handle the host keeps
-  /// itself is not this one's to end.
-  template <class T> bool release(i64 handle) { return end(handle, kind<T>()); }
+  /// itself is not this one's to end. (Where a handle it has no object of names one made for it -
+  /// see `missing` - that is the object ended: made as there, and ended.)
+  template <class T> bool release(i64 handle) {
+    if (end(handle, kind<T>())) return true;
+    if (handle == 0 || !missing_ || find(handle, kind<T>())) return false;
+    return missing_(*this, handle, kind<T>()) && end(handle, kind<T>());
+  }
   /// Ends everything this owns and forgets every handle (the next one is 1 again).
   void clear();
-  /// How many handles name an object now.
+  /// How many objects a handle names now.
   std::size_t size() const;
 
   /// What a host does with a handle it has no object of (null: nothing - the call fails). A test
@@ -96,7 +101,8 @@ class EngineObjects {
   /// one of a class the way C++ makes it without arguments).
   using Missing = void* (*)(EngineObjects&, i64 handle, Kind want);
   void on_missing(Missing m) { missing_ = m; }
-  /// An object made for a handle the host had none of (see on_missing): this ends it.
+  /// An object made for a handle the host had none of (see on_missing): this ends it. (Where the handle names
+  /// an object of another class, both stay - each of them ends with these objects.)
   template <class T, class... Bases> T* put_at(i64 handle, std::unique_ptr<T> object) {
     T* at = object.release();
     place(handle, kinds_of<T, Bases...>(at), [](void* p) { delete static_cast<T*>(p); });
@@ -145,8 +151,11 @@ class EngineObjects {
   void* find(i64 handle, Kind k) const;
   bool end(i64 handle, Kind k);
 
-  std::unordered_map<i64, Entry> entries_;
-  std::vector<i64> order_;  // (the handles in the order their objects came)
+  // (a handle names one object - of a class and those it derives from; only where a test makes one for a handle
+  // it had none of as that class (on_missing) does the same number name an object of another class beside it,
+  // as the test's stand-in keeps its objects by class and number)
+  std::unordered_map<i64, std::vector<Entry>> entries_;
+  std::vector<std::pair<i64, void*>> order_;  // (the objects in the order they came: handle and where)
   std::unordered_map<const void*, std::vector<std::pair<Kind, i64>>> by_object_;
   i64 next_ = 1;
   Missing missing_ = nullptr;
