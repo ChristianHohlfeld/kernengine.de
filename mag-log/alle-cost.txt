@@ -1,0 +1,8 @@
+  cost: clip_line: in 17 of 300 calls the class asks for memory more often than the source (up to 4 times instead of 3)
+  cost: extract: in 33 of 39 calls the class asks for memory more often than the source (up to 3305 times instead of 2761)
+  cost: furnish: in 28 of 30 calls the class asks for memory more often than the source (up to 1617 times instead of 1080)
+  cost: FurnishIndex_add_ring: in 5 of 210 calls the class asks for memory more often than the source (up to 3 times instead of 2)
+  cost: parse_road: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  cost: training_level: in 167 of 167 calls the class asks for memory more often than the source (up to 49 times instead of 47)
+  cost: Writer_end_layer: in 124 of 300 calls the class asks for memory more often than the source (up to 28 times instead of 19)
+  cost: Writer_feature: in 226 of 300 calls the class asks for memory more often than the source (up to 17 times instead of 14)

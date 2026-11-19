@@ -1,0 +1,80 @@
+    Vec4::Vec4 (1): written
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+engine_physics_physics          1 /    1 functions        1 /      1 lines   (what the program calls of it)
+    QueryFilter::QueryFilter (1): written
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+mvt_cpp                        30 /   30 functions      304 /    304 lines
+    Reader::more (1): written
+    Reader::varint (13): written
+    Reader::sub (7): written
+    Reader::text (7): written
+    Reader::skip (10): written
+    Reader::le32 (1): written
+    Reader::fixed64 (6): written
+    Reader::fixed32 (6): written
+    zigzag (1): written
+    read_value (18): written
+    read_geometry (21): written
+    Layer::tag (5): written
+    Layer::text (4): written
+    Layer::number (4): written
+    Tile::layer (5): written
+    ring_area (6): written
+    wanted_layer (6): written
+    open_layer (15): written
+    read_feature (22): written
+    Decoder::begin (25): written
+    Decoder::step (30): written
+    decode (7): written
+    put_varint (4): written
+    put_key (1): written
+    put_bytes (5): written
+    put_bytes (5): written
+    zz (1): written
+    Writer::begin_layer (5): written
+    Writer::feature (42): written
+    Writer::end_layer (21): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+tiles_cpp                      26 /   26 functions      482 /    482 lines
+    tile_at (9): written
+    tile_lonlat (5): written
+    unproject (4): written
+    road_width (18): written
+    road_is_water (1): written
+    road_drivable (1): written
+    parse_road (10): written
+    polygons (9): written
+    Projector::Projector (11): written
+    Projector::operator() (6): written
+    inside_side (1): written
+    cut_side (10): written
+    clip_pass (10): written
+    clip_to_tile (6): written
+    hash_u32 (4): written
+    extract (120): written
+    FurnishIndex::key (1): written
+    FurnishIndex::cell (1): written
+    FurnishIndex::add_seg (7): written
+    FurnishIndex::add_ring (10): written
+    FurnishIndex::built (14): written
+    FurnishIndex::off_roads (12): written
+    furnish (64): written
+    training_level (57): written
+    procedural_city (64): written
+    clip_line (27): written
+
+80 of 80 functions of the program are written as Blueprints (843 of 843 lines), and 5 of the engine's headers that they call: 9 Blueprints - 2 of source files, 0 of states, 7 of headers and of shapes
+83 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+
+real	1m19,972s
+user	2m45,783s
+sys	0m10,209s
