@@ -3058,6 +3058,7 @@ class Emit:
         self.pointers = {}    # decl id of a parameter that is a pointer into a list -> (the list's input, the place's input, the entries' type)
         self.or_none = {}     # decl id of a text or none (text_or_none) -> the Bool that says whether there is one
         self.unbound = {}     # decl id of a pointer to an entry of a list that began as none (entry_pointer) -> the Int its place is
+        self.loop_entries = {}   # decl id of the entry of a pass of a loop over a list (a reference) -> (the list, its place)
         self.text_ptrs = {}   # decl id of a local pointer into a text (char* end of strtod) -> {"text": the text, "at": the Int of its place}
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
@@ -4481,6 +4482,7 @@ class Emit:
             if not isinstance(self.named_places, set):
                 self.named_places = set()
             self.name_references(stmts, i)
+            self.rest_stmts = stmts[i + 1:]   # (what follows the statement in its block: see bytes_pointer)
             lines, ends = self.stmt(s)
             out += lines
             if ends:
@@ -4620,6 +4622,10 @@ class Emit:
                 to_entry = self.entry_pointer(v)
                 if to_entry is not None:
                     out += self.take_pre() + to_entry
+                    continue
+                of_bytes = self.bytes_pointer(v)
+                if of_bytes is not None:
+                    out += self.take_pre() + of_bytes
                     continue
                 end_pointer = self.text_pointer_local(v)
                 if end_pointer is not None:
@@ -5417,25 +5423,59 @@ class Emit:
         return before + [f"for (auto it{node} = flow_for(n{node}, 0, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
 
     def each_place(self, v, src, body):
-        """for (T* p : {&a, &b}): a pass for each place the list names, in its order - the body once for each, with
-        p's place where p stands (`p->x` is `a.x`), as the addresses C++ works out once, before the loop: what they
-        read the body does not change. break ends the passes, continue the pass (the flags of a loop). None: no
-        such loop (a pointer used as a value, a place worked out by a step)."""
-        if not re.fullmatch(r"[^*&]+\*", qtype(v).strip()):
+        """for (T* p : {&a, &b}), for (auto [c, p, x] : {std::tuple<C, T*, f32>{c1, &a, x1}, {c2, &b, x2}}): a pass for
+        each entry of the list, in its order - the body once for each. A pointer it names is the place (`p->x` is
+        `a.x`, `*p` is `a`): the addresses C++ works out once, before the loop - what they read the body does not
+        change. A value it names is worked out there too, every entry's before the first pass, into a variable of
+        its own (the copy a loop variable by value is). break ends the passes, continue the pass (the flags of a
+        loop). None: no such loop (a pointer used as a value, a place worked out by a step)."""
+        pointer = lambda t: re.fullmatch(r"[^*&]+\*(?:\s*const)?", t.strip()) is not None
+        if v.get("kind") == "DecompositionDecl":
+            # (a binding's type: the tuple's - it has no other)
+            whole = self.u.clean(qtype(v))
+            types = template_args(whole) if whole.startswith("std::tuple<") else []
+            binds = [b for b in kids(v) if b.get("kind") == "BindingDecl"]
+            if "&" in qtype(v) or not binds or len(types) != len(binds):
+                return None
+            names = [(b["id"], pointer(t), {**b, "type": {"qualType": t}}) for b, t in zip(binds, types)]
+            if not any(p_ for _, p_, _ in names):
+                return None
+        elif pointer(qtype(v)):
+            names = [(v["id"], True, v)]
+        else:
             return None
         lst = bare(src)
         while lst.get("kind") in ("ImplicitCastExpr", "CXXStdInitializerListExpr", "MaterializeTemporaryExpr") and kids(lst) and lst.get("kind") != "InitListExpr":
             lst = bare(kids(lst)[0])
         if lst.get("kind") != "InitListExpr" or not kids(lst):
             return None
-        places = []
-        for x in kids(lst):
+        def strip(x):
             x = bare(x)
-            while x.get("kind") == "ImplicitCastExpr" and kids(x):
+            while x.get("kind") in ("ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXFunctionalCastExpr") and kids(x) and x.get("castKind") not in ("IntegralCast", "FloatingCast", "IntegralToFloating", "FloatingToIntegral"):
                 x = bare(kids(x)[0])
-            if x.get("kind") != "UnaryOperator" or x.get("opcode") != "&" or not kids(x):
-                return None
-            places.append(kids(x)[0])
+            return x
+        passes = []
+        for x in kids(lst):
+            x = strip(x)
+            if v.get("kind") == "DecompositionDecl":
+                if x.get("kind") not in ("CXXConstructExpr", "CXXTemporaryObjectExpr", "InitListExpr") or len(kids(x)) != len(names) \
+                        or not self.u.clean(qtype(x)).startswith("std::tuple<"):
+                    return None
+                parts = [strip(c) for c in kids(x)]
+            else:
+                parts = [x]
+            got = []
+            for (_, is_pointer, b), c in zip(names, parts):
+                if is_pointer:
+                    if c.get("kind") != "UnaryOperator" or c.get("opcode") != "&" or not kids(c):
+                        return None
+                    got.append(kids(c)[0])
+                else:
+                    # (a value of the type the entry has there: what the tuple holds is that, nothing converted on the way)
+                    if re.sub(r"\bconst\b|&", "", self.u.clean(qtype(c))).strip() != re.sub(r"\bconst\b|&", "", self.u.clean(qtype(b))).strip():
+                        return None
+                    got.append(c)
+            passes.append(got)
         def addressed(x):   # (what the address of a place depends on: a pointer it goes through, an index - not the values of its parts)
             x = bare(x)
             k = x.get("kind")
@@ -5455,52 +5495,76 @@ class Emit:
                 return addressed(kids(x)[1]) | self.reads(kids(x)[2])
             return self.reads(x)
         changed = self.assigned(body)
-        if any(self.steps_in(x) or addressed(x) & changed for x in places):
-            return None   # (p itself is not changed: every use of it is checked below)
-        def uses(n, up):   # (each use of p: `p->x` or `*p` - the node that stands for the place, and where it is)
+        if any(self.steps_in(x) or addressed(x) & changed for got in passes for x, (_, is_pointer, _) in zip(got, names) if is_pointer):
+            return None   # (a pointer itself is not changed: every use of it is checked below)
+        ids = {i: k for k, (i, _, _) in enumerate(names)}
+        def uses(n, up):   # (each use of a name: the node that stands for it, and where it is)
             for i, c in enumerate(kids(n)):
-                if c.get("kind") == "DeclRefExpr" and (c.get("referencedDecl") or {}).get("id") == v["id"]:
-                    yield up + [(n, i)]
+                if c.get("kind") == "DeclRefExpr" and (c.get("referencedDecl") or {}).get("id") in ids:
+                    yield up + [(n, i)], ids[c["referencedDecl"]["id"]]
                 else:
                     yield from uses(c, up + [(n, i)])
-        found = list(uses(body, []))
         spots = []
-        for path in found:
+        for path, k in uses(body, []):
+            if not names[k][1]:
+                spots.append(("value", tuple(i for _, i in path[:-1]), path[-1][1], k))
+                continue
             # (through what only stands around it - the read of p - to the member access or the * it is the base of)
             j = len(path) - 1
             while j > 0 and path[j][0].get("kind") in ("ImplicitCastExpr", "ParenExpr"):
                 j -= 1
             holder, at = path[j]
             if holder.get("kind") == "MemberExpr" and holder.get("isArrow"):
-                spots.append(("member", tuple(i for _, i in path[:j]), at))
+                spots.append(("member", tuple(i for _, i in path[:j]), at, k))
             elif holder.get("kind") == "UnaryOperator" and holder.get("opcode") == "*":
-                spots.append(("star", tuple(i for _, i in path[:j]), at))
+                spots.append(("star", tuple(i for _, i in path[:j]), at, k))
             else:
-                return None   # (p as a value: compared, handed on)
+                return None   # (a pointer as a value: compared, handed on)
+        # the values of every entry, in their order, before the first pass
+        held, lines = {}, []
+        decls = []
+        for n_, got in enumerate(passes):
+            for k, ((i, is_pointer, b), c) in enumerate(zip(names, got)):
+                if is_pointer:
+                    continue
+                vid = f"{i}_pass{n_}"
+                t = {"qualType": re.sub(r"\bconst\b|&", "", qtype(b)).strip()}
+                decl = {"kind": "VarDecl", "id": vid, "name": b.get("name") or "value", "type": dict(t), "init": "c",
+                        **{x: b[x] for x in ("_at", "_file") if x in b}, "inner": [c]}
+                self.tree.decl[vid] = decl
+                decls.append(decl)
+                held[(n_, k)] = {"kind": "DeclRefExpr", "type": dict(t), "valueCategory": "lvalue",
+                                 "referencedDecl": {"id": vid, "kind": "VarDecl", "name": decl["name"], "type": dict(t)}}
+        if decls:
+            got_lines, _ = self.stmt({"kind": "DeclStmt", "inner": decls})
+            lines += got_lines
         loop = self.enter_loop(body)
-        lines = [f"{loop['stop']} = false;"] if loop["stop"] else []
+        lines += [f"{loop['stop']} = false;"] if loop["stop"] else []
         try:
-            for n_, place in enumerate(places):
+            for n_, got in enumerate(passes):
                 one_pass = copy.deepcopy(body)
-                ids = {}
+                ids_ = {}
                 for x in walk(one_pass):   # (what the body declares: its own in each pass)
                     if x.get("kind", "").endswith("Decl") and "id" in x:
-                        ids[x["id"]] = f"{x['id']}_pass{n_}"
+                        ids_[x["id"]] = f"{x['id']}_pass{n_}"
                 for x in walk(one_pass):
-                    if x.get("id") in ids:
-                        x["id"] = ids[x["id"]]
+                    if x.get("id") in ids_:
+                        x["id"] = ids_[x["id"]]
                         self.tree.decl[x["id"]] = x
                     r = x.get("referencedDecl")
-                    if r and r.get("id") in ids:
-                        x["referencedDecl"] = {**r, "id": ids[r["id"]]}
+                    if r and r.get("id") in ids_:
+                        x["referencedDecl"] = {**r, "id": ids_[r["id"]]}
                     for key in ("declId", "targetLabelDeclId"):
-                        if x.get(key) in ids:
-                            x[key] = ids[x[key]]
-                for kind, path, at in spots:
+                        if x.get(key) in ids_:
+                            x[key] = ids_[x[key]]
+                for kind, path, at, k in spots:
                     holder = one_pass
                     for i in path:
                         holder = kids(holder)[i]
-                    there = copy.deepcopy(place)
+                    if kind == "value":
+                        holder["inner"][at] = copy.deepcopy(held[(n_, k)])
+                        continue
+                    there = copy.deepcopy(got[k])
                     if kind == "member":
                         holder["isArrow"] = False
                         holder["inner"][at] = there
@@ -5596,6 +5660,8 @@ class Emit:
         elif "&" in raw or self.u.clean(raw) == "std::_Bit_reference":   # (std::vector<bool>'s entry by value: still the entry where it stands)
             self.names[v["id"]] = entry
             self.types[v["id"]] = it
+            if not keyed:
+                self.loop_entries[v["id"]] = (place, index)   # (the entry of a pass: its list and its place - entry_pointer_set)
         else:
             first = [f"{self.local(v, it)} = {entry};"]
         if not keyed and v.get("kind") == "DecompositionDecl":
@@ -7086,6 +7152,48 @@ class Emit:
         self.pointers[v["id"]] = (lst["_text"], name, entries)
         return [f"{name} = {at};"]
 
+    NUMBER_BYTES = {"double": 8, "float": 4, "long": 8, "unsigned long": 8, "long long": 8, "unsigned long long": 8, "int": 4, "unsigned int": 4,
+                    "short": 2, "unsigned short": 2, "char": 1, "signed char": 1, "unsigned char": 1, "bool": 1}
+
+    def bytes_pointer(self, v):
+        """`const u8* p = reinterpret_cast<const u8*>(&x);` - x a number: a pointer to the bytes of x as C++ holds them
+        (little-endian, as the machines the game runs on). p is a list of them, made where p is declared, at its
+        first place - never moved, and x is not changed while p is used (what p reads later is what x had there).
+        None: `v` is no such pointer."""
+        raw = qtype(v).strip()
+        init = self.init_of(v)
+        if init is None or not BYTE_POINTER.match(raw) or v.get("id") in self.assigned_ids:
+            return None
+        x = bare(init)
+        while x.get("kind") in ("ImplicitCastExpr", "ParenExpr", "CXXStaticCastExpr", "CXXReinterpretCastExpr", "CStyleCastExpr") and kids(x):
+            if x.get("kind") == "ImplicitCastExpr" and x.get("castKind") not in ("BitCast", "NoOp"):
+                return None
+            if x.get("kind") != "ImplicitCastExpr" and x.get("kind") != "ParenExpr" and not BYTE_POINTER.match(qtype(x).strip()):
+                return None
+            x = bare(kids(x)[0])
+        if x.get("kind") != "UnaryOperator" or x.get("opcode") != "&" or not kids(x):
+            return None
+        x = kids(x)[0]
+        t = re.sub(r"\bconst\b", "", self.u.clean(self.ctype(x))).strip()
+        size = self.NUMBER_BYTES.get(t)
+        later = self.changed_while_named(getattr(self, "rest_stmts", None) or [], v["id"])
+        if size is None or self.steps_in(x) or self.reads(x) & later:
+            return None   # (x changed while p is used: p reads what x has then)
+        if t == "double":
+            bits = f"int64_bits_of_float({self.ex(x, 'Float')})"
+        elif t == "float":
+            bits = f"int64_of_int(math_bits_of_float32({self.ex(x, 'Float')}))"
+        elif size == 8:
+            bits = self.ex64(x)
+        else:
+            bits = f"int64_of_int({self.ex(x, 'Int')})"
+        held = self.temp("bits", "Int64")
+        lt = "List<Int>"
+        made = self.temp("bytes", lt, size)
+        at = self.temp((v.get("name") or "p") + "_at", "Int")
+        self.pointers[v["id"]] = (made, at, "Int")
+        return [f"{held} = {bits};"] + [f"{made}[{i}] = int64_low(int64_and(int64_shift_right_unsigned({held}, {8 * i}), int64_of_int(255)));" for i in range(size)] + [f"{at} = 0;"]
+
     def entry_pointer(self, v):
         """`T* p = &list[i];`, `T* p = there ? &list[i] : nullptr;` - a pointer of the function to an entry of a list
         (or to none), never given another value: like a pointer into a list a function is handed, it is the list -
@@ -7173,6 +7281,27 @@ class Emit:
             return [f"{name} = -1;"]
         e = self.unwrap(kids(b)[0]) if b.get("kind") == "UnaryOperator" and b.get("opcode") == "&" and kids(b) else {}
         k = e.get("kind")
+        held = None   # (the list and the place the entry has, where the C++ names it otherwise)
+        if k == "DeclRefExpr" and (e.get("referencedDecl") or {}).get("id") in self.loop_entries:
+            held = self.loop_entries[e["referencedDecl"]["id"]]   # (&q of the entry of a pass of a loop over a list)
+        elif k == "CXXMemberCallExpr" and callee(e).get("name") in ("back", "front") and len(kids(e)) == 1 and kids(callee(e)) \
+                and (self.tp_or_none(kids(callee(e))[0]) or "").startswith("List<"):
+            lst = kids(callee(e))[0]   # (&list.back(): the last entry - at the list's length less one, as it is then)
+            try:
+                home = self.steady(lst)
+            except Wait:
+                raise Wait("a pointer to an entry of a list that is itself at a place that is computed")
+            got = self.spot(home)
+            if got is None or not got[1].startswith("List<"):
+                raise Wait("a pointer")
+            held = (got[0], "0" if callee(e).get("name") == "front" else self.whole_math("-", f"list_length<{got[1][5:-1]}>({got[0]})", "1"))
+        if held is not None:
+            bound = self.pointers.get(vid)
+            if bound is not None and re.sub(r"\s+", "", bound[0]) != re.sub(r"\s+", "", held[0]):
+                raise Wait("a pointer that is given entries of two lists")
+            entries = self.types.get(e["referencedDecl"]["id"]) if k == "DeclRefExpr" else self.tp(lst)[5:-1]
+            self.pointers[vid] = (held[0], name, entries)
+            return [f"{name} = {held[1]};"]
         if not (k == "ArraySubscriptExpr" or (k == "CXXOperatorCallExpr" and not e.get("_op") and callee_name(e) == "operator[]" and len(kids(e)) == 3)) or self.is_slot(e):
             raise Wait("a pointer")
         base, idx = (kids(e)[0], kids(e)[1]) if k == "ArraySubscriptExpr" else (kids(e)[1], kids(e)[2])
