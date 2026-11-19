@@ -5601,9 +5601,8 @@ TEST(logic_libraries) {
       "struct Garage : virtual kern::Blueprint, virtual Wheels {\n  // ---- variables ----\n"
       "  List<Wheel> Spare = List<Wheel>{Wheel{0.5, Side::Front, List<Float>{}}};\n  Float Seen = 0.0;\n\n  // ---- functions ----\n"
       "  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; };\n"
-      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
-      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n\n"
-      "  // ---- what nodes give and keep ----\n  Wheels::twiceResult n5;\n};\n";
+      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::twiceResult n5;\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
+      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n};\n";
   std::map<std::string, logic::Graph> project;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
     auto it = project.find(std::string(name));
