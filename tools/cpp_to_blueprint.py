@@ -1764,6 +1764,9 @@ class Unit:
             if m.group(1) == "Set":
                 return f"Set<{key}>"
             value = self.btype(a[1])
+            if value.startswith("List<") and value[5:-1] in WIDTHS:
+                # (what a map holds is no place of a fixed width - the language's maps hold Ints: a list of them, entries as they are)
+                value = "List<Int>"
             if value.startswith(("Map<", "Set<")):
                 raise Wait("a map of maps or sets")
             return f"Map<{key}, {value}>"
