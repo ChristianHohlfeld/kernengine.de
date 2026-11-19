@@ -9704,16 +9704,25 @@ class Api:
             return t + "_list", of
         raise Wait(f"a {bt}")
 
-    def shape(self, bt):
-        """A value's form, written out: n i b v t, e<values>, {fields}, [items]."""
+    def shape(self, bt, raw=None):
+        """A value's form, written out: n i b v t, e<values>, {fields}, [items] - [N items] for a list of a fixed
+        length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it)."""
         if bt in ENGINE_PIN:
             return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:
-            return "{" + "".join(self.shape(t) for _, t, _, _ in self.u.struct_fields[bt]) + "}"
+            q = next((k for k, n_ in self.u.structs.items() if n_ == bt and isinstance(k, str) and k in self.tree.records), None)
+            cpp = {c.get("name"): qtype(c) for c in kids(self.tree.records[q]) if c.get("kind") == "FieldDecl"} if q else {}
+            return "{" + "".join(self.shape(t, cpp.get(c)) for _, t, _, c in self.u.struct_fields[bt]) + "}"
         if bt.startswith("List<"):
-            return "[" + self.shape(bt[5:-1]) + "]"
+            n = self.u.entries(raw) if raw else None
+            inner = None
+            if n:   # (what each entry is in C++: T[3][2] -> T[2], std::array<X, N> -> X)
+                c = self.u.clean(raw)
+                m = re.match(r"std::array<(.*),\s*\d+[uUlL]*>$", c)
+                inner = template_args(c)[0].strip() if m else re.sub(r"\[\d+\]", "", c, count=1)
+            return "[" + (str(n) if n else "") + self.shape(bt[5:-1], inner) + "]"
         raise Wait(f"a {bt}")
 
     def home(self, d):

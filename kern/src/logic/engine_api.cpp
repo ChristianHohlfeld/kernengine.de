@@ -115,7 +115,7 @@ u64 next(u64& state) {
 
 /// A value of a form (EnginePin::shape), read from `at` on. Numbers are eighths, so that the engine's
 /// 32-bit numbers hold them exactly; whole numbers are small enough for every whole type. A list has
-/// no more than `most` entries.
+/// no more than `most` entries; a list of a fixed length (`[16n]`) has exactly that many.
 Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u64{0}) {
   const char c = at < shape.size() ? shape[at++] : 'n';
   switch (c) {
@@ -142,8 +142,12 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
       return Value::structure(std::move(fields));
     }
     case '[': {
+      // ([N item]: a list of a fixed length - `f32 m[16]` -, exactly N entries, as C++ holds them; [item]: 0 to 2)
+      u64 fixed = 0;
+      bool sized = false;
+      while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') { fixed = fixed * 10 + static_cast<u64>(shape[at++] - '0'); sized = true; }
       const std::size_t item = at;
-      const std::size_t count = static_cast<std::size_t>(std::min<u64>(next(state) % 3, most));
+      const std::size_t count = static_cast<std::size_t>(sized ? fixed : std::min<u64>(next(state) % 3, most));
       std::vector<Value> items;
       std::size_t end = at;
       for (std::size_t k = 0; k < count; ++k) {
