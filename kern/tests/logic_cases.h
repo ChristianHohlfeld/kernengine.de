@@ -16,6 +16,10 @@ namespace logic_cases {
 struct Case {
   const char* name;
   const char* graph;
+  // C++ leaves open what the scenario does (a function that calls itself for ever: C++ runs out of
+  // its stack) - the interpreter and the JIT stop it with the same error; the Blueprint's class is
+  // not run on it (blueprint_native.h).
+  bool cpp_leaves_open = false;
 };
 
 inline const std::vector<Case>& cases() {
@@ -207,6 +211,58 @@ inline const std::vector<Case>& cases() {
           [45,"then1",46,"exec"],[45,"then2",46,"exec"],[45,"then3",46,"exec"],[45,"then4",46,"exec"],[45,"then5",46,"exec"],[45,"then6",46,"exec"],[45,"then7",46,"exec"],
           [45,"then8",46,"exec"],[45,"then9",46,"exec"],[45,"then10",46,"exec"],
           [50,"then",51,"exec"],[50,"v",51,"v"],[60,"then",61,"exec"],[60,"v",62,"a"],[62,"result",61,"condition"],[61,"true",63,"exec"],[60,"v",64,"a"],[64,"result",63,"value"]]})"},
+      // Functions that call themselves - each call with its own values, in every tier as in C++: Fib
+      // reads what its first call gave after its second (Fib(15) = 610), Loop calls itself in the
+      // body of its For Loop (the index is the call's own: 2 + 2 Loop(n - 1) steps).
+      {"recursion_direct",
+       R"({"variables":[{"name":"R","type":"int","value":0},{"name":"Count","type":"int","value":0}],
+        "functions":[{"name":"Fib","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"r","type":"int","value":0}]},
+          {"name":"Loop","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fib"}},{"id":21,"type":"flow.branch"},{"id":22,"type":"math.compare","params":{"op":"<"},"values":{"b":2}},
+          {"id":23,"type":"func.return","params":{"function":"Fib"}},{"id":24,"type":"func.call","params":{"function":"Fib"}},{"id":25,"type":"math.sub","values":{"b":1}},
+          {"id":26,"type":"func.call","params":{"function":"Fib"}},{"id":27,"type":"math.sub","values":{"b":2}},{"id":28,"type":"func.return","params":{"function":"Fib"}},{"id":29,"type":"math.add"},
+          {"id":40,"type":"func.entry","params":{"function":"Loop"}},{"id":41,"type":"flow.for","values":{"first":1,"last":2}},{"id":42,"type":"flow.branch"},
+          {"id":43,"type":"math.compare","params":{"op":">"},"values":{"b":0}},{"id":44,"type":"func.call","params":{"function":"Loop"}},{"id":45,"type":"math.sub","values":{"b":1}},
+          {"id":46,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},{"id":47,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"func.call","params":{"function":"Fib"}},{"id":3,"type":"math.add","values":{"b":10}},
+          {"id":4,"type":"var.add","params":{"variable":"R"}},{"id":5,"type":"func.call","params":{"function":"Loop"}}],
+        "links":[[20,"then",21,"exec"],[20,"n",22,"a"],[22,"result",21,"condition"],[21,"true",23,"exec"],[20,"n",23,"r"],[21,"false",24,"exec"],[20,"n",25,"a"],[25,"result",24,"n"],
+          [24,"then",26,"exec"],[20,"n",27,"a"],[27,"result",26,"n"],[26,"then",28,"exec"],[24,"r",29,"a"],[26,"r",29,"b"],[29,"result",28,"r"],
+          [40,"then",41,"exec"],[41,"body",42,"exec"],[40,"n",43,"a"],[43,"result",42,"condition"],[42,"true",44,"exec"],[40,"n",45,"a"],[45,"result",44,"n"],[44,"then",46,"exec"],[42,"false",47,"exec"],
+          [1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",2,"n"],[2,"then",4,"exec"],[2,"r",4,"amount"],[4,"then",5,"exec"],[1,"value",5,"n"]]})"},
+      // Through others: Ping calls Pong, Pong calls Ping; Ping's second step (a Sequence) runs when
+      // the calls below it are over, with its own n (Trail: the order the calls end in).
+      {"recursion_through",
+       R"({"variables":[{"name":"Trail","type":"float","value":0},{"name":"Hops","type":"int","value":0}],
+        "functions":[{"name":"Ping","inputs":[{"name":"n","type":"float","value":0}],"outputs":[]},{"name":"Pong","inputs":[{"name":"n","type":"float","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Ping"}},{"id":11,"type":"flow.sequence","params":{"count":"2"}},{"id":12,"type":"flow.branch"},
+          {"id":13,"type":"math.compare","params":{"op":">"},"values":{"b":0}},{"id":14,"type":"func.call","params":{"function":"Pong"}},{"id":15,"type":"math.sub","values":{"b":1}},
+          {"id":16,"type":"var.set","params":{"variable":"Trail"}},{"id":17,"type":"math.formula","params":{"formula":"(acc * 7 + x) % 1000003"}},{"id":18,"type":"var.get","params":{"variable":"Trail"}},
+          {"id":30,"type":"func.entry","params":{"function":"Pong"}},{"id":31,"type":"var.add","params":{"variable":"Hops"},"values":{"amount":1}},{"id":32,"type":"func.call","params":{"function":"Ping"}},
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"func.call","params":{"function":"Ping"}}],
+        "links":[[10,"then",11,"exec"],[11,"then0",12,"exec"],[10,"n",13,"a"],[13,"result",12,"condition"],[12,"true",14,"exec"],[10,"n",15,"a"],[15,"result",14,"n"],
+          [11,"then1",16,"exec"],[18,"value",17,"acc"],[10,"n",17,"x"],[17,"result",16,"value"],
+          [30,"then",31,"exec"],[31,"then",32,"exec"],[30,"n",32,"n"],[1,"then",2,"exec"],[1,"value",2,"n"]]})"},
+      // Deep: 5000 calls one in another - more than the interpreter reached on the 1 MiB stack of the
+      // WebAssembly build while each call was a call of C++ (about 700).
+      {"recursion_deep",
+       R"({"variables":[{"name":"Depth","type":"int","value":0}],
+        "functions":[{"name":"Down","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Down"}},{"id":11,"type":"flow.branch"},{"id":12,"type":"math.compare","params":{"op":">"},"values":{"b":0}},
+          {"id":13,"type":"var.add","params":{"variable":"Depth"},"values":{"amount":1}},{"id":14,"type":"func.call","params":{"function":"Down"}},{"id":15,"type":"math.sub","values":{"b":1}},
+          {"id":1,"type":"event.custom","params":{"name":"Open"}},{"id":2,"type":"func.call","params":{"function":"Down"},"values":{"n":5000}}],
+        "links":[[10,"then",11,"exec"],[10,"n",12,"a"],[12,"result",11,"condition"],[11,"true",13,"exec"],[13,"then",14,"exec"],[10,"n",15,"a"],[15,"result",14,"n"],
+          [1,"then",2,"exec"]]})"},
+      // For ever: the call past Runtime::kCallsDeep (65536) stops the chain and the Blueprint, in the
+      // interpreter and with the JIT at the same call. C++ leaves it open (its stack runs out).
+      {"recursion_endless",
+       R"({"variables":[{"name":"Steps","type":"int","value":0}],
+        "functions":[{"name":"Forever","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Forever"}},{"id":11,"type":"var.add","params":{"variable":"Steps"},"values":{"amount":1}},
+          {"id":12,"type":"func.call","params":{"function":"Forever"}},
+          {"id":1,"type":"event.custom","params":{"name":"Open"}},{"id":2,"type":"func.call","params":{"function":"Forever"}}],
+        "links":[[10,"then",11,"exec"],[11,"then",12,"exec"],[10,"n",12,"n"],[1,"then",2,"exec"]]})",
+       true},
       // Whole numbers at their ends: a variable doubled 70 times stays at Int's end, one past 2^53
       // adds as a number does, Float to Int of what does not fit, Floor and Round of endless and
       // of what is no number - every tier holds a whole number the same way (logic::normal). Int's

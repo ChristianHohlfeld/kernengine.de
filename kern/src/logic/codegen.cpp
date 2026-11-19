@@ -71,7 +71,7 @@ struct Bytes {
 };
 
 enum Op : u8 {
-  kBlock = 0x02, kLoop = 0x03, kIf = 0x04, kElse = 0x05, kEnd = 0x0b, kBr = 0x0c, kBrTable = 0x0e, kReturn = 0x0f, kCall = 0x10, kSelect = 0x1b,
+  kBlock = 0x02, kLoop = 0x03, kIf = 0x04, kElse = 0x05, kEnd = 0x0b, kBr = 0x0c, kBrTable = 0x0e, kReturn = 0x0f, kCall = 0x10, kSelect = 0x1b, kDrop = 0x1a,
   kLocalGet = 0x20, kLocalSet = 0x21, kLocalTee = 0x22,
   kI32Load = 0x28, kF64Load = 0x2b, kI32Store = 0x36, kF64Store = 0x39,
   kI32Const = 0x41, kF64Const = 0x44,
@@ -93,7 +93,7 @@ class WasmGen {
  public:
   explicit WasmGen(const Instance& inst) : in_(const_cast<Instance&>(inst)) {
     slots_ = reinterpret_cast<uintptr_t>(in_.slots());
-    stack_ = reinterpret_cast<uintptr_t>(in_.stack());
+    cell_ = reinterpret_cast<uintptr_t>(in_.stack_cell());
     table_ = reinterpret_cast<uintptr_t>(in_.exec_table());
     counters_ = reinterpret_cast<uintptr_t>(in_.counters());
   }
@@ -173,7 +173,7 @@ class WasmGen {
 
  private:
   Instance& in_;
-  uintptr_t slots_, stack_, table_, counters_;
+  uintptr_t slots_, cell_, table_, counters_;
   Bytes* o_ = nullptr;
 
   void op(u8 x) { o_->byte(x); }
@@ -332,13 +332,17 @@ class WasmGen {
     lset(kEntry);
   }
   void stop() { i32c(-1); lset(kPc); }
+  // The stack: its address and capacity are in the instance's cell (the stack grows - a function
+  // that calls itself leaves something open in every call): [cell] = address, [cell + 4] = capacity.
+  void stack_at() { i32c(static_cast<u32>(cell_)); mem(kI32Load, 2, 0); }
+  void stack_entry() { stack_at(); i32c(4); op(kI32Add); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); }  // (address of entry kSp)
   void push(int pc, int entry) {
-    const u32 st = static_cast<u32>(stack_);
-    i32c(st); mem(kI32Load, 2, 0); lset(kSp);
-    lget(kSp); i32c(in_.stack_capacity()); op(kI32GeS); if_void(); ret_i32(2); op(kEnd);
-    i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); i32c(pc); mem(kI32Store, 2, 0);
-    i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); i32c(entry); mem(kI32Store, 2, 4);
-    i32c(st); lget(kSp); i32c(1); op(kI32Add); mem(kI32Store, 2, 0);
+    stack_at(); mem(kI32Load, 2, 0); lset(kSp);
+    lget(kSp); i32c(static_cast<u32>(cell_) + 4); mem(kI32Load, 2, 0); op(kI32GeS);
+    if_void(); i32c(in_.id()); i32c(Instance::kGrowStack); i32c(0); call(kFnCallNode); op(kDrop); op(kEnd);
+    stack_entry(); i32c(pc); mem(kI32Store, 2, 0);
+    stack_entry(); i32c(entry); mem(kI32Store, 2, 4);
+    stack_at(); lget(kSp); i32c(1); op(kI32Add); mem(kI32Store, 2, 0);
   }
   void push_exec(int node, int ordinal) {
     const auto [target, entry] = in_.exec_target(node, ordinal);
@@ -369,6 +373,14 @@ class WasmGen {
     if (!in_.inline_node(i)) {
       // C++ node: call it, then continue at the exec output it chose.
       i32c(in_.id()); lget(kPc); lget(kEntry); call(kFnCallNode); lset(kR);
+      const int f = in_.calls_fn(i);
+      const bool calls = f >= 0 && in_.fn_entry(f) >= 0;
+      if (calls) {
+        // Call Function: the call began - on at the function's entry (its mark ends it: Instance::call_node)
+        lget(kR); i32c(Instance::kEnterCall); op(kI32Eq);
+        if_void(); i32c(in_.fn_entry(f)); lset(kPc); i32c(0); lset(kEntry);
+        op(kElse);
+      }
       lget(kR); i32c(in_.exec_outputs(i)); op(kI32GeU);
       if_void();
       stop();
@@ -377,6 +389,7 @@ class WasmGen {
       i32c(rows); lget(kR); i32c(3); op(kI32Shl); op(kI32Add); mem(kI32Load, 2, 0); lset(kPc);
       i32c(rows); lget(kR); i32c(3); op(kI32Shl); op(kI32Add); mem(kI32Load, 2, 4); lset(kEntry);
       op(kEnd);
+      if (calls) op(kEnd);
       return;
     }
     if (d->kind == NodeKind::event) { next(i, 0); return; }
@@ -489,18 +502,18 @@ class WasmGen {
   void body(Bytes& code) {
     o_ = &code;
     const int n = static_cast<int>(in_.node_count());
-    const u32 st = static_cast<u32>(stack_), ct = static_cast<u32>(counters_);
-    i32c(st); mem(kI32Load, 2, 0); lset(kBase);
+    const u32 ct = static_cast<u32>(counters_);
+    stack_at(); mem(kI32Load, 2, 0); lset(kBase);
     op(kLoop); op(kVoid);
     // pc < 0: continue with a continuation, or return when ours are used up.
     lget(kPc); i32c(0); op(kI32LtS);
     if_void();
-    i32c(st); mem(kI32Load, 2, 0); ltee(kSp); lget(kBase); op(kI32LeS);
+    stack_at(); mem(kI32Load, 2, 0); ltee(kSp); lget(kBase); op(kI32LeS);
     if_void(); ret_i32(0); op(kEnd);
     lget(kSp); i32c(1); op(kI32Sub); lset(kSp);
-    i32c(st); lget(kSp); mem(kI32Store, 2, 0);
-    i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); mem(kI32Load, 2, 0); lset(kPc);
-    i32c(st + 4); lget(kSp); i32c(3); op(kI32Shl); op(kI32Add); mem(kI32Load, 2, 4); lset(kEntry);
+    stack_at(); lget(kSp); mem(kI32Store, 2, 0);
+    stack_entry(); mem(kI32Load, 2, 0); lset(kPc);
+    stack_entry(); mem(kI32Load, 2, 4); lset(kEntry);
     op(kEnd);
     // Nodes run (a count for the runtime) and tracing for the editor. (The loop guard is at the loops.)
     i32c(ct); i32c(ct); mem(kI32Load, 2, 0); i32c(1); op(kI32Add); mem(kI32Store, 2, 0);
