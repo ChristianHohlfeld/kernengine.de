@@ -539,9 +539,10 @@ void add_variables(Library& lib) {
       Value now;
       c.instance().change(c.node(), at, [&](Value& v) {
         // (the number where it is: a whole number stays one - as a variable's slot holds it; one of a
-        // fixed width holds the low bits, as C++'s += stores them)
-        v = v.type == PinType::integer ? Value::integer(whole(v.as_number() + amount)) : Value::number(v.as_number() + amount);
-        if (v.type == PinType::integer && has_width(type)) v.i = wrapped(v.i, type.of);
+        // fixed width holds the low bits of the sum, as C++'s += stores them: the sum's low bits are
+        // those of the two numbers' low bits added)
+        if (v.type == PinType::integer && has_width(type)) v.i = wrapped(static_cast<i64>(static_cast<u64>(v.i) + static_cast<u64>(whole(amount))), type.of);
+        else v = v.type == PinType::integer ? Value::integer(whole(v.as_number() + amount)) : Value::number(v.as_number() + amount);
         now = v;
       });
       c.out("value", now);

@@ -1055,6 +1055,42 @@ inline const std::vector<Case>& cases() {
       // its type's length - no list asked for (the same entries, the rest zero).
       {"fixed_literal_input",
        R"kg({"structs":[{"name":"Trio","fields":[{"name":"m","type":"float_list","count":3,"value":[0,0,0]},{"name":"k","type":"int","value":0}]}],"variables":[{"name":"P","type":"struct","of":"Trio","value":{"m":[0,0,0],"k":0}},{"name":"Q","type":"struct","of":"Trio","value":{"m":[0,0,0],"k":0}}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.make","params":{"struct":"Trio"},"values":{"m":[1.5,-2,0],"k":7}},{"id":3,"type":"var.set","params":{"variable":"P"}},{"id":4,"type":"struct.make","params":{"struct":"Trio"},"values":{"m":[0,0,4],"k":1}},{"id":5,"type":"var.set","params":{"variable":"Q"}}],"links":[[1,"then",3,"exec"],[2,"value",3,"value"],[3,"then",5,"exec"],[4,"value",5,"value"]]})kg"},
+      // Ints of a fixed width (U8 ... I32, logic::kWidthNames): every place holds the low bits of what it is given, as C++
+      // stores them - a variable by Set (an Int, a Float made whole), a field of a struct, an input and an output and a local
+      // variable of a function, Add to Variable (the low bits of the sum) - at the edges of every width and of Int (2^53,
+      // Int's ends), and mul32 of two of them (C++'s u32 * u32).
+      {"fixed_widths",
+       R"kg({"kind":"kern-logic","version":1,"nextId":78,"variables":[{"name":"In","type":"int_list","value":[0,1,-1,127,128,255,256,-128,-129,32767,32768,65535,65536,-32768,-32769,2147483647,2147483648,429496729)kg"
+       R"kg(5,4294967296,-2147483648,-2147483649,9007199254740992,-9007199254740994,9223372036854776000,-9223372036854776000]},{"name":"F","type":"float_list","value":[0.5,-0.5,255.9,-1.5,1e+30,-1e+30,4294967296.)kg"
+       R"kg(7,0]},{"name":"W","type":"int_list","value":[]},{"name":"A","type":"int","of":"u8","value":0},{"name":"B","type":"int","of":"i8","value":0},{"name":"Cc","type":"int","of":"u16","value":0},{"name":"D",)kg"
+       R"kg("type":"int","of":"i16","value":0},{"name":"E","type":"int","of":"u32","value":4294967295},{"name":"G","type":"int","of":"i32","value":-2147483648},{"name":"S","type":"struct","of":"P","value":{"a":0})kg"
+       R"kg(}],"structs":[{"name":"P","fields":[{"name":"a","type":"int","of":"u16","value":0}]}],"nodes":[{"id":1,"type":"event.begin","x":0,"y":290},{"id":3,"type":"flow.for_each","x":280,"y":290,"params":{"typ)kg"
+       R"kg(e":"int"}},{"id":4,"type":"flow.for_each","x":7000,"y":290,"params":{"type":"float"}},{"id":30,"type":"func.call","x":6160,"y":290,"params":{"function":"Twice"}},{"id":31,"type":"func.entry","x":0,"y")kg"
+       R"kg(:0,"params":{"function":"Twice"}},{"id":32,"type":"var.set","x":280,"y":0,"params":{"variable":"Here","scope":"Twice"}},{"id":33,"type":"func.return","x":560,"y":0,"params":{"function":"Twice"}},{"id")kg"
+       R"kg(:34,"type":"var.get","x":440,"y":150,"params":{"variable":"Here","scope":"Twice"}},{"id":35,"type":"var.get","x":160,"y":440,"params":{"variable":"In"}},{"id":36,"type":"var.set","x":560,"y":290,"para)kg"
+       R"kg(ms":{"variable":"A"}},{"id":37,"type":"var.set","x":840,"y":290,"params":{"variable":"B"}},{"id":38,"type":"var.set","x":1120,"y":290,"params":{"variable":"Cc"}},{"id":39,"type":"var.set","x":1400,"y")kg"
+       R"kg(:290,"params":{"variable":"D"}},{"id":40,"type":"var.set","x":1680,"y":290,"params":{"variable":"E"}},{"id":41,"type":"var.set","x":1960,"y":290,"params":{"variable":"G"}},{"id":42,"type":"var.set","x)kg"
+       R"kg(":2240,"y":290,"params":{"variable":"S","path":".a"}},{"id":43,"type":"list.add","x":2520,"y":290,"params":{"variable":"W"}},{"id":44,"type":"var.get","x":2400,"y":440,"params":{"variable":"A"}},{"id")kg"
+       R"kg(:45,"type":"list.add","x":2800,"y":290,"params":{"variable":"W"}},{"id":46,"type":"var.get","x":2680,"y":440,"params":{"variable":"B"}},{"id":47,"type":"list.add","x":3080,"y":290,"params":{"variable")kg"
+       R"kg(:"W"}},{"id":48,"type":"var.get","x":2960,"y":440,"params":{"variable":"Cc"}},{"id":49,"type":"list.add","x":3360,"y":290,"params":{"variable":"W"}},{"id":50,"type":"var.get","x":3240,"y":440,"params")kg"
+       R"kg(:{"variable":"D"}},{"id":51,"type":"list.add","x":3640,"y":290,"params":{"variable":"W"}},{"id":52,"type":"var.get","x":3520,"y":440,"params":{"variable":"E"}},{"id":53,"type":"list.add","x":3920,"y":)kg"
+       R"kg(290,"params":{"variable":"W"}},{"id":54,"type":"var.get","x":3800,"y":440,"params":{"variable":"G"}},{"id":55,"type":"list.add","x":4200,"y":290,"params":{"variable":"W"}},{"id":56,"type":"var.get","x)kg"
+       R"kg(":4080,"y":440,"params":{"variable":"S","path":".a"}},{"id":57,"type":"var.add","x":4480,"y":290,"params":{"variable":"A"}},{"id":58,"type":"var.add","x":4760,"y":290,"params":{"variable":"G"}},{"id":)kg"
+       R"kg(59,"type":"var.add","x":5040,"y":290,"params":{"variable":"E"},"values":{"amount":-4294967297}},{"id":60,"type":"list.add","x":5320,"y":290,"params":{"variable":"W"}},{"id":61,"type":"var.get","x":520)kg"
+       R"kg(0,"y":440,"params":{"variable":"A"}},{"id":62,"type":"list.add","x":5600,"y":290,"params":{"variable":"W"}},{"id":63,"type":"var.get","x":5480,"y":440,"params":{"variable":"G"}},{"id":64,"type":"list.)kg"
+       R"kg(add","x":5880,"y":290,"params":{"variable":"W"}},{"id":65,"type":"var.get","x":5760,"y":440,"params":{"variable":"E"}},{"id":66,"type":"list.add","x":6440,"y":290,"params":{"variable":"W"}},{"id":67,")kg"
+       R"kg(type":"list.add","x":6720,"y":290,"params":{"variable":"W"}},{"id":68,"type":"math.formula","x":6600,"y":440,"params":{"formula":"mul32(a, b)"}},{"id":69,"type":"var.get","x":6600,"y":530,"params":{"v)kg"
+       R"kg(ariable":"E"}},{"id":70,"type":"var.get","x":6600,"y":620,"params":{"variable":"G"}},{"id":71,"type":"var.get","x":6880,"y":440,"params":{"variable":"F"}},{"id":72,"type":"var.set","x":7280,"y":290,"p)kg"
+       R"kg(arams":{"variable":"A"}},{"id":73,"type":"var.set","x":7560,"y":290,"params":{"variable":"G"}},{"id":74,"type":"list.add","x":7840,"y":290,"params":{"variable":"W"}},{"id":75,"type":"var.get","x":7720)kg"
+       R"kg(,"y":440,"params":{"variable":"A"}},{"id":76,"type":"list.add","x":8120,"y":290,"params":{"variable":"W"}},{"id":77,"type":"var.get","x":8000,"y":440,"params":{"variable":"G"}}],"links":[[1,"then",3,")kg"
+       R"kg(exec"],[3,"body",36,"exec"],[3,"completed",4,"exec"],[3,"item",30,"x"],[3,"item",36,"value"],[3,"item",37,"value"],[3,"item",38,"value"],[3,"item",39,"value"],[3,"item",40,"value"],[3,"item",41,"value)kg"
+       R"kg("],[3,"item",42,"value"],[3,"item",57,"amount"],[3,"item",58,"amount"],[4,"body",72,"exec"],[4,"item",72,"value"],[4,"item",73,"value"],[30,"r",66,"item"],[30,"then",66,"exec"],[31,"then",32,"exec"],[)kg"
+       R"kg(31,"x",32,"value"],[32,"then",33,"exec"],[34,"value",33,"r"],[35,"value",3,"list"],[36,"then",37,"exec"],[37,"then",38,"exec"],[38,"then",39,"exec"],[39,"then",40,"exec"],[40,"then",41,"exec"],[41,"th)kg"
+       R"kg(en",42,"exec"],[42,"then",43,"exec"],[43,"then",45,"exec"],[44,"value",43,"item"],[45,"then",47,"exec"],[46,"value",45,"item"],[47,"then",49,"exec"],[48,"value",47,"item"],[49,"then",51,"exec"],[50,"v)kg"
+       R"kg(alue",49,"item"],[51,"then",53,"exec"],[52,"value",51,"item"],[53,"then",55,"exec"],[54,"value",53,"item"],[55,"then",57,"exec"],[56,"value",55,"item"],[57,"then",58,"exec"],[58,"then",59,"exec"],[59,)kg"
+       R"kg("then",60,"exec"],[60,"then",62,"exec"],[61,"value",60,"item"],[62,"then",64,"exec"],[63,"value",62,"item"],[64,"then",30,"exec"],[65,"value",64,"item"],[66,"then",67,"exec"],[68,"result",67,"item"],[)kg"
+       R"kg(69,"value",68,"a"],[70,"value",68,"b"],[71,"value",4,"list"],[72,"then",73,"exec"],[73,"then",74,"exec"],[74,"then",76,"exec"],[75,"value",74,"item"],[77,"value",76,"item"]],"machines":[],"functions":)kg"
+       R"kg([{"name":"Twice","inputs":[{"name":"x","type":"int","of":"i16","value":0}],"outputs":[{"name":"r","type":"int","of":"u8","value":0}],"locals":[{"name":"Here","type":"int","of":"i16","value":0}]}]})kg"},
       // Append into the variable it reads (NodeDef::takes_first: in the class text_append(std::move(T), ...) appends where T's
       // characters are) - with the index, with T itself (T + T: T as it was), and T into U.
       {"append_in_place",

@@ -98,6 +98,14 @@ struct Layout {
 struct BlueprintCore : logic::PureNodes {
   /// A whole number as a Blueprint holds it (the functions of nodes.h take and give i64).
   using Int = logic::Whole;
+  /// Ints of a fixed width (logic::kWidthNames): a place that holds what it is given as C++ stores it
+  /// in a std::uint8_t ... std::int32_t (logic::Sized, nodes.h); read, an Int.
+  using U8 = logic::Sized<u8>;
+  using U16 = logic::Sized<u16>;
+  using U32 = logic::Sized<u32>;
+  using I8 = logic::Sized<i8>;
+  using I16 = logic::Sized<i16>;
+  using I32 = logic::Sized<i32>;
   /// A text as a Blueprint's class holds it: one written out in the program is referred to, one
   /// made while running is held (logic::Text, nodes.h).
   using Text = logic::Text;
