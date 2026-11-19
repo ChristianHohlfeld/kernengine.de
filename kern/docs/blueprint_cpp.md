@@ -1220,14 +1220,16 @@ und sagt, wie ihre Werte hinüberkommen (`Function::exported`, `Function::wire`;
 `"wire"`):
 
 ```cpp
-KERN_EXPORT_AS("game_hud", "text bytes i32 f32 -> text") game_hudResult game_hud(const Text& ask, const List<Int>& data, Int view = 0, Float scale = 0.0) { ... }
+KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game_hud(Text ask = "", Int ask_length = 0, List<Int> data = List<Int>{}, Int data_length = 0, Int view = 0) { ... }
 ```
 
-- Ein Wort je Eingang, in ihrer Reihenfolge; nach `->` der eine Ausgang (oder keiner). `i32`, `u32`,
-  `f32`, `f64`: eine Zahl dieses C-Typs (eine Zahl oder ein Bool als Wert; C++ wandelt sie, wie C++
-  wandelt – `f32` ist, was der Host als 32-Bit-Zahl gibt). `text`: hinein ein Zeiger und eine Länge (u32),
-  heraus ein Zeiger auf die Zeichen, gehalten bis zum nächsten Text, den ein Export gibt. `bytes`: hinein
-  ein Zeiger auf u8 und eine Länge – eine `List<Int>` der Bytes.
+- Ein Wort je Eingang und je C-Parameter, in ihrer Reihenfolge; nach `->` der eine Ausgang (oder keiner).
+  `i32`, `u32`, `f32`, `f64`: eine Zahl dieses C-Typs (eine Zahl oder ein Bool als Wert; C++ wandelt sie,
+  wie C++ wandelt – `f32` ist, was der Host als 32-Bit-Zahl gibt). `text`: hinein ein Zeiger auf die
+  Zeichen, so viele, wie das `len` danach sagt (ohne `len` bis zur 0), heraus ein Zeiger auf die Zeichen,
+  gehalten bis zum nächsten Text, den ein Export gibt. `bytes`: hinein ein Zeiger auf u8 – eine `List<Int>`
+  der Bytes, so viele, wie das `len` danach sagt (es muss folgen). `len`: ein Int-Eingang, die Länge davor
+  (u32) – so kommt das C++ `const char* text, u32 length` eines Programms Wort für Wort herüber.
 - Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen,
   die die Funktion am Objekt der Instanz ruft, die als die Klasse läuft (die zuletzt gestartete:
   `kern::logic::blueprint_object`, `kern/logic/blueprint_class.h`) – nichts wird beim Namen gesucht. Läuft

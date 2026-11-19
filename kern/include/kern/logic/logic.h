@@ -566,9 +566,11 @@ struct Function {
   /// A function the program gives its host under a fixed C name - a page's script calls it on the module
   /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
   /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
-  /// cross, one word each in their order: i32, u32, f32, f64 (a number of that C type; a Bool as 0/1), text
-  /// (an input: a pointer and a u32 length; the output: a pointer to its characters, kept until the next
-  /// export gives a text), bytes (an input: a pointer to u8 and a u32 length - a List<Int> of the bytes).
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
   /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
   /// instance that runs as its class (kern::logic::blueprint_object).
   std::string exported{};

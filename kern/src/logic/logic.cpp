@@ -1664,12 +1664,16 @@ bool export_ok(const Function& f, std::string* why) {
   auto fits = [](const std::string& w, const FunctionPin& p, bool input) {
     const bool number = (p.type == PinType::integer || p.type == PinType::number || p.type == PinType::boolean) && !p.ref;
     if (w == "i32" || w == "u32" || w == "f32" || w == "f64") return number;
+    if (w == "len") return input && p.type == PinType::integer && !p.ref;
     if (w == "text") return p.type == PinType::text && (!p.ref || p.constant);
     if (w == "bytes") return input && p.type == PinType::integer_list && (!p.ref || p.constant);
     return false;
   };
-  for (std::size_t k = 0; k < words.size(); ++k)
-    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int)");
+  for (std::size_t k = 0; k < words.size(); ++k) {
+    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int; len: an Int)");
+    if (words[k] == "len" && (k == 0 || (words[k - 1] != "text" && words[k - 1] != "bytes"))) return no("len is the length of the text or the bytes before it");
+    if (words[k] == "bytes" && (k + 1 == words.size() || words[k + 1] != "len")) return no("bytes are followed by their length: bytes len");
+  }
   if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64 or text)");
   return true;
 }

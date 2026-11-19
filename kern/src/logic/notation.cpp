@@ -5192,8 +5192,13 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       const std::string a = "a" + std::to_string(k);
       params += std::string(k ? ", " : "");
       args += std::string(k ? ", " : "");
-      if (words[k] == "text") params += "const char* " + a + ", kern::u32 " + a + "_length", args += "kern::logic::export_text_in(" + a + ", " + a + "_length)";
-      else if (words[k] == "bytes") params += "const kern::u8* " + a + ", kern::u32 " + a + "_length", args += "kern::logic::export_bytes_in(" + a + ", " + a + "_length)";
+      // (one C parameter each; a text or bytes and the len after them: the pointer and how many - a text without
+      // one ends at its 0)
+      const bool counted = k + 1 < words.size() && words[k + 1] == "len";
+      const std::string n = "a" + std::to_string(k + 1);
+      if (words[k] == "text") params += "const char* " + a, args += counted ? "kern::logic::export_text_in(" + a + ", " + n + ")" : "kern::logic::export_text_in(" + a + ")";
+      else if (words[k] == "bytes") params += "const kern::u8* " + a, args += "kern::logic::export_bytes_in(" + a + ", " + n + ")";
+      else if (words[k] == "len") params += "kern::u32 " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
       else params += "kern::" + words[k] + " " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
     }
     const std::string ret = out_word.empty() ? "void" : out_word == "text" ? "const char*" : "kern::" + out_word;

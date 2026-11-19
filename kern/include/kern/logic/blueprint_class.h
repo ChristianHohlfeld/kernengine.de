@@ -57,6 +57,8 @@ template <> inline bool export_in<bool, f32>(f32 x) { return x != 0; }
 template <> inline bool export_in<bool, f64>(f64 x) { return x != 0; }
 /// A text that comes in: its characters, copied (the host's memory is the host's).
 inline Text export_text_in(const char* text, u32 length) { return Text(std::string_view(text ? text : "", text ? length : 0)); }
+/// A text that comes in without its length: up to its 0.
+inline Text export_text_in(const char* text) { return Text(std::string_view(text ? text : "")); }
 /// Bytes that come in: a List of Int, one entry each.
 inline List<Whole> export_bytes_in(const u8* bytes, u32 length) {
   List<Whole> out;

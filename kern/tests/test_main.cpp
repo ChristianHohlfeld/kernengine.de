@@ -2353,7 +2353,7 @@ TEST(logic_function_export) {
   const char* text = R"kn(
 struct Host : kern::Blueprint {
   struct game_hudResult { Text Result = ""; };
-  KERN_EXPORT_AS("game_hud", "text bytes i32 f32 -> text") game_hudResult game_hud(const Text& ask, const List<Int>& data, Int view = 0, Float scale = 0.0) {
+  KERN_EXPORT_AS("game_hud", "text len bytes len i32 f32 -> text") game_hudResult game_hud(Text ask = "", Int ask_length = 0, List<Int> data = List<Int>{}, Int data_length = 0, Int view = 0, Float scale = 0.0) {
     return {ask};
   }
   KERN_EXPORT_AS("game_tick", "f64") void game_tick(Float dt = 0.0) {
@@ -2365,27 +2365,29 @@ struct Host : kern::Blueprint {
   CHECK(logic::from_cpp(text, g, nullptr, &error));
   if (!error.empty()) std::printf("%s\n", error.c_str());
   const logic::Function* hud = g.function("game_hud");
-  CHECK(hud && hud->exported == "game_hud" && hud->wire == "text bytes i32 f32 -> text");
+  CHECK(hud && hud->exported == "game_hud" && hud->wire == "text len bytes len i32 f32 -> text");
   CHECK(g.function("game_tick") && g.function("game_tick")->exported == "game_tick" && g.function("game_tick")->wire == "f64");
   logic::Graph back;
   CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
   std::string written;
-  CHECK(logic::to_cpp(g, "Host", written, &error) && written.find("  KERN_EXPORT_AS(\"game_hud\", \"text bytes i32 f32 -> text\") game_hudResult game_hud(") != std::string::npos);
+  CHECK(logic::to_cpp(g, "Host", written, &error) && written.find("  KERN_EXPORT_AS(\"game_hud\", \"text len bytes len i32 f32 -> text\") game_hudResult game_hud(") != std::string::npos);
   logic::Graph read;
   CHECK(logic::from_cpp(written, read, nullptr, &error) && read == g);
   std::string glue;
-  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a0_length, const kern::u8* a1, kern::u32 a1_length, kern::i32 a2, kern::f32 a3) {") != std::string::npos &&
+  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5) {") != std::string::npos &&
         glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};
   CHECK(logic::export_ok(f));
-  f.wire = "text bytes i32 -> text";
+  f.wire = "text len bytes len i32 -> text";   // (one word too few)
   CHECK(!logic::export_ok(f));
-  f.wire = "text bytes text f32 -> text";
+  f.wire = "text len bytes i32 i32 f32 -> text";   // (bytes without their len)
   CHECK(!logic::export_ok(f));
-  f.wire = "text bytes i32 f32 -> bytes";
+  f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
   CHECK(!logic::export_ok(f));
-  f.wire = "text bytes i32 f32 -> text";
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes do not go out)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes len i32 f32 -> text";
   f.exported = "game hud";
   CHECK(!logic::export_ok(f));
   CHECK(!logic::from_cpp(std::string(text).replace(std::string(text).find("\"f64\""), 5, "\"text\""), read, nullptr, &error));
