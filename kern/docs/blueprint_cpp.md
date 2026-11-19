@@ -1308,7 +1308,7 @@ Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schr
 jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
 bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
 Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
-Funktion liest (`Formula::whole()`), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
+Funktion liest (`Formula::whole_result()`, unten), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
 und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
 `Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
 Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
@@ -1323,10 +1323,29 @@ neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Za
 verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
 Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
 (`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
-Formel, an `band` … `mul32` als ganze Zahl). Ist ein Eingang ein Float, eine
-geschriebene Zahl oder liest die Formel einen Eingang anders (`a + 1` an der Wurzel, `-a`, `a / 2`, `a < b`),
-ist sie eine Formel über Floats wie oben. Der Leser lehnt `[](Int …) -> Int` für eine Formel ab, die das nicht hergibt, ebenso
-gemischte Eingänge, eine geschriebene Zahl oder ein `kern::to` an einem ihrer Eingänge.
+Formel, an `band` … `mul32` als ganze Zahl, als Int `whole` dieser Zahl).
+
+**Int-Eingänge und Int-Ergebnis, Eingang für Eingang** (`Formula::int_input(k)`, `Formula::whole_result()` – eine
+Regel am Ausdruck, keine Namen). Ein Eingang ist ein `Int`, wo sein Draht von einem Int kommt und die Formel ihn
+nur als ganze Zahl liest: als Argument einer solchen Funktion, als Seite eines Vergleichs (`==` `!=` `<` `<=` `>`
+`>=`), dessen andere Seite ein Eingang, eine geschriebene Zahl, eine solche Funktion oder ein solches `+`/`−`/`×` ist,
+oder durch `+`, `−`, `×` (die nur Eingänge, Zahlen, solche Funktionen und einander bekommen), deren Wert selbst so
+gelesen wird oder der Wert der Formel ist. Unter `/`, `%`, `^`, einer anderen Funktion, `-a`, `!` oder `?:` ist er
+ein Float (Int/Int wäre in C++ ganzzahlige Division; `/` steht ohnehin als `kern::math::div`). Jeder andere Eingang
+ist ein Float wie oben – ein Float-Eingang oder eine geschriebene Zahl macht nur diesen Eingang zum Float:
+`kern::formula([](Int a, Float f) -> Float { return a + f; }, n3.item, 0.25)`.
+Das Ergebnis ist ein `Int`, wo jeder Eingang einer ist und die Wurzel eine solche Funktion ist oder ein `+`/`−`/`×`,
+in dem ein Eingang steht – im zweiten Fall nur, wo alles, was den Wert liest, ein Int ist (jenseits der Enden von Int
+ist das Int sein Ende, das double nicht): `List[kern::to<Int>(kern::formula([](Int i) -> Int { return i - 1.0; }, i))]`.
+Sonst ein `Float`, auch mit Int-Eingängen: `kern::formula([](Int i, Int n) -> Float { return (i < 0.0) != (n < 0.0); }, i, n)`.
+In jeder Stufe derselbe Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double. In der Klasse ist jedes
+Int als double exakt (`normal`), und die Umwandlung erhält die Ordnung – der Vergleich zweier Ints oder eines Ints mit
+einer Zahl in i64 bzw. über das double gibt, was der der doubles gibt (auch an 2^53 und ±(2^63 − 1): `a == 9007199254740993`
+vergleicht mit dem double 2^53); `+`/`−`/`×` sind `logic::Sum` – als Float genau die double-Rechnung, als Int
+`whole` von ihr (ganzzahlig, wo jede Zahl auf dem Weg in ±2^53 liegt). Der Leser lehnt ab: `Int` an einem Eingang,
+den die Formel anders liest (`div(a, 2.0)`, `-a`, `a * sqrt(2.0)`, `a < 3.0 ? a : 1.0`); `-> Int` mit einem Float-Eingang,
+mit einer Wurzel, die kein Int gibt (`a < 3.0`, `sin(a)`, `band(a, 1.0) + 2.0`), oder mit `+`/`−`/`×` an der Wurzel und
+einem Leser, der kein Int ist; eine geschriebene Zahl oder ein `kern::to` an einem Int-Eingang.
 
 ## Wo was steht
 
