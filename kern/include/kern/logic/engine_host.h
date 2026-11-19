@@ -84,8 +84,13 @@ class EngineObjects {
     return nullptr;
   }
   /// Ends an object of a handle this owns (its destructor): true if it did. A handle the host keeps
-  /// itself is not this one's to end.
-  template <class T> bool release(i64 handle) { return end(handle, kind<T>()); }
+  /// itself is not this one's to end. (Where a handle it has no object of names one made for it -
+  /// see `missing` - that is the object ended: made as there, and ended.)
+  template <class T> bool release(i64 handle) {
+    if (end(handle, kind<T>())) return true;
+    if (handle == 0 || !missing_ || find(handle, kind<T>())) return false;
+    return missing_(*this, handle, kind<T>()) && end(handle, kind<T>());
+  }
   /// Ends everything this owns and forgets every handle (the next one is 1 again).
   void clear();
   /// How many handles name an object now.

@@ -6406,8 +6406,13 @@ TEST(engine_calls_default_objects_made_with) {
   CHECK(o.size() == 2);   // (the transport and the renderer have no handle)
   out.clear();
   CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  // a handle it has no object of names one as C++ makes it - releasing it ends that one (nothing is left)
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(9)}, out) && o.size() == 1);
   o.clear();
   CHECK(o.size() == 0);
+  // without a maker (a host that keeps its own objects) a handle without an object is not released
+  logic::EngineObjects host;
+  CHECK(!logic::call_engine(host, "engine.client.release", {logic::Value::integer(9)}, out) && host.error.find("Client") != std::string::npos);
 }
 
 }  // namespace
