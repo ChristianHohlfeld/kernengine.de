@@ -861,6 +861,9 @@ template <class S> struct Callback;
 template <class R, class... A> struct Callback<R(A...)> {
   R (*fn)(void*, A...) = nullptr;
   void* place = nullptr;
+  /// (bound or not - as the interpreter's value says: what it calls, a call says. A Blueprint does not compare one;
+  /// a struct that holds one is equal field by field)
+  friend bool operator==(const Callback& x, const Callback& y) { return !x.fn == !y.fn; }
   R operator()(A... a) const {
     if constexpr (std::is_void_v<R>) {
       if (fn) fn(place, a...);
@@ -2322,6 +2325,7 @@ template <detail::NativeStruct S> void native_set(S& variable, const Value& v) {
 inline void native_set(Int64& variable, const Value& v) { variable = from_value<Int64>(v.converted(PinType::int64)); }
 template <class K, class V> void native_set(Map<K, V>& variable, const Value& v) { variable = from_value<Map<K, V>>(v.converted(pin_type_of<Map<K, V>>())); }
 template <class K> void native_set(Set<K>& variable, const Value& v) { variable = from_value<Set<K>>(v.converted(pin_type_of<Set<K>>())); }
+template <class R, class... A> void native_set(Callback<R(A...)>& variable, const Value& v) { variable = from_value<Callback<R(A...)>>(v); }
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a
