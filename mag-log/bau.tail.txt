@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp: 114 of 173 Blueprint(s) as C++ classes
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/src/logic/core_nodes.cpp:1560:16: warning: lambda capture 'of' is not used [-Wunused-lambda-capture]
+ 1560 |     d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
+      |                ^~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/src/logic/core_nodes.cpp:1592:16: warning: lambda capture 'of' is not used [-Wunused-lambda-capture]
+ 1592 |     d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
+      |                ^~
+In file included from /dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/equipment.cpp:2:
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/equipment.h:126:7: warning: private field 'sample_' is not used [-Wunused-private-field]
+  126 |   u64 sample_ = 0;
+      |       ^
+1 warning generated.
+In file included from /dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/life.cpp:2:
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/life.h:270:24: warning: private field 'tree_ground_cursor_' is not used [-Wunused-private-field]
+  270 |   u32 trees_down_ = 0, tree_ground_cursor_ = 0;
+      |                        ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/life.h:284:81: warning: private field 'ambient_chirp_' is not used [-Wunused-private-field]
+  284 |   f32 last_shout_ = -99, last_honk_ = -99, last_scream_ = -99, last_coo_ = -99, ambient_chirp_ = 0;
+      |                                                                                 ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/nostr.cpp:100:6: warning: unused function 'from_hex256' [-Wunused-function]
+  100 | U256 from_hex256(const char* s) {
+      |      ^~~~~~~~~~~
+1 warning generated.
+In file included from /dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/people.cpp:2:
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/people.h:207:21: warning: private field 'serial_' is not used [-Wunused-private-field]
+  207 |   u32 budget_ = 60, serial_ = 1;
+      |                     ^
+1 warning generated.
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/world_traffic.cpp:52:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+   52 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/world_traffic.cpp:101:63: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  101 |               if (!dup) nodes[ni].arms.push_back({dir, g.width});
+      |                                                               ^
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:21767:16: warning: unused variable 'a' [-Wunused-variable]
+ 21767 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:21805:16: warning: unused variable 'a_4' [-Wunused-variable]
+ 21805 |     nostr_U256 a_4 = nostr_U256{Fixed<Int, 8>{}};
+       |                ^~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:21871:16: warning: unused variable 'a' [-Wunused-variable]
+ 21871 |     nostr_U256 a = nostr_U256{Fixed<Int, 8>{}};
+       |                ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:36225:10: warning: unused variable 'playing' [-Wunused-variable]
+ 36225 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:36604:10: warning: unused variable 'playing' [-Wunused-variable]
+ 36604 |     Bool playing = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:43761:9: warning: unused variable 'count' [-Wunused-variable]
+ 43761 |     Int count = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:43762:9: warning: unused variable 'at_5' [-Wunused-variable]
+ 43762 |     Int at_5 = 0;
+       |         ^~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/src/level_blueprints.cpp:43763:9: warning: unused variable 'end_4' [-Wunused-variable]
+ 43763 |     Int end_4 = 0;
+       |         ^~~~~
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-103059-7878/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+8 warnings generated.
+0 tests, 0 checks, 0 failures
+
+real	5m7,210s
+user	38m10,918s
+sys	0m57,959s

@@ -1,0 +1,80 @@
+    finish (9): written
+    sha256 (5): written
+    sha256 (5): written
+    from_be (5): written
+    to_be (5): written
+    half (5): written
+    from_hex256 (5): written
+    cmp (4): written
+    is_zero (1): written
+    add (5): written
+    sub (5): written
+    addm (6): written
+    subm (5): written
+    mulm (8): written
+    powm (9): written
+    reduce (5): written
+    P (1): a name for a place - written where it is called
+    N (1): a name for a place - written where it is called
+    G (1): a name for a place - written where it is called
+    fm (1): written
+    fa (1): written
+    fs (1): written
+    dbl (16): written
+    add_pt (15): written
+    mul_pt (8): written
+    affine (9): written
+    lift_x (16): written
+    tagged (7): written
+    append (1): written
+    public_key (8): written
+    sign (32): written
+    verify (18): written
+    hex_of (4): written
+    hex (5): written
+    hex (5): written
+    from_hex (11): written
+    escape (18): written
+    event_json (15): written
+qr_code                         1 /    1 functions        1 /      1 lines
+    Code::dark (1): written
+qr_code_cpp                    11 /   11 functions      176 /    176 lines
+    raw_modules (9): written
+    data_codewords (1): written
+    gf_mul (8): written
+    rs_divisor (13): written
+    rs_remainder (10): written
+    alignment_positions (9): written
+    Grid::set (1): written
+    finder (9): written
+    format_bits (15): written
+    encode (86): written
+    read_format (15): written
+settings                        3 /    3 functions        3 /      3 lines
+    Settings::get (1): written
+    Settings::on (1): written
+    Settings::version (1): written
+settings_cpp                   11 /   11 functions       92 /     92 lines
+    escape_into (7): written
+    num (5): written
+    bind_settings (13): written
+    opt_spec (3): written
+    find_opt (5): written
+    Settings::Settings (3): written
+    Settings::set (6): written
+    Settings::set (17): written
+    Settings::reset_section (4): written
+    Settings::values_json (11): written
+    Settings::schema_json (18): written
+
+117 of 120 functions of the program are written as Blueprints (892 of 950 lines), and 3 of the engine's headers that they call: 12 Blueprints - 4 of source files, 0 of states, 8 of headers and of shapes
+115 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (    30)   a reference to something it changes
+     1 (    21)   a pointer
+     1 (     7)   it calls Decoder::step(), which waits
+
+real	1m47,186s
+user	5m53,572s
+sys	0m19,092s
