@@ -3246,10 +3246,12 @@ struct Reader {
                                cpp_type(TypeRef{v.type, src.of, src.count}));
     // (what flows into a pin is an Int: one of a fixed width is the place's - the place holds its low bits)
     const bool any_int = v.type == PinType::integer && pin.type == PinType::integer && src.of.empty() && has_width(pin.type, pin.of);
-    if (v.type != pin.type || (src.of != pin.of && !any_int))
+    // (an input of a list of Ints of any width: a list written out is a List<Int>{...} - kAnyWidth)
+    const bool any_list = v.type == PinType::integer_list && pin.of == kAnyWidth && src.of.empty();
+    if (v.type != pin.type || (src.of != pin.of && !any_int && !any_list))
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
-    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, pin.of}));
+    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, any_list ? std::string() : pin.of}));
     return true;
   }
   /// Wires the exec outputs `from` to the exec input `in` of `node` ("": its first), or of the step go<id>.
