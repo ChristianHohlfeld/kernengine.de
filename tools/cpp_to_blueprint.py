@@ -3058,6 +3058,7 @@ class Emit:
         self.pointers = {}    # decl id of a parameter that is a pointer into a list -> (the list's input, the place's input, the entries' type)
         self.or_none = {}     # decl id of a text or none (text_or_none) -> the Bool that says whether there is one
         self.unbound = {}     # decl id of a pointer to an entry of a list that began as none (entry_pointer) -> the Int its place is
+        self.char_places = {}    # decl id of `char& c` of a loop over a text -> (the text, the place, the C++ type)
         self.loop_entries = {}   # decl id of the entry of a pass of a loop over a list (a reference) -> (the list, its place)
         self.text_ptrs = {}   # decl id of a local pointer into a text (char* end of strtod) -> {"text": the text, "at": the Int of its place}
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
@@ -5415,11 +5416,14 @@ class Emit:
         return self.ex(n, "Text")
 
     def for_each_char(self, s, v, raw, src, body):
-        """for (char c : text): a loop over the bytes of a text - each read where it stands (Code At)."""
-        if "&" in raw and not re.search(r"\bconst\b", raw):
-            raise Wait("a loop that changes the characters of a text")
+        """for (char c : text): a loop over the bytes of a text - each read where it stands (Code At). for (char& c :
+        text): c is the byte where it stands - read there each time, set there (Set Code: the text keeps its length,
+        as a loop over a std::string's characters does; it is counted once)."""
+        changes = "&" in raw and not re.search(r"\bconst\b", raw)
         got = self.spot(src)
         before = self.take_pre()
+        if changes and (got is None or got[1] != "Text" or not self.writable(got[0])):
+            raise Wait("a loop that changes the characters of a text that is no place of the function")
         if got is not None and got[1] == "Text":
             text = got[0]
         else:
@@ -5429,14 +5433,18 @@ class Emit:
         loop = self.enter_loop(body)
         if has_break:
             at, count = self.temp("at", "Int"), self.temp("count", "Int")
-            first = [f"{self.local(v, 'Int')} = {self.char_of(text, at, raw)};"]
+            if changes:
+                self.char_places[v["id"]] = (text, at, raw)
+            first = [] if changes else [f"{self.local(v, 'Int')} = {self.char_of(text, at, raw)};"]
             lines = first + self.loop_body(loop, [body], [f"{at} += 1;"])
             cond = f'math_compare<"<">({self.cast("Float", at)}, {self.cast("Float", count)})'
             return before + [f"{count} = text_length({text});", f"{at} = 0;"] + self.loop_lines(cond, [], lines, loop)
         node = self.u.next_node
         self.u.next_node += 1
         self.u.members.append(f"  struct : kern::Node<{node}> {{ Int index = 0; }} n{node};")
-        first = [f"{self.local(v, 'Int')} = {self.char_of(text, f'n{node}.index', raw)};"]
+        if changes:
+            self.char_places[v["id"]] = (text, f"n{node}.index", raw)
+        first = [] if changes else [f"{self.local(v, 'Int')} = {self.char_of(text, f'n{node}.index', raw)};"]
         lines = first + self.loop_body(loop, [body])
         last = self.whole_math("-", f"text_length({text})", "1")
         return before + [f"for (auto it{node} = flow_for(n{node}, 0, {last}); it{node}.next();) {{", *["  " + ln for ln in lines], "}"]
@@ -8344,6 +8352,9 @@ class Emit:
         read, changed and stored back, level by level)."""
         t = self.unwrap(target)
         k = t.get("kind")
+        if k == "DeclRefExpr" and (t.get("referencedDecl") or {}).get("id") in self.char_places:
+            text, at, _ = self.char_places[t["referencedDecl"]["id"]]   # (a byte of a text where it stands: Set Code)
+            return [f"text_set_code({text}, {at}, {value('Int')});"]
         if k == "DeclRefExpr":
             if self.held_type(t) in self.u.rows:   # (the entry of a list inside a list a name stands for - `auto& ring : rings` -
                 # is held as a struct of that list: its place is that field, as `spot` says)
@@ -8649,6 +8660,9 @@ class Emit:
         k = b.get("kind")
         if k == "_Text":
             return b["_text"], b["_type"]
+        if k == "DeclRefExpr" and (b.get("referencedDecl") or {}).get("id") in self.char_places:
+            text, at, raw = self.char_places[b["referencedDecl"]["id"]]   # (a byte of a text where it stands, read there)
+            return self.char_of(text, at, raw), "Int"
         got = self.text_pointer_value(b)
         if got is not None:
             return got
@@ -9484,8 +9498,9 @@ class Emit:
             return f"kern::math::band({text}, 255.0)"
         if want == "unsigned short":
             return f"kern::math::band({text}, 65535.0)"
-        if want in ("short", "signed char"):
-            # (the low bits, read with their sign - two's complement, as C++20 converts: (v ^ 0x8000) - 0x8000)
+        if want in ("short", "signed char", "char"):
+            # (the low bits, read with their sign - two's complement, as C++20 converts: (v ^ 0x8000) - 0x8000; a char is
+            # signed on every machine the game is built for, as char_of reads it)
             top = 32768.0 if want == "short" else 128.0
             return f"(kern::math::bxor(kern::math::band({text}, {flit(top * 2 - 1)}), {flit(top)}) - {flit(top)})"
         raise Wait(f"a whole number cut to {want}")
