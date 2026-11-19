@@ -346,6 +346,11 @@ void on1(Actor actor, Float value, Text text) {
 ### Listen fester Länge
 
 Ein **Platz** kann als Liste fester Länge deklariert sein: Er hat immer genau so viele Einträge.
+Ein Wert, der an einem **Eingang** steht, dessen Typ eine Liste fester Länge ist (das Feld einer Struktur bei Make Struct,
+der Eingang einer Funktion), wird ebenso mit seinem Typ geschrieben: `struct_make<Trio>(Fixed<Float, 3>{1.5, -2.0}, 7)` – die
+Länge ist die des Eingangs (`PinDef::count`, aus dem Typ des Felds bzw. des Eingangs). Der Leser lehnt eine andere Länge ab;
+`List<Float>{…}` dort liest er wie bisher (dieselben Einträge, der Rest null). In C++ fordert das keinen Speicher an.
+
 In C++ ist `Fixed<Float, 16>` ein `std::array` – es liegt dort, wo es steht, und fordert keinen
 Speicher an (eine `List` ist ein `std::vector`: Jede hat ihren eigenen Speicher). Damit kostet
 eine Matrix im Blueprint, was sie im C++ kostet.
@@ -854,6 +859,11 @@ LeerenResult Leeren() {
     Runde liest, wird kopiert; was jede Runde erst neu setzt, wird übergeben. Jeder Aufruf hat
     seine lokalen Variablen für sich (in der Klasse sind es die von C++), darum ist das allein
     eine Frage der Schritte dieses Aufrufs.
+  - **die Variable, die ein Wert als ersten Eingang liest und die der eine Schritt, der diesen Wert liest,
+    als Ganzes auf ihn setzt** – bei einem Knoten, der das von sich sagt (`NodeDef::takes_first`: Append):
+    `O = text_append(std::move(O), x, "");` hängt dort an, wo O seine Zeichen hat. Den alten Wert liest danach
+    nichts mehr (der Schritt setzt O sofort neu); was die anderen Eingänge lesen, ist vorher gelesen, und ist
+    ein anderer Eingang O selbst (`text_append(std::move(O), O, "")`), nimmt text_append O, wie es war.
   - **was der Schritt direkt davor gab** (`n4.punkte`), wenn dieser Eingang es als einziger liest.
     „Direkt davor“: ein einfacher Schritt, dessen einer Weg zu diesem Schritt führt, und kein
     anderer Weg führt hierher – der Schritt läuft genau einmal nach jedem seiner Läufe, und
@@ -1267,6 +1277,30 @@ Durch 0 ergibt es 0, wie `mod`. Damit wird ein Winkel auf −180 … 180 gebrach
 der Konverter schreibt `std::remainder` und `remainderf` damit.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
+
+**Formel ganzer Zahlen.** `band`, `bor`, `bxor`, `shl`, `shr`, `wrap32`, `wrap32s` und `mul32` geben für
+jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
+bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
+Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
+Funktion liest (`Formula::whole()`), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
+und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
+`Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
+Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
+Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double; die Klasse reicht die ganze Zahl
+weiter (`kern::math::Exact`) – ihre Bits sind die des doubles, das sie ist (genau, solange sie in ±2^53
+liegt, sonst über dieses double), und ihr Int ist `normal` von ihr, also `whole` ihres doubles. Zahlen im
+Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0).
+`+`, `−` und `×` dürfen zwischen solchen Funktionen stehen (`wrap32(a + b)`, `wrap32(base + mul32(i, s))`,
+`band(a * b - 1.0, 255.0)`): ganz sind sie dort, wo sie nur Eingänge, geschriebene Zahlen, solche Funktionen
+und einander bekommen und ihr Wert selbst als ganze Zahl gelesen wird (`kWholeOperators` in formula.cpp,
+neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Zahlen als double, als double
+verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
+Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
+(`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
+Formel, an `band` … `mul32` als ganze Zahl). Ist ein Eingang ein Float, eine
+geschriebene Zahl oder liest die Formel einen Eingang anders (`a + 1` an der Wurzel, `-a`, `a / 2`, `a < b`),
+ist sie eine Formel über Floats wie oben. Der Leser lehnt `[](Int …) -> Int` für eine Formel ab, die das nicht hergibt, ebenso
+gemischte Eingänge, eine geschriebene Zahl oder ein `kern::to` an einem ihrer Eingänge.
 
 ## Wo was steht
 

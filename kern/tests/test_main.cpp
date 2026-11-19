@@ -4448,7 +4448,7 @@ TEST(logic_native_blueprints) {
     f64 heat = 1;
     void attach(const logic::BlueprintWorld&) override {}
     void run(int, int) override {}
-    bool call(std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
+    bool call(std::string_view function, std::span<const logic::Value> args, logic::Results& results) override {
       results.clear();
       if (function != "Twice") return false;
       results = {logic::Value::number(2 * (args.empty() ? 0.0 : args[0].as_number()) + heat)};
@@ -5260,6 +5260,21 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a +; }, 1.0);"), "the formula:");
+  // (a formula of whole numbers, [](Int a) -> Int: only where Formula::whole holds, every input a wire from an Int as it is)
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a + 1.0; }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(kern::math::div(a, 2.0), 3.0); }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::band(a, 3.0); }, Count));"), "(a formula with Int inputs gives an Int)");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "(the inputs of a formula of whole numbers are Int");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "an input of a formula of whole numbers is an Int");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, kern::to<Float>(Count)));"), "an Int as it is: no kern::to");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
+  // (a list of a fixed length written out on an input says the input's length: Fixed<Float, 3> for a field of three)
+  for (const char* wrong : {"Fixed<Float, 4>{1.5}", "Fixed<Float, 2>{1.5}"})
+    refused("  KERN_STRUCT(Trio) { Fixed<Float, 3> m = Fixed<Float, 3>{}; Int k = 0; };\n  Trio P = Trio{Fixed<Float, 3>{}, 0};\n" +
+                in_event(std::string("    P = struct_make<Trio>(") + wrong + ", 7);"),
+            "\"m\" of struct_make is Fixed<Float, 3>, this is Fixed<Float, ");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 1.0; } n1;\n  void Unused() {"), "starts empty");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 0.0; } n77;\n  void Unused() {"), "n77 names no node");
   refused("  Float Heat = 1.0;", "the variable Heat is declared twice");

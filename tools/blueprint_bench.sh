@@ -2,7 +2,8 @@
 # The time a Blueprint's class takes against the C++ it was converted from (BLUEPRINTS.md, "Der Weg ab
 # hier": every building block costs in the class what the C++ it stands for costs).
 #
-#   tools/blueprint_bench.sh <level.klevel> [rounds] [case ...]
+#   tools/blueprint_bench.sh <level.klevel> [--check <limit>] [rounds] [case ...]
+#   (--check 1.10: fails when a class takes more than 1.10 times its source - bench.cpp)
 #
 # Writes the classes of the measured Blueprints (tools/blueprint_cpp.sh --classes), builds
 # kern/games/spawncity/tests/bench/ in the game's release build (clang, -O3 -flto=thin -DNDEBUG
