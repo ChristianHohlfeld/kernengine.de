@@ -13,6 +13,7 @@
 namespace kern {
 
 void Input::key(Key k, bool is_down) {
+  if (static_cast<u32>(k) >= static_cast<u32>(Key::count)) return;  // (no such key: nothing to keep)
   u8& s = keys_[static_cast<u32>(k)];
   if (is_down && !(s & kDown)) s |= kDown | kPressed;
   if (!is_down && (s & kDown)) { s &= ~kDown; s |= kReleased; }

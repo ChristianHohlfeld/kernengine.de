@@ -37,9 +37,10 @@ struct Touch {
 
 class Input {
  public:
-  bool down(Key k) const { return keys_[static_cast<u32>(k)] & kDown; }
-  bool pressed(Key k) const { return keys_[static_cast<u32>(k)] & kPressed; }
-  bool released(Key k) const { return keys_[static_cast<u32>(k)] & kReleased; }
+  // (a key past the last one - Key::count, or any value of the type beyond it - is never down)
+  bool down(Key k) const { return state(k) & kDown; }
+  bool pressed(Key k) const { return state(k) & kPressed; }
+  bool released(Key k) const { return state(k) & kReleased; }
   /// Pointer position in drawing-buffer pixels, movement since the last frame (pixels, includes locked movement).
   Vec2 pointer() const { return pointer_; }
   Vec2 pointer_delta() const { return pointer_delta_; }
@@ -62,6 +63,7 @@ class Input {
  private:
   enum : u8 { kDown = 1, kPressed = 2, kReleased = 4 };
   u8 keys_[static_cast<u32>(Key::count)] = {};
+  u8 state(Key k) const { return static_cast<u32>(k) < static_cast<u32>(Key::count) ? keys_[static_cast<u32>(k)] : 0; }
   Vec2 pointer_, pointer_delta_;
   u32 buttons_ = 0, pressed_buttons_ = 0;
   f32 wheel_ = 0;

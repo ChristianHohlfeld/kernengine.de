@@ -819,6 +819,7 @@ template <class Core> struct EngineNodesOf : Core {
     if (this->kern_world.host) this->kern_world.host->engine_failed(function);
   }
 
+  /// (a key past the last one - Key::count, or any value of the type beyond it - is never down)
   template <class T1> Bool engine_input_down(Int input, const T1& k) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();

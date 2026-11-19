@@ -13441,6 +13441,11 @@ TEST(app_input_and_args) {
   in.key(Key::a, true);
   in.set_focus(false);
   CHECK(!in.down(Key::a));
+  // a key past the last one (Key::count, or any value of the type beyond it) is never down, and keeping it changes nothing
+  for (Key past : {Key::count, static_cast<Key>(200)}) {
+    in.key(past, true);
+    CHECK(!in.down(past) && !in.pressed(past) && !in.released(past));
+  }
   in.touch(7, 0, {10, 10});
   in.touch(8, 0, {20, 20});
   CHECK(in.touch_count() == 2);

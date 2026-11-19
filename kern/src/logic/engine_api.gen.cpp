@@ -6,7 +6,7 @@ namespace kern::logic {
 
 const std::vector<EngineFunction>& engine_functions() {
   static const std::vector<EngineFunction> all = {
-      {"engine.input.down", "kern::Input::down", "Down", "Engine: Input", "", true,
+      {"engine.input.down", "kern::Input::down", "Down", "Engine: Input", "(a key past the last one - Key::count, or any value of the type beyond it - is never down)", true,
        {{"input", PinType::integer, "", "i"}, {"k", PinType::enumeration, "Key", "e53"}},
        {{"result", PinType::boolean, "", "b"}}},
       {"engine.input.pressed", "kern::Input::pressed", "Pressed", "Engine: Input", "", true,
