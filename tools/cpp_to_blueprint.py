@@ -3930,8 +3930,10 @@ class Emit:
                     self.tree.decl[pid] = decl
                 was = node.get("type", {})
                 stood = {k: node[k] for k in ("_at", "_file") if k in node}
+                call = dict(node)
                 node.clear()
-                node.update({"kind": "ArraySubscriptExpr", "type": was, "valueCategory": "lvalue", "_bt": lt[5:-1], "inner": [lst, at], **stood})
+                # (`_call`: the source has the call there - TestWriter.guard sees it, as it is written)
+                node.update({"kind": "ArraySubscriptExpr", "type": was, "valueCategory": "lvalue", "_bt": lt[5:-1], "inner": [lst, at], **stood, "_call": call})
             slot = self.unwrap(init)
             if self.is_slot(bare(slot)):
                 # `V& r = m[key];` - C++ finds the key's entry once, where the reference is bound (adding it when the key is
@@ -3949,8 +3951,9 @@ class Emit:
                 was = slot.get("type", {})
                 stood = {k: slot[k] for k in ("_at", "_file") if k in slot}
                 held = self.entry(base, {"kind": "_Text", "_text": row, "_type": "Int", "_steady": True}, vt)   # (the row: set here alone)
+                call = dict(slot)
                 slot.clear()
-                slot.update({**held, "type": was, **stood})
+                slot.update({**held, "type": was, **stood, "_call": call})   # (the source has m[key] there: TestWriter.guard)
             rest = {"kind": "CompoundStmt", "inner": stmts[i + 1:]}
             changed = self.assigned(rest)
             if re.search(r"\bconst\b", raw) and not own and root not in changed:
