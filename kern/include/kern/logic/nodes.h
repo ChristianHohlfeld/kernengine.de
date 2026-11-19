@@ -229,6 +229,8 @@ class Text {
   template <std::size_t N> Text(char (&)[N]) = delete;
   Text(std::string made) : made_(std::move(made)), holds_(true) {}                                // NOLINT (implicit: a text made while running)
   explicit Text(std::string_view copied) : made_(copied), holds_(true) {}
+  /// (one character, made where it is held - Text of Code)
+  explicit Text(std::size_t count, char c) : made_(count, c), holds_(true) {}
   /// A text the program holds for good, by its characters - the name of an enum's value:
   /// referred to, not copied. (Only for what stays where it is as long as the program runs.)
   static Text of_program(std::string_view held) {
@@ -250,6 +252,34 @@ class Text {
     else if (o.holds_) hold(std::string(o.made_));
     else refer(o.written_, o.ended_);
     return *this;
+  }
+  /// `O = text_append(std::move(O), x, y)` (a text handed on, set again to itself and more): what
+  /// text_append gives there, worked out where it is set - the others are appended where O's
+  /// characters are, as std::string's += does, without handing the characters on and back. Made
+  /// into a Text anywhere else, it is what text_append gives.
+  struct Appending {
+    Text& a;
+    const Text& b;
+    const Text& c;
+    operator Text() && {  // NOLINT (implicit: it is that text)
+      if (!a.holds_ || &b == &a || &c == &a) {
+        std::string made;
+        made.reserve(a.size() + b.size() + c.size());
+        made.append(a.view()).append(b.view()).append(c.view());
+        return made;
+      }
+      std::string t = std::move(a.made_);
+      t.append(b.view()).append(c.view());
+      return t;
+    }
+  };
+  Text& operator=(Appending&& x) {
+    if (&x.a == this && holds_ && &x.b != this && &x.c != this) [[likely]] {
+      add(x.b.view());
+      add(x.c.view());
+      return *this;
+    }
+    return *this = static_cast<Text>(std::move(x));
   }
   Text& operator=(Text&& o) noexcept {
     if (this == &o) return *this;
@@ -282,6 +312,11 @@ class Text {
   friend auto operator<=>(const Text& a, const Text& b) { return a.view() <=> b.view(); }
 
  private:
+  /// (appended where its characters are - one character as std::string's += of a char adds it)
+  void add(std::string_view v) {
+    if (v.size() == 1) made_.push_back(v[0]);
+    else if (!v.empty()) made_.append(v);
+  }
   void hold(std::string made) {
     if (holds_) made_ = std::move(made);
     else new (&made_) std::string(std::move(made)), holds_ = true;
