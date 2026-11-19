@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:52597:9: warning: unused variable 'at_5' [-Wunused-variable]
+ 52597 |     Int at_5 = 0;
+       |         ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:52598:9: warning: unused variable 'end_4' [-Wunused-variable]
+ 52598 |     Int end_4 = 0;
+       |         ^~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60082:10: warning: unused variable 'running' [-Wunused-variable]
+ 60082 |     Bool running = false;
+       |          ^~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60085:10: warning: unused variable 'connected' [-Wunused-variable]
+ 60085 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60116:10: warning: unused variable 'connected' [-Wunused-variable]
+ 60116 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60159:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 60159 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60333:9: warning: unused variable 'max_clients' [-Wunused-variable]
+ 60333 |     Int max_clients = 0;
+       |         ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60336:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 60336 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60409:10: warning: unused variable 'connected' [-Wunused-variable]
+ 60409 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60412:10: warning: unused variable 'send' [-Wunused-variable]
+ 60412 |     Bool send = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60457:10: warning: unused variable 'connected' [-Wunused-variable]
+ 60457 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60460:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 60460 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60479:10: warning: unused variable 'connected' [-Wunused-variable]
+ 60479 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60482:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 60482 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60501:10: warning: unused variable 'connected' [-Wunused-variable]
+ 60501 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60504:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 60504 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:60598:9: warning: unused variable 'connected_clients' [-Wunused-variable]
+ 60598 |     Int connected_clients = 0;
+       |         ^~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:66658:22: warning: unused variable 'body_type' [-Wunused-variable]
+ 66658 |     physics_BodyType body_type = physics_BodyType::fixed;
+       |                      ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:68684:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 68684 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/src/level_blueprints.cpp:68814:10: warning: unused variable 'body_valid' [-Wunused-variable]
+ 68814 |     Bool body_valid = false;
+       |          ^~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-leck-vergleich-044258-11385/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+1 warning generated.
+34 warnings generated.
+0 tests, 0 checks, 0 failures
+
+real	6m43,034s
+user	30m31,449s
+sys	0m47,446s
