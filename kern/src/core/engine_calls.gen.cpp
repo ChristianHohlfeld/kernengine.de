@@ -113,15 +113,21 @@ bool c12(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.jobs.take_queued: kern::jobs::take_queued
+// engine.jobs.reset: kern::jobs::reset
 bool c13(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  kern::jobs::reset();
+  return true;
+}
+
+// engine.jobs.take_queued: kern::jobs::take_queued
+bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   decltype(auto) r = kern::jobs::take_queued();
   ev::give<ev::List<ev::Int>>(o, out, 0, r);
   return true;
 }
 
 // engine.jobs.run: kern::jobs::run
-bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 0, a0);
   std::vector<unsigned char> a1;
@@ -134,7 +140,7 @@ bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.jobs.done: kern::jobs::done
-bool c15(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 0, a0);
   std::vector<unsigned char> a1;
@@ -157,9 +163,10 @@ const EngineCall kCalls[] = {
     {"engine.jobs.external", &c10},
     {"engine.jobs.set_threads", &c11},
     {"engine.jobs.threads", &c12},
-    {"engine.jobs.take_queued", &c13},
-    {"engine.jobs.run", &c14},
-    {"engine.jobs.done", &c15},
+    {"engine.jobs.reset", &c13},
+    {"engine.jobs.take_queued", &c14},
+    {"engine.jobs.run", &c15},
+    {"engine.jobs.done", &c16},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
