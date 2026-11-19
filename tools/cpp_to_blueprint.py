@@ -3940,6 +3940,66 @@ class Emit:
                 n["_call"] = call
 
     # ---- statements ----
+    def either_place(self, stmts, i):
+        """`T& r = c ? a : b;` - a name for one of two places, which the condition chooses where r is bound: what
+        follows in the block, once with r as a and once with r as b, the condition choosing which (an if, where
+        the reference is bound - C++ works out c there, once). The places themselves must be where they are
+        whatever follows does: a variable, a member of one or of the object (a name for a place stands for that
+        place - name_references). The new statements of the block; None: no such reference."""
+        s = stmts[i]
+        if s.get("kind") != "DeclStmt" or len(kids(s)) != 1:
+            return None
+        v = kids(s)[0]
+        raw = qtype(v)
+        if v.get("kind") != "VarDecl" or "&" not in raw or "&&" in raw or self.init_of(v) is None:
+            return None
+        init = bare(self.unwrap(self.init_of(v)))
+        while init.get("kind") == "ParenExpr" and kids(init):
+            init = bare(kids(init)[0])
+        if init.get("kind") != "ConditionalOperator" or len(kids(init)) != 3 or init.get("valueCategory") != "lvalue":
+            return None
+        def fixed(x):   # (a place whose address nothing that follows can change)
+            x = bare(x)
+            k = x.get("kind")
+            if k in ("ImplicitCastExpr", "ParenExpr") and kids(x) and x.get("castKind") in (None, "NoOp"):
+                return fixed(kids(x)[0])
+            if k == "DeclRefExpr":
+                return (x.get("referencedDecl") or {}).get("kind") in ("VarDecl", "ParmVarDecl")   # (a variable stays where it is; a reference is not bound again)
+            if k == "MemberExpr" and kids(x):
+                return bare(kids(x)[0]).get("kind") == "CXXThisExpr" if x.get("isArrow") else fixed(kids(x)[0])
+            return k == "CXXThisExpr"
+        cond, a, b = kids(init)
+        if not (fixed(a) and fixed(b)):
+            return None
+        rest = stmts[i + 1:]
+        for x in (y for r in rest for y in walk(r)):
+            if x.get("kind") == "LabelStmt":
+                return None   # (a goto into what follows: the copies would have the label twice)
+            if x.get("kind") == "LambdaExpr" and any((y.get("referencedDecl") or {}).get("id") == v["id"] for y in walk(x)):
+                return None   # (captured by a lambda: what it captures is r itself)
+        def branch(n, arm):
+            body = copy.deepcopy({"kind": "CompoundStmt", "inner": rest})
+            ids = {x["id"]: f"{x['id']}_or{n}" for x in walk(body) if x.get("kind", "").endswith("Decl") and "id" in x}
+            for x in walk(body):   # (what follows declares: its own in each)
+                if x.get("id") in ids:
+                    x["id"] = ids[x["id"]]
+                    self.tree.decl[x["id"]] = x
+                r = x.get("referencedDecl")
+                if r and r.get("id") in ids:
+                    x["referencedDecl"] = {**r, "id": ids[r["id"]]}
+                for key in ("declId", "targetLabelDeclId"):
+                    if x.get(key) in ids:
+                        x[key] = ids[x[key]]
+            for x in list(walk(body)):
+                if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == v["id"]:
+                    put = copy.deepcopy(arm)
+                    x.clear()
+                    x.update(put)
+            return body
+        choice = {"kind": "IfStmt", "hasElse": True, **{k: s[k] for k in ("_at", "_file", "range", "loc") if k in s},
+                  "inner": [copy.deepcopy(cond), branch(0, a), branch(1, b)]}
+        return stmts[:i] + [choice]
+
     def name_references(self, stmts, i):
         """`T& x = a.b[i];` - a name for a place: in what follows, x is written out as a.b[i]. (A const
         reference is a copy of the value as long as what it names does not change while it lives.)"""
@@ -4592,6 +4652,9 @@ class Emit:
             s = stmts[i]
             if not isinstance(self.named_places, set):
                 self.named_places = set()
+            chosen = self.either_place(stmts, i)
+            if chosen is not None:
+                stmts, s = chosen, chosen[i]
             self.name_references(stmts, i)
             self.rest_stmts = stmts[i + 1:]   # (what follows the statement in its block: see bytes_pointer)
             lines, ends = self.stmt(s)
