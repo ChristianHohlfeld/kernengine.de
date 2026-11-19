@@ -74,3 +74,4 @@ code (170 compiled)“. Nicht von e. (Job 135460440782.)
   nicht („use of undeclared identifier 'explosion'/'combat_blast'“: der Test einer Datei braucht die Quelle der Gerufenen aus der anderen, die erst
   weitergereicht wird, wenn deren Test vergleicht – wieder ein Kreis, 72 „went round“). Behoben im Ablauf (convert_unit: Exporte jedes Versuchs)
   → neuer konvert.
+- 15:05: work-e-tramp-konvert-125819-29832 (1d706cc9) wartet seit 12:58 auf mag – vor ihm läuft work-d-konvert-125538-27289 seit 13:10 (konvert-Aufträge laufen offenbar einzeln).

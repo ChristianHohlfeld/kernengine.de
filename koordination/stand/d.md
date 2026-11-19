@@ -45,6 +45,8 @@
   Sonst: number_at 14/300 (t1), converted_game_details_cpp real (bekannt). Engine-Suite läuft: `work-d-belege3-engine-120959-12020`.
 - work-d = **fa753bcb** (work-zusammen 6998a56e eingemischt: Konflikt logic.h/.cpp – bound_now und lengths_on (e) beide behalten; + belege3; Generator neu). Syntax ✓.
 
+- **15:00 Stand Platz:** `work-d-konvert-125538-27289` (work-d 275d3ddf, 9 Kerne) rechnet noch. Nächste Schritte: uebergabe/d.md „15:00“.
+
 ## BEREIT ZUM MERGEN (d, 14:57): work-d-make 49e5c319 (Macher geben nie Handle 0, Form `h`) – auf work-zusammen dc4229b5
 - Belege: `work-d-make-vergleich-131505-2655` (game, game_equipment, sound_fx, game_details, equipment, combat_audio): **52/52 ok in beiden Durchgängen, keine
   Abweichung** (audio_init vorher 1/20); Engine-Suite `work-d-make-engine-141127-4668` rc=0 (55404 checks, 0 failures; engine_stand_in_makes_an_object ok).

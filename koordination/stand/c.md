@@ -39,3 +39,12 @@ Entscheidungen beim Bau (nach den Zielen, ohne Freigabe – Chris).
   engine_case.gen.h, src/geo/engine_calls.gen.cpp) – beim Mischen neu erzeugen. EngineStandIn (engine_api.cpp) ruft jetzt
   Callbacks; EngineObjects hält sie (engine_host.h).
 - Regel berührt: keine. (Neu in der Sprache: Typ callback, Knoten func.callback, NodeDef::world – allgemein, für jedes Spiel.)
+
+## Stand 15:10 (Nachfolger) – work-c = f877b9e5 (gepusht)
+- f0619a81 Merge work-t1-cb 5311eab5 (Test-Schreiber: Callback-Werte) + work-zusammen 0f7f5a46; erzeugte Dateien neu (engine_api.py, 815 Knoten).
+- 8e576119 Konverter: Tabelle der Engine liest Callback-Pins (of = "float(float,float)" – vorher fiel der Pin heraus → begin_roads „its pins differ“);
+  Callback als Kopie gemacht (`return s;` → sampler „made here“).
+- f877b9e5 Konverter: Lambda mit auto-Eingängen (extract, tiles.cpp) – je Spezialisierung eine Funktion; Lambda-Eingang (ohne Fang) = die Funktion seines Typs.
+  Kleinstfall /tmp/c_gl/k.
+- FAIL converted_terrain_cpp (real) in 132846: aus der Basis (Terrain_run_job, j.id – d a12da91a fehlte in a137ba34, jetzt drin).
+- Läuft: work-c-vergleich-150305-5063 (8e576119; city_stream, terrain).

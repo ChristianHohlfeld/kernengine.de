@@ -219,3 +219,10 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
   * extract (tiles.cpp:227): generisches Lambda `[&](const char*, auto kind_of)`, je Aufruf mit einem anderen Lambda – Instanz je Aufruf
     (FunctionTemplateDecl-Spezialisierungen), kind_of als lokale Funktion der Instanz. Berührt Funktionswerte (Paket c)? – nicht begonnen.
   * minimap_json (Feat.pts: Zeiger in eine fremde Liste) – nicht untersucht über den Vorgänger hinaus.
+  * ff6e5a89 `_call` an den eingesetzten Plätzen (.back(), m[key]): TestWriter.guard sieht den Aufruf der Quelle (sonst „an entry by a pointer“).
+  * 798186ff m[key]-Referenz nur halten, wenn die Map im Rest des Blocks nicht wieder genannt wird (gaps_barricade_doors: erase während st lebt –
+    BEFUND in stand/k.md).
+- BEREIT ZUM MERGEN 798186ff (stand/k.md). Belege: 135928-32635, 142617-9783, 145547-26283, CI 44532859846.
+- Neu offen: gaps_draw – `GapsState::Part& part = p.ember ? g.ember : g.disc;` (Referenz auf einen von zwei Plätzen: Bedingung beim Binden halten,
+  jede Verwendung als Wahl – Lesen select, Schreiben if/else).
+- Nächster Schritt: Warteliste des vollen Laufs (123021-18658 oder neuer) nach dem Einmischen lesen; extract, minimap_json, gaps_draw (oben).

@@ -26,7 +26,17 @@
   der Probe nur an Teilen anderer Dateien (send_world_to, send_swarm, gaps_riding, horn_low, vr_menu_json) – zeigt der volle Lauf.
   gaps_draw wartet jetzt an `GapsState::Part& part = p.ember ? g.ember : g.disc;` (Referenz auf einen von zwei Plätzen – neue Wartestelle,
   vorher verdeckt; nicht gebaut).
-- Beleg läuft: work-k-vergleich-145547-26283 (mvt, game_swarm, game_gaps, game_barricades, game.cpp auf 798186ff).
+- work-k-vergleich-145547-26283 (798186ff; mvt, game_swarm, game_gaps, game_barricades, game.cpp): convert/bau/alle rc=0, 52/52 ok in beiden
+  Durchgängen; gaps_barricade_doors/gaps_barricades_draw wieder geschrieben und gleich; Decoder::step, Writer::end_layer geschrieben und verglichen.
+
+## BEREIT ZUM MERGEN: 798186ff (4d14f00c … 798186ff, auf work-zusammen fc8752ab) – Beleg work-k-vergleich-145547-26283 + 135928-32635 + CI 44532859846
+- Belegt (geschrieben UND verglichen, ohne Abweichung, beide Durchgänge): Decoder::step, Writer::end_layer. Kein Rückschritt in 135928 (53/53),
+  145547 (52/52).
+- Sprache (da0e0f6f text.set_code): CI 44532859846 auf dd3bd1c5 – build „logic JIT: all cases match“, native ok (Rundreise, logic_cases
+  text_set_code, blueprint_native_test, game_native_test), determinism, input ok. e2e rot nur an „cannot convert int to int64 (voice)“
+  (game_equipment_cpp, sound_fx_cpp: das Level im Zweig ist älter als 5d804704 – nicht von hier), native-spawncity abgebrochen (Zeitgrenze).
+- Unbelegt (in den Proben warten sie nur an Teilen anderer Dateien – zeigt der volle Lauf): worldsync_update (state_pointer), swarm_update
+  (m[key]), gaps_jet_audio/gaps_sirens (Tupel, &q/&back()), hud_json (char&). gaps_draw wartet jetzt an `Part& part = c ? a : b` (offen).
 
 ### BEFUND (Quelltext des Spiels, für den Koordinator) – gaps_barricade_doors (game_barricades.cpp:39–43)
 - `std::vector<u8>& st = gaps_->planks[key];` lebt über `gaps_->planks.erase(it)` hinweg (mehr als 400 Gebäude): kern::Map hält die Einträge

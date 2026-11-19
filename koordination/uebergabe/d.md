@@ -296,3 +296,10 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
 - Danach aus ks Liste (Koordinator 13:45): GeoProjector::init (fail variadisch → Engine-Knoten fail(Text)), look_* (`kern::Mesh*`), handle_shots/run_buildings
   (Platz), „a member of Int is set“ (TextureDesc als Engine-Objekt mit Handle) – Entwurf selbst entscheiden.
 - Hinweis: zwei Merge-Commits (3c10e298 auf work-d-belege3, 275d3ddf auf work-d) tragen den Standardtext ohne Attribution (gepusht, kein Force-Push).
+- **15:00 (Ende Nachfolger 6):** work-d-make 49e5c319 BELEGT und gemeldet (vergleich 131505-2655 52/52 beide Durchgänge; Engine-Suite 141127-4668 rc=0).
+  Offen für den Nachfolger: (1) Ergebnis `work-d-konvert-125538-27289` (`./mag.sh holen …`; in convert.log.xz die 9 Platz-Funktionen suchen; rc und „written“-Zahl
+  mit dem vollen Lauf vergleichen – kein Rückfall „was written and waits now“). (2) work-d mit origin/work-zusammen (≥ fc8752ab, samt make) mischen, Generator neu,
+  dann `vergleich origin/work-d` über game.cpp + alle Game-Dateien mit Plätzen (game_events, game_lamps, game_look, game_foot_rounds, game_military, game_town, game_ui
+  und was die Kette sonst braucht – besser alle src/game*.cpp) und Engine-Suite auf work-d → „BEREIT ZUM MERGEN“ erst auf Wort des Koordinators einmischen.
+  (3) ks Liste (Koordinator 13:45): GeoProjector::init (fail variadisch → Engine-Knoten fail(Text)), look_* (`kern::Mesh*`), handle_shots/run_buildings (Platz),
+  „a member of Int is set“ (TextureDesc als Engine-Objekt mit Handle; stand/k.md „BEFUND FÜR d (08:55)“).
