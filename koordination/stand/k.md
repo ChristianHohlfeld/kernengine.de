@@ -1,5 +1,11 @@
 # Paket k – Stand (neuer Auftrag 04:40: B0–B3)
 
+## BEREIT ZUM MERGEN: 09dd6818 (B3 Index mit Schritt, auf B0–B2) – Beleg work-k-vergleich-062739-13858
+- vergleich game_foot_rounds, game_military, game_gaps, gaps_rules, road_graph, game.cpp auf 09dd6818: convert rc=0, bau rc=0; Stellvertreter 54/54 ok;
+  Engine selbst 53/54 – converted_Game__game_gaps_cpp nur durch LECK (MadeWith<GameWorld>, engine_make_default: Paket d), 0 Abweichungen.
+  Game::rocket_smoke_emit und Game::gaps_guided geschrieben und verglichen (vorher 2/20 bzw. 10/20). spawn_squad/spawn_tank warten in der Probe
+  (CityStream::ground_height, gaps_spawn_viewers) – gleiche Gestalt, zeigt der volle Lauf.
+
 ## BEREIT ZUM MERGEN: 5d804704 (B1 cdcd2f51 + B2 5d804704, auf B0) – Beleg work-k-vergleich-054057-841
 - vergleich sound_fx.cpp, game_life.cpp, game.cpp auf 5d804704: convert rc=0, bau rc=0, Stellvertreter 46/46 ok, Engine selbst 46/46 ok, keine Abweichung.
   Mat4::perspective, projection_matrix, SoundFx::drive, SoundFx::update geschrieben und verglichen. life_hud (Game/game_life_cpp) war in der Probe nicht
@@ -24,7 +30,7 @@
 | B0 kQuiet (convert rc=1) | dateieigene Konstanten zweier Teile nach Namen zusammengeführt | 8b8c0e10 | work-k-konvert-044336-12397: convert rc=0, 1695/1652, 20 wartend | belegt |
 | B1 Mat4_perspective 300/300, projection_matrix 62/300 (.m[15] Quelle 1) | Test-Schreiber: `memset(r.m, 0, sizeof r.m)` → sizeof des Programms (64), im Test sind die 16 f32 aber 64-bittig: nur m[0..7] genullt | cdcd2f51 (converted::layout::set_bytes) | work-k-vergleich-054057-841: beide Durchgänge 46/46 ok (Mat4::perspective, projection_matrix geschrieben und verglichen) | belegt |
 | B2 SoundFx_drive/update `.l.voice` | qtype löste `VoiceId` (= u64) zu `unsigned long` → Int; Engine-Tabelle ebenso (voice-Eingänge der Mixer-Knoten Int) | 5d804704 (WIDE_NAMES; engine_api neu erzeugt: 8 Eingänge Int64) | work-k-vergleich-054057-841: SoundFx::drive/update verglichen, beide Durchgänge ok; Level las die Texte (convert rc=0) | belegt (Engine-Suite noch offen) |
-| B3 rocket_smoke_emit 2/20, spawn_squad 10/20, spawn_tank 5/20 (rng_.s), vermutl. gaps_guided | Name für einen Eintrag, dessen Index etwas ändert (`r = g.a[g.cur++ % n]`, `L = lanes[rng_.next() % n]`): steps_in sah Änderungen an Feldern des Objekts / hinter *ptr nicht → Index je Nutzung neu (4× ++, mehrere rng-Züge) | 09dd6818 | – | gebaut, unbelegt |
+| B3 rocket_smoke_emit 2/20, spawn_squad 10/20, spawn_tank 5/20 (rng_.s), vermutl. gaps_guided | Name für einen Eintrag, dessen Index etwas ändert (`r = g.a[g.cur++ % n]`, `L = lanes[rng_.next() % n]`): steps_in sah Änderungen an Feldern des Objekts / hinter *ptr nicht → Index je Nutzung neu (4× ++, mehrere rng-Züge) | 09dd6818 | work-k-vergleich-062739-13858: rocket_smoke_emit, gaps_guided geschrieben, beide Durchgänge ohne Abweichung (gegen die Engine nur das bekannte LECK GameWorld aus engine_make_default, d); spawn_squad/tank in der Probe nicht geschrieben | belegt für rocket_smoke_emit/gaps_guided; spawn_* zeigt der volle Lauf |
 | B3 life_hud 1/33 (gegen die Engine) | `"bubbles"` x 0.5578/0.5579 – projection_matrix im Test der Quelle (B1) | cdcd2f51 | – | vermutlich mit B1 |
 | B3 number_at 8/300, game_details `.Result` | kein Konverterfehler: alle 8 Fälle mit from > s.size() – `s.c_str() + from` jenseits des Endes (UB) | – | Einzelausgabe 032626 | BEFUND FÜR t1 |
 

@@ -150,3 +150,6 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
 - work-k-vergleich-060032-8835 (09dd6818): 52/52 ok, aber die B3-Funktionen waren NICHT geschrieben (unit_hash in gaps_rules.cpp, lane_signature in
   road_graph.cpp, put in combat_art.cpp fehlten) – kein Beleg. Neu: work-k-vergleich-062739-13858 (foot_rounds, military, gaps, gaps_rules, road_graph, game.cpp).
 - Befunde t1 (equipment ui_radio SEGV, number_at UB) und offene Punkte (mp_hud_json connected, draw_events) in stand/k.md.
+- 07:25 B3 (09dd6818) BELEGT für rocket_smoke_emit/gaps_guided (work-k-vergleich-062739-13858; real-FAIL nur LECK von d) → BEREIT ZUM MERGEN 09dd6818.
+  Nächster Schritt für den Nachfolger: nach dem vollen Lauf des Koordinators spawn_squad/spawn_tank, life_hud, draw_events, mp_hud_json prüfen;
+  Engine-Suite mit der neuen Engine-Tabelle (5d804704) prüfen.
