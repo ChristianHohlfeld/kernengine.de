@@ -458,6 +458,16 @@ def bound_type(v):
     t["desugaredQualType"] = f"{base} {'&&' if spelled.endswith('&&') else '&'}"
 
 
+def calls_in(n):
+    """Does this expression call a function - of the program, of the engine, an operator of a class (what can see or
+    change what another part of the statement changes, and what the engine sees in its order)?"""
+    if n is None:
+        return False
+    if n.get("kind") in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr"):
+        return True
+    return any(calls_in(c) for c in kids(n))
+
+
 def kids(n):
     """The parts of a node (without the comments and attributes that stand with a declaration). An array written
     out with fewer values than it has entries (`f32 a[20] = {x, 2}`): the compiler's tree names what fills the
@@ -2956,6 +2966,7 @@ class Emit:
         self.locals = []      # (name, type): declared at the top of the body
         self.lengths = {}     # the local variables that are lists of a fixed length (name -> length)
         self.taken = set()
+        self.made = set()     # the local variables of the function's own making (temp)
         self.index = {}       # decl id of a loop's counter -> "n12.index"
         self.pre = []         # steps to run before the statement being written
         self.loops = []       # the loops around the statement being written: their flags for break and continue
@@ -3067,6 +3078,7 @@ class Emit:
         a value for a reference of that type)."""
         name = self.u.fresh(want, self.taken)
         self.taken.add(name)
+        self.made.add(name)
         self.locals.append((name, t))
         if fixed:
             self.lengths[name] = fixed
@@ -3313,6 +3325,46 @@ class Emit:
             raise Hoists("a call that changes something, in a part of an expression that does not always run")
         self.pre += lines
 
+    def operand(self, done, node, t, write, place=False):
+        """Writes the next operand of a call - of the program, of the engine, of a format -, after those in `done`
+        ([node, type, text, place] each), in the order C++ works them out (from the left, as clang does - E13).
+        The steps an operand needs run before the statement (hoist), the operands written before it stand in the
+        statement itself and so would run after them: where the steps can see or change what such an operand
+        reads, or the operand calls a function (the engine sees its calls in their order), it is held first, in
+        a variable of its own, before the steps. Never held: a place (a reference binds it, the function reads it
+        when it runs - as C++ does), a number or a text written out, a variable made for a value already.
+        Gives the operand's text; `done` gets it (its text can change to the variable that holds it)."""
+        if self.cond_depth:   # (where steps are refused - see hoist - nothing is moved before the statement)
+            text = write()
+        else:
+            pre, text = self.lazily(write)
+            if pre:
+                calm = self.calm(pre)
+                for e in done:
+                    if e[3] or self.unmoved(e[2]) or (calm and not calls_in(e[0])):
+                        continue
+                    held = self.temp("arg", e[1])
+                    self.hoist([f"{held} = {e[2]};"])
+                    e[2] = held
+                self.hoist(pre)
+        done.append([node, t, text, place])
+        return text
+
+    def calm(self, lines):
+        """Do these steps change nothing but variables of the function's own making, each set to a value (no call
+        that changes something, no store into a place of the function)?"""
+        for ln in lines:
+            m = re.fullmatch(r"(\w+) = (.*);", ln, re.S)
+            if m is None or m.group(1) not in self.made:
+                return False
+        return True
+
+    def unmoved(self, text):
+        """Is this text of an operand the same before and after any step: a number or a text written out, a
+        variable made for a value, what a call made as a step gave (n12.Result)?"""
+        return (re.fullmatch(r'-?\d+(\.\d*)?([eE][-+]?\d+)?|"(?:[^"\\]|\\.)*"|true|false', text) is not None
+                or text in self.made or re.fullmatch(r"n\d+\.Result", text) is not None)
+
     def lazily(self, fn):
         """Writes a part of an expression apart from the statement it stands in: (the steps it needs, its text)."""
         saved, self.pre = self.pre, []
@@ -3489,7 +3541,7 @@ class Emit:
         integer conversion writes goes in as the text of its 64 bits - Int64 to Text Signed (d i), Int64 to Text (u),
         Int64 to Hex (x) - at a %s of the same width and the same `-` (the digits are the same; printf pads a
         number and a text alike); another flag, a precision or another conversion of one: Wait."""
-        out, values, at, k = [], [], 0, 0
+        out, done, at, k = [], [], 0, 0   # (the values in the order C++ works them out - see operand)
         while at < len(fmt):
             if fmt[at] != "%":
                 out.append(fmt[at])
@@ -3502,16 +3554,16 @@ class Emit:
                 k += 1
                 w = self.bits64(x) if t == "Int" else None
                 if w is None:
-                    values.append(self.ex(x, t))
+                    self.operand(done, x, t, lambda: self.ex(x, t))
                 else:
                     node = {"d": "int64_text_signed", "i": "int64_text_signed", "u": "int64_text", "x": "int64_text_hex"}.get(m.group(5))
                     if node is None or set(m.group(1)) - {"-"} or m.group(3) is not None or m.group(4) in ("h", "hh"):
                         raise Wait("a 64-bit number in a format Int64 to Text does not write so (a flag, a precision, X, o, c)")
                     spec = f"%{m.group(1)}{m.group(2)}s"
-                    values.append(f"{node}({self.ex(w, 'Int64')})")
+                    self.operand(done, x, "Text", lambda: f"{node}({self.ex(w, 'Int64')})")
             out.append(spec)
             at += m.end()
-        return "".join(out), values
+        return "".join(out), [e[2] for e in done]
 
     @staticmethod
     def format_kinds(fmt):
@@ -6181,14 +6233,14 @@ class Emit:
             # is not written here yet)
             raise Wait(f"the engine's {d.get('name')}() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)")
         u.engine_calls[d["id"]] = f
-        ins, texts, own = list(f["ins"]), [], None
+        ins, done, own = list(f["ins"]), [], None   # (done: the inputs in the order C++ works them out - see operand)
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
             # (of an object of the engine: its handle; of plain data the engine defines the method of - MeshData::as_input
             # -: the value, the node's first input, and what a method that is not const makes of it its output `self`)
             _, bt, handle = ins.pop(0)
             if obj is None or self.is_this(obj):
                 raise Wait("a call of the engine on its own object")
-            texts.append(self.ex(obj, bt))
+            self.operand(done, obj, bt, lambda: self.ex(obj, bt))
             own = obj
         params = [p for p in kids(d) if p.get("kind") == "ParmVarDecl"]
         nodes = {}   # pin -> the argument it is (an output: where the call wants it - None: nowhere)
@@ -6234,11 +6286,12 @@ class Emit:
             while made.get("kind") in ("MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "CXXFunctionalCastExpr") and len(kids(made)) == 1:
                 made = self.unwrap(kids(made)[0])
             if bt in u.struct_fields and made.get("kind") in ("CXXConstructExpr", "InitListExpr", "CXXTemporaryObjectExpr") and not [x for x in kids(made) if x.get("kind") != "CXXDefaultArgExpr"]:
-                texts.append(u.zero(bt))   # ({} - the struct with its defaults)
+                done.append([a, bt, u.zero(bt), True])   # ({} - the struct with its defaults)
             elif bt.startswith("List<") and (re.search(r"\*\s*(const)?$", raw) or "Span<" in raw):
-                texts.append(self.as_list(a, bt))
+                self.operand(done, a, bt, lambda: self.as_list(a, bt))
             else:
-                texts.append(self.ex(a, bt))
+                self.operand(done, a, bt, lambda: self.ex(a, bt))
+        texts = [e[2] for e in done]
         fn = f["type"].replace(".", "_")
         outs = f["outs"]
         if f["value"]:
@@ -7963,7 +8016,6 @@ class Emit:
         self.f.indexes = self.f.indexes or g.indexes
         if g.state and g.mutates and self.f.state and not self.f.mutates:
             self.f.mutates, self.f.pure = True, False   # (what a function of the state it calls changes, it changes)
-        texts = []
         params = g.params
         if any(x.get("kind") == "CXXDefaultArgExpr" for x in args):
             # an argument the call leaves out: the default the function's declaration gives it
@@ -7988,6 +8040,7 @@ class Emit:
             args = filled
         kinds = g.kinds
         after = []   # (what is stored back after the call: reference arguments that are no places of the notation)
+        done = []    # (the inputs written so far, in the order C++ works them out - see operand)
         if g.state and obj is not None and not self.is_this(obj):
             raise Wait(f"a function of the Blueprint {self.u.name} on another object of its state")
         if g.self_type is not None and not g.ctor:
@@ -7996,9 +8049,9 @@ class Emit:
                     raise Wait("a method of another object is called as its own")
                 if kinds[0] == "ref":
                     self.self_var()   # (a method that only reads its object does not call one that changes it)
-                texts.append(self.self_name)
+                done.append([None, None, self.self_name, True])
             else:
-                texts.append(self.place_arg(obj, g.self_type, kinds[0], after, raising=self.may_raise(g)))
+                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after, raising=self.may_raise(g)), place=True)
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
@@ -8010,12 +8063,18 @@ class Emit:
                 self.logic_arg(a)
                 continue
             if first + j in g.pointers:   # (a pointer into a list: the list and the place in it - Unit.pointed)
-                texts += self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))
+                two = []
+                self.operand(done, a, None, lambda: two.extend(self.pointer_arg(a, params[j][1][5:-1], g.fixed.get(first + j))), place=True)
+                done[-1:] = [[a, None, x, True] for x in two]
                 j += 2
                 continue
             (_, pt), kind = params[j], kinds[j]
-            texts.append(self.place_arg(a, pt, kind, after, g.fixed.get(first + j), raising=self.may_raise(g)) if kind else self.ex(a, pt))
+            if kind:
+                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j), raising=self.may_raise(g)), place=True)
+            else:
+                self.operand(done, a, pt, lambda: self.ex(a, pt))
             j += 1
+        texts = [e[2] for e in done]
         gives = g.self_type if g.ctor else g.value
         texts = [texts[i] for i in g.order()]   # (as the Blueprint function has its inputs: those by reference first)
         call = f"{g.name}({', '.join(texts)}).Result"
