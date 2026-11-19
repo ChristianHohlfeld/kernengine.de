@@ -143,3 +143,6 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
 - Beleg B1+B2: work-k-vergleich-054057-841 (sound_fx.cpp, game_life.cpp, game.cpp; erwartet: Mat4_perspective/projection_matrix, SoundFx_*, life_hud ohne Abweichung).
 - B3 aus work-zusammen-suite-alle-043356-8771 (entpackt in $S/mag/<name>/e/): mp_hud_json 7/20 (`"connected"` Quelle false / Blueprint true),
   draw_events, gaps_guided, rocket_smoke_emit, spawn_squad/tank (rng_.s), equipment/look: ASan SEGV in libc. number_at → BEFUND t1 (UB).
+- 09dd6818 B3: steps_in → assigned(steps=True): eine Änderung ohne Variable der Funktion (Feld von this, *unique_ptr) zählt als Schritt; damit
+  bekommt `P& r = g.a[g.cur++ % n]` / `const Lane& L = lanes[rng_.next() % n]` seinen Index einmal (`r_at`). Kleinstfall /tmp/k_r.
+  Beleg geplant: vergleich game_foot_rounds, game_military, game_gaps, game_events, game.cpp (nach 054057-841).

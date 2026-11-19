@@ -194,3 +194,11 @@
   run_tests.sh linkt app, test_main.cpp gibt kern_create_app() = nullptr (wie kern/tests). Keine Regel des Makers nötig.
 - Beleg-Zweig **work-d-belege2 = f5030c78** (work-zusammen 12438d1c + leck + weld + app, Generator reproduziert). Läuft:
   `work-d-belege2-vergleich-050059-20415` (city_stream.cpp, game_controls.cpp, game.cpp). Danach Engine-Suite auf work-d-belege2.
+- 05:50: `work-d-belege2-vergleich-050059-20415` bau rc=1 (app.cpp braucht kern::c_api_renderer → auch kern/src/api linken; work-d-app 3cb92099).
+  `work-d-belege2-vergleich-052701-29611` (city_stream, game_controls, game): **Stellvertreter 49/49 ok; real 48 ok, 0 LECK**, converted_city_stream(_cpp)
+  ok (D2: kein ASan in weld mehr), converted_Game__game_cpp ok; einziges FAIL real converted_game_controls_cpp: UBSan app.h:40 Input::down(Key::count)
+  (Test zieht count als Wert von Key) → Zweig **work-d-key = 0c8e767f** (Input prüft den Bereich wie bus_name).
+- Lauf 043356 gegen die Engine: übrig „the handle names no Client/RoadBuilder/Earcut/LightPool that was made“ bei release (BEFUND t1: look_apply_tier)
+  → Zweig **work-d-release = 28b67b2b**: release eines Handles ohne Objekt beendet das, das on_missing dort macht (LightPool hat einen Macher).
+- Beleg-Zweig work-d-belege2 = 7b1a05ed (+key, +release). Läuft: `work-d-belege2-vergleich-055045-6922` (city_stream, game_controls, game, net_session,
+  game_look). Danach Engine-Suite auf work-d-belege2.

@@ -19,6 +19,7 @@
 | B0 kQuiet (convert rc=1) | dateieigene Konstanten zweier Teile nach Namen zusammengeführt | 8b8c0e10 | work-k-konvert-044336-12397: convert rc=0, 1695/1652, 20 wartend | belegt |
 | B1 Mat4_perspective 300/300, projection_matrix 62/300 (.m[15] Quelle 1) | Test-Schreiber: `memset(r.m, 0, sizeof r.m)` → sizeof des Programms (64), im Test sind die 16 f32 aber 64-bittig: nur m[0..7] genullt | cdcd2f51 (converted::layout::set_bytes) | – | gebaut, unbelegt |
 | B2 SoundFx_drive/update `.l.voice` | qtype löste `VoiceId` (= u64) zu `unsigned long` → Int; Engine-Tabelle ebenso (voice-Eingänge der Mixer-Knoten Int) | 5d804704 (WIDE_NAMES; engine_api neu erzeugt: 8 Eingänge Int64) | – | gebaut, unbelegt (braucht auch Engine-Suite) |
+| B3 rocket_smoke_emit 2/20, spawn_squad 10/20, spawn_tank 5/20 (rng_.s), vermutl. gaps_guided | Name für einen Eintrag, dessen Index etwas ändert (`r = g.a[g.cur++ % n]`, `L = lanes[rng_.next() % n]`): steps_in sah Änderungen an Feldern des Objekts / hinter *ptr nicht → Index je Nutzung neu (4× ++, mehrere rng-Züge) | 09dd6818 | – | gebaut, unbelegt |
 | B3 life_hud 1/33 (gegen die Engine) | `"bubbles"` x 0.5578/0.5579 – projection_matrix im Test der Quelle (B1) | cdcd2f51 | – | vermutlich mit B1 |
 | B3 number_at 8/300, game_details `.Result` | kein Konverterfehler: alle 8 Fälle mit from > s.size() – `s.c_str() + from` jenseits des Endes (UB) | – | Einzelausgabe 032626 | BEFUND FÜR t1 |
 

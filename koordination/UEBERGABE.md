@@ -885,3 +885,26 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - Fünf Neustarts des Servers hinter der Sitzung bisher (21:30, 22:43, 02:28, 03:10, 03:52) – laufende Agenten werden dabei abgebrochen und per SendMessage an ihre
   ID fortgesetzt (zuletzt geschah das teils automatisch); mag ist davon unberührt.
 
+### 16.22 Stand 06:00 (19.11.) – 138 von 150 Tests ok, 1695 von 1844 Funktionen geschrieben; voller Lauf 055004 rechnet
+- **Engine-Fix cpp_names (12438d1c) bewiesen:** `work-zusammen-engine-043403-8808` rc=0; Kontrolllauf `work-zusammen-suite-alle-043356-8771` (Level und Tests des
+  Laufs 020121 + beide Fixe des Koordinators): **Stellvertreter 138 ok / 12 FAIL / 1 ZEIT; Engine selbst 127 ok / 23 FAIL / 11 LECK / 1 ZEIT** (vorher 113/35/4 und
+  108/39/9 LECK/3). Auswertung: stand/t1.md „SUITE 020121b“.
+- **work-zusammen = fe83683e** = 12438d1c + Merge work-k 8b8c0e10 (kQuiet-Regel: dateieigene Konstanten gleichen Namens verschiedener Teile heißen `<datei>_<name>`;
+  enthält t1b c5b8ab99 – Familien kReliable, CarSpec/World, g_fun; 247dab47) + Merge work-t1 c13e917c (mvt, life, game_look/equipment, LightPool-Stellvertreter,
+  get_u8 – letzteres nur im ganzen Programm belegbar). Beleg der Konvertierung: `work-k-konvert-044336-12397` convert rc=0 – **1695 von 1844 Funktionen geschrieben
+  (21450 von 30978 Zeilen), 1652 verglichen, 20 „cannot compare it yet“, 18 „waits for good“** (020121: 1637 / 19218 / 1594 / ~116 / 16).
+- **Voller Lauf: `work-zusammen-voll-055004-6649` auf fe83683e, Start 05:50:35** (Konvertierung bis ~06:25, Suiten danach – die erste ganze Spiel-Suite am Stück mit
+  dem berichtigten Testrahmen, mit eigenen Tests, tests/lowered und native). Nach convert rc=0: `grundlage` im Zweig mag/auftrag auf diesen Lauf.
+  Er wird nicht grün sein – bekannt offen:
+  · **k (läuft, work-k):** Mat4 `.m[15]` (Ursache laut k im Test: memset auf f32-Liste; cdcd2f51 unbelegt), SoundFx `.l.voice` (5d804704: Alias einer 64-Bit-Zahl
+    bleibt Int64, ändert engine_api – unbelegt, Beleg `work-k-vergleich-054057-841`), draw_events, rocket_smoke_emit, gaps_guided, spawn_squad/spawn_tank (`rng_.s`),
+    mp_hud_json; number_at 8/300 (from > s.size(): was C++ offen lässt → Test).
+  · **d (läuft, work-d / kurze Zweige work-d-…):** 11 LECK aus engine_make_default (im eigenen Lauf `work-d-belege2-vergleich-052701-29611` schon 0 LECK, noch nicht
+    gemeldet), ASan in kern::weld (city_stream gegen die Engine), 14 × „only 0 calls could be compared“, Maker für LightPool (look_apply_tier), key.
+  · **t1 (beendet 05:52; Nachfolger nach dem Lauf):** get_u8 im vollen Lauf prüfen; Graph als Wert/request_level (E12); ein Test, der gegen die Engine einmal FAIL
+    und einmal ok zeigt (game_details_cpp); ZEIT converted_Game__game (>20 min in beiden Durchgängen – hängt er oder rechnet er nur lang?).
+  · 16–18 Funktionen in Rekursion über Teile (Entwurfspunkt Stufe 6), ~149 nicht geschriebene (Platz der Engine, Callbacks, Events – Stufe 6), 271 cost-Zeilen und
+    der Zeit-Test (Paket p) – nach dem ersten grünen Stand.
+- **Was für den ersten grünen Stand in `work` fehlt:** die Punkte von k und d oben belegt und gemergt, dann ein voller Lauf mit `convert rc=0`, `suite rc=0`
+  (beide Durchgänge), `engine rc=0` → work-zusammen + „Level und Tests“ nach `work`, CI (der Job native-spawncity läuft bisher in seine 45-Minuten-Grenze).
+
