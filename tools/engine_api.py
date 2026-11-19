@@ -258,6 +258,9 @@ class Calls:
         u = self.u
         if bt in SCALAR_TAG:
             return ev + SCALAR_TAG[bt]
+        if c2b.callback_parts(bt):
+            r, a = c2b.callback_parts(bt)
+            return f"{ev}Callback<{self.tag(r, need, ev, types) if r else 'void'}({', '.join(self.tag(x, need, ev, types) for x in a)})>"
         if bt.startswith("List<"):
             return f"{ev}List<{self.tag(bt[5:-1], need, ev, types)}>"
         if bt in u.enum_values:

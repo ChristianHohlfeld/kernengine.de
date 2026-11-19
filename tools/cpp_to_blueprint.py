@@ -1096,6 +1096,43 @@ def count_per(t):
     return int(m.group(1)) if m else None
 
 
+CALLBACK_VALUES = ("Bool", "Int", "Float", "Vector", "Int64")   # (what the engine hands a Callback and what it gives: values C++ passes as values)
+CALLBACK_PIN = {"Bool": "bool", "Int": "int", "Float": "float", "Vector": "vector", "Int64": "int64"}
+
+
+def split_top(text):
+    """The parts of a list of types at its top level: "f64, std::pair<a, b>" -> ["f64", "std::pair<a, b>"]."""
+    out, depth, cur = [], 0, ""
+    for ch in text:
+        if ch in "<([":
+            depth += 1
+        elif ch in ">)]":
+            depth -= 1
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        out.append(cur.strip())
+    return out
+
+
+def callback_parts(bt):
+    """A Callback's Blueprint type "Callback<Float(Float, Float)>": (its result - None: it gives nothing -, its inputs);
+    None for any other type."""
+    m = re.fullmatch(r"Callback<(\w+)\((.*)\)>", bt or "")
+    if not m:
+        return None
+    return (None if m.group(1) == "void" else m.group(1)), split_top(m.group(2))
+
+
+def callback_of(bt):
+    """What TypeRef::of says of a Callback (kern/include/kern/logic/logic.h, callback_of): "float(float,float)"."""
+    r, a = callback_parts(bt)
+    return (CALLBACK_PIN[r] if r else "") + "(" + ",".join(CALLBACK_PIN[x] for x in a) + ")"
+
+
 def template_args(t):
     """The arguments of a template type's name: "std::pair<int, std::vector<float>>" -> ["int", "std::vector<float>"]."""
     a, b = t.find("<"), t.rfind(">")
@@ -1626,12 +1663,66 @@ class Unit:
         self.objects_seen.add(q)
         return q
 
+    def callback_record(self, q):
+        """The record `q` as a Callback: a struct of the engine of exactly a pointer to a function that takes a void* in
+        front and that void* (kern::HeightSampler: fn, user - the function the engine calls and what it hands it) - its
+        Blueprint type "Callback<Float(Float, Float)>"; None for any other record."""
+        rec = self.tree.records.get(q)
+        if rec is None or not q.startswith(ENGINE + "::"):
+            return None
+        fields = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
+        if len(fields) != 2:
+            return None
+        fn, user = (re.sub(r"\s+", " ", qtype(c).strip()) for c in fields)
+        m = re.fullmatch(r"(.+?)\s*\(\s*\*\s*\)\s*\((.*)\)", fn)
+        if not m or user.replace(" ", "") != "void*":
+            return None
+        args = split_top(m.group(2))
+        if not args or args[0].replace(" ", "") != "void*":
+            return None
+        return self.callback_sig(m.group(1), args[1:], same=True)
+
+    def callback_sig(self, result, args, same=False):
+        """The Callback of a C++ signature: its result and its inputs, each a value C++ hands over as a value (Bool, Int,
+        Float, Vector, Int64). `same`: the engine calls the class's thunk itself (a function pointer, no std::function
+        between) - then each is the type the class has for it: bool, f64, Vec3 (an Int of the class is a Whole)."""
+        def one(raw):
+            t = self.clean(raw)
+            if t == "void":
+                return "void"
+            bt = self.btype(raw)
+            if bt not in CALLBACK_VALUES:
+                raise Wait(f"a callback that is handed or gives a {bt} (a Callback: Bool, Int, Float, Vector, Int64)")
+            if same and (bt in ("Int", "Int64") or (bt == "Float" and t not in ("double", "f64", "kern::f64")) or (bt == "Vector" and t != "kern::Vec3")):
+                raise Wait(f"a callback through a function pointer that is handed or gives a {t} (the class's thunk has f64, bool, Vec3)")
+            return bt
+        r = one(result)
+        ins = [one(a) for a in args if a.strip() not in ("", "void")]
+        if "void" in ins:
+            raise Wait("a callback handed nothing (void)")
+        return f"Callback<{r}({', '.join(ins)})>"
+
+    def callback_type(self, raw):
+        """The Callback a C++ type is: std::function<R(A...)>, or a struct of the engine that is one (callback_record).
+        None: no such type."""
+        t = self.clean(raw)
+        m = re.fullmatch(r"std::function<(.+?)\s*\((.*)\)>", t)
+        if m:
+            return self.callback_sig(m.group(1), split_top(m.group(2)))
+        try:
+            q = self.find_type(t) if t.startswith(ENGINE + "::") else None
+        except Wait:
+            q = None
+        return self.callback_record(q) if q else None
+
     def engine_object(self, q):
         """Is the class `q` of the engine an object with a life of its own (a handle in a Blueprint), not
         plain data? A `class` is one (its state is its own: the engine's convention), and so is a struct
         that cannot be a struct of the Blueprint (a pointer in it, a field without a Blueprint type).
-        Api.opaque asks the same."""
+        Api.opaque asks the same. (A struct that is a Callback is a value: callback_record.)"""
         if not q.startswith(ENGINE + "::") or q not in self.tree.records or q in (ENGINE + "::Vec3", ENGINE + "::Vec2"):
+            return False
+        if self.callback_record(q):
             return False
         rec = self.tree.records[q]
         if rec.get("tagUsed") == "class":
@@ -1682,6 +1773,9 @@ class Unit:
             # said here, where the type still says that what its entries point at is not changed)
             inner = re.sub(r"\[\d*\]\s*$", "", raw.strip(), count=1).strip()
             return f"List<{self.element(self.btype(inner), self.entries(inner))}>"
+        cb = self.callback_type(raw) if "*" not in re.sub(r"<.*>|\(.*\)", "", raw) else None
+        if cb:
+            return cb
         if self.object_of(raw):
             return "Int"
         t = self.clean(raw)
@@ -1946,8 +2040,8 @@ class Unit:
             return ZERO[t]
         if re.match(r"Fixed<(.+), (\d+)>$", t):   # (a list of a fixed length: what its text does not say is zero)
             return t + "{}"
-        if t.startswith(("List<", "Map<", "Set<")):
-            return t + "{}"
+        if t.startswith(("List<", "Map<", "Set<", "Callback<")):
+            return t + "{}"   # (a Callback: unbound)
         if t in self.enum_values:
             return f"{t}::{self.enum_values[t][0]}"
         if t in self.struct_fields:
@@ -9731,6 +9825,8 @@ class Api:
         """(pin type, the struct or enum it names) of a Blueprint type."""
         if bt in ENGINE_PIN:
             return ENGINE_PIN[bt], ""
+        if callback_parts(bt):
+            return "callback", callback_of(bt)
         if bt in self.u.enum_values:
             return "enumeration", bt
         if bt in self.u.struct_fields:
@@ -9747,6 +9843,9 @@ class Api:
         length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it)."""
         if bt in ENGINE_PIN:
             return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
+        if callback_parts(bt):   # (c, what it gives - none: nothing -, and in brackets what it is handed: cn(nn))
+            r, a = callback_parts(bt)
+            return "c" + (self.shape(r) if r else "") + "(" + "".join(self.shape(x) for x in a) + ")"
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:
