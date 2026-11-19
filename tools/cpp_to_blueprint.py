@@ -13141,6 +13141,12 @@ class TestWriter:
             decl = tree.decl.get(i)
             if decl is None or decl.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
                 return
+            if function_key(tree, decl) not in self.closures:
+                # (the Blueprint whose file it stands in has not handed it on - it is none this one calls, only its test
+                # holds it: a destructor runs what it calls where a value ends. That Blueprint is one this one needs: main)
+                part = u.world.part_of_function(tree, decl)
+                if part is not None and part != u.name:
+                    u.missing.add((part, function_key(tree, decl)))
             for place in self.closures.get(function_key(tree, decl), ()):
                 if place in G.wanted:
                     continue
