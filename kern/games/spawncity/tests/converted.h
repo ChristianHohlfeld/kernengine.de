@@ -1445,11 +1445,14 @@ struct Tally {
   std::string first_refused;         // (the first such call of the source: said in the note)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
+  double class_seconds = 0, interpreter_seconds = 0;   // (where the function's time went: said in its "time:" line)
+  mutable int drawn = 0;                               // (the calls drawn: what more() was asked for)
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(const char* f) : function(f) { cost::tracing = cost::where() && std::strcmp(cost::where(), f) == 0; }
   /// Is there another call to make? Up to kCalls compared ones; of a function that takes long, as many
   /// as two seconds have room for, but twenty at least. (What the source says nothing for is drawn again.)
   bool more(int tried) const {
+    drawn = tried;
     if (compared >= kCalls || tried >= kCalls * 20) return false;
     if (compared >= 20) return seconds() < 2.0;
     return compared < 5 || seconds() < kLong;
@@ -1503,9 +1506,12 @@ struct Tally {
     const bool ib = bp.native->call(function, args, b);
     const long class_asks = g_class_asks;
     const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
+    class_seconds += took;
     const bool both = took < 0.005;
     if (both) bp.before_call(false);
+    const auto interpreter_began = std::chrono::steady_clock::now();
     const bool ia = both ? bp.interp->call(function, args, a) : ib;
+    interpreter_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - interpreter_began).count();
     if (state && changes) {
       b.push_back(read_state(*bp.native, *state));
       if (both) a.push_back(read_state(*bp.interp, *state));
@@ -1567,6 +1573,11 @@ struct Tally {
   void given_up() { ++outside; }
   ~Tally() {
     cost::tracing = false;
+    // (a function that takes the test a second or more: where the time went - the class, the interpreter, or the rest: drawing the
+    // arguments and the object, setting the Blueprints' variables, the source's call, comparing)
+    if (seconds() >= 1.0)
+      std::printf("  time: %s: %.1f s (the class %.1f s, the interpreter %.1f s, the rest %.1f s) - %d calls drawn, %d compared\n", function, seconds(), class_seconds,
+                  interpreter_seconds, seconds() - class_seconds - interpreter_seconds, drawn, compared);
     if (class_only > 0)
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
