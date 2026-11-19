@@ -1398,6 +1398,7 @@ class Unit:
         self.next_node = 10 + (self.world.part_numbers.get(self.job, 0) << 20)
         self.enum_aliases = {}      # (enum, a value's name) -> the earlier value of the same number it is
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
+        self.lambda_vars = {}   # (a local function's variable -> its lambda: `auto gone = [&](...) {...};`, named where an algorithm is given it)
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
         self.objects_seen = set()   # the engine's classes it holds handles of
@@ -5938,8 +5939,14 @@ class Emit:
             k = x.get("kind")
             if k == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in self.names:
                 take(x["referencedDecl"]["id"], x, x["referencedDecl"]["id"] in changed)
-            elif k == "CXXOperatorCallExpr" and callee(x).get("referencedDecl", {}).get("id") in u.lambdas:
-                other = u.lambdas[callee(x)["referencedDecl"]["id"]]   # (a local function it calls: what that one uses, it gets too)
+            elif (k == "CXXOperatorCallExpr" and callee(x).get("referencedDecl", {}).get("id") in u.lambdas) or (k == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in u.lambda_vars):
+                # (a local function it calls - or names, to hand it to an algorithm: what that one uses, it gets too)
+                if k == "DeclRefExpr":
+                    named_ = u.lambda_vars[x["referencedDecl"]["id"]]
+                    op_ = next((c for c in kids(next((r for r in kids(named_) if r.get("kind") == "CXXRecordDecl"), {})) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), {})
+                    other = u.lambdas[op_["id"]]
+                else:
+                    other = u.lambdas[callee(x)["referencedDecl"]["id"]]
                 if other["snapshots"]:
                     raise Wait("a local function that calls one that captures by value")
                 for i, node, is_changed in other["free"]:
@@ -5978,6 +5985,8 @@ class Emit:
         if this_used:
             tree.owner[method["id"]] = tree.owner.get(outer["id"])
         u.lambdas[method["id"]] = {"free": free, "args": args, "snapshots": not by_ref}
+        if v.get("id"):
+            u.lambda_vars[v["id"]] = lam
         g = u.function(method["id"])
         g.lifted = True
         return lines
@@ -7224,6 +7233,8 @@ class Emit:
                 b = self.unwrap(kids(b)[0])
             d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
             lam = self.lambda_of(kids(d)[-1]) if d is not None and d.get("init") and kids(d) else None
+            if lam is None and b.get("kind") == "DeclRefExpr":   # (a local function of the function, or of one it stands in)
+                lam = self.u.lambda_vars.get(b.get("referencedDecl", {}).get("id"))
             if lam is None:
                 raise Wait(f"algorithm: std::{name} with a function value that is no lambda")
         else:
