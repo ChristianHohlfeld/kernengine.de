@@ -4696,7 +4696,15 @@ TEST(logic_fixed_widths) {
   CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
   CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
   CHECK(says("  Map<Int, U32> Bad = Map<Int, U32>{};\n", "Int of a fixed width"));
-  CHECK(says("  List<U8> Bytes = List<U8>{};\n", "a list of Ints of a fixed width is no type of the language yet"));
+  // a list of Ints of a fixed width: its default holds its values; a list of another width (or of Int) is another type; Copy Bytes
+  // writes numbers of its width into it; a field of a width has its own width in a layout
+  CHECK(says("  List<U8> Bad = List<U8>{1, 256};\n", "a list's item: 256 is no U8"));
+  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_append(W, B);\n  }\n",
+             "this is List<U8>, the input is List<Int>: the two do not convert"));
+  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_copy_bytes<\"u32\", \"u8\">(B, 0, W, 0, 4);\n  }\n",
+             "its numbers are u8, not u32"));
+  CHECK(says("  KERN_STRUCT(H) {\n    U8 a = 0;\n  };\n  List<U16> B = List<U16>{};\n  H Hh = H{0};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    Hh = struct_of_bytes<H, \"2: u16@0\">(B, 0);\n  }\n",
+             "its own width"));
   {
     // ... and a graph that says it wrong
     logic::Graph h;
@@ -4705,6 +4713,21 @@ TEST(logic_fixed_widths) {
     std::string all;
     for (const logic::Issue& i : logic::check(h)) all += i.text + "\n";
     CHECK(all.find("variable \"W\" is U16, its default 70000 is none of its values (0 .. 65535)") != std::string::npos && all.find("variable \"X\"") != std::string::npos);
+  }
+  {
+    // Lists of a width hold and give what std::vector<u8>, <int8_t>, <uint32_t> hold and give - the same steps in C++ give these numbers
+    // (and the case fixed_width_lists runs as a class and in the JIT against this interpreter)
+    for (const logic_cases::Case& c : logic_cases::cases()) {
+      if (std::string(c.name) != "fixed_width_lists") continue;
+      logic_cases::Host lh;
+      logic::Runtime lr(lh);
+      lr.native = false;
+      logic::Instance* li = lr.add(logic_cases::parse(c), 0, "l");
+      lr.begin();
+      CHECK(li->get("W").as_text() ==
+            "[3, 0, -1, 6, 7, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 128, 127, 0, 0, 0, 254, -2, -61, -65, 122, 0, 0, -1, "
+            "-1, 0, -1, 127, -128, 0, -1, -128, 127, -1, 1, 0, 127, 20]");
+    }
   }
 }
 

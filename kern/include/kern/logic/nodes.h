@@ -174,6 +174,7 @@ template <class T> struct Sized {
   constexpr Sized(math::Exact x) : Sized(Whole(x)) {}                                // NOLINT
   template <char Op, class A, class B> Sized(const Sum<Op, A, B>& x) : Sized(Whole(x)) {}  // NOLINT
   constexpr operator Whole() const { Whole r; r.v = static_cast<i64>(v); return r; }  // NOLINT (implicit: it is that Int)
+  constexpr explicit operator i64() const { return static_cast<i64>(v); }  // (its number: static_cast<i64>, as of a std::uint8_t)
   Sized& operator+=(Whole amount) {
     v = static_cast<T>(static_cast<u64>(static_cast<i64>(v)) + static_cast<u64>(amount.v));
     return *this;
@@ -392,7 +393,15 @@ struct Truth {
 namespace detail {
 template <class T> struct Entry { using type = T; };
 template <> struct Entry<bool> { using type = Truth; };
+template <class T> struct Sought { using type = T; };
+template <class T> struct Sought<Sized<T>> { using type = Whole; };
 }  // namespace detail
+/// What an item of a list of T is compared with (Find, Contains, Remove Item): a T - for a list of Ints
+/// of a fixed width an Int, as C++ compares a std::uint8_t with an int: the number, not what a U8 would
+/// hold of it (std::find of 256 in a std::vector<u8> finds nothing).
+template <class T> using Sought = typename detail::Sought<T>::type;
+template <class A, class B> constexpr bool equal_item(const A& a, const B& b) { return a == b; }
+template <class T> constexpr bool equal_item(const Sized<T>& a, const Whole& b) { return static_cast<i64>(a.v) == b.v; }
 
 /// Beside the lists. A place that is named beside a list (Cars[9] of two cars) is an entry of
 /// its own, with the zero of the items' type - a struct with its defaults: read, it is that
@@ -508,6 +517,11 @@ template <class T> struct Items {
     return zero;
   }
 };
+/// The entries of a list, whatever its items are (a node over the items of a list of Ints of each width -
+/// Text of Bytes, Copy Bytes: in C++ a function over the list's items).
+template <class T> Items<T> items_of(const List<T>& list) { return list; }
+template <class T, std::size_t N> Items<T> items_of(const Fixed<T, N>& list) { return list; }
+template <class T> Items<T> items_of(Items<T> list) { return list; }
 
 /// A value of the interpreter as the C++ type of its pin, and back. A list is the vector of its
 /// items; a list of whole numbers is a vector of i64 in the interpreter and of Whole (`Int`) in a
@@ -572,6 +586,13 @@ template <> struct Held<std::vector<Whole>> {
   static std::vector<Whole> from(const Value& v) {
     const std::vector<i64>& items = v.items<i64>();
     return std::vector<Whole>(items.begin(), items.end());
+  }
+};
+template <class T> struct Held<std::vector<Sized<T>>> {
+  static constexpr PinType type = PinType::integer_list;
+  static std::vector<Sized<T>> from(const Value& v) {
+    const std::vector<i64>& items = v.items<i64>();
+    return std::vector<Sized<T>>(items.begin(), items.end());
   }
 };
 template <> struct Held<std::vector<Text>> {
@@ -693,6 +714,7 @@ Value to_value(std::vector<E> v) {
 }
 inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Truth>& v) { return Value::of(std::vector<bool>(v.begin(), v.end())); }
+template <class T> Value to_value(const std::vector<Sized<T>>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Text>& v) {
   std::vector<std::string> items;
   items.reserve(v.size());
@@ -747,12 +769,12 @@ template <class T> void remove_at(std::vector<T>& items, i64 index) {
   if (index >= 0 && static_cast<u64>(index) < items.size()) items.erase(items.begin() + static_cast<std::ptrdiff_t>(index));
 }
 /// Takes every item that equals `item` out; was there one?
-template <class T> bool remove(std::vector<T>& items, const std::type_identity_t<T>& item) {
+template <class T> bool remove(std::vector<T>& items, const Sought<T>& item) {
   std::size_t kept = 0;
   for (std::size_t k = 0; k < items.size(); ++k) {
     {
       const T& at = items[k];
-      if (at == item) continue;
+      if (equal_item(at, item)) continue;
     }
     if (kept != k) items[kept] = std::move(items[k]);
     ++kept;
