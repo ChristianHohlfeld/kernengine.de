@@ -10251,7 +10251,8 @@ class TestWriter:
             (Emit.pointer_alias), or such a pointer cast to another pointer to bytes?"""
             x = bare(n)
             while x.get("kind") in ("ImplicitCastExpr", "ParenExpr", "CXXStaticCastExpr", "CXXReinterpretCastExpr", "CStyleCastExpr") and kids(x):
-                if x.get("kind") not in ("ImplicitCastExpr", "ParenExpr") and not BYTE_POINTER.match(qtype(x).strip()):
+                # (to a pointer to bytes - also to `const char*`, the bytes of a text: `reinterpret_cast<const char*>(bytes.data)`)
+                if x.get("kind") not in ("ImplicitCastExpr", "ParenExpr") and not (BYTE_POINTER.match(qtype(x).strip()) or re.match(r"const\s+(?:signed\s+)?char\s*\*$", qtype(x).strip())):
                     return False
                 x = bare(kids(x)[0])
             if x.get("kind") == "BinaryOperator" and x.get("opcode") in ("+", "-") and len(kids(x)) == 2 and "*" in qtype(kids(x)[0]):
