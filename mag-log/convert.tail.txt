@@ -1,0 +1,80 @@
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_main_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+357 of 441 functions of the program are written as Blueprints (1498 of 3240 lines), and 8 of the engine's headers that they call: 52 Blueprints - 1 of source files, 1 of states, 50 of headers and of shapes
+300 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 2 give nothing
+
+what the others wait for: functions (lines)
+     7 (   534)   an expression: RecoveryExpr
+     6 (   247)   it calls CityStream::ground_height(), which waits
+     2 (   117)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     2 (    87)   detach() is defined in another file
+     1 (    87)   look_begin() is defined in another file
+     4 (    77)   it calls Game::matrix_of(), which waits
+     7 (    67)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: 'level_blueprints.h' file not found)
+     3 (    54)   a statement: RecoveryExpr
+     1 (    43)   it calls Game::clear_spot(), which waits
+     1 (    41)   gaps_riding() is defined in another file
+     3 (    39)   a pointer
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    27)   begin() is defined in another file
+     1 (    26)   call: ?()
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (     9)   a reference to something it changes
+     1 (     7)   a static local variable (kept from one call to the next: a library keeps nothing)
+     1 (     7)   kill() is defined in another file
+     2 (     6)   the export bytes: a parameter of the C type const kern::u8 *, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)
+     2 (     6)   the export rgba: a parameter of the C type const kern::u8 *, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)
+     5 (     5)   input() is defined in another file
+     4 (     4)   put() is defined in another file
+     1 (     3)   vr_set_hand() is defined in another file
+     1 (     3)   set_touch_frame() is defined in another file
+     1 (     3)   touch() is defined in another file
+     2 (     2)   fail() is defined in another file
+     2 (     2)   the state of the Blueprint Game (its one object is that Blueprint, no value)
+     2 (     2)   find() is defined in another file
+     1 (     1)   it calls Devices::key(), which waits
+     1 (     1)   the export sc_result_length: it gives a kern::u32, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text)
+     1 (     1)   call: take_requests() of a CityStream
+     1 (     1)   go_offline() is defined in another file
+     1 (     1)   take_requests() is defined in another file
+     1 (     1)   call: take_image_requests() of a Terrain
+     1 (     1)   fail_image() is defined in another file
+     1 (     1)   touch_view_json() is defined in another file
+     1 (     1)   the export samples: a parameter of the C type const kern::f32 *, which does not cross to the host as a word of the wire (i32, u32, f32, f64, text, bytes)
+
+real	24m59,093s
+user	36m16,658s
+sys	1m49,730s

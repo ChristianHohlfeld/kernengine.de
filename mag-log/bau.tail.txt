@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/converted/test_facades.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/src/level_blueprints.cpp:45814:11: warning: unused variable 'sim_time' [-Wunused-variable]
+ 45814 |     Float sim_time = 0.0;
+       |           ^~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/src/level_blueprints.cpp:45828:11: warning: variable 'reach' set but not used [-Wunused-but-set-variable]
+ 45828 |     Float reach = 0.0;
+       |           ^
+1 warning generated.
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/converted/test_main_cpp.cpp:206:21: warning: unused variable 'draw' [-Wunused-variable]
+  206 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+1 warning generated.
+4 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:342:81: error: no member named 'qr_code_cpp' in namespace 'blueprints'
+  342 |   SC_CHECK(qr_rules.problems.empty() && kern::logic::bind_blueprint<blueprints::qr_code_cpp>(qr_rules.rt) && kern::logic::bind_blueprint<blueprints::qr_code>(qr_rules.rt),
+      |                                                                     ~~~~~~~~~~~~^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_util.h:23:11: note: expanded from macro 'SC_CHECK'
+   23 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:342:150: error: no member named 'qr_code' in namespace 'blueprints'
+  342 |   SC_CHECK(qr_rules.problems.empty() && kern::logic::bind_blueprint<blueprints::qr_code_cpp>(qr_rules.rt) && kern::logic::bind_blueprint<blueprints::qr_code>(qr_rules.rt),
+      |                                                                                                                                          ~~~~~~~~~~~~^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_util.h:23:11: note: expanded from macro 'SC_CHECK'
+   23 |     if (!(cond)) {                                                            \
+      |           ^~~~
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:344:49: error: no member named 'qr_code_cpp' in namespace 'blueprints'
+  344 |   auto& qr = kern::logic::blueprint<blueprints::qr_code_cpp>();
+      |                                     ~~~~~~~~~~~~^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:345:51: error: no member named 'qr_code' in namespace 'blueprints'
+  345 |   auto& code = kern::logic::blueprint<blueprints::qr_code>();
+      |                                       ~~~~~~~~~~~~^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:347:15: error: no member named 'qr_code' in namespace 'blueprints'
+  347 |   blueprints::qr_code::qr_Code c;
+      |   ~~~~~~~~~~~~^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:355:15: error: no member named 'qr_code_cpp' in namespace 'blueprints'
+  355 |   blueprints::qr_code_cpp::Int level = 9, mask = 9;
+      |   ~~~~~~~~~~~~^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:355:47: error: expected ';' at end of declaration
+  355 |   blueprints::qr_code_cpp::Int level = 9, mask = 9;
+      |                                               ^
+      |                                               ;
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:356:37: error: use of undeclared identifier 'mask'
+  356 |   SC_CHECK(qr.read_format(c, level, mask).Result && level == 1 && mask == 0, "format L / mask 0 (%lld %lld)", static_cast<long long>(level), static_cast<long long>(mask));
+      |                                     ^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:356:67: error: use of undeclared identifier 'mask'
+  356 |   SC_CHECK(qr.read_format(c, level, mask).Result && level == 1 && mask == 0, "format L / mask 0 (%lld %lld)", static_cast<long long>(level), static_cast<long long>(mask));
+      |                                                                   ^
+/dev/shm/spawncity-jobs-chris/work-s5-vergleich-163530-23397/kern/games/spawncity/tests/test_mp.cpp:356:165: error: use of undeclared identifier 'mask'
+  356 |   SC_CHECK(qr.read_format(c, level, mask).Result && level == 1 && mask == 0, "format L / mask 0 (%lld %lld)", static_cast<long long>(level), static_cast<long long>(mask));
+      |                                                                                                                                                                     ^
+10 errors generated.
+9 warnings generated.
+
+real	16m59,246s
+user	84m20,609s
+sys	1m23,424s
