@@ -13,9 +13,26 @@
 #
 # kern/build.sh keys its object cache on Kern's own headers only; the game's headers (src/*.h,
 # firmware/*.hpp) go into the flags as a hash, so a header change rebuilds the game's objects.
+#   kern/games/spawncity/build.sh --only-blueprints [out.html]   (default: generated/spawncity_blueprints.html)
+#
+# The way "only Blueprints" (BLUEPRINTS.md, "5 - Umschalten": the end, src/ empty): the level alone, its
+# Blueprints compiled in as C++ classes, as Kern Studio exports any level (tools/export_game.sh) - no line
+# of src/. It goes as far as the level carries; what it still lacks - functions without a Blueprint, the
+# exports the page calls, the engine calling the program's C++, the entry - stands in
+# generated/spawncity_gaps.txt (tools/blueprint_gaps.py; with the log of a run over the whole program:
+# SC_CONVERT_LOG=<convert.log[.xz]>).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
+if [ "${1:-}" = "--only-blueprints" ]; then
+  out="${2:-$root/generated/spawncity_blueprints.html}"
+  mkdir -p "$(dirname "$out")" "$root/generated"
+  "$root/tools/export_game.sh" "$here/level/spawncity.klevel" "$out" "SpawnCity (Blueprints)"
+  python3 -I "$root/tools/blueprint_gaps.py" --level "$here/level/spawncity.klevel" --src "$here/src" \
+    ${SC_CONVERT_LOG:+--log "$SC_CONVERT_LOG"} --out "$root/generated/spawncity_gaps.txt"
+  sed -n 2p "$root/generated/spawncity_gaps.txt"
+  exit 0
+fi
 skip_wasm=0
 if [ "${1:-}" = "--skip-wasm" ]; then skip_wasm=1; shift; fi
 out="${1:-$root/generated/spawncity.html}"
