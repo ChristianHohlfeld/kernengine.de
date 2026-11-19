@@ -1,0 +1,80 @@
+      |                                 List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:869:38: note:   initializing argument 1 of ‘Nodes::P138Result Nodes::P138(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<signed char> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<signed char> >)’
+  869 |   KERN_PURE P138Result P138(List<I8> i0 = List<I8>{}, List<I8> i1 = List<I8>{}) {
+      |                             ~~~~~~~~~^~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:9968:33: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<short int>>’
+ 9968 |       const auto out = b.P139(r.a0, r.a1);
+      |                               ~~^~
+      |                                 |
+      |                                 List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:875:39: note:   initializing argument 1 of ‘Nodes::P139Result Nodes::P139(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<short int> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<short int> >)’
+  875 |   KERN_PURE P139Result P139(List<I16> i0 = List<I16>{}, List<I16> i1 = List<I16>{}) {
+      |                             ~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:9999:33: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<int>>’
+ 9999 |       const auto out = b.P140(r.a0, r.a1);
+      |                               ~~^~
+      |                                 |
+      |                                 List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:881:39: note:   initializing argument 1 of ‘Nodes::P140Result Nodes::P140(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<int> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<int> >)’
+  881 |   KERN_PURE P140Result P140(List<I32> i0 = List<I32>{}, List<I32> i1 = List<I32>{}) {
+      |                             ~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:15373:39: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<unsigned char>>’
+15373 |       const auto out = b.P283(r.a0, r.a1, r.a2);
+      |                                     ~~^~
+      |                                       |
+      |                                       List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:1745:54: note:   initializing argument 2 of ‘Nodes::P283Result Nodes::P283(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Bool, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<unsigned char> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<unsigned char> >)’
+ 1745 |   KERN_PURE P283Result P283(Bool i0 = true, List<U8> i1 = List<U8>{}, List<U8> i2 = List<U8>{}) {
+      |                                             ~~~~~~~~~^~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:15404:39: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<short unsigned int>>’
+15404 |       const auto out = b.P284(r.a0, r.a1, r.a2);
+      |                                     ~~^~
+      |                                       |
+      |                                       List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:1751:55: note:   initializing argument 2 of ‘Nodes::P284Result Nodes::P284(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Bool, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<short unsigned int> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<short unsigned int> >)’
+ 1751 |   KERN_PURE P284Result P284(Bool i0 = true, List<U16> i1 = List<U16>{}, List<U16> i2 = List<U16>{}) {
+      |                                             ~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:15435:39: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<unsigned int>>’
+15435 |       const auto out = b.P285(r.a0, r.a1, r.a2);
+      |                                     ~~^~
+      |                                       |
+      |                                       List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:1757:55: note:   initializing argument 2 of ‘Nodes::P285Result Nodes::P285(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Bool, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<unsigned int> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<unsigned int> >)’
+ 1757 |   KERN_PURE P285Result P285(Bool i0 = true, List<U32> i1 = List<U32>{}, List<U32> i2 = List<U32>{}) {
+      |                                             ~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:15466:39: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<signed char>>’
+15466 |       const auto out = b.P286(r.a0, r.a1, r.a2);
+      |                                     ~~^~
+      |                                       |
+      |                                       List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:1763:54: note:   initializing argument 2 of ‘Nodes::P286Result Nodes::P286(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Bool, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<signed char> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<signed char> >)’
+ 1763 |   KERN_PURE P286Result P286(Bool i0 = true, List<I8> i1 = List<I8>{}, List<I8> i2 = List<I8>{}) {
+      |                                             ~~~~~~~~~^~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:15497:39: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<short int>>’
+15497 |       const auto out = b.P287(r.a0, r.a1, r.a2);
+      |                                     ~~^~
+      |                                       |
+      |                                       List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:1769:55: note:   initializing argument 2 of ‘Nodes::P287Result Nodes::P287(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Bool, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<short int> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<short int> >)’
+ 1769 |   KERN_PURE P287Result P287(Bool i0 = true, List<I16> i1 = List<I16>{}, List<I16> i2 = List<I16>{}) {
+      |                                             ~~~~~~~~~~^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/blueprint_native_main.cpp:15528:39: error: cannot convert ‘List<kern::logic::Whole>’ to ‘List<kern::logic::Sized<int>>’
+15528 |       const auto out = b.P288(r.a0, r.a1, r.a2);
+      |                                     ~~^~
+      |                                       |
+      |                                       List<kern::logic::Whole>
+/dev/shm/spawncity-jobs-chris/work-p-engine-142115-8863/tmp/kern-tests/native_gen/bp_Nodes.h:1775:55: note:   initializing argument 2 of ‘Nodes::P288Result Nodes::P288(kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::Bool, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<int> >, kern::game::BlueprintNodesOf<kern::logic::EngineNodesOf<kern::BlueprintCore> >::List<kern::logic::Sized<int> >)’
+ 1775 |   KERN_PURE P288Result P288(Bool i0 = true, List<I32> i1 = List<I32>{}, List<I32> i2 = List<I32>{}) {
+      |                                             ~~~~~~~~~~^~~~~~~~~~~~~~~~
+
+real	9m35,749s
+user	28m20,955s
+sys	1m6,339s
