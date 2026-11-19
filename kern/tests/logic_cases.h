@@ -700,6 +700,29 @@ inline const std::vector<Case>& cases() {
           {"name":"Twice","inputs":[{"name":"name","type":"text","value":"n"}],"outputs":[{"name":"a","type":"text","value":""},{"name":"b","type":"text","value":""}]},
           {"name":"TakeLog","inputs":[],"outputs":[{"name":"list","type":"float_list","value":[]}]},
           {"name":"LocalTake","inputs":[{"name":"given","type":"text","value":"g"}],"outputs":[{"name":"text","type":"text","value":""},{"name":"left","type":"text","value":""}],"locals":[{"name":"Held","type":"text","value":"h"}]}]})"},
+      // An entry of a list of any length held by a call whose function runs handlers (Raise Event): while the
+      // handlers leave the list as it is, the function works on the entry (Go: Shout raises Ping, then adds to
+      // car.Speed); when a handler changes how long the list is (Open: Ping adds to Cars while Call2 holds Cars[0] -
+      // in C++ the reference would go nowhere), the run stops there with an error and the Blueprint is stopped, in
+      // every tier the same (Runtime::held_lost; logic::Held in the class).
+      {"held_entry",
+       R"({"structs":[{"name":"Car","fields":[{"name":"Speed","type":"float","value":0}]}],"variables":[
+          {"name":"Cars","type":"struct_list","of":"Car","value":[{"Speed":1}]},{"name":"Extra","type":"struct","of":"Car","value":{"Speed":5}},
+          {"name":"Grow","type":"bool","value":false},{"name":"Count","type":"int","value":0}],"nodes":[
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.call","params":{"function":"Shout","car.variable":"Cars","car.path":"[]"},"values":{"car.path0":0}},
+          {"id":3,"type":"func.entry","params":{"function":"Shout"}},{"id":4,"type":"flow.call","params":{"name":"Ping"}},
+          {"id":5,"type":"var.add","params":{"variable":"car","scope":"Shout","path":".Speed"},"values":{"amount":1}},
+          {"id":6,"type":"event.custom","params":{"name":"Ping"}},{"id":7,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},
+          {"id":8,"type":"flow.branch"},{"id":9,"type":"var.get","params":{"variable":"Grow"}},
+          {"id":10,"type":"list.add","params":{"variable":"Cars"}},{"id":11,"type":"var.get","params":{"variable":"Extra"}},
+          {"id":12,"type":"event.custom","params":{"name":"Open"}},{"id":13,"type":"var.set","params":{"variable":"Grow"},"values":{"value":true}},
+          {"id":14,"type":"func.call","params":{"function":"Call2","car.variable":"Cars","car.path":"[]"},"values":{"car.path0":0}},
+          {"id":15,"type":"func.entry","params":{"function":"Call2"}},{"id":16,"type":"flow.call","params":{"name":"Ping"}}],
+        "links":[[1,"then",2,"exec"],[3,"then",4,"exec"],[4,"then",5,"exec"],[6,"then",7,"exec"],[7,"then",8,"exec"],[9,"value",8,"condition"],
+          [8,"true",10,"exec"],[11,"value",10,"item"],[12,"then",13,"exec"],[13,"then",14,"exec"],[15,"then",16,"exec"]],"functions":[
+          {"name":"Shout","inputs":[{"name":"car","type":"struct","of":"Car","ref":true,"value":{"Speed":0}}],"outputs":[]},
+          {"name":"Call2","inputs":[{"name":"car","type":"struct","of":"Car","ref":true,"value":{"Speed":0}}],"outputs":[]}]})"},
       // Call on Actor: a function called on a Blueprint (here its own: the Level's) - one that
       // calls itself that way, every call with its own parameters and local variable; a function
       // of another Blueprint nobody has (the declared defaults); calls that never end (64 deep).
