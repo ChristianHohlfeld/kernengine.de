@@ -1,4 +1,16 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 05:45 **Fortschritt, alles belegt:**
+  · **Engine-Fix cpp_names (12438d1c): `work-zusammen-engine-043403-8808` rc=0**, und im Kontrolllauf `work-zusammen-suite-alle-043356-8771` kommt „Game runs as its
+    C++ class“ nicht mehr vor: **Stellvertreter 138 ok / 12 FAIL / 1 ZEIT (vorher 113/35/4); Engine selbst 127 ok / 23 FAIL / 11 LECK / 1 ZEIT.** Auswertung t1:
+    stand/t1.md „SUITE 020121b“.
+  · **k B0 (kQuiet) gemergt – work-zusammen enthält jetzt work-k 8b8c0e10 samt t1b (c5b8ab99).** Beleg `work-k-konvert-044336-12397`: convert rc=0,
+    **1695 von 1844 geschrieben (21450 Zeilen), 1652 verglichen, 20 „cannot compare it yet“** (020121: 1637 / 19218 / 1594 / ~116), 18 „waits for good“.
+  · Rest gegen den Stellvertreter: k – Mat4 .m[15] (Ursache laut k im Test: memset auf f32-Liste, sizeof 64 gegen 128 Byte breite Test-Floats; cdcd2f51 unbelegt),
+    SoundFx .l.voice (5d804704 unbelegt, braucht Engine-Suite), draw_events, rocket_smoke_emit, gaps_guided, spawn_squad/spawn_tank (rng_.s), mp_hud_json; number_at
+    8/300 ist laut k ein Fall für t1 (from > s.size(): C++ lässt es offen). t1 – life (belegt), mvt, game_look, game_equipment, get_u8 (gebaut, Beleg
+    `work-t1-vergleich-051419-24098` läuft). ZEIT converted_Game__game (beide Durchgänge) – offen. d – 11 LECK, weld-ASan, 14 × „0 compared“
+    (`work-d-belege2-vergleich-050059-20415`: Testprogramm baute nicht – d).
+  · **Nächster voller Lauf:** sobald t1s Beleg da ist (work-t1 c13e917c einmischen), sonst spätestens 06:00 mit dem, was belegt ist.
 - 04:40 **DIE GANZE LISTE (erste vollständige Auswertung): `work-zusammen-suite-alle-032626-8142`** – Level und Tests des gültigen Laufs 020121 (4748a503), jeder
   der 150 Tests einzeln. **Stellvertreter: 113 ok, 35 FAIL, 4 ZEIT. Engine selbst: 108 ok, 39 FAIL, 9 LECK, 3 ZEIT.** Auswertung von t1b: stand/t1.md „SUITE 020121“.
   **A. Eine Ursache für 33 Game-Tests (+ die 4 ZEIT) – BEHOBEN vom Koordinator (work-zusammen 12438d1c, Engine):** „Game runs as its C++ class (it runs:

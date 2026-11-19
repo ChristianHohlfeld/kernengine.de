@@ -1,4 +1,33 @@
-# Paket k – Stand (neuer Auftrag 22:25: Regeln des Konverters, die die Spiel-Suite rot machen)
+# Paket k – Stand (neuer Auftrag 04:40: B0–B3)
+
+## BEREIT ZUM MERGEN: 8b8c0e10 (B0 kQuiet) – Beleg work-k-konvert-044336-12397
+- konvert origin/work-k (8b8c0e10, mit work-zusammen 12438d1c + work-t1 c5b8ab99): **convert rc=0** (05:40, 56 min auf 9 Kernen).
+  1695 von 1844 Funktionen geschrieben (21450 von 30978 Zeilen; 020121: 1637 / 19218), 1652 verglichen (020121: 1594).
+  „cannot compare it yet“: 20 (020121: ~116) – übrig: get_u8/dispatch-Familie (gaps_send_jets, melee_hit, gaps_seat_press, gaps_send_military, hit_remotes),
+  SoundBank::request_level (audio_init), Graph (vehicle_actor) – alles Test-Schreiber (t1).
+- Hinweis: work-k hat danach cdcd2f51 (B1) und 5d804704 (B2, mit neu erzeugter Engine-Tabelle) – noch unbelegt; für B0 allein 8b8c0e10 mergen.
+
+## 04:45 B0 kQuiet
+- work-k = 8b8c0e10 (mit work-zusammen 12438d1c, work-t1 c5b8ab99; dc7a12cc = Rücknahme 90ecf01f nach E13).
+- Regel: Konstanten, die eine Quelldatei für sich hat (Namensumgebung / `static const` einer Funktion), die in mehreren Quelldateien der Teile
+  EINES Blueprints vorkommen, heißen `<datei>_<name>` (survey_one → World.constant_names → Unit.constant; wie plan_names bei Typen).
+- Kleinstfall /tmp/k_mini2 (Zustand W, w_a.cpp kQ=0.6, w_b.cpp kQ=0.5): alt rc=1 „W: two parts have a constant kQ …“, neu rc=0 (w_a_kQ, w_b_kQ).
+- Beleg: `work-k-konvert-044336-12397` (konvert origin/work-k 37) – läuft.
+
+| Abweichung | Ursache | Commit | Beleg | Stand |
+|---|---|---|---|---|
+| B0 kQuiet (convert rc=1) | dateieigene Konstanten zweier Teile nach Namen zusammengeführt | 8b8c0e10 | work-k-konvert-044336-12397: convert rc=0, 1695/1652, 20 wartend | belegt |
+| B1 Mat4_perspective 300/300, projection_matrix 62/300 (.m[15] Quelle 1) | Test-Schreiber: `memset(r.m, 0, sizeof r.m)` → sizeof des Programms (64), im Test sind die 16 f32 aber 64-bittig: nur m[0..7] genullt | cdcd2f51 (converted::layout::set_bytes) | – | gebaut, unbelegt |
+| B2 SoundFx_drive/update `.l.voice` | qtype löste `VoiceId` (= u64) zu `unsigned long` → Int; Engine-Tabelle ebenso (voice-Eingänge der Mixer-Knoten Int) | 5d804704 (WIDE_NAMES; engine_api neu erzeugt: 8 Eingänge Int64) | – | gebaut, unbelegt (braucht auch Engine-Suite) |
+| B3 life_hud 1/33 (gegen die Engine) | `"bubbles"` x 0.5578/0.5579 – projection_matrix im Test der Quelle (B1) | cdcd2f51 | – | vermutlich mit B1 |
+| B3 number_at 8/300, game_details `.Result` | kein Konverterfehler: alle 8 Fälle mit from > s.size() – `s.c_str() + from` jenseits des Endes (UB) | – | Einzelausgabe 032626 | BEFUND FÜR t1 |
+
+## BEFUND FÜR t1 (04:55)
+- **number_at 8/300 (converted_game_details_cpp):** `number_at(s, from, …)` liest `strtoll(s.c_str() + from, …)`; alle abweichenden Fälle haben
+  from > s.size() (hello world/13, Abc/22, hello world/25) – C++ hat dafür kein Verhalten (Zeiger hinter das Ende), die Quelle liest Speicherrest.
+  Der Test darf nur from ≤ s.size() geben (Vorbedingung aus den Aufrufern: next_at liefert npos oder eine Stelle in s).
+
+# (früher) Auftrag 22:25
 
 ## BEREIT ZUM MERGEN: 20cb5259 (enthält 2a6ef5b3, 12e3da24) – Beleg work-k-vergleich-224717-8097
 - combat_rules.cpp, drone.cpp, city_stream.cpp auf 20cb5259, beide Durchgänge: converted_combat_rules_cpp ok (flak_cell, G4),

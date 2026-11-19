@@ -260,3 +260,12 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
 - `f["place"]` gibt es nur bei Funktionen aus Api.function1; maker/releaser haben das Feld nicht → `f.get("place")`.
 - Im nativen Test heißt die Funktion `differs(...)` im erzeugten main; lokale Variablen dort nicht so nennen.
 - Text-Ausgaben „told“ müssen in allen Stufen Zeichen für Zeichen gleich sein (Funktionsname + o.error).
+
+## Nachfolger 5 (19.11., ab 04:40) – Arbeitsliste D aus KOORDINATOR 04:40
+- D1 Lecks: Ursache EngineObjects::place überschrieb einen Eintrag, wenn on_missing für ein Handle eine andere Klasse machte (Test-Handles sind
+  Nummern je Klasse, kept[h % 8]). Fix work-d-leck 16d72b56 (je Handle Liste von Einträgen). Beleg work-d-leck-vergleich-044258-11385 (0 LECK).
+- D2 weld: der Test zieht MeshData mit unstimmigen Listenlängen; weld las ungeprüft. Fix work-d-weld f31ea939 (Längenprüfung wie upsert).
+- D3 „0 compared“: Komponente app nicht im Testprogramm gelinkt („this build has no function engine.input.down/engine.engine.aspect“).
+  Fix work-d-app d11cb0cf (run_tests.sh + kern_create_app in tests/test_main.cpp).
+- Beleg-Zweig work-d-belege2 f5030c78 = alle drei; vergleich work-d-belege2-vergleich-050059-20415, danach `mag.sh engine origin/work-d-belege2`.
+- Danach: work-d aktuell halten (git merge origin/work-zusammen), Platz der Engine erst nach erstem grünen Stand.

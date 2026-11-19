@@ -126,3 +126,20 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
 - c32f607b: Diagnose im Ablauf für pendelnde Blueprints (goes round: …). Lauf 232247-24031 endete mit Pendeln von 30 Game-Einheiten.
 - Stand 23:58: work-k = c32f607b (enthält work-zusammen 5a445af8). Gemergt in work-zusammen: 20cb5259 (G4/G6/G7), fa3dc97d.
   Nicht melden: 90ecf01f (E13). Offen: siehe stand/k.md „WARTET AUF“.
+
+# AUFTRAG 04:40 (Koordinator, KOORDINATOR.md „04:40“ B0–B3)
+- work-k: Merge work-zusammen 12438d1c (Konflikt im Ablauf: Fassung von work-zusammen genommen, sie enthält c32f607b), Merge work-t1 c5b8ab99,
+  dc7a12cc Rücknahme 90ecf01f (E13), **8b8c0e10 B0**: dateieigene Konstanten gleichen Namens in mehreren Quelldateien der Teile eines Blueprints
+  → `<datei>_<name>` (survey_one "constants", main nach part_numbers: World.constant_names, Unit.constant). Kleinstfall /tmp/k_mini2 (Aufruf:
+  `cd /tmp/k_mini2; FUNCTIONS=1 KERN_JOBS=1 flock $S/heavy3.lock python3 /home/claude/w-k/tools/cpp_to_blueprint.py --convert sc --texts t -I/home/claude/w-k/kern/include -Isrc -- src/w.cpp src/w_a.cpp src/w_b.cpp`; Quelle in namespace sc!).
+- Beleg-Auftrag: work-k-konvert-044336-12397 (Erwartung convert rc=0, „cannot compare it yet“ ~11). Danach BEREIT ZUM MERGEN + Nachricht an main.
+- Danach B1 (Mat4_perspective .m[15]), B2 (SoundFx `.l.voice` u64), B3 (Game-Teile; Ergebnis work-zusammen-suite-alle-043356-8771).
+- 05:40 B0 BELEGT (work-k-konvert-044336-12397 rc=0, 1695/1652, 20 wartend) → BEREIT ZUM MERGEN 8b8c0e10 gemeldet.
+- cdcd2f51 B1: Test-Schreiber – memset auf f32-Liste → converted::layout::set_bytes<true> (converted.h). Ursache: `sizeof` wird im Test die Größe im
+  Programm (64), die Test-floats sind 64-bittig → memset nullte nur die Hälfte (m[15] blieb 1). Kleinstfall /tmp/k_sb/t2.cpp.
+- 5d804704 B2: qtype + Tree.wide_names (WIDE_NAMES): Alias, der einen 64-Bit-Typ nennt (VoiceId = u64), wird kern::u64 statt `unsigned long`
+  (vorher Feld Int, Array Int64). engine_api.py neu laufen lassen (6 s, unter flock): 8 voice-Eingänge der Mixer-Knoten Int64. Kleinstfall /tmp/k_v.
+  Risiko: das Level des letzten vollen Laufs hat Mixer-Knoten mit Int-Eingang – vergleich zeigt, ob der Leser das annimmt; Engine-Suite nötig.
+- Beleg B1+B2: work-k-vergleich-054057-841 (sound_fx.cpp, game_life.cpp, game.cpp; erwartet: Mat4_perspective/projection_matrix, SoundFx_*, life_hud ohne Abweichung).
+- B3 aus work-zusammen-suite-alle-043356-8771 (entpackt in $S/mag/<name>/e/): mp_hud_json 7/20 (`"connected"` Quelle false / Blueprint true),
+  draw_events, gaps_guided, rocket_smoke_emit, spawn_squad/tank (rng_.s), equipment/look: ASan SEGV in libc. number_at → BEFUND t1 (UB).

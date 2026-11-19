@@ -175,3 +175,22 @@
   den die Engine nie gesehen hat – Testrahmen, BEFUND FÜR t1). Stellvertreter: matrix_of / Session_push weichen ab = Punkte 2/1 (nicht auf diesem Zweig).
   alle-real.txt nennt converted_net_session_cpp FAIL, seine Einzelausgabe sagt „0 failures“ (wie bei game_gaps in 002858) – ungeklärt, Bitte an t1/Koordinator.
 - Engine-Suite läuft: `work-d-maker-engine-015441-9451`.
+
+## Nachfolger 5 (ab 04:40, 19.11.) – Arbeitsliste D (KOORDINATOR 04:40)
+- **D1 Lecks – Fix gebaut:** Zweig **work-d-leck = 16d72b56** (auf work-zusammen 12438d1c). Ursache: Handles eines Tests sind Nummern je Klasse
+  (Stellvertreter kept[handle % 8] je Klasse); fragte ein Aufruf eine Nummer als Klasse B, unter der schon ein A stand, machte on_missing ein B
+  und EngineObjects::place ÜBERSCHRIEB den Eintrag des A (nie freigegeben, als A verloren). Jetzt: je Handle eine Liste von Einträgen (gemachtes
+  Objekt steht neben dem ersten; release/clear beenden jedes). Engine-Test engine_calls_default_objects_by_class; Kleinstfall ASan alt 20120 B
+  verloren, neu nichts. Beleg läuft: `work-d-leck-vergleich-044258-11385` (world_marks, net_session, terrain).
+- **D2 weld – Fix gebaut:** Zweig **work-d-weld = f31ea939** (auf 12438d1c). Ursache: der Test zieht chunk.mesh mit Listen beliebiger Länge;
+  kern::weld las normals/colors/uvs je Ecke ohne Prüfung (upsert prüft dieselben Längen). Jetzt prüft weld wie upsert, sonst bleibt die Suppe.
+  Engine-Test weld_and_hash erweitert. Beleg folgt (vergleich city_stream.cpp + Engine-Suite Filter weld).
+- **D1 belegt (05:00):** `work-d-leck-vergleich-044258-11385` (16d72b56; world_marks, net_session, terrain): convert rc=0, bau rc=0;
+  **Stellvertreter 17/17 ok, Engine selbst 17/17 ok, 0 LECK** (Basis 032626: LECK net_session(_cpp), terrain(_cpp), world_marks_cpp).
+  interiors/game_gaps/game_town (gleiche Ursache, Renderer/GameWorld/Mixer) laufen im nächsten vollen Lauf mit. Engine-Suite folgt (auf work-d-belege2).
+- **D3 Ursache gefunden, Fix gebaut:** die note nennt „engine.input.down(4, 9) (this build has no function engine.input.down)“ bzw.
+  „engine.engine.aspect(3) (this build has no function …)“ – keine fehlende Klasse, sondern die Komponente app (kern::Engine, kern::Input mit ihren
+  Machern) war nicht im Testprogramm gelinkt (run_tests.sh: core … game ohne app; das Spiel baut mit --app --game). Zweig **work-d-app = d11cb0cf**:
+  run_tests.sh linkt app, test_main.cpp gibt kern_create_app() = nullptr (wie kern/tests). Keine Regel des Makers nötig.
+- Beleg-Zweig **work-d-belege2 = f5030c78** (work-zusammen 12438d1c + leck + weld + app, Generator reproduziert). Läuft:
+  `work-d-belege2-vergleich-050059-20415` (city_stream.cpp, game_controls.cpp, game.cpp). Danach Engine-Suite auf work-d-belege2.
