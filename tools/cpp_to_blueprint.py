@@ -4656,10 +4656,14 @@ class Emit:
             chosen = self.either_place(stmts, i)
             if chosen is not None:
                 stmts, s = chosen, chosen[i]
-            self.name_references(stmts, i)
+            before, self.pre = self.pre, []
+            try:
+                self.name_references(stmts, i)
+            finally:
+                bound, self.pre = self.pre, before   # (what binding a name works out - the row of m[key]: there, before the statement)
             self.rest_stmts = stmts[i + 1:]   # (what follows the statement in its block: see bytes_pointer)
             lines, ends = self.stmt(s)
-            out += lines
+            out += bound + lines
             if ends:
                 return out, True
             if s.get("kind") in ("BreakStmt", "ContinueStmt"):
