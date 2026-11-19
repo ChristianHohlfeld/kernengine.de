@@ -12938,6 +12938,22 @@ class TestWriter:
                     held = tree.owner.get(c["id"]) or "" if c is not None else ""
                     if c is not None and not (held.startswith(ENGINE + "::") and u.engine_object(held)):   # (an object of the engine: its stand-in makes it)
                         want_function(c["id"])
+                elif k == "CallExpr" and callee_name(x) in ("make_unique", "make_shared"):
+                    # (std::make_unique<T>(a...) makes the T by its constructor of these arguments in the standard library:
+                    # no call of it stands in the tree of the source - `std::make_unique<Car>(CarSpec::car())`, game_net.cpp)
+                    m = re.match(r"(?:const\s+)?std::(?:unique_ptr|shared_ptr)<(.+)>$", u.clean(qtype(x)).strip())
+                    try:
+                        q = u.find_type(m.group(1).strip()) if m else None
+                    except Wait:
+                        q = None
+                    if q in tree.records and not (q.startswith(ENGINE + "::") and u.engine_object(q)):
+                        given = len(kids(x)) - 1
+                        for c in kids(tree.records[q]):
+                            if c.get("kind") != "CXXConstructorDecl" or c.get("isImplicit"):
+                                continue
+                            ps = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
+                            if len([p for p in ps if not kids(p)]) <= given <= len(ps):
+                                want_function(c["id"])
         def scan_record(d):
             for base in d.get("bases", []) or []:
                 want_types(base.get("type", {}).get("qualType", ""))
