@@ -11177,6 +11177,9 @@ class TestWriter:
         if m:   # (what may be there or not - in the Blueprint a list of no entry or one; a list in braces: the drawn list, see converted::listed)
             inner = self.spell(template_args(c)[0])
             return f"std::vector<{inner}>" if m.group(1) == "initializer_list" else f"std::{m.group(1)}<{inner}>"
+        m = re.fullmatch(r"std::function<(.+?)\s*\((.*)\)>", c)
+        if m:   # (a callback: the test's own values in it - converted.h, "callbacks")
+            return f"std::function<{self.spell(m.group(1)) if m.group(1).strip() != 'void' else 'void'}({', '.join(self.spell(a) for a in split_top(m.group(2)) if a.strip())})>"
         q = self.record_named(c)
         if q in self.tree.enums:
             if q not in self.enum_names:
@@ -11271,6 +11274,11 @@ class TestWriter:
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return f"draw.said_c_word({self.said_list()})" if self.said else "draw.c_word()"
+        cq = self.u.find_type(c)
+        if c.startswith("std::function<") or (cq in self.tree.records and self.u.callback_record(cq)):
+            # a callback (std::function, or a struct of the engine that is one - fn and user): none, or one of a few plain
+            # functions of its inputs (converted::draw_callback); arg, same, take of it are converted.h's
+            return f"converted::draw_callback<{self.spell(raw)}>(draw)"
         q = self.u.object_of(raw)
         if q:   # (an object of the engine: one of a few the test keeps, by its handle)
             one = f"converted::engine_object<{self.object_name(q)}>(1 + draw.below(6))"
@@ -11351,7 +11359,7 @@ class TestWriter:
             return [c]
         for part in parts(c):
             q = self.u.find_type(part)
-            if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2"):
+            if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2") and not self.u.callback_record(q):   # (a callback: converted.h's)
                 self.helpers(q)
 
     def helpers(self, q):

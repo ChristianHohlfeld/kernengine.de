@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <initializer_list>
 #include <list>
 #include <map>
@@ -1369,6 +1370,157 @@ inline bool same_value(const Value& a, const Value& b) {
     return true;
   }
   return a == b;
+}
+
+// ---- callbacks: a function the engine calls back (std::function<R(A...)>, or a struct of the engine that is one -
+// `struct HeightSampler { f64 (*fn)(void* user, f64 x, f64 y); void* user; }`). In the Blueprint a Callback
+// (PinType::callback): a function of a library and the place it is bound to; only the engine calls it. ----
+template <class S> concept FnAndUser = requires(const S& s) { s.fn; s.user; } && std::is_pointer_v<decltype(S::fn)>;
+template <class T> struct CallbackSig;
+template <class R, class... A> struct CallbackSig<std::function<R(A...)>> { using Result = R; using Args = std::tuple<A...>; };
+template <class R, class... A> struct CallbackSig<R (*)(void*, A...)> { using Result = R; using Args = std::tuple<A...>; };
+/// A callback of the source as the Blueprint is handed it: a Callable that calls it, its arguments and result as
+/// the test's values (take, arg).
+template <class R, class Args, class F> struct SourceCallable;
+template <class R, class... A, class F> struct SourceCallable<R, std::tuple<A...>, F> : kern::logic::Callable {
+  F f;
+  explicit SourceCallable(F g) : f(std::move(g)) {}
+  bool call(std::span<const Value> args, Value& result) const override {
+    if (args.size() != sizeof...(A)) return false;
+    std::tuple<std::remove_cvref_t<A>...> in;
+    std::size_t k = 0;
+    std::apply([&](auto&... x) { ((take(x, args[k++])), ...); }, in);
+    if constexpr (std::is_void_v<R>) {
+      std::apply(f, in);
+      result = Value{};
+    } else {
+      result = arg(std::apply(f, in));
+    }
+    return true;
+  }
+};
+template <class R, class... A> Value arg(const std::function<R(A...)>& f) {
+  if (!f) return Value::callback(nullptr);
+  return Value::callback(std::make_shared<SourceCallable<R, std::tuple<A...>, std::function<R(A...)>>>(f));
+}
+template <FnAndUser S> Value arg(const S& s) {
+  using Sig = CallbackSig<std::remove_cv_t<decltype(S::fn)>>;
+  if (!s.fn) return Value::callback(nullptr);
+  const auto call = [fn = s.fn, user = s.user](auto... a) { return fn(user, a...); };
+  return Value::callback(std::make_shared<SourceCallable<typename Sig::Result, typename Sig::Args, decltype(call)>>(call));
+}
+/// The values a callback is called with to compare it (a number, a whole number, a flag, a vector of each input).
+template <class X> Value probe_value(f64 v) {
+  if constexpr (std::is_same_v<X, bool>) return Value::boolean(v > 0);
+  else if constexpr (std::is_integral_v<X>) return Value::integer(static_cast<kern::i64>(v * 4));
+  else if constexpr (std::is_floating_point_v<X>) return Value::number(v);
+  else return Value::vector({static_cast<f32>(v), static_cast<f32>(-v), static_cast<f32>(v * 0.5)});
+}
+template <class... A> std::vector<Value> probe_values(std::tuple<A...>*, std::size_t from) {
+  static constexpr f64 at[] = {1.5, -2.25, 4, 0, -0.5, 7.25};
+  std::size_t k = from;
+  return {probe_value<std::remove_cvref_t<A>>(at[k++ % std::size(at)])...};
+}
+/// Is what the Blueprint gives this callback? The same, bound or not, and where bound, the same answer at a few places
+/// (1.5, -2.25, 4, …), bit for bit - what the engine would get from either.
+template <class R, class Args> bool same_call(const std::function<bool(std::span<const Value>, Value&)>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::callback) return differ_at([] { return std::string("a callback"); }, [&] { return std::string("no callback"); });
+  for (int round = 0; round < 3; ++round) {
+    const std::vector<Value> in = probe_values(static_cast<Args*>(nullptr), static_cast<std::size_t>(round));
+    Value a, b;
+    const bool wa = want(in, a);
+    const bool gb = got.call && got.call->call(in, b);
+    if (wa != gb) return differ_at([&] { return std::string(wa ? "bound" : "unbound"); }, [&] { return std::string(gb ? "bound" : "unbound"); });
+    if (!wa) return true;
+    if (!same_value(a, b)) return differ_at([&] { return "at call " + std::to_string(round + 1) + ": " + shown(a); }, [&] { return shown(b); });
+  }
+  return true;
+}
+template <class R, class... A> bool same(const std::function<R(A...)>& want, const Value& got) {
+  const Value w = arg(want);
+  return same_call<R, std::tuple<std::remove_cvref_t<A>...>>([&](std::span<const Value> in, Value& out) { return w.call && w.call->call(in, out); }, got);
+}
+template <FnAndUser S> bool same(const S& want, const Value& got) {
+  using Sig = CallbackSig<std::remove_cv_t<decltype(S::fn)>>;
+  const Value w = arg(want);
+  return same_call<typename Sig::Result, typename Sig::Args>([&](std::span<const Value> in, Value& out) { return w.call && w.call->call(in, out); }, got);
+}
+template <class R, class... A> bool defined(const std::function<R(A...)>&) { return true; }
+template <FnAndUser S> bool defined(const S&) { return true; }
+template <class R, class... A> std::string text(const std::function<R(A...)>& f) { return f ? "(a callback)" : "(no callback)"; }
+template <FnAndUser S> std::string text(const S& s) { return s.fn ? "(a callback)" : "(no callback)"; }
+/// What the Blueprint gives, as the source's callback: one that calls it (the value kept as long as the test runs).
+template <class R, class... A> void take(std::function<R(A...)>& to, const Value& v) {
+  if (!v.call) { to = nullptr; return; }
+  to = [held = v](A... a) -> R {
+    Value r;
+    std::vector<Value> in{arg(a)...};
+    held.call->call(in, r);
+    if constexpr (!std::is_void_v<R>) {
+      R out{};
+      take(out, r);
+      return out;
+    }
+  };
+}
+template <class R, class... A> R value_callback_thunk(void* user, A... a) {
+  const Value& held = *static_cast<const Value*>(user);
+  Value r;
+  std::vector<Value> in{arg(a)...};
+  if (held.call) held.call->call(in, r);
+  if constexpr (!std::is_void_v<R>) {
+    R out{};
+    take(out, r);
+    return out;
+  }
+}
+template <class R, class... A> auto value_thunk_of(R (*)(void*, A...)) { return &value_callback_thunk<R, A...>; }
+template <FnAndUser S> void take(S& to, const Value& v) {
+  if (!v.call) { to.fn = nullptr; to.user = nullptr; return; }
+  static std::deque<Value> kept;
+  kept.push_back(v);
+  to.fn = value_thunk_of(decltype(S::fn){});
+  to.user = &kept.back();
+}
+template <class X> f64 callback_number(const X& x) {
+  if constexpr (std::is_arithmetic_v<X>) return static_cast<f64>(x);
+  else return static_cast<f64>(x.x) + 2.0 * static_cast<f64>(x.y);
+}
+/// A drawn callback: none (unbound), or one of three plain functions of its arguments (each the same in every run).
+template <class R, class... A> struct DrawnCallback {
+  static R pick(int which, A... a) {
+    if constexpr (std::is_void_v<R>) {
+      return;
+    } else {
+      f64 sum = 0, k = 1;
+      ((sum += k * static_cast<f64>(callback_number(a)), k += 0.5), ...);
+      const f64 r = which == 0 ? sum : which == 1 ? sum * 0.25 - 1.5 : -sum + 3;
+      if constexpr (std::is_same_v<R, bool>) return r > 0;
+      else if constexpr (std::is_arithmetic_v<R>) return static_cast<R>(r);
+      else return R{static_cast<f32>(r), static_cast<f32>(-r), 0};
+    }
+  }
+  template <int W> static R plain(void*, A... a) { return pick(W, a...); }
+};
+template <class T> T draw_callback(Draw& draw) {
+  const u32 which = draw.below(4);
+  T out{};
+  if constexpr (FnAndUser<T>) {
+    if (which == 3) return out;
+    using Sig = CallbackSig<std::remove_cv_t<decltype(T::fn)>>;
+    [&]<class... A>(std::tuple<A...>*) {
+      using D = DrawnCallback<typename Sig::Result, A...>;
+      out.fn = which == 0 ? &D::template plain<0> : which == 1 ? &D::template plain<1> : &D::template plain<2>;
+    }(static_cast<typename Sig::Args*>(nullptr));
+  } else {
+    if (which == 3) return out;
+    using Sig = CallbackSig<T>;
+    [&]<class... A>(std::tuple<A...>*) {
+      using D = DrawnCallback<typename Sig::Result, A...>;
+      out = [which](A... a) { return D::pick(static_cast<int>(which), a...); };
+    }(static_cast<typename Sig::Args*>(nullptr));
+  }
+  return out;
 }
 
 /// The Blueprints of the level's actors a converted Blueprint calls on them (Call on Actor, Get Variable on
