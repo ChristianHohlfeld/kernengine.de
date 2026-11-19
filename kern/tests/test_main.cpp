@@ -11,6 +11,7 @@
 #include "gl_stub.h"
 #include "kern/kern.h"
 #include "kern/physics/physics.h"
+#include "kern/core/jobs.h"
 #include "kern/core/json.h"
 #include "kern/game/demos.h"
 #include "kern/audio/synth.h"
@@ -6319,6 +6320,37 @@ TEST(engine_calls_every_node) {
   }
   CHECK(made > 10);
   CHECK(objects.size() == 0);
+}
+
+namespace {
+void job_double(kern::Span<const u8> in, std::vector<u8>& out) {
+  out.assign(in.begin(), in.end());
+  out.insert(out.end(), in.begin(), in.end());
+}
+}  // namespace
+KERN_JOB(61, job_double);
+
+TEST(jobs_reset_begins_again) {
+  // after reset the jobs are as when the program starts: none waits, none is done, the next is numbered 1 - with the
+  // threads and without (it waits for what they run); what is defined and the switch stay
+  for (const bool threaded : {false, true}) {
+    jobs::set_threads(threaded);
+    const u32 a = jobs::submit(61, {1, 2});
+    jobs::submit(61, {3});
+    if (!threaded) jobs::pump(1000);
+    jobs::reset();
+    CHECK(jobs::pending() == 0);
+    CHECK(jobs::threads() == threaded);
+    std::vector<u8> out;
+    CHECK(!jobs::take(a, out));   // (forgotten, done or not)
+    jobs::set_threads(false);
+    const u32 b = jobs::submit(61, {7});
+    CHECK(b == 1);
+    jobs::pump(1000);
+    CHECK(jobs::take(b, out) && out == std::vector<u8>({7, 7}));
+    jobs::reset();
+  }
+  jobs::set_threads(true);
 }
 
 TEST(engine_stand_in_fixed_length) {
