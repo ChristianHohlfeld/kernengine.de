@@ -96,12 +96,13 @@ struct Machine {
 };
 
 /// kern::formula(lambda, values...): a Formula node. The lambda is the formula.
-template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(values...)); }
+/// (a place of a fixed width - U8 ... I32 - gives the formula its Int: logic::pinned)
+template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(logic::pinned(values)...)); }
 /// (a formula of whole numbers - [](Int a) -> Int: its value is the double of the Int it gives, held as
 /// that whole number, kern::math::Exact: an Int takes it as it is, everything else as that double)
 template <class F, class... A>
-  requires std::same_as<std::invoke_result_t<F, A...>, logic::Whole>
-constexpr math::Exact formula(F&& f, A... values) { return {static_cast<i64>(f(values...))}; }
+  requires std::same_as<std::invoke_result_t<F, decltype(logic::pinned(std::declval<A>()))...>, logic::Whole>
+constexpr math::Exact formula(F&& f, A... values) { return {static_cast<i64>(f(logic::pinned(values)...))}; }
 
 /// kern::out(n7.stars, n7.found): where a call on another Blueprint puts what it gave, in the
 /// order of the function's outputs (func_call_on).

@@ -5003,6 +5003,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
       if (is_keyed(f.type.type)) return type_in(f.type.type, f.type.of, rooted);
+      if (is_list(f.type.type) && has_width(f.type)) return type_in(f.type.type, f.type.of, rooted);  // (a List<U8> ...: its items of that width)
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };

@@ -182,6 +182,12 @@ template <class T> struct Sized {
   u64 hash() const { return KeyHash<i64>{}(static_cast<i64>(v)); }
   friend constexpr bool operator==(Sized a, Sized b) { return a.v == b.v; }
 };
+/// What a pin reads from a value it is handed (a Formula's input): an Int of a fixed width is the Int it holds,
+/// anything else is itself.
+template <class X> constexpr decltype(auto) pinned(X&& x) {
+  if constexpr (is_sized<std::remove_cvref_t<X>>) return Whole(x);
+  else return std::forward<X>(x);
+}
 }  // namespace logic
 namespace math {
 template <class T> inline i64 bits_of(logic::Sized<T> a) { return static_cast<i64>(a.v); }
@@ -431,14 +437,14 @@ template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
   List(const Items& items) : Items(items) {}                 // NOLINT (implicit: the vector of its items is the list)
   List(Items&& items) noexcept : Items(std::move(items)) {}  // NOLINT
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
@@ -474,14 +480,14 @@ template <class T, std::size_t N> struct Fixed {
   operator List<T>() const& { return List<T>(typename List<T>::Items(items.begin(), items.end())); }           // NOLINT (implicit: its entries as a list)
   operator List<T>() && { return List<T>(typename List<T>::Items(std::make_move_iterator(items.begin()), std::make_move_iterator(items.end()))); }  // NOLINT
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
@@ -841,14 +847,14 @@ template <class K, class V> struct Map : kern::Map<K, typename detail::Entry<V>:
   using Entries::Entries;
   Map() = default;
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
@@ -2426,6 +2432,7 @@ struct PureNodes {
   static Bool int64_less_unsigned(Int64 a, Int64 b) { return a.bits < b.bits; }
   /// An Int as 64 bits: an i64 (a whole number below 0 is its two's complement).
   static Int64 int64_of_int(Int a) { return Int64(static_cast<u64>(static_cast<i64>(a))); }
+  template <class T> static Int64 int64_of_int(Sized<T> a) { return int64_of_int(static_cast<i64>(a)); }  // (an Int of a fixed width: its number)
   /// The bits as an i64 / a u64, as an Int holds that (exact up to 2^53, beyond: the nearest).
   static Int int64_to_int(Int64 a) { return normal(static_cast<i64>(a.bits)); }
   static Int int64_to_int_unsigned(Int64 a) { return whole(static_cast<f64>(a.bits)); }
