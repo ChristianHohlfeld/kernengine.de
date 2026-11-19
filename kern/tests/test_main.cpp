@@ -3568,6 +3568,11 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("DeepCount").as_int() == 63 && r.find("events nest more than") != std::string::npos && !inst->disabled());
       CHECK(inst->get("Tail").as_int() == 630);  // every handler's ten open steps ran when the levels below were over
     }
+    if (std::string(c.name) == "recursion_direct") CHECK(inst->get("R").as_int() == 55 + 144 + 377 + 610 + 610 + 89 && inst->get("Count").as_int() == 2 + 14 + 62 + 126 + 126 + 6 && !inst->disabled());
+    if (std::string(c.name) == "recursion_through") CHECK(inst->get("Trail").as_number() == 614664 && inst->get("Hops").as_int() == 17 && !inst->disabled());
+    if (std::string(c.name) == "recursion_deep") CHECK(inst->get("Depth").as_int() == 5000 && !inst->disabled());
+    if (std::string(c.name) == "recursion_endless")
+      CHECK(inst->get("Steps").as_int() == logic::Runtime::kCallsDeep && inst->disabled() && r.find("function calls nest") != std::string::npos);
     if (std::string(c.name) == "whole_numbers") {
       const i64 top = std::numeric_limits<i64>::max();
       CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
@@ -4150,6 +4155,103 @@ TEST(logic_notation_every_node_type) {
   for (const char* ok : {"Heat", "max_stars", "a1", "Go", "n", "on", "it", "x_y"}) CHECK(logic::cpp_name_ok(ok));
   for (const char* no : {"", "1a", "my var", "class", "float", "Float", "Text", "loop", "entry", "n12", "go3", "on7", "it1", "machine2", "n007", "a__b", "_Big", "kern", "kern_x", "ä"})
     CHECK(!logic::cpp_name_ok(no));
+}
+
+TEST(logic_notation_values_of_a_call) {
+  // What a step of a function gives, and what its loop keeps while it runs, is the call's own: a
+  // local of the method, where only the function's own path after it reads it. Read before the
+  // step (a loop's earlier pass) or in an event: a member, as before. The reader also takes such a
+  // value as a member (texts of before); declared in the wrong body, it is refused.
+  const std::string text =
+      "struct Calls : kern::Blueprint {\n"
+      "  // ---- variables ----\n"
+      "  Float Total = 0.0;\n"
+      "  Float Last = 0.0;\n"
+      "\n"
+      "  // ---- functions ----\n"
+      "  struct HalfResult { Float h = 0.0; };\n"
+      "  HalfResult Half(Float x = 0.0) {\n"
+      "    return {math_div(x, 2.0)};\n"
+      "  }\n"
+      "\n"
+      "  struct SumResult { Float s = 0.0; };\n"
+      "  SumResult Sum(Int n = 0) {\n"
+      "    Float Acc = 0.0;\n"
+      "    struct : kern::Node<11> { Int index = 0; } n11;\n"
+      "    HalfResult n12;\n"
+      "    for (auto it11 = flow_for(n11, 1, n); it11.next();) {\n"
+      "      Last = n13.h;\n"
+      "      n12 = Half(kern::to<Float>(n11.index));\n"
+      "      Acc = math_add(Acc, n12.h);\n"
+      "      n13 = Half(Acc);\n"
+      "    }\n"
+      "    return {Acc};\n"
+      "  }\n"
+      "\n"
+      "  // ---- events ----\n"
+      "  KERN_EVENT(on1, event_custom<\"Go\">)\n"
+      "  void on1(Actor actor, Float value, Text text) {\n"
+      "    n2 = Sum(kern::to<Int>(value));\n"
+      "    Total = n2.s;\n"
+      "  }\n"
+      "\n"
+      "  // ---- what nodes give and keep ----\n"
+      "  SumResult n2;\n"
+      "  HalfResult n13;\n"
+      "};\n";
+  auto strip = [](const std::string& s) {  // (the struct alone: without the head and the layout)
+    const std::size_t from = s.find("struct Calls"), at = s.find("\nKERN_LAYOUT(");
+    return from == std::string::npos || at == std::string::npos ? s : s.substr(from, at - from);
+  };
+  logic::Graph g;
+  std::string name, error, again;
+  const bool read = logic::from_cpp(text, g, &name, &error);
+  if (!read) std::printf("%s\n", error.c_str());
+  CHECK(read && logic::to_cpp(g, name, again, &error));
+  if (strip(again) != text) std::printf("%s\n", again.c_str());
+  CHECK(strip(again) == text);
+  // the same Blueprint with n12 and n11 as members (as texts had them before)
+  std::string before = text;
+  auto cut = [&](const std::string& what) { const std::size_t at = before.find(what); CHECK(at != std::string::npos); if (at != std::string::npos) before.erase(at, what.size()); };
+  cut("    HalfResult n12;\n");
+  cut("    struct : kern::Node<11> { Int index = 0; } n11;\n");
+  before.insert(before.rfind("};"), "  HalfResult n12;\n  struct : kern::Node<11> { Int index = 0; } n11;\n");
+  logic::Graph old;
+  CHECK(logic::from_cpp(before, old, &name, &error) && logic::same_blueprint(old, g));
+  // a value an earlier pass of the loop reads (n13), or one an event reads (n2), is no local of Sum
+  for (const char* member : {"  HalfResult n13;\n", "  SumResult n2;\n"}) {
+    std::string wrong = text;
+    const std::size_t at = wrong.find(member);
+    wrong.erase(at, std::strlen(member));
+    wrong.insert(wrong.find("    for (auto it11"), std::string("  ") + member);
+    logic::Graph bad;
+    CHECK(!logic::from_cpp(wrong, bad, &name, &error) && error.find("it is a member of the class") != std::string::npos);
+  }
+}
+
+TEST(logic_recursion_rules) {
+  // A function may call itself, directly or through others, as a step. Read as a value it would
+  // read itself (a value has no circles); and in a circle what its steps give stays on its path.
+  auto refused = [](const char* text, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool read = logic::from_cpp(text, g, nullptr, &error);
+    if (read || error.find(why) == std::string::npos) std::printf("%s\n", error.c_str());
+    return !read && error.find(why) != std::string::npos;
+  };
+  CHECK(refused("struct P : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  KERN_PURE HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      return {Half(math_div(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
+                "calls itself and is read as a value"));
+  CHECK(refused("struct Q : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
+                "  // ---- what nodes give and keep ----\n  HalfResult n5;\n};\n",
+                "calls itself, so every call has its own values"));
+  logic::Graph ok;
+  std::string error;
+  CHECK(logic::from_cpp("struct R : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n    HalfResult n5;\n"
+                        "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
+                        ok, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
 }
 
 TEST(logic_notation_reads_what_a_person_writes) {
@@ -5655,9 +5757,8 @@ TEST(logic_libraries) {
       "struct Garage : virtual kern::Blueprint, virtual Wheels {\n  // ---- variables ----\n"
       "  List<Wheel> Spare = List<Wheel>{Wheel{0.5, Side::Front, List<Float>{}}};\n  Float Seen = 0.0;\n\n  // ---- functions ----\n"
       "  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; };\n"
-      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
-      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n\n"
-      "  // ---- what nodes give and keep ----\n  Wheels::twiceResult n5;\n};\n";
+      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::twiceResult n5;\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
+      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n};\n";
   std::map<std::string, logic::Graph> project;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
     auto it = project.find(std::string(name));
@@ -5975,11 +6076,11 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
       CHECK(!i.error);
     }
   };
-  // a function does not run again while it runs: not by calling itself, not through another one
-  problem(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
+  // a function calls itself as a step - its own values in every call (that this one never ends is
+  // the scenario's, not the graph's: logic_cases recursion_endless) - but not as a value
+  fine(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
             "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}}],
-            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})",
-          "function \"Fact\" calls itself:", 21);
+            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})");
   problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"G","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.pure","params":{"function":"G"}},{"id":3,"type":"func.return","params":{"function":"F"}},
               {"id":4,"type":"func.entry","params":{"function":"G"}},{"id":5,"type":"func.call","params":{"function":"F"}},{"id":6,"type":"func.return","params":{"function":"G"}}],
