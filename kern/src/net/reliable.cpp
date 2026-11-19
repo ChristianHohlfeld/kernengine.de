@@ -79,7 +79,8 @@ int Endpoint::read_header(const u8* in, int bytes, u16& sequence, u16& ack, u32&
   return n;
 }
 
-u16 Endpoint::send_packet(const u8* payload, int bytes) {
+u16 Endpoint::send_packet(const u8* payload, Count<1> given) {
+  const int bytes = static_cast<int>(static_cast<u32>(given));   // (the bytes, as many as the caller says)
   const u16 sequence = sequence_;
   if (bytes < 0 || bytes > config_.max_packet_size) {
     ++stats_.packets_too_large_to_send;
@@ -123,7 +124,8 @@ u16 Endpoint::send_packet(const u8* payload, int bytes) {
   return sequence;
 }
 
-void Endpoint::receive_packet(const u8* packet, int bytes) {
+void Endpoint::receive_packet(const u8* packet, Count<1> given) {
+  const int bytes = static_cast<int>(static_cast<u32>(given));   // (the bytes, as many as the caller says)
   if (!packet || bytes <= 0) { ++stats_.packets_invalid; return; }
   if (bytes > config_.max_packet_size + kMaxHeader + kFragmentHeader) { ++stats_.packets_too_large_to_receive; return; }
   if (!(packet[0] & kFragmentFlag)) { process_regular(packet, bytes); return; }

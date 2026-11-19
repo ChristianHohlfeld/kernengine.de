@@ -2449,12 +2449,13 @@ bool c196(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Text>(o, in, 1, a0);
   std::vector<float> a1;
   ev::take<ev::List<ev::Float>>(o, in, 2, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<unsigned int>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 3, a2);
   auto a3 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<unsigned int>>();
   ev::take<ev::Int>(o, in, 5, a4);
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than samples says"; return false; }
   decltype(auto) r = self->set_pcm(a0, a1.empty() ? nullptr : a1.data(), std::move(a2), std::move(a3), std::move(a4));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;

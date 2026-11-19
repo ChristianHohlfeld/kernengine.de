@@ -1229,16 +1229,21 @@ selbst“).
 - **Was eine Funktion durch einen Parameter schreibt, ist ein weiterer Ausgang:** durch eine
   Referenz (`std::vector<u64>& out`), durch einen Zeiger, der null sein darf (`bool* changed =
   nullptr` – der Aufruf nimmt den Wert, wo er ihn will, oder nirgends), und durch einen Zeiger auf
-  Zahlen mit ihrer Anzahl daneben (`void render(f32* out, u32 frames)`): eine Liste der Zahlen,
+  Zahlen mit ihrer Anzahl daneben (`void render(f32* out, Count<2> frames)`): eine Liste der Zahlen,
   die die Engine dort hinschreibt (`out`, List<Float>), die Anzahl bleibt ein Eingang. In der
   Tabelle nennt der Ausgang seine Anzahl (`EnginePin::count`); der Stellvertreter gibt nicht mehr
   Einträge, als sie sagt – den Platz, den der Aufruf ihm gibt. Der Aufruf `mixer_.render(out_.data(),
   frames)` schreibt die Zahlen des Knotens in die Liste, auf die der Zeiger zeigt, ab dem Eintrag,
-  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++. Zählt die
-  Anzahl Dinge aus mehreren Zahlen, sagt ihr Typ es: `void render(f32* out, Count<2> frames)`
-  (`kern::Count<Per>`, kern/core/base.h – die ganze Zahl, die er hält) schreibt 2 × frames Zahlen;
-  die Tabelle sagt es (`EnginePin::per`), der Stellvertreter gibt so viele, der Aufruf im Test nimmt
-  so viele.
+  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++. **Dass die
+  Zahl neben einem Zeiger seine Anzahl ist, sagt allein ihr Typ:** `kern::Count<Per>` (kern/core/base.h
+  – die ganze Zahl, die er hält; Per Zahlen oder Einträge je Gezähltem): `void render(f32* out,
+  Count<2> frames)` schreibt 2 × frames Zahlen; die Tabelle sagt es (`EnginePin::per`), der
+  Stellvertreter gibt so viele, der Aufruf im Test nimmt so viele. Ebenso für einen Zeiger, den die
+  Engine liest: `push_incoming(from, const u8* data, Count<1> bytes)`, `triangulate(const f64* xy,
+  Count<2> vertex_count, …)` – die Tür und die Klasse weisen eine kürzere Liste ab, der Test der
+  Quelle zeichnet Per × Anzahl Werte auf. Steht neben einem Zeiger eine ganze Zahl eines anderen
+  Typs, sagt sie nichts über seine Länge: `tools/engine_api.py` hält mit der Liste dieser
+  Erklärungen an (kein Name wird gelesen, keine Länge geraten).
 - **Der Knoten auf der Engine selbst** (`kern/logic/engine_host.h`): `logic::call_engine(objects,
   function, in, out)` ruft die echte Funktion eines Knotens – `tools/engine_api.py` schreibt jeden
   Aufruf aus den Headern (`kern/src/<Teil>/engine_calls.gen.cpp`, ein Teil der Engine je Datei: ein

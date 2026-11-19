@@ -116,9 +116,10 @@ class Mixer {
   bool ready() const { return rate_ != 0; }
 
   // ---- clips ----
-  /// Copies `frames` frames of `channels` interleaved samples at `rate` and resamples
-  /// them to the mixer rate. Returns 0 (and sets last_error) for invalid input.
-  ClipId create_clip(const f32* samples, u32 frames, u32 channels, u32 rate, std::string name);
+  /// Copies `samples` interleaved samples of `channels` channels at `rate` (samples / channels
+  /// frames) and resamples them to the mixer rate. Returns 0 (and sets last_error) for invalid
+  /// input - also a sample count that is no whole number of frames.
+  ClipId create_clip(const f32* data, Count<1> samples, u32 channels, u32 rate, std::string name);
   /// Takes samples already at the mixer rate (synthesised sounds).
   ClipId adopt_clip(std::vector<f32> samples, u32 channels, std::string name, bool loopable = false);
   bool destroy_clip(ClipId clip);  // stops its voices

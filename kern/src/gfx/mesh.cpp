@@ -22,7 +22,7 @@ Vec3 Mesh::posed_vertex(u32 v) const {
   return out;
 }
 
-Sphere bounding_sphere(const f32* p, u32 n) {
+Sphere bounding_sphere(const f32* p, Count<3> n) {
   Aabb box;
   for (u32 i = 0; i < n; ++i) box.extend(Vec3::load(p + i * 3));
   const Vec3 c = box.center();
@@ -31,7 +31,7 @@ Sphere bounding_sphere(const f32* p, u32 n) {
   return {c, std::sqrt(r2)};
 }
 
-u8 mirror_state(const f32* t, u32 count) {
+u8 mirror_state(const f32* t, Count<16> count) {
   u32 mirrored = 0;
   for (u32 k = 0; k < count; ++k) {
     const f32* m = t + k * 16;
@@ -49,7 +49,7 @@ void apply_cull_mode(i32 mode) {
   gl::cullFace(mode == 2 ? gl::FRONT : gl::BACK);
 }
 
-Sphere instanced_bounds(const Sphere& local, const f32* t, u32 count) {
+Sphere instanced_bounds(const Sphere& local, const f32* t, Count<16> count) {
   Aabb box;
   for (u32 i = 0; i < count; ++i, t += 16) {
     const Vec3 c{t[0] * local.center.x + t[4] * local.center.y + t[8] * local.center.z + t[12],

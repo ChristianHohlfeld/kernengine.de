@@ -16,10 +16,10 @@ namespace kern {
 /// `vertex_count` counts vertices, each two numbers of `xy` (kern::Count<2>).
 class Earcut {
  public:
-  void triangulate(const f64* xy, Count<2> vertex_count, const u32* hole_starts, u32 hole_count, std::vector<u32>& out);
+  void triangulate(const f64* xy, Count<2> vertex_count, const u32* hole_starts, Count<1> hole_count, std::vector<u32>& out);
 
   /// Relative difference between polygon area and triangulated area (0 = exact).
-  static f64 deviation(const f64* xy, Count<2> vertex_count, const u32* hole_starts, u32 hole_count, const u32* triangles, u32 index_count);
+  static f64 deviation(const f64* xy, Count<2> vertex_count, const u32* hole_starts, Count<1> hole_count, const u32* triangles, Count<1> index_count);
 
  private:
   struct Node {

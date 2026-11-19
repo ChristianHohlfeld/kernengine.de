@@ -4,7 +4,7 @@
 
 namespace kern {
 
-bool RoadBuilder::begin(const f64* stream, std::size_t length, const RoadOptions& options, HeightSampler heights) {
+bool RoadBuilder::begin(const f64* stream, Count<1> length, const RoadOptions& options, HeightSampler heights) {
   if (!(options.radius > 0) || !(options.chunk_size > 0) || !(options.segment_length >= 0.25) || !(options.dash_period > 0) ||
       !(options.dash_length > 0) || !(options.marking_width > 0) || !(options.dash_start >= 0) || !std::isfinite(options.radius) ||
       !std::isfinite(options.chunk_size) || !std::isfinite(options.segment_length) || !std::isfinite(options.dash_period))

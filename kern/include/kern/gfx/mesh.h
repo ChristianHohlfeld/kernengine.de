@@ -122,12 +122,12 @@ struct Mesh {
 };
 
 /// Bounding sphere of a position array.
-Sphere bounding_sphere(const f32* positions, u32 vertex_count);
+Sphere bounding_sphere(const f32* positions, Count<3> vertex_count);
 /// 0 when no instance mirrors (negative 3x3 determinant), 1 when all do, 2 for a mix.
-u8 mirror_state(const f32* transforms, u32 instance_count);
+u8 mirror_state(const f32* transforms, Count<16> instance_count);
 /// Applies a cull_mode() value to the GL state.
 void apply_cull_mode(i32 mode);
 /// World sphere enclosing every instance transform of a local sphere.
-Sphere instanced_bounds(const Sphere& local, const f32* transforms, u32 instance_count);
+Sphere instanced_bounds(const Sphere& local, const f32* transforms, Count<16> instance_count);
 
 }  // namespace kern
