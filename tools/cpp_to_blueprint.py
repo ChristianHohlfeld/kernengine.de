@@ -9871,7 +9871,8 @@ class Api:
 
     def shape(self, bt, raw=None):
         """A value's form, written out: n i b v t, e<values>, {fields}, [items] - [N items] for a list of a fixed
-        length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it)."""
+        length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it), [?item] for what
+        may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in ENGINE_PIN:
             return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
         if bt in self.u.enum_values:
@@ -9881,12 +9882,18 @@ class Api:
             cpp = {c.get("name"): qtype(c) for c in kids(self.tree.records[q]) if c.get("kind") == "FieldDecl"} if q else {}
             return "{" + "".join(self.shape(t, cpp.get(c)) for _, t, _, c in self.u.struct_fields[bt]) + "}"
         if bt.startswith("List<"):
+            c = self.u.clean(raw).strip() if raw else ""
+            if c.startswith(("std::optional<", "std::unique_ptr<")):
+                # (what may be there or not - a list of no entry or one: `[?item]`, never two, as C++ holds one at most)
+                return "[?" + self.shape(bt[5:-1], template_args(c)[0].strip()) + "]"
             n = self.u.entries(raw) if raw else None
             inner = None
             if n:   # (what each entry is in C++: T[3][2] -> T[2], std::array<X, N> -> X)
                 c = self.u.clean(raw)
                 m = re.match(r"std::array<(.*),\s*\d+[uUlL]*>$", c)
                 inner = template_args(c)[0].strip() if m else re.sub(r"\[\d+\]", "", c, count=1)
+            elif c.startswith("std::vector<"):   # (what each entry is in C++: it may be one that may be there or not)
+                inner = template_args(c)[0].strip()
             return "[" + (str(n) if n else "") + self.shape(bt[5:-1], inner) + "]"
         raise Wait(f"a {bt}")
 
@@ -10055,6 +10062,7 @@ class Api:
         method = d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static"
         const = qtype(d).rstrip().endswith("const")
         ins, outs, taken = [], [], {"exec", "then", "result"}
+        raws = {}   # pin -> the C++ type it stands for (its form: Api.shape)
 
         def name_of(want):
             name = re.sub(r"\W", "_", want) or "value"
@@ -10096,6 +10104,7 @@ class Api:
                 continue
             bt, writes, handle = self.handed(qtype(p))
             name = name_of(p.get("name") or f"value{i + 1}")
+            raws[name] = qtype(p)
             ins.append((name, bt, handle))
             if writes:
                 outs.append((name, bt, None))
@@ -10107,19 +10116,20 @@ class Api:
         place = False
         if ret != "void":
             bt, gives_place, handle = self.handed(ret)
+            raws["result"] = ret
             outs.insert(0, ("result", bt, handle))
             # a reference (not const) to something the engine holds, by a method that only looks it up: a place of the
             # engine (kern/docs/blueprint_cpp.md, "Plätze der Engine") - the node binds it, the place nodes work on it
             place = gives_place and handle is None and method and not ins[1:] and len(outs) == 1 and self.looks_up(d)
         qualified = self.home(d) + "::" + d["name"]
         value = not place and ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
-        for _, bt, _ in ins + outs:
+        for name, bt, _ in ins + outs:
             self.pin(bt)
-            self.shape(bt)
+            self.shape(bt, raws.get(name))
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
                 "help": u.comment_of(d), "value": value, "place": place, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per,
-                "clock": self.reads_clock(d)}
+                "clock": self.reads_clock(d), "raws": raws}
 
     @staticmethod
     def looks_up(d):

@@ -2760,6 +2760,15 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Bool>(this->kern_engine("engine.jobs.threads", {}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
+  /// Forgets every job - waiting, running (it waits for those the threads run) or done - and numbers the next one 1 again, as when the program starts; what is defined and the switches stay. (A test that plays calls of a program on several sides from the same beginning: each side begins with the jobs as the others did.)
+  void engine_jobs_reset() {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::jobs::reset();
+      return;
+    }
+    this->kern_engine("engine.jobs.reset", {}, {});
+  }
   /// ---- host interface (kern/web/jobs.mjs) ---- Queued jobs not yet handed out, as one buffer: u32 count, then per job u32 id, u32 kind, u32 length, bytes. The jobs count as running until kern_job_done.
   List<Int> engine_jobs_take_queued() const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
