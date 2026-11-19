@@ -48,6 +48,24 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
   none = T{};
   return none;
 }
+// p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
+// any other is marked (C++ leaves it open) and stands at p - a range up to it is empty, nothing is read there.
+template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  const long long k = static_cast<long long>(n);
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + k;
+    if (e >= 0 && e <= static_cast<long long>((b - a) / sizeof(T))) return p + k;
+    converted::open_read();
+    return p;
+  }
+  if (p != nullptr || k == 0) return p + k;
+  converted::open_read();
+  return p;
+}
+template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }
 
 // ---- city_stream.cpp and what it uses, as it stands ----
 #pragma GCC diagnostic push
@@ -58,9 +76,18 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-double now_ms();
 struct KeyIndex : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+};
+struct Earcut : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  Earcut();
+  void triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const;
+  ~Earcut();
+  Earcut(const Earcut&) = default;
+  Earcut(Earcut&&) = default;
+  Earcut& operator=(const Earcut&) = default;
+  Earcut& operator=(Earcut&& o) noexcept;
 };
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
@@ -68,8 +95,26 @@ struct Vec4 {
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
+struct Quat {
+  f32 x = 0, y = 0, z = 0, w = 1;
+  
+
+
+
+
+  
+
+
+
+  
+
+
+
+
+};
+struct Bvh;
 constexpr u32 kMaxExtensionAttributes = 2;
 constexpr u32 kMaxMaterialParams = 8;
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
@@ -119,6 +164,7 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 struct MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
@@ -164,11 +210,23 @@ struct GeoChunk {
 };
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  ~BuildingBuilder();
+  BuildingBuilder();
+  BuildingBuilder(const BuildingBuilder&) = default;
+  BuildingBuilder(BuildingBuilder&&) = default;
+  BuildingBuilder& operator=(const BuildingBuilder&) = default;
+  BuildingBuilder& operator=(BuildingBuilder&& o) noexcept;
 };
 struct FootprintStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   void begin(const unsigned int& seed_hash, const double& base, const double& top, const double& center_x, const double& center_y) const;
-  void ring(const Vec2* points, const unsigned int& count) const;
+  void ring(const Vec2* points, const u32& count) const;
+  ~FootprintStream();
+  FootprintStream();
+  FootprintStream(const FootprintStream&) = default;
+  FootprintStream(FootprintStream&&) = default;
+  FootprintStream& operator=(const FootprintStream&) = default;
+  FootprintStream& operator=(FootprintStream&& o) noexcept;
 };
 struct RoadOptions : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -176,9 +234,22 @@ struct RoadOptions : converted::EngineObject {
 };
 struct RoadBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  ~RoadBuilder();
+  RoadBuilder();
+  RoadBuilder(const RoadBuilder&) = default;
+  RoadBuilder(RoadBuilder&&) = default;
+  RoadBuilder& operator=(const RoadBuilder&) = default;
+  RoadBuilder& operator=(RoadBuilder&& o) noexcept;
 };
 struct RoadStream : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  ~RoadStream();
+  RoadStream();
+  void road(const Vec2* points, const u32& count, const double& width, const bool& curb, const unsigned int& surface_color, const int& marking_color = -1) const;
+  RoadStream(const RoadStream&) = default;
+  RoadStream(RoadStream&&) = default;
+  RoadStream& operator=(const RoadStream&) = default;
+  RoadStream& operator=(RoadStream&& o) noexcept;
 };
 struct GeoProjector {
   f64 lon0 = 0, lat0 = 0, cos_lat = 1;
@@ -213,6 +284,7 @@ enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -229,10 +301,37 @@ namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Shape { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Shape { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Shape& o) const { return id == o.id; } }; }
+namespace physics { struct ShapeMaterial {
+  f32 density = 1;            // kg/m^3
+  f32 friction = 0.6;
+  f32 restitution = 0;        // 0..1
+  f32 rolling_resistance = 0; // spheres, capsules, hulls (Box3D: a quarter of the inner radius)
+  bool sensor = false;
+  u64 category_bits = 1, mask_bits = ~0ull;
+  i32 group_index = 0;
+  bool contact_events = true, sensor_events = true, hit_events = false;
+  u64 user = 0;               // returned by World::shape_user
+  Surface surface = Surface::none;
+}; }
+namespace physics { struct ShapeSettings {
+  ShapeKind kind = ShapeKind::box;
+  Vec3 center;               // body-local placement of the shape
+  Quat rotation;
+  Vec3 size{1, 1, 1};        // box: full extents
+  f32 radius = 0.5;         // sphere, capsule
+  f32 length = 1;            // capsule: distance between the hemisphere centres, along the shape's Z
+  Span<const Vec3> points;   // hull: points in shape space (4..128 after hull reduction); mesh: vertices
+  Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
+  ShapeMaterial material;
+}; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  bool body_valid(const physics::Body& body) const;
+  void destroy_body(const physics::Body& body) const;
+  physics::Shape create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const;
+  void destroy_shape(const physics::Shape& shape) const;
 };
 struct MouseGrab : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -240,18 +339,43 @@ struct MouseGrab : converted::EngineObject {
 struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+struct Rng {
+  // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
+  // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
+  u32 s = 0x9e3779b9u;
+  f32 spare_ = 0;           // gaussian(): the second number of a pair, kept for the next call
+  bool has_spare_ = false;
+  /// The generator for a seed that may be 0 (0: the default seed).
+  
+  u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+  f32 unit() { return static_cast<f32>(next() >> 8) * (1.0 / 16777216.0); }
+  
+  /// Standard normal (Box-Muller), as SpawnCity's sensor noise.
+  
+
+
+
+
+
+
+
+};
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
 namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
 constexpr i32 kTileZoom = 14;
 struct TileKey {
   i32 z = kTileZoom, x = 0, y = 0;
-  
-  
+  bool operator==(const TileKey& o) const { return z == o.z && x == o.x && y == o.y; }
+  u64 hash() const { return (static_cast<u64>(static_cast<u32>(x)) << 32) ^ static_cast<u64>(static_cast<u32>(y)) ^ (static_cast<u64>(z) << 58); }
 };
 TileKey tile_at(f64 lon, f64 lat, i32 z = kTileZoom);
 void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat);
 void unproject(const GeoProjector& p, f64 x, f64 y, f64& lon, f64& lat);
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
+f32 road_width(RoadClass c);
+bool road_is_water(RoadClass c);
 enum class AreaKind : u8 { water, park, wood, grass, sand, pitch };
 struct MapFeatures {
   struct Building {
@@ -303,7 +427,7 @@ struct Terrain {
   
   /// New world (origin of the local metres). `dem`: fetch real elevation (else flat ground).
   
-  
+  void clear();
   /// No elevation service (offline, dem=0): flat ground from now on.
   
 
@@ -332,22 +456,22 @@ struct Terrain {
   std::vector<Vec4> needs;
 
   // ---- heights (one truth for physics, rendering, walkers, cars) ----
-  
+  f32 elevation(f32 x, f32 y) const;
   /// Height of a 5 m node: elevation + craters, water basins carved (terrainNodeHeightAt).
-  
+  f32 node_height(f32 x, f32 y) const;
   /// The static ground surface at (x, y): the node heights on the SW-NE triangles.
-  
+  f32 height(f32 x, f32 y) const;
   
   /// Where a building stands: the lowest ground along its outline (buildingGroundBase).
   
   
 
   // ---- water ----
-  
+  void add_water_polygon(const std::vector<std::vector<Vec2>>& rings);
   /// A waterway line `width` wide; `speed` m/s current along it (river 1.6, canal 0.5, else 1.1).
-  
-  
-    // open water here (not under a bridge)
+  void add_waterway(const std::vector<Vec2>& points, f32 width, f32 speed);
+  void add_bridge(Vec2 a, Vec2 b, f32 width);
+  bool water_at(f32 x, f32 y) const;  // open water here (not under a bridge)
   
   
   /// Ground surface kind for tyres etc. (groundSurfaceAt): 0 ground, 1 water, 2 soil (crater).
@@ -356,8 +480,8 @@ struct Terrain {
   // ---- map areas (world_ground.mjs paintAreas) ----
   /// Parks, woods, pitches, sand tint the ground's vertex colours (node * .45 + colour * .55,
   /// linear): the ground already is the surface, so they cost no triangles. `owner`: the map tile.
-  
-  
+  void add_tint(u64 owner, const std::vector<std::vector<Vec2>>& rings, Vec3 srgb);
+  void remove_tints(u64 owner);
 
   // ---- road corridors (terrain_craters.mjs setRoadCorridors) ----
   /// The streets of one map tile (`owner`, its square `bounds`): inside that square the ground is
@@ -369,7 +493,7 @@ struct Terrain {
   /// A street's corridor is its centre line and `widths` of it: its width with the pavements (road
   /// width + 3.4 m); a street of width 0 has none.
   
-  
+  void remove_corridors(u64 owner);
   /// Whether the streets of the map tile at (x, y) have shaped the ground there (or no city runs).
   bool corridors_at(f32 x, f32 y) const;
   /// The city streams map tiles: a place's ground is final only once its tile's streets are in.
@@ -385,7 +509,7 @@ struct Terrain {
 
   
   /// One crater as it goes over the network (destruction sync: game_destruction_sync.cpp).
-  struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; };
+  struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } };
   
   /// The host's craters, in his order: only what differs is dug or filled (its tiles rebuilt).
   
@@ -428,7 +552,7 @@ struct Terrain {
   /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
   i32 corridor_set(f32 x, f32 y) const;
   
-  
+  f32 road_level(f32 x, f32 y, f32 h) const;
   struct Tint { u64 owner; Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
   struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
   converted::wide::Map<u64, Image> images_;
@@ -440,14 +564,14 @@ struct Terrain {
 
   
   
+  Vec4 interior(const Grid& g) const;
   
   
-  
-  
-  
-  
-  
-  
+  f32 grid_at(const Grid& g, f32 x, f32 y) const;
+  bool water_cell(i32 cx, i32 cy) const;
+  void set_water_cell(i32 cx, i32 cy);
+  bool on_bridge(f32 x, f32 y) const;
+  void dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify = true);
   
   
   
@@ -471,7 +595,7 @@ struct Terrain {
   std::vector<Bridge> bridges_;
   std::vector<Crater> craters_;
   std::vector<Tint> tints_;
-  
+  void repaint(const Vec4& box);
   // tiles: render keyed by (level, i, j), collision by (i, j)
   converted::wide::Map<u64, RenderTile> render_;
   converted::wide::Map<u64, CollisionTile> collision_;
@@ -485,6 +609,7 @@ struct Terrain {
   std::vector<Vec4> changes_;
   TerrainStats stats_;
 };
+f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim);
 struct Lane {
   std::vector<Vec2> points;
   f32 width = 6;
@@ -512,7 +637,7 @@ struct CityStream {
   /// Starts a world around lon/lat (origin of the local metres). `world` gets the static collision.
   /// `dem`: ask the host for real elevation (terrain.h), else flat ground.
   
-  
+  void clear();
   
 
   /// Requests, builds and unloads around `focus` for about `budget_ms`.
@@ -520,7 +645,7 @@ struct CityStream {
 
   // ---- host side ----
   /// Tiles to fetch now, as JSON [[z,x,y],...] (each tile once).
-  std::string take_requests();
+  
   /// Uncompressed MVT bytes of a requested tile (copied).
   
   
@@ -534,9 +659,9 @@ struct CityStream {
   // ---- gameplay queries ----
   
   /// A point on a drivable street within `radius` of `near` (heading along the street).
-  
+  bool street_point(Rng& rng, Vec3 near, f32 radius, Vec3& point, f32& heading) const;
   /// Ground height: the terrain's static surface (elevation, water basins, craters).
-  
+  f32 ground_height(f32 x, f32 y) const { return terrain_.height(x, y); }
   /// The ground (elevation tiles, water, craters, ground tiles): terrain.h.
   
   
@@ -547,7 +672,7 @@ struct CityStream {
   /// start, unit direction, outward normal, length, base / top of the building, its seed.
   struct Wall { Vec2 a, dir, normal; f32 len = 0, base = 0, top = 0; u32 seed = 0, edge = 0; };
   /// Walls of loaded buildings whose outline comes within `r` of p.
-  
+  void walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const;
   /// The building whose footprint contains p (-1: none); its outer ring, base and top.
   bool building_at(Vec2 p) const;
   /// The tiles whose ground is final, in a fixed order: their street furniture (tiles.h furnish)
@@ -598,9 +723,9 @@ struct CityStream {
   /// its map feature. Its 160 m mesh chunk is rebuilt as a job and swapped in one step, its
   /// collider replaced alone. The damage outlives the tile (a re-streamed tile keeps it) until
   /// clear_damage().
-  
+  bool damage_building(u64 tile, u32 index, f32 new_top, bool leveled);
   /// Every building back to its full height (RESET).
-  
+  void clear_damage();
   
   /// Counts every height a building lost (marks on the walls drop what hangs in the air: world_marks.cpp).
   
@@ -616,7 +741,7 @@ struct CityStream {
   /// every machine ends at the same city whatever order the reports come in). A loaded building
   /// is lowered at once (drawing, collider), an unloaded one when its tile streams in. Returns
   /// whether anything changed. `log`: whether this change is ours to tell again (host relays).
-  
+  bool merge_damage(const std::vector<DamageRec>& list, bool log);
 
  private:
   u32 damage_serial_ = 0;
@@ -624,13 +749,13 @@ struct CityStream {
   std::vector<Vec4> ground_changes_;
   struct Tile;
   
-  
+  void unload_far(Vec3 focus);
   Vec4 ring_bounds(Vec3 focus, i32 r) const;
   
   
   void upload(Tile& t, GeoChunk& chunk, const Material& material, bool walls);
-  
-  
+  void remove(Tile& t);
+  void feed_terrain(Tile& t);
   
   
   // The original's working sets around the focus: the drawn buildings (world_city_buildings.mjs:
@@ -656,7 +781,7 @@ struct CityStream {
   f64 worst_step_ms_ = 0;
   u32 rebuilds_ = 0, relays_ = 0, upload_count_ = 0;
   u64 upload_vertices_ = 0;
-  void step_time(const char* name, f64 t0);
+  
   Vec3 focus_{};
   Vec2 vis_at_{1e9, 1e9}, vis_ahead_{1e9, 1e9};
   f64 vis_ms_ = -1e9;
@@ -664,7 +789,7 @@ struct CityStream {
   void drop_cell(Tile& t, u64 cell);
   
   
-  
+  physics::Shape building_shape(physics::Body body, const MapFeatures::Building& b);
   // damage by building seed: the height above its base that is left, and whether it collapsed
   struct Damage { f32 height = 0; bool leveled = false; };
   converted::wide::Map<u32, Damage> damage_;
@@ -753,12 +878,150 @@ bool Terrain::ready_at(Vec3 p) const {
 i32 Terrain::corridor_set(f32 x, f32 y) const {
   // the map tile whose square holds the point (the squares tile the plane: west / south edge in - one at most)
   for (std::size_t i = 0; i < corridors_.size(); converted::pre_inc(i)) {
-    const CorridorSet& s = *converted::at(corridors_, i);
+    const CorridorSet& s = *converted::present(converted::at(corridors_, i));
     if (x >= s.bounds.x && x < s.bounds.z && y >= s.bounds.y && y < s.bounds.w) return static_cast<i32>(i);
   }
   return -1;
 }
 bool Terrain::corridors_at(f32 x, f32 y) const { return !corridors_expected || corridor_set(x, y) >= 0; }
+namespace terrain_cpp_local { constexpr f32 kBlock = 640; }
+namespace terrain_cpp_local { constexpr f32 kWaterChunk = 320; }
+namespace terrain_cpp_local { i32 sx28(u64 v) { return static_cast<i32>(static_cast<u32>(converted::shl_bits(v, 4))) >> 4; } }
+namespace terrain_cpp_local { void unkey3(u64 k, i32& level, i32& i, i32& j) {
+  level = static_cast<i32>(converted::shr_bits(k, 56));
+  i = sx28((converted::shr_bits(k, 28)) & 0xFFFFFFF);
+  j = sx28(k & 0xFFFFFFF);
+} }
+void Terrain::set_water_cell(i32 cx, i32 cy) {
+  WaterBlock& b = water_[terrain_cpp_local::key2(cx >> 4, cy >> 4)];
+  const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
+  if (!((converted::shr_bits(converted::at(b.bits, idx >> 6), (idx & 63))) & 1u)) ++stats_.water_cells;
+  converted::at(b.bits, idx >> 6) |= converted::shl_bits(u64{1}, (idx & 63));
+}
+void Terrain::add_water_polygon(const std::vector<std::vector<Vec2>>& rings) {
+  if (rings.empty() || converted::at(rings, 0).size() < 3) return;
+  f32 y_lo = 1e9, y_hi = -1e9, x_lo = 1e9, x_hi = -1e9;
+  for (Vec2 p : converted::at(rings, 0)) { y_lo = std::fmin(y_lo, p.y); y_hi = std::fmax(y_hi, p.y); x_lo = std::fmin(x_lo, p.x); x_hi = std::fmax(x_hi, p.x); }
+  // Scanline fill (even-odd over all rings: courtyards / islands stay dry), cell centres.
+  std::vector<f32> xs;
+  const i32 j0 = static_cast<i32>(converted::fits<int>(std::floor(y_lo / kWaterCell))), j1 = static_cast<i32>(converted::fits<int>(std::floor(y_hi / kWaterCell)));
+  for (i32 j = j0; j <= j1; ++j) {
+    const f32 y = (static_cast<f32>(j) + 0.5) * kWaterCell;
+    xs.clear();
+    for (const auto& ring : rings)
+      for (std::size_t a = 0, c = converted::minus(ring.size(), 1); a < ring.size(); c = converted::post_inc(a)) {
+        const f32 ya = converted::at(ring, a).y, yc = converted::at(ring, c).y;
+        if ((ya > y) != (yc > y)) xs.push_back(converted::at(ring, a).x + (y - ya) / (yc - ya) * (converted::at(ring, c).x - converted::at(ring, a).x));
+      }
+    std::stable_sort(xs.begin(), xs.end());
+    for (std::size_t k = 0; converted::plus(k, 1) < xs.size(); converted::plus_to(k, 2)) {
+      const i32 ia = static_cast<i32>(converted::fits<int>(std::ceil(converted::at(xs, k) / kWaterCell - 0.5))), ib = static_cast<i32>(converted::fits<int>(std::floor(converted::at(xs, converted::plus(k, 1)) / kWaterCell - 0.5)));
+      for (i32 i = ia; i <= ib; ++i) set_water_cell(i, j);
+    }
+  }
+  dirty(x_lo, y_lo, x_hi, y_hi);
+}
+void Terrain::dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify) {
+  const f32 m = kStep * 2;
+  x0 -= m; y0 -= m; x1 += m; y1 += m;
+  for (auto& [k, t] : render_) {
+    i32 level, i, j;
+    terrain_cpp_local::unkey3(k, level, i, j);
+    const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
+    if (i * size <= x1 && (i + 1) * size >= x0 && j * size <= y1 && (j + 1) * size >= y0) dirty_render_.insert(k);
+  }
+  for (auto& [k, c] : collision_) {
+    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
+    if (i * terrain_cpp_local::kTile - kStep <= x1 && (i + 1) * terrain_cpp_local::kTile + kStep >= x0 && j * terrain_cpp_local::kTile - kStep <= y1 && (j + 1) * terrain_cpp_local::kTile + kStep >= y0) dirty_collision_.insert(k);
+  }
+  for (auto& [k, m2] : water_meshes_) {
+    (void)m2;
+    const i32 i = static_cast<i32>(converted::shr_bits(k, 32)), j = static_cast<i32>(k & 0xffffffffu);
+    if (i * terrain_cpp_local::kWaterChunk <= x1 && (i + 1) * terrain_cpp_local::kWaterChunk >= x0 && j * terrain_cpp_local::kWaterChunk <= y1 && (j + 1) * terrain_cpp_local::kWaterChunk >= y0) dirty_water_.insert(k);
+  }
+  if (notify) changes_.push_back({x0, y0, x1, y1});
+  replan_ = true;
+}
+namespace terrain_cpp_local { f32 srgb_to_linear(f32 v) { return v <= 0.04045 ? v / 12.92 : kern::math::pow((v + 0.055) / 1.055, 2.4); } }
+namespace terrain_cpp_local { Vec3 to_linear(Vec3 c) { return {srgb_to_linear(c.x), srgb_to_linear(c.y), srgb_to_linear(c.z)}; } }
+void Terrain::add_tint(u64 owner, const std::vector<std::vector<Vec2>>& rings, Vec3 srgb) {
+  if (rings.empty() || converted::at(rings, 0).size() < 3) return;
+  Tint t{owner, {1e30, 1e30, -1e30, -1e30}, terrain_cpp_local::to_linear(srgb), rings};
+  for (Vec2 p : converted::at(rings, 0)) {
+    t.box.x = std::fmin(t.box.x, p.x); t.box.y = std::fmin(t.box.y, p.y);
+    t.box.z = std::fmax(t.box.z, p.x); t.box.w = std::fmax(t.box.w, p.y);
+  }
+  repaint(t.box);
+  tints_.push_back(std::move(t));
+}
+void Terrain::repaint(const Vec4& b) {
+  // only the render tiles: the shape (collision, roads on it) does not change
+  for (auto& [k, t] : render_) {
+    (void)t;
+    i32 level, i, j;
+    terrain_cpp_local::unkey3(k, level, i, j);
+    const f32 size = level == 2 ? terrain_cpp_local::kBlock : terrain_cpp_local::kTile;
+    if (i * size <= b.z && (i + 1) * size >= b.x && j * size <= b.w && (j + 1) * size >= b.y) dirty_render_.insert(k);
+  }
+}
+bool road_is_water(RoadClass c) { return c == RoadClass::river || c == RoadClass::canal || c == RoadClass::stream; }
+void Terrain::add_waterway(const std::vector<Vec2>& pts, f32 width, f32 speed) {
+  f32 x_lo = 1e9, y_lo = 1e9, x_hi = -1e9, y_hi = -1e9;
+  for (std::size_t k = 0; converted::plus(k, 1) < pts.size(); converted::pre_inc(k)) {
+    const Vec2 a = converted::at(pts, k), c = converted::at(pts, converted::plus(k, 1));
+    const f32 l = hypot_bp(c.x - a.x, c.y - a.y);
+    if (l < 0.2) continue;
+    const Vec2 u{(c.x - a.x) / l, (c.y - a.y) / l};
+    const f32 half = width / 2, reach = half + 30;  // world_water.mjs: flow felt 30 m beyond the banks
+    const i32 i0 = static_cast<i32>(converted::fits<int>(std::floor((std::fmin(a.x, c.x) - reach) / kWaterCell))), i1 = static_cast<i32>(converted::fits<int>(std::floor((std::fmax(a.x, c.x) + reach) / kWaterCell)));
+    const i32 j0 = static_cast<i32>(converted::fits<int>(std::floor((std::fmin(a.y, c.y) - reach) / kWaterCell))), j1 = static_cast<i32>(converted::fits<int>(std::floor((std::fmax(a.y, c.y) + reach) / kWaterCell)));
+    x_lo = std::fmin(x_lo, std::fmin(a.x, c.x) - half); x_hi = std::fmax(x_hi, std::fmax(a.x, c.x) + half);
+    y_lo = std::fmin(y_lo, std::fmin(a.y, c.y) - half); y_hi = std::fmax(y_hi, std::fmax(a.y, c.y) + half);
+    for (i32 i = i0; i <= i1; ++i)
+      for (i32 j = j0; j <= j1; ++j) {
+        const f32 x = (static_cast<f32>(i) + 0.5) * kWaterCell, y = (static_cast<f32>(j) + 0.5) * kWaterCell;
+        const f32 t = clampf((x - a.x) * u.x + (y - a.y) * u.y, 0, l);
+        const f32 d = hypot_bp(x - a.x - u.x * t, y - a.y - u.y * t);
+        if (d <= half) set_water_cell(i, j);
+        if (d < reach) {
+          auto it = water_.find(terrain_cpp_local::key2(i >> 4, j >> 4));
+          if (it == water_.end()) continue;
+          WaterBlock& b = it->second;
+          if (b.flow.empty()) { b.flow.assign(converted::count(256), Vec2{}); b.speed.assign(converted::count(256), 0.0); }
+          const u32 idx = static_cast<u32>((j & 15) * 16 + (i & 15));
+          const f32 sp = speed * (1 - d / reach);
+          if (converted::at(b.speed, idx) < sp) { converted::at(b.flow, idx) = u; converted::at(b.speed, idx) = sp; }
+        }
+      }
+  }
+  if (x_lo < x_hi) dirty(x_lo, y_lo, x_hi, y_hi);
+}
+f32 road_width(RoadClass c) {
+  switch (c) {
+    case RoadClass::motorway: return 14;
+    case RoadClass::trunk: return 12;
+    case RoadClass::primary: return 11;
+    case RoadClass::secondary: return 9;
+    case RoadClass::tertiary: return 8;
+    case RoadClass::minor: return 6.5;
+    case RoadClass::service: return 4.2;
+    case RoadClass::track: return 3;
+    case RoadClass::path: return 2.2;
+    case RoadClass::pedestrian: return 3.6;
+    case RoadClass::river: return 18;
+    case RoadClass::canal: return 12;
+    case RoadClass::stream: return 4.5;
+  }
+  return 6;
+}
+void Terrain::add_bridge(Vec2 a, Vec2 b, f32 width) {
+  const f32 l = hypot_bp(b.x - a.x, b.y - a.y);
+  if (l < 0.5) return;
+  // world_water.mjs: deck = the segment +1 m long, +1.5 m each side
+  bridges_.push_back({(a + b) * 0.5, l / 2 + 1, width / 2 + 1.5, kern::math::atan2(b.y - a.y, b.x - a.x)});
+  const f32 r = l / 2 + width;
+  dirty((a.x + b.x) / 2 - r, (a.y + b.y) / 2 - r, (a.x + b.x) / 2 + r, (a.y + b.y) / 2 + r);
+}
 void unproject(const GeoProjector& p, f64 x, f64 y, f64& lon, f64& lat) {
   lon = p.lon0 + x / (GeoProjector::kEarthRadius * p.cos_lat) / GeoProjector::kRad;
   lat = p.lat0 + y / GeoProjector::kEarthRadius / GeoProjector::kRad;
@@ -777,6 +1040,163 @@ void tile_lonlat(const TileKey& t, f64 fx, f64 fy, f64& lon, f64& lat) {
   const f64 n = ldexp_bp(1.0, t.z);
   lon = (t.x + fx) / n * 360 - 180;
   lat = kern::math::atan(sinh_bp(tiles_cpp_local::kPiD * (1 - 2 * (t.y + fy) / n))) * 180 / tiles_cpp_local::kPiD;
+}
+void Terrain::clear() {
+  if (r_) {
+    for (auto& [k, t] : render_) if (t.mesh) r_->remove(t.mesh);
+    for (auto& [k, m] : water_meshes_) if (m) r_->remove(m);
+  }
+  if (world_)
+    for (auto& [k, c] : collision_)
+      if (c.body.valid() && world_->body_valid(c.body)) world_->destroy_body(c.body);
+  render_.clear();
+  collision_.clear();
+  water_meshes_.clear();
+  water_detail_.clear();
+  dirty_render_.clear();
+  dirty_collision_.clear();
+  dirty_water_.clear();
+  want_render_.clear();
+  want_collision_.clear();
+  want_water_.clear();
+  water_.clear();
+  bridges_.clear();
+  craters_.clear();
+  tints_.clear();
+  images_.clear();
+  image_requests_.clear();
+  image_at_ = {1e9, 1e9};
+  dem_tiles_.clear();
+  requests_.clear();
+  if (job_ && converted::present(job_)->id) jobs::cancel(converted::present(job_)->id);
+  job_.reset();
+  grid_ = Grid{};
+  side_.clear();
+  corridors_.clear();
+  grid_ready_ = false;
+  ref_ready_ = false;
+  ref_height_ = 0;
+  dem_failures_ = 0;
+  retry_at_ = 0;
+  changes_.clear();
+  replan_ = true;
+  planned_focus_ = planned_anchor_ = {1e9, 1e9, 0};
+  stats_ = {};
+  settled_ = !dem_;
+}
+void Terrain::remove_tints(u64 owner) {
+  for (auto it = tints_.begin(); it != tints_.end();) {
+    if (it->owner != owner) { ++it; continue; }
+    repaint(it->box);
+    it = converted::erase(tints_, it);
+  }
+}
+void Terrain::remove_corridors(u64 owner) {
+  for (auto it = corridors_.begin(); it != corridors_.end(); ++it) {
+    if (converted::present((*it))->owner != owner) continue;
+    const Vec4 box = converted::present((*it))->box, bounds = converted::present((*it))->bounds;
+      converted::erase(corridors_, it);
+    if (box.z > box.x) {
+      const Vec4 c{std::fmax(box.x, bounds.x), std::fmax(box.y, bounds.y), std::fmin(box.z, bounds.z), std::fmin(box.w, bounds.w)};
+      if (c.z > c.x && c.w > c.y) dirty(c.x, c.y, c.z, c.w, false);
+    }
+    return;
+  }
+}
+f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
+  const f32 bowl = radius * 0.5;
+  if (r < bowl) return -depth * (1 - (r / bowl) * (r / bowl));
+  if (r >= radius) return 0;
+  const f32 x = (r - bowl) / (radius - bowl), k = (x - 0.12) / 0.14;
+  return rim * kern::math::exp(-(k * k)) * (1 - x);
+}
+namespace terrain_cpp_local { Vec4 interior_of(f32 x0, f32 y0, f32 span, f32 margin) { return {x0 + margin, y0 + margin, x0 + span - margin, y0 + span - margin}; } }
+Vec4 Terrain::interior(const Grid& g) const {
+  return terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n > 0 ? g.n - 1 : 0), kDemMargin);
+}
+f32 Terrain::grid_at(const Grid& g, f32 x, f32 y) const {
+  if (g.n < 2) return 0;
+  const f32 lim = static_cast<f32>(g.n) - 1.001;
+  const f32 fx = clampf((x - g.x0) / g.step, 0, lim), fy = clampf((y - g.y0) / g.step, 0, lim);
+  const u32 i = static_cast<u32>(converted::fits<unsigned int>(fx)), j = static_cast<u32>(converted::fits<unsigned int>(fy));
+  const f32 tx = fx - i, ty = fy - j;
+  const std::size_t at = converted::plus(converted::times(static_cast<std::size_t>(j), g.n), i);
+  return (converted::at(g.h, at) * (1 - tx) + converted::at(g.h, converted::plus(at, 1)) * tx) * (1 - ty) + (converted::at(g.h, converted::plus(at, g.n)) * (1 - tx) + converted::at(g.h, converted::plus(converted::plus(at, g.n), 1)) * tx) * ty;
+}
+f32 Terrain::elevation(f32 x, f32 y) const {
+  if (!grid_ready_) return 0.0;
+  // the window that knows the place (its interior); else any that holds it; else the player's,
+  // held at its edge (far ground nobody stands on: the horizon)
+  auto in = [&](const Vec4& r) { return x >= r.x && y >= r.y && x <= r.z && y <= r.w; };
+  if (side_.empty() || in(interior(grid_))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(interior(g))) return grid_at(g, x, y) - ref_height_;
+  if (in(terrain_cpp_local::interior_of(grid_.x0, grid_.y0, grid_.step * static_cast<f32>(grid_.n - 1), 0))) return grid_at(grid_, x, y) - ref_height_;
+  for (const Grid& g : side_) if (in(terrain_cpp_local::interior_of(g.x0, g.y0, g.step * static_cast<f32>(g.n - 1), 0))) return grid_at(g, x, y) - ref_height_;
+  return grid_at(grid_, x, y) - ref_height_;
+}
+namespace terrain_cpp_local { constexpr f32 kRoadGrid = 24, kRoadBlend = 4.5; }
+namespace terrain_cpp_local { u64 road_key(i32 ix, i32 iy) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(ix)), 32)) | static_cast<u32>(iy); } }
+f32 Terrain::road_level(f32 x, f32 y, f32 h) const {
+  // terrain_craters.mjs roadLevel: every corridor covering the point contributes (weighted), so
+  // junctions blend smoothly, no steps
+  const i32 at = corridors_.empty() ? -1 : corridor_set(x, y);
+  if (at < 0) return h;
+  const CorridorSet& set = *converted::present(converted::at(corridors_, static_cast<std::size_t>(at)));
+  const auto it = set.grid.find(terrain_cpp_local::road_key(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kRoadGrid))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kRoadGrid)))));
+  if (it == set.grid.end()) return h;
+  f32 best = 0, sw = 0, sh = 0;
+  for (const CorridorSeg& s : it->second) {
+    const f32 t = clampf(((x - s.ax) * s.dx + (y - s.ay) * s.dy) / s.l2, 0, 1);
+    const f32 px = s.ax + s.dx * t, py = s.ay + s.dy * t, d = hypot_bp(x - px, y - py);
+    const f32 w = d <= s.half ? 1 : d >= s.half + terrain_cpp_local::kRoadBlend ? 0 : 1 - (d - s.half) / terrain_cpp_local::kRoadBlend;
+    if (w <= 0) continue;
+    const f32 ws = w * w * (3 - 2 * w);
+    sw += ws;
+    sh += ws * (s.ha + (s.hb - s.ha) * t);
+    best = std::fmax(best, w);
+  }
+  if (sw <= 0) return h;
+  return h + (sh / sw - h) * (best * best * (3 - 2 * best));
+}
+f32 Terrain::node_height(f32 x, f32 y) const {
+  const f32 e = elevation(x, y);
+  f32 h = road_level(x, y, e);
+  for (const Crater& c : craters_) {
+    const f32 dx = x - c.c.x, dy = y - c.c.y;
+    if (std::fabs(dx) >= c.r || std::fabs(dy) >= c.r) continue;
+    const f32 r = kern::math::sqrt(dx * dx + dy * dy);
+    if (r < c.r) h += crater_profile(r, c.r, c.depth, c.rim);
+  }
+  if (!water_.empty() && water_at(x, y)) return std::fmin(h, e - kWaterBed);
+  return h;
+}
+f32 Terrain::height(f32 x, f32 y) const {
+  // terrain_surface.mjs triangleHeightAt: the SW-NE diagonal of every 5 m cell.
+  const f32 x0 = std::floor(x / kStep) * kStep, y0 = std::floor(y / kStep) * kStep;
+  const f32 u = (x - x0) / kStep, v = (y - y0) / kStep;
+  const f32 a = node_height(x0, y0), d = node_height(x0 + kStep, y0 + kStep);
+  return u >= v ? a + (node_height(x0 + kStep, y0) - a) * (u - v) + (d - a) * v : a + (node_height(x0, y0 + kStep) - a) * (v - u) + (d - a) * u;
+}
+bool Terrain::water_cell(i32 cx, i32 cy) const {
+  // the 256 bits of the cell's 64 m block
+  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
+  if (it == water_.end()) return false;
+  const u32 idx = static_cast<u32>((cy & 15) * 16 + (cx & 15));
+  return (converted::shr_bits(converted::at(it->second.bits, idx >> 6), (idx & 63))) & 1u;
+}
+bool Terrain::on_bridge(f32 x, f32 y) const {
+  for (const Bridge& b : bridges_) {
+    const f32 dx = x - b.c.x, dy = y - b.c.y;
+    if (std::fabs(dx) > b.hl + b.hw || std::fabs(dy) > b.hl + b.hw) continue;
+    const f32 c = kern::math::cos(b.yaw), s = kern::math::sin(b.yaw), u = dx * c + dy * s, v = -dx * s + dy * c;
+    if (std::fabs(u) <= b.hl && std::fabs(v) <= b.hw) return true;
+  }
+  return false;
+}
+bool Terrain::water_at(f32 x, f32 y) const {
+  if (water_.empty()) return false;
+  if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
+  return bridges_.empty() || !on_bridge(x, y);
 }
 const MapFeatures kNoFeatures{};
 BuildingStyle konstanz_style() {
@@ -833,6 +1253,54 @@ void put_footprint(FootprintStream& fs, const MapFeatures::Building& b, Vec2 c, 
     fs.ring(thin.data(), static_cast<u32>(thin.size()));
   }
 }
+void CityStream::clear() {
+  for (auto& [k, t] : tiles_) remove(*converted::present(t));
+  tiles_.clear();
+  requests_.clear();
+  lanes_.clear();
+  stats_ = {};
+  ms_ = {};
+  terrain_.clear();
+  terrain_changes_.clear();
+  if (world_) for (physics::Body b : {near_.body, near_.old_body}) if (b.valid() && world_->body_valid(b)) world_->destroy_body(b);
+  near_ = {};
+  damage_.clear();  // a new start place: a new city
+  damage_log_.clear();
+  vis_at_ = {1e9, 1e9};
+  vis_ms_ = -1e9;
+}
+void CityStream::remove(Tile& t) {
+  if (r_) {
+    auto drop = [&](const std::vector<u32>& list) { for (u32 id : list) r_->remove(id); };
+    drop(t.meshes);
+    drop(t.lay_meshes);
+    drop(t.old_lay);
+  }
+  auto cancel = [](u32& job) { if (job) { jobs::cancel(job); job = 0; } };
+  cancel(t.tile_job);
+  cancel(t.build_job);
+  cancel(t.cell_job);
+  t.cell_ids.clear();
+  t.dirty_cells.clear();
+  t.job_cells.clear();
+  if (r_) for (auto& [c, ids] : t.cell_old) for (u32 id : ids) r_->remove(id);
+  t.cell_old.clear();
+  t.want_cells.clear();
+  t.cell_uploading = false;
+  t.meshes.clear();
+  t.lay_meshes.clear();
+  t.old_lay.clear();
+  near_.dirty = true;  // the collision set may hold this tile's buildings
+  if (t.prepared) ++furniture_serial_;
+  terrain_.remove_tints(t.key.hash());
+  terrain_.remove_corridors(t.key.hash());
+  if (world_ && t.body.valid() && world_->body_valid(t.body)) world_->destroy_body(t.body);
+  t.body = {};
+  if (world_ && t.old_body.valid() && world_->body_valid(t.old_body)) world_->destroy_body(t.old_body);  // M3 life
+  t.old_body = {};
+  for (Lane& l : lanes_)
+    if (l.tile == t.key.hash()) l.alive = false;
+}
 Vec4 CityStream::ring_bounds(Vec3 focus, i32 r) const {
   f64 lon, lat, x0, y0, x1, y1;
   unproject(proj_, focus.x, focus.y, lon, lat);
@@ -843,33 +1311,40 @@ Vec4 CityStream::ring_bounds(Vec3 focus, i32 r) const {
   proj_.project(lon, lat, x1, y1);
   return {static_cast<f32>(x0), static_cast<f32>(y0), static_cast<f32>(x1), static_cast<f32>(y1)};
 }
-std::string CityStream::take_requests() {
-  std::string s = "[";
-  for (std::size_t i = 0; i < requests_.size(); converted::pre_inc(i)) {
-    char b[64];
-    std::snprintf(b, sizeof b, "%s[%d,%d,%d]", i ? "," : "", converted::at(requests_, i).z, converted::at(requests_, i).x, converted::at(requests_, i).y);
-    s += b;
+void CityStream::unload_far(Vec3 focus) {
+  f64 lon, lat;
+  unproject(proj_, focus.x, focus.y, lon, lat);
+  const TileKey c = tile_at(lon, lat);
+  std::vector<TileKey> mates;
+  for (const Vec3& f : extra_foci) { f64 lo, la; unproject(proj_, f.x, f.y, lo, la); mates.push_back(tile_at(lo, la)); }
+  for (auto it = tiles_.begin(); it != tiles_.end();) {
+    Tile& t = *converted::present(it->second);
+    const i32 d = std::max(std::abs(t.key.x - c.x), std::abs(t.key.y - c.y));
+    bool near_mate = false;
+    for (const TileKey& m : mates) near_mate = near_mate || std::max(std::abs(t.key.x - m.x), std::abs(t.key.y - m.y)) <= mate_ring + 1;
+    if (!t.procedural && d > ring + 1 && !near_mate) {
+      remove(t);
+      it = tiles_.erase(it);
+    } else ++it;
   }
-  if (!requests_.empty() && ms_.t_request < 0) ms_.t_request = now_ms() - start_ms_;
-  requests_.clear();
-  return s + "]";
+  // Lanes of unloaded tiles stay as dead entries: traffic holds indices into the list.
 }
 void CityStream::furniture(std::vector<u64>& out) const {
   out.clear();
   for (const auto& [k, t] : tiles_)
-    if (t->prepared) out.push_back(k);
+    if (converted::present(t)->prepared) out.push_back(k);
   std::stable_sort(out.begin(), out.end());
 }
 const MapFeatures& CityStream::features(u64 tile) const {
   const auto it = tiles_.find(tile);
-  return it != tiles_.end() ? it->second->features : kNoFeatures;
+  return it != tiles_.end() ? converted::present(it->second)->features : kNoFeatures;
 }
 bool CityStream::ready_at(Vec3 p) const {
   if (!terrain_.ready_at(p)) return false;
   const bool solid = near_.built && !near_.building && !near_.dirty && hypot_bp(near_.at.x - p.x, near_.at.y - p.y) < 140;
   if (offline_) {
     for (const auto& [k, t] : tiles_)
-      if (t->procedural) return t->state == Tile::State::ready && solid;
+      if (converted::present(t)->procedural) return converted::present(t)->state == Tile::State::ready && solid;
     return false;
   }
   (void)solid;
@@ -877,6 +1352,18 @@ bool CityStream::ready_at(Vec3 p) const {
   // elevation and the streets that level it (terrain.h set_corridors); the city (drawn set,
   // collision set) streams in around him (world_spawn_guard: see Game::spawn_guard).
   return terrain_.corridors_at(p.x, p.y);
+}
+void CityStream::feed_terrain(Tile& t) {
+  // world_water.mjs: lakes / harbours (polygons) and waterways (lines with a width per class)
+  // become basins in the terrain; bridges keep a solid road over them.
+  for (const MapFeatures::Area& a : t.features.areas)
+    if (a.kind == AreaKind::water) terrain_.add_water_polygon(a.rings);
+    else terrain_.add_tint(t.key.hash(), a.rings, area_color(a.kind));  // world_ground.mjs setAreas
+  for (const MapFeatures::Road& r : t.features.roads) {
+    if (road_is_water(r.cls)) terrain_.add_waterway(r.points, road_width(r.cls), r.cls == RoadClass::river ? 1.6 : r.cls == RoadClass::canal ? 0.5 : 1.1);
+    else if (r.bridge)
+      for (std::size_t i = 0; converted::plus(i, 1) < r.points.size(); converted::pre_inc(i)) terrain_.add_bridge(converted::at(r.points, i), converted::at(r.points, converted::plus(i, 1)), road_width(r.cls));
+  }
 }
 void CityStream::drop_cell(Tile& t, u64 cell) {
   auto it = t.cell_ids.find(cell);
@@ -903,6 +1390,86 @@ void CityStream::upload(Tile& t, GeoChunk& chunk, const Material& material, bool
   if (walls) t.cell_ids[cell_key(chunk.x, chunk.y)].push_back(id);
   t.triangles += chunk.mesh.triangle_count();
 }
+physics::Shape CityStream::building_shape(physics::Body body, const MapFeatures::Building& b) {
+  Earcut earcut;
+  std::vector<f64> xy;
+  std::vector<u32> holes, tris, idx;
+  std::vector<Vec3> pts;
+  xy.clear(); holes.clear(); tris.clear(); idx.clear(); pts.clear();
+  std::vector<std::vector<Vec2>> rings = b.rings;
+  // MAX_VERTICES 64 per ring
+  for (auto& ring : rings)
+    if (ring.size() > 64) { const std::size_t step = converted::quot((converted::plus(ring.size(), 63)), 64); std::vector<Vec2> thin; for (std::size_t k = 0; k < ring.size(); converted::plus_to(k, step)) thin.push_back(converted::at(ring, k)); ring = std::move(thin); }
+  for (std::size_t r = 0; r < rings.size(); converted::pre_inc(r)) {
+    auto& ring = converted::at(rings, r);
+    if (ring.size() < 3) continue;
+    const f64 a = signed_area(ring);
+    if (std::fabs(a) < 0.5) continue;
+    if ((r == 0) != (a > 0)) std::reverse(ring.begin(), ring.end());  // outer CCW, courtyards CW
+    if (r) holes.push_back(static_cast<u32>(converted::quot(xy.size(), 2)));
+    for (Vec2 p : ring) xy.insert(xy.end(), {p.x, p.y});
+    // Walls: quads per edge, outward = right of the edge for CCW outer / CW holes.
+    for (std::size_t i = 0; i < ring.size(); converted::pre_inc(i)) {
+      const Vec2 p0 = converted::at(ring, i), p1 = converted::at(ring, converted::rem((converted::plus(i, 1)), ring.size()));
+      const u32 base = static_cast<u32>(pts.size());
+      pts.push_back({p0.x, p0.y, b.base});
+      pts.push_back({p1.x, p1.y, b.base});
+      pts.push_back({p1.x, p1.y, b.top});
+      pts.push_back({p0.x, p0.y, b.top});
+      idx.insert(idx.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+    }
+  }
+  if (xy.size() >= 6) {
+    earcut.triangulate(xy.data(), static_cast<u32>(converted::quot(xy.size(), 2)), holes.data(), static_cast<u32>(holes.size()), tris);
+    const u32 base = static_cast<u32>(pts.size());
+    for (std::size_t i = 0; i < converted::quot(xy.size(), 2); converted::pre_inc(i)) pts.push_back({static_cast<f32>(converted::at(xy, converted::times(i, 2))), static_cast<f32>(converted::at(xy, converted::plus(converted::times(i, 2), 1))), b.top});
+    for (std::size_t i = 0; converted::plus(i, 2) < tris.size(); converted::plus_to(i, 3)) {
+      u32 a = base + converted::at(tris, i), c = base + converted::at(tris, converted::plus(i, 1)), d = base + converted::at(tris, converted::plus(i, 2));
+      if (converted::wide::cross(converted::at(pts, c) - converted::at(pts, a), converted::at(pts, d) - converted::at(pts, a)).z < 0) std::swap(c, d);
+      idx.insert(idx.end(), {a, c, d});
+    }
+  }
+  if (!idx.empty()) {
+    physics::ShapeSettings ss;
+    ss.kind = physics::ShapeKind::mesh;
+    ss.points = Span<const Vec3>(pts.data(), pts.size());
+    ss.indices = Span<const u32>(idx.data(), idx.size());
+    ss.material.friction = 0.7;
+    ss.material.category_bits = kCatWorld;
+    return world_->create_shape(body, ss);
+  }
+  return {};
+}
+bool CityStream::damage_building(u64 tile, u32 index, f32 new_top, bool leveled) {
+  auto it = tiles_.find(tile);
+  if (it == tiles_.end() || !converted::present(it->second)->prepared || index >= converted::present(it->second)->features.buildings.size()) return false;
+  Tile& t = *converted::present(it->second);
+  MapFeatures::Building& b = converted::at(t.features.buildings, index);
+  if (!(new_top < b.top - 0.01)) return false;
+  b.top = std::fmax(b.base + 0.3, new_top);
+  b.leveled = b.leveled || leveled;
+  ++damage_serial_;
+  Damage& d = damage_[b.seed];
+  d.height = b.top - b.base;
+  d.leveled = b.leveled;
+  if (!damage_quiet_) damage_log_.push_back(b.seed);
+  // the drawing: its chunk alone (when the building is drawn at all)
+  if (index < t.cent.size() && t.cell_ids.count(cell_of(converted::at(t.cent, index)))) t.dirty_cells.insert(cell_of(converted::at(t.cent, index)));
+  // the collision: its collider alone, replaced on the same static body (Box3D: a shape can be
+  // destroyed and created on a static body; no teleport, no filter change, no rebuild of the set)
+  NearCollision& n = near_;
+  if (n.building) { n.dirty = true; return true; }  // the set being built: built again after it
+  for (std::size_t k = 0; k < n.list.size(); converted::pre_inc(k)) {
+    if (converted::at(n.list, k).first != tile || converted::at(n.list, k).second != index) continue;
+    if (k < n.shapes.size()) {
+      if (converted::at(n.shapes, k).valid()) { world_->destroy_shape(converted::at(n.shapes, k)); --n.colliders; }
+      converted::at(n.shapes, k) = building_shape(n.body, b);
+      if (converted::at(n.shapes, k).valid()) ++n.colliders;
+    }
+    break;
+  }
+  return true;
+}
 void CityStream::damage_list(std::vector<DamageRec>& out) const {
   out.clear();
   out.reserve(converted::count(damage_.size()));
@@ -915,13 +1482,101 @@ bool CityStream::damage_of(u32 seed, DamageRec& out) const {
   out = {seed, it->second.height, it->second.leveled};
   return true;
 }
-void CityStream::step_time(const char* name, f64 t0) {
-  const f64 took = now_ms() - t0;
-  if (took > worst_step_ms_) { worst_step_ms_ = took; worst_step_ = name; }
+bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
+  if (list.empty()) return false;
+  converted::wide::Map<u32, u32> want;  // seed -> the place of its record in list (the last one of the seed)
+  bool changed = false;
+  for (u32 i = 0; i < list.size(); ++i) {
+    const DamageRec& r = converted::at(list, i);
+    if (!(r.height >= 0) || !std::isfinite(r.height)) continue;
+    auto it = damage_.find(r.seed);
+    if (it != damage_.end() && it->second.height <= r.height + 0.01 && (it->second.leveled || !r.leveled)) continue;  // ours is as low already
+    want[r.seed] = i;
+  }
+  if (want.empty()) return false;
+  damage_quiet_ = !log;
+  // the loaded ones: lowered now (the same path as a blast: its chunk, its collider)
+  for (auto& [k, tp] : tiles_) {
+    Tile& t = *converted::present(tp);
+    if (!t.prepared) continue;
+    for (u32 i = 0; i < t.features.buildings.size(); ++i) {
+      auto w = want.find(converted::at(t.features.buildings, i).seed);
+      if (w == want.end()) continue;
+      const MapFeatures::Building& b = converted::at(t.features.buildings, i);
+      const DamageRec& r = converted::at(list, w->second);
+      if (damage_building(k, i, b.base + r.height, r.leveled)) changed = true;
+    }
+  }
+  // the rest (not loaded here): kept for when the tile comes (prepare applies damage_)
+  for (const auto& [seed, at] : want) {
+    const DamageRec& r = converted::at(list, at);
+    auto it = damage_.find(seed);
+    if (it == damage_.end()) {
+      damage_[seed] = Damage{r.height, r.leveled};
+    } else if (r.height < it->second.height - 0.01 || (r.leveled && !it->second.leveled)) {
+      it->second.height = std::fmin(it->second.height, r.height);
+      it->second.leveled = it->second.leveled || r.leveled;
+    } else {
+      continue;
+    }
+    changed = true;
+    if (log) damage_log_.push_back(seed);
+  }
+  damage_quiet_ = false;
+  if (changed) ++damage_serial_;
+  return changed;
+}
+void CityStream::clear_damage() {
+  damage_.clear();
+  damage_log_.clear();
+  for (auto& [k, tp] : tiles_) {
+    Tile& t = *converted::present(tp);
+    if (!t.prepared) continue;
+    for (u32 i = 0; i < t.features.buildings.size(); ++i) {
+      MapFeatures::Building& b = converted::at(t.features.buildings, i);
+      if (b.top >= b.full_top - 0.01 && !b.leveled) continue;
+      b.top = b.full_top;
+      b.leveled = false;
+      if (i < t.cent.size() && t.cell_ids.count(cell_of(converted::at(t.cent, i)))) t.dirty_cells.insert(cell_of(converted::at(t.cent, i)));
+    }
+  }
+  near_.dirty = true;
+}
+void CityStream::walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const {
+  out.clear();
+  for (const auto& [k, tp] : tiles_) {
+    const Tile& t = *converted::present(tp);
+    if (t.state != Tile::State::ready) continue;
+    if (p.x < t.bounds.x - r - 200 || p.x > t.bounds.z + r + 200 || p.y < t.bounds.y - r - 200 || p.y > t.bounds.w + r + 200) continue;
+    for (const MapFeatures::Building& b : t.features.buildings) {
+      if (b.rings.empty() || converted::at(b.rings, 0).empty()) continue;
+      const Vec2 q = converted::at(converted::at(b.rings, 0), 0);
+      if (std::fabs(q.x - p.x) > r + 150 || std::fabs(q.y - p.y) > r + 150) continue;
+      u32 edge = 0;
+      for (std::size_t ri = 0; ri < b.rings.size(); converted::pre_inc(ri)) {
+        const auto& ring = converted::at(b.rings, ri);
+        if (ring.size() < 3) continue;
+        // Outward: right of the edge for a counter-clockwise outer ring (left for courtyards).
+        const bool ccw = signed_area(ring) > 0;
+        const f32 s = (ccw == (ri == 0)) ? 1.0 : -1.0;
+        for (std::size_t i = 0; i < ring.size(); converted::pre_inc(i), ++edge) {
+          const Vec2 a = converted::at(ring, i), c = converted::at(ring, converted::rem((converted::plus(i, 1)), ring.size()));
+          const f32 len = hypot_bp(c.x - a.x, c.y - a.y);
+          if (len < 0.05) continue;
+          const Vec2 d{(c.x - a.x) / len, (c.y - a.y) / len};
+          const f32 u = (p.x - a.x) * d.x + (p.y - a.y) * d.y;
+          const Vec2 n{d.y * s, -d.x * s};
+          const f32 side = (p.x - a.x) * n.x + (p.y - a.y) * n.y;
+          if (u < -r || u > len + r || std::fabs(side) > r) continue;
+          out.push_back({a, d, n, len, b.base, b.top, b.seed, edge});
+        }
+      }
+    }
+  }
 }
 bool CityStream::building_at(Vec2 p) const {
   for (const auto& [k, tp] : tiles_) {
-    const Tile& t = *tp;
+    const Tile& t = *converted::present(tp);
     if (t.state != Tile::State::ready) continue;
     if (p.x < t.bounds.x - 200 || p.x > t.bounds.z + 200 || p.y < t.bounds.y - 200 || p.y > t.bounds.w + 200) continue;
     for (const MapFeatures::Building& b : t.features.buildings) {
@@ -937,11 +1592,30 @@ bool CityStream::building_at(Vec2 p) const {
   }
   return false;
 }
+bool CityStream::street_point(Rng& rng, Vec3 near, f32 radius, Vec3& point, f32& heading) const {
+  if (lanes_.empty()) return false;
+  for (int attempt = 0; attempt < 48; ++attempt) {
+    const Lane& l = converted::at(lanes_, converted::rem(rng.next(), lanes_.size()));
+    if (!l.alive || l.points.size() < 2) continue;
+    const std::size_t i = converted::rem(rng.next(), (converted::minus(l.points.size(), 1)));
+    const Vec2 a = converted::at(l.points, i), b = converted::at(l.points, converted::plus(i, 1));
+    const f32 t = rng.unit();
+    const Vec2 p = a + (b - a) * t;
+    const f32 d = hypot_bp(p.x - near.x, p.y - near.y);
+    if (d > radius || hypot_bp(b.x - a.x, b.y - a.y) < 4) continue;
+    heading = kern::math::atan2(b.y - a.y, b.x - a.x);
+    // Right-hand traffic: the lane centre right of the street's centre line.
+    const f32 off = std::fmin(l.width * 0.25, 1.8);
+    point = {p.x + kern::math::sin(heading) * off, p.y - kern::math::cos(heading) * off, ground_height(p.x, p.y)};
+    return true;
+  }
+  return false;
+}
 void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const {
   for (const auto& [k, t] : tiles_) {
-    if (t->state != Tile::State::ready && t->state != Tile::State::collision) continue;
-    for (std::size_t i = 0; i < t->features.buildings.size(); converted::pre_inc(i)) {
-      const MapFeatures::Building& b = converted::at(t->features.buildings, i);
+    if (converted::present(t)->state != Tile::State::ready && converted::present(t)->state != Tile::State::collision) continue;
+    for (std::size_t i = 0; i < converted::present(t)->features.buildings.size(); converted::pre_inc(i)) {
+      const MapFeatures::Building& b = converted::at(converted::present(t)->features.buildings, i);
       if (b.rings.empty() || converted::at(b.rings, 0).size() < 3) continue;
       f32 x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
       for (Vec2 q : converted::at(b.rings, 0)) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
@@ -954,18 +1628,18 @@ void CityStream::ready_tiles(std::vector<u64>& out) const {
   for (const auto& [k, t] : tiles_)
     // a tile being re-synced keeps its features (the map and the town must not lose its houses
     // while the meshes are rebuilt: they flickered on the minimap)
-    if (t->prepared) out.push_back(k);
+    if (converted::present(t)->prepared) out.push_back(k);
 }
 void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const {
   for (const auto& [k, t] : tiles_) {
-    if (t->state != Tile::State::ready) continue;
-    for (std::size_t i = 0; i < t->features.areas.size(); converted::pre_inc(i)) {
-      const MapFeatures::Area& a = converted::at(t->features.areas, i);
+    if (converted::present(t)->state != Tile::State::ready) continue;
+    for (std::size_t i = 0; i < converted::present(t)->features.areas.size(); converted::pre_inc(i)) {
+      const MapFeatures::Area& a = converted::at(converted::present(t)->features.areas, i);
       if (a.kind != kind || a.rings.empty() || converted::at(a.rings, 0).size() < 3) continue;
       f32 x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
       for (Vec2 q : converted::at(a.rings, 0)) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
       if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({converted::plus(converted::times(k, 65536), i), k, static_cast<u32>(i)});
+      out.push_back({converted::plus_bits(converted::times_bits(k, 65536), i), k, static_cast<u32>(i)});
     }
   }
 }
@@ -978,13 +1652,13 @@ void CityStream::exclude_building(u64 tile, i32 index) {
   if (tile == excl_tile_ && index == excl_index_) return;
   if (excl_tile_) {
     auto it = tiles_.find(excl_tile_);
-    if (it != tiles_.end()) { it->second->skip = -1; recollide(*it->second); }
+    if (it != tiles_.end()) { converted::present(it->second)->skip = -1; recollide(*converted::present(it->second)); }
   }
   excl_tile_ = tile;
   excl_index_ = tile ? index : -1;
   if (tile) {
     auto it = tiles_.find(tile);
-    if (it != tiles_.end()) { it->second->skip = index; recollide(*it->second); }
+    if (it != tiles_.end()) { converted::present(it->second)->skip = index; recollide(*converted::present(it->second)); }
   }
 }
 bool CityStream::exclusion_done() const { return !near_.building && !near_.dirty; }
@@ -992,31 +1666,6 @@ bool CityStream::exclusion_done() const { return !near_.building && !near_.dirty
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static Rgb draw_kern__Rgb(converted::Draw& draw) {
-  Rgb s{};
-  s.r = draw.number();
-  s.g = draw.number();
-  s.b = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Rgb& s) { return converted::Value::structure({arg(s.r), arg(s.g), arg(s.b)}); }
-[[maybe_unused]] static bool same(const Rgb& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.r, (*got.rows)[0]) && same(want.g, (*got.rows)[1]) && same(want.b, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const Rgb& s) { return defined(s.r) && defined(s.g) && defined(s.b); }
-[[maybe_unused]] static std::string text(const Rgb& s) { return std::string("{") + text(s.r) + ", " + text(s.g) + ", " + text(s.b) + "}"; }
-[[maybe_unused]] static void take(Rgb& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.r, (*v.rows)[0]); converted::take_as<double>(s.g, (*v.rows)[1]); converted::take_as<double>(s.b, (*v.rows)[2]); }
-[[maybe_unused]] static BuildingStyle draw_kern__BuildingStyle(converted::Draw& draw) {
-  BuildingStyle s{};
-  s.walls = draw_list(draw, [&]() -> Rgb { return draw_kern__Rgb(draw); });
-  s.roofs = draw_list(draw, [&]() -> Rgb { return draw_kern__Rgb(draw); });
-  s.trim = draw_kern__Rgb(draw);
-  s.trim_mix = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const BuildingStyle& s) { return converted::Value::structure({arg(s.walls), arg(s.roofs), arg(s.trim), arg(s.trim_mix)}); }
-[[maybe_unused]] static bool same(const BuildingStyle& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.walls, (*got.rows)[0]) && same(want.roofs, (*got.rows)[1]) && same(want.trim, (*got.rows)[2]) && same(want.trim_mix, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const BuildingStyle& s) { return defined(s.walls) && defined(s.roofs) && defined(s.trim) && defined(s.trim_mix); }
-[[maybe_unused]] static std::string text(const BuildingStyle& s) { return std::string("{") + text(s.walls) + ", " + text(s.roofs) + ", " + text(s.trim) + ", " + text(s.trim_mix) + "}"; }
-[[maybe_unused]] static void take(BuildingStyle& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Rgb>>(s.walls, (*v.rows)[0]); converted::take_as<std::vector<Rgb>>(s.roofs, (*v.rows)[1]); converted::take_as<Rgb>(s.trim, (*v.rows)[2]); converted::take_as<double>(s.trim_mix, (*v.rows)[3]); }
 [[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
   if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
   Vec4 s{};
@@ -1027,39 +1676,10 @@ bool CityStream::exclusion_done() const { return !near_.building && !near_.dirty
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Vec4& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
-[[maybe_unused]] static BuildingOptions draw_kern__BuildingOptions(converted::Draw& draw) {
-  BuildingOptions s{};
-  s.chunk_size = draw.number();
-  s.max_buildings = static_cast<unsigned int>(draw.below(40));
-  s.cornice = draw.flag();
-  s.wall_records = draw.flag();
-  s.style = draw_kern__BuildingStyle(draw);
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const BuildingOptions& s) { return converted::Value::structure({arg(s.chunk_size), arg(s.max_buildings), arg(s.cornice), arg(s.wall_records), arg(s.style)}); }
-[[maybe_unused]] static bool same(const BuildingOptions& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.chunk_size, (*got.rows)[0]) && same(want.max_buildings, (*got.rows)[1]) && same(want.cornice, (*got.rows)[2]) && same(want.wall_records, (*got.rows)[3]) && same(want.style, (*got.rows)[4]); }
-[[maybe_unused]] static bool defined(const BuildingOptions& s) { return defined(s.chunk_size) && defined(s.max_buildings) && defined(s.cornice) && defined(s.wall_records) && defined(s.style); }
-[[maybe_unused]] static std::string text(const BuildingOptions& s) { return std::string("{") + text(s.chunk_size) + ", " + text(s.max_buildings) + ", " + text(s.cornice) + ", " + text(s.wall_records) + ", " + text(s.style) + "}"; }
-[[maybe_unused]] static void take(BuildingOptions& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.chunk_size, (*v.rows)[0]); converted::take_as<unsigned int>(s.max_buildings, (*v.rows)[1]); converted::take_as<bool>(s.cornice, (*v.rows)[2]); converted::take_as<bool>(s.wall_records, (*v.rows)[3]); converted::take_as<BuildingStyle>(s.style, (*v.rows)[4]); }
-[[maybe_unused]] static MapFeatures::Building draw_MapFeatures__Building(converted::Draw& draw) {
-  MapFeatures::Building s{};
-  s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
-  s.base = draw.number();
-  s.top = draw.number();
-  s.seed = static_cast<unsigned int>(draw.below(40));
-  s.full_top = draw.number();
-  s.leveled = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MapFeatures::Building& s) { return converted::Value::structure({arg(s.rings), arg(s.base), arg(s.top), arg(s.seed), arg(s.full_top), arg(s.leveled)}); }
-[[maybe_unused]] static bool same(const MapFeatures::Building& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.rings, (*got.rows)[0]) && same(want.base, (*got.rows)[1]) && same(want.top, (*got.rows)[2]) && same(want.seed, (*got.rows)[3]) && same(want.full_top, (*got.rows)[4]) && same(want.leveled, (*got.rows)[5]); }
-[[maybe_unused]] static bool defined(const MapFeatures::Building& s) { return defined(s.rings) && defined(s.base) && defined(s.top) && defined(s.seed) && defined(s.full_top) && defined(s.leveled); }
-[[maybe_unused]] static std::string text(const MapFeatures::Building& s) { return std::string("{") + text(s.rings) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.seed) + ", " + text(s.full_top) + ", " + text(s.leveled) + "}"; }
-[[maybe_unused]] static void take(MapFeatures::Building& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<double>(s.base, (*v.rows)[1]); converted::take_as<double>(s.top, (*v.rows)[2]); converted::take_as<unsigned int>(s.seed, (*v.rows)[3]); converted::take_as<double>(s.full_top, (*v.rows)[4]); converted::take_as<bool>(s.leveled, (*v.rows)[5]); }
 [[maybe_unused]] static physics::Body draw_kern__physics__Body(converted::Draw& draw) {
   physics::Body s{};
   s.id = static_cast<u64>(draw.bits());
@@ -1067,7 +1687,7 @@ bool CityStream::exclusion_done() const { return !near_.building && !near_.dirty
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -1079,7 +1699,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Shape& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Shape& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Shape& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Shape& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -1102,7 +1722,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CityStream::NearCollision& s) { return converted::Value::structure({arg(s.body), arg(s.old_body), arg(s.at), arg(s.ahead), arg(s.at_ms), arg(converted::shaped<std::vector<std::pair<converted::Whole, unsigned int>>>(s.list)), arg(s.shapes), arg(s.next), arg(s.building), arg(s.dirty), arg(s.built), arg(s.mates_at), arg(s.colliders)}); }
-[[maybe_unused]] static bool same(const CityStream::NearCollision& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.body, (*got.rows)[0]) && same(want.old_body, (*got.rows)[1]) && same(want.at, (*got.rows)[2]) && same(want.ahead, (*got.rows)[3]) && same(want.at_ms, (*got.rows)[4]) && same(converted::shaped<std::vector<std::pair<converted::Whole, unsigned int>>>(want.list), (*got.rows)[5]) && same(want.shapes, (*got.rows)[6]) && same(want.next, (*got.rows)[7]) && same(want.building, (*got.rows)[8]) && same(want.dirty, (*got.rows)[9]) && same(want.built, (*got.rows)[10]) && same(want.mates_at, (*got.rows)[11]) && same(want.colliders, (*got.rows)[12]); }
+[[maybe_unused]] static bool same(const CityStream::NearCollision& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.body, (*got.rows)[0]), ".body") && converted::at_place(same(want.old_body, (*got.rows)[1]), ".old_body") && converted::at_place(same(want.at, (*got.rows)[2]), ".at") && converted::at_place(same(want.ahead, (*got.rows)[3]), ".ahead") && converted::at_place(same(want.at_ms, (*got.rows)[4]), ".at_ms") && converted::at_place(same(converted::shaped<std::vector<std::pair<converted::Whole, unsigned int>>>(want.list), (*got.rows)[5]), ".list") && converted::at_place(same(want.shapes, (*got.rows)[6]), ".shapes") && converted::at_place(same(want.next, (*got.rows)[7]), ".next") && converted::at_place(same(want.building, (*got.rows)[8]), ".building") && converted::at_place(same(want.dirty, (*got.rows)[9]), ".dirty") && converted::at_place(same(want.built, (*got.rows)[10]), ".built") && converted::at_place(same(want.mates_at, (*got.rows)[11]), ".mates_at") && converted::at_place(same(want.colliders, (*got.rows)[12]), ".colliders"); }
 [[maybe_unused]] static bool defined(const CityStream::NearCollision& s) { return defined(s.body) && defined(s.old_body) && defined(s.at) && defined(s.ahead) && defined(s.at_ms) && defined(converted::shaped<std::vector<std::pair<converted::Whole, unsigned int>>>(s.list)) && defined(s.shapes) && defined(s.next) && defined(s.building) && defined(s.dirty) && defined(s.built) && defined(s.mates_at) && defined(s.colliders); }
 [[maybe_unused]] static std::string text(const CityStream::NearCollision& s) { return std::string("{") + text(s.body) + ", " + text(s.old_body) + ", " + text(s.at) + ", " + text(s.ahead) + ", " + text(s.at_ms) + ", " + text(converted::shaped<std::vector<std::pair<converted::Whole, unsigned int>>>(s.list)) + ", " + text(s.shapes) + ", " + text(s.next) + ", " + text(s.building) + ", " + text(s.dirty) + ", " + text(s.built) + ", " + text(s.mates_at) + ", " + text(s.colliders) + "}"; }
 [[maybe_unused]] static void take(CityStream::NearCollision& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<physics::Body>(s.body, (*v.rows)[0]); converted::take_as<physics::Body>(s.old_body, (*v.rows)[1]); converted::take_as<Vec2>(s.at, (*v.rows)[2]); converted::take_as<Vec2>(s.ahead, (*v.rows)[3]); converted::take_as<double>(s.at_ms, (*v.rows)[4]); converted::take_as<std::vector<std::pair<converted::Whole, unsigned int>>>(s.list, (*v.rows)[5]); converted::take_as<std::vector<physics::Shape>>(s.shapes, (*v.rows)[6]); converted::take_as<unsigned long>(s.next, (*v.rows)[7]); converted::take_as<bool>(s.building, (*v.rows)[8]); converted::take_as<bool>(s.dirty, (*v.rows)[9]); converted::take_as<bool>(s.built, (*v.rows)[10]); converted::take_as<std::vector<Vec3>>(s.mates_at, (*v.rows)[11]); converted::take_as<unsigned int>(s.colliders, (*v.rows)[12]); }
@@ -1133,7 +1753,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const StreamStats& s) { return converted::Value::structure({arg(s.tiles_ready), arg(s.tiles_loading), arg(s.tiles_failed), arg(s.buildings), arg(s.colliders), arg(s.triangles), arg(s.meshes), arg(s.last_slice_ms), arg(s.t_request), arg(s.t_data), arg(s.t_decoded), arg(s.t_terrain), arg(s.t_built), arg(s.t_collision), arg(s.work_ms), arg(s.worst_ms), arg(s.worst_step), arg(s.worst_step_ms), arg(s.rebuilds), arg(s.relays), arg(s.uploads), arg(s.upload_vertices)}); }
-[[maybe_unused]] static bool same(const StreamStats& want, const converted::Value& got) { return got.rows && got.rows->size() == 22 && same(want.tiles_ready, (*got.rows)[0]) && same(want.tiles_loading, (*got.rows)[1]) && same(want.tiles_failed, (*got.rows)[2]) && same(want.buildings, (*got.rows)[3]) && same(want.colliders, (*got.rows)[4]) && same(want.triangles, (*got.rows)[5]) && same(want.meshes, (*got.rows)[6]) && same(want.last_slice_ms, (*got.rows)[7]) && same(want.t_request, (*got.rows)[8]) && same(want.t_data, (*got.rows)[9]) && same(want.t_decoded, (*got.rows)[10]) && same(want.t_terrain, (*got.rows)[11]) && same(want.t_built, (*got.rows)[12]) && same(want.t_collision, (*got.rows)[13]) && same(want.work_ms, (*got.rows)[14]) && same(want.worst_ms, (*got.rows)[15]) && same(want.worst_step, (*got.rows)[16]) && same(want.worst_step_ms, (*got.rows)[17]) && same(want.rebuilds, (*got.rows)[18]) && same(want.relays, (*got.rows)[19]) && same(want.uploads, (*got.rows)[20]) && same(want.upload_vertices, (*got.rows)[21]); }
+[[maybe_unused]] static bool same(const StreamStats& want, const converted::Value& got) { return converted::rows_of(got, 22) && converted::at_place(same(want.tiles_ready, (*got.rows)[0]), ".tiles_ready") && converted::at_place(same(want.tiles_loading, (*got.rows)[1]), ".tiles_loading") && converted::at_place(same(want.tiles_failed, (*got.rows)[2]), ".tiles_failed") && converted::at_place(same(want.buildings, (*got.rows)[3]), ".buildings") && converted::at_place(same(want.colliders, (*got.rows)[4]), ".colliders") && converted::at_place(same(want.triangles, (*got.rows)[5]), ".triangles") && converted::at_place(same(want.meshes, (*got.rows)[6]), ".meshes") && converted::at_place(same(want.last_slice_ms, (*got.rows)[7]), ".last_slice_ms") && converted::at_place(same(want.t_request, (*got.rows)[8]), ".t_request") && converted::at_place(same(want.t_data, (*got.rows)[9]), ".t_data") && converted::at_place(same(want.t_decoded, (*got.rows)[10]), ".t_decoded") && converted::at_place(same(want.t_terrain, (*got.rows)[11]), ".t_terrain") && converted::at_place(same(want.t_built, (*got.rows)[12]), ".t_built") && converted::at_place(same(want.t_collision, (*got.rows)[13]), ".t_collision") && converted::at_place(same(want.work_ms, (*got.rows)[14]), ".work_ms") && converted::at_place(same(want.worst_ms, (*got.rows)[15]), ".worst_ms") && converted::at_place(same(want.worst_step, (*got.rows)[16]), ".worst_step") && converted::at_place(same(want.worst_step_ms, (*got.rows)[17]), ".worst_step_ms") && converted::at_place(same(want.rebuilds, (*got.rows)[18]), ".rebuilds") && converted::at_place(same(want.relays, (*got.rows)[19]), ".relays") && converted::at_place(same(want.uploads, (*got.rows)[20]), ".uploads") && converted::at_place(same(want.upload_vertices, (*got.rows)[21]), ".upload_vertices"); }
 [[maybe_unused]] static bool defined(const StreamStats& s) { return defined(s.tiles_ready) && defined(s.tiles_loading) && defined(s.tiles_failed) && defined(s.buildings) && defined(s.colliders) && defined(s.triangles) && defined(s.meshes) && defined(s.last_slice_ms) && defined(s.t_request) && defined(s.t_data) && defined(s.t_decoded) && defined(s.t_terrain) && defined(s.t_built) && defined(s.t_collision) && defined(s.work_ms) && defined(s.worst_ms) && defined(s.worst_step) && defined(s.worst_step_ms) && defined(s.rebuilds) && defined(s.relays) && defined(s.uploads) && defined(s.upload_vertices); }
 [[maybe_unused]] static std::string text(const StreamStats& s) { return std::string("{") + text(s.tiles_ready) + ", " + text(s.tiles_loading) + ", " + text(s.tiles_failed) + ", " + text(s.buildings) + ", " + text(s.colliders) + ", " + text(s.triangles) + ", " + text(s.meshes) + ", " + text(s.last_slice_ms) + ", " + text(s.t_request) + ", " + text(s.t_data) + ", " + text(s.t_decoded) + ", " + text(s.t_terrain) + ", " + text(s.t_built) + ", " + text(s.t_collision) + ", " + text(s.work_ms) + ", " + text(s.worst_ms) + ", " + text(s.worst_step) + ", " + text(s.worst_step_ms) + ", " + text(s.rebuilds) + ", " + text(s.relays) + ", " + text(s.uploads) + ", " + text(s.upload_vertices) + "}"; }
 [[maybe_unused]] static void take(StreamStats& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 22) return; converted::take_as<unsigned int>(s.tiles_ready, (*v.rows)[0]); converted::take_as<unsigned int>(s.tiles_loading, (*v.rows)[1]); converted::take_as<unsigned int>(s.tiles_failed, (*v.rows)[2]); converted::take_as<unsigned int>(s.buildings, (*v.rows)[3]); converted::take_as<unsigned int>(s.colliders, (*v.rows)[4]); converted::take_as<unsigned int>(s.triangles, (*v.rows)[5]); converted::take_as<unsigned int>(s.meshes, (*v.rows)[6]); converted::take_as<double>(s.last_slice_ms, (*v.rows)[7]); converted::take_as<double>(s.t_request, (*v.rows)[8]); converted::take_as<double>(s.t_data, (*v.rows)[9]); converted::take_as<double>(s.t_decoded, (*v.rows)[10]); converted::take_as<double>(s.t_terrain, (*v.rows)[11]); converted::take_as<double>(s.t_built, (*v.rows)[12]); converted::take_as<double>(s.t_collision, (*v.rows)[13]); converted::take_as<double>(s.work_ms, (*v.rows)[14]); converted::take_as<double>(s.worst_ms, (*v.rows)[15]); converted::take_as<const char*>(s.worst_step, (*v.rows)[16]); converted::take_as<double>(s.worst_step_ms, (*v.rows)[17]); converted::take_as<unsigned int>(s.rebuilds, (*v.rows)[18]); converted::take_as<unsigned int>(s.relays, (*v.rows)[19]); converted::take_as<unsigned int>(s.uploads, (*v.rows)[20]); converted::take_as<unsigned int>(s.upload_vertices, (*v.rows)[21]); }
@@ -1144,7 +1764,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CityStream::Damage& s) { return converted::Value::structure({arg(s.height), arg(s.leveled)}); }
-[[maybe_unused]] static bool same(const CityStream::Damage& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.height, (*got.rows)[0]) && same(want.leveled, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const CityStream::Damage& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.height, (*got.rows)[0]), ".height") && converted::at_place(same(want.leveled, (*got.rows)[1]), ".leveled"); }
 [[maybe_unused]] static bool defined(const CityStream::Damage& s) { return defined(s.height) && defined(s.leveled); }
 [[maybe_unused]] static std::string text(const CityStream::Damage& s) { return std::string("{") + text(s.height) + ", " + text(s.leveled) + "}"; }
 [[maybe_unused]] static void take(CityStream::Damage& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.height, (*v.rows)[0]); converted::take_as<bool>(s.leveled, (*v.rows)[1]); }
@@ -1156,7 +1776,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const GeoProjector& s) { return converted::Value::structure({arg(s.lon0), arg(s.lat0), arg(s.cos_lat)}); }
-[[maybe_unused]] static bool same(const GeoProjector& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.lon0, (*got.rows)[0]) && same(want.lat0, (*got.rows)[1]) && same(want.cos_lat, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const GeoProjector& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.lon0, (*got.rows)[0]), ".lon0") && converted::at_place(same(want.lat0, (*got.rows)[1]), ".lat0") && converted::at_place(same(want.cos_lat, (*got.rows)[2]), ".cos_lat"); }
 [[maybe_unused]] static bool defined(const GeoProjector& s) { return defined(s.lon0) && defined(s.lat0) && defined(s.cos_lat); }
 [[maybe_unused]] static std::string text(const GeoProjector& s) { return std::string("{") + text(s.lon0) + ", " + text(s.lat0) + ", " + text(s.cos_lat) + "}"; }
 [[maybe_unused]] static void take(GeoProjector& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.lon0, (*v.rows)[0]); converted::take_as<double>(s.lat0, (*v.rows)[1]); converted::take_as<double>(s.cos_lat, (*v.rows)[2]); }
@@ -1168,10 +1788,25 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TileKey& s) { return converted::Value::structure({arg(s.z), arg(s.x), arg(s.y)}); }
-[[maybe_unused]] static bool same(const TileKey& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.z, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const TileKey& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.z, (*got.rows)[0]), ".z") && converted::at_place(same(want.x, (*got.rows)[1]), ".x") && converted::at_place(same(want.y, (*got.rows)[2]), ".y"); }
 [[maybe_unused]] static bool defined(const TileKey& s) { return defined(s.z) && defined(s.x) && defined(s.y); }
 [[maybe_unused]] static std::string text(const TileKey& s) { return std::string("{") + text(s.z) + ", " + text(s.x) + ", " + text(s.y) + "}"; }
 [[maybe_unused]] static void take(TileKey& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.z, (*v.rows)[0]); converted::take_as<int>(s.x, (*v.rows)[1]); converted::take_as<int>(s.y, (*v.rows)[2]); }
+[[maybe_unused]] static MapFeatures::Building draw_MapFeatures__Building(converted::Draw& draw) {
+  MapFeatures::Building s{};
+  s.rings = draw_list(draw, [&]() -> std::vector<Vec2> { return draw_list(draw, [&]() -> Vec2 { return draw.vector2(); }); });
+  s.base = draw.number();
+  s.top = draw.number();
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.full_top = draw.number();
+  s.leveled = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MapFeatures::Building& s) { return converted::Value::structure({arg(s.rings), arg(s.base), arg(s.top), arg(s.seed), arg(s.full_top), arg(s.leveled)}); }
+[[maybe_unused]] static bool same(const MapFeatures::Building& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.rings, (*got.rows)[0]), ".rings") && converted::at_place(same(want.base, (*got.rows)[1]), ".base") && converted::at_place(same(want.top, (*got.rows)[2]), ".top") && converted::at_place(same(want.seed, (*got.rows)[3]), ".seed") && converted::at_place(same(want.full_top, (*got.rows)[4]), ".full_top") && converted::at_place(same(want.leveled, (*got.rows)[5]), ".leveled"); }
+[[maybe_unused]] static bool defined(const MapFeatures::Building& s) { return defined(s.rings) && defined(s.base) && defined(s.top) && defined(s.seed) && defined(s.full_top) && defined(s.leveled); }
+[[maybe_unused]] static std::string text(const MapFeatures::Building& s) { return std::string("{") + text(s.rings) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.seed) + ", " + text(s.full_top) + ", " + text(s.leveled) + "}"; }
+[[maybe_unused]] static void take(MapFeatures::Building& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<double>(s.base, (*v.rows)[1]); converted::take_as<double>(s.top, (*v.rows)[2]); converted::take_as<unsigned int>(s.seed, (*v.rows)[3]); converted::take_as<double>(s.full_top, (*v.rows)[4]); converted::take_as<bool>(s.leveled, (*v.rows)[5]); }
 [[maybe_unused]] static MapFeatures::Road draw_MapFeatures__Road(converted::Draw& draw) {
   MapFeatures::Road s{};
   s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -1180,7 +1815,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MapFeatures::Road& s) { return converted::Value::structure({arg(s.points), arg(s.cls), arg(s.bridge)}); }
-[[maybe_unused]] static bool same(const MapFeatures::Road& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.points, (*got.rows)[0]) && same(want.cls, (*got.rows)[1]) && same(want.bridge, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const MapFeatures::Road& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.points, (*got.rows)[0]), ".points") && converted::at_place(same(want.cls, (*got.rows)[1]), ".cls") && converted::at_place(same(want.bridge, (*got.rows)[2]), ".bridge"); }
 [[maybe_unused]] static bool defined(const MapFeatures::Road& s) { return defined(s.points) && defined(s.cls) && defined(s.bridge); }
 [[maybe_unused]] static std::string text(const MapFeatures::Road& s) { return std::string("{") + text(s.points) + ", " + text(s.cls) + ", " + text(s.bridge) + "}"; }
 [[maybe_unused]] static void take(MapFeatures::Road& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<RoadClass>(s.cls, (*v.rows)[1]); converted::take_as<bool>(s.bridge, (*v.rows)[2]); }
@@ -1191,7 +1826,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MapFeatures::Area& s) { return converted::Value::structure({arg(s.rings), arg(s.kind)}); }
-[[maybe_unused]] static bool same(const MapFeatures::Area& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.rings, (*got.rows)[0]) && same(want.kind, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const MapFeatures::Area& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.rings, (*got.rows)[0]), ".rings") && converted::at_place(same(want.kind, (*got.rows)[1]), ".kind"); }
 [[maybe_unused]] static bool defined(const MapFeatures::Area& s) { return defined(s.rings) && defined(s.kind); }
 [[maybe_unused]] static std::string text(const MapFeatures::Area& s) { return std::string("{") + text(s.rings) + ", " + text(s.kind) + "}"; }
 [[maybe_unused]] static void take(MapFeatures::Area& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[0]); converted::take_as<AreaKind>(s.kind, (*v.rows)[1]); }
@@ -1202,7 +1837,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MapFeatures::Spot& s) { return converted::Value::structure({arg(s.p), arg(s.a)}); }
-[[maybe_unused]] static bool same(const MapFeatures::Spot& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.p, (*got.rows)[0]) && same(want.a, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const MapFeatures::Spot& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.a, (*got.rows)[1]), ".a"); }
 [[maybe_unused]] static bool defined(const MapFeatures::Spot& s) { return defined(s.p) && defined(s.a); }
 [[maybe_unused]] static std::string text(const MapFeatures::Spot& s) { return std::string("{") + text(s.p) + ", " + text(s.a) + "}"; }
 [[maybe_unused]] static void take(MapFeatures::Spot& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<double>(s.a, (*v.rows)[1]); }
@@ -1217,7 +1852,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MapFeatures& s) { return converted::Value::structure({arg(s.buildings), arg(s.roads), arg(s.areas), arg(s.trees), arg(s.lamps), arg(s.procedural)}); }
-[[maybe_unused]] static bool same(const MapFeatures& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.buildings, (*got.rows)[0]) && same(want.roads, (*got.rows)[1]) && same(want.areas, (*got.rows)[2]) && same(want.trees, (*got.rows)[3]) && same(want.lamps, (*got.rows)[4]) && same(want.procedural, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const MapFeatures& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.buildings, (*got.rows)[0]), ".buildings") && converted::at_place(same(want.roads, (*got.rows)[1]), ".roads") && converted::at_place(same(want.areas, (*got.rows)[2]), ".areas") && converted::at_place(same(want.trees, (*got.rows)[3]), ".trees") && converted::at_place(same(want.lamps, (*got.rows)[4]), ".lamps") && converted::at_place(same(want.procedural, (*got.rows)[5]), ".procedural"); }
 [[maybe_unused]] static bool defined(const MapFeatures& s) { return defined(s.buildings) && defined(s.roads) && defined(s.areas) && defined(s.trees) && defined(s.lamps) && defined(s.procedural); }
 [[maybe_unused]] static std::string text(const MapFeatures& s) { return std::string("{") + text(s.buildings) + ", " + text(s.roads) + ", " + text(s.areas) + ", " + text(s.trees) + ", " + text(s.lamps) + ", " + text(s.procedural) + "}"; }
 [[maybe_unused]] static void take(MapFeatures& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<MapFeatures::Building>>(s.buildings, (*v.rows)[0]); converted::take_as<std::vector<MapFeatures::Road>>(s.roads, (*v.rows)[1]); converted::take_as<std::vector<MapFeatures::Area>>(s.areas, (*v.rows)[2]); converted::take_as<std::vector<MapFeatures::Spot>>(s.trees, (*v.rows)[3]); converted::take_as<std::vector<MapFeatures::Spot>>(s.lamps, (*v.rows)[4]); converted::take_as<bool>(s.procedural, (*v.rows)[5]); }
@@ -1266,7 +1901,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CityStream::Tile& s) { return converted::Value::structure({arg(s.state), arg(s.key), arg(s.tries), arg(s.retry_ms), arg(s.procedural), arg(s.features), arg(s.footprints), arg(s.roads), arg(s.buildings), arg(s.road_builder), arg(s.meshes), arg(s.body), arg(s.collide_next), arg(s.upload_next), arg(s.colliders), arg(s.triangles), arg(s.center), arg(s.bounds), arg(s.lay_meshes), arg(s.old_lay), arg(s.relay), arg(s.relay_again), arg(s.roads_at), arg(s.cent), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_items)), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.want_cells)), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_old)), arg(s.cell_uploading), arg(s.tile_job), arg(s.build_job), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_ids)), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_cells)), arg(converted::shaped<std::vector<converted::Whole>>(s.job_cells)), arg(s.cell_job), arg(s.built_bytes), arg(s.built_at), arg(s.prepared), arg(s.skip), arg(s.old_body), arg(s.recollide)}); }
-[[maybe_unused]] static bool same(const CityStream::Tile& want, const converted::Value& got) { return got.rows && got.rows->size() == 40 && same(want.state, (*got.rows)[0]) && same(want.key, (*got.rows)[1]) && same(want.tries, (*got.rows)[2]) && same(want.retry_ms, (*got.rows)[3]) && same(want.procedural, (*got.rows)[4]) && same(want.features, (*got.rows)[5]) && same(want.footprints, (*got.rows)[6]) && same(want.roads, (*got.rows)[7]) && same(want.buildings, (*got.rows)[8]) && same(want.road_builder, (*got.rows)[9]) && same(want.meshes, (*got.rows)[10]) && same(want.body, (*got.rows)[11]) && same(want.collide_next, (*got.rows)[12]) && same(want.upload_next, (*got.rows)[13]) && same(want.colliders, (*got.rows)[14]) && same(want.triangles, (*got.rows)[15]) && same(want.center, (*got.rows)[16]) && same(want.bounds, (*got.rows)[17]) && same(want.lay_meshes, (*got.rows)[18]) && same(want.old_lay, (*got.rows)[19]) && same(want.relay, (*got.rows)[20]) && same(want.relay_again, (*got.rows)[21]) && same(want.roads_at, (*got.rows)[22]) && same(want.cent, (*got.rows)[23]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.cell_items), (*got.rows)[24]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.want_cells), (*got.rows)[25]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.cell_old), (*got.rows)[26]) && same(want.cell_uploading, (*got.rows)[27]) && same(want.tile_job, (*got.rows)[28]) && same(want.build_job, (*got.rows)[29]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.cell_ids), (*got.rows)[30]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_cells), (*got.rows)[31]) && same(converted::shaped<std::vector<converted::Whole>>(want.job_cells), (*got.rows)[32]) && same(want.cell_job, (*got.rows)[33]) && same(want.built_bytes, (*got.rows)[34]) && same(want.built_at, (*got.rows)[35]) && same(want.prepared, (*got.rows)[36]) && same(want.skip, (*got.rows)[37]) && same(want.old_body, (*got.rows)[38]) && same(want.recollide, (*got.rows)[39]); }
+[[maybe_unused]] static bool same(const CityStream::Tile& want, const converted::Value& got) { return converted::rows_of(got, 40) && converted::at_place(same(want.state, (*got.rows)[0]), ".state") && converted::at_place(same(want.key, (*got.rows)[1]), ".key") && converted::at_place(same(want.tries, (*got.rows)[2]), ".tries") && converted::at_place(same(want.retry_ms, (*got.rows)[3]), ".retry_ms") && converted::at_place(same(want.procedural, (*got.rows)[4]), ".procedural") && converted::at_place(same(want.features, (*got.rows)[5]), ".features") && converted::at_place(same(want.footprints, (*got.rows)[6]), ".footprints") && converted::at_place(same(want.roads, (*got.rows)[7]), ".roads") && converted::at_place(same(want.buildings, (*got.rows)[8]), ".buildings") && converted::at_place(same(want.road_builder, (*got.rows)[9]), ".road_builder") && converted::at_place(same(want.meshes, (*got.rows)[10]), ".meshes") && converted::at_place(same(want.body, (*got.rows)[11]), ".body") && converted::at_place(same(want.collide_next, (*got.rows)[12]), ".collide_next") && converted::at_place(same(want.upload_next, (*got.rows)[13]), ".upload_next") && converted::at_place(same(want.colliders, (*got.rows)[14]), ".colliders") && converted::at_place(same(want.triangles, (*got.rows)[15]), ".triangles") && converted::at_place(same(want.center, (*got.rows)[16]), ".center") && converted::at_place(same(want.bounds, (*got.rows)[17]), ".bounds") && converted::at_place(same(want.lay_meshes, (*got.rows)[18]), ".lay_meshes") && converted::at_place(same(want.old_lay, (*got.rows)[19]), ".old_lay") && converted::at_place(same(want.relay, (*got.rows)[20]), ".relay") && converted::at_place(same(want.relay_again, (*got.rows)[21]), ".relay_again") && converted::at_place(same(want.roads_at, (*got.rows)[22]), ".roads_at") && converted::at_place(same(want.cent, (*got.rows)[23]), ".cent") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.cell_items), (*got.rows)[24]), ".cell_items") && converted::at_place(same(converted::shaped<converted::wide::Set<converted::Whole>>(want.want_cells), (*got.rows)[25]), ".want_cells") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.cell_old), (*got.rows)[26]), ".cell_old") && converted::at_place(same(want.cell_uploading, (*got.rows)[27]), ".cell_uploading") && converted::at_place(same(want.tile_job, (*got.rows)[28]), ".tile_job") && converted::at_place(same(want.build_job, (*got.rows)[29]), ".build_job") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(want.cell_ids), (*got.rows)[30]), ".cell_ids") && converted::at_place(same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_cells), (*got.rows)[31]), ".dirty_cells") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(want.job_cells), (*got.rows)[32]), ".job_cells") && converted::at_place(same(want.cell_job, (*got.rows)[33]), ".cell_job") && converted::at_place(same(want.built_bytes, (*got.rows)[34]), ".built_bytes") && converted::at_place(same(want.built_at, (*got.rows)[35]), ".built_at") && converted::at_place(same(want.prepared, (*got.rows)[36]), ".prepared") && converted::at_place(same(want.skip, (*got.rows)[37]), ".skip") && converted::at_place(same(want.old_body, (*got.rows)[38]), ".old_body") && converted::at_place(same(want.recollide, (*got.rows)[39]), ".recollide"); }
 [[maybe_unused]] static bool defined(const CityStream::Tile& s) { return defined(s.state) && defined(s.key) && defined(s.tries) && defined(s.retry_ms) && defined(s.procedural) && defined(s.features) && defined(s.footprints) && defined(s.roads) && defined(s.buildings) && defined(s.road_builder) && defined(s.meshes) && defined(s.body) && defined(s.collide_next) && defined(s.upload_next) && defined(s.colliders) && defined(s.triangles) && defined(s.center) && defined(s.bounds) && defined(s.lay_meshes) && defined(s.old_lay) && defined(s.relay) && defined(s.relay_again) && defined(s.roads_at) && defined(s.cent) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_items)) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.want_cells)) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_old)) && defined(s.cell_uploading) && defined(s.tile_job) && defined(s.build_job) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_ids)) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_cells)) && defined(converted::shaped<std::vector<converted::Whole>>(s.job_cells)) && defined(s.cell_job) && defined(s.built_bytes) && defined(s.built_at) && defined(s.prepared) && defined(s.skip) && defined(s.old_body) && defined(s.recollide); }
 [[maybe_unused]] static std::string text(const CityStream::Tile& s) { return std::string("{") + text(s.state) + ", " + text(s.key) + ", " + text(s.tries) + ", " + text(s.retry_ms) + ", " + text(s.procedural) + ", " + text(s.features) + ", " + text(s.footprints) + ", " + text(s.roads) + ", " + text(s.buildings) + ", " + text(s.road_builder) + ", " + text(s.meshes) + ", " + text(s.body) + ", " + text(s.collide_next) + ", " + text(s.upload_next) + ", " + text(s.colliders) + ", " + text(s.triangles) + ", " + text(s.center) + ", " + text(s.bounds) + ", " + text(s.lay_meshes) + ", " + text(s.old_lay) + ", " + text(s.relay) + ", " + text(s.relay_again) + ", " + text(s.roads_at) + ", " + text(s.cent) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_items)) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.want_cells)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_old)) + ", " + text(s.cell_uploading) + ", " + text(s.tile_job) + ", " + text(s.build_job) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_ids)) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_cells)) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.job_cells)) + ", " + text(s.cell_job) + ", " + text(s.built_bytes) + ", " + text(s.built_at) + ", " + text(s.prepared) + ", " + text(s.skip) + ", " + text(s.old_body) + ", " + text(s.recollide) + "}"; }
 [[maybe_unused]] static void take(CityStream::Tile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 40) return; converted::take_as<CityStream::Tile::State>(s.state, (*v.rows)[0]); converted::take_as<TileKey>(s.key, (*v.rows)[1]); converted::take_as<unsigned int>(s.tries, (*v.rows)[2]); converted::take_as<double>(s.retry_ms, (*v.rows)[3]); converted::take_as<bool>(s.procedural, (*v.rows)[4]); converted::take_as<MapFeatures>(s.features, (*v.rows)[5]); converted::take_as<FootprintStream>(s.footprints, (*v.rows)[6]); converted::take_as<RoadStream>(s.roads, (*v.rows)[7]); converted::take_as<BuildingBuilder>(s.buildings, (*v.rows)[8]); converted::take_as<RoadBuilder>(s.road_builder, (*v.rows)[9]); converted::take_as<std::vector<unsigned int>>(s.meshes, (*v.rows)[10]); converted::take_as<physics::Body>(s.body, (*v.rows)[11]); converted::take_as<unsigned long>(s.collide_next, (*v.rows)[12]); converted::take_as<unsigned long>(s.upload_next, (*v.rows)[13]); converted::take_as<unsigned int>(s.colliders, (*v.rows)[14]); converted::take_as<unsigned int>(s.triangles, (*v.rows)[15]); converted::take_as<Vec2>(s.center, (*v.rows)[16]); converted::take_as<Vec4>(s.bounds, (*v.rows)[17]); converted::take_as<std::vector<unsigned int>>(s.lay_meshes, (*v.rows)[18]); converted::take_as<std::vector<unsigned int>>(s.old_lay, (*v.rows)[19]); converted::take_as<bool>(s.relay, (*v.rows)[20]); converted::take_as<bool>(s.relay_again, (*v.rows)[21]); converted::take_as<Vec2>(s.roads_at, (*v.rows)[22]); converted::take_as<std::vector<Vec2>>(s.cent, (*v.rows)[23]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_items, (*v.rows)[24]); converted::take_as<converted::wide::Set<converted::Whole>>(s.want_cells, (*v.rows)[25]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_old, (*v.rows)[26]); converted::take_as<bool>(s.cell_uploading, (*v.rows)[27]); converted::take_as<unsigned int>(s.tile_job, (*v.rows)[28]); converted::take_as<unsigned int>(s.build_job, (*v.rows)[29]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<unsigned int>>>(s.cell_ids, (*v.rows)[30]); converted::take_as<converted::wide::Set<converted::Whole>>(s.dirty_cells, (*v.rows)[31]); converted::take_as<std::vector<converted::Whole>>(s.job_cells, (*v.rows)[32]); converted::take_as<unsigned int>(s.cell_job, (*v.rows)[33]); converted::take_as<std::vector<unsigned char>>(s.built_bytes, (*v.rows)[34]); converted::take_as<unsigned long>(s.built_at, (*v.rows)[35]); converted::take_as<bool>(s.prepared, (*v.rows)[36]); converted::take_as<int>(s.skip, (*v.rows)[37]); converted::take_as<physics::Body>(s.old_body, (*v.rows)[38]); converted::take_as<bool>(s.recollide, (*v.rows)[39]); }
@@ -1279,7 +1914,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.points, (*got.rows)[0]), ".points") && converted::at_place(same(want.width, (*got.rows)[1]), ".width") && converted::at_place(same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]), ".tile") && converted::at_place(same(want.alive, (*got.rows)[3]), ".alive"); }
 [[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.alive); }
 [[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.alive) + "}"; }
 [[maybe_unused]] static void take(Lane& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<double>(s.width, (*v.rows)[1]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[2]); converted::take_as<bool>(s.alive, (*v.rows)[3]); }
@@ -1296,7 +1931,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::CorridorSeg& s) { return converted::Value::structure({arg(s.ax), arg(s.ay), arg(s.dx), arg(s.dy), arg(s.l2), arg(s.ha), arg(s.hb), arg(s.half)}); }
-[[maybe_unused]] static bool same(const Terrain::CorridorSeg& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.ax, (*got.rows)[0]) && same(want.ay, (*got.rows)[1]) && same(want.dx, (*got.rows)[2]) && same(want.dy, (*got.rows)[3]) && same(want.l2, (*got.rows)[4]) && same(want.ha, (*got.rows)[5]) && same(want.hb, (*got.rows)[6]) && same(want.half, (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const Terrain::CorridorSeg& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.ax, (*got.rows)[0]), ".ax") && converted::at_place(same(want.ay, (*got.rows)[1]), ".ay") && converted::at_place(same(want.dx, (*got.rows)[2]), ".dx") && converted::at_place(same(want.dy, (*got.rows)[3]), ".dy") && converted::at_place(same(want.l2, (*got.rows)[4]), ".l2") && converted::at_place(same(want.ha, (*got.rows)[5]), ".ha") && converted::at_place(same(want.hb, (*got.rows)[6]), ".hb") && converted::at_place(same(want.half, (*got.rows)[7]), ".half"); }
 [[maybe_unused]] static bool defined(const Terrain::CorridorSeg& s) { return defined(s.ax) && defined(s.ay) && defined(s.dx) && defined(s.dy) && defined(s.l2) && defined(s.ha) && defined(s.hb) && defined(s.half); }
 [[maybe_unused]] static std::string text(const Terrain::CorridorSeg& s) { return std::string("{") + text(s.ax) + ", " + text(s.ay) + ", " + text(s.dx) + ", " + text(s.dy) + ", " + text(s.l2) + ", " + text(s.ha) + ", " + text(s.hb) + ", " + text(s.half) + "}"; }
 [[maybe_unused]] static void take(Terrain::CorridorSeg& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<double>(s.ax, (*v.rows)[0]); converted::take_as<double>(s.ay, (*v.rows)[1]); converted::take_as<double>(s.dx, (*v.rows)[2]); converted::take_as<double>(s.dy, (*v.rows)[3]); converted::take_as<double>(s.l2, (*v.rows)[4]); converted::take_as<double>(s.ha, (*v.rows)[5]); converted::take_as<double>(s.hb, (*v.rows)[6]); converted::take_as<double>(s.half, (*v.rows)[7]); }
@@ -1309,7 +1944,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::CorridorSet& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.owner)), arg(s.bounds), arg(s.box), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<Terrain::CorridorSeg>>>(s.grid))}); }
-[[maybe_unused]] static bool same(const Terrain::CorridorSet& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.owner), (*got.rows)[0]) && same(want.bounds, (*got.rows)[1]) && same(want.box, (*got.rows)[2]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<Terrain::CorridorSeg>>>(want.grid), (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Terrain::CorridorSet& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(converted::shaped<converted::Whole>(want.owner), (*got.rows)[0]), ".owner") && converted::at_place(same(want.bounds, (*got.rows)[1]), ".bounds") && converted::at_place(same(want.box, (*got.rows)[2]), ".box") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<Terrain::CorridorSeg>>>(want.grid), (*got.rows)[3]), ".grid"); }
 [[maybe_unused]] static bool defined(const Terrain::CorridorSet& s) { return defined(converted::shaped<converted::Whole>(s.owner)) && defined(s.bounds) && defined(s.box) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<Terrain::CorridorSeg>>>(s.grid)); }
 [[maybe_unused]] static std::string text(const Terrain::CorridorSet& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.owner)) + ", " + text(s.bounds) + ", " + text(s.box) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<Terrain::CorridorSeg>>>(s.grid)) + "}"; }
 [[maybe_unused]] static void take(Terrain::CorridorSet& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.owner, (*v.rows)[0]); converted::take_as<Vec4>(s.bounds, (*v.rows)[1]); converted::take_as<Vec4>(s.box, (*v.rows)[2]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<Terrain::CorridorSeg>>>(s.grid, (*v.rows)[3]); }
@@ -1322,7 +1957,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::Image& s) { return converted::Value::structure({arg(s.key), arg(s.albedo), arg(s.requested), arg(s.failed)}); }
-[[maybe_unused]] static bool same(const Terrain::Image& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.key, (*got.rows)[0]) && same(want.albedo, (*got.rows)[1]) && same(want.requested, (*got.rows)[2]) && same(want.failed, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Terrain::Image& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.key, (*got.rows)[0]), ".key") && converted::at_place(same(want.albedo, (*got.rows)[1]), ".albedo") && converted::at_place(same(want.requested, (*got.rows)[2]), ".requested") && converted::at_place(same(want.failed, (*got.rows)[3]), ".failed"); }
 [[maybe_unused]] static bool defined(const Terrain::Image& s) { return defined(s.key) && defined(s.albedo) && defined(s.requested) && defined(s.failed); }
 [[maybe_unused]] static std::string text(const Terrain::Image& s) { return std::string("{") + text(s.key) + ", " + text(s.albedo) + ", " + text(s.requested) + ", " + text(s.failed) + "}"; }
 [[maybe_unused]] static void take(Terrain::Image& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<TileKey>(s.key, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.albedo, (*v.rows)[1]); converted::take_as<bool>(s.requested, (*v.rows)[2]); converted::take_as<bool>(s.failed, (*v.rows)[3]); }
@@ -1338,7 +1973,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::Grid& s) { return converted::Value::structure({arg(s.x0), arg(s.y0), arg(s.step), arg(s.n), arg(s.h), arg(s.cx), arg(s.cy)}); }
-[[maybe_unused]] static bool same(const Terrain::Grid& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.x0, (*got.rows)[0]) && same(want.y0, (*got.rows)[1]) && same(want.step, (*got.rows)[2]) && same(want.n, (*got.rows)[3]) && same(want.h, (*got.rows)[4]) && same(want.cx, (*got.rows)[5]) && same(want.cy, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const Terrain::Grid& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.x0, (*got.rows)[0]), ".x0") && converted::at_place(same(want.y0, (*got.rows)[1]), ".y0") && converted::at_place(same(want.step, (*got.rows)[2]), ".step") && converted::at_place(same(want.n, (*got.rows)[3]), ".n") && converted::at_place(same(want.h, (*got.rows)[4]), ".h") && converted::at_place(same(want.cx, (*got.rows)[5]), ".cx") && converted::at_place(same(want.cy, (*got.rows)[6]), ".cy"); }
 [[maybe_unused]] static bool defined(const Terrain::Grid& s) { return defined(s.x0) && defined(s.y0) && defined(s.step) && defined(s.n) && defined(s.h) && defined(s.cx) && defined(s.cy); }
 [[maybe_unused]] static std::string text(const Terrain::Grid& s) { return std::string("{") + text(s.x0) + ", " + text(s.y0) + ", " + text(s.step) + ", " + text(s.n) + ", " + text(s.h) + ", " + text(s.cx) + ", " + text(s.cy) + "}"; }
 [[maybe_unused]] static void take(Terrain::Grid& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.x0, (*v.rows)[0]); converted::take_as<double>(s.y0, (*v.rows)[1]); converted::take_as<double>(s.step, (*v.rows)[2]); converted::take_as<unsigned int>(s.n, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.h, (*v.rows)[4]); converted::take_as<double>(s.cx, (*v.rows)[5]); converted::take_as<double>(s.cy, (*v.rows)[6]); }
@@ -1354,7 +1989,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::Job& s) { return converted::Value::structure({arg(s.g), arg(s.id), arg(s.side), arg(s.x0), arg(s.y0), arg(s.x1), arg(s.y1)}); }
-[[maybe_unused]] static bool same(const Terrain::Job& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.g, (*got.rows)[0]) && same(want.id, (*got.rows)[1]) && same(want.side, (*got.rows)[2]) && same(want.x0, (*got.rows)[3]) && same(want.y0, (*got.rows)[4]) && same(want.x1, (*got.rows)[5]) && same(want.y1, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const Terrain::Job& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.g, (*got.rows)[0]), ".g") && converted::at_place(same(want.id, (*got.rows)[1]), ".id") && converted::at_place(same(want.side, (*got.rows)[2]), ".side") && converted::at_place(same(want.x0, (*got.rows)[3]), ".x0") && converted::at_place(same(want.y0, (*got.rows)[4]), ".y0") && converted::at_place(same(want.x1, (*got.rows)[5]), ".x1") && converted::at_place(same(want.y1, (*got.rows)[6]), ".y1"); }
 [[maybe_unused]] static bool defined(const Terrain::Job& s) { return defined(s.g) && defined(s.id) && defined(s.side) && defined(s.x0) && defined(s.y0) && defined(s.x1) && defined(s.y1); }
 [[maybe_unused]] static std::string text(const Terrain::Job& s) { return std::string("{") + text(s.g) + ", " + text(s.id) + ", " + text(s.side) + ", " + text(s.x0) + ", " + text(s.y0) + ", " + text(s.x1) + ", " + text(s.y1) + "}"; }
 [[maybe_unused]] static void take(Terrain::Job& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<Terrain::Grid>(s.g, (*v.rows)[0]); converted::take_as<unsigned int>(s.id, (*v.rows)[1]); converted::take_as<bool>(s.side, (*v.rows)[2]); converted::take_as<int>(s.x0, (*v.rows)[3]); converted::take_as<int>(s.y0, (*v.rows)[4]); converted::take_as<int>(s.x1, (*v.rows)[5]); converted::take_as<int>(s.y1, (*v.rows)[6]); }
@@ -1369,7 +2004,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::DemTile& s) { return converted::Value::structure({arg(s.key), arg(s.h), arg(s.w), arg(s.hgt), arg(s.failed), arg(s.requested)}); }
-[[maybe_unused]] static bool same(const Terrain::DemTile& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.key, (*got.rows)[0]) && same(want.h, (*got.rows)[1]) && same(want.w, (*got.rows)[2]) && same(want.hgt, (*got.rows)[3]) && same(want.failed, (*got.rows)[4]) && same(want.requested, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Terrain::DemTile& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.key, (*got.rows)[0]), ".key") && converted::at_place(same(want.h, (*got.rows)[1]), ".h") && converted::at_place(same(want.w, (*got.rows)[2]), ".w") && converted::at_place(same(want.hgt, (*got.rows)[3]), ".hgt") && converted::at_place(same(want.failed, (*got.rows)[4]), ".failed") && converted::at_place(same(want.requested, (*got.rows)[5]), ".requested"); }
 [[maybe_unused]] static bool defined(const Terrain::DemTile& s) { return defined(s.key) && defined(s.h) && defined(s.w) && defined(s.hgt) && defined(s.failed) && defined(s.requested); }
 [[maybe_unused]] static std::string text(const Terrain::DemTile& s) { return std::string("{") + text(s.key) + ", " + text(s.h) + ", " + text(s.w) + ", " + text(s.hgt) + ", " + text(s.failed) + ", " + text(s.requested) + "}"; }
 [[maybe_unused]] static void take(Terrain::DemTile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<TileKey>(s.key, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.h, (*v.rows)[1]); converted::take_as<unsigned int>(s.w, (*v.rows)[2]); converted::take_as<unsigned int>(s.hgt, (*v.rows)[3]); converted::take_as<bool>(s.failed, (*v.rows)[4]); converted::take_as<bool>(s.requested, (*v.rows)[5]); }
@@ -1381,7 +2016,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::WaterBlock& s) { return converted::Value::structure({arg(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.bits))), arg(s.flow), arg(s.speed)}); }
-[[maybe_unused]] static bool same(const Terrain::WaterBlock& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.bits)), (*got.rows)[0]) && same(want.flow, (*got.rows)[1]) && same(want.speed, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Terrain::WaterBlock& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.bits)), (*got.rows)[0]), ".bits") && converted::at_place(same(want.flow, (*got.rows)[1]), ".flow") && converted::at_place(same(want.speed, (*got.rows)[2]), ".speed"); }
 [[maybe_unused]] static bool defined(const Terrain::WaterBlock& s) { return defined(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.bits))) && defined(s.flow) && defined(s.speed); }
 [[maybe_unused]] static std::string text(const Terrain::WaterBlock& s) { return std::string("{") + text(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.bits))) + ", " + text(s.flow) + ", " + text(s.speed) + "}"; }
 [[maybe_unused]] static void take(Terrain::WaterBlock& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; { std::vector<u64> items; converted::take_as<std::vector<converted::Whole>>(items, (*v.rows)[0]); converted::array_from(s.bits, items); } converted::take_as<std::vector<Vec2>>(s.flow, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.speed, (*v.rows)[2]); }
@@ -1394,7 +2029,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::Bridge& s) { return converted::Value::structure({arg(s.c), arg(s.hl), arg(s.hw), arg(s.yaw)}); }
-[[maybe_unused]] static bool same(const Terrain::Bridge& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.c, (*got.rows)[0]) && same(want.hl, (*got.rows)[1]) && same(want.hw, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Terrain::Bridge& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.c, (*got.rows)[0]), ".c") && converted::at_place(same(want.hl, (*got.rows)[1]), ".hl") && converted::at_place(same(want.hw, (*got.rows)[2]), ".hw") && converted::at_place(same(want.yaw, (*got.rows)[3]), ".yaw"); }
 [[maybe_unused]] static bool defined(const Terrain::Bridge& s) { return defined(s.c) && defined(s.hl) && defined(s.hw) && defined(s.yaw); }
 [[maybe_unused]] static std::string text(const Terrain::Bridge& s) { return std::string("{") + text(s.c) + ", " + text(s.hl) + ", " + text(s.hw) + ", " + text(s.yaw) + "}"; }
 [[maybe_unused]] static void take(Terrain::Bridge& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec2>(s.c, (*v.rows)[0]); converted::take_as<double>(s.hl, (*v.rows)[1]); converted::take_as<double>(s.hw, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); }
@@ -1407,7 +2042,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::Crater& s) { return converted::Value::structure({arg(s.c), arg(s.r), arg(s.depth), arg(s.rim)}); }
-[[maybe_unused]] static bool same(const Terrain::Crater& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.c, (*got.rows)[0]) && same(want.r, (*got.rows)[1]) && same(want.depth, (*got.rows)[2]) && same(want.rim, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Terrain::Crater& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.c, (*got.rows)[0]), ".c") && converted::at_place(same(want.r, (*got.rows)[1]), ".r") && converted::at_place(same(want.depth, (*got.rows)[2]), ".depth") && converted::at_place(same(want.rim, (*got.rows)[3]), ".rim"); }
 [[maybe_unused]] static bool defined(const Terrain::Crater& s) { return defined(s.c) && defined(s.r) && defined(s.depth) && defined(s.rim); }
 [[maybe_unused]] static std::string text(const Terrain::Crater& s) { return std::string("{") + text(s.c) + ", " + text(s.r) + ", " + text(s.depth) + ", " + text(s.rim) + "}"; }
 [[maybe_unused]] static void take(Terrain::Crater& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec2>(s.c, (*v.rows)[0]); converted::take_as<double>(s.r, (*v.rows)[1]); converted::take_as<double>(s.depth, (*v.rows)[2]); converted::take_as<double>(s.rim, (*v.rows)[3]); }
@@ -1420,7 +2055,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::Tint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.owner)), arg(s.box), arg(s.lin), arg(s.rings)}); }
-[[maybe_unused]] static bool same(const Terrain::Tint& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.owner), (*got.rows)[0]) && same(want.box, (*got.rows)[1]) && same(want.lin, (*got.rows)[2]) && same(want.rings, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Terrain::Tint& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(converted::shaped<converted::Whole>(want.owner), (*got.rows)[0]), ".owner") && converted::at_place(same(want.box, (*got.rows)[1]), ".box") && converted::at_place(same(want.lin, (*got.rows)[2]), ".lin") && converted::at_place(same(want.rings, (*got.rows)[3]), ".rings"); }
 [[maybe_unused]] static bool defined(const Terrain::Tint& s) { return defined(converted::shaped<converted::Whole>(s.owner)) && defined(s.box) && defined(s.lin) && defined(s.rings); }
 [[maybe_unused]] static std::string text(const Terrain::Tint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.owner)) + ", " + text(s.box) + ", " + text(s.lin) + ", " + text(s.rings) + "}"; }
 [[maybe_unused]] static void take(Terrain::Tint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.owner, (*v.rows)[0]); converted::take_as<Vec4>(s.box, (*v.rows)[1]); converted::take_as<Vec3>(s.lin, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.rings, (*v.rows)[3]); }
@@ -1431,7 +2066,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::RenderTile& s) { return converted::Value::structure({arg(s.mesh), arg(s.skirt)}); }
-[[maybe_unused]] static bool same(const Terrain::RenderTile& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.mesh, (*got.rows)[0]) && same(want.skirt, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Terrain::RenderTile& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.mesh, (*got.rows)[0]), ".mesh") && converted::at_place(same(want.skirt, (*got.rows)[1]), ".skirt"); }
 [[maybe_unused]] static bool defined(const Terrain::RenderTile& s) { return defined(s.mesh) && defined(s.skirt); }
 [[maybe_unused]] static std::string text(const Terrain::RenderTile& s) { return std::string("{") + text(s.mesh) + ", " + text(s.skirt) + "}"; }
 [[maybe_unused]] static void take(Terrain::RenderTile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned int>(s.mesh, (*v.rows)[0]); converted::take_as<bool>(s.skirt, (*v.rows)[1]); }
@@ -1441,7 +2076,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain::CollisionTile& s) { return converted::Value::structure({arg(s.body)}); }
-[[maybe_unused]] static bool same(const Terrain::CollisionTile& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.body, (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const Terrain::CollisionTile& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.body, (*got.rows)[0]), ".body"); }
 [[maybe_unused]] static bool defined(const Terrain::CollisionTile& s) { return defined(s.body); }
 [[maybe_unused]] static std::string text(const Terrain::CollisionTile& s) { return std::string("{") + text(s.body) + "}"; }
 [[maybe_unused]] static void take(Terrain::CollisionTile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<physics::Body>(s.body, (*v.rows)[0]); }
@@ -1462,7 +2097,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TerrainStats& s) { return converted::Value::structure({arg(s.windows), arg(s.dem_tiles), arg(s.dem_failed), arg(s.render_tiles), arg(s.collision_tiles), arg(s.water_cells), arg(s.craters), arg(s.rebuilds), arg(s.min_height), arg(s.max_height), arg(s.dem), arg(s.settled)}); }
-[[maybe_unused]] static bool same(const TerrainStats& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.windows, (*got.rows)[0]) && same(want.dem_tiles, (*got.rows)[1]) && same(want.dem_failed, (*got.rows)[2]) && same(want.render_tiles, (*got.rows)[3]) && same(want.collision_tiles, (*got.rows)[4]) && same(want.water_cells, (*got.rows)[5]) && same(want.craters, (*got.rows)[6]) && same(want.rebuilds, (*got.rows)[7]) && same(want.min_height, (*got.rows)[8]) && same(want.max_height, (*got.rows)[9]) && same(want.dem, (*got.rows)[10]) && same(want.settled, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const TerrainStats& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.windows, (*got.rows)[0]), ".windows") && converted::at_place(same(want.dem_tiles, (*got.rows)[1]), ".dem_tiles") && converted::at_place(same(want.dem_failed, (*got.rows)[2]), ".dem_failed") && converted::at_place(same(want.render_tiles, (*got.rows)[3]), ".render_tiles") && converted::at_place(same(want.collision_tiles, (*got.rows)[4]), ".collision_tiles") && converted::at_place(same(want.water_cells, (*got.rows)[5]), ".water_cells") && converted::at_place(same(want.craters, (*got.rows)[6]), ".craters") && converted::at_place(same(want.rebuilds, (*got.rows)[7]), ".rebuilds") && converted::at_place(same(want.min_height, (*got.rows)[8]), ".min_height") && converted::at_place(same(want.max_height, (*got.rows)[9]), ".max_height") && converted::at_place(same(want.dem, (*got.rows)[10]), ".dem") && converted::at_place(same(want.settled, (*got.rows)[11]), ".settled"); }
 [[maybe_unused]] static bool defined(const TerrainStats& s) { return defined(s.windows) && defined(s.dem_tiles) && defined(s.dem_failed) && defined(s.render_tiles) && defined(s.collision_tiles) && defined(s.water_cells) && defined(s.craters) && defined(s.rebuilds) && defined(s.min_height) && defined(s.max_height) && defined(s.dem) && defined(s.settled); }
 [[maybe_unused]] static std::string text(const TerrainStats& s) { return std::string("{") + text(s.windows) + ", " + text(s.dem_tiles) + ", " + text(s.dem_failed) + ", " + text(s.render_tiles) + ", " + text(s.collision_tiles) + ", " + text(s.water_cells) + ", " + text(s.craters) + ", " + text(s.rebuilds) + ", " + text(s.min_height) + ", " + text(s.max_height) + ", " + text(s.dem) + ", " + text(s.settled) + "}"; }
 [[maybe_unused]] static void take(TerrainStats& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<unsigned int>(s.windows, (*v.rows)[0]); converted::take_as<unsigned int>(s.dem_tiles, (*v.rows)[1]); converted::take_as<unsigned int>(s.dem_failed, (*v.rows)[2]); converted::take_as<unsigned int>(s.render_tiles, (*v.rows)[3]); converted::take_as<unsigned int>(s.collision_tiles, (*v.rows)[4]); converted::take_as<unsigned int>(s.water_cells, (*v.rows)[5]); converted::take_as<unsigned int>(s.craters, (*v.rows)[6]); converted::take_as<unsigned int>(s.rebuilds, (*v.rows)[7]); converted::take_as<double>(s.min_height, (*v.rows)[8]); converted::take_as<double>(s.max_height, (*v.rows)[9]); converted::take_as<bool>(s.dem, (*v.rows)[10]); converted::take_as<bool>(s.settled, (*v.rows)[11]); }
@@ -1514,7 +2149,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Terrain& s) { return converted::Value::structure({arg(s.needs), arg(s.corridors_expected), arg(s.lead), arg(s.extra), arg(s.corridors_), arg(converted::shaped<converted::wide::Map<converted::Whole, Terrain::Image>>(s.images_)), arg(s.image_requests_), arg(s.image_at_), arg(s.r_), arg(s.world_), arg(s.proj_), arg(s.dem_), arg(s.settled_), arg(s.grid_ready_), arg(s.ref_height_), arg(s.ref_ready_), arg(s.grid_), arg(s.side_), arg(s.job_), arg(converted::shaped<converted::wide::Map<converted::Whole, Terrain::DemTile>>(s.dem_tiles_)), arg(s.requests_), arg(s.dem_failures_), arg(s.retry_at_), arg(converted::shaped<converted::wide::Map<converted::Whole, Terrain::WaterBlock>>(s.water_)), arg(s.bridges_), arg(s.craters_), arg(s.tints_), arg(converted::shaped<converted::wide::Map<converted::Whole, Terrain::RenderTile>>(s.render_)), arg(converted::shaped<converted::wide::Map<converted::Whole, Terrain::CollisionTile>>(s.collision_)), arg(converted::shaped<converted::wide::Map<converted::Whole, unsigned int>>(s.water_meshes_)), arg(converted::shaped<converted::wide::Map<converted::Whole, bool>>(s.water_detail_)), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_render_)), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_collision_)), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_water_)), arg(converted::shaped<std::vector<converted::Whole>>(s.want_render_)), arg(converted::shaped<std::vector<converted::Whole>>(s.want_collision_)), arg(converted::shaped<std::vector<converted::Whole>>(s.want_water_)), arg(s.planned_focus_), arg(s.planned_anchor_), arg(s.planned_extra_), arg(s.replan_), arg(s.changes_), arg(s.stats_)}); }
-[[maybe_unused]] static bool same(const Terrain& want, const converted::Value& got) { return got.rows && got.rows->size() == 43 && same(want.needs, (*got.rows)[0]) && same(want.corridors_expected, (*got.rows)[1]) && same(want.lead, (*got.rows)[2]) && same(want.extra, (*got.rows)[3]) && same(want.corridors_, (*got.rows)[4]) && same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::Image>>(want.images_), (*got.rows)[5]) && same(want.image_requests_, (*got.rows)[6]) && same(want.image_at_, (*got.rows)[7]) && same(want.r_, (*got.rows)[8]) && same(want.world_, (*got.rows)[9]) && same(want.proj_, (*got.rows)[10]) && same(want.dem_, (*got.rows)[11]) && same(want.settled_, (*got.rows)[12]) && same(want.grid_ready_, (*got.rows)[13]) && same(want.ref_height_, (*got.rows)[14]) && same(want.ref_ready_, (*got.rows)[15]) && same(want.grid_, (*got.rows)[16]) && same(want.side_, (*got.rows)[17]) && same(want.job_, (*got.rows)[18]) && same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::DemTile>>(want.dem_tiles_), (*got.rows)[19]) && same(want.requests_, (*got.rows)[20]) && same(want.dem_failures_, (*got.rows)[21]) && same(want.retry_at_, (*got.rows)[22]) && same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::WaterBlock>>(want.water_), (*got.rows)[23]) && same(want.bridges_, (*got.rows)[24]) && same(want.craters_, (*got.rows)[25]) && same(want.tints_, (*got.rows)[26]) && same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::RenderTile>>(want.render_), (*got.rows)[27]) && same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::CollisionTile>>(want.collision_), (*got.rows)[28]) && same(converted::shaped<converted::wide::Map<converted::Whole, unsigned int>>(want.water_meshes_), (*got.rows)[29]) && same(converted::shaped<converted::wide::Map<converted::Whole, bool>>(want.water_detail_), (*got.rows)[30]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_render_), (*got.rows)[31]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_collision_), (*got.rows)[32]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_water_), (*got.rows)[33]) && same(converted::shaped<std::vector<converted::Whole>>(want.want_render_), (*got.rows)[34]) && same(converted::shaped<std::vector<converted::Whole>>(want.want_collision_), (*got.rows)[35]) && same(converted::shaped<std::vector<converted::Whole>>(want.want_water_), (*got.rows)[36]) && same(want.planned_focus_, (*got.rows)[37]) && same(want.planned_anchor_, (*got.rows)[38]) && same(want.planned_extra_, (*got.rows)[39]) && same(want.replan_, (*got.rows)[40]) && same(want.changes_, (*got.rows)[41]) && same(want.stats_, (*got.rows)[42]); }
+[[maybe_unused]] static bool same(const Terrain& want, const converted::Value& got) { return converted::rows_of(got, 43) && converted::at_place(same(want.needs, (*got.rows)[0]), ".needs") && converted::at_place(same(want.corridors_expected, (*got.rows)[1]), ".corridors_expected") && converted::at_place(same(want.lead, (*got.rows)[2]), ".lead") && converted::at_place(same(want.extra, (*got.rows)[3]), ".extra") && converted::at_place(same(want.corridors_, (*got.rows)[4]), ".corridors_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::Image>>(want.images_), (*got.rows)[5]), ".images_") && converted::at_place(same(want.image_requests_, (*got.rows)[6]), ".image_requests_") && converted::at_place(same(want.image_at_, (*got.rows)[7]), ".image_at_") && converted::at_place(same(want.r_, (*got.rows)[8]), ".r_") && converted::at_place(same(want.world_, (*got.rows)[9]), ".world_") && converted::at_place(same(want.proj_, (*got.rows)[10]), ".proj_") && converted::at_place(same(want.dem_, (*got.rows)[11]), ".dem_") && converted::at_place(same(want.settled_, (*got.rows)[12]), ".settled_") && converted::at_place(same(want.grid_ready_, (*got.rows)[13]), ".grid_ready_") && converted::at_place(same(want.ref_height_, (*got.rows)[14]), ".ref_height_") && converted::at_place(same(want.ref_ready_, (*got.rows)[15]), ".ref_ready_") && converted::at_place(same(want.grid_, (*got.rows)[16]), ".grid_") && converted::at_place(same(want.side_, (*got.rows)[17]), ".side_") && converted::at_place(same(want.job_, (*got.rows)[18]), ".job_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::DemTile>>(want.dem_tiles_), (*got.rows)[19]), ".dem_tiles_") && converted::at_place(same(want.requests_, (*got.rows)[20]), ".requests_") && converted::at_place(same(want.dem_failures_, (*got.rows)[21]), ".dem_failures_") && converted::at_place(same(want.retry_at_, (*got.rows)[22]), ".retry_at_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::WaterBlock>>(want.water_), (*got.rows)[23]), ".water_") && converted::at_place(same(want.bridges_, (*got.rows)[24]), ".bridges_") && converted::at_place(same(want.craters_, (*got.rows)[25]), ".craters_") && converted::at_place(same(want.tints_, (*got.rows)[26]), ".tints_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::RenderTile>>(want.render_), (*got.rows)[27]), ".render_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, Terrain::CollisionTile>>(want.collision_), (*got.rows)[28]), ".collision_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, unsigned int>>(want.water_meshes_), (*got.rows)[29]), ".water_meshes_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, bool>>(want.water_detail_), (*got.rows)[30]), ".water_detail_") && converted::at_place(same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_render_), (*got.rows)[31]), ".dirty_render_") && converted::at_place(same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_collision_), (*got.rows)[32]), ".dirty_collision_") && converted::at_place(same(converted::shaped<converted::wide::Set<converted::Whole>>(want.dirty_water_), (*got.rows)[33]), ".dirty_water_") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(want.want_render_), (*got.rows)[34]), ".want_render_") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(want.want_collision_), (*got.rows)[35]), ".want_collision_") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(want.want_water_), (*got.rows)[36]), ".want_water_") && converted::at_place(same(want.planned_focus_, (*got.rows)[37]), ".planned_focus_") && converted::at_place(same(want.planned_anchor_, (*got.rows)[38]), ".planned_anchor_") && converted::at_place(same(want.planned_extra_, (*got.rows)[39]), ".planned_extra_") && converted::at_place(same(want.replan_, (*got.rows)[40]), ".replan_") && converted::at_place(same(want.changes_, (*got.rows)[41]), ".changes_") && converted::at_place(same(want.stats_, (*got.rows)[42]), ".stats_"); }
 [[maybe_unused]] static bool defined(const Terrain& s) { return defined(s.needs) && defined(s.corridors_expected) && defined(s.lead) && defined(s.extra) && defined(s.corridors_) && defined(converted::shaped<converted::wide::Map<converted::Whole, Terrain::Image>>(s.images_)) && defined(s.image_requests_) && defined(s.image_at_) && defined(s.r_) && defined(s.world_) && defined(s.proj_) && defined(s.dem_) && defined(s.settled_) && defined(s.grid_ready_) && defined(s.ref_height_) && defined(s.ref_ready_) && defined(s.grid_) && defined(s.side_) && defined(s.job_) && defined(converted::shaped<converted::wide::Map<converted::Whole, Terrain::DemTile>>(s.dem_tiles_)) && defined(s.requests_) && defined(s.dem_failures_) && defined(s.retry_at_) && defined(converted::shaped<converted::wide::Map<converted::Whole, Terrain::WaterBlock>>(s.water_)) && defined(s.bridges_) && defined(s.craters_) && defined(s.tints_) && defined(converted::shaped<converted::wide::Map<converted::Whole, Terrain::RenderTile>>(s.render_)) && defined(converted::shaped<converted::wide::Map<converted::Whole, Terrain::CollisionTile>>(s.collision_)) && defined(converted::shaped<converted::wide::Map<converted::Whole, unsigned int>>(s.water_meshes_)) && defined(converted::shaped<converted::wide::Map<converted::Whole, bool>>(s.water_detail_)) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_render_)) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_collision_)) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_water_)) && defined(converted::shaped<std::vector<converted::Whole>>(s.want_render_)) && defined(converted::shaped<std::vector<converted::Whole>>(s.want_collision_)) && defined(converted::shaped<std::vector<converted::Whole>>(s.want_water_)) && defined(s.planned_focus_) && defined(s.planned_anchor_) && defined(s.planned_extra_) && defined(s.replan_) && defined(s.changes_) && defined(s.stats_); }
 [[maybe_unused]] static std::string text(const Terrain& s) { return std::string("{") + text(s.needs) + ", " + text(s.corridors_expected) + ", " + text(s.lead) + ", " + text(s.extra) + ", " + text(s.corridors_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, Terrain::Image>>(s.images_)) + ", " + text(s.image_requests_) + ", " + text(s.image_at_) + ", " + text(s.r_) + ", " + text(s.world_) + ", " + text(s.proj_) + ", " + text(s.dem_) + ", " + text(s.settled_) + ", " + text(s.grid_ready_) + ", " + text(s.ref_height_) + ", " + text(s.ref_ready_) + ", " + text(s.grid_) + ", " + text(s.side_) + ", " + text(s.job_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, Terrain::DemTile>>(s.dem_tiles_)) + ", " + text(s.requests_) + ", " + text(s.dem_failures_) + ", " + text(s.retry_at_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, Terrain::WaterBlock>>(s.water_)) + ", " + text(s.bridges_) + ", " + text(s.craters_) + ", " + text(s.tints_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, Terrain::RenderTile>>(s.render_)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, Terrain::CollisionTile>>(s.collision_)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, unsigned int>>(s.water_meshes_)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, bool>>(s.water_detail_)) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_render_)) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_collision_)) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.dirty_water_)) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.want_render_)) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.want_collision_)) + ", " + text(converted::shaped<std::vector<converted::Whole>>(s.want_water_)) + ", " + text(s.planned_focus_) + ", " + text(s.planned_anchor_) + ", " + text(s.planned_extra_) + ", " + text(s.replan_) + ", " + text(s.changes_) + ", " + text(s.stats_) + "}"; }
 [[maybe_unused]] static void take(Terrain& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 43) return; converted::take_as<std::vector<Vec4>>(s.needs, (*v.rows)[0]); converted::take_as<bool>(s.corridors_expected, (*v.rows)[1]); converted::take_as<Vec3>(s.lead, (*v.rows)[2]); converted::take_as<std::vector<Vec3>>(s.extra, (*v.rows)[3]); converted::take_as<std::vector<std::unique_ptr<Terrain::CorridorSet>>>(s.corridors_, (*v.rows)[4]); converted::take_as<converted::wide::Map<converted::Whole, Terrain::Image>>(s.images_, (*v.rows)[5]); converted::take_as<std::vector<TileKey>>(s.image_requests_, (*v.rows)[6]); converted::take_as<Vec2>(s.image_at_, (*v.rows)[7]); converted::take_as<Renderer*>(s.r_, (*v.rows)[8]); converted::take_as<World*>(s.world_, (*v.rows)[9]); converted::take_as<GeoProjector>(s.proj_, (*v.rows)[10]); converted::take_as<bool>(s.dem_, (*v.rows)[11]); converted::take_as<bool>(s.settled_, (*v.rows)[12]); converted::take_as<bool>(s.grid_ready_, (*v.rows)[13]); converted::take_as<double>(s.ref_height_, (*v.rows)[14]); converted::take_as<bool>(s.ref_ready_, (*v.rows)[15]); converted::take_as<Terrain::Grid>(s.grid_, (*v.rows)[16]); converted::take_as<std::vector<Terrain::Grid>>(s.side_, (*v.rows)[17]); converted::take_as<std::unique_ptr<Terrain::Job>>(s.job_, (*v.rows)[18]); converted::take_as<converted::wide::Map<converted::Whole, Terrain::DemTile>>(s.dem_tiles_, (*v.rows)[19]); converted::take_as<std::vector<TileKey>>(s.requests_, (*v.rows)[20]); converted::take_as<unsigned int>(s.dem_failures_, (*v.rows)[21]); converted::take_as<double>(s.retry_at_, (*v.rows)[22]); converted::take_as<converted::wide::Map<converted::Whole, Terrain::WaterBlock>>(s.water_, (*v.rows)[23]); converted::take_as<std::vector<Terrain::Bridge>>(s.bridges_, (*v.rows)[24]); converted::take_as<std::vector<Terrain::Crater>>(s.craters_, (*v.rows)[25]); converted::take_as<std::vector<Terrain::Tint>>(s.tints_, (*v.rows)[26]); converted::take_as<converted::wide::Map<converted::Whole, Terrain::RenderTile>>(s.render_, (*v.rows)[27]); converted::take_as<converted::wide::Map<converted::Whole, Terrain::CollisionTile>>(s.collision_, (*v.rows)[28]); converted::take_as<converted::wide::Map<converted::Whole, unsigned int>>(s.water_meshes_, (*v.rows)[29]); converted::take_as<converted::wide::Map<converted::Whole, bool>>(s.water_detail_, (*v.rows)[30]); converted::take_as<converted::wide::Set<converted::Whole>>(s.dirty_render_, (*v.rows)[31]); converted::take_as<converted::wide::Set<converted::Whole>>(s.dirty_collision_, (*v.rows)[32]); converted::take_as<converted::wide::Set<converted::Whole>>(s.dirty_water_, (*v.rows)[33]); converted::take_as<std::vector<converted::Whole>>(s.want_render_, (*v.rows)[34]); converted::take_as<std::vector<converted::Whole>>(s.want_collision_, (*v.rows)[35]); converted::take_as<std::vector<converted::Whole>>(s.want_water_, (*v.rows)[36]); converted::take_as<Vec3>(s.planned_focus_, (*v.rows)[37]); converted::take_as<Vec3>(s.planned_anchor_, (*v.rows)[38]); converted::take_as<std::vector<Vec3>>(s.planned_extra_, (*v.rows)[39]); converted::take_as<bool>(s.replan_, (*v.rows)[40]); converted::take_as<std::vector<Vec4>>(s.changes_, (*v.rows)[41]); converted::take_as<TerrainStats>(s.stats_, (*v.rows)[42]); }
@@ -1565,10 +2200,49 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CityStream& s) { return converted::Value::structure({arg(s.anchor), arg(s.view_lead), arg(s.building_budget), arg(s.ring), arg(s.extra_foci), arg(s.mate_ring), arg(s.training_offline), arg(s.damage_serial_), arg(s.furniture_serial_), arg(s.ground_changes_), arg(s.near_), arg(s.ms_), arg(s.start_ms_), arg(s.worst_), arg(s.worst_at_), arg(s.worst_step_), arg(s.worst_step_ms_), arg(s.rebuilds_), arg(s.relays_), arg(s.upload_count_), arg(converted::shaped<converted::Whole>(s.upload_vertices_)), arg(s.focus_), arg(s.vis_at_), arg(s.vis_ahead_), arg(s.vis_ms_), arg(s.damage_), arg(s.damage_log_), arg(s.damage_quiet_), arg(s.r_), arg(s.world_), arg(s.proj_), arg(s.origin_tile_), arg(converted::shaped<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(s.tiles_)), arg(s.requests_), arg(s.lanes_), arg(s.offline_), arg(s.real_tiles_), arg(s.stats_), arg(s.terrain_), arg(s.terrain_changes_), arg(converted::shaped<converted::Whole>(s.excl_tile_)), arg(s.excl_index_)}); }
-[[maybe_unused]] static bool same(const CityStream& want, const converted::Value& got) { return got.rows && got.rows->size() == 42 && same(want.anchor, (*got.rows)[0]) && same(want.view_lead, (*got.rows)[1]) && same(want.building_budget, (*got.rows)[2]) && same(want.ring, (*got.rows)[3]) && same(want.extra_foci, (*got.rows)[4]) && same(want.mate_ring, (*got.rows)[5]) && same(want.training_offline, (*got.rows)[6]) && same(want.damage_serial_, (*got.rows)[7]) && same(want.furniture_serial_, (*got.rows)[8]) && same(want.ground_changes_, (*got.rows)[9]) && same(want.near_, (*got.rows)[10]) && same(want.ms_, (*got.rows)[11]) && same(want.start_ms_, (*got.rows)[12]) && same(want.worst_, (*got.rows)[13]) && same(want.worst_at_, (*got.rows)[14]) && same(want.worst_step_, (*got.rows)[15]) && same(want.worst_step_ms_, (*got.rows)[16]) && same(want.rebuilds_, (*got.rows)[17]) && same(want.relays_, (*got.rows)[18]) && same(want.upload_count_, (*got.rows)[19]) && same(converted::shaped<converted::Whole>(want.upload_vertices_), (*got.rows)[20]) && same(want.focus_, (*got.rows)[21]) && same(want.vis_at_, (*got.rows)[22]) && same(want.vis_ahead_, (*got.rows)[23]) && same(want.vis_ms_, (*got.rows)[24]) && same(want.damage_, (*got.rows)[25]) && same(want.damage_log_, (*got.rows)[26]) && same(want.damage_quiet_, (*got.rows)[27]) && same(want.r_, (*got.rows)[28]) && same(want.world_, (*got.rows)[29]) && same(want.proj_, (*got.rows)[30]) && same(want.origin_tile_, (*got.rows)[31]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(want.tiles_), (*got.rows)[32]) && same(want.requests_, (*got.rows)[33]) && same(want.lanes_, (*got.rows)[34]) && same(want.offline_, (*got.rows)[35]) && same(want.real_tiles_, (*got.rows)[36]) && same(want.stats_, (*got.rows)[37]) && same(want.terrain_, (*got.rows)[38]) && same(want.terrain_changes_, (*got.rows)[39]) && same(converted::shaped<converted::Whole>(want.excl_tile_), (*got.rows)[40]) && same(want.excl_index_, (*got.rows)[41]); }
+[[maybe_unused]] static bool same(const CityStream& want, const converted::Value& got) { return converted::rows_of(got, 42) && converted::at_place(same(want.anchor, (*got.rows)[0]), ".anchor") && converted::at_place(same(want.view_lead, (*got.rows)[1]), ".view_lead") && converted::at_place(same(want.building_budget, (*got.rows)[2]), ".building_budget") && converted::at_place(same(want.ring, (*got.rows)[3]), ".ring") && converted::at_place(same(want.extra_foci, (*got.rows)[4]), ".extra_foci") && converted::at_place(same(want.mate_ring, (*got.rows)[5]), ".mate_ring") && converted::at_place(same(want.training_offline, (*got.rows)[6]), ".training_offline") && converted::at_place(same(want.damage_serial_, (*got.rows)[7]), ".damage_serial_") && converted::at_place(same(want.furniture_serial_, (*got.rows)[8]), ".furniture_serial_") && converted::at_place(same(want.ground_changes_, (*got.rows)[9]), ".ground_changes_") && converted::at_place(same(want.near_, (*got.rows)[10]), ".near_") && converted::at_place(same(want.ms_, (*got.rows)[11]), ".ms_") && converted::at_place(same(want.start_ms_, (*got.rows)[12]), ".start_ms_") && converted::at_place(same(want.worst_, (*got.rows)[13]), ".worst_") && converted::at_place(same(want.worst_at_, (*got.rows)[14]), ".worst_at_") && converted::at_place(same(want.worst_step_, (*got.rows)[15]), ".worst_step_") && converted::at_place(same(want.worst_step_ms_, (*got.rows)[16]), ".worst_step_ms_") && converted::at_place(same(want.rebuilds_, (*got.rows)[17]), ".rebuilds_") && converted::at_place(same(want.relays_, (*got.rows)[18]), ".relays_") && converted::at_place(same(want.upload_count_, (*got.rows)[19]), ".upload_count_") && converted::at_place(same(converted::shaped<converted::Whole>(want.upload_vertices_), (*got.rows)[20]), ".upload_vertices_") && converted::at_place(same(want.focus_, (*got.rows)[21]), ".focus_") && converted::at_place(same(want.vis_at_, (*got.rows)[22]), ".vis_at_") && converted::at_place(same(want.vis_ahead_, (*got.rows)[23]), ".vis_ahead_") && converted::at_place(same(want.vis_ms_, (*got.rows)[24]), ".vis_ms_") && converted::at_place(same(want.damage_, (*got.rows)[25]), ".damage_") && converted::at_place(same(want.damage_log_, (*got.rows)[26]), ".damage_log_") && converted::at_place(same(want.damage_quiet_, (*got.rows)[27]), ".damage_quiet_") && converted::at_place(same(want.r_, (*got.rows)[28]), ".r_") && converted::at_place(same(want.world_, (*got.rows)[29]), ".world_") && converted::at_place(same(want.proj_, (*got.rows)[30]), ".proj_") && converted::at_place(same(want.origin_tile_, (*got.rows)[31]), ".origin_tile_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(want.tiles_), (*got.rows)[32]), ".tiles_") && converted::at_place(same(want.requests_, (*got.rows)[33]), ".requests_") && converted::at_place(same(want.lanes_, (*got.rows)[34]), ".lanes_") && converted::at_place(same(want.offline_, (*got.rows)[35]), ".offline_") && converted::at_place(same(want.real_tiles_, (*got.rows)[36]), ".real_tiles_") && converted::at_place(same(want.stats_, (*got.rows)[37]), ".stats_") && converted::at_place(same(want.terrain_, (*got.rows)[38]), ".terrain_") && converted::at_place(same(want.terrain_changes_, (*got.rows)[39]), ".terrain_changes_") && converted::at_place(same(converted::shaped<converted::Whole>(want.excl_tile_), (*got.rows)[40]), ".excl_tile_") && converted::at_place(same(want.excl_index_, (*got.rows)[41]), ".excl_index_"); }
 [[maybe_unused]] static bool defined(const CityStream& s) { return defined(s.anchor) && defined(s.view_lead) && defined(s.building_budget) && defined(s.ring) && defined(s.extra_foci) && defined(s.mate_ring) && defined(s.training_offline) && defined(s.damage_serial_) && defined(s.furniture_serial_) && defined(s.ground_changes_) && defined(s.near_) && defined(s.ms_) && defined(s.start_ms_) && defined(s.worst_) && defined(s.worst_at_) && defined(s.worst_step_) && defined(s.worst_step_ms_) && defined(s.rebuilds_) && defined(s.relays_) && defined(s.upload_count_) && defined(converted::shaped<converted::Whole>(s.upload_vertices_)) && defined(s.focus_) && defined(s.vis_at_) && defined(s.vis_ahead_) && defined(s.vis_ms_) && defined(s.damage_) && defined(s.damage_log_) && defined(s.damage_quiet_) && defined(s.r_) && defined(s.world_) && defined(s.proj_) && defined(s.origin_tile_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(s.tiles_)) && defined(s.requests_) && defined(s.lanes_) && defined(s.offline_) && defined(s.real_tiles_) && defined(s.stats_) && defined(s.terrain_) && defined(s.terrain_changes_) && defined(converted::shaped<converted::Whole>(s.excl_tile_)) && defined(s.excl_index_); }
 [[maybe_unused]] static std::string text(const CityStream& s) { return std::string("{") + text(s.anchor) + ", " + text(s.view_lead) + ", " + text(s.building_budget) + ", " + text(s.ring) + ", " + text(s.extra_foci) + ", " + text(s.mate_ring) + ", " + text(s.training_offline) + ", " + text(s.damage_serial_) + ", " + text(s.furniture_serial_) + ", " + text(s.ground_changes_) + ", " + text(s.near_) + ", " + text(s.ms_) + ", " + text(s.start_ms_) + ", " + text(s.worst_) + ", " + text(s.worst_at_) + ", " + text(s.worst_step_) + ", " + text(s.worst_step_ms_) + ", " + text(s.rebuilds_) + ", " + text(s.relays_) + ", " + text(s.upload_count_) + ", " + text(converted::shaped<converted::Whole>(s.upload_vertices_)) + ", " + text(s.focus_) + ", " + text(s.vis_at_) + ", " + text(s.vis_ahead_) + ", " + text(s.vis_ms_) + ", " + text(s.damage_) + ", " + text(s.damage_log_) + ", " + text(s.damage_quiet_) + ", " + text(s.r_) + ", " + text(s.world_) + ", " + text(s.proj_) + ", " + text(s.origin_tile_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(s.tiles_)) + ", " + text(s.requests_) + ", " + text(s.lanes_) + ", " + text(s.offline_) + ", " + text(s.real_tiles_) + ", " + text(s.stats_) + ", " + text(s.terrain_) + ", " + text(s.terrain_changes_) + ", " + text(converted::shaped<converted::Whole>(s.excl_tile_)) + ", " + text(s.excl_index_) + "}"; }
 [[maybe_unused]] static void take(CityStream& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 42) return; converted::take_as<Vec3>(s.anchor, (*v.rows)[0]); converted::take_as<Vec3>(s.view_lead, (*v.rows)[1]); converted::take_as<unsigned int>(s.building_budget, (*v.rows)[2]); converted::take_as<int>(s.ring, (*v.rows)[3]); converted::take_as<std::vector<Vec3>>(s.extra_foci, (*v.rows)[4]); converted::take_as<int>(s.mate_ring, (*v.rows)[5]); converted::take_as<bool>(s.training_offline, (*v.rows)[6]); converted::take_as<unsigned int>(s.damage_serial_, (*v.rows)[7]); converted::take_as<unsigned int>(s.furniture_serial_, (*v.rows)[8]); converted::take_as<std::vector<Vec4>>(s.ground_changes_, (*v.rows)[9]); converted::take_as<CityStream::NearCollision>(s.near_, (*v.rows)[10]); converted::take_as<StreamStats>(s.ms_, (*v.rows)[11]); converted::take_as<double>(s.start_ms_, (*v.rows)[12]); converted::take_as<double>(s.worst_, (*v.rows)[13]); converted::take_as<double>(s.worst_at_, (*v.rows)[14]); converted::take_as<const char*>(s.worst_step_, (*v.rows)[15]); converted::take_as<double>(s.worst_step_ms_, (*v.rows)[16]); converted::take_as<unsigned int>(s.rebuilds_, (*v.rows)[17]); converted::take_as<unsigned int>(s.relays_, (*v.rows)[18]); converted::take_as<unsigned int>(s.upload_count_, (*v.rows)[19]); converted::take_as<converted::Whole>(s.upload_vertices_, (*v.rows)[20]); converted::take_as<Vec3>(s.focus_, (*v.rows)[21]); converted::take_as<Vec2>(s.vis_at_, (*v.rows)[22]); converted::take_as<Vec2>(s.vis_ahead_, (*v.rows)[23]); converted::take_as<double>(s.vis_ms_, (*v.rows)[24]); converted::take_as<converted::wide::Map<unsigned int, CityStream::Damage>>(s.damage_, (*v.rows)[25]); converted::take_as<std::vector<unsigned int>>(s.damage_log_, (*v.rows)[26]); converted::take_as<bool>(s.damage_quiet_, (*v.rows)[27]); converted::take_as<Renderer*>(s.r_, (*v.rows)[28]); converted::take_as<World*>(s.world_, (*v.rows)[29]); converted::take_as<GeoProjector>(s.proj_, (*v.rows)[30]); converted::take_as<TileKey>(s.origin_tile_, (*v.rows)[31]); converted::take_as<converted::wide::Map<converted::Whole, std::unique_ptr<CityStream::Tile>>>(s.tiles_, (*v.rows)[32]); converted::take_as<std::vector<TileKey>>(s.requests_, (*v.rows)[33]); converted::take_as<std::vector<Lane>>(s.lanes_, (*v.rows)[34]); converted::take_as<bool>(s.offline_, (*v.rows)[35]); converted::take_as<unsigned int>(s.real_tiles_, (*v.rows)[36]); converted::take_as<StreamStats>(s.stats_, (*v.rows)[37]); converted::take_as<Terrain>(s.terrain_, (*v.rows)[38]); converted::take_as<std::vector<Vec4>>(s.terrain_changes_, (*v.rows)[39]); converted::take_as<converted::Whole>(s.excl_tile_, (*v.rows)[40]); converted::take_as<int>(s.excl_index_, (*v.rows)[41]); }
+[[maybe_unused]] static Rgb draw_kern__Rgb(converted::Draw& draw) {
+  Rgb s{};
+  s.r = draw.number();
+  s.g = draw.number();
+  s.b = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Rgb& s) { return converted::Value::structure({arg(s.r), arg(s.g), arg(s.b)}); }
+[[maybe_unused]] static bool same(const Rgb& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.r, (*got.rows)[0]), ".r") && converted::at_place(same(want.g, (*got.rows)[1]), ".g") && converted::at_place(same(want.b, (*got.rows)[2]), ".b"); }
+[[maybe_unused]] static bool defined(const Rgb& s) { return defined(s.r) && defined(s.g) && defined(s.b); }
+[[maybe_unused]] static std::string text(const Rgb& s) { return std::string("{") + text(s.r) + ", " + text(s.g) + ", " + text(s.b) + "}"; }
+[[maybe_unused]] static void take(Rgb& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.r, (*v.rows)[0]); converted::take_as<double>(s.g, (*v.rows)[1]); converted::take_as<double>(s.b, (*v.rows)[2]); }
+[[maybe_unused]] static BuildingStyle draw_kern__BuildingStyle(converted::Draw& draw) {
+  BuildingStyle s{};
+  s.walls = draw_list(draw, [&]() -> Rgb { return draw_kern__Rgb(draw); });
+  s.roofs = draw_list(draw, [&]() -> Rgb { return draw_kern__Rgb(draw); });
+  s.trim = draw_kern__Rgb(draw);
+  s.trim_mix = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const BuildingStyle& s) { return converted::Value::structure({arg(s.walls), arg(s.roofs), arg(s.trim), arg(s.trim_mix)}); }
+[[maybe_unused]] static bool same(const BuildingStyle& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.walls, (*got.rows)[0]), ".walls") && converted::at_place(same(want.roofs, (*got.rows)[1]), ".roofs") && converted::at_place(same(want.trim, (*got.rows)[2]), ".trim") && converted::at_place(same(want.trim_mix, (*got.rows)[3]), ".trim_mix"); }
+[[maybe_unused]] static bool defined(const BuildingStyle& s) { return defined(s.walls) && defined(s.roofs) && defined(s.trim) && defined(s.trim_mix); }
+[[maybe_unused]] static std::string text(const BuildingStyle& s) { return std::string("{") + text(s.walls) + ", " + text(s.roofs) + ", " + text(s.trim) + ", " + text(s.trim_mix) + "}"; }
+[[maybe_unused]] static void take(BuildingStyle& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Rgb>>(s.walls, (*v.rows)[0]); converted::take_as<std::vector<Rgb>>(s.roofs, (*v.rows)[1]); converted::take_as<Rgb>(s.trim, (*v.rows)[2]); converted::take_as<double>(s.trim_mix, (*v.rows)[3]); }
+[[maybe_unused]] static BuildingOptions draw_kern__BuildingOptions(converted::Draw& draw) {
+  BuildingOptions s{};
+  s.chunk_size = draw.number();
+  s.max_buildings = static_cast<unsigned int>(draw.below(40));
+  s.cornice = draw.flag();
+  s.wall_records = draw.flag();
+  s.style = draw_kern__BuildingStyle(draw);
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const BuildingOptions& s) { return converted::Value::structure({arg(s.chunk_size), arg(s.max_buildings), arg(s.cornice), arg(s.wall_records), arg(s.style)}); }
+[[maybe_unused]] static bool same(const BuildingOptions& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.chunk_size, (*got.rows)[0]), ".chunk_size") && converted::at_place(same(want.max_buildings, (*got.rows)[1]), ".max_buildings") && converted::at_place(same(want.cornice, (*got.rows)[2]), ".cornice") && converted::at_place(same(want.wall_records, (*got.rows)[3]), ".wall_records") && converted::at_place(same(want.style, (*got.rows)[4]), ".style"); }
+[[maybe_unused]] static bool defined(const BuildingOptions& s) { return defined(s.chunk_size) && defined(s.max_buildings) && defined(s.cornice) && defined(s.wall_records) && defined(s.style); }
+[[maybe_unused]] static std::string text(const BuildingOptions& s) { return std::string("{") + text(s.chunk_size) + ", " + text(s.max_buildings) + ", " + text(s.cornice) + ", " + text(s.wall_records) + ", " + text(s.style) + "}"; }
+[[maybe_unused]] static void take(BuildingOptions& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.chunk_size, (*v.rows)[0]); converted::take_as<unsigned int>(s.max_buildings, (*v.rows)[1]); converted::take_as<bool>(s.cornice, (*v.rows)[2]); converted::take_as<bool>(s.wall_records, (*v.rows)[3]); converted::take_as<BuildingStyle>(s.style, (*v.rows)[4]); }
 [[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
   MeshData s{};
   s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
@@ -1581,7 +2255,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
-[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.positions, (*got.rows)[0]), ".positions") && converted::at_place(same(want.normals, (*got.rows)[1]), ".normals") && converted::at_place(same(want.colors, (*got.rows)[2]), ".colors") && converted::at_place(same(want.uvs, (*got.rows)[3]), ".uvs") && converted::at_place(same(want.extra, (*got.rows)[4]), ".extra") && converted::at_place(same(want.extra_size, (*got.rows)[5]), ".extra_size") && converted::at_place(same(want.indices, (*got.rows)[6]), ".indices"); }
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
 [[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
@@ -1597,7 +2271,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const GeoChunk& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.items), arg(s.triangles), arg(s.hash), arg(s.welded), arg(s.mesh)}); }
-[[maybe_unused]] static bool same(const GeoChunk& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.items, (*got.rows)[2]) && same(want.triangles, (*got.rows)[3]) && same(want.hash, (*got.rows)[4]) && same(want.welded, (*got.rows)[5]) && same(want.mesh, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const GeoChunk& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.items, (*got.rows)[2]), ".items") && converted::at_place(same(want.triangles, (*got.rows)[3]), ".triangles") && converted::at_place(same(want.hash, (*got.rows)[4]), ".hash") && converted::at_place(same(want.welded, (*got.rows)[5]), ".welded") && converted::at_place(same(want.mesh, (*got.rows)[6]), ".mesh"); }
 [[maybe_unused]] static bool defined(const GeoChunk& s) { return defined(s.x) && defined(s.y) && defined(s.items) && defined(s.triangles) && defined(s.hash) && defined(s.welded) && defined(s.mesh); }
 [[maybe_unused]] static std::string text(const GeoChunk& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.items) + ", " + text(s.triangles) + ", " + text(s.hash) + ", " + text(s.welded) + ", " + text(s.mesh) + "}"; }
 [[maybe_unused]] static void take(GeoChunk& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<int>(s.x, (*v.rows)[0]); converted::take_as<int>(s.y, (*v.rows)[1]); converted::take_as<unsigned int>(s.items, (*v.rows)[2]); converted::take_as<unsigned int>(s.triangles, (*v.rows)[3]); converted::take_as<unsigned int>(s.hash, (*v.rows)[4]); converted::take_as<bool>(s.welded, (*v.rows)[5]); converted::take_as<MeshData>(s.mesh, (*v.rows)[6]); }
@@ -1620,7 +2294,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
-[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.color, (*got.rows)[0]) && same(want.alpha, (*got.rows)[1]) && same(want.alpha_cutoff, (*got.rows)[2]) && same(want.roughness, (*got.rows)[3]) && same(want.metalness, (*got.rows)[4]) && same(want.emissive, (*got.rows)[5]) && same(want.unlit, (*got.rows)[6]) && same(want.double_sided, (*got.rows)[7]) && same(want.cast_shadow, (*got.rows)[8]) && same(want.frustum_culled, (*got.rows)[9]) && same(want.viewmodel, (*got.rows)[10]) && same(want.linear_colors, (*got.rows)[11]) && same(want.lines, (*got.rows)[12]) && same(converted::array_list(want.params), (*got.rows)[13]); }
+[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
 [[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
 [[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
 [[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
@@ -1632,10 +2306,39 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CityStream::DamageRec& s) { return converted::Value::structure({arg(s.seed), arg(s.height), arg(s.leveled)}); }
-[[maybe_unused]] static bool same(const CityStream::DamageRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.seed, (*got.rows)[0]) && same(want.height, (*got.rows)[1]) && same(want.leveled, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const CityStream::DamageRec& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.seed, (*got.rows)[0]), ".seed") && converted::at_place(same(want.height, (*got.rows)[1]), ".height") && converted::at_place(same(want.leveled, (*got.rows)[2]), ".leveled"); }
 [[maybe_unused]] static bool defined(const CityStream::DamageRec& s) { return defined(s.seed) && defined(s.height) && defined(s.leveled); }
 [[maybe_unused]] static std::string text(const CityStream::DamageRec& s) { return std::string("{") + text(s.seed) + ", " + text(s.height) + ", " + text(s.leveled) + "}"; }
 [[maybe_unused]] static void take(CityStream::DamageRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.seed, (*v.rows)[0]); converted::take_as<double>(s.height, (*v.rows)[1]); converted::take_as<bool>(s.leveled, (*v.rows)[2]); }
+[[maybe_unused]] static CityStream::Wall draw_CityStream__Wall(converted::Draw& draw) {
+  CityStream::Wall s{};
+  s.a = draw.vector2();
+  s.dir = draw.vector2();
+  s.normal = draw.vector2();
+  s.len = draw.number();
+  s.base = draw.number();
+  s.top = draw.number();
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.edge = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const CityStream::Wall& s) { return converted::Value::structure({arg(s.a), arg(s.dir), arg(s.normal), arg(s.len), arg(s.base), arg(s.top), arg(s.seed), arg(s.edge)}); }
+[[maybe_unused]] static bool same(const CityStream::Wall& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.a, (*got.rows)[0]), ".a") && converted::at_place(same(want.dir, (*got.rows)[1]), ".dir") && converted::at_place(same(want.normal, (*got.rows)[2]), ".normal") && converted::at_place(same(want.len, (*got.rows)[3]), ".len") && converted::at_place(same(want.base, (*got.rows)[4]), ".base") && converted::at_place(same(want.top, (*got.rows)[5]), ".top") && converted::at_place(same(want.seed, (*got.rows)[6]), ".seed") && converted::at_place(same(want.edge, (*got.rows)[7]), ".edge"); }
+[[maybe_unused]] static bool defined(const CityStream::Wall& s) { return defined(s.a) && defined(s.dir) && defined(s.normal) && defined(s.len) && defined(s.base) && defined(s.top) && defined(s.seed) && defined(s.edge); }
+[[maybe_unused]] static std::string text(const CityStream::Wall& s) { return std::string("{") + text(s.a) + ", " + text(s.dir) + ", " + text(s.normal) + ", " + text(s.len) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.seed) + ", " + text(s.edge) + "}"; }
+[[maybe_unused]] static void take(CityStream::Wall& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<Vec2>(s.a, (*v.rows)[0]); converted::take_as<Vec2>(s.dir, (*v.rows)[1]); converted::take_as<Vec2>(s.normal, (*v.rows)[2]); converted::take_as<double>(s.len, (*v.rows)[3]); converted::take_as<double>(s.base, (*v.rows)[4]); converted::take_as<double>(s.top, (*v.rows)[5]); converted::take_as<unsigned int>(s.seed, (*v.rows)[6]); converted::take_as<unsigned int>(s.edge, (*v.rows)[7]); }
+[[maybe_unused]] static Rng draw_Rng(converted::Draw& draw) {
+  Rng s{};
+  s.s = static_cast<unsigned int>(draw.below(40));
+  s.spare_ = draw.number();
+  s.has_spare_ = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Rng& s) { return converted::Value::structure({arg(s.s), arg(s.spare_), arg(s.has_spare_)}); }
+[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.s, (*got.rows)[0]), ".s") && converted::at_place(same(want.spare_, (*got.rows)[1]), ".spare_") && converted::at_place(same(want.has_spare_, (*got.rows)[2]), ".has_spare_"); }
+[[maybe_unused]] static bool defined(const Rng& s) { return defined(s.s) && defined(s.spare_) && defined(s.has_spare_); }
+[[maybe_unused]] static std::string text(const Rng& s) { return std::string("{") + text(s.s) + ", " + text(s.spare_) + ", " + text(s.has_spare_) + "}"; }
+[[maybe_unused]] static void take(Rng& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); converted::take_as<double>(s.spare_, (*v.rows)[1]); converted::take_as<bool>(s.has_spare_, (*v.rows)[2]); }
 [[maybe_unused]] static CityStream::BuildingRef draw_CityStream__BuildingRef(converted::Draw& draw) {
   CityStream::BuildingRef s{};
   s.tile = static_cast<u64>(draw.bits());
@@ -1643,7 +2346,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CityStream::BuildingRef& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.tile)), arg(s.index)}); }
-[[maybe_unused]] static bool same(const CityStream::BuildingRef& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[0]) && same(want.index, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const CityStream::BuildingRef& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[0]), ".tile") && converted::at_place(same(want.index, (*got.rows)[1]), ".index"); }
 [[maybe_unused]] static bool defined(const CityStream::BuildingRef& s) { return defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.index); }
 [[maybe_unused]] static std::string text(const CityStream::BuildingRef& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.index) + "}"; }
 [[maybe_unused]] static void take(CityStream::BuildingRef& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.tile, (*v.rows)[0]); converted::take_as<unsigned int>(s.index, (*v.rows)[1]); }
@@ -1655,10 +2358,71 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CityStream::AreaRef& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.index)}); }
-[[maybe_unused]] static bool same(const CityStream::AreaRef& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[1]) && same(want.index, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const CityStream::AreaRef& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[1]), ".tile") && converted::at_place(same(want.index, (*got.rows)[2]), ".index"); }
 [[maybe_unused]] static bool defined(const CityStream::AreaRef& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.index); }
 [[maybe_unused]] static std::string text(const CityStream::AreaRef& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.index) + "}"; }
 [[maybe_unused]] static void take(CityStream::AreaRef& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[1]); converted::take_as<unsigned int>(s.index, (*v.rows)[2]); }
+[[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
+  Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
+[[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+[[maybe_unused]] static physics::ShapeMaterial draw_kern__physics__ShapeMaterial(converted::Draw& draw) {
+  physics::ShapeMaterial s{};
+  s.density = draw.number();
+  s.friction = draw.number();
+  s.restitution = draw.number();
+  s.rolling_resistance = draw.number();
+  s.sensor = draw.flag();
+  s.category_bits = static_cast<u64>(draw.bits());
+  s.mask_bits = static_cast<u64>(draw.bits());
+  s.group_index = static_cast<int>(draw.whole());
+  s.contact_events = draw.flag();
+  s.sensor_events = draw.flag();
+  s.hit_events = draw.flag();
+  s.user = static_cast<u64>(draw.bits());
+  s.surface = static_cast<physics::Surface>(draw.below(4));
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::ShapeMaterial& s) { return converted::Value::structure({arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.sensor), arg(converted::shaped<converted::Whole>(s.category_bits)), arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(s.group_index), arg(s.contact_events), arg(s.sensor_events), arg(s.hit_events), arg(converted::shaped<converted::Whole>(s.user)), arg(s.surface)}); }
+[[maybe_unused]] static bool same(const physics::ShapeMaterial& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.density, (*got.rows)[0]), ".density") && converted::at_place(same(want.friction, (*got.rows)[1]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[2]), ".restitution") && converted::at_place(same(want.rolling_resistance, (*got.rows)[3]), ".rolling_resistance") && converted::at_place(same(want.sensor, (*got.rows)[4]), ".sensor") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[5]), ".category_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[6]), ".mask_bits") && converted::at_place(same(want.group_index, (*got.rows)[7]), ".group_index") && converted::at_place(same(want.contact_events, (*got.rows)[8]), ".contact_events") && converted::at_place(same(want.sensor_events, (*got.rows)[9]), ".sensor_events") && converted::at_place(same(want.hit_events, (*got.rows)[10]), ".hit_events") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[11]), ".user") && converted::at_place(same(want.surface, (*got.rows)[12]), ".surface"); }
+[[maybe_unused]] static bool defined(const physics::ShapeMaterial& s) { return defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.sensor) && defined(converted::shaped<converted::Whole>(s.category_bits)) && defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(s.group_index) && defined(s.contact_events) && defined(s.sensor_events) && defined(s.hit_events) && defined(converted::shaped<converted::Whole>(s.user)) && defined(s.surface); }
+[[maybe_unused]] static std::string text(const physics::ShapeMaterial& s) { return std::string("{") + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.sensor) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + ", " + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(s.group_index) + ", " + text(s.contact_events) + ", " + text(s.sensor_events) + ", " + text(s.hit_events) + ", " + text(converted::shaped<converted::Whole>(s.user)) + ", " + text(s.surface) + "}"; }
+[[maybe_unused]] static void take(physics::ShapeMaterial& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.density, (*v.rows)[0]); converted::take_as<double>(s.friction, (*v.rows)[1]); converted::take_as<double>(s.restitution, (*v.rows)[2]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[3]); converted::take_as<bool>(s.sensor, (*v.rows)[4]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[5]); converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[6]); converted::take_as<int>(s.group_index, (*v.rows)[7]); converted::take_as<bool>(s.contact_events, (*v.rows)[8]); converted::take_as<bool>(s.sensor_events, (*v.rows)[9]); converted::take_as<bool>(s.hit_events, (*v.rows)[10]); converted::take_as<converted::Whole>(s.user, (*v.rows)[11]); converted::take_as<physics::Surface>(s.surface, (*v.rows)[12]); }
+}
+[[maybe_unused]] static physics::ShapeSettings draw_kern__physics__ShapeSettings(converted::Draw& draw) {
+  physics::ShapeSettings s{};
+  s.kind = static_cast<physics::ShapeKind>(draw.below(5));
+  s.center = draw.vector();
+  s.rotation = draw_kern__Quat(draw);
+  s.size = draw.vector();
+  s.radius = draw.number();
+  s.length = draw.number();
+  static std::deque<std::vector<Vec3>> kept_points;
+  kept_points.push_back(draw_list(draw, [&]() -> Vec3 { return draw.vector(); }));
+  s.points = {kept_points.back().data(), kept_points.back().size()};
+  static std::deque<std::vector<unsigned int>> kept_indices;
+  kept_indices.push_back(draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }));
+  s.indices = {kept_indices.back().data(), kept_indices.back().size()};
+  s.material = draw_kern__physics__ShapeMaterial(draw);
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::ShapeSettings& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(std::vector<Vec3>(s.points.begin(), s.points.end())), arg(std::vector<unsigned int>(s.indices.begin(), s.indices.end())), arg(s.material)}); }
+[[maybe_unused]] static bool same(const physics::ShapeSettings& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.size, (*got.rows)[3]), ".size") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.length, (*got.rows)[5]), ".length") && converted::at_place(same(std::vector<Vec3>(want.points.begin(), want.points.end()), (*got.rows)[6]), ".points") && converted::at_place(same(std::vector<unsigned int>(want.indices.begin(), want.indices.end()), (*got.rows)[7]), ".indices") && converted::at_place(same(want.material, (*got.rows)[8]), ".material"); }
+[[maybe_unused]] static bool defined(const physics::ShapeSettings& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(std::vector<Vec3>(s.points.begin(), s.points.end())) && defined(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) && defined(s.material); }
+[[maybe_unused]] static std::string text(const physics::ShapeSettings& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(std::vector<Vec3>(s.points.begin(), s.points.end())) + ", " + text(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) + ", " + text(s.material) + "}"; }
+[[maybe_unused]] static void take(physics::ShapeSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<physics::ShapeMaterial>(s.material, (*v.rows)[8]); }
+}
 [[maybe_unused]] static WeldStats draw_kern__WeldStats(converted::Draw& draw) {
   WeldStats s{};
   s.source_vertices = static_cast<unsigned int>(draw.below(40));
@@ -1669,7 +2433,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const WeldStats& s) { return converted::Value::structure({arg(s.source_vertices), arg(s.unique_vertices), arg(s.bytes_before), arg(s.bytes_after), arg(s.indexed)}); }
-[[maybe_unused]] static bool same(const WeldStats& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.source_vertices, (*got.rows)[0]) && same(want.unique_vertices, (*got.rows)[1]) && same(want.bytes_before, (*got.rows)[2]) && same(want.bytes_after, (*got.rows)[3]) && same(want.indexed, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const WeldStats& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.source_vertices, (*got.rows)[0]), ".source_vertices") && converted::at_place(same(want.unique_vertices, (*got.rows)[1]), ".unique_vertices") && converted::at_place(same(want.bytes_before, (*got.rows)[2]), ".bytes_before") && converted::at_place(same(want.bytes_after, (*got.rows)[3]), ".bytes_after") && converted::at_place(same(want.indexed, (*got.rows)[4]), ".indexed"); }
 [[maybe_unused]] static bool defined(const WeldStats& s) { return defined(s.source_vertices) && defined(s.unique_vertices) && defined(s.bytes_before) && defined(s.bytes_after) && defined(s.indexed); }
 [[maybe_unused]] static std::string text(const WeldStats& s) { return std::string("{") + text(s.source_vertices) + ", " + text(s.unique_vertices) + ", " + text(s.bytes_before) + ", " + text(s.bytes_after) + ", " + text(s.indexed) + "}"; }
 [[maybe_unused]] static void take(WeldStats& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned int>(s.source_vertices, (*v.rows)[0]); converted::take_as<unsigned int>(s.unique_vertices, (*v.rows)[1]); converted::take_as<unsigned long>(s.bytes_before, (*v.rows)[2]); converted::take_as<unsigned long>(s.bytes_after, (*v.rows)[3]); converted::take_as<bool>(s.indexed, (*v.rows)[4]); }
@@ -1684,45 +2448,108 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
-[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.material, (*got.rows)[0]) && same(want.extra_slot, (*got.rows)[1]) && same(want.texture, (*got.rows)[2]) && same(want.visible, (*got.rows)[3]) && same(want.layers, (*got.rows)[4]) && same(want.pick_bvh, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
 [[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
 [[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
 [[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
+inline BuildingBuilder::~BuildingBuilder() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.building_builder.release", {converted::value_of(*this)}); }
+inline BuildingBuilder::BuildingBuilder() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.building_builder.make", {}); converted::take_made(*this, kern_out[0]); }
+inline BuildingBuilder& BuildingBuilder::operator=(BuildingBuilder&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.building_builder.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
+inline Earcut::Earcut() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.make", {}); converted::take_made(*this, kern_out[0]); }
+inline void Earcut::triangulate(const double* xy, const u32& vertex_count, const unsigned int* hole_starts, const u32& hole_count, std::vector<unsigned int>& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.earcut.triangulate", {converted::value_of(*this), converted::value_of(std::vector<double>(xy, xy + 2 * static_cast<std::size_t>(vertex_count))), converted::value_of(vertex_count), converted::value_of(std::vector<unsigned int>(hole_starts, hole_starts + 1 * static_cast<std::size_t>(hole_count))), converted::value_of(hole_count), converted::value_of(out)}); converted::take_as<std::vector<unsigned int>>(out, kern_out[0]); }
+inline Earcut::~Earcut() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.earcut.release", {converted::value_of(*this)}); }
+inline Earcut& Earcut::operator=(Earcut&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.earcut.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline void FootprintStream::begin(const unsigned int& seed_hash, const double& base, const double& top, const double& center_x, const double& center_y) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.begin_2", {converted::value_of(*this), converted::value_of(seed_hash), converted::value_of(base), converted::value_of(top), converted::value_of(center_x), converted::value_of(center_y)}); }
-inline void FootprintStream::ring(const Vec2* points, const unsigned int& count) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.ring", {converted::value_of(*this), converted::value_of(std::vector<Vec2>(points, points + count)), converted::value_of(count)}); }
+inline void FootprintStream::ring(const Vec2* points, const u32& count) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.ring", {converted::value_of(*this), converted::value_of(std::vector<Vec2>(points, points + 1 * static_cast<std::size_t>(count))), converted::value_of(count)}); }
+inline FootprintStream::~FootprintStream() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.footprint_stream.release", {converted::value_of(*this)}); }
+inline FootprintStream::FootprintStream() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.footprint_stream.make", {}); converted::take_made(*this, kern_out[0]); }
+inline FootprintStream& FootprintStream::operator=(FootprintStream&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.footprint_stream.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.remove", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
 inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
+inline RoadBuilder::~RoadBuilder() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_builder.release", {converted::value_of(*this)}); }
+inline RoadBuilder::RoadBuilder() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_builder.make", {}); converted::take_made(*this, kern_out[0]); }
+inline RoadBuilder& RoadBuilder::operator=(RoadBuilder&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_builder.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline RoadOptions::RoadOptions() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_options.make", {}); converted::take_made(*this, kern_out[0]); }
+inline RoadStream::~RoadStream() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_stream.release", {converted::value_of(*this)}); }
+inline RoadStream::RoadStream() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_stream.make", {}); converted::take_made(*this, kern_out[0]); }
+inline void RoadStream::road(const Vec2* points, const u32& count, const double& width, const bool& curb, const unsigned int& surface_color, const int& marking_color) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_stream.road", {converted::value_of(*this), converted::value_of(std::vector<Vec2>(points, points + 1 * static_cast<std::size_t>(count))), converted::value_of(count), converted::value_of(width), converted::value_of(curb), converted::value_of(surface_color), converted::value_of(marking_color)}); }
+inline RoadStream& RoadStream::operator=(RoadStream&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_stream.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
+inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
+inline physics::Shape World::create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_shape", {converted::value_of(*this), converted::value_of(body), converted::value_of(settings)}); physics::Shape kern_result = converted::quiet<physics::Shape>(); converted::take_as<physics::Shape>(kern_result, kern_out[0]); return kern_result; }
+inline void World::destroy_shape(const physics::Shape& shape) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_shape", {converted::value_of(*this), converted::value_of(shape)}); }
 namespace jobs { inline void cancel(const unsigned int& id) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.jobs.cancel", {converted::value_of(id)}); } }
-inline double now_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.now_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
-namespace jobs { inline unsigned int submit(const unsigned int& kind, const std::vector<unsigned char>& input) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.jobs.submit", {converted::value_of(kind), converted::value_of(input)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; } }
 inline WeldStats weld(MeshData& mesh, const unsigned long& min_saving) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.weld", {converted::value_of(mesh), converted::value_of(min_saving)}); WeldStats kern_result = converted::quiet<WeldStats>(); converted::take_as<WeldStats>(kern_result, kern_out[0]); converted::take_as<MeshData>(mesh, kern_out[1]); return kern_result; }
 inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+namespace jobs { inline unsigned int submit(const unsigned int& kind, const std::vector<unsigned char>& input) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.jobs.submit", {converted::value_of(kind), converted::value_of(input)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; } }
 namespace jobs { inline bool take(const unsigned int& id, std::vector<unsigned char>& out) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.jobs.take", {converted::value_of(id), converted::value_of(out)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); converted::take_as<std::vector<unsigned char>>(out, kern_out[1]); return kern_result; } }
-struct Out_CityStream_take_requests { CityStream Self; std::string Result; };
-[[maybe_unused]] static bool same(const Out_CityStream_take_requests& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Out_CityStream_take_requests& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_CityStream_take_requests& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_CityStream_remove { CityStream Self; CityStream::Tile t; };
+[[maybe_unused]] static bool same(const Out_CityStream_remove& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.t, (*got.rows)[1]), ".t"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_remove& s) { return defined(s.Self) && defined(s.t); }
+[[maybe_unused]] static std::string text(const Out_CityStream_remove& s) { return std::string("{") + text(s.Self) + ", " + text(s.t) + "}"; }
+struct Out_CityStream_feed_terrain { CityStream Self; CityStream::Tile t; };
+[[maybe_unused]] static bool same(const Out_CityStream_feed_terrain& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.t, (*got.rows)[1]), ".t"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_feed_terrain& s) { return defined(s.Self) && defined(s.t); }
+[[maybe_unused]] static std::string text(const Out_CityStream_feed_terrain& s) { return std::string("{") + text(s.Self) + ", " + text(s.t) + "}"; }
 struct Out_CityStream_drop_cell { CityStream Self; CityStream::Tile t; };
-[[maybe_unused]] static bool same(const Out_CityStream_drop_cell& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.t, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_CityStream_drop_cell& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.t, (*got.rows)[1]), ".t"); }
 [[maybe_unused]] static bool defined(const Out_CityStream_drop_cell& s) { return defined(s.Self) && defined(s.t); }
 [[maybe_unused]] static std::string text(const Out_CityStream_drop_cell& s) { return std::string("{") + text(s.Self) + ", " + text(s.t) + "}"; }
 struct Out_CityStream_upload { CityStream Self; CityStream::Tile t; GeoChunk chunk; };
-[[maybe_unused]] static bool same(const Out_CityStream_upload& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.t, (*got.rows)[1]) && same(want.chunk, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_CityStream_upload& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.t, (*got.rows)[1]), ".t") && converted::at_place(same(want.chunk, (*got.rows)[2]), ".chunk"); }
 [[maybe_unused]] static bool defined(const Out_CityStream_upload& s) { return defined(s.Self) && defined(s.t) && defined(s.chunk); }
 [[maybe_unused]] static std::string text(const Out_CityStream_upload& s) { return std::string("{") + text(s.Self) + ", " + text(s.t) + ", " + text(s.chunk) + "}"; }
+struct Out_CityStream_building_shape { CityStream Self; physics::Shape Result; };
+[[maybe_unused]] static bool same(const Out_CityStream_building_shape& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_building_shape& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_CityStream_building_shape& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_CityStream_damage_building { CityStream Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_CityStream_damage_building& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_damage_building& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_CityStream_damage_building& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_CityStream_damage_of { bool Result; CityStream::DamageRec out; };
-[[maybe_unused]] static bool same(const Out_CityStream_damage_of& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_CityStream_damage_of& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_CityStream_damage_of& s) { return defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_CityStream_damage_of& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
+struct Out_CityStream_merge_damage { CityStream Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_CityStream_merge_damage& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_merge_damage& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_CityStream_merge_damage& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_CityStream_street_point { bool Result; Rng rng; Vec3 point; double heading; };
+[[maybe_unused]] static bool same(const Out_CityStream_street_point& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.rng, (*got.rows)[1]), ".rng") && converted::at_place(same(want.point, (*got.rows)[2]), ".point") && converted::at_place(same(want.heading, (*got.rows)[3]), ".heading"); }
+[[maybe_unused]] static bool defined(const Out_CityStream_street_point& s) { return defined(s.Result) && defined(s.rng) && defined(s.point) && defined(s.heading); }
+[[maybe_unused]] static std::string text(const Out_CityStream_street_point& s) { return std::string("{") + text(s.Result) + ", " + text(s.rng) + ", " + text(s.point) + ", " + text(s.heading) + "}"; }
 struct Out_CityStream_recollide { CityStream Self; CityStream::Tile arg2; };
-[[maybe_unused]] static bool same(const Out_CityStream_recollide& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.arg2, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_CityStream_recollide& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.arg2, (*got.rows)[1]), ".arg2"); }
 [[maybe_unused]] static bool defined(const Out_CityStream_recollide& s) { return defined(s.Self) && defined(s.arg2); }
 [[maybe_unused]] static std::string text(const Out_CityStream_recollide& s) { return std::string("{") + text(s.Self) + ", " + text(s.arg2) + "}"; }
 
 SC_TEST(converted_city_stream_cpp) {
   converted::Blueprint bp("city_stream_cpp");
+  {  // CityStream::ground_height
+    converted::Tally tally("CityStream_ground_height");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return a0.ground_height(std::move(a1), std::move(a2)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
   {  // konstanz_style
     converted::Tally tally("konstanz_style");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -1734,7 +2561,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1752,7 +2581,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1762,7 +2593,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // area_color
     converted::Tally tally("area_color");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] AreaKind a0) { return converted::counted([&] { return converted_city_stream_cpp::area_color(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] AreaKind& a0) { return converted::counted([&] { return converted_city_stream_cpp::area_color(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       AreaKind a0 = static_cast<AreaKind>(draw.below(6));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1771,7 +2602,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1781,7 +2614,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // signed_area
     converted::Tally tally("signed_area");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Vec2> a0) { return converted::counted([&] { return converted_city_stream_cpp::signed_area(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<Vec2>& a0) { return converted::counted([&] { return converted_city_stream_cpp::signed_area(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<Vec2> a0 = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1790,7 +2623,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1800,7 +2635,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // rect_distance_to
     converted::Tally tally("rect_distance_to");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec4 a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_city_stream_cpp::rect_distance_to(a0, std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] Vec4& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_city_stream_cpp::rect_distance_to(a0, std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec4 a0 = draw_kern__Vec4(draw);
       double a1 = draw.number();
@@ -1811,7 +2646,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1821,7 +2658,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // cell_key
     converted::Tally tally("cell_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_city_stream_cpp::cell_key(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0, [[maybe_unused]] int& a1) { return converted::counted([&] { return converted_city_stream_cpp::cell_key(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       int a1 = static_cast<int>(draw.whole());
@@ -1831,7 +2668,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1841,7 +2680,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // cell_of
     converted::Tally tally("cell_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec2 a0) { return converted::counted([&] { return converted_city_stream_cpp::cell_of(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec2& a0) { return converted::counted([&] { return converted_city_stream_cpp::cell_of(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec2 a0 = draw.vector2();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1850,7 +2689,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1868,7 +2709,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1878,7 +2721,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // put_footprint
     converted::Tally tally("put_footprint");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FootprintStream& a0, [[maybe_unused]] MapFeatures::Building a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] std::vector<Vec2> a3) { converted::counted([&] { return converted_city_stream_cpp::put_footprint(a0, a1, std::move(a2), a3); }); return a3; };
+    const auto run = [&]([[maybe_unused]] FootprintStream& a0, [[maybe_unused]] MapFeatures::Building& a1, [[maybe_unused]] Vec2& a2, [[maybe_unused]] std::vector<Vec2>& a3) { converted::counted([&] { return converted_city_stream_cpp::put_footprint(a0, a1, std::move(a2), a3); }); return std::move(a3); };
     for (int i = 0; tally.more(i); ++i) {
       FootprintStream& a0 = *converted::engine_object<FootprintStream>(1 + draw.below(6));
       MapFeatures::Building a1 = draw_MapFeatures__Building(draw);
@@ -1890,7 +2733,52 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CityStream::remove
+    converted::Tally tally("CityStream_remove");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] CityStream::Tile& a1) { converted::counted([&] { return a0.remove(a1); }); return Out_CityStream_remove{std::move(a0), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      CityStream::Tile a1 = draw_CityStream__Tile(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // CityStream::clear
+    converted::Tally tally("CityStream_clear");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0) { converted::counted([&] { return a0.clear(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1900,7 +2788,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::ring_bounds
     converted::Tally tally("CityStream_ring_bounds");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] int a2) { return converted::counted([&] { return a0.ring_bounds(std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] int& a2) { return converted::counted([&] { return a0.ring_bounds(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       Vec3 a1 = draw.vector();
@@ -1911,76 +2799,19 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // CityStream::take_requests
-    converted::Tally tally("CityStream_take_requests");
+  {  // CityStream::unload_far
+    converted::Tally tally("CityStream_unload_far");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0) { auto r = converted::counted([&] { return a0.take_requests(); }); return Out_CityStream_take_requests{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      CityStream a0 = draw_CityStream(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
-    }
-  }
-  {  // CityStream::furniture
-    converted::Tally tally("CityStream_furniture");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] std::vector<u64> a1) { converted::counted([&] { return a0.furniture(a1); }); return a1; };
-    for (int i = 0; tally.more(i); ++i) {
-      CityStream a0 = draw_CityStream(draw);
-      std::vector<u64> a1 = draw_list(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); });
-      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<std::vector<converted::Whole>>(a1))};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = converted::shaped<std::vector<converted::Whole>>(made);
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // CityStream::features
-    converted::Tally tally("CityStream_features");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] u64 a1) { return converted::counted([&] { return a0.features(std::move(a1)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      CityStream a0 = draw_CityStream(draw);
-      u64 a1 = static_cast<u64>(draw.bits());
-      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<converted::Whole>(a1))};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // CityStream::ready_at
-    converted::Tally tally("CityStream_ready_at");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return a0.ready_at(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec3& a1) { converted::counted([&] { return a0.unload_far(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       Vec3 a1 = draw.vector();
@@ -1990,7 +2821,97 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CityStream::feed_terrain
+    converted::Tally tally("CityStream_feed_terrain");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] CityStream::Tile& a1) { converted::counted([&] { return a0.feed_terrain(a1); }); return Out_CityStream_feed_terrain{std::move(a0), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      CityStream::Tile a1 = draw_CityStream__Tile(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // CityStream::furniture
+    converted::Tally tally("CityStream_furniture");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] std::vector<u64>& a1) { converted::counted([&] { return a0.furniture(a1); }); return std::move(a1); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      std::vector<u64> a1 = draw_list(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); });
+      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<std::vector<converted::Whole>>(a1))};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = converted::shaped<std::vector<converted::Whole>>(made);
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CityStream::features
+    converted::Tally tally("CityStream_features");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] u64& a1) { return converted::counted([&] { return a0.features(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<converted::Whole>(a1))};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CityStream::ready_at
+    converted::Tally tally("CityStream_ready_at");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec3& a1) { return converted::counted([&] { return a0.ready_at(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      Vec3 a1 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2000,7 +2921,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::drop_cell
     converted::Tally tally("CityStream_drop_cell");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] CityStream::Tile a1, [[maybe_unused]] u64 a2) { converted::counted([&] { return a0.drop_cell(a1, std::move(a2)); }); return Out_CityStream_drop_cell{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] CityStream::Tile& a1, [[maybe_unused]] u64& a2) { converted::counted([&] { return a0.drop_cell(a1, std::move(a2)); }); return Out_CityStream_drop_cell{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       CityStream::Tile a1 = draw_CityStream__Tile(draw);
@@ -2011,7 +2932,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2021,7 +2944,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::upload
     converted::Tally tally("CityStream_upload");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] CityStream::Tile a1, [[maybe_unused]] GeoChunk a2, [[maybe_unused]] Material a3, [[maybe_unused]] bool a4) { converted::counted([&] { return a0.upload(a1, a2, a3, std::move(a4)); }); return Out_CityStream_upload{std::move(a0), std::move(a1), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] CityStream::Tile& a1, [[maybe_unused]] GeoChunk& a2, [[maybe_unused]] Material& a3, [[maybe_unused]] bool& a4) { converted::counted([&] { return a0.upload(a1, a2, a3, std::move(a4)); }); return Out_CityStream_upload{std::move(a0), std::move(a1), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       CityStream::Tile a1 = draw_CityStream__Tile(draw);
@@ -2034,17 +2957,67 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
     }
   }
+  {  // CityStream::building_shape
+    converted::Tally tally("CityStream_building_shape");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] physics::Body& a1, [[maybe_unused]] MapFeatures::Building& a2) { auto r = converted::counted([&] { return a0.building_shape(std::move(a1), a2); }); return Out_CityStream_building_shape{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      physics::Body a1 = draw_kern__physics__Body(draw);
+      MapFeatures::Building a2 = draw_MapFeatures__Building(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // CityStream::damage_building
+    converted::Tally tally("CityStream_damage_building");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] u64& a1, [[maybe_unused]] unsigned int& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4) { auto r = converted::counted([&] { return a0.damage_building(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_CityStream_damage_building{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      unsigned int a2 = static_cast<unsigned int>(draw.below(40));
+      double a3 = draw.number();
+      bool a4 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<converted::Whole>(a1)), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
   {  // CityStream::damage_list
     converted::Tally tally("the_CityStream_damage_list_");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] std::vector<CityStream::DamageRec> a1) { converted::counted([&] { return a0.damage_list(a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] std::vector<CityStream::DamageRec>& a1) { converted::counted([&] { return a0.damage_list(a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       std::vector<CityStream::DamageRec> a1 = draw_list(draw, [&]() -> CityStream::DamageRec { return draw_CityStream__DamageRec(draw); });
@@ -2054,7 +3027,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2064,7 +3039,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::damage_of
     converted::Tally tally("CityStream_damage_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] CityStream::DamageRec a2) { auto r = converted::counted([&] { return a0.damage_of(std::move(a1), a2); }); return Out_CityStream_damage_of{std::move(r), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] CityStream::DamageRec& a2) { auto r = converted::counted([&] { return a0.damage_of(std::move(a1), a2); }); return Out_CityStream_damage_of{std::move(r), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -2075,28 +3050,77 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
-  {  // CityStream::step_time
-    converted::Tally tally("CityStream_step_time");
+  {  // CityStream::merge_damage
+    converted::Tally tally("CityStream_merge_damage");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] const char* a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.step_time(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] std::vector<CityStream::DamageRec>& a1, [[maybe_unused]] bool& a2) { auto r = converted::counted([&] { return a0.merge_damage(a1, std::move(a2)); }); return Out_CityStream_merge_damage{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
-      const char* a1 = draw.c_word();
-      double a2 = draw.number();
+      std::vector<CityStream::DamageRec> a1 = draw_list(draw, [&]() -> CityStream::DamageRec { return draw_CityStream__DamageRec(draw); });
+      bool a2 = draw.flag();
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1, std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // CityStream::clear_damage
+    converted::Tally tally("CityStream_clear_damage");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0) { converted::counted([&] { return a0.clear_damage(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CityStream::walls_near
+    converted::Tally tally("CityStream_walls_near");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2, [[maybe_unused]] std::vector<CityStream::Wall>& a3) { converted::counted([&] { return a0.walls_near(std::move(a1), std::move(a2), a3); }); return std::move(a3); };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      Vec2 a1 = draw.vector2();
+      double a2 = draw.number();
+      std::vector<CityStream::Wall> a3 = draw_list(draw, [&]() -> CityStream::Wall { return draw_CityStream__Wall(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2106,7 +3130,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::building_at
     converted::Tally tally("CityStream_building_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] Vec2 a1) { return converted::counted([&] { return a0.building_at(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec2& a1) { return converted::counted([&] { return a0.building_at(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       Vec2 a1 = draw.vector2();
@@ -2116,17 +3140,45 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
+  {  // CityStream::street_point
+    converted::Tally tally("CityStream_street_point");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Rng& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3, [[maybe_unused]] Vec3& a4, [[maybe_unused]] double& a5) { auto r = converted::counted([&] { return a0.street_point(a1, std::move(a2), std::move(a3), a4, a5); }); return Out_CityStream_street_point{std::move(r), std::move(a1), std::move(a4), std::move(a5)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CityStream a0 = draw_CityStream(draw);
+      Rng a1 = draw_Rng(draw);
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      Vec3 a4 = draw.vector();
+      double a5 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a4), arg(a5), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2, 3});
+    }
+  }
   {  // CityStream::buildings_near
     converted::Tally tally("CityStream_buildings_near");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] std::vector<CityStream::BuildingRef> a3) { converted::counted([&] { return a0.buildings_near(std::move(a1), std::move(a2), a3); }); return a3; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2, [[maybe_unused]] std::vector<CityStream::BuildingRef>& a3) { converted::counted([&] { return a0.buildings_near(std::move(a1), std::move(a2), a3); }); return std::move(a3); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       Vec2 a1 = draw.vector2();
@@ -2138,7 +3190,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2148,7 +3202,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::ready_tiles
     converted::Tally tally("CityStream_ready_tiles");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] std::vector<u64> a1) { converted::counted([&] { return a0.ready_tiles(a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] std::vector<u64>& a1) { converted::counted([&] { return a0.ready_tiles(a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       std::vector<u64> a1 = draw_list(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); });
@@ -2158,7 +3212,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = converted::shaped<std::vector<converted::Whole>>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2168,7 +3224,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::areas_near
     converted::Tally tally("CityStream_areas_near");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] AreaKind a3, [[maybe_unused]] std::vector<CityStream::AreaRef> a4) { converted::counted([&] { return a0.areas_near(std::move(a1), std::move(a2), std::move(a3), a4); }); return a4; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2, [[maybe_unused]] AreaKind& a3, [[maybe_unused]] std::vector<CityStream::AreaRef>& a4) { converted::counted([&] { return a0.areas_near(std::move(a1), std::move(a2), std::move(a3), a4); }); return std::move(a4); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       Vec2 a1 = draw.vector2();
@@ -2181,7 +3237,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2191,7 +3249,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::recollide
     converted::Tally tally("CityStream_recollide");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] CityStream::Tile a1) { converted::counted([&] { return a0.recollide(a1); }); return Out_CityStream_recollide{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] CityStream::Tile& a1) { converted::counted([&] { return a0.recollide(a1); }); return Out_CityStream_recollide{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       CityStream::Tile a1 = draw_CityStream__Tile(draw);
@@ -2201,7 +3259,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2211,7 +3271,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::exclude_building
     converted::Tally tally("CityStream_exclude_building");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0, [[maybe_unused]] u64 a1, [[maybe_unused]] int a2) { converted::counted([&] { return a0.exclude_building(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CityStream& a0, [[maybe_unused]] u64& a1, [[maybe_unused]] int& a2) { converted::counted([&] { return a0.exclude_building(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       u64 a1 = static_cast<u64>(draw.bits());
@@ -2222,7 +3282,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2232,7 +3294,7 @@ SC_TEST(converted_city_stream_cpp) {
   {  // CityStream::exclusion_done
     converted::Tally tally("CityStream_exclusion_done");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CityStream a0) { return converted::counted([&] { return a0.exclusion_done(); }); };
+    const auto run = [&]([[maybe_unused]] CityStream& a0) { return converted::counted([&] { return a0.exclusion_done(); }); };
     for (int i = 0; tally.more(i); ++i) {
       CityStream a0 = draw_CityStream(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -2241,7 +3303,9 @@ SC_TEST(converted_city_stream_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

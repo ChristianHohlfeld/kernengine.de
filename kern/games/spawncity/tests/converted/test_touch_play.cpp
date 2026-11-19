@@ -185,7 +185,7 @@ struct TouchPlay {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TouchLayout& s) { return converted::Value::structure({arg(s.mode), arg(s.alive), arg(s.weapon), arg(s.sniper), arg(s.scope_on), arg(s.grenade), arg(s.grenades), arg(s.grenade_left), arg(s.near_car), arg(s.near_jet), arg(s.emp), arg(s.strike_ready), arg(s.aiming), arg(s.armed), arg(s.cockpit), arg(s.hover), arg(s.rocket), arg(s.ground), arg(s.drone_cooldown), arg(s.pad_drone)}); }
-[[maybe_unused]] static bool same(const TouchLayout& want, const converted::Value& got) { return got.rows && got.rows->size() == 20 && same(want.mode, (*got.rows)[0]) && same(want.alive, (*got.rows)[1]) && same(want.weapon, (*got.rows)[2]) && same(want.sniper, (*got.rows)[3]) && same(want.scope_on, (*got.rows)[4]) && same(want.grenade, (*got.rows)[5]) && same(want.grenades, (*got.rows)[6]) && same(want.grenade_left, (*got.rows)[7]) && same(want.near_car, (*got.rows)[8]) && same(want.near_jet, (*got.rows)[9]) && same(want.emp, (*got.rows)[10]) && same(want.strike_ready, (*got.rows)[11]) && same(want.aiming, (*got.rows)[12]) && same(want.armed, (*got.rows)[13]) && same(want.cockpit, (*got.rows)[14]) && same(want.hover, (*got.rows)[15]) && same(want.rocket, (*got.rows)[16]) && same(want.ground, (*got.rows)[17]) && same(want.drone_cooldown, (*got.rows)[18]) && same(want.pad_drone, (*got.rows)[19]); }
+[[maybe_unused]] static bool same(const TouchLayout& want, const converted::Value& got) { return converted::rows_of(got, 20) && converted::at_place(same(want.mode, (*got.rows)[0]), ".mode") && converted::at_place(same(want.alive, (*got.rows)[1]), ".alive") && converted::at_place(same(want.weapon, (*got.rows)[2]), ".weapon") && converted::at_place(same(want.sniper, (*got.rows)[3]), ".sniper") && converted::at_place(same(want.scope_on, (*got.rows)[4]), ".scope_on") && converted::at_place(same(want.grenade, (*got.rows)[5]), ".grenade") && converted::at_place(same(want.grenades, (*got.rows)[6]), ".grenades") && converted::at_place(same(want.grenade_left, (*got.rows)[7]), ".grenade_left") && converted::at_place(same(want.near_car, (*got.rows)[8]), ".near_car") && converted::at_place(same(want.near_jet, (*got.rows)[9]), ".near_jet") && converted::at_place(same(want.emp, (*got.rows)[10]), ".emp") && converted::at_place(same(want.strike_ready, (*got.rows)[11]), ".strike_ready") && converted::at_place(same(want.aiming, (*got.rows)[12]), ".aiming") && converted::at_place(same(want.armed, (*got.rows)[13]), ".armed") && converted::at_place(same(want.cockpit, (*got.rows)[14]), ".cockpit") && converted::at_place(same(want.hover, (*got.rows)[15]), ".hover") && converted::at_place(same(want.rocket, (*got.rows)[16]), ".rocket") && converted::at_place(same(want.ground, (*got.rows)[17]), ".ground") && converted::at_place(same(want.drone_cooldown, (*got.rows)[18]), ".drone_cooldown") && converted::at_place(same(want.pad_drone, (*got.rows)[19]), ".pad_drone"); }
 [[maybe_unused]] static bool defined(const TouchLayout& s) { return defined(s.mode) && defined(s.alive) && defined(s.weapon) && defined(s.sniper) && defined(s.scope_on) && defined(s.grenade) && defined(s.grenades) && defined(s.grenade_left) && defined(s.near_car) && defined(s.near_jet) && defined(s.emp) && defined(s.strike_ready) && defined(s.aiming) && defined(s.armed) && defined(s.cockpit) && defined(s.hover) && defined(s.rocket) && defined(s.ground) && defined(s.drone_cooldown) && defined(s.pad_drone); }
 [[maybe_unused]] static std::string text(const TouchLayout& s) { return std::string("{") + text(s.mode) + ", " + text(s.alive) + ", " + text(s.weapon) + ", " + text(s.sniper) + ", " + text(s.scope_on) + ", " + text(s.grenade) + ", " + text(s.grenades) + ", " + text(s.grenade_left) + ", " + text(s.near_car) + ", " + text(s.near_jet) + ", " + text(s.emp) + ", " + text(s.strike_ready) + ", " + text(s.aiming) + ", " + text(s.armed) + ", " + text(s.cockpit) + ", " + text(s.hover) + ", " + text(s.rocket) + ", " + text(s.ground) + ", " + text(s.drone_cooldown) + ", " + text(s.pad_drone) + "}"; }
 [[maybe_unused]] static void take(TouchLayout& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 20) return; converted::take_as<TouchMode>(s.mode, (*v.rows)[0]); converted::take_as<bool>(s.alive, (*v.rows)[1]); converted::take_as<std::string>(s.weapon, (*v.rows)[2]); converted::take_as<bool>(s.sniper, (*v.rows)[3]); converted::take_as<bool>(s.scope_on, (*v.rows)[4]); converted::take_as<bool>(s.grenade, (*v.rows)[5]); converted::take_as<int>(s.grenades, (*v.rows)[6]); converted::take_as<double>(s.grenade_left, (*v.rows)[7]); converted::take_as<bool>(s.near_car, (*v.rows)[8]); converted::take_as<bool>(s.near_jet, (*v.rows)[9]); converted::take_as<bool>(s.emp, (*v.rows)[10]); converted::take_as<bool>(s.strike_ready, (*v.rows)[11]); converted::take_as<bool>(s.aiming, (*v.rows)[12]); converted::take_as<bool>(s.armed, (*v.rows)[13]); converted::take_as<bool>(s.cockpit, (*v.rows)[14]); converted::take_as<bool>(s.hover, (*v.rows)[15]); converted::take_as<bool>(s.rocket, (*v.rows)[16]); converted::take_as<bool>(s.ground, (*v.rows)[17]); converted::take_as<bool>(s.drone_cooldown, (*v.rows)[18]); converted::take_as<bool>(s.pad_drone, (*v.rows)[19]); }
@@ -205,7 +205,7 @@ struct TouchPlay {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TouchBtn& s) { return converted::Value::structure({arg(s.id), arg(s.label), arg(s.x), arg(s.y), arg(s.w), arg(s.h), arg(s.round), arg(s.pressed), arg(s.on), arg(s.on_down), arg(s.color)}); }
-[[maybe_unused]] static bool same(const TouchBtn& want, const converted::Value& got) { return got.rows && got.rows->size() == 11 && same(want.id, (*got.rows)[0]) && same(want.label, (*got.rows)[1]) && same(want.x, (*got.rows)[2]) && same(want.y, (*got.rows)[3]) && same(want.w, (*got.rows)[4]) && same(want.h, (*got.rows)[5]) && same(want.round, (*got.rows)[6]) && same(want.pressed, (*got.rows)[7]) && same(want.on, (*got.rows)[8]) && same(want.on_down, (*got.rows)[9]) && same(want.color, (*got.rows)[10]); }
+[[maybe_unused]] static bool same(const TouchBtn& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.label, (*got.rows)[1]), ".label") && converted::at_place(same(want.x, (*got.rows)[2]), ".x") && converted::at_place(same(want.y, (*got.rows)[3]), ".y") && converted::at_place(same(want.w, (*got.rows)[4]), ".w") && converted::at_place(same(want.h, (*got.rows)[5]), ".h") && converted::at_place(same(want.round, (*got.rows)[6]), ".round") && converted::at_place(same(want.pressed, (*got.rows)[7]), ".pressed") && converted::at_place(same(want.on, (*got.rows)[8]), ".on") && converted::at_place(same(want.on_down, (*got.rows)[9]), ".on_down") && converted::at_place(same(want.color, (*got.rows)[10]), ".color"); }
 [[maybe_unused]] static bool defined(const TouchBtn& s) { return defined(s.id) && defined(s.label) && defined(s.x) && defined(s.y) && defined(s.w) && defined(s.h) && defined(s.round) && defined(s.pressed) && defined(s.on) && defined(s.on_down) && defined(s.color); }
 [[maybe_unused]] static std::string text(const TouchBtn& s) { return std::string("{") + text(s.id) + ", " + text(s.label) + ", " + text(s.x) + ", " + text(s.y) + ", " + text(s.w) + ", " + text(s.h) + ", " + text(s.round) + ", " + text(s.pressed) + ", " + text(s.on) + ", " + text(s.on_down) + ", " + text(s.color) + "}"; }
 [[maybe_unused]] static void take(TouchBtn& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<std::string>(s.id, (*v.rows)[0]); converted::take_as<std::string>(s.label, (*v.rows)[1]); converted::take_as<double>(s.x, (*v.rows)[2]); converted::take_as<double>(s.y, (*v.rows)[3]); converted::take_as<double>(s.w, (*v.rows)[4]); converted::take_as<double>(s.h, (*v.rows)[5]); converted::take_as<bool>(s.round, (*v.rows)[6]); converted::take_as<bool>(s.pressed, (*v.rows)[7]); converted::take_as<bool>(s.on, (*v.rows)[8]); converted::take_as<bool>(s.on_down, (*v.rows)[9]); converted::take_as<unsigned int>(s.color, (*v.rows)[10]); }
@@ -226,7 +226,7 @@ struct TouchPlay {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TouchPlay::Finger& s) { return converted::Value::structure({arg(s.id), arg(s.kind), arg(s.button), arg(s.x0), arg(s.y0), arg(s.x), arg(s.y), arg(s.last_x), arg(s.last_y), arg(s.t0), arg(s.last_t), arg(s.base)}); }
-[[maybe_unused]] static bool same(const TouchPlay::Finger& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.id, (*got.rows)[0]) && same(want.kind, (*got.rows)[1]) && same(want.button, (*got.rows)[2]) && same(want.x0, (*got.rows)[3]) && same(want.y0, (*got.rows)[4]) && same(want.x, (*got.rows)[5]) && same(want.y, (*got.rows)[6]) && same(want.last_x, (*got.rows)[7]) && same(want.last_y, (*got.rows)[8]) && same(want.t0, (*got.rows)[9]) && same(want.last_t, (*got.rows)[10]) && same(want.base, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const TouchPlay::Finger& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.kind, (*got.rows)[1]), ".kind") && converted::at_place(same(want.button, (*got.rows)[2]), ".button") && converted::at_place(same(want.x0, (*got.rows)[3]), ".x0") && converted::at_place(same(want.y0, (*got.rows)[4]), ".y0") && converted::at_place(same(want.x, (*got.rows)[5]), ".x") && converted::at_place(same(want.y, (*got.rows)[6]), ".y") && converted::at_place(same(want.last_x, (*got.rows)[7]), ".last_x") && converted::at_place(same(want.last_y, (*got.rows)[8]), ".last_y") && converted::at_place(same(want.t0, (*got.rows)[9]), ".t0") && converted::at_place(same(want.last_t, (*got.rows)[10]), ".last_t") && converted::at_place(same(want.base, (*got.rows)[11]), ".base"); }
 [[maybe_unused]] static bool defined(const TouchPlay::Finger& s) { return defined(s.id) && defined(s.kind) && defined(s.button) && defined(s.x0) && defined(s.y0) && defined(s.x) && defined(s.y) && defined(s.last_x) && defined(s.last_y) && defined(s.t0) && defined(s.last_t) && defined(s.base); }
 [[maybe_unused]] static std::string text(const TouchPlay::Finger& s) { return std::string("{") + text(s.id) + ", " + text(s.kind) + ", " + text(s.button) + ", " + text(s.x0) + ", " + text(s.y0) + ", " + text(s.x) + ", " + text(s.y) + ", " + text(s.last_x) + ", " + text(s.last_y) + ", " + text(s.t0) + ", " + text(s.last_t) + ", " + text(s.base) + "}"; }
 [[maybe_unused]] static void take(TouchPlay::Finger& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<int>(s.id, (*v.rows)[0]); converted::take_as<TouchPlay::Finger::Kind>(s.kind, (*v.rows)[1]); converted::take_as<std::string>(s.button, (*v.rows)[2]); converted::take_as<double>(s.x0, (*v.rows)[3]); converted::take_as<double>(s.y0, (*v.rows)[4]); converted::take_as<double>(s.x, (*v.rows)[5]); converted::take_as<double>(s.y, (*v.rows)[6]); converted::take_as<double>(s.last_x, (*v.rows)[7]); converted::take_as<double>(s.last_y, (*v.rows)[8]); converted::take_as<double>(s.t0, (*v.rows)[9]); converted::take_as<double>(s.last_t, (*v.rows)[10]); converted::take_as<Vec2>(s.base, (*v.rows)[11]); }
@@ -244,7 +244,7 @@ struct TouchPlay {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TouchFire& s) { return converted::Value::structure({arg(s.id), arg(s.x), arg(s.y), arg(s.down_t), arg(s.last_shot), arg(s.fresh), arg(s.hand), arg(s.depth), arg(s.lifted)}); }
-[[maybe_unused]] static bool same(const TouchFire& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.id, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]) && same(want.down_t, (*got.rows)[3]) && same(want.last_shot, (*got.rows)[4]) && same(want.fresh, (*got.rows)[5]) && same(want.hand, (*got.rows)[6]) && same(want.depth, (*got.rows)[7]) && same(want.lifted, (*got.rows)[8]); }
+[[maybe_unused]] static bool same(const TouchFire& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.x, (*got.rows)[1]), ".x") && converted::at_place(same(want.y, (*got.rows)[2]), ".y") && converted::at_place(same(want.down_t, (*got.rows)[3]), ".down_t") && converted::at_place(same(want.last_shot, (*got.rows)[4]), ".last_shot") && converted::at_place(same(want.fresh, (*got.rows)[5]), ".fresh") && converted::at_place(same(want.hand, (*got.rows)[6]), ".hand") && converted::at_place(same(want.depth, (*got.rows)[7]), ".depth") && converted::at_place(same(want.lifted, (*got.rows)[8]), ".lifted"); }
 [[maybe_unused]] static bool defined(const TouchFire& s) { return defined(s.id) && defined(s.x) && defined(s.y) && defined(s.down_t) && defined(s.last_shot) && defined(s.fresh) && defined(s.hand) && defined(s.depth) && defined(s.lifted); }
 [[maybe_unused]] static std::string text(const TouchFire& s) { return std::string("{") + text(s.id) + ", " + text(s.x) + ", " + text(s.y) + ", " + text(s.down_t) + ", " + text(s.last_shot) + ", " + text(s.fresh) + ", " + text(s.hand) + ", " + text(s.depth) + ", " + text(s.lifted) + "}"; }
 [[maybe_unused]] static void take(TouchFire& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<int>(s.id, (*v.rows)[0]); converted::take_as<double>(s.x, (*v.rows)[1]); converted::take_as<double>(s.y, (*v.rows)[2]); converted::take_as<double>(s.down_t, (*v.rows)[3]); converted::take_as<double>(s.last_shot, (*v.rows)[4]); converted::take_as<bool>(s.fresh, (*v.rows)[5]); converted::take_as<int>(s.hand, (*v.rows)[6]); converted::take_as<double>(s.depth, (*v.rows)[7]); converted::take_as<bool>(s.lifted, (*v.rows)[8]); }
@@ -258,7 +258,7 @@ struct TouchPlay {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TouchPlay::DomRect& s) { return converted::Value::structure({arg(s.id), arg(s.x), arg(s.y), arg(s.w), arg(s.h)}); }
-[[maybe_unused]] static bool same(const TouchPlay::DomRect& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.id, (*got.rows)[0]) && same(want.x, (*got.rows)[1]) && same(want.y, (*got.rows)[2]) && same(want.w, (*got.rows)[3]) && same(want.h, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const TouchPlay::DomRect& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.x, (*got.rows)[1]), ".x") && converted::at_place(same(want.y, (*got.rows)[2]), ".y") && converted::at_place(same(want.w, (*got.rows)[3]), ".w") && converted::at_place(same(want.h, (*got.rows)[4]), ".h"); }
 [[maybe_unused]] static bool defined(const TouchPlay::DomRect& s) { return defined(s.id) && defined(s.x) && defined(s.y) && defined(s.w) && defined(s.h); }
 [[maybe_unused]] static std::string text(const TouchPlay::DomRect& s) { return std::string("{") + text(s.id) + ", " + text(s.x) + ", " + text(s.y) + ", " + text(s.w) + ", " + text(s.h) + "}"; }
 [[maybe_unused]] static void take(TouchPlay::DomRect& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.id, (*v.rows)[0]); converted::take_as<double>(s.x, (*v.rows)[1]); converted::take_as<double>(s.y, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); converted::take_as<double>(s.h, (*v.rows)[4]); }
@@ -297,7 +297,7 @@ struct TouchPlay {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TouchPlay& s) { return converted::Value::structure({arg(s.w_), arg(s.h_), arg(s.sl_), arg(s.st_), arg(s.sr_), arg(s.sb_), arg(s.lay_), arg(s.buttons_), arg(s.fingers_), arg(s.pressed_), arg(s.released_), arg(s.fires_), arg(s.move_id_), arg(s.look_id_), arg(s.move_), arg(s.look_), arg(s.look_edge_), arg(s.drag_), arg(s.clearance_), arg(s.nade_up_), arg(s.zoom_), arg(s.pinch_d_), arg(s.strike_tap_), arg(s.dom_), arg(s.strike_x_), arg(s.strike_y_), arg(s.pad_x_), arg(s.pad_y_), arg(s.pad_w_), arg(s.pad_h_)}); }
-[[maybe_unused]] static bool same(const TouchPlay& want, const converted::Value& got) { return got.rows && got.rows->size() == 30 && same(want.w_, (*got.rows)[0]) && same(want.h_, (*got.rows)[1]) && same(want.sl_, (*got.rows)[2]) && same(want.st_, (*got.rows)[3]) && same(want.sr_, (*got.rows)[4]) && same(want.sb_, (*got.rows)[5]) && same(want.lay_, (*got.rows)[6]) && same(want.buttons_, (*got.rows)[7]) && same(want.fingers_, (*got.rows)[8]) && same(want.pressed_, (*got.rows)[9]) && same(want.released_, (*got.rows)[10]) && same(want.fires_, (*got.rows)[11]) && same(want.move_id_, (*got.rows)[12]) && same(want.look_id_, (*got.rows)[13]) && same(want.move_, (*got.rows)[14]) && same(want.look_, (*got.rows)[15]) && same(want.look_edge_, (*got.rows)[16]) && same(want.drag_, (*got.rows)[17]) && same(want.clearance_, (*got.rows)[18]) && same(want.nade_up_, (*got.rows)[19]) && same(want.zoom_, (*got.rows)[20]) && same(want.pinch_d_, (*got.rows)[21]) && same(want.strike_tap_, (*got.rows)[22]) && same(want.dom_, (*got.rows)[23]) && same(want.strike_x_, (*got.rows)[24]) && same(want.strike_y_, (*got.rows)[25]) && same(want.pad_x_, (*got.rows)[26]) && same(want.pad_y_, (*got.rows)[27]) && same(want.pad_w_, (*got.rows)[28]) && same(want.pad_h_, (*got.rows)[29]); }
+[[maybe_unused]] static bool same(const TouchPlay& want, const converted::Value& got) { return converted::rows_of(got, 30) && converted::at_place(same(want.w_, (*got.rows)[0]), ".w_") && converted::at_place(same(want.h_, (*got.rows)[1]), ".h_") && converted::at_place(same(want.sl_, (*got.rows)[2]), ".sl_") && converted::at_place(same(want.st_, (*got.rows)[3]), ".st_") && converted::at_place(same(want.sr_, (*got.rows)[4]), ".sr_") && converted::at_place(same(want.sb_, (*got.rows)[5]), ".sb_") && converted::at_place(same(want.lay_, (*got.rows)[6]), ".lay_") && converted::at_place(same(want.buttons_, (*got.rows)[7]), ".buttons_") && converted::at_place(same(want.fingers_, (*got.rows)[8]), ".fingers_") && converted::at_place(same(want.pressed_, (*got.rows)[9]), ".pressed_") && converted::at_place(same(want.released_, (*got.rows)[10]), ".released_") && converted::at_place(same(want.fires_, (*got.rows)[11]), ".fires_") && converted::at_place(same(want.move_id_, (*got.rows)[12]), ".move_id_") && converted::at_place(same(want.look_id_, (*got.rows)[13]), ".look_id_") && converted::at_place(same(want.move_, (*got.rows)[14]), ".move_") && converted::at_place(same(want.look_, (*got.rows)[15]), ".look_") && converted::at_place(same(want.look_edge_, (*got.rows)[16]), ".look_edge_") && converted::at_place(same(want.drag_, (*got.rows)[17]), ".drag_") && converted::at_place(same(want.clearance_, (*got.rows)[18]), ".clearance_") && converted::at_place(same(want.nade_up_, (*got.rows)[19]), ".nade_up_") && converted::at_place(same(want.zoom_, (*got.rows)[20]), ".zoom_") && converted::at_place(same(want.pinch_d_, (*got.rows)[21]), ".pinch_d_") && converted::at_place(same(want.strike_tap_, (*got.rows)[22]), ".strike_tap_") && converted::at_place(same(want.dom_, (*got.rows)[23]), ".dom_") && converted::at_place(same(want.strike_x_, (*got.rows)[24]), ".strike_x_") && converted::at_place(same(want.strike_y_, (*got.rows)[25]), ".strike_y_") && converted::at_place(same(want.pad_x_, (*got.rows)[26]), ".pad_x_") && converted::at_place(same(want.pad_y_, (*got.rows)[27]), ".pad_y_") && converted::at_place(same(want.pad_w_, (*got.rows)[28]), ".pad_w_") && converted::at_place(same(want.pad_h_, (*got.rows)[29]), ".pad_h_"); }
 [[maybe_unused]] static bool defined(const TouchPlay& s) { return defined(s.w_) && defined(s.h_) && defined(s.sl_) && defined(s.st_) && defined(s.sr_) && defined(s.sb_) && defined(s.lay_) && defined(s.buttons_) && defined(s.fingers_) && defined(s.pressed_) && defined(s.released_) && defined(s.fires_) && defined(s.move_id_) && defined(s.look_id_) && defined(s.move_) && defined(s.look_) && defined(s.look_edge_) && defined(s.drag_) && defined(s.clearance_) && defined(s.nade_up_) && defined(s.zoom_) && defined(s.pinch_d_) && defined(s.strike_tap_) && defined(s.dom_) && defined(s.strike_x_) && defined(s.strike_y_) && defined(s.pad_x_) && defined(s.pad_y_) && defined(s.pad_w_) && defined(s.pad_h_); }
 [[maybe_unused]] static std::string text(const TouchPlay& s) { return std::string("{") + text(s.w_) + ", " + text(s.h_) + ", " + text(s.sl_) + ", " + text(s.st_) + ", " + text(s.sr_) + ", " + text(s.sb_) + ", " + text(s.lay_) + ", " + text(s.buttons_) + ", " + text(s.fingers_) + ", " + text(s.pressed_) + ", " + text(s.released_) + ", " + text(s.fires_) + ", " + text(s.move_id_) + ", " + text(s.look_id_) + ", " + text(s.move_) + ", " + text(s.look_) + ", " + text(s.look_edge_) + ", " + text(s.drag_) + ", " + text(s.clearance_) + ", " + text(s.nade_up_) + ", " + text(s.zoom_) + ", " + text(s.pinch_d_) + ", " + text(s.strike_tap_) + ", " + text(s.dom_) + ", " + text(s.strike_x_) + ", " + text(s.strike_y_) + ", " + text(s.pad_x_) + ", " + text(s.pad_y_) + ", " + text(s.pad_w_) + ", " + text(s.pad_h_) + "}"; }
 [[maybe_unused]] static void take(TouchPlay& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 30) return; converted::take_as<double>(s.w_, (*v.rows)[0]); converted::take_as<double>(s.h_, (*v.rows)[1]); converted::take_as<double>(s.sl_, (*v.rows)[2]); converted::take_as<double>(s.st_, (*v.rows)[3]); converted::take_as<double>(s.sr_, (*v.rows)[4]); converted::take_as<double>(s.sb_, (*v.rows)[5]); converted::take_as<TouchLayout>(s.lay_, (*v.rows)[6]); converted::take_as<std::vector<TouchBtn>>(s.buttons_, (*v.rows)[7]); converted::take_as<std::vector<TouchPlay::Finger>>(s.fingers_, (*v.rows)[8]); converted::take_as<std::vector<std::string>>(s.pressed_, (*v.rows)[9]); converted::take_as<std::vector<std::string>>(s.released_, (*v.rows)[10]); converted::take_as<std::vector<TouchFire>>(s.fires_, (*v.rows)[11]); converted::take_as<int>(s.move_id_, (*v.rows)[12]); converted::take_as<int>(s.look_id_, (*v.rows)[13]); converted::take_as<Vec2>(s.move_, (*v.rows)[14]); converted::take_as<Vec2>(s.look_, (*v.rows)[15]); converted::take_as<Vec2>(s.look_edge_, (*v.rows)[16]); converted::take_as<Vec2>(s.drag_, (*v.rows)[17]); converted::take_as<double>(s.clearance_, (*v.rows)[18]); converted::take_as<double>(s.nade_up_, (*v.rows)[19]); converted::take_as<double>(s.zoom_, (*v.rows)[20]); converted::take_as<double>(s.pinch_d_, (*v.rows)[21]); converted::take_as<bool>(s.strike_tap_, (*v.rows)[22]); converted::take_as<std::vector<TouchPlay::DomRect>>(s.dom_, (*v.rows)[23]); converted::take_as<double>(s.strike_x_, (*v.rows)[24]); converted::take_as<double>(s.strike_y_, (*v.rows)[25]); converted::take_as<double>(s.pad_x_, (*v.rows)[26]); converted::take_as<double>(s.pad_y_, (*v.rows)[27]); converted::take_as<double>(s.pad_w_, (*v.rows)[28]); converted::take_as<double>(s.pad_h_, (*v.rows)[29]); }
@@ -315,7 +315,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -325,7 +327,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::move
     converted::Tally tally("TouchPlay_move");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.move(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.move(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -334,7 +336,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -344,7 +348,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::look
     converted::Tally tally("TouchPlay_look");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.look(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -353,7 +357,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -363,7 +369,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::move_live
     converted::Tally tally("TouchPlay_move_live");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.move_live(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.move_live(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -372,7 +378,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -382,7 +390,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::look_live
     converted::Tally tally("TouchPlay_look_live");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look_live(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.look_live(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -391,7 +399,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -401,7 +411,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::look_edge
     converted::Tally tally("TouchPlay_look_edge");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.look_edge(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.look_edge(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -410,7 +420,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -420,7 +432,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::drop_lifted
     converted::Tally tally("TouchPlay_drop_lifted");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { converted::counted([&] { return a0.drop_lifted(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { converted::counted([&] { return a0.drop_lifted(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -429,7 +441,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -439,7 +453,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::clearance
     converted::Tally tally("TouchPlay_clearance");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.clearance(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.clearance(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -448,7 +462,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -458,7 +474,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::grenade_drag
     converted::Tally tally("TouchPlay_grenade_drag");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.grenade_drag(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.grenade_drag(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -467,7 +483,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -477,7 +495,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::inject
     converted::Tally tally("TouchPlay_inject");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] std::string a1) { converted::counted([&] { return a0.inject(a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0, [[maybe_unused]] std::string& a1) { converted::counted([&] { return a0.inject(a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       std::string a1 = draw.word();
@@ -487,7 +505,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -497,7 +517,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::any
     converted::Tally tally("TouchPlay_any");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.any(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.any(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -506,7 +526,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -516,7 +538,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::mode
     converted::Tally tally("TouchPlay_mode");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.mode(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.mode(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -525,7 +547,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -535,7 +559,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::no_sticks
     converted::Tally tally("TouchPlay_no_sticks");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0) { return converted::counted([&] { return a0.no_sticks(); }); };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0) { return converted::counted([&] { return a0.no_sticks(); }); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -544,7 +568,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -554,7 +580,7 @@ SC_TEST(converted_touch_play) {
   {  // TouchPlay::add
     converted::Tally tally("TouchPlay_add");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TouchPlay a0, [[maybe_unused]] TouchBtn a1) { converted::counted([&] { return a0.add(a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] TouchPlay& a0, [[maybe_unused]] TouchBtn& a1) { converted::counted([&] { return a0.add(a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       TouchPlay a0 = draw_TouchPlay(draw);
       TouchBtn a1 = draw_TouchBtn(draw);
@@ -564,7 +590,9 @@ SC_TEST(converted_touch_play) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
