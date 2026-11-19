@@ -1467,7 +1467,9 @@ struct Blueprint {
   ActorsStarted interpreted_actors, compiled_actors, source_actors;
   kern::logic::Instance* interp = nullptr;
   kern::logic::Instance* native = nullptr;
-  explicit Blueprint(const char* actor, std::vector<std::string> actors = {}) {
+  const char* name;
+  std::vector<std::string> others;
+  explicit Blueprint(const char* actor, std::vector<std::string> actors = {}) : name(actor), others(actors) {
     interpreted = std::make_unique<RuleBlueprint>(actor, nullptr, false, actors);
     compiled = std::make_unique<RuleBlueprint>(actor, nullptr, true, actors);
     // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by
@@ -1489,6 +1491,26 @@ struct Blueprint {
     }
     SC_CHECK(native && std::string(native->tier()) == "native C++", "%s runs as its C++ class (it runs: %s)", actor, native ? native->tier() : "not at all");
     kern::logic::native_probe = class_runs;
+  }
+  /// Did a call stop the Blueprint because it held an entry of a list that handlers changed (Runtime::held_lost)? In C++
+  /// the reference would go nowhere - what the call gives C++ leaves open. The Blueprint (class and interpreter) is made
+  /// anew - a stopped one takes no call - and true.
+  bool held_lost() {
+    const auto lost = [](const std::unique_ptr<RuleBlueprint>& r) { return r && r->host.errors.find("a call held an entry of a list while handlers ran") != std::string::npos; };
+    if (!lost(interpreted) && !lost(compiled)) return false;
+    interpreted = std::make_unique<RuleBlueprint>(name, nullptr, false, others);
+    compiled = std::make_unique<RuleBlueprint>(name, nullptr, true, others);
+    interpreted->rt.budget = compiled->rt.budget = 2000000000u;
+    interp = interpreted->inst;
+    native = compiled->inst;
+    interpreted_actors = {};
+    compiled_actors = {};
+    if (!others.empty()) {
+      interpreted_actors.keep(*interpreted, others);
+      compiled_actors.keep(*compiled, others);
+    }
+    kern::logic::native_probe = class_runs;
+    return true;
   }
   /// The logic the source's ActorBlueprints are bound to (kern::logic::ActorBlueprint::bind): the runtime of
   /// its own in which the actors' Blueprints run - where it calls none, one in which none has a Blueprint.
@@ -1655,6 +1677,7 @@ struct Tally {
     g_class_asks = 0;
     const bool ib = bp.native->call(function, args, b);
     const long class_asks = g_class_asks;
+    if (bp.held_lost()) { ++outside; return; }   // (C++ leaves open what a reference that goes nowhere gives: drawn again)
     const long long looped = bp.native->counters()[3];   // (the loop passes of this call - the runtime counts from zero for a call from outside)
     passes += looped;
     work += looped / 10;
@@ -1665,6 +1688,7 @@ struct Tally {
     if (both) bp.before_call(false);
     const auto interpreter_began = std::chrono::steady_clock::now();
     const bool ia = both ? bp.interp->call(function, args, a) : ib;
+    if (both && bp.held_lost()) { ++outside; return; }
     interpreter_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - interpreter_began).count();
     if (state && changes) {
       b.push_back(read_state(*bp.native, *state));

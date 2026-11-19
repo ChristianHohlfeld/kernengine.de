@@ -780,7 +780,8 @@ class Tree:
         for o in self.engine:
             self.take(o, ENGINE + "::", seen)
         for i, n in list(self.decl.items()):
-            if n.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl") and any(c.get("kind") == "CompoundStmt" for c in kids(n)):
+            # (and a destructor that does something of its own: a function of its Blueprint - Emit.ended_parts calls it)
+            if (n.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl") or ends_itself(n)) and any(c.get("kind") == "CompoundStmt" for c in kids(n)):
                 self.body[i] = n
                 p = n.get("previousDecl")
                 while p:
@@ -1321,6 +1322,7 @@ class Function:
         self.name = name
         self.cpp = name
         self.pure = True
+        self.asks_engine = False   # (it calls the engine - itself or through what it calls: the engine sees each call)
         self.params = []      # (name, type)
         self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
         self.fixed = {}       # per parameter (by place) that is a list of a fixed length (std::array, T[N]): its length - it is declared Fixed<T, N>
@@ -1397,6 +1399,7 @@ class Unit:
         self.next_node = 10 + (self.world.part_numbers.get(self.job, 0) << 20)
         self.enum_aliases = {}      # (enum, a value's name) -> the earlier value of the same number it is
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
+        self.lambda_vars = {}   # (a local function's variable -> its lambda: `auto gone = [&](...) {...};`, named where an algorithm is given it)
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
         self.objects_seen = set()   # the engine's classes it holds handles of
@@ -1915,10 +1918,14 @@ class Unit:
             if c.get("isImplicit"):
                 continue
             k = c.get("kind")
-            special = k == "CXXDestructorDecl" or (k == "CXXConstructorDecl" and of_itself(c)) or (k == "CXXMethodDecl" and c.get("name") == "operator=")
-            if special:   # (one it declares, even = default, is no longer C++'s own move field by field: a destructor or a copy of its own leave it none)
+            special = (k == "CXXConstructorDecl" and of_itself(c)) or (k == "CXXMethodDecl" and c.get("name") == "operator=")
+            if special:   # (a copy or a move it declares, even = default, is no longer C++'s own move field by field)
                 raise Wait(f"what stays where a value was moved out of (std::move): {q.split('::')[-1]} moves as it says itself")
         st = self.struct(q)
+        if any(c.get("kind") == "CXXDestructorDecl" and not c.get("isImplicit") for c in kids(rec)):
+            # A class that declares a destructor (even = default) and no copy or move has no move of C++'s own: what
+            # takes it out of a place copies it (its copy - C++'s own, field by field), and everything stays.
+            return [at + (fname,) for fname, _, _, _ in self.struct_fields[st]]
         keep = []
         fds = [c for c in kids(rec) if c.get("kind") == "FieldDecl"]
         for (fname, ft, _, _), fd in zip(self.struct_fields[st], fds):
@@ -2165,6 +2172,8 @@ class Unit:
         want = self.cpp_name(d).replace("::", "_")
         if d.get("kind") == "CXXConstructorDecl":
             want = owner.split("::")[-1] + "_new"
+        elif d.get("kind") == "CXXDestructorDecl":
+            want = owner.split("::")[-1] + "_end"
         elif d.get("name", "").startswith("operator") and d["name"][8:] in ops:
             want = (owner.split("::")[-1] + "_" if owner else "") + ops[d["name"][8:]]
         return want
@@ -2411,6 +2420,7 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open, f.state = e["open"], e["state"]
+            f.asks_engine = e.get("engine", False)
             if f.state and e["unit"] != self.name and not f.wait:
                 f.wait = f"a function of {e['unit']}, the Blueprint of the program's one object: only its own functions call it"
             f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
@@ -2451,7 +2461,7 @@ class Unit:
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
                 "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers, "logic": f.logic,
-                "actors": sorted(actors_called(f))}
+                "actors": sorted(actors_called(f)), "engine": f.asks_engine}
 
     def uses(self):
         """The Blueprints whose functions the written functions call."""
@@ -2707,16 +2717,18 @@ class Const:
         return kids(f)[-1] if kids(f) and f.get("hasInClassInitializer") else {"kind": "ImplicitValueInitExpr"}
 
     def inlined(self, n):
-        """A call of a constexpr function that returns one expression of its parameters
-        (`constexpr Vec3 hex_color(u32 h) { return {...}; }`), with constants for them: that expression,
-        the parameters standing for what the call gives - worked out as the compiler works it out at
-        compile time. None: the call is none such."""
+        """A call of a function that returns one expression of its parameters (`constexpr Vec3 hex_color(u32 h)
+        { return {...}; }`, `Vec3 rgb(u32 h) { return {...}; }`), with constants for them: that expression, the
+        parameters standing for what the call gives - worked out as the compiler works it out at compile time.
+        (Constexpr or not, such a function gives the same value of the same arguments - the program works it out
+        when it begins, `const Vec3 kWall = rgb(0xe9e4da);` -: what the expression is is worked out as a constant
+        - `number`, `literal` -, or the constant waits.) None: the call is none such."""
         n = bare(n)
         if n.get("kind") != "CallExpr":
             return None
         c = callee(n)
         d = self.unit.tree.body.get(c.get("referencedDecl", {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
-        if d is None or not d.get("constexpr") or d.get("kind") != "FunctionDecl":
+        if d is None or d.get("kind") != "FunctionDecl":
             return None
         body = next((x for x in kids(d) if x.get("kind") == "CompoundStmt"), None)
         stmts = kids(body) if body is not None else []
@@ -2727,6 +2739,14 @@ class Const:
         if len(args) != len(params) or any(a.get("kind") == "CXXDefaultArgExpr" for a in args):
             return None
         by = {p["id"]: a for p, a in zip(params, args)}
+        if not d.get("constexpr"):
+            # (what it reads besides its parameters: constants only - a variable may have changed when it is called)
+            for x in walk(kids(stmts[0])[0]):
+                r = x.get("referencedDecl") or {}
+                if x.get("kind") == "DeclRefExpr" and r.get("kind") == "VarDecl" and r.get("id") not in by:
+                    v = self.unit.tree.decl.get(r.get("id"), {})
+                    if not (v.get("constexpr") or re.search(r"\bconst\b", qtype(v))):
+                        return None
         out = copy.deepcopy(kids(stmts[0])[0])
         for x in walk(out):
             if x.get("kind") == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in by:
@@ -3148,7 +3168,7 @@ class Emit:
         # a method: its object is the first parameter - a reference to a value of the struct its class's data is:
         # the place the call names, changed where it stands (a const method reads it there)
         static = d.get("storageClass") == "static" or self.tree.decl.get(d.get("previousDecl"), {}).get("storageClass") == "static"
-        if d.get("kind") == "CXXMethodDecl" and not static and not f.state and uses_this(d):
+        if d.get("kind") in ("CXXMethodDecl", "CXXDestructorDecl") and not static and not f.state and uses_this(d):
             owner = self.tree.owner.get(d["id"])
             if owner is None:
                 raise Wait("the state of its object (its class is not known here)")
@@ -3223,7 +3243,10 @@ class Emit:
             f.pure = False   # (it changes a place of its caller: a step, not a value)
         # what a call changes or gives, as the test compares it: the object, what the C++ returns, what it wrote
         # through its parameters. The function itself gives what the C++ returns (a constructor: the object).
-        if f.mutates and f.state:
+        if d.get("kind") == "CXXDestructorDecl":
+            pass   # (a destructor's object is gone after it: what it did is what it changed elsewhere - compared where a
+                   # value ends, in the test of the function that ends it)
+        elif f.mutates and f.state:
             f.out_fields.append(("State", u.name, "state"))   # (the test compares all the Blueprint's variables)
         elif f.mutates:
             f.out_fields.append(("Self", f.self_type, "self"))
@@ -4005,10 +4028,8 @@ class Emit:
         that holds some ends the same way."""
         parts, body = self.u.life(q)
         short = q.split("::")[-1]
-        if body:
-            raise Wait(f"the end of a {short} runs its destructor ~{short}(), which is not written yet")
         sname = self.u.struct(q)
-        out = []
+        out = self.own_end(q, place) if body else []   # (first its own body, then its fields)
         for c, (kind, what) in reversed(parts):
             fname, _ = self.u.field(sname, c["name"])
             p = f"{place}.{fname}"
@@ -4027,10 +4048,7 @@ class Emit:
         object of the engine a variable of its Blueprint holds or owns is released, each value that holds some
         ends the same way."""
         parts, body = self.u.life(self.u.state)
-        if body:
-            short = self.u.state.split("::")[-1]
-            raise Wait(f"the end of the state {short} runs its destructor ~{short}(), which is not written yet")
-        out = []
+        out = self.own_end(self.u.state, None) if body else []   # (first its own body, then its fields)
         for c, (kind, what) in reversed(parts):
             name, _ = self.u.state_variable(c["name"])
             if kind in ("object", "owned"):
@@ -4042,6 +4060,26 @@ class Emit:
             else:
                 raise Wait(f"the end of the state: its field {c['name']} is a list, a map or an array of what ends with it")
         return out
+
+    def own_end(self, q, place):
+        """The call of the destructor of the program's class `q` that does something of its own (Unit.life) on the
+        value at `place` (None: the one object of the state) - its Blueprint's function (Unit.function), a step."""
+        rec = self.tree.records.get(q) or {}
+        dtor = next((c for c in kids(rec) if c.get("kind") == "CXXDestructorDecl" and not c.get("isImplicit")), None)
+        if dtor is None:
+            raise Wait(f"the end of a {q.split('::')[-1]}: its destructor is not known here")
+        g = self.u.function(dtor["id"])
+        self.f.calls.append(g)
+        self.f.indexes = self.f.indexes or g.indexes
+        self.f.pure = False
+        if g.state:
+            if not self.f.state:
+                raise Wait(f"the end of the state {q.split('::')[-1]} outside a function of its Blueprint")
+            self.f.mutates = True
+            return [f"{g.name}();"]
+        if g.self_type is None:
+            return [f"{g.name}();"]   # (a destructor that does not use its object)
+        return [f"{g.name}({place});"]
 
     def ended_box(self, q, place):
         """The end of what an owned or optional value at `place` holds (a value of the program's class `q`), if it
@@ -4286,10 +4324,52 @@ class Emit:
         return [f"{count} = {kind}_length<{row}>({lv});",   # (Length gives an Int)
                 *self.count_loop("0", last, lambda i: [f"{at} = {self.whole_math('-', last, i)};", *self.ended_entry(h, f"{lv}[{at}]")])]
 
+    @staticmethod
+    def goes_to(n, label):
+        """Does this code hold a goto to the label (its declaration's id)?"""
+        return any(x.get("kind") == "GotoStmt" and x.get("targetLabelDeclId") == label for x in walk(n))
+
+    def labels_of(self, stmts):
+        """The labels of a block that a goto before them in the block goes to (forward, out of an if or a block,
+        not out of a loop, a switch or a lambda): each gets a flag of its own - set where the goto is, and what
+        stands between the goto and its label runs only while it is not set (block_of). Gives the steps that
+        clear the flags where the block begins."""
+        out = []
+        for j, s in enumerate(stmts):
+            if s.get("kind") != "LabelStmt":
+                continue
+            label = s.get("declId")
+            if label in self.goto_flags:
+                continue   # (the rest of its block, written again: the flag it has)
+            if any(self.goes_to(x, label) for x in stmts[j:]):
+                raise Wait("a goto back (a loop of its own)")
+            if not any(self.goes_to(x, label) for x in stmts[:j]):
+                continue
+            for x in stmts[:j]:
+                for y in walk(x):
+                    if y.get("kind") in ("ForStmt", "WhileStmt", "DoStmt", "CXXForRangeStmt", "SwitchStmt", "LambdaExpr") and self.goes_to(y, label):
+                        raise Wait("a goto out of a loop, a switch or a lambda")
+            flag = self.temp(f"to_{s.get('name') or 'label'}", "Bool")
+            self.goto_flags[label] = flag
+            out.append(f"{flag} = false;")
+        return out
+
     def block_of(self, stmts):
         """The statements of a block, and whether it always returns (then its objects are released by the return)."""
-        out = []
-        for i, s in enumerate(stmts):
+        if not isinstance(self.goto_flags, dict):
+            self.goto_flags, self.goto_live = {}, set()
+        known = set(self.goto_flags)
+        try:
+            return self.block_steps(stmts)
+        finally:
+            self.goto_live -= set(self.goto_flags) - known   # (the labels of this block: no goto reaches them from outside it)
+
+    def block_steps(self, stmts):
+        out = self.labels_of(stmts)
+        self.goto_live |= set(self.goto_flags)
+        i = 0
+        while i < len(stmts):
+            s = stmts[i]
             if not isinstance(self.named_places, set):
                 self.named_places = set()
             self.name_references(stmts, i)
@@ -4299,12 +4379,32 @@ class Emit:
                 return out, True
             if s.get("kind") in ("BreakStmt", "ContinueStmt"):
                 break
+            jumped = [label for label in self.goto_live if s.get("kind") != "GotoStmt" and self.goes_to(s, label)]
+            if len(jumped) > 1:
+                raise Wait("gotos to several labels from one statement")
+            if jumped:
+                # (after a statement with a goto: up to its label - or to the end of this block, the label stands
+                # further out - only while the goto has not gone)
+                at = next((j for j in range(i + 1, len(stmts)) if stmts[j].get("kind") == "LabelStmt" and stmts[j].get("declId") == jumped[0]), None)
+                rest = self.block(stmts[i + 1:at if at is not None else len(stmts)])
+                if rest:
+                    out += [f"if (logic_not({self.goto_flags[jumped[0]]})) {{", *["  " + ln for ln in rest], "}"]
+                if at is None:
+                    break
+                i = at
+                continue
+            if s.get("kind") == "GotoStmt":
+                break   # (what follows a goto in its block does not run)
             if self.loops and any(self.jumps(s)):   # (after a statement that may break or continue: the rest only if it did not)
                 rest = self.block(stmts[i + 1:])
                 if rest:
                     out += [f"if ({self.going()}) {{", *["  " + ln for ln in rest], "}"]
                 break
+            i += 1
         return out, False
+
+    goto_flags = None
+    goto_live = None
 
     def continues(self, s):
         """Does a statement end with continue - in a switch in a loop, a case that goes on with the loop's next round
@@ -4568,6 +4668,12 @@ class Emit:
             return self.for_each(s), False
         if k == "SwitchStmt":
             return self.switch(s)
+        if k == "GotoStmt":
+            if s.get("targetLabelDeclId") not in (self.goto_flags or {}):
+                raise Wait("GotoStmt")
+            return [f"{self.goto_flags[s['targetLabelDeclId']]} = true;"], False
+        if k == "LabelStmt":
+            return self.stmt(kids(s)[0]) if kids(s) else ([], False)
         if k in ("BreakStmt", "ContinueStmt"):
             if not self.loops or not self.loops[-1]["stop" if k == "BreakStmt" else "skip"]:
                 raise Wait("a break outside a loop")
@@ -5912,8 +6018,14 @@ class Emit:
             k = x.get("kind")
             if k == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in self.names:
                 take(x["referencedDecl"]["id"], x, x["referencedDecl"]["id"] in changed)
-            elif k == "CXXOperatorCallExpr" and callee(x).get("referencedDecl", {}).get("id") in u.lambdas:
-                other = u.lambdas[callee(x)["referencedDecl"]["id"]]   # (a local function it calls: what that one uses, it gets too)
+            elif (k == "CXXOperatorCallExpr" and callee(x).get("referencedDecl", {}).get("id") in u.lambdas) or (k == "DeclRefExpr" and x.get("referencedDecl", {}).get("id") in u.lambda_vars):
+                # (a local function it calls - or names, to hand it to an algorithm: what that one uses, it gets too)
+                if k == "DeclRefExpr":
+                    named_ = u.lambda_vars[x["referencedDecl"]["id"]]
+                    op_ = next((c for c in kids(next((r for r in kids(named_) if r.get("kind") == "CXXRecordDecl"), {})) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), {})
+                    other = u.lambdas[op_["id"]]
+                else:
+                    other = u.lambdas[callee(x)["referencedDecl"]["id"]]
                 if other["snapshots"]:
                     raise Wait("a local function that calls one that captures by value")
                 for i, node, is_changed in other["free"]:
@@ -5952,6 +6064,8 @@ class Emit:
         if this_used:
             tree.owner[method["id"]] = tree.owner.get(outer["id"])
         u.lambdas[method["id"]] = {"free": free, "args": args, "snapshots": not by_ref}
+        if v.get("id"):
+            u.lambda_vars[v["id"]] = lam
         g = u.function(method["id"])
         g.lifted = True
         return lines
@@ -6238,6 +6352,7 @@ class Emit:
         mine = (f["value"], [(n, *u.api().pin(bt)) for n, bt, _ in f["ins"]], [(n, *u.api().pin(bt)) for n, bt, _ in f["outs"]])
         if known != mine:
             raise Wait(f"the engine's {d.get('name')}() (its node is another one in the engine: {'none' if known is None else 'its pins differ'})")
+        self.f.asks_engine = True
         u.engine_calls[d["id"]] = f
         ins, done, own = list(f["ins"]), [], None   # (done: the inputs in the order C++ works them out - see operand)
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
@@ -7204,6 +7319,8 @@ class Emit:
                 b = self.unwrap(kids(b)[0])
             d = self.tree.decl.get(b.get("referencedDecl", {}).get("id")) if b.get("kind") == "DeclRefExpr" else None
             lam = self.lambda_of(kids(d)[-1]) if d is not None and d.get("init") and kids(d) else None
+            if lam is None and b.get("kind") == "DeclRefExpr":   # (a local function of the function, or of one it stands in)
+                lam = self.u.lambda_vars.get(b.get("referencedDecl", {}).get("id"))
             if lam is None:
                 raise Wait(f"algorithm: std::{name} with a function value that is no lambda")
         else:
@@ -8012,6 +8129,11 @@ class Emit:
         chosen = self.chosen_place(g, args, obj)
         if chosen is not None:
             return chosen
+        if g.asks_engine and self.cond_depth:
+            # (a function that calls the engine - pure or not - in a part of an expression C++ does not always work
+            # out, c ? body(a) : body(b): called only where C++ calls it - the engine sees every call; see guarded)
+            raise Hoists("a call that asks the engine, in a part of an expression that does not always run")
+        self.f.asks_engine = self.f.asks_engine or g.asks_engine
         self.f.calls.append(g)
         self.f.indexes = self.f.indexes or g.indexes
         if g.state and g.mutates and self.f.state and not self.f.mutates:
@@ -8441,7 +8563,12 @@ class Emit:
             if op == ",":
                 raise Wait("the comma operator")
             if op == "=":
-                raise Wait("an assignment inside an expression")
+                # (x = v) as a value - if ((hit = f()) >= 0): the assignment is a step before the statement, the value
+                # is x as it is after it (C++: the assigned object)
+                if self.unwrap(kids(b)[0]).get("kind") not in ("DeclRefExpr", "MemberExpr"):
+                    raise Wait("an assignment inside an expression")
+                self.hoist(self.effect(b))
+                return self.value(kids(b)[0])
             raise Wait(f"the operator {op}")
         if k == "CompoundAssignOperator":
             raise Wait("an assignment inside an expression")
@@ -9785,7 +9912,8 @@ class Api:
         raise Wait(f"a {bt}")
 
     def shape(self, bt, raw=None):
-        """A value's form, written out: n i b v t, e<values>, {fields}, [items] - [N items] for a list of a fixed
+        """A value's form, written out: n i b v t, h (the handle of an object the engine made: never 0 - a maker's
+        result, its "shapes"), e<values>, {fields}, [items] - [N items] for a list of a fixed
         length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it), [?item] for what
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in ENGINE_PIN:
@@ -9945,7 +10073,10 @@ class Api:
             self.shape(bt)
         return {"type": f"engine.{group}.make" + (f"_{nth}" if nth > 1 else ""), "cpp": q + "::" + q.split("::")[-1], "label": "Make " + q.split("::")[-1],
                 "category": "Engine: " + q.split("::")[-1], "help": self.u.comment_of(d) or f"Makes a {q.split('::')[-1]} of the engine: its handle (the host keeps it until it is released).",
-                "value": False, "ins": ins, "outs": [("result", "Int", q)], "params": params, "decl": d, "role": "make", "class": q}
+                "value": False, "ins": ins, "outs": [("result", "Int", q)], "params": params, "decl": d, "role": "make", "class": q,
+                # (what it gives is the handle of the object it made - a constructor of C++ always makes one: never the
+                # handle 0, which names none; the form `h`, Api.shape)
+                "shapes": {"result": "h"}}
 
     def releaser(self, q):
         """The node that ends an object of the engine that was made (its destructor): <class>.release."""
@@ -12046,6 +12177,9 @@ class TestWriter:
                 return
             G.records.add(t)
             todo.append(("record", d))
+            for c in kids(d):   # (a destructor that does something of its own runs where a value of the class ends: held with it)
+                if c.get("kind") == "CXXDestructorDecl" and ends_itself(tree.body.get(c["id"], c)):
+                    want_function(c["id"])
         def want_unnamed(i):
             """An enum without a name whose values the source names (they are numbers in the Blueprint): its
             declaration is part of the source."""
@@ -12103,7 +12237,7 @@ class TestWriter:
                 return take(i)
             if d["id"] in G.functions or d["id"] in u.lambdas or d.get("_at", (None, None))[1] is None:
                 return
-            if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
+            if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl") and not ends_itself(d):
                 return
             if d.get("isImplicit"):
                 return   # (what the compiler makes of a class - its copy, its assignment: it makes it in the test too; its place is the class's name, no source)
@@ -12521,8 +12655,8 @@ class TestWriter:
             before = chain(d)
             owner = tree.owner.get(d["id"]) or next((tree.owner[x["id"]] for x in before if x["id"] in tree.owner), None)
             return any(not here(x) for x in before) or (owner is not None and not here(tree.records.get(owner, {})))
-        def own(d):   # (of this file alone)
-            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl") and outside(d))
+        def own(d):   # (of this file alone - not the definition of what a header declares: a function, or a variable `extern i32 kGates;`)
+            return here(d) and not (d.get("kind") in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl", "FunctionTemplateDecl", "VarDecl") and outside(d))
         def namespace_level(d):
             return tree.owner.get(d["id"]) is None and tree.scope_of.get(d["id"], "").rstrip(":") not in tree.records
         def local_of(d):   # (the namespace a piece of this file alone stands in, in the test that takes it)
@@ -12640,7 +12774,11 @@ class TestWriter:
         for q in sorted(G.enums):
             put(tree.enums[q], {"kind": "enum", "text": self.enum_text(q, local_of(tree.enums[q])), "pairs": [(self.absolute(q), enum_names[q])]})
         for d, text, said, pairs in self.const_pieces(G.consts, decls, G.records, local_of):
-            put(d, {"kind": "const", "text": text, "names": [self.ident(x) for x in said], "pairs": pairs, **self.statement_of(d),
+            # (the definition of a variable of the program a header declares - `i32 kGates = 0;` to `extern i32 kGates;` -
+            # stands where the header puts it, not among this file's own: one variable. A test that takes it and has it already
+            # from that declaration - its own, drawn, set and compared (const_pieces) - leaves this piece out: "program")
+            program = d.get("kind") == "VarDecl" and here(d) and outside(d) and tree.owner.get(d["id"]) is None
+            put(d, {"kind": "const", "program": program, "text": text, "names": [self.ident(x) for x in said], "pairs": pairs, **self.statement_of(d),
                     "actors": ["::".join(self.local_path(tree.scope_of.get(x["id"], ""), local_of(x)) + [x["name"]]) for x in said if self.actor_blueprint(qtype(x))]})
         for d, text, named in self.unnamed_pieces(G.unnamed, decls, G.records, local_of):
             put(d, {"kind": "unnamed", "text": text, "pairs": named})
@@ -12793,7 +12931,10 @@ class TestWriter:
         first = min((tree.place(d) for d in [*functions.values(), *templates.values(), *G.consts.values(), *decls, *(tree.enums[q] for q in enums), *G.declared.values()]
                      if os.path.abspath(d.get("_file") or "?") == main), default=(10 ** 9 + 1, 0))
         foreign_chunks = []
+        own_said = {a for gives in const_gives.values() for a in gives}
         for i, (place, piece) in enumerate(G.foreign.items()):
+            if piece.get("program") and any(a in own_said for a, _ in piece.get("pairs", ())):
+                continue   # (a variable of the program this test has from its header's declaration: once)
             if piece["kind"] in ("const", "unnamed"):
                 if self.widen(piece["text"]) in said_consts:
                     continue
@@ -13431,7 +13572,7 @@ def survey_one(job):
     for i, d in tree.body.items():
         # (a constructor defined `= default` outside its class is C++'s own: a function only of the state - see main)
         if (i != d["id"] or not d.get("_file") or d.get("kind") == "VarDecl" or d.get("isImplicit") or (d.get("explicitlyDefaulted") and not defaulted_maker(d))
-                or d.get("kind") == "CXXDestructorDecl"):
+                or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))):
             continue
         file = os.path.abspath(d["_file"])
         if file != me and not is_header(file):
@@ -13637,7 +13778,7 @@ def convert_unit(job):
         # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
                 and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
-                         or d.get("kind") == "CXXDestructorDecl") and world.part_of_function(tree, d) == part]
+                         or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part]
         mine.sort(key=lambda d: (not is_header(d["_file"]), os.path.abspath(d["_file"]), d.get("_at", (0, 0))[0] or 0))
         # A function is written only when its test compares it: what the test cannot compare yet waits,
         # and with it what calls it - the file is converted again without those. And no input or local

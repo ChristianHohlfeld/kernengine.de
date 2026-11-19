@@ -121,6 +121,7 @@ Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u6
   switch (c) {
     case 'b': return Value::boolean(next(state) % 2 != 0);
     case 'i': return Value::integer(static_cast<i64>(next(state) % 7));
+    case 'h': return Value::integer(1 + static_cast<i64>(next(state) % 7));  // (a handle of an object made: never 0, which names none)
     case 'v': {
       Vec3 v;
       v.x = static_cast<f32>(static_cast<i64>(next(state) % 2001) - 1000) / 8.0f;
