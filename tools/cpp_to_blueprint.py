@@ -1420,6 +1420,7 @@ class Unit:
         self.next_node = 10 + (self.world.part_numbers.get(self.job, 0) << 20)
         self.enum_aliases = {}      # (enum, a value's name) -> the earlier value of the same number it is
         self.lambdas = {}           # a local function (the id of its call operator) -> how it is called (see Emit.local_function)
+        self.generic = {}           # a specialization of a lambda with auto inputs (its id) -> (variable, lambda, record, it) (Emit.instance)
         self.lambda_vars = {}   # (a local function's variable -> its lambda: `auto gone = [&](...) {...};`, named where an algorithm is given it)
         self.engine = None          # the engine's functions as nodes (Api), made when the first one is called
         self.engine_calls = {}      # the engine's functions this Blueprint calls: decl id -> its node (Api.function)
@@ -3871,7 +3872,7 @@ class Emit:
             if c.get("kind") != "DeclRefExpr":
                 return None
             i = c.get("referencedDecl", {}).get("id")
-        elif self.is_local_call(n) and self.u.lambdas[c["referencedDecl"]["id"]].get("place") is not None:
+        elif self.is_local_call(n) and self.u.lambdas.get(c["referencedDecl"]["id"], {}).get("place") is not None:
             i = c["referencedDecl"]["id"]   # (a local function that names a place: local_function)
         else:
             return None
@@ -6444,9 +6445,19 @@ class Emit:
         method = next((c for c in kids(rec or {}) if c.get("kind") == "CXXMethodDecl" and c.get("name") == "operator()"), None)
         body = next((c for c in kids(method or {}) if c.get("kind") == "CompoundStmt"), None)
         if body is None:
-            # (a lambda with auto inputs is a template: a function for each type it is called with - one that takes
-            # functions is one for each function it is given; the language has no function values)
-            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+            # A lambda with auto inputs is a template: a function for each type it is called with - one that takes a
+            # lambda, one for each lambda it is given (each its own type). The compiler has made each that is called
+            # (the specializations of its operator()): each is a local function of its own, made where it is called
+            # (local_call), the lambda it is given standing for its input (the language has no function values).
+            tmpl = next((c for c in kids(rec or {}) if c.get("kind") == "FunctionTemplateDecl" and c.get("name") == "operator()"), None)
+            made = [c for c in kids(tmpl or {}) if c.get("kind") == "CXXMethodDecl"][1:]
+            uses_this_ = any(uses_this(c) for c in made)
+            if not made or not all(any(x.get("kind") == "CompoundStmt" for x in kids(c)) for c in made) \
+                    or not all("&" in qtype(c) or (uses_this_ and qtype(c).rstrip().endswith("*")) for c in kids(rec) if c.get("kind") == "FieldDecl"):
+                raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+            for c in made:
+                u.generic[c["id"]] = (v, lam, rec, c)
+            return []
         fields = [qtype(c) for c in kids(rec) if c.get("kind") == "FieldDecl"]
         this_used = uses_this(body)
         values = [t for t in fields if not (this_used and t.rstrip().endswith("*") and "&" not in t)]
@@ -6534,13 +6545,47 @@ class Emit:
 
     def local_call(self, n):
         """A call of a local function: (text, type) of what it gives, as `invoke` has it."""
-        info = self.u.lambdas[callee(n)["referencedDecl"]["id"]]
+        cid = callee(n)["referencedDecl"]["id"]
+        if cid not in self.u.lambdas:
+            self.instance(n, cid)
+        info = self.u.lambdas[cid]
         if info.get("place") is not None:
             raise Wait(f"{self.u.cpp_name(info['place'])}(): {self.u.PLACE}")
-        return self.invoke(self.u.function(callee(n)["referencedDecl"]["id"]), info["args"] + kids(n)[2:])
+        given = [a for k, a in enumerate(kids(n)[2:]) if k not in info.get("drop", ())]
+        return self.invoke(self.u.function(cid), info["args"] + given)
+
+    def instance(self, n, cid):
+        """A call of a lambda with auto inputs (local_function): the specialization the compiler made for it becomes a
+        local function - the lambdas it is given (each a local function of its own, made here) are no inputs of it:
+        where it calls one, that one is called."""
+        v, lam, rec, spec = self.u.generic[cid]
+        params = [p for p in kids(spec) if p.get("kind") == "ParmVarDecl"]
+        args = kids(n)[2:]
+        body = next(c for c in kids(spec) if c.get("kind") == "CompoundStmt")
+        drop = {k for k, p in enumerate(params) if "(lambda at " in qtype(p)}
+        if len(args) != len(params):
+            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+        for k in sorted(drop):
+            given = self.lambda_of(args[k])
+            pid = params[k]["id"]
+            refs = [x for x in walk(body) if x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") == pid]
+            called = [x for x in walk(body) if x.get("kind") == "CXXOperatorCallExpr" and callee_name(x) == "operator()" and len(kids(x)) > 1
+                      and (bare(self.unwrap(kids(x)[1])).get("referencedDecl") or {}).get("id") == pid]
+            if given is None or len(refs) != len(called):
+                raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs that is given a function value")
+            if self.local_function({"name": f"{v.get('name', 'local')}_{params[k].get('name', 'f')}"}, given):
+                raise Wait("a local function that calls one that captures by value")   # (its copies are made where it is given)
+        t = qtype(spec)
+        kept = [p for k, p in enumerate(params) if k not in drop]
+        one = dict(spec, inner=kept + [body], type={"qualType": f"{t[:t.index('(')].strip()} ({', '.join(qtype(p) for p in kept)}){' const' if t.rstrip().endswith('const') else ''}"})
+        made = dict(lam, inner=[dict(rec, inner=[c for c in kids(rec) if c.get("kind") == "FieldDecl"] + [one])])
+        if self.local_function({"name": v.get("name", "local")}, made):
+            raise Wait("a function value (lambda / std::function) of another shape: a lambda with auto inputs")
+        self.u.lambdas[cid]["drop"] = drop
 
     def is_local_call(self, n):
-        return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
+        return n.get("kind") == "CXXOperatorCallExpr" and callee_name(n) == "operator()" and (callee(n).get("referencedDecl", {}).get("id") in self.u.lambdas
+                                                                                            or callee(n).get("referencedDecl", {}).get("id") in self.u.generic)
 
     # ---- a function of the Blueprint of an actor of the level: Call on Actor ----
     def on_actor(self, n):
