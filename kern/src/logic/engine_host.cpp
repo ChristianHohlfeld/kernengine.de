@@ -18,10 +18,11 @@ i64 EngineObjects::put(Kinds kinds, void (*end)(void*)) {
   return handle;
 }
 
-void EngineObjects::place(i64 handle, Kinds kinds, void (*end)(void*)) {
+void EngineObjects::place(i64 handle, Kinds kinds, void (*end)(void*), void* owner) {
   Entry e;
   e.at = kinds.front().second;
   e.end = end;
+  e.owner = owner;
   e.kinds = std::move(kinds);
   for (const auto& [kind, where] : e.kinds) by_object_[where].push_back({kind, handle});
   entries_[handle] = std::move(e);
@@ -50,7 +51,7 @@ bool EngineObjects::end(i64 handle, Kind k) {
     v.erase(std::remove_if(v.begin(), v.end(), [&](const auto& x) { return x.second == handle; }), v.end());
     if (v.empty()) by_object_.erase(o);
   }
-  e.end(e.at);
+  e.end(e.owner ? e.owner : e.at);
   return true;
 }
 
@@ -63,7 +64,7 @@ void EngineObjects::clear() {
     if (it == entries_.end()) continue;
     Entry e = std::move(it->second);
     entries_.erase(it);
-    if (e.end) e.end(e.at);
+    if (e.end) e.end(e.owner ? e.owner : e.at);
   }
   entries_.clear();
   by_object_.clear();

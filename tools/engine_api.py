@@ -716,7 +716,103 @@ class Calls:
             return self.tree.records[f["class"]].get("_file", "")
         return d.get("_file", "")
 
+    def default_makers(self):
+        """How a host makes an object of the engine for a handle it has none of (EngineObjects::on_missing; a test
+        makes one there, the same on every side it compares): class -> (the constructor's node, its arguments) -
+        each argument ("value", C++ type): its zero, as C++ makes it without arguments (ev::blank); ("null",): a
+        pointer to an object, its zero; ("object", class): an object of the engine the constructor takes by
+        reference, made the same way with it (ev::MadeWith - it has no handle). A constructor whose further
+        parameters all have defaults stops there. Of the constructors the first that can be made this way, one
+        whose parameters all have defaults first. A reference to a class the engine has no constructor of
+        (an abstract Transport&) is made as the one class deriving from it that can be made (none or several:
+        not made). Also self.unmade: class -> why there is no such way (for --list)."""
+        makes = collections.defaultdict(list)
+        for f in self.functions:
+            if f.get("role") == "make":
+                makes[f["class"]].append(f)
+        plans, unmade = {}, {}
+
+        def plan(q, stack):
+            if q in plans:
+                return plans[q]
+            if q in stack:
+                return None
+            if not makes.get(q):
+                unmade.setdefault(q, "no constructor of it is a node")
+                return None
+            fs = sorted(makes[q], key=lambda f: not all(c2b.kids(p) for p in c2b.kids(f["decl"]) if p.get("kind") == "ParmVarDecl"))
+            why = []
+            for f in fs:
+                parms = [p for p in c2b.kids(f["decl"]) if p.get("kind") == "ParmVarDecl"]
+                args, ok = [], True
+                for p, P, (name, bt, h) in zip(parms, self.ptypes(f), f["ins"]):
+                    if c2b.kids(p):
+                        break   # (it and every one after it have defaults)
+                    if h is None:
+                        args.append(("value", P))
+                    elif P.endswith("*"):
+                        args.append(("null",))
+                    else:
+                        d = provider(h, stack | {q})
+                        if d is None:
+                            why.append(f"{name}: {unmade.get(h, 'nothing makes a ' + h)}")
+                            ok = False
+                            break
+                        args.append(("object", d))
+                if ok:
+                    plans[q] = (f, args)
+                    unmade.pop(q, None)
+                    return plans[q]
+            unmade[q] = "its constructors take what cannot be made: " + "; ".join(why)
+            return None
+
+        def provider(h, stack):
+            if plan(h, stack) is not None:
+                return h
+            found = [c for c in sorted(makes) if c != h and h in self.bases(c) and plan(c, stack) is not None]
+            if len(found) == 1:
+                return found[0]
+            unmade[h] = (f"several classes deriving from it can be made ({', '.join(found)})" if found else unmade.get(h, "no constructor of it is a node"))
+            return None
+
+        for q in sorted(makes):
+            plan(q, frozenset())
+        self.unmade = unmade
+        return plans
+
+    def maker_text(self, q, plans, headers):
+        """The maker of class q for a handle a host has none of (see default_makers)."""
+        f, args = plans[q]
+        if not args and all(c2b.kids(p) for p in c2b.kids(f["decl"]) if p.get("kind") == "ParmVarDecl"):
+            return f"{{EngineObjects::kind<{q}>(), [](EngineObjects& o, i64 handle) -> void* {{ return o.put_at<{self.kinds(q)}>(handle, std::unique_ptr<{q}>(new {q}())); }}}}"
+        lines, n = [], [0]
+
+        def spelled(c, args):
+            out = []
+            for a in args:
+                if a[0] == "value":
+                    out.append(f"ev::blank<std::remove_cvref_t<{a[1]}>>()")
+                elif a[0] == "null":
+                    out.append("nullptr")
+                else:
+                    d = a[1]
+                    headers.add(re.sub(r"^.*/include/", "", self.tree.records[d].get("_file", "")))
+                    inner = spelled(d, plans[d][1])
+                    v = f"d{n[0]}"
+                    n[0] += 1
+                    lines.append(f"auto& {v} = made->keep(new {d}({', '.join(inner)}));")
+                    out.append(v)
+            return out
+        top = spelled(q, args)
+        if not lines:
+            return (f"{{EngineObjects::kind<{q}>(), [](EngineObjects& o, i64 handle) -> void* {{ return o.put_at<{self.kinds(q)}>(handle, "
+                    f"std::unique_ptr<{q}>(new {q}({', '.join(top)}))); }}}}")
+        body = " ".join([f"auto made = std::make_unique<ev::MadeWith<{q}>>();", *lines, f"made->object.emplace({', '.join(top)});",
+                         f"return o.put_made<{self.kinds(q)}>(handle, std::move(made));"])
+        return f"{{EngineObjects::kind<{q}>(), [](EngineObjects& o, i64 handle) -> void* {{ {body} }}}}"
+
     def texts(self):
+        plans = self.default_makers()
         by = collections.defaultdict(list)
         for f in self.functions:
             by[component_of(self.file_of(f))].append(f)
@@ -741,10 +837,9 @@ class Calls:
                                f"bool c{k}_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {{",
                                f"  auto* self = ev::object<{q}>(o, in, 0, {c_text(pin)});", "  if (!self) return false;",
                                f"  ev::take<{self.tag(f['outs'][0][1], need)}>(o, in, 1, self->{f['decl']['name']}());", "  return true;", "}", ""]
-                if f.get("role") == "make" and all(c2b.kids(p) for p in c2b.kids(f["decl"]) if p.get("kind") == "ParmVarDecl"):
-                    q = f["class"]
-                    if not any(m[0] == q for m in makers):
-                        makers.append((q, f"{{EngineObjects::kind<{q}>(), [](EngineObjects& o, i64 handle) -> void* {{ return o.put_at<{self.kinds(q)}>(handle, std::unique_ptr<{q}>(new {q}())); }}}}"))
+                if f.get("role") == "make" and f["class"] in plans and plans[f["class"]][0] is f:
+                    # (a host without an object at a handle - a test - makes one there: see default_makers)
+                    makers.append((f["class"], self.maker_text(f["class"], plans, headers)))
             text = ["// The engine's nodes on the engine itself: the calls of the functions the headers of this component declare",
                     "// (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).",
                     *[f'#include "{h}"' for h in sorted(headers)], '#include "kern/logic/engine_host.h"', "",
@@ -801,6 +896,10 @@ def main(argv):
         for name, why in waiting:
             print(f"no node: {name}: {why}")
     calls = Calls(api, functions)
+    if "--list" in argv:   # (the objects of the engine a host cannot make for a handle it has none of - and why)
+        calls.default_makers()
+        for q, why in sorted(calls.unmade.items()):
+            print(f"not made for a handle: {q}: {why}")
     for rel, text in (("src/logic/engine_api.gen.cpp", table_text(api, functions)), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
                       ("tests/engine_case.gen.h", case_text(api, functions)), *calls.texts().items()):
         path = os.path.join(KERN, rel)

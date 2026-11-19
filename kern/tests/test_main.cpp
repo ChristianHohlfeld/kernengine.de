@@ -6349,6 +6349,22 @@ TEST(engine_calls_default_objects) {
   CHECK(a.size() == 1 && b.size() == 1);
 }
 
+TEST(engine_calls_default_objects_made_with) {
+  // a class whose constructor takes other objects of the engine (Client(Transport&, config, salt), GameWorld(Renderer&))
+  // is made for a handle with them - made the same way, without a handle; the release ends them all (ASan: nothing left)
+  logic::EngineObjects o;
+  o.on_missing(logic::engine_make_default);
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out) && !out[0].b);
+  out = {logic::Value::zero(logic::PinType::boolean), logic::Value::zero(logic::PinType::structure)};
+  CHECK(logic::call_engine(o, "engine.game_world.actor_matrix", {logic::Value::integer(4), logic::Value::integer(1), logic::Value::zero(logic::PinType::structure)}, out) && !out[0].b);
+  CHECK(o.size() == 2);   // (the transport and the renderer have no handle)
+  out.clear();
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  o.clear();
+  CHECK(o.size() == 0);
+}
+
 }  // namespace
 
 // A Blueprint's class calls the functions of the engine's nodes itself where its host gives it the engine's
