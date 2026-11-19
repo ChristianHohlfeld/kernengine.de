@@ -25,12 +25,15 @@ Entscheidungen beim Bau stehen in stand/c.md. Der Entwurf vom 18.11. (Stellen, B
    „Rückrufe der Engine (Callback)“, Editor (Palette logic_edit.cpp, Farbe/Typ web/studio/logic.mjs), every_node lässt
    func.callback aus.
 
+## Belege
+- Lokal (logic+core gebaut, /tmp/cbk – Kleinstfall): logic_callbacks 0 Fehler; Ground/Site Interpreter = Klasse Zeichen für Zeichen.
+- CI 44523773375 (edefcb08) und mag `work-c-vergleich-132846-9096` (city_stream, terrain): Ergebnis in stand/c.md.
+
 ## Unbewiesen / offen (in dieser Reihenfolge)
 - **Engine-Suite**: `work-c-engine-125735-29671` rechnet f54c7738+Test (nur Schritt 1/2); danach eine Engine-Suite auf dem
   neuesten Stand (nativer Fall, every_node, Generator) – Ergebnisse in stand/c.md.
-- Bekannte Lücke der Regel: „kein Listeneintrag auf dem Weg des gebundenen Platzes (auch über Referenz-Eingänge der Aufrufer)“
-  ist NICHT gebaut (Site bindet absichtlich Fields[1] – in C++ ein Zeiger auf den Eintrag, im Interpreter der Spot mit Index:
-  gleich, solange die Liste nicht wächst). Entscheiden: verbieten (check) oder so lassen und dokumentieren.
+- Regel „kein Listeneintrag (Liste ohne feste Länge) und kein Map-Eintrag auf dem Weg des gebundenen Platzes“ gebaut (87163668),
+  nur am Weg des Knotens selbst – über die Referenz-Eingänge der Aufrufer hinweg nicht (wie C++: der Aufrufer nennt den Platz).
 - Weltregel für Funktionen einer anderen Bibliothek: nur wo ihr Rumpf im Graphen ist (gelinkt); ungelinkt prüft sie niemand.
 - Risiko Stellvertreter: ein behaltener NativeCallable (Klasse durch die Tür) zeigt nach dem Ende der Klasse ins Leere, wenn
   das Objekt der Engine nicht freigegeben wurde – NativeCallable sollte das Lebenszeichen der Instanz halten.
@@ -38,7 +41,7 @@ Entscheidungen beim Bau stehen in stand/c.md. Der Entwurf vom 18.11. (Stellen, B
   Typ (HeightSampler {fn,user}, RoadOptions mit std::function) und `arg()` → `Value::callback(Callable um den C++-Zeiger /
   die std::function)`; `same()` eines zurückgegebenen Callbacks (Terrain::sampler) = beide rufen und vergleichen. Stelle:
   stand_ins() ~Z. 11580 cpp_to_blueprint.py, converted.h (arg/same).
-- **Konverter (das Spiel)**: (a) `ro.deformed = [this](f64 x, f64 y, f64 r) { … }` → Lambda heben zu einer Funktion der
+- **Konverter (das Spiel)**: (a) GEBAUT (Emit.callback_lambda, Aufruf in Emit.ex bei want = Callback<…>; unbelegt): `ro.deformed = [this](f64 x, f64 y, f64 r) { … }` → Lambda heben zu einer Funktion der
   Bibliothek der Datei mit `const CityStream& self` vorn, `ro.deformed = callback<&lib::fn>(self)`; Captures nur `this`.
   (b) Terrain::sampler: `s.user = const_cast<T*>(this); s.fn = [](void* u, …) { static_cast<const T*>(u)->… }` →
   `return {callback<&lib::fn>(self)}` (Feld für Feld zu einem Wert des Callback-Structs). Beides allgemein: „ein Lambda an

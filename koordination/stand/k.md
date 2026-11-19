@@ -18,6 +18,13 @@
   Klasse (Ursache der Abweichung Game::stop 8/20 in 120450: die Testkopie von Ragdolls hatte ~Ragdolls nicht), 1e523e83 Merge work-zusammen.
 - Beleg läuft: work-k-vergleich-131110-451 (game_controls, game_vr, game_weapons, world_marks, city_stream, game.cpp auf 1e523e83).
 
+## BEREIT ZUM MERGEN: 1e523e83 (alles bis hier, mit work-zusammen 13:00) – Beleg work-k-vergleich-131110-451 + 123309-19335
+- 131110-451 (game_controls, game_vr, game_weapons, world_marks, city_stream, game.cpp auf 1e523e83): convert/bau/alle rc=0, 54/54 in beiden
+  Durchgängen. Marks::update, Marks::prune_walls geschrieben und verglichen (neu); cost-Zeilen 26 (Marks_* über CityStream_walls_near u. a. –
+  Speicher der Klasse, Paket p; CityStream_* gleich in früheren Läufen).
+- Unbelegt (in den Proben nicht geschrieben, Ketten fehlender Teile – zeigt der volle Lauf): ctl_strike_confirm (fb37e05e; wartet in der Probe an
+  CityStream::ground_height), vr_melee (bb6da523), update_projectiles (aa24c1f0), step_world/step_tow/life_update/draw_vehicles (Destruktoren).
+
 ## BEREIT ZUM MERGEN: 39ddc452 (+ cd69e381) – Beleg work-k-vergleich-123309-19335
 - Interiors::build (306 Zeilen) geschrieben und verglichen, Game::stop/~Ragdolls geschrieben und verglichen; 53/53 in beiden Durchgängen.
   (Die Stufen danach – 8c91947d…1e523e83 – belegt erst 131110-451.)
