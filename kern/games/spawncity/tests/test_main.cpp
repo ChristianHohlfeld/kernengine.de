@@ -3,6 +3,9 @@
 // suspension and tyres, the map decoder and the game rules.
 //
 //   kern/games/spawncity/tests/run_tests.sh
+//   spawncity_tests [part]          the tests whose name has `part` in it (all of them without it)
+//   spawncity_tests --name <n>...   exactly the tests named so, each once (a whole name; one that is no test's: FAIL)
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -195,7 +198,17 @@ int main(int argc, char** argv) {
     }
     return 0;
   }
-  const char* only = argc > 1 ? argv[1] : nullptr;
+  // (--name: whole names. A part of a name is not one test: "converted_game_details" is also part of
+  // converted_game_details_cpp, and a run for the one ran both.)
+  const bool by_name = argc > 1 && std::strcmp(argv[1], "--name") == 0;
+  const char* only = argc > 1 && !by_name ? argv[1] : nullptr;
+  std::vector<std::string> names;
+  if (by_name) for (int k = 2; k < argc; ++k) names.emplace_back(argv[k]);
+  for (const std::string& n : names) {
+    bool known = false;
+    for (const sct::Case& c : sct::cases()) known = known || n == c.name;
+    if (!known) { std::printf("FAIL %s (no test has this name)\n", n.c_str()); ++sct::failures; }
+  }
   int ran = 0;
   count_memory();
   // Every test in a process of its own: one that crashes (a sanitizer's report, a signal) or leaks is that
@@ -204,7 +217,13 @@ int main(int argc, char** argv) {
   std::setvbuf(stdout, nullptr, _IOLBF, 0);
   for (const sct::Case& c : sct::cases()) {
     if (only && !std::strstr(c.name, only)) continue;
+    if (by_name) {
+      bool named = false;
+      for (const std::string& n : names) named = named || n == c.name;
+      if (!named) continue;
+    }
     std::fflush(stdout);
+    const auto began = std::chrono::steady_clock::now();
     int counts[2] = {0, 0}, pipe_fd[2];
     if (pipe(pipe_fd) != 0) { std::printf("FAIL %s (no pipe)\n", c.name); ++sct::failures; continue; }
     const pid_t child = fork();
@@ -233,6 +252,7 @@ int main(int argc, char** argv) {
     int status = 0;
     if (child > 0) waitpid(child, &status, 0);
     ++ran;
+    std::printf("  time: %s: %.1f s\n", c.name, std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count());
     sct::checks += counts[0];
     sct::failures += counts[1];
     if (child < 0 || got != sizeof counts || !WIFEXITED(status) || WEXITSTATUS(status) != 0) {
