@@ -1,0 +1,80 @@
+    Terrain::grid_at (9): written
+    Terrain::elevation (11): written
+    road_key (1): written
+    Terrain::road_field (12): written
+    Terrain::set_corridors (45): written
+    Terrain::remove_corridors (12): written
+    Terrain::corridor_set (8): written
+    Terrain::corridors_at (1): written
+    Terrain::road_level (22): written
+    Terrain::node_height (12): written
+    Terrain::height (7): written
+    Terrain::normal (4): written
+    Terrain::footprint_base (12): written
+    Terrain::sampler (7): a Callback<Float(Float, Float)> made here
+    Terrain::water_cell (7): written
+    Terrain::set_water_cell (6): written
+    Terrain::on_bridge (9): written
+    Terrain::water_at (5): written
+    Terrain::flow_at (7): written
+    Terrain::surface_at (6): written
+    Terrain::add_water_polygon (23): written
+    Terrain::add_waterway (31): written
+    Terrain::add_bridge (8): written
+    albedo (9): written
+    srgb_lin8 (1): written
+    Terrain::take_image_requests (10): written
+    Terrain::image_bounds (9): tile_lonlat() is defined in another file
+    Terrain::plan_images (24): unproject() is defined in another file
+    Terrain::provide_image (36): it calls Terrain::image_bounds(), which waits
+    Terrain::fail_image (4): written
+    Terrain::ground_albedo (14): unproject() is defined in another file
+    srgb_to_linear (1): written
+    linear_to_srgb (1): written
+    to_linear (1): written
+    to_srgb (1): written
+    Terrain::add_tint (10): written
+    Terrain::remove_tints (7): written
+    Terrain::repaint (10): written
+    Terrain::add_crater (12): written
+    Terrain::crater_list (4): written
+    Terrain::set_craters (13): written
+    Terrain::dirty (21): written
+    Terrain::ground_ready (5): written
+    Terrain::has_collision (4): written
+    Terrain::want_tiles (60): written
+    Terrain::build_render_tile (91): it calls Terrain::ground_albedo(), which waits
+    Terrain::build_collision_tile (35): written
+    Terrain::build_water_chunk (117): build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+    Terrain::ready_at (12): written
+    Terrain::update (81): it calls Terrain::plan_windows(), which waits
+tiles                           2 /    2 functions        2 /      2 lines
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+150 of 176 functions of the program are written as Blueprints (1388 of 2383 lines), and 11 of the engine's headers that they call: 14 Blueprints - 2 of source files, 0 of states, 12 of headers and of shapes
+151 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     7 (   186)   unproject() is defined in another file
+     1 (   117)   build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+     1 (   110)   read_features() is defined in another file
+     1 (    91)   it calls Terrain::ground_albedo(), which waits
+     1 (    85)   it calls CityStream::request_around(), which waits
+     1 (    81)   it calls Terrain::plan_windows(), which waits
+     2 (    73)   road_is_water() is defined in another file
+     2 (    62)   it calls GeoProjector::init(), which waits
+     1 (    44)   chunk_count() is defined in another file
+     1 (    36)   it calls Terrain::image_bounds(), which waits
+     2 (    33)   training_level() is defined in another file
+     1 (    22)   buildings_input() is defined in another file
+     1 (    17)   the engine's begin() (its node is another one in the engine: its pins differ)
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (     9)   tile_input() is defined in another file
+     1 (     9)   tile_lonlat() is defined in another file
+     1 (     7)   a Callback<Float(Float, Float)> made here
+
+real	2m37,575s
+user	4m39,801s
+sys	0m15,914s
