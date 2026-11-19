@@ -16,6 +16,10 @@ namespace logic_cases {
 struct Case {
   const char* name;
   const char* graph;
+  // C++ leaves open what the scenario does (a function that calls itself for ever: C++ runs out of
+  // its stack) - the interpreter and the JIT stop it with the same error; the Blueprint's class is
+  // not run on it (blueprint_native.h).
+  bool cpp_leaves_open = false;
 };
 
 inline const std::vector<Case>& cases() {
@@ -207,6 +211,58 @@ inline const std::vector<Case>& cases() {
           [45,"then1",46,"exec"],[45,"then2",46,"exec"],[45,"then3",46,"exec"],[45,"then4",46,"exec"],[45,"then5",46,"exec"],[45,"then6",46,"exec"],[45,"then7",46,"exec"],
           [45,"then8",46,"exec"],[45,"then9",46,"exec"],[45,"then10",46,"exec"],
           [50,"then",51,"exec"],[50,"v",51,"v"],[60,"then",61,"exec"],[60,"v",62,"a"],[62,"result",61,"condition"],[61,"true",63,"exec"],[60,"v",64,"a"],[64,"result",63,"value"]]})"},
+      // Functions that call themselves - each call with its own values, in every tier as in C++: Fib
+      // reads what its first call gave after its second (Fib(15) = 610), Loop calls itself in the
+      // body of its For Loop (the index is the call's own: 2 + 2 Loop(n - 1) steps).
+      {"recursion_direct",
+       R"({"variables":[{"name":"R","type":"int","value":0},{"name":"Count","type":"int","value":0}],
+        "functions":[{"name":"Fib","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"r","type":"int","value":0}]},
+          {"name":"Loop","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fib"}},{"id":21,"type":"flow.branch"},{"id":22,"type":"math.compare","params":{"op":"<"},"values":{"b":2}},
+          {"id":23,"type":"func.return","params":{"function":"Fib"}},{"id":24,"type":"func.call","params":{"function":"Fib"}},{"id":25,"type":"math.sub","values":{"b":1}},
+          {"id":26,"type":"func.call","params":{"function":"Fib"}},{"id":27,"type":"math.sub","values":{"b":2}},{"id":28,"type":"func.return","params":{"function":"Fib"}},{"id":29,"type":"math.add"},
+          {"id":40,"type":"func.entry","params":{"function":"Loop"}},{"id":41,"type":"flow.for","values":{"first":1,"last":2}},{"id":42,"type":"flow.branch"},
+          {"id":43,"type":"math.compare","params":{"op":">"},"values":{"b":0}},{"id":44,"type":"func.call","params":{"function":"Loop"}},{"id":45,"type":"math.sub","values":{"b":1}},
+          {"id":46,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},{"id":47,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"func.call","params":{"function":"Fib"}},{"id":3,"type":"math.add","values":{"b":10}},
+          {"id":4,"type":"var.add","params":{"variable":"R"}},{"id":5,"type":"func.call","params":{"function":"Loop"}}],
+        "links":[[20,"then",21,"exec"],[20,"n",22,"a"],[22,"result",21,"condition"],[21,"true",23,"exec"],[20,"n",23,"r"],[21,"false",24,"exec"],[20,"n",25,"a"],[25,"result",24,"n"],
+          [24,"then",26,"exec"],[20,"n",27,"a"],[27,"result",26,"n"],[26,"then",28,"exec"],[24,"r",29,"a"],[26,"r",29,"b"],[29,"result",28,"r"],
+          [40,"then",41,"exec"],[41,"body",42,"exec"],[40,"n",43,"a"],[43,"result",42,"condition"],[42,"true",44,"exec"],[40,"n",45,"a"],[45,"result",44,"n"],[44,"then",46,"exec"],[42,"false",47,"exec"],
+          [1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",2,"n"],[2,"then",4,"exec"],[2,"r",4,"amount"],[4,"then",5,"exec"],[1,"value",5,"n"]]})"},
+      // Through others: Ping calls Pong, Pong calls Ping; Ping's second step (a Sequence) runs when
+      // the calls below it are over, with its own n (Trail: the order the calls end in).
+      {"recursion_through",
+       R"({"variables":[{"name":"Trail","type":"float","value":0},{"name":"Hops","type":"int","value":0}],
+        "functions":[{"name":"Ping","inputs":[{"name":"n","type":"float","value":0}],"outputs":[]},{"name":"Pong","inputs":[{"name":"n","type":"float","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Ping"}},{"id":11,"type":"flow.sequence","params":{"count":"2"}},{"id":12,"type":"flow.branch"},
+          {"id":13,"type":"math.compare","params":{"op":">"},"values":{"b":0}},{"id":14,"type":"func.call","params":{"function":"Pong"}},{"id":15,"type":"math.sub","values":{"b":1}},
+          {"id":16,"type":"var.set","params":{"variable":"Trail"}},{"id":17,"type":"math.formula","params":{"formula":"(acc * 7 + x) % 1000003"}},{"id":18,"type":"var.get","params":{"variable":"Trail"}},
+          {"id":30,"type":"func.entry","params":{"function":"Pong"}},{"id":31,"type":"var.add","params":{"variable":"Hops"},"values":{"amount":1}},{"id":32,"type":"func.call","params":{"function":"Ping"}},
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"func.call","params":{"function":"Ping"}}],
+        "links":[[10,"then",11,"exec"],[11,"then0",12,"exec"],[10,"n",13,"a"],[13,"result",12,"condition"],[12,"true",14,"exec"],[10,"n",15,"a"],[15,"result",14,"n"],
+          [11,"then1",16,"exec"],[18,"value",17,"acc"],[10,"n",17,"x"],[17,"result",16,"value"],
+          [30,"then",31,"exec"],[31,"then",32,"exec"],[30,"n",32,"n"],[1,"then",2,"exec"],[1,"value",2,"n"]]})"},
+      // Deep: 5000 calls one in another - more than the interpreter reached on the 1 MiB stack of the
+      // WebAssembly build while each call was a call of C++ (about 700).
+      {"recursion_deep",
+       R"({"variables":[{"name":"Depth","type":"int","value":0}],
+        "functions":[{"name":"Down","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Down"}},{"id":11,"type":"flow.branch"},{"id":12,"type":"math.compare","params":{"op":">"},"values":{"b":0}},
+          {"id":13,"type":"var.add","params":{"variable":"Depth"},"values":{"amount":1}},{"id":14,"type":"func.call","params":{"function":"Down"}},{"id":15,"type":"math.sub","values":{"b":1}},
+          {"id":1,"type":"event.custom","params":{"name":"Open"}},{"id":2,"type":"func.call","params":{"function":"Down"},"values":{"n":5000}}],
+        "links":[[10,"then",11,"exec"],[10,"n",12,"a"],[12,"result",11,"condition"],[11,"true",13,"exec"],[13,"then",14,"exec"],[10,"n",15,"a"],[15,"result",14,"n"],
+          [1,"then",2,"exec"]]})"},
+      // For ever: the call past Runtime::kCallsDeep (65536) stops the chain and the Blueprint, in the
+      // interpreter and with the JIT at the same call. C++ leaves it open (its stack runs out).
+      {"recursion_endless",
+       R"({"variables":[{"name":"Steps","type":"int","value":0}],
+        "functions":[{"name":"Forever","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Forever"}},{"id":11,"type":"var.add","params":{"variable":"Steps"},"values":{"amount":1}},
+          {"id":12,"type":"func.call","params":{"function":"Forever"}},
+          {"id":1,"type":"event.custom","params":{"name":"Open"}},{"id":2,"type":"func.call","params":{"function":"Forever"}}],
+        "links":[[10,"then",11,"exec"],[11,"then",12,"exec"],[10,"n",12,"n"],[1,"then",2,"exec"]]})",
+       true},
       // Whole numbers at their ends: a variable doubled 70 times stays at Int's end, one past 2^53
       // adds as a number does, Float to Int of what does not fit, Floor and Round of endless and
       // of what is no number - every tier holds a whole number the same way (logic::normal). Int's
@@ -559,6 +615,13 @@ inline const std::vector<Case>& cases() {
       // Texts as std::string reads them (find, rfind, find_*_of, substr, insert, erase, replace) and numbers
       // and words read as C reads them (strtod, strtof, strtoll, strtoull, sscanf) - every value made into
       // one text.
+      // A byte of a text variable set where it stands (Set Code: `s[i] = c` of a std::string) - outside the text: nothing.
+      {"text_set_code",
+       R"({"variables":[{"name":"Shown","type":"text","value":"ab\ncd"}],"nodes":[{"id":1,"type":"event.begin"},
+          {"id":2,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":2,"code":32}},
+          {"id":3,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":7,"code":33}},
+          {"id":4,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":0,"code":321}}],
+          "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})"},
       {"text_scan",
        R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
           {"id":2,"type":"var.set","params":{"variable":"Shown"}},
@@ -1114,6 +1177,35 @@ inline const std::vector<Case>& cases() {
        R"kg("then",60,"exec"],[60,"then",62,"exec"],[61,"value",60,"item"],[62,"then",64,"exec"],[63,"value",62,"item"],[64,"then",30,"exec"],[65,"value",64,"item"],[66,"then",67,"exec"],[68,"result",67,"item"],[)kg"
        R"kg(69,"value",68,"a"],[70,"value",68,"b"],[71,"value",4,"list"],[72,"then",73,"exec"],[73,"then",74,"exec"],[74,"then",76,"exec"],[75,"value",74,"item"],[77,"value",76,"item"]],"machines":[],"functions":)kg"
        R"kg([{"name":"Twice","inputs":[{"name":"x","type":"int","of":"i16","value":0}],"outputs":[{"name":"r","type":"int","of":"u8","value":0}],"locals":[{"name":"Here","type":"int","of":"i16","value":0}]}]})kg"},
+      // Lists of Ints of a fixed width (List<U8>, List<I8>, List<U32>): an item is stored as C++ stores it there (Add, Insert,
+      // Set Length's value, Insert Text Bytes - an I8 holds the bytes 128 .. 255 as -128 .. -1 -, Copy Bytes of its width); Find,
+      // Contains and Remove Item compare the number (std::find of 256 in a std::vector<u8> finds nothing); Text of Bytes, Struct of
+      // Bytes and Copy Bytes read a list of any width (kAnyWidth). The same values as the C++ of std::vector<u8> ... (checked so).
+      {"fixed_width_lists",
+       R"kg({"kind":"kern-logic","version":1,"nextId":42,"variables":[{"name":"In","type":"int_list","value":[0,1,-1,127,128,255,256,-128,-129,65535,65536,-32769,4294967295,4294967296,9007199254740992,-9007199254)kg"
+       R"kg(740994]},{"name":"W","type":"int_list","value":[]},{"name":"Z","type":"bool_list","value":[]},{"name":"B","type":"int_list","of":"u8","value":[1,2,255]},{"name":"S","type":"int_list","of":"i8","value")kg"
+       R"kg(:[]},{"name":"U","type":"int_list","of":"u32","value":[]},{"name":"Hh","type":"struct","of":"H","value":{"a":0,"b":0}}],"structs":[{"name":"H","fields":[{"name":"a","type":"int","of":"u16","value":0},)kg"
+       R"kg({"name":"b","type":"int","of":"u8","value":0}]}],"nodes":[{"id":1,"type":"event.begin","x":0,"y":0},{"id":3,"type":"flow.for_each","x":280,"y":0,"params":{"type":"int"}},{"id":4,"type":"flow.for_each")kg"
+       R"kg(,"x":4200,"y":0,"params":{"type":"u8"}},{"id":5,"type":"flow.for_each","x":4760,"y":0,"params":{"type":"i8"}},{"id":6,"type":"var.get","x":160,"y":150,"params":{"variable":"In"}},{"id":7,"type":"list.)kg"
+       R"kg(add","x":560,"y":0,"params":{"variable":"B"}},{"id":8,"type":"list.insert","x":840,"y":0,"params":{"variable":"S"},"values":{"index":0}},{"id":9,"type":"list.add","x":1120,"y":0,"params":{"variable":")kg"
+       R"kg(U"}},{"id":10,"type":"list.add","x":1400,"y":0,"params":{"variable":"W"}},{"id":11,"type":"list.find","x":1280,"y":150,"params":{"type":"u8"}},{"id":12,"type":"var.get","x":1280,"y":240,"params":{"var)kg"
+       R"kg(iable":"B"}},{"id":13,"type":"list.add","x":1680,"y":0,"params":{"variable":"Z"}},{"id":14,"type":"list.contains","x":1560,"y":150,"params":{"type":"i8"}},{"id":15,"type":"var.get","x":1560,"y":240,"p)kg"
+       R"kg(arams":{"variable":"S"}},{"id":16,"type":"list.insert_text","x":1960,"y":0,"params":{"variable":"S"},"values":{"index":1,"text":"\u00ffz"}},{"id":17,"type":"list.resize","x":2240,"y":0,"params":{"vari)kg"
+       R"kg(able":"U"},"values":{"length":20,"value":-1}},{"id":18,"type":"list.copy_bytes","x":2520,"y":0,"params":{"variable":"B","code":"u8","from_code":"u32"},"values":{"at":0,"from":0,"count":8}},{"id":19,"t)kg"
+       R"kg(ype":"var.get","x":2400,"y":150,"params":{"variable":"U"}},{"id":20,"type":"list.add","x":2800,"y":0,"params":{"variable":"W"}},{"id":21,"type":"text.length","x":2680,"y":150},{"id":22,"type":"text.of)kg"
+       R"kg(_bytes","x":2680,"y":240,"values":{"at":0,"count":6}},{"id":23,"type":"var.get","x":2680,"y":330,"params":{"variable":"B"}},{"id":24,"type":"var.set","x":3080,"y":0,"params":{"variable":"Hh"}},{"id":2)kg"
+       R"kg(5,"type":"struct.of_bytes","x":2960,"y":150,"params":{"struct":"H","layout":"4: u16@0 u8@2"},"values":{"at":1}},{"id":26,"type":"var.get","x":2960,"y":240,"params":{"variable":"B"}},{"id":27,"type":"l)kg"
+       R"kg(ist.add","x":3360,"y":0,"params":{"variable":"W"}},{"id":28,"type":"var.get","x":3240,"y":150,"params":{"variable":"Hh","path":".a"}},{"id":29,"type":"list.add","x":3640,"y":0,"params":{"variable":"W")kg"
+       R"kg(}},{"id":30,"type":"var.get","x":3520,"y":150,"params":{"variable":"Hh","path":".b"}},{"id":31,"type":"list.remove","x":3920,"y":0,"params":{"variable":"B"},"values":{"item":255}},{"id":32,"type":"var)kg"
+       R"kg(.get","x":4080,"y":150,"params":{"variable":"B"}},{"id":33,"type":"list.add","x":4480,"y":0,"params":{"variable":"W"}},{"id":34,"type":"var.get","x":4640,"y":150,"params":{"variable":"S"}},{"id":35,"t)kg"
+       R"kg(ype":"list.add","x":5040,"y":0,"params":{"variable":"W"}},{"id":36,"type":"list.add","x":5320,"y":0,"params":{"variable":"W"}},{"id":37,"type":"list.get","x":5200,"y":150,"params":{"type":"u32"},"valu)kg"
+       R"kg(es":{"index":3}},{"id":38,"type":"var.get","x":5200,"y":240,"params":{"variable":"U"}},{"id":39,"type":"list.add","x":5600,"y":0,"params":{"variable":"W"}},{"id":40,"type":"list.length","x":5480,"y":1)kg"
+       R"kg(50,"params":{"type":"u32"}},{"id":41,"type":"var.get","x":5480,"y":240,"params":{"variable":"U"}}],"links":[[1,"then",3,"exec"],[3,"body",7,"exec"],[3,"completed",16,"exec"],[3,"item",7,"item"],[3,"it)kg"
+       R"kg(em",8,"item"],[3,"item",9,"item"],[3,"item",11,"item"],[3,"item",14,"item"],[4,"body",33,"exec"],[4,"completed",5,"exec"],[4,"item",33,"item"],[5,"body",35,"exec"],[5,"completed",36,"exec"],[5,"item",)kg"
+       R"kg(35,"item"],[6,"value",3,"list"],[7,"then",8,"exec"],[8,"then",9,"exec"],[9,"then",10,"exec"],[10,"then",13,"exec"],[11,"index",10,"item"],[12,"value",11,"list"],[14,"result",13,"item"],[15,"value",14,)kg"
+       R"kg("list"],[16,"then",17,"exec"],[17,"then",18,"exec"],[18,"then",20,"exec"],[19,"value",18,"items"],[20,"then",24,"exec"],[21,"result",20,"item"],[22,"result",21,"a"],[23,"value",22,"bytes"],[24,"then",)kg"
+       R"kg(27,"exec"],[25,"value",24,"value"],[26,"value",25,"bytes"],[27,"then",29,"exec"],[28,"value",27,"item"],[29,"then",31,"exec"],[30,"value",29,"item"],[31,"then",4,"exec"],[32,"value",4,"list"],[34,"val)kg"
+       R"kg(ue",5,"list"],[36,"then",39,"exec"],[37,"item",36,"item"],[38,"value",37,"list"],[40,"length",39,"item"],[41,"value",40,"list"]],"machines":[]})kg"},
       // Append into the variable it reads (NodeDef::takes_first: in the class text_append(std::move(T), ...) appends where T's
       // characters are) - with the index, with T itself (T + T: T as it was), and T into U.
       {"append_in_place",

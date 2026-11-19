@@ -556,9 +556,14 @@ json::Value Studio::logic_json() const {
         pj.set("id", p.id);
         pj.set("label", p.label);
         pj.set("type", logic::pin_type_name(p.type));
-        if (!p.of.empty()) pj.set("of", p.of);
+        if (!p.of.empty() && p.of != logic::kAnyWidth) pj.set("of", p.of);
         // (a pin that takes the type of the first wire: the types it can be)
         for (const auto& [id, types] : generic) if (id == p.id) pj.set("generic", types);
+        if (p.of == logic::kAnyWidth) {  // (it reads a list of Ints of each width: List<Int>, List<U8> ...)
+          std::string types = "int_list";
+          for (std::string_view w : logic::kWidthNames) types += " " + std::string(w) + "_list";
+          pj.set("generic", types);
+        }
         bool linked = false;
         for (const logic::Link& l : g->links)
           if ((output && l.from == n.id && l.out == p.id) || (!output && l.to == n.id && l.in == p.id)) linked = true;
@@ -2570,8 +2575,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (!name_problem(g, base).empty()) base += "Value";
       std::string vname = base;
       for (int i = 2; g.variable(vname) || g.function(vname) || g.enumeration(vname) || g.structure(vname); ++i) vname = base + std::to_string(i);
-      const logic::TypeRef held{p.type, p.of};
-      logic::Variable v{vname, p.type, logic::zero_of(held, g).to_json(g, held), {}, p.of};
+      const logic::TypeRef held = logic::place_type(p);
+      logic::Variable v{vname, p.type, logic::zero_of(held, g).to_json(g, held), {}, held.of};
       if (!output)
         if (const json::Value* lit = n->value(p.id)) v.value = logic::Value::from_json(*lit, held, g).to_json(g, held);
       g.variables.push_back(v);

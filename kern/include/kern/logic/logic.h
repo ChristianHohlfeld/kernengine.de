@@ -427,6 +427,10 @@ constexpr int width_bits(std::string_view of) {
     if (of == kWidthNames[k]) return kBits[k];
   return 0;
 }
+/// The `of` of an input that reads a list of Ints of any width - Int, U8 ... I32 (`List<Int>`, `List<U8>`):
+/// a node that reads the numbers of the list as they are (Text of Bytes, Copy Bytes' Items, Struct of
+/// Bytes) - in C++ a function over the list's items (logic::Items<T>). No place and no value is of it.
+inline constexpr std::string_view kAnyWidth = "*";
 /// Is the place an Int of a fixed width (or a list of such)?
 constexpr bool has_width(PinType t, std::string_view of) { return element_of(t) == PinType::integer && width_bits(of) != 0; }
 inline bool has_width(const TypeRef& t) { return has_width(t.type, t.of); }
@@ -772,6 +776,8 @@ struct PinDef {
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
   u32 count = 0;         // a list of a fixed length: that many entries (a field's, a function's pin: TypeRef::count)
 };
+/// The type a place takes from a pin it is made for (a variable, a function's input): a pin of kAnyWidth's is a List<Int>.
+inline TypeRef place_type(const PinDef& p) { return {p.type, p.of == kAnyWidth ? std::string() : p.of}; }
 
 struct ParamDef {
   std::string key, label;
@@ -793,6 +799,10 @@ struct ParamDef {
   bool structs_only = false;  // Kind::type: a struct of the Blueprint and nothing else (the struct nodes' "Struct")
   bool optional = false;      // Kind::function: it may name none (Sort List without an Order: the items' own)
   bool keys_only = false;     // Kind::type: a type a map's or a set's keys can be (Bool, Int, Int64, an enum, Text)
+  /// Kind::type: Ints of a fixed width are among them - as the type of a list's items (U8 ... I32: what a
+  /// list holds is stored there, a wire of an item is an Int); `with_lists`: a list of them (u8_list), which a
+  /// value of the type is as it is (not a single Int of a width: on a pin it would be another number)
+  bool widths = false;
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.
@@ -1256,6 +1266,16 @@ class Instance {
   bool inline_pure(int node) const;
   f64* slots() { return slots_.data(); }
   i32* stack() { return stack_.data(); }
+  /// Where generated code finds the stack: {its address, its capacity} - the stack grows (a
+  /// function that calls itself leaves something open in every call), so the code reads them here.
+  i32* stack_cell() { return stack_cell_; }
+  /// A Call Function node: the function's index (-1: another node), and the node its body begins at.
+  int calls_fn(int node) const { return calls_fn_[static_cast<std::size_t>(node)]; }
+  int fn_entry(int f) const { return fn_entry_[static_cast<std::size_t>(f)]; }
+  /// call_node's answer for a Call Function node whose call began: go on at the function's entry.
+  static constexpr int kEnterCall = 1000;
+  /// call_node(-2): generated code found its stack full - make it larger.
+  static constexpr int kGrowStack = -2;
   /// How many continuations the stack holds: as many as this graph can ever leave open (a node
   /// leaves some at most once in each running chain, and chains nest 64 events deep at most) -
   /// generated code never runs out of it where the interpreter and the Blueprint's class go on.
@@ -1332,13 +1352,45 @@ class Instance {
   struct Local { std::string key; Value init; };
   std::vector<std::vector<Local>> locals_;                // per function: its local variables
   std::unordered_map<std::string, TypeRef> var_types_;    // what is held under a key
+  /// What a call of a function that is already running (it calls itself, directly or through
+  /// others, or an event it raised reaches it again) keeps of the call it interrupts: that call's
+  /// parameters, local variables, and what its steps gave and its loops keep. The interrupted
+  /// call has them back when the inner one is over - as the Blueprint's class has them in its
+  /// method's own parameters and locals.
+  struct Kept {
+    std::vector<Value> parameters, locals;
+    std::vector<std::pair<std::vector<Value>, NodeState>> nodes;  // (by fn_nodes_)
+    std::vector<f64> slots;  // their slots (a loop's index, what generated code reads), the entry's first
+  };
   struct Frame {                     // a function call that is running
     int function = -1;               // index in graph_.functions
     int depth = 0;                   // Runtime::depth_ of the call's own chain
     i32 stack_base = 0;              // generated code: continuation depth when the call began
     bool returned = false;
     std::vector<Value> results;
+    // A call a node of the graph makes (Call Function) runs in the chain of the caller: no call of
+    // C++, a frame - the chain goes on at the function's entry, and where the call's continuations
+    // begin (`base`) a mark stands that ends the call (kAfterCall). So how deep functions call each
+    // other does not depend on the machine's stack.
+    bool trampoline = false;
+    int call_node = -1;
+    std::size_t base = 0;
+    std::vector<Spot> outer_refs;
+    std::vector<Spot> held;                         // the places in lists the call holds (by reference)
+    std::vector<std::vector<std::size_t>> lengths;  // and how long those lists were when it began
+    std::unique_ptr<Kept> kept;
   };
+  static constexpr int kAfterCall = -1000;  // the entry of the mark that ends a call (Frame::trampoline)
+  /// The call's beginning and end (call_function, and the chain's own frames): the inputs bound,
+  /// what an interrupted call of the same function has kept, its locals at their defaults.
+  bool enter_call(int f, const std::vector<Value>& args, const std::vector<Spot>* places, bool inside, Frame& frame);
+  void leave_call(Frame& frame);
+  /// Call Function at node `n` in a chain of the interpreter: 1 the call began (the chain goes on
+  /// at the entry, `n` is that), 0 no call (the function has no body: on after the node), -1 the
+  /// chain is stopped (calls nest too deep).
+  int begin_call(int& n, std::vector<std::pair<int, int>>& stack);
+  /// The mark of a call is reached: its results on the node's outputs; the node to go on at.
+  int end_call(int n, int& entry);
   Runtime& rt_;
   Graph graph_;
   ActorRef self_ = 0;
@@ -1350,11 +1402,18 @@ class Instance {
   std::vector<Machine> machines_;
   std::unordered_map<std::string, int> fn_index_;  // function name -> index in graph_.functions
   std::vector<int> fn_entry_;         // per function: compiled index of its entry node (-1 none)
+  std::vector<int> fn_running_;       // per function: its calls that are running now
+  std::vector<std::vector<int>> fn_nodes_;  // per function: the steps of its body (what a call that interrupts another keeps of it)
+  std::vector<int> calls_fn_;         // per node: the function a Call Function node calls (-1: none, or another node)
   std::vector<int> events_;           // the event nodes, by node id: the order handlers of one event run in
   std::vector<Frame> frames_;
   std::vector<f64> slots_;            // fixed size: generated code holds absolute addresses
   std::vector<i32> stack_;            // [0] = depth, then (pc, entry) pairs
   int stack_capacity_ = CodeLayout::kStack;
+  i32 stack_cell_[2] = {0, 0};          // {address of stack_, stack_capacity_}: what generated code reads
+  void stack_moved();                  // (stack_ was assigned: the cell again)
+  void grow_stack();                   // twice the capacity, what it holds kept
+  void push_cont(int node, int entry); // a continuation onto stack_ (it grows)
   bool jit_fits_ = true;              // (false: the graph could need more than kStackMost - it stays in the interpreter)
   std::vector<i32> exec_table_;       // per node: (target, entry) per exec output
   std::vector<int> exec_table_offset_;
@@ -1498,6 +1557,12 @@ class Runtime {
   std::vector<Trace> trace_;
   u64 executed_ = 0, tick_start_ = 0, serial_ = 0;
   int depth_ = 0;
+  int calls_ = 0;  // function calls that are running, one in another (at most kCallsDeep)
+ public:
+  /// How deep calls of a Blueprint's functions may nest in the interpreter and with the JIT
+  /// (docs/blueprint_cpp.md): the call past it stops the chain and the Blueprint.
+  static constexpr int kCallsDeep = 65536;
+ private:
   i32 counters_[5] = {0, 200000, 0, 0, 0};     // shared with generated code: [0] nodes run, [1] the limit of loop
                                                // passes per step, [2] tracing, [3] loop passes this step, [4] a loop
                                                // of the running compiled chain was refused a pass

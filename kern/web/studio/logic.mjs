@@ -53,7 +53,7 @@ const lgTypeName = t => LG_TYPE_NAMES[t] || (lgIsKeyed(t) ? lgKeyedName(t) : lgI
 const lgTyped = x => {
   if (x && (x.type === "map" || x.type === "set")) { x.type = x.type + "<" + (x.of || "int") + ">"; return; }  // (a map, a set: "map<int>float>", as the engine names it)
   if (x?.of && ["enum", "enum_list", "struct", "struct_list"].includes(x.type)) x.type = x.type.endsWith("_list") ? x.of + "_list" : x.of;
-  if (x?.of && x.type === "int" && LG_WIDTHS.includes(x.of)) x.type = x.of;  // (an Int of a fixed width: "u32")
+  if (x?.of && (x.type === "int" || x.type === "int_list") && LG_WIDTHS.includes(x.of)) x.type = x.type === "int" ? x.of : x.of + "_list";  // (an Int of a fixed width: "u32", "u8_list")
 };
 // A map of values under keys, a set of keys - in the order the keys came: a type by the engine's
 // name for it, "map<int>float>", "map<enum:Kind>struct_list:Cell>", "set<text>". Its keys and
@@ -922,7 +922,7 @@ export class LogicEditor {
    *  Blueprint's enums and structs (`without`: the structs that are none of them), and a list of each. */
   typeOptions(current, without = [], keyed = true) {
     const values = [...LG_VALUE_TYPES, ...LG_WIDTHS, ...(this.data?.enums || []).map(e => e.name), ...(this.data?.structs || []).map(s => s.name).filter(n => !without.includes(n))];
-    const all = [...values, ...values.filter(t => !LG_WIDTHS.includes(t)).map(t => t + "_list")];  // (List<U8> comes with its own step)
+    const all = [...values, ...values.map(t => t + "_list")];  // (a list of Ints of a fixed width too: List<U8>)
     // (a map or a set: the one it is, else one of Integer keys - its keys and values are chosen beside it, keyOptions)
     if (keyed) all.push(lgIsKeyed(current) && current.startsWith("map") ? current : "map<int>float>", lgIsKeyed(current) && current.startsWith("set") ? current : "set<int>");
     return all.map(t => `<option value="${lgEsc(t)}"${t === current ? " selected" : ""}>${lgEsc(lgIsKeyed(t) ? (t.startsWith("map") ? "Map…" : "Set…") : lgTypeName(t))}</option>`).join("");
