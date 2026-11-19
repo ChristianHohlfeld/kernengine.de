@@ -843,3 +843,19 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - **Leistung (p, Kopf 85d60a1d):** Zeit-Test `--check 1.10`: 25 von 29 Fällen darüber; größte Reste mulm 7,8×, settings_escape 7×, sha256 6,7×, from_hex 5,1×, qr 5×.
   Nächste Entwürfe laut uebergabe/p.md: +,−,× und Vergleich an der Wurzel einer Int-Formel; Struktur-Argumente bei Call on Actor ohne logic::Value.
 
+### 16.20 Stand 02:45 (19.11.) – GÜLTIGER LAUF: `work-zusammen-voll-020121-10802` (4748a503), convert rc=0
+- **Konvertierung 02:01:37 → 02:32:34 (18 Runden), `convert rc=0`.** „1637 of 1844 functions of the program are written as Blueprints (19218 of 30978 lines), and 28 of
+  the engine's headers that they call: 156 Blueprints – 70 of source files, 1 of states, 85 of headers and of shapes“; „1594 functions of the Blueprints are
+  compared with their source, bit for bit …; 5 give nothing“. Zum Vergleich 203000 (20:53): 1632 / 18813 / 1589. **`grundlage` im Zweig mag/auftrag zeigt jetzt auf
+  diesen Lauf.** Die Suiten rechneten bei Redaktionsschluss (Spiel-Suite mit clang, beide Durchgänge im Testrahmen von t1; Engine-Suite).
+- **work-zusammen = 4748a503** = 84696123 + work-d-count (E14 set_pcm, Count im Typ), work-d-array (`T m[N]`), work-d-maker (Objekte der Engine für sechs Klassen).
+- **Die nächste große Hebelstelle (rund 116 wartende Funktionen, fast alle Game):** der Test übersetzt im ganzen Programm nicht, wenige Familien – `kReliable`/
+  `kUnreliable` aus net_session_cpp_local (~60), `World`/`arg` (10), `draw_CarSpec` fehlt (16), `g_fun`/`multiplier` (6), „';' after top level declarator“ (6),
+  `kOlive` (5), `kScorches` (2), Graph (E12). Im Kleinen (t2: sieben Dateien; g: drei) tritt es nicht auf. → Nachfolger t1 („t1b“, gestartet 02:47).
+  Dazu 16 Funktionen „waits for good“ (Rekursion über Teile; Entwurfspunkt Stufe 6) und die 207 nicht geschriebenen (1844 − 1637: brauchen Platz der Engine,
+  Callbacks/Events, build_level – Stufe 6).
+- **Agenten:** d4 beim dritten Neustart des Servers (~02:28) abgebrochen und NICHT fortgesetzt (seine Fixe sind gemergt; Engine-Suite des Makers
+  `work-d-maker-engine-015441-9451` abholen). Laufend: t1b. Nach der Auswertung der Suite: Nachfolger für die Regeln (k: Nicht-Game, g: Game).
+- **Nächster Schritt:** Suite-Ergebnis (suite rc, engine rc in `mag/<name>/when`; suite.log) auswerten – beide Durchgänge; ist alles grün (unwahrscheinlich beim
+  ersten Mal): `work-zusammen` + Commit „Level und Tests“ des Laufs nach `work` (Abschnitt 10), CI anstoßen. Sonst Liste nach Gebieten, Agenten, nächster Lauf.
+

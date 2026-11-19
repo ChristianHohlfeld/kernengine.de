@@ -1,4 +1,17 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 02:45 **GÜLTIG: `work-zusammen-voll-020121-10802` auf 4748a503 – `convert rc=0` (02:32, 18 Runden, 31 min).** Der erste gültige Lauf seit 20:53.
+  „1637 of 1844 functions of the program are written as Blueprints (19218 of 30978 lines) … 156 Blueprints“; „1594 functions … compared with their source“.
+  (203000: 1632 / 18813 Zeilen / 1589.) Die Suiten rechnen (Spiel-Suite mit clang, beide Durchgänge; Engine-Suite). `grundlage` für `vergleich` ist jetzt dieser Lauf.
+  · **Warum es trotz t2 kaum mehr sind:** im ganzen Programm warten rund 116 Funktionen an ihrem Test, fast alle aus wenigen Familien (Protokoll:
+    `xz -dc $S/mag/work-zusammen-voll-020121-10802/zwischen/convert.log.xz | grep 'cannot compare it yet'`):
+    (1) ~60 × `kReliable`/`kUnreliable` – „use of undeclared identifier 'kReliable'; did you mean 'net_session_cpp_local::kReliable'?“ in den Tests der Game-Teile, die
+        Session-Methoden mitnehmen (town_to_host 12, send_fx 9+11+2+2, town_to_all 9, seat_request 7, gaps_lamp_break 4, send_proj 3, send_swarm_hit 3 …);
+    (2) 10 × „type name 'World' … no matching function for call to 'arg'“ (Game::fixed_step u. a.); (3) 16 × `draw_CarSpec` fehlt („did you mean 'draw_MassSpec'?“:
+        Car, spawn_police_unit, steer_torque_at, suspension_tuning, ai_drive …); (4) 6 × `g_fun`/`multiplier` (combat_hud …); (5) 6 × „expected ';' after top level
+        declarator“; (6) 5 × `kOlive` (CombatArt); (7) 2 × `kScorches`; dazu Graph (E12). Alles Test-Schreiber im ganzen Programm → Nachfolger t1 (gestartet).
+    Dazu 16 „waits for good“ (Rekursion über Teile, Entwurfspunkt Stufe 6).
+  · Dritter Neustart des Servers hinter der Sitzung (~02:28): d4 wurde abgebrochen – nicht fortgesetzt (seine drei Fixe sind gemergt; der Rest von d kommt nach dem
+    ersten grünen Stand).
 - 02:10 **work-zusammen = 4748a503** – dazu die drei belegten Fixe von d4 (stand/d.md 01:35/01:54): work-d-count (E14 set_pcm zählt Samples; die Zahl neben
   einem Zeiger sagt ihre Länge im Typ – keine Namensregel mehr), work-d-array (ein Feld `T m[N]` hat in Form und Antwort N Werte), work-d-maker (Objekte der Engine
   auch für Klassen, deren Konstruktor Werte und machbare Objekte nimmt: Engine, GameAudio, GameWorld, SoundBank, net::Client, net::Server). Belege:
