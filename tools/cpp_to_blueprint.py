@@ -10017,7 +10017,7 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
   if (p != nullptr && !held) return p[i];
   converted::open_read();
   static T none;
-  none = T{};
+  none = converted::none_entry<T>();
   return none;
 }
 // p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
@@ -10037,7 +10037,24 @@ template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
   converted::open_read();
   return p;
 }
-template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }"""
+template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }
+// n entries from p, as a value of the library is made of them (`std::string_view s(p, n)`): where they do not all
+// stand in the list p points into, the call is marked (C++ leaves it open) and the value has none of them.
+template <class T> struct converted_pointed_range_t {
+  const T* p;
+  std::size_t n;
+  template <class V> requires (!std::is_pointer_v<V> && std::is_constructible_v<V, const T*, std::size_t>) operator V() const { return V(p, n); }
+};
+template <class T, class N> converted_pointed_range_t<T> converted_pointed_range(const T* p, N n) {
+  if ((std::is_signed_v<N> && static_cast<long long>(n) < 0) || static_cast<unsigned long long>(n) > 0x7fffffffffffffffull) {
+    converted::open_read();   // (more entries than any list has)
+    return {p, 0};
+  }
+  const T* e = converted_pointed_end(p, static_cast<long long>(n));
+  return {p, static_cast<std::size_t>(e - p)};
+}"""
+# A view the test hands a function (kern::Span): its entries are a list a pointer of the source points into (`bytes.data`).
+SPAN_TYPE = re.compile(r"(?:const\s+)?(?:kern::)?Span<")
 WIDE_PRELUDE = """// the numbers of the Blueprint language (../converted.h): a number is 64-bit, a vector's components 32-bit
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
@@ -10235,11 +10252,20 @@ class TestWriter:
             (Emit.pointer_alias), or such a pointer cast to another pointer to bytes?"""
             x = bare(n)
             while x.get("kind") in ("ImplicitCastExpr", "ParenExpr", "CXXStaticCastExpr", "CXXReinterpretCastExpr", "CStyleCastExpr") and kids(x):
-                if x.get("kind") not in ("ImplicitCastExpr", "ParenExpr") and not BYTE_POINTER.match(qtype(x).strip()):
+                # (to a pointer to bytes - also to `const char*`, the bytes of a text: `reinterpret_cast<const char*>(bytes.data)`)
+                if x.get("kind") not in ("ImplicitCastExpr", "ParenExpr") and not (BYTE_POINTER.match(qtype(x).strip()) or re.match(r"const\s+(?:signed\s+)?char\s*\*$", qtype(x).strip())):
                     return False
                 x = bare(kids(x)[0])
             if x.get("kind") == "BinaryOperator" and x.get("opcode") in ("+", "-") and len(kids(x)) == 2 and "*" in qtype(kids(x)[0]):
                 return into_list(kids(x)[0])
+            if x.get("kind") == "MemberExpr" and x.get("name") == "data" and not x.get("isArrow") and kids(x):
+                # the entries of a view the test hands over (kern::Span `bytes.data`): a pointer into the list it
+                # keeps for it - the test hands that list on as one a pointer points into (spans, `run`)
+                o = bare(kids(x)[0])
+                while o.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(o):
+                    o = bare(kids(o)[0])
+                r = o.get("referencedDecl") or {}
+                return o.get("kind") == "DeclRefExpr" and r.get("kind") == "ParmVarDecl" and SPAN_TYPE.match(self.u.clean(qtype(r))) is not None
             r = x.get("referencedDecl") or {}
             if x.get("kind") == "DeclRefExpr" and r.get("id") in aliases:
                 return True
@@ -10382,6 +10408,15 @@ class TestWriter:
                 edits.append((a, 2, depth, a, "converted_pointed_end("))
                 swap(lb, ra, n["opcode"], ", " if n["opcode"] == "+" else ", -(")
                 edits.append((b, 0, -depth, b, ")" if n["opcode"] == "+" else "))"))
+                self.pointed = True
+            elif (k in ("CXXConstructExpr", "CXXTemporaryObjectExpr") and len(ks) == 2 and "*" in qtype(ks[0]) and whole(ks[1])
+                  and re.match(r"(?:const\s+)?std::", self.u.clean(qtype(n))) and into_list(ks[0])):
+                # so many entries from a place in a list a pointer points into, as a value of the library (`std::string_view
+                # s(p, n)`): C++ defines it where they all stand in the list; else the call is marked (C++ leaves it open)
+                # and the range is empty - nothing is read there (converted_pointed_range, as converted_pointed_end)
+                (xa, _), (_, xb) = span(ks[0]), span(ks[1])
+                edits.append((xa, 2, depth, xa, "converted_pointed_range("))
+                edits.append((xb, 0, -depth, xb, ")"))
                 self.pointed = True
             elif k == "ArraySubscriptExpr" or name == "operator[]":
                 base, index = ks[-2:]
@@ -11274,7 +11309,7 @@ class TestWriter:
         for q in sorted(objects):
             name = self.object_name(q)
             pairs.append((self.absolute(q), name))
-            decls, made = [], False
+            decls, made, makes = [], False, False
             for f in by_class.get(q, []):
                 try:
                     a, b = self.stand_in_life(f, name) if f.get("role") else self.stand_in(f, name)
@@ -11283,6 +11318,7 @@ class TestWriter:
                     continue   # (what it takes the test has no values of: a function that calls it is not compared)
                 # (a constructor that needs no arguments - none, or a default for each - is the one C++ makes it by)
                 made = made or (f.get("role") == "make" and all(kids(p) for p in kids(f["decl"]) if p.get("kind") == "ParmVarDecl"))
+                makes = makes or f.get("role") == "make"
                 if "  " + a in decls:
                     continue   # (the one function, which the source and a piece of another file name by two declarations of it)
                 decls.append("  " + a)
@@ -11290,7 +11326,9 @@ class TestWriter:
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
-            inherit = [f"  using {self.object_name(b)}::{self.object_name(b)};" for b in self.engine_bases(q)] or ["  using converted::EngineObject::EngineObject;"]
+            # (EngineObject's constructor of any arguments is for a class whose stand-in has none of its own: beside one
+            # it would be the better match - `kern::LightPool(n, 96)` with an int took it, and no light_pool.make was asked)
+            inherit = [f"  using {self.object_name(b)}::{self.object_name(b)};" for b in self.engine_bases(q)] or ([] if makes else ["  using converted::EngineObject::EngineObject;"])
             ends = next((f for f in by_class.get(q, []) if f.get("role") == "release"), None)
             if ends is not None:
                 # (its own destructor would leave it without moves: moved, what it owns goes with it - EngineObject.
@@ -12359,8 +12397,10 @@ class TestWriter:
             d = tree.decl.get(i)
             if d is not None and d.get("_file") and d.get("_at", (None, None))[1] is not None:
                 put(d, {"kind": "member"})
+        # - and so of a method declared with its body in such a class (`inside`: wire::Reader::get_u8 in Session::dispatch,
+        # handed on from net_session through game_net to game_controls): the class's text there holds it only where it is wanted
         for place in sorted(G.wanted, key=str):
-            if self.pieces.get(place, {}).get("kind") == "member" and self.at(place) is None:
+            if self.pieces.get(place, {}).get("kind") in ("member", "inside") and self.at(place) is None:
                 out.append(((-1, 0), place, self.pieces[place]))
         # what of the engine the pieces call and hold: the test that takes them has its own stand-ins
         for d in self.engine_called(G).values():
@@ -12557,6 +12597,7 @@ class TestWriter:
                     names.append("a0")
                 first = len(names)
                 held_lists = []   # (the lists the source gets a pointer into: the list and the place - Unit.pointed)
+                spans = []   # (the views it is handed)
                 self.said = self.said_words(d)
                 for p in params:
                     if self.u.is_logic(qtype(p)):
@@ -12584,11 +12625,14 @@ class TestWriter:
                         continue
                     types.append(self.spell(qtype(p)))
                     decl_lines.append(f"{types[-1]} a{len(names)} = {self.draw(qtype(p))};")
+                    if SPAN_TYPE.match(self.u.clean(qtype(p))):
+                        spans.append(f"a{len(names)}")   # (a view: its entries are a list a pointer of the source may point into - `bytes.data`)
                     names.append(f"a{len(names)}")
                 self.said = ()
-                if held_lists:
+                if held_lists or spans:
                     self.pointed = True
-                    decl_lines.append("converted_pointed_lists = {" + ", ".join(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists) + "};")
+                    decl_lines.append("converted_pointed_lists = {" + ", ".join([*(f"{{reinterpret_cast<const unsigned char*>({x}.data()), reinterpret_cast<const unsigned char*>({x}.data() + {x}.size())}}" for x in held_lists),
+                                                                                  *(f"{{reinterpret_cast<const unsigned char*>({x}.data), reinterpret_cast<const unsigned char*>({x}.data + {x}.size)}}" for x in spans)]) + "};")
                 ret = qtype(d).split("(")[0].strip()
                 if f.value is not None:
                     self.result_ok(ret)
