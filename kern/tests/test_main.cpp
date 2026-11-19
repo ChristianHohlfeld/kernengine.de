@@ -3571,7 +3571,7 @@ TEST(logic_tier_cases_interpreter) {
     if (std::string(c.name) == "recursion_through") CHECK(inst->get("Trail").as_number() == 614664 && inst->get("Hops").as_int() == 17 && !inst->disabled());
     if (std::string(c.name) == "recursion_deep") CHECK(inst->get("Depth").as_int() == 5000 && !inst->disabled());
     if (std::string(c.name) == "recursion_endless")
-      CHECK(inst->get("Steps").as_int() == logic::Runtime::kCallsDeep && inst->disabled() && r.find("function calls nest more than") != std::string::npos);
+      CHECK(inst->get("Steps").as_int() == logic::Runtime::kCallsDeep && inst->disabled() && r.find("function calls nest") != std::string::npos);
     if (std::string(c.name) == "whole_numbers") {
       const i64 top = std::numeric_limits<i64>::max();
       CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
@@ -5950,11 +5950,11 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
       CHECK(!i.error);
     }
   };
-  // a function does not run again while it runs: not by calling itself, not through another one
-  problem(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
+  // a function calls itself as a step - its own values in every call (that this one never ends is
+  // the scenario's, not the graph's: logic_cases recursion_endless) - but not as a value
+  fine(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
             "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}}],
-            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})",
-          "function \"Fact\" calls itself:", 21);
+            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})");
   problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"G","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.pure","params":{"function":"G"}},{"id":3,"type":"func.return","params":{"function":"F"}},
               {"id":4,"type":"func.entry","params":{"function":"G"}},{"id":5,"type":"func.call","params":{"function":"F"}},{"id":6,"type":"func.return","params":{"function":"G"}}],
