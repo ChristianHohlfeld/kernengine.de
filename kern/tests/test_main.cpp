@@ -6470,6 +6470,32 @@ TEST(engine_stand_in_fixed_length) {
   }
 }
 
+TEST(engine_stand_in_makes_an_object) {
+  using logic::Value;
+  // a maker gives the handle of the object it made - a constructor of C++ always makes one: the form `h`, and the
+  // stand-in never answers the handle 0 (which names none: `std::make_unique<SoundBank>(...)` is never empty)
+  int makers = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions()) {
+    const std::string type = f.type;
+    // (a maker: "engine.<class>.make", the n-th of a class "....make_<n>")
+    const std::size_t at = type.rfind(".make");
+    if (at == std::string::npos) continue;
+    const std::string rest = type.substr(at + 5);
+    if (!rest.empty() && (rest[0] != '_' || rest.size() < 2 || rest.find_first_not_of("0123456789", 1) != std::string::npos)) continue;
+    CHECK(f.outputs.size() == 1 && std::string(f.outputs[0].shape) == "h");
+    logic::EngineStandIn s;
+    for (int k = 0; k < 16; ++k) {
+      std::vector<Value> in;
+      for (const logic::EnginePin& p : f.inputs) in.push_back(Value::zero(p.type));
+      if (!in.empty() && in[0].type == logic::PinType::integer) in[0] = Value::integer(k);
+      std::vector<Value> out{Value::zero(logic::PinType::integer)};
+      CHECK(s.engine(type, in, out) && out.size() == 1 && out[0].as_int() > 0);
+    }
+    ++makers;
+  }
+  CHECK(makers > 10);
+}
+
 TEST(engine_stand_in_one_or_none) {
   using logic::Value;
   // what may be there or not (`std::optional<Message> Client::receive`, the std::optional components of a level's actor)

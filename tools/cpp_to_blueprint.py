@@ -9870,7 +9870,8 @@ class Api:
         raise Wait(f"a {bt}")
 
     def shape(self, bt, raw=None):
-        """A value's form, written out: n i b v t, e<values>, {fields}, [items] - [N items] for a list of a fixed
+        """A value's form, written out: n i b v t, h (the handle of an object the engine made: never 0 - a maker's
+        result, its "shapes"), e<values>, {fields}, [items] - [N items] for a list of a fixed
         length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it), [?item] for what
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
         if bt in ENGINE_PIN:
@@ -10030,7 +10031,10 @@ class Api:
             self.shape(bt)
         return {"type": f"engine.{group}.make" + (f"_{nth}" if nth > 1 else ""), "cpp": q + "::" + q.split("::")[-1], "label": "Make " + q.split("::")[-1],
                 "category": "Engine: " + q.split("::")[-1], "help": self.u.comment_of(d) or f"Makes a {q.split('::')[-1]} of the engine: its handle (the host keeps it until it is released).",
-                "value": False, "ins": ins, "outs": [("result", "Int", q)], "params": params, "decl": d, "role": "make", "class": q}
+                "value": False, "ins": ins, "outs": [("result", "Int", q)], "params": params, "decl": d, "role": "make", "class": q,
+                # (what it gives is the handle of the object it made - a constructor of C++ always makes one: never the
+                # handle 0, which names none; the form `h`, Api.shape)
+                "shapes": {"result": "h"}}
 
     def releaser(self, q):
         """The node that ends an object of the engine that was made (its destructor): <class>.release."""
