@@ -694,7 +694,8 @@ struct Shape {
     return true;
   }
 
-  /// Functions: none runs again while it runs (it has one set of values, not one per call), and
+  /// Functions: one may call itself, directly or through others, as a step (each call has its own
+  /// values - not one read as a value: a value has no circles), and
   /// one that is read as a value only computes - how often and in which order values are read
   /// then makes no difference.
   bool functions_ok() {
@@ -735,31 +736,52 @@ struct Shape {
         for (const auto& next : next_steps(x)) todo.push_back(next);
       }
     }
-    // a function that calls itself, directly or through others
-    std::vector<u8> mark(count, 0);
-    for (std::size_t start = 0; start < count; ++start) {
-      if (mark[start]) continue;
-      std::vector<std::pair<int, std::size_t>> stack{{static_cast<int>(start), 0}};
-      mark[start] = 1;
-      while (!stack.empty()) {
-        const std::size_t f = static_cast<std::size_t>(stack.back().first);
-        if (stack.back().second < calls[f].size()) {
-          const auto [callee, node] = calls[f][stack.back().second++];
-          if (mark[static_cast<std::size_t>(callee)] == 1) {
-            const std::string& a = g.functions[f].name;
-            const std::string& b = g.functions[static_cast<std::size_t>(callee)].name;
-            return fail("function \"" + b + "\" calls itself" + (a == b ? std::string() : " (through \"" + a + "\")") +
-                            ": a function does not run again while it runs - repeat steps with a loop",
-                        node);
+    // Functions that call themselves, directly or through others: a call like any other, each
+    // with its own values (in the class a method's parameters and locals; in the interpreter and
+    // the JIT a frame of its own, at most Runtime::kCallsDeep calls one in another). The circles
+    // (strongly connected parts of the calls; Tarjan's way, without recursion):
+    std::vector<int> circle(count, -1), index(count, -1), low(count, 0);
+    {
+      std::vector<int> held;
+      std::vector<u8> on(count, 0);
+      int next = 0, circles = 0;
+      for (std::size_t start = 0; start < count; ++start) {
+        if (index[start] >= 0) continue;
+        std::vector<std::pair<std::size_t, std::size_t>> walk{{start, 0}};
+        index[start] = low[start] = next++;
+        held.push_back(static_cast<int>(start));
+        on[start] = 1;
+        while (!walk.empty()) {
+          const std::size_t f = walk.back().first;
+          if (walk.back().second < calls[f].size()) {
+            const std::size_t c = static_cast<std::size_t>(calls[f][walk.back().second++].first);
+            if (index[c] < 0) {
+              index[c] = low[c] = next++;
+              held.push_back(static_cast<int>(c));
+              on[c] = 1;
+              walk.push_back({c, 0});
+            } else if (on[c]) {
+              low[f] = std::min(low[f], index[c]);
+            }
+            continue;
           }
-          if (mark[static_cast<std::size_t>(callee)] == 0) {
-            mark[static_cast<std::size_t>(callee)] = 1;
-            stack.push_back({callee, 0});
+          walk.pop_back();
+          if (!walk.empty()) low[walk.back().first] = std::min(low[walk.back().first], low[f]);
+          if (low[f] != index[f]) continue;
+          std::vector<int> part;
+          for (int x = -1; x != static_cast<int>(f);) {
+            x = held.back();
+            held.pop_back();
+            on[static_cast<std::size_t>(x)] = 0;
+            part.push_back(x);
           }
-          continue;
+          bool self = false;
+          for (const auto& c : calls[f]) self = self || c.first == static_cast<int>(f);
+          if (part.size() > 1 || self) {
+            for (int x : part) circle[static_cast<std::size_t>(x)] = circles;
+            ++circles;
+          }
         }
-        mark[f] = 2;
-        stack.pop_back();
       }
     }
     // the inputs by reference come first: an input by value is written with its default, and in
@@ -795,6 +817,28 @@ struct Shape {
         if (!computes)
           return fail(because[f] + ": " + title(x) + (d.latent ? " waits" : " changes something") + ". Call the function as a step instead (My Blueprint: untick Pure)", x);
       }
+    }
+    // In a circle: a function read as a value would read itself - a value has no circles (call it
+    // as a step); and what its steps give stays on its own path (a member of the class would be
+    // one for all its calls: Shape::locals).
+    for (std::size_t f = 0; f < count; ++f) {
+      if (circle[f] < 0) continue;
+      const std::string through = [&] {
+        for (const auto& [c, node] : calls[f])
+          if (circle[static_cast<std::size_t>(c)] == circle[f] && c != static_cast<int>(f)) return " (through \"" + g.functions[static_cast<std::size_t>(c)].name + "\")";
+        return std::string();
+      }();
+      if (value[f]) {
+        int node = -1;
+        for (int i : by_id)
+          if (at(i).def->type == "func.pure" && at(i).node->param("function") == g.functions[f].name) node = i;
+        return fail("function \"" + g.functions[f].name + "\" calls itself" + through + " and is read as a value: a value does not read itself - call it as a step (My Blueprint: untick Pure)", node);
+      }
+      for (int x : steps[f])
+        if (at(x).member && (!at(x).def->memory || at(x).def->loop))
+          return fail("function \"" + g.functions[f].name + "\" calls itself" + through + ", so every call has its own values: what " + title(x) +
+                          " gives is read where it may not have run in this call, or outside the function's path after it",
+                      x);
     }
     return places_ok(steps, calls);
   }
@@ -847,7 +891,7 @@ struct Shape {
       }
       return seen;
     };
-    // (callees first: no function calls itself, functions_ok has seen to that)
+    // (callees first - where functions call each other in a circle, the rounds below see to the rest)
     std::vector<u8> done(count, 0);
     std::vector<std::size_t> order;
     for (std::size_t start = 0; start < count; ++start) {
@@ -868,6 +912,10 @@ struct Shape {
         stack.pop_back();
       }
     }
+    // what each function does itself, then with what its calls do - again and again where
+    // functions call each other in a circle, until nothing new comes (a path through a value's
+    // fields and entries is as long as its type is deep: it ends)
+    std::vector<std::vector<Write>> own(count);
     for (std::size_t f : order) {
       for (int x : steps[f]) {
         const std::string& t = at(x).def->type;
@@ -881,11 +929,31 @@ struct Shape {
         // (a Take puts the zero where something stood, like a Set; Sort puts other items there, Copy Bytes other bytes)
         w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes";
         w.node = x;
-        writes[f].push_back(std::move(w));
+        own[f].push_back(std::move(w));
       }
-      for (const auto& [callee, call] : calls[f]) {
-        for (Write& w : through(static_cast<std::size_t>(callee), call)) writes[f].push_back(std::move(w));
-        if (raises[static_cast<std::size_t>(callee)] >= 0 && raises[f] < 0) raises[f] = call;
+    }
+    auto key = [](const Write& w) {
+      std::string k = std::to_string(static_cast<int>(w.kind)) + (w.resizes ? "+" : "=") + w.root;
+      for (const std::string& s : w.path) k += "\x1f" + s;
+      return k;
+    };
+    for (bool changed = true; changed;) {
+      changed = false;
+      for (std::size_t f : order) {
+        std::vector<Write> now = own[f];
+        for (const auto& [callee, call] : calls[f]) {
+          for (Write& w : through(static_cast<std::size_t>(callee), call)) now.push_back(std::move(w));
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && raises[f] < 0) {
+            raises[f] = call;
+            changed = true;
+          }
+        }
+        std::set<std::string> seen;
+        std::vector<Write> once;
+        for (Write& w : now)
+          if (seen.insert(key(w)).second) once.push_back(std::move(w));
+        if (once.size() != writes[f].size()) changed = true;
+        writes[f] = std::move(once);
       }
     }
     // every call - in a function, in an event -: the places it holds against what its function does

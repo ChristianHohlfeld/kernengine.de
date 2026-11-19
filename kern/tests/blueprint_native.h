@@ -1559,7 +1559,7 @@ inline std::vector<Case> cases() {
     c.name = std::string("Tier_") + t.name;
     c.graph = logic_cases::parse(t);
     c.scenario = true;
-    if (logic::native_ready(c.graph)) all.push_back(std::move(c));
+    if (logic::native_ready(c.graph) && !t.cpp_leaves_open) all.push_back(std::move(c));  // (what C++ leaves open is no case for the class)
   }
   return all;
 }

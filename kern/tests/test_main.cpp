@@ -3567,6 +3567,11 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("DeepCount").as_int() == 63 && r.find("events nest more than") != std::string::npos && !inst->disabled());
       CHECK(inst->get("Tail").as_int() == 630);  // every handler's ten open steps ran when the levels below were over
     }
+    if (std::string(c.name) == "recursion_direct") CHECK(inst->get("R").as_int() == 55 + 144 + 377 + 610 + 610 + 89 && inst->get("Count").as_int() == 2 + 14 + 62 + 126 + 126 + 6 && !inst->disabled());
+    if (std::string(c.name) == "recursion_through") CHECK(inst->get("Trail").as_number() == 614664 && inst->get("Hops").as_int() == 17 && !inst->disabled());
+    if (std::string(c.name) == "recursion_deep") CHECK(inst->get("Depth").as_int() == 5000 && !inst->disabled());
+    if (std::string(c.name) == "recursion_endless")
+      CHECK(inst->get("Steps").as_int() == logic::Runtime::kCallsDeep && inst->disabled() && r.find("function calls nest more than") != std::string::npos);
     if (std::string(c.name) == "whole_numbers") {
       const i64 top = std::numeric_limits<i64>::max();
       CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
@@ -4221,6 +4226,31 @@ TEST(logic_notation_values_of_a_call) {
     logic::Graph bad;
     CHECK(!logic::from_cpp(wrong, bad, &name, &error) && error.find("it is a member of the class") != std::string::npos);
   }
+}
+
+TEST(logic_recursion_rules) {
+  // A function may call itself, directly or through others, as a step. Read as a value it would
+  // read itself (a value has no circles); and in a circle what its steps give stays on its path.
+  auto refused = [](const char* text, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool read = logic::from_cpp(text, g, nullptr, &error);
+    if (read || error.find(why) == std::string::npos) std::printf("%s\n", error.c_str());
+    return !read && error.find(why) != std::string::npos;
+  };
+  CHECK(refused("struct P : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  KERN_PURE HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      return {Half(math_div(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
+                "calls itself and is read as a value"));
+  CHECK(refused("struct Q : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
+                "  // ---- what nodes give and keep ----\n  HalfResult n5;\n};\n",
+                "calls itself, so every call has its own values"));
+  logic::Graph ok;
+  std::string error;
+  CHECK(logic::from_cpp("struct R : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n    HalfResult n5;\n"
+                        "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
+                        ok, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
 }
 
 TEST(logic_notation_reads_what_a_person_writes) {

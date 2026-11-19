@@ -1447,8 +1447,12 @@ Typs.
 
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
-Event. Funktionsaufrufe zählen nicht mit: Sie können sich nicht selbst erreichen, und in C++ sind
-sie gewöhnliche Aufrufe. Werte lesen einander so tief, wie der Graph es vorgibt (ein Ausdruck in
+Event. Funktionsaufrufe zählen nicht mit. Sie schachteln höchstens 65.536 tief
+(`Runtime::kCallsDeep`) – im Interpreter und mit dem JIT ein Rahmen je Aufruf, nicht ein Aufruf von
+C++, also unabhängig vom Stapel der Maschine; der Aufruf darüber stoppt die Kette und den Blueprint
+(„function calls nest more than 65536 deep“), in beiden Stufen beim selben Aufruf. Die Klasse ruft
+ihre Methoden wie C++, ohne Zähler: Wie tief C++ kommt, lässt C++ offen (sein Stapel) – ein Aufruf,
+der so tief führt, wird im Vergleichstest nicht verglichen. Werte lesen einander so tief, wie der Graph es vorgibt (ein Ausdruck in
 C++ hat auch keine Grenze).
 
 **Wege, die sich wieder treffen.** Führen alle Wege eines Branch (oder Switch) in denselben Knoten,
@@ -1539,9 +1543,12 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
 - **Eine Funktion eines anderen Blueprints** (`KERN_EXTERN`) hat hier keinen Rumpf: kein Function
   Entry, kein Return, kein Call und kein Function Value mit ihrem Namen, keine lokalen Variablen,
   nicht pure. Aufgerufen wird sie mit Call on Actor – ein Schritt.
-- **Eine Funktion läuft nicht noch einmal, während sie läuft:** Sie ruft sich nicht selbst auf,
-  auch nicht über andere Funktionen. (Nach einem Warten ist sie zu Ende; sich dann aufzurufen,
-  geht.)
+- **Eine Funktion darf sich selbst aufrufen**, auch über andere Funktionen – als Schritt (Call
+  Function), jeder Aufruf mit seinen eigenen Werten (Parameter, lokale Variablen, was seine Schritte
+  geben und seine Schleifen sich merken), wie in C++. Nicht als Wert: Eine Funktion, die als Wert
+  gelesen wird (pure), in einem solchen Kreis läse sich selbst – ein Wert hat keine Kreise. Und
+  was ein Schritt einer Funktion im Kreis gibt, liest nur ihr eigener Weg nach ihm (siehe „Werte
+  eines Aufrufs“: sonst wäre es ein Member für alle Aufrufe).
 - **Eine Funktion, die als Wert gelesen wird (pure), rechnet nur:** kein Set oder Add (außer auf ihre eigenen lokalen Variablen), kein
   Warten, kein Do Once, Gate oder Flip Flop, keine Aktion – und was sie als Schritt aufruft,
   rechnet ebenfalls nur. Verzweigen, Schleifen und andere Werte lesen darf sie. So ist es gleich,
@@ -1796,7 +1803,10 @@ Liste vom Typ einer Struktur mit einer Aufzählung, einer Struktur und Listen al
 Break und Set Field, Vergleich Feld für Feld, ein Eintrag jenseits der Liste), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
-tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
+tiefer als 64 ineinander liegen (`function_reentry`), Funktionen, die sich selbst rufen
+(`recursion_direct`: Fib(15) = 610, eine Schleife über den inneren Aufruf; `recursion_through`: über eine
+andere; `recursion_deep`: 5.000 tief; `recursion_endless`: der 65.537. Aufruf stoppt, in Interpreter und JIT
+gleich – die Klasse rechnet ihn nicht, `Case::cpp_leaves_open`), ganze Zahlen an ihren Enden
 (`whole_numbers`), das Vorzeichen von −0 (`signed_zero`: Copy Sign und `copysign` der Formel), die Bytes einer Struktur (`bytes`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit
