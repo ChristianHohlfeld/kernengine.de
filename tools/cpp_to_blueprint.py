@@ -11813,6 +11813,8 @@ class TestWriter:
                 return
             if d.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
                 return
+            if d.get("isImplicit"):
+                return   # (what the compiler makes of a class - its copy, its assignment: it makes it in the test too; its place is the class's name, no source)
             if tree.scope_of.get(d["id"], "").startswith(ENGINE + "::dm::"):
                 return   # (the engine's functions of numbers: in the test's source the formula's, see `widen`)
             if ENGINE_NODES and (u.api().declared_only(d) or u.api().declared_only(tree.decl.get(i, d))):
@@ -11853,8 +11855,11 @@ class TestWriter:
             if far is other:
                 G.foreign[same] = merged
             else:
-                del G.foreign[same]
-                G.foreign[place] = merged
+                # (under the place of the farther, where the nearer stood: what took the statement before stands
+                # after it - at the end, it would stand after the functions that name its constants)
+                kept = list(G.foreign.items())
+                G.foreign.clear()
+                G.foreign.update((place, merged) if p == same else (p, x) for p, x in kept)
         def take(i):
             """A function whose body stands in another source file: the pieces its test holds, as the test of
             that file hands them on."""
