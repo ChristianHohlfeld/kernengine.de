@@ -344,35 +344,68 @@ std::string Formula::print(int t, int outer, bool cpp) const {
   return mine < outer && !call_form ? "(" + s + ")" : s;
 }
 
-bool Formula::whole() const {
-  if (!ok() || inputs_.empty()) return false;
-  auto whole_fn = [](u8 code) {
-    for (const Fn& x : kFunctions) if (x.code == code) return x.whole;
-    return false;
-  };
-  auto whole_op = [](u8 code) {
-    for (Code x : kWholeOperators) if (x == code) return true;
-    return false;
-  };
-  if (!whole_fn(tree_[static_cast<std::size_t>(root_)].code)) return false;
-  // Every input is read as a whole number: as an argument of such a function, or as what +, - or * is
-  // given whose own value is read so. Such an operator is given only inputs, numbers written out, such
-  // functions and such operators.
-  bool ok_all = true;
-  auto read = [&](auto&& self, int t, bool as_whole) -> void {
-    const Term& n = tree_[static_cast<std::size_t>(t)];
-    if (n.code == kInput) { if (!as_whole) ok_all = false; return; }
-    const bool op = as_whole && whole_op(n.code);
-    for (int child : {n.a, n.b, n.c}) {
-      if (child < 0) continue;
-      const u8 c = tree_[static_cast<std::size_t>(child)].code;
-      if (op && !(c == kInput || c == kConst || whole_fn(c) || whole_op(c))) ok_all = false;
-      self(self, child, whole_fn(n.code) || op);
+namespace {
+bool whole_fn(u8 code) {
+  for (const Fn& x : kFunctions) if (x.code == code) return x.whole;
+  return false;
+}
+bool whole_op(u8 code) {
+  for (Code x : kWholeOperators) if (x == code) return true;
+  return false;
+}
+bool comparison(u8 code) { return code == kLt || code == kLe || code == kGt || code == kGe || code == kEq || code == kNe; }
+}  // namespace
+
+bool Formula::whole_operand(int t) const {
+  const Term& n = tree_[static_cast<std::size_t>(t)];
+  if (n.code == kInput || n.code == kConst || whole_fn(n.code)) return true;
+  if (!whole_op(n.code)) return false;
+  return whole_operand(n.a) && whole_operand(n.b);
+}
+
+bool Formula::int_input(std::size_t k) const {
+  if (!ok() || k >= inputs_.size()) return false;
+  std::vector<int> parent(tree_.size(), -1);
+  for (std::size_t t = 0; t < tree_.size(); ++t)
+    for (int child : {tree_[t].a, tree_[t].b, tree_[t].c})
+      if (child >= 0) parent[static_cast<std::size_t>(child)] = static_cast<int>(t);
+  // (where a value of whole numbers - the input, or +, - or * it is given to - is read)
+  auto read_whole = [&](int at) {
+    for (bool first = true;; first = false) {
+      const int up = parent[static_cast<std::size_t>(at)];
+      if (up < 0) return !first;  // (the formula's value: +, - or *; the input itself is no formula of it)
+      const Term& p = tree_[static_cast<std::size_t>(up)];
+      if (whole_fn(p.code)) return true;
+      if (comparison(p.code)) return whole_operand(p.a == at ? p.b : p.a);
+      if (!whole_op(p.code) || !whole_operand(up)) return false;
+      at = up;
     }
   };
-  read(read, root_, true);
-  return ok_all;
+  bool read = false;
+  for (std::size_t t = 0; t < tree_.size(); ++t) {
+    if (tree_[t].code != kInput || tree_[t].index != k) continue;
+    if (!read_whole(static_cast<int>(t))) return false;
+    read = true;
+  }
+  return read;
 }
+
+bool Formula::whole_result() const {
+  if (!ok() || inputs_.empty()) return false;
+  const u8 root = tree_[static_cast<std::size_t>(root_)].code;
+  // (+, - or * is an Int where an input stands in it - an Int, logic::Sum in the class; between numbers and whole functions
+  // alone it is the double those give)
+  auto holds_input = [&](auto&& self, int t) -> bool {
+    const Term& n = tree_[static_cast<std::size_t>(t)];
+    return n.code == kInput || (whole_op(n.code) && (self(self, n.a) || self(self, n.b)));
+  };
+  if (!whole_fn(root) && !(whole_op(root) && whole_operand(root_) && holds_input(holds_input, root_))) return false;
+  for (std::size_t k = 0; k < inputs_.size(); ++k)
+    if (!int_input(k)) return false;
+  return true;
+}
+
+bool Formula::result_sum() const { return ok() && whole_op(tree_[static_cast<std::size_t>(root_)].code); }
 
 std::string Formula::text() const { return ok() ? print(root_, 0, false) : std::string(); }
 std::string Formula::cpp() const { return ok() ? print(root_, 0, true) : std::string("0.0"); }

@@ -142,6 +142,9 @@ struct Whole {
   /// (what a formula of whole numbers gives as an Int: the number its double holds as an Int -
   /// whole(double(v)), which is normal(v): -> Int in a formula of whole numbers)
   constexpr Whole(math::Exact x) : v(normal(x.v)) {}  // NOLINT
+  /// (what a formula of whole numbers whose value is +, - or * gives as an Int - -> Int: whole of the
+  /// double the formula's arithmetic gives, the whole number itself where that is exact; below, at Sum)
+  template <char Op, class A, class B> Whole(const Sum<Op, A, B>& s);  // NOLINT
   constexpr operator i64() const { return v; }   // NOLINT
   Whole& operator+=(Whole amount) {
     v = whole_add(v, amount.v);
@@ -206,6 +209,11 @@ template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64&
 template <char Op, class A, class B> inline i64 bits_of(const Sum<Op, A, B>& s) {
   i64 r = 0;
   return sum_exact(s, r) ? r : math::bits_of(static_cast<f64>(s));
+}
+/// (-> Int: every number on the way a whole number of at most 2^53 - then it is the double -, else whole(double))
+template <char Op, class A, class B> Whole::Whole(const Sum<Op, A, B>& s) {
+  i64 r = 0;
+  v = sum_exact(s, r) ? r : whole(static_cast<f64>(s));
 }
 template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'+', A, B> operator+(A a, B b) { return {a, b}; }
 template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'-', A, B> operator-(A a, B b) { return {a, b}; }
