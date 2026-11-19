@@ -776,6 +776,8 @@ struct PinDef {
   std::string of = {};   // a value of an enum or a struct (or a list of them): its name
   u32 count = 0;         // a list of a fixed length: that many entries (a field's, a function's pin: TypeRef::count)
 };
+/// The type a place takes from a pin it is made for (a variable, a function's input): a pin of kAnyWidth's is a List<Int>.
+inline TypeRef place_type(const PinDef& p) { return {p.type, p.of == kAnyWidth ? std::string() : p.of}; }
 
 struct ParamDef {
   std::string key, label;

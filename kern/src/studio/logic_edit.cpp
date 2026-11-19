@@ -2575,8 +2575,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (!name_problem(g, base).empty()) base += "Value";
       std::string vname = base;
       for (int i = 2; g.variable(vname) || g.function(vname) || g.enumeration(vname) || g.structure(vname); ++i) vname = base + std::to_string(i);
-      const logic::TypeRef held{p.type, p.of};
-      logic::Variable v{vname, p.type, logic::zero_of(held, g).to_json(g, held), {}, p.of};
+      const logic::TypeRef held = logic::place_type(p);
+      logic::Variable v{vname, p.type, logic::zero_of(held, g).to_json(g, held), {}, held.of};
       if (!output)
         if (const json::Value* lit = n->value(p.id)) v.value = logic::Value::from_json(*lit, held, g).to_json(g, held);
       g.variables.push_back(v);

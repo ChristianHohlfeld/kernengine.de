@@ -1202,13 +1202,15 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   for (const logic::PinDef& p : in) {
     if (p.type == PinType::exec) continue;
     const std::string name = "i" + std::to_string(f.inputs.size());
-    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of({p.type, p.of}, g).to_json(g, p.of) : p.def, p.of});
+    const logic::TypeRef held = logic::place_type(p);  // (an input of a list of any width: a List<Int> is given)
+    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of(held, g).to_json(g, held.of) : p.def, held.of});
     g.links.push_back({entry.id, name, node.id, p.id});
   }
   for (const logic::PinDef& p : out) {
     if (p.type == PinType::exec) continue;
     const std::string name = "o" + std::to_string(f.outputs.size());
-    f.outputs.push_back({name, p.type, logic::zero_of({p.type, p.of}, g).to_json(g, p.of), p.of});
+    const logic::TypeRef held = logic::place_type(p);
+    f.outputs.push_back({name, p.type, logic::zero_of(held, g).to_json(g, held.of), held.of});
     g.links.push_back({node.id, p.id, give.id, name});
   }
   g.functions.push_back(f);
