@@ -37,19 +37,41 @@ inline void fresh_engine(kern::logic::EngineObjects& objects) {
 /// (converted::Watch sets it to zero; a call of the source in which one was is not compared - Tally::take).
 inline long g_engine_refused = 0;
 inline std::string g_engine_refused_first;   // (the first call refused since the comparison began, as written down: said in the note)
+/// The engine's clocks on the engine itself (real_engine): a function the table marks as one (EngineFunction::clock -
+/// KERN_CLOCK, kern/core/base.h) gives what the time is when it is called, and the source is called before the
+/// Blueprints. So a clock answers a Blueprint what it answered the source at the same place of the record of the
+/// call being compared, where the Blueprint's call there is the source's (the same function, the same values -
+/// the order of the calls is compared as for every call, Tally::take); anywhere else it is asked itself. `source`:
+/// the record of the source (converted::Watch sets it, with the answers gone, as a call of the source begins).
+struct Clocks {
+  const kern::logic::EngineStandIn* source = nullptr;
+  std::map<std::size_t, std::vector<kern::logic::Value>> given;   // (by the place of the call in the source's record)
+};
+inline Clocks g_clocks;
 /// One call of the engine on one side: written down in `kept`, answered by the stand-in or the engine.
 inline bool test_engine(kern::logic::EngineStandIn& kept, kern::logic::EngineObjects& objects, std::string_view function, const std::vector<kern::logic::Value>& in,
                         std::vector<kern::logic::Value>& out) {
   if (!real_engine()) return kept.engine(function, in, out);
   // (a place of the engine read or set - "<function>@get", "@set" - is no call of the source: not written down)
   if (function.ends_with("@get") || function.ends_with("@set")) return kern::logic::call_engine(objects, function, in, out);
-  if (!kern::logic::engine_function(function)) return false;
+  const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
+  if (!f) return false;
   kept.calls.push_back(kern::logic::engine_call_shown(function, in));
+  const std::size_t at = kept.calls.size() - 1;
+  if (f->clock && g_clocks.source && &kept != g_clocks.source) {
+    const auto given = g_clocks.given.find(at);
+    if (given != g_clocks.given.end() && at < g_clocks.source->calls.size() && g_clocks.source->calls[at] == kept.calls[at] && given->second.size() == out.size()) {
+      out = given->second;
+      return true;
+    }
+  }
   // A call the engine refuses (no object of its class at a handle, a list shorter than its count) gives
   // nothing: its record says so - a side on which it is refused and one on which it is not differ there.
   if (!kern::logic::call_engine(objects, function, in, out)) {
     if (g_engine_refused++ == 0) g_engine_refused_first = kept.calls.back() + (objects.error.empty() ? "" : " (" + objects.error + ")");
     kept.calls.back() += " - refused";
+  } else if (f->clock && &kept == g_clocks.source) {
+    g_clocks.given[at] = out;
   }
   return true;
 }

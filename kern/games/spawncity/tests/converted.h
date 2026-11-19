@@ -2003,6 +2003,7 @@ struct Watch {
     g_engine_refused = 0;
     g_source_engine.calls.clear();
     g_places.clear();
+    g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - rule_blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);
   }
   bool left() const { return g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0; }
