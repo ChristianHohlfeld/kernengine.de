@@ -1,4 +1,10 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 06:48 **Entscheidung E15 (ersetzt E12; t2, Graph):** ein Typ aus kern::logic, den die Regel des Konverters selbst (Unit.engine_object) als einfache Daten
+  einstuft (Graph, Node, Link, StateMachine, Function …), ist im Test eine Struktur wie jede Struktur der Engine – mitübersetzt, Feld für Feld gezogen und
+  verglichen; seine Objekt-Teile (Variable, FunctionPin, json::Value) sind Stellvertreter mit Handle (wie TextureAsset in Level). Die Maschinerie der Logik
+  (Runtime, ActorBlueprint, Instance) bleibt ausgenommen. Grund (Befund t2): über die Serialisierung lässt sich nicht Bit für Bit vergleichen – die Teile mit
+  json::Value sind in der Sprache Handles, die der Stellvertreter nicht auflöst; Feld für Feld ist strenger. Bedingungen: keine Liste von Typnamen; Quelltext,
+  der einen Graph an die echte Logik gibt, wartet ehrlich; kein Feld ausgelassen. Betrifft vehicle_actor, Game::audio_init, ui_audio_init (request_level/Level).
 - 06:37 **work-zusammen = 0f05da13** (+ k 09dd6818, B3: Name für einen Eintrag mit Schritt im Index; Beleg `work-k-vergleich-060032-8835` 52 von 52 ok in beiden
   Durchgängen, kein Rückschritt – die vier Funktionen der Abweichung schreibt der Teil-Lauf nicht, ihren Vergleich zeigt der volle Lauf).
   · **BEFUND Koordinator (Konverter, seit 18.11. abends unbemerkt):** 33 Funktionen (1682 Zeilen: CityStream::update/work/…, Terrain::update/run_job/…,
