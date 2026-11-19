@@ -1,0 +1,80 @@
+    Reader::get_i32 (7): written
+    Reader::get_u64 (7): written
+    Reader::get_i64 (7): written
+    Reader::get_f32 (7): written
+    Reader::get_f64 (7): written
+    Reader::get_vec3 (7): written
+    Reader::get_quat (7): written
+    Reader::get_bytes (7): written
+    Reader::done (1): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_art_cpp                   6 /    6 functions       59 /     59 lines
+    WorldArt::init (18): written
+    WorldArt::part (13): written
+    WorldArt::begin (3): written
+    WorldArt::put (6): written
+    WorldArt::end (8): written
+    WorldArt::set_mesh (11): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_marks_cpp                13 /   15 functions      341 /    376 lines
+    ragged (1): written
+    Marks::ring_put_Scorch (5): written
+    Marks::ring_put_WallMark (5): written
+    Marks::clear (14): written
+    Marks::blast (22): written
+    Marks::add_soot (32): written
+    Marks::add_breach (44): written
+    Marks::spawn_rubble (33): written
+    fh (1): written
+    facade_glass (24): written
+    Marks::bullet (23): written
+    Marks::update (13): algorithm: std::remove_if with a function value that is no lambda
+    Marks::prune_walls (22): algorithm: std::remove_if with a function value that is no lambda
+    Marks::rebuild (112): written
+    Marks::draw (25): written
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+world_traffic_cpp               9 /    9 functions      308 /    308 lines
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_equipment_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_wanted_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_net_session_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_jet_seats_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_town_sync_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_combat_detail_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_gaps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_gaps_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_mp_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_guided_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_spawn_guard_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_controls_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_world_traffic_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    cell (1): written
+    TrafficRules::rebuild (142): written
+    TrafficRules::near (12): written
+    TrafficRules::bind (1): written
+    TrafficRules::take_laws (8): written
+    TrafficRules::light (6): written
+    TrafficRules::pursuit (32): written
+    TrafficRules::gap_speed (20): written
+    TrafficRules::limit (86): written
+Game: two parts have a constant kQuiet that is not the same:
+['  KERN_CONST Float kQuiet = 0.6;']
+['  KERN_CONST Float kQuiet = 0.5;'] (Game/game_toss_cpp)
+
+real	44m18,491s
+user	483m15,344s
+sys	17m54,603s
