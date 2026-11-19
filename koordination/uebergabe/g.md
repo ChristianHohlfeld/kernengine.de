@@ -21,3 +21,7 @@ Rohdaten: $S/mag/work-t2-vergleich-223555-30482/einzeln (je Test ganze Ausgabe),
 - 01:21 konvert 005330: Pinnen griff (16 Funktionen), dann ValueError (Variable `more` überschrieb --program-Liste) → 7bd9ac5d. Neu: work-g1-konvert-012113-4171.
   Wurzel offen: explosion/wreck_car (game_town) „look_blast()/explosion() of the Blueprint Game is not written“ = Unit.foreign: Schlüssel fehlt in world.table
   (w.table aus tables der need-Einheiten). Idee: WHY=explosion (Env, druckt die Stelle) in einem ganzen Lauf.
+- 02:05 Festhalten belegt im Zwischenstand von work-zusammen-voll-012215-4354 (Fixpunkt Runde 18). Danach Lesefehler (atoi → wrap32s ohne Formel) →
+  96d52bef (cut_low), lokal mit lesen.py an den Texten von 012215 belegt. Rekursion: stand/g.md „Rekursion“. Offen: combat_hud/g_fun und die Familie
+  „<datei>_local“-Stücke über dritte Teile (stand/g.md „Offen“). Kopie der Texte: $S/shared-tmp/g-lesen (zum Löschen frei).
+  Nachrichten an main gingen ab ~02:00 nicht mehr (Kontingent) – Bericht über SubagentHandback.

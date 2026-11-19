@@ -824,3 +824,22 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - **mag:** Auftragsarten `konvert <ref> <kerne>` (nur Konvertierung, ~27 min bei 37 Kernen – der schnelle Test, ob das ganze Programm konvergiert), `vergleich`,
   `alle`, `voll`; Budget in der Datei `cap` (84); `abbrechen`. `grundlage` für `vergleich` ist weiter der Lauf 203000 (der letzte gültige).
 
+### 16.19 Stand 02:00 (19.11.) – der Ablauf endet wieder; Lesefehler behoben; neuer voller Lauf; nur d4 läuft
+- **`work-zusammen-voll-012215-4354` (2c7667bc):** die Sicherung von g trägt am ganzen Programm – Fixpunkt nach Runde 18 (Konvertierung 32 min), 16 Funktionen
+  „waits for good … (it went round with …)“. Dann `convert rc=1` am Leser: „Game.cpp: line 8106, column 18: kern::to<Type>(value) or kern::formula(...) expected, not
+  kern::math“ (`std::atoi`, game_toss.cpp:245, als `kern::math::wrap32s(int64_low(...))` ohne Formel gesetzt). Fix g 96d52bef, lokal mit `lesen.py` an den Texten des
+  Laufs belegt (zwei Stellen berichtigt: alle 156 Texte gelesen). **work-zusammen = 84696123; `work-zusammen-voll-015912-10300` läuft seit 01:59** (Konvertierung
+  bis ~02:32, Suiten danach). Zählung im Protokoll von 012215: 103 Zeilen „cannot compare it yet“ (203000: 118), 16 „waits for good“.
+- **Seit 9f10aa88 in work-zusammen:** t1 8e2474a9 (2dacbbb5), p 85d60a1d (f67af15b), Rücknahme 12e3da24 (e3901213), g 7bd9ac5d (2c7667bc), g 96d52bef (84696123).
+  Die Sperre „12e3da24“ für `work` ist damit weg; ihr Beleg (flak_cell / combat_rules_cpp unter ASan ohne das Ausweichen) kommt mit diesem Lauf.
+- **Beendet (Läufe zu Ende, alles Gebaute gemergt):** t1 (01:05), p-Nachfolger (01:15), g (01:58). **Es läuft nur d Nachfolger 4** (Count im Typ, `T m[N]`, set_pcm, Maker
+  für Client/Server). **Nachfolger starten, sobald die Suite eines gültigen Laufs die Arbeitsliste gibt:** t1 (Auswertung, look_apply_tier, Graph E12), k (Regeln
+  Nicht-Game-Dateien), g (Regeln Game-Dateien: combat_hud/g_fun, kReliable, kOlive – Stücke einer Datei über einen dritten Teil; Game-Abweichungen der Suite),
+  p (Leistung: zwei Entwürfe angekündigt) – p erst nach dem ersten grünen Stand. Übergaben: uebergabe/{t1,k,g,p,d}.md.
+- **Neue Entwurfspunkte der Stufe 6 (neben Platz der Engine, Callbacks/Events, build_level):** **Rekursion** – die Sprache verbietet sie (Leser, notation.cpp:686ff.;
+  Wiedereintritt nur über Events, höchstens 64 tief); im Spiel 16 Funktionen in Rekursion über Teile (Kern: Game::explosion ↔ blast_cars/wreck_car/combat_blast) +
+  6 Aufrufer. Vorschlag g: Rekursion mit derselben Grenze 64 zulassen (Engine-Fall in allen Stufen). **Graph als Wert** (E12, 2 Funktionen).
+- **Vor dem Abschluss zu lösen (CI):** der Job native-spawncity läuft auf `work` wie auf den Zweigen in seine 45-Minuten-Grenze (rot).
+- **Leistung (p, Kopf 85d60a1d):** Zeit-Test `--check 1.10`: 25 von 29 Fällen darüber; größte Reste mulm 7,8×, settings_escape 7×, sha256 6,7×, from_hex 5,1×, qr 5×.
+  Nächste Entwürfe laut uebergabe/p.md: +,−,× und Vergleich an der Wurzel einer Int-Formel; Struktur-Argumente bei Call on Actor ohne logic::Value.
+

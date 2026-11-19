@@ -158,3 +158,20 @@
   Neu gemacht: Engine, GameAudio, GameWorld, SoundBank, net::Client, net::Server. `--list`: nicht gemacht nur kern::net::Transport (abstrakt).
   Hinweis: GameAudio(Mixer&, SoundBank&) bekommt zwei unabhängige Mixer (jedes Objekt für sich gemacht – keine Annahme über Teilen).
   Engine-Test engine_calls_default_objects_made_with, Doku. Syntax ✓, Generator reproduziert. Beleg folgt (vergleich net_session real; Engine-Suite).
+
+## BEREIT ZUM MERGEN (d, 01:35): work-d-count = 0c6840cc (E14 set_pcm/create_clip) + f384bdfd (Count im Typ) – Belege work-d-count-vergleich-000943-8780, work-d-belege-vergleich-002858-13659, work-d-belege-engine-005831-17971
+- Auf work-zusammen e4aa2e8d, nur diese zwei Commits (E14 zuerst: mit der Typ-Regel meldet der Erzeuger sonst set_pcm/create_clip). Session_push ok,
+  kein ABBRUCH converted_net_session (real); gaps_guided_sounds ok in beiden Durchgängen. **Engine-Suite rc=0** (54469 checks, 0 failures) auf work-d-belege 07bd7074.
+
+## BEREIT ZUM MERGEN (d, 01:35): work-d-array = 83733dad (Form `[N item]`, Feld T m[N]) – Belege work-d-belege-vergleich-002858-13659, work-d-belege-engine-005831-17971
+- Auf work-zusammen e4aa2e8d. matrix_of: Stellvertreter ok (Basis 88/88). Real weiter „0 compared“ – Ursache GameWorld ohne Macher → Punkt 4 (work-d-maker).
+  engine_stand_in_fixed_length ok in der Suite.
+- Punkt 4 (work-d-maker b317557a): Beleg läuft – vergleich net_session.cpp + game.cpp (real: Session_connected/join/stop, matrix_of …).
+- **Beleg Punkt 4 (01:54):** `work-d-maker-vergleich-013431-7648` (b317557a, ohne die Fixe 1–3; net_session.cpp + game.cpp): convert rc=0, bau rc=0.
+  **Real:** converted_Game__game_cpp ok – matrix_of, eject, state_of, hide_soldier, step_parachute, body werden jetzt verglichen, keine Abweichung
+  (vorher „only 0 calls could be compared“). Session_connected/join/stop: 300 verglichen, keine Abweichung (vorher 0). Übrig real: ABBRUCH-artiger
+  ASan heap-buffer-overflow in converted_net_session = push_incoming (Punkt 1, auf diesem Zweig nicht enthalten); note Session_join/stop:
+  „engine.client.release(n) (the handle names no Client that was made)“ in 52–62 von 300 Aufrufen neu gezogen (die Quelle gibt einen Client frei,
+  den die Engine nie gesehen hat – Testrahmen, BEFUND FÜR t1). Stellvertreter: matrix_of / Session_push weichen ab = Punkte 2/1 (nicht auf diesem Zweig).
+  alle-real.txt nennt converted_net_session_cpp FAIL, seine Einzelausgabe sagt „0 failures“ (wie bei game_gaps in 002858) – ungeklärt, Bitte an t1/Koordinator.
+- Engine-Suite läuft: `work-d-maker-engine-015441-9451`.

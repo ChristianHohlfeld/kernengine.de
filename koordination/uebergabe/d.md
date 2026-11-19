@@ -219,6 +219,10 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
   matrix_of, gaps_guided_sounds – Game-Funktionen brauchen game.cpp, sonst „struct Game has more than 96 fields“), danach `mag.sh engine origin/work-d-belege`.
 - work-d: work-zusammen 310c6e10 eingemischt (e00222c9; Konflikt TestWriter: deren Zeroed-Fassung + meine places_close-Zeile).
 - BEFUND real-Durchgang: GameWorld ohne Default-Macher → alle GameWorld-Aufrufe „refused“ (stand/d.md).
+- 01:35: Punkte 1–3 BEREIT ZUM MERGEN (stand/d.md), Engine-Suite work-d-belege-engine-005831-17971 rc=0. work-d = c581d498 (beide Kurzzweige eingemischt).
+- Punkt 4 (Macher, Auftrag 01:0x): work-d-maker = b317557a (auf work-zusammen 2dacbbb5), Beleg: vergleich work-d-maker-vergleich-013431-7648
+  (net_session.cpp + game.cpp; real: Session_connected/join/stop und GameWorld-Funktionen müssen verglichen werden), danach `mag.sh engine origin/work-d-maker`.
+  Danach BEREIT + in work-d mischen. SendMessage an main ging nicht mehr (Grenze) – nur Stand-Datei.
 
 ## C. Wo der Code steht (gelesen, spart Suche)
 - Plätze: `Graph::root_of` (kern/src/logic/logic.cpp ~864), `path_of` (~909), `place_of` (~958); `Graph::Root`

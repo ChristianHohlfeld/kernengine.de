@@ -1,4 +1,13 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 02:00 **Voller Lauf 012215: der Ablauf endet jetzt (Fixpunkt nach Runde 18, 16 Funktionen „waits for good … went round“), aber `convert rc=1` am Leser:**
+  „Game.cpp: line 8106, column 18: kern::to<Type>(value) or kern::formula(...) expected, not kern::math“ – `std::atoi` (game_toss.cpp:245) wurde zu
+  `id = kern::math::wrap32s(int64_low(...))` ohne Formel. g: Fix 96d52bef (der Schnitt auf 32 Bit ist ein eigener Schritt), lokal mit lesen.py belegt (alle 156 Texte
+  gelesen). **work-zusammen = 84696123, neuer voller Lauf: `work-zusammen-voll-015912-10300`** (01:59). **g ist beendet** (Lauf zu Ende). Es läuft nur noch d4.
+  · Wurzel des Kreises (g): Rekursion über Teile – Game::explosion → blast_cars/wreck_car → explosion, explosion → combat_blast → explosion. Die Sprache verbietet
+    Rekursion (der Leser lehnt sie ab, notation.cpp:686ff.; erlaubt ist Wiedereintritt über ein Event, höchstens 64 tief). 16 Funktionen festgehalten, 6 Aufrufer
+    warten mit; 0 warten wegen direkter Selbstrufe. **Entwurfspunkt Stufe 6 „Rekursion“** (Vorschlag g: mit derselben Grenze 64 zulassen) – nicht entschieden.
+  · Offen bei den Game-Dateien (Nachfolger g): combat_hud („g_fun is not a member of …combat_rules_cpp_local“) und dieselbe Art bei kReliable/kUnreliable
+    (send_fx, town_to_all, town_to_host) und kOlive – Stücke einer Datei, die ein Test über einen dritten Teil bekommt; nur im ganzen Programm.
 - 01:25 **work-zusammen = 2c7667bc** und darauf der **volle Lauf `work-zusammen-voll-012215-4354`** (abgelegt 01:22). Seit 9f10aa88 dazu: t1 8e2474a9 (Methoden
   außerhalb der Klasse, note nennt den Grund der Engine; 2dacbbb5), **p 85d60a1d** (ganzzahlige Formeln mit +,−,×, Weitergabe beim Anhängen, Aufrufweg an einen
   Actor ohne vector, Fixed an Eingängen, Switch on Text, Zeit-Test, Fix text_format; f67af15b – Belege `work-p-engine-002417-11420` rc=0,
