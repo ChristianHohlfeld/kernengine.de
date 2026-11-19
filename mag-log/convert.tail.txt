@@ -1,0 +1,80 @@
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+431 of 519 functions of the program are written as Blueprints (2136 of 5501 lines), and 11 of the engine's headers that they call: 60 Blueprints - 6 of source files, 1 of states, 53 of headers and of shapes
+378 functions of the Blueprints are compared with their source, bit for bit, by the tests in /dev/shm/spawncity-jobs-chris/work-t1-probe-032316-6838/pt/converted - each once, in the Blueprint it stands in; 1 give nothing
+
+what the others wait for: functions (lines)
+    13 (   550)   it calls CityStream::ground_height(), which waits
+     7 (   395)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: unknown type name 'World' - that went with World: no matching function for call to 'arg')
+     4 (   281)   gaps_riding() is defined in another file
+     1 (   268)   ctl_command() is defined in another file
+     3 (   264)   stars() is defined in another file
+     1 (   136)   vr_menu_json() is defined in another file
+     2 (   122)   swarm_draw() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    87)   look_begin() is defined in another file
+     2 (    84)   gaps_can_spawn() is defined in another file
+     1 (    80)   the engine's shots() (its node is another one in the engine: its pins differ)
+     1 (    71)   line_of_sight() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     1 (    55)   it calls Game::launch_jets(), which waits
+     1 (    50)   blast() is defined in another file
+     1 (    40)   lane_signature() is defined in another file
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    37)   its test cannot compare it yet (the class Graph is not written)
+     1 (    36)   combat_sfx() is defined in another file
+     1 (    35)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no member named 'multiplier' in 'converted_Game__game_events_cpp::combat::Fun' - that went with multiplier: no member named 'g_fun' in namespace 'converted_Game__game_events_cpp::combat::combat_rules_cpp_local')
+     3 (    35)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Car'; did you mean 'sc::Car'? - that went with Car: use of undeclared identifier 'draw_CarSpec'; did you mean 'draw_MassSpec'?)
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    27)   begin() is defined in another file
+     1 (    25)   it calls Game::spawn_unseen(), which waits
+     1 (    24)   explosion() is defined in another file
+     1 (    22)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: expected ';' after top level declarator)
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    17)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: no matching function for call to 'defined')
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    11)   init() is defined in another file
+     1 (     7)   kill() is defined in another file
+     2 (     6)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'draw_CarSpec'; did you mean 'draw_MassSpec'?)
+     5 (     5)   input() is defined in another file
+     1 (     4)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     1 (     4)   it calls Game::player_position(), which waits
+
+real	11m39,583s
+user	32m8,512s
+sys	1m30,138s
