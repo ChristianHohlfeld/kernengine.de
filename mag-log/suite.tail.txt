@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/src/level_blueprints.cpp:112202:10: warning: variable 'set_visible' set but not used [-Wunused-but-set-variable]
+ 112202 |     Bool set_visible = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/src/level_blueprints.cpp:112229:10: warning: variable 'update_instances' set but not used [-Wunused-but-set-variable]
+ 112229 |     Bool update_instances = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/src/level_blueprints.cpp:112230:10: warning: variable 'set_visible_2' set but not used [-Wunused-but-set-variable]
+ 112230 |     Bool set_visible_2 = false;
+        |          ^
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/src/level_blueprints.cpp:112461:10: warning: unused variable 'actor_alive' [-Wunused-variable]
+ 112461 |     Bool actor_alive = false;
+        |          ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_game_gaps_cpp.cpp:637:21: warning: unused variable 'draw' [-Wunused-variable]
+  637 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+3 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:500:21: warning: unused variable 'draw' [-Wunused-variable]
+  500 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:520:21: warning: unused variable 'draw' [-Wunused-variable]
+  520 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:540:21: warning: unused variable 'draw' [-Wunused-variable]
+  540 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:560:21: warning: unused variable 'draw' [-Wunused-variable]
+  560 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:580:21: warning: unused variable 'draw' [-Wunused-variable]
+  580 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:600:21: warning: unused variable 'draw' [-Wunused-variable]
+  600 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:620:21: warning: unused variable 'draw' [-Wunused-variable]
+  620 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_gaps_rules_cpp.cpp:640:21: warning: unused variable 'draw' [-Wunused-variable]
+  640 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:262:21: warning: unused variable 'draw' [-Wunused-variable]
+  262 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:282:21: warning: unused variable 'draw' [-Wunused-variable]
+  282 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:302:21: warning: unused variable 'draw' [-Wunused-variable]
+  302 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:322:21: warning: unused variable 'draw' [-Wunused-variable]
+  322 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:342:21: warning: unused variable 'draw' [-Wunused-variable]
+  342 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:362:21: warning: unused variable 'draw' [-Wunused-variable]
+  362 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:382:21: warning: unused variable 'draw' [-Wunused-variable]
+  382 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:402:21: warning: unused variable 'draw' [-Wunused-variable]
+  402 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_guided_cpp.cpp:422:21: warning: unused variable 'draw' [-Wunused-variable]
+  422 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+9 warnings generated.
+8 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_jet_seats_cpp.cpp:186:21: warning: unused variable 'draw' [-Wunused-variable]
+  186 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_lamps_cpp.cpp:1596:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1596 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-012215-4354/kern/games/spawncity/tests/converted/test_lamps_cpp.cpp:1616:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1616 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
