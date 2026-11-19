@@ -1,0 +1,12 @@
+native && std::string(native->tier()) == "native C++" | Game runs as its C++ class (it runs: interpreter)
+wrong == 0 | draw_events: 8 of 18 calls differ
+wrong == 0 | gaps_guided: 4 of 7 calls differ
+wrong == 0 | Mat4_perspective: 300 of 300 calls differ
+wrong == 0 | number_at: 8 of 300 calls differ
+wrong == 0 | projection_matrix: 62 of 300 calls differ
+wrong == 0 | rocket_smoke_emit: 2 of 20 calls differ
+wrong == 0 | Session_update: 1 of 56 calls differ
+wrong == 0 | SoundFx_drive: 40 of 300 calls differ
+wrong == 0 | SoundFx_update: 169 of 300 calls differ
+wrong == 0 | spawn_squad: 10 of 20 calls differ
+wrong == 0 | spawn_tank: 5 of 20 calls differ

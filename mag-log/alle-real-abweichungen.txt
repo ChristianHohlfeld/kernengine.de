@@ -1,0 +1,23 @@
+compared >= 20 || long_calls | aim_ray: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | car_input: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | ctl_screen_ray: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | gaps_init: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | key: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | my_state: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | parachute_input: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | ui_draw_gps: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | ui_draw_helpers: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | update_camera: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | vr_room_forward: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | vr_room: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | vr_scope_update: only 0 calls could be compared (in 6000 the source left the numbers)
+compared >= 20 || long_calls | vr_update_view: only 0 calls could be compared (in 6000 the source left the numbers)
+native && std::string(native->tier()) == "native C++" | Game runs as its C++ class (it runs: interpreter)
+wrong == 0 | draw_events: 10 of 20 calls differ
+wrong == 0 | gaps_guided: 5 of 9 calls differ
+wrong == 0 | life_hud: 1 of 33 calls differ
+wrong == 0 | Mat4_perspective: 300 of 300 calls differ
+wrong == 0 | projection_matrix: 62 of 300 calls differ
+wrong == 0 | rocket_smoke_emit: 4 of 28 calls differ
+wrong == 0 | spawn_squad: 10 of 20 calls differ
+wrong == 0 | spawn_tank: 5 of 20 calls differ
