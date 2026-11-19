@@ -6410,6 +6410,29 @@ TEST(engine_calls_default_objects_made_with) {
   CHECK(o.size() == 0);
 }
 
+TEST(engine_calls_default_objects_by_class) {
+  // a test's handles are numbers kept by class (the stand-in's objects): where the same number names an object
+  // of one class and is then asked for as another, the second is made beside the first - neither replaces nor
+  // loses the other, and each ends with the objects (ASan: nothing left)
+  logic::EngineObjects o;
+  o.on_missing(logic::engine_make_default);
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.mixer.init", {logic::Value::integer(3), logic::Value::integer(44100), logic::Value::integer(8)}, out) && out[0].b);
+  out = {logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out) && !out[0].b);
+  CHECK(o.size() == 2);
+  out = {logic::Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(3)}, out) && out[0].i == 44100);
+  out.clear();
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  out = {logic::Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(3)}, out) && out[0].i == 44100);
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out = {logic::Value::zero(logic::PinType::boolean)}));
+  CHECK(o.size() == 2);
+  o.clear();
+  CHECK(o.size() == 0);
+}
+
 }  // namespace
 
 // A Blueprint's class calls the functions of the engine's nodes itself where its host gives it the engine's
