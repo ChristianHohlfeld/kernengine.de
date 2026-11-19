@@ -63,6 +63,24 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
   none = T{};
   return none;
 }
+// p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
+// any other is marked (C++ leaves it open) and stands at p - a range up to it is empty, nothing is read there.
+template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  const long long k = static_cast<long long>(n);
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + k;
+    if (e >= 0 && e <= static_cast<long long>((b - a) / sizeof(T))) return p + k;
+    converted::open_read();
+    return p;
+  }
+  if (p != nullptr || k == 0) return p + k;
+  converted::open_read();
+  return p;
+}
+template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }
 
 // ---- drone.cpp and what it uses, as it stands ----
 #pragma GCC diagnostic push
@@ -1286,12 +1304,12 @@ namespace hwcontract { inline fc::V3 orient_target(fc::V3 value) {
 namespace hwcontract { inline bool decode_icm42688_registers(const uint8_t raw[14], fc::Imu& out) {
     if (!raw) return false;
     const int16_t bad = std::numeric_limits<int16_t>::min();
-    const int16_t ax = read_be_i16(raw + 2);
-    const int16_t ay = read_be_i16(raw + 4);
-    const int16_t az = read_be_i16(raw + 6);
-    const int16_t gx = read_be_i16(raw + 8);
-    const int16_t gy = read_be_i16(raw + 10);
-    const int16_t gz = read_be_i16(raw + 12);
+    const int16_t ax = read_be_i16(converted_pointed_end(raw, 2));
+    const int16_t ay = read_be_i16(converted_pointed_end(raw, 4));
+    const int16_t az = read_be_i16(converted_pointed_end(raw, 6));
+    const int16_t gx = read_be_i16(converted_pointed_end(raw, 8));
+    const int16_t gy = read_be_i16(converted_pointed_end(raw, 10));
+    const int16_t gz = read_be_i16(converted_pointed_end(raw, 12));
     if (ax == bad || ay == bad || az == bad || gx == bad || gy == bad || gz == bad) return false;
     out.a = orient_target({ax / 2048.0, ay / 2048.0, az / 2048.0});
     out.g = orient_target({gx / 16.4, gy / 16.4, gz / 16.4});
@@ -1475,8 +1493,8 @@ namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } }; }
-namespace physics { struct Shape { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
@@ -2038,7 +2056,7 @@ void Drone::step(World& world, physics::Body body, f32 h, const DroneSticks& sti
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -2076,7 +2094,7 @@ void Drone::step(World& world, physics::Body body, f32 h, const DroneSticks& sti
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const DroneParams& s) { return converted::Value::structure({arg(s.span), arg(s.prop_d), arg(s.kv), arg(s.R), arg(s.J), arg(s.Ct), arg(s.Cq), arg(s.motor_limit_a), arg(s.esc_limit_a), arg(s.cells), arg(s.capacity_ah), arg(s.battery_r), arg(s.battery_max_a), arg(s.rho), arg(s.drag_scale), arg(s.ground_effect), arg(s.wind), arg(s.m_frame), arg(s.m_motor), arg(s.m_prop), arg(s.m_battery), arg(s.m_esc), arg(s.m_fc_rx), arg(s.m_cam_vtx), arg(s.m_wiring), arg(s.battery_x), arg(s.battery_z), arg(s.camera_x), arg(s.camera_z)}); }
-[[maybe_unused]] static bool same(const DroneParams& want, const converted::Value& got) { return got.rows && got.rows->size() == 29 && same(want.span, (*got.rows)[0]) && same(want.prop_d, (*got.rows)[1]) && same(want.kv, (*got.rows)[2]) && same(want.R, (*got.rows)[3]) && same(want.J, (*got.rows)[4]) && same(want.Ct, (*got.rows)[5]) && same(want.Cq, (*got.rows)[6]) && same(want.motor_limit_a, (*got.rows)[7]) && same(want.esc_limit_a, (*got.rows)[8]) && same(want.cells, (*got.rows)[9]) && same(want.capacity_ah, (*got.rows)[10]) && same(want.battery_r, (*got.rows)[11]) && same(want.battery_max_a, (*got.rows)[12]) && same(want.rho, (*got.rows)[13]) && same(want.drag_scale, (*got.rows)[14]) && same(want.ground_effect, (*got.rows)[15]) && same(want.wind, (*got.rows)[16]) && same(want.m_frame, (*got.rows)[17]) && same(want.m_motor, (*got.rows)[18]) && same(want.m_prop, (*got.rows)[19]) && same(want.m_battery, (*got.rows)[20]) && same(want.m_esc, (*got.rows)[21]) && same(want.m_fc_rx, (*got.rows)[22]) && same(want.m_cam_vtx, (*got.rows)[23]) && same(want.m_wiring, (*got.rows)[24]) && same(want.battery_x, (*got.rows)[25]) && same(want.battery_z, (*got.rows)[26]) && same(want.camera_x, (*got.rows)[27]) && same(want.camera_z, (*got.rows)[28]); }
+[[maybe_unused]] static bool same(const DroneParams& want, const converted::Value& got) { return converted::rows_of(got, 29) && converted::at_place(same(want.span, (*got.rows)[0]), ".span") && converted::at_place(same(want.prop_d, (*got.rows)[1]), ".prop_d") && converted::at_place(same(want.kv, (*got.rows)[2]), ".kv") && converted::at_place(same(want.R, (*got.rows)[3]), ".R") && converted::at_place(same(want.J, (*got.rows)[4]), ".J") && converted::at_place(same(want.Ct, (*got.rows)[5]), ".Ct") && converted::at_place(same(want.Cq, (*got.rows)[6]), ".Cq") && converted::at_place(same(want.motor_limit_a, (*got.rows)[7]), ".motor_limit_a") && converted::at_place(same(want.esc_limit_a, (*got.rows)[8]), ".esc_limit_a") && converted::at_place(same(want.cells, (*got.rows)[9]), ".cells") && converted::at_place(same(want.capacity_ah, (*got.rows)[10]), ".capacity_ah") && converted::at_place(same(want.battery_r, (*got.rows)[11]), ".battery_r") && converted::at_place(same(want.battery_max_a, (*got.rows)[12]), ".battery_max_a") && converted::at_place(same(want.rho, (*got.rows)[13]), ".rho") && converted::at_place(same(want.drag_scale, (*got.rows)[14]), ".drag_scale") && converted::at_place(same(want.ground_effect, (*got.rows)[15]), ".ground_effect") && converted::at_place(same(want.wind, (*got.rows)[16]), ".wind") && converted::at_place(same(want.m_frame, (*got.rows)[17]), ".m_frame") && converted::at_place(same(want.m_motor, (*got.rows)[18]), ".m_motor") && converted::at_place(same(want.m_prop, (*got.rows)[19]), ".m_prop") && converted::at_place(same(want.m_battery, (*got.rows)[20]), ".m_battery") && converted::at_place(same(want.m_esc, (*got.rows)[21]), ".m_esc") && converted::at_place(same(want.m_fc_rx, (*got.rows)[22]), ".m_fc_rx") && converted::at_place(same(want.m_cam_vtx, (*got.rows)[23]), ".m_cam_vtx") && converted::at_place(same(want.m_wiring, (*got.rows)[24]), ".m_wiring") && converted::at_place(same(want.battery_x, (*got.rows)[25]), ".battery_x") && converted::at_place(same(want.battery_z, (*got.rows)[26]), ".battery_z") && converted::at_place(same(want.camera_x, (*got.rows)[27]), ".camera_x") && converted::at_place(same(want.camera_z, (*got.rows)[28]), ".camera_z"); }
 [[maybe_unused]] static bool defined(const DroneParams& s) { return defined(s.span) && defined(s.prop_d) && defined(s.kv) && defined(s.R) && defined(s.J) && defined(s.Ct) && defined(s.Cq) && defined(s.motor_limit_a) && defined(s.esc_limit_a) && defined(s.cells) && defined(s.capacity_ah) && defined(s.battery_r) && defined(s.battery_max_a) && defined(s.rho) && defined(s.drag_scale) && defined(s.ground_effect) && defined(s.wind) && defined(s.m_frame) && defined(s.m_motor) && defined(s.m_prop) && defined(s.m_battery) && defined(s.m_esc) && defined(s.m_fc_rx) && defined(s.m_cam_vtx) && defined(s.m_wiring) && defined(s.battery_x) && defined(s.battery_z) && defined(s.camera_x) && defined(s.camera_z); }
 [[maybe_unused]] static std::string text(const DroneParams& s) { return std::string("{") + text(s.span) + ", " + text(s.prop_d) + ", " + text(s.kv) + ", " + text(s.R) + ", " + text(s.J) + ", " + text(s.Ct) + ", " + text(s.Cq) + ", " + text(s.motor_limit_a) + ", " + text(s.esc_limit_a) + ", " + text(s.cells) + ", " + text(s.capacity_ah) + ", " + text(s.battery_r) + ", " + text(s.battery_max_a) + ", " + text(s.rho) + ", " + text(s.drag_scale) + ", " + text(s.ground_effect) + ", " + text(s.wind) + ", " + text(s.m_frame) + ", " + text(s.m_motor) + ", " + text(s.m_prop) + ", " + text(s.m_battery) + ", " + text(s.m_esc) + ", " + text(s.m_fc_rx) + ", " + text(s.m_cam_vtx) + ", " + text(s.m_wiring) + ", " + text(s.battery_x) + ", " + text(s.battery_z) + ", " + text(s.camera_x) + ", " + text(s.camera_z) + "}"; }
 [[maybe_unused]] static void take(DroneParams& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 29) return; converted::take_as<double>(s.span, (*v.rows)[0]); converted::take_as<double>(s.prop_d, (*v.rows)[1]); converted::take_as<double>(s.kv, (*v.rows)[2]); converted::take_as<double>(s.R, (*v.rows)[3]); converted::take_as<double>(s.J, (*v.rows)[4]); converted::take_as<double>(s.Ct, (*v.rows)[5]); converted::take_as<double>(s.Cq, (*v.rows)[6]); converted::take_as<double>(s.motor_limit_a, (*v.rows)[7]); converted::take_as<double>(s.esc_limit_a, (*v.rows)[8]); converted::take_as<double>(s.cells, (*v.rows)[9]); converted::take_as<double>(s.capacity_ah, (*v.rows)[10]); converted::take_as<double>(s.battery_r, (*v.rows)[11]); converted::take_as<double>(s.battery_max_a, (*v.rows)[12]); converted::take_as<double>(s.rho, (*v.rows)[13]); converted::take_as<double>(s.drag_scale, (*v.rows)[14]); converted::take_as<double>(s.ground_effect, (*v.rows)[15]); converted::take_as<Vec3>(s.wind, (*v.rows)[16]); converted::take_as<double>(s.m_frame, (*v.rows)[17]); converted::take_as<double>(s.m_motor, (*v.rows)[18]); converted::take_as<double>(s.m_prop, (*v.rows)[19]); converted::take_as<double>(s.m_battery, (*v.rows)[20]); converted::take_as<double>(s.m_esc, (*v.rows)[21]); converted::take_as<double>(s.m_fc_rx, (*v.rows)[22]); converted::take_as<double>(s.m_cam_vtx, (*v.rows)[23]); converted::take_as<double>(s.m_wiring, (*v.rows)[24]); converted::take_as<double>(s.battery_x, (*v.rows)[25]); converted::take_as<double>(s.battery_z, (*v.rows)[26]); converted::take_as<double>(s.camera_x, (*v.rows)[27]); converted::take_as<double>(s.camera_z, (*v.rows)[28]); }
@@ -2089,7 +2107,7 @@ void Drone::step(World& world, physics::Body body, f32 h, const DroneSticks& sti
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::PT1& s) { return converted::Value::structure({arg(s.cutoff_hz_), arg(s.y_), arg(s.initialized_)}); }
-[[maybe_unused]] static bool same(const fc::PT1& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.cutoff_hz_, (*got.rows)[0]) && same(want.y_, (*got.rows)[1]) && same(want.initialized_, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::PT1& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.cutoff_hz_, (*got.rows)[0]), ".cutoff_hz_") && converted::at_place(same(want.y_, (*got.rows)[1]), ".y_") && converted::at_place(same(want.initialized_, (*got.rows)[2]), ".initialized_"); }
 [[maybe_unused]] static bool defined(const fc::PT1& s) { return defined(s.cutoff_hz_) && defined(s.y_) && defined(s.initialized_); }
 [[maybe_unused]] static std::string text(const fc::PT1& s) { return std::string("{") + text(s.cutoff_hz_) + ", " + text(s.y_) + ", " + text(s.initialized_) + "}"; }
 [[maybe_unused]] static void take(fc::PT1& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.cutoff_hz_, (*v.rows)[0]); converted::take_as<double>(s.y_, (*v.rows)[1]); converted::take_as<bool>(s.initialized_, (*v.rows)[2]); }
@@ -2102,7 +2120,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Filters& s) { return converted::Value::structure({arg(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())), arg(std::vector<fc::PT1>(s.accel.begin(), s.accel.end()))}); }
-[[maybe_unused]] static bool same(const fc::Filters& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(std::vector<fc::PT1>(want.gyro.begin(), want.gyro.end()), (*got.rows)[0]) && same(std::vector<fc::PT1>(want.accel.begin(), want.accel.end()), (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const fc::Filters& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(std::vector<fc::PT1>(want.gyro.begin(), want.gyro.end()), (*got.rows)[0]), ".gyro") && converted::at_place(same(std::vector<fc::PT1>(want.accel.begin(), want.accel.end()), (*got.rows)[1]), ".accel"); }
 [[maybe_unused]] static bool defined(const fc::Filters& s) { return defined(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())) && defined(std::vector<fc::PT1>(s.accel.begin(), s.accel.end())); }
 [[maybe_unused]] static std::string text(const fc::Filters& s) { return std::string("{") + text(std::vector<fc::PT1>(s.gyro.begin(), s.gyro.end())) + ", " + text(std::vector<fc::PT1>(s.accel.begin(), s.accel.end())) + "}"; }
 [[maybe_unused]] static void take(fc::Filters& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.gyro); ++k) converted::take_as<fc::PT1>(s.gyro[k], items.item(k)); } { const converted::Value& items = (*v.rows)[1]; for (std::size_t k = 0; k < items.size() && k < std::size(s.accel); ++k) converted::take_as<fc::PT1>(s.accel[k], items.item(k)); } }
@@ -2116,7 +2134,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Attitude& s) { return converted::Value::structure({arg(s.roll), arg(s.pitch), arg(s.yaw)}); }
-[[maybe_unused]] static bool same(const fc::Attitude& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.roll, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::Attitude& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.roll, (*got.rows)[0]), ".roll") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw"); }
 [[maybe_unused]] static bool defined(const fc::Attitude& s) { return defined(s.roll) && defined(s.pitch) && defined(s.yaw); }
 [[maybe_unused]] static std::string text(const fc::Attitude& s) { return std::string("{") + text(s.roll) + ", " + text(s.pitch) + ", " + text(s.yaw) + "}"; }
 [[maybe_unused]] static void take(fc::Attitude& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.roll, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); }
@@ -2133,7 +2151,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Gains& s) { return converted::Value::structure({arg(s.kp), arg(s.ki), arg(s.kd), arg(s.integral_limit), arg(s.output_limit), arg(s.d_cutoff_hz)}); }
-[[maybe_unused]] static bool same(const fc::Gains& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.kp, (*got.rows)[0]) && same(want.ki, (*got.rows)[1]) && same(want.kd, (*got.rows)[2]) && same(want.integral_limit, (*got.rows)[3]) && same(want.output_limit, (*got.rows)[4]) && same(want.d_cutoff_hz, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const fc::Gains& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.kp, (*got.rows)[0]), ".kp") && converted::at_place(same(want.ki, (*got.rows)[1]), ".ki") && converted::at_place(same(want.kd, (*got.rows)[2]), ".kd") && converted::at_place(same(want.integral_limit, (*got.rows)[3]), ".integral_limit") && converted::at_place(same(want.output_limit, (*got.rows)[4]), ".output_limit") && converted::at_place(same(want.d_cutoff_hz, (*got.rows)[5]), ".d_cutoff_hz"); }
 [[maybe_unused]] static bool defined(const fc::Gains& s) { return defined(s.kp) && defined(s.ki) && defined(s.kd) && defined(s.integral_limit) && defined(s.output_limit) && defined(s.d_cutoff_hz); }
 [[maybe_unused]] static std::string text(const fc::Gains& s) { return std::string("{") + text(s.kp) + ", " + text(s.ki) + ", " + text(s.kd) + ", " + text(s.integral_limit) + ", " + text(s.output_limit) + ", " + text(s.d_cutoff_hz) + "}"; }
 [[maybe_unused]] static void take(fc::Gains& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.kp, (*v.rows)[0]); converted::take_as<double>(s.ki, (*v.rows)[1]); converted::take_as<double>(s.kd, (*v.rows)[2]); converted::take_as<double>(s.integral_limit, (*v.rows)[3]); converted::take_as<double>(s.output_limit, (*v.rows)[4]); converted::take_as<double>(s.d_cutoff_hz, (*v.rows)[5]); }
@@ -2149,7 +2167,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::PID& s) { return converted::Value::structure({arg(s.gains_), arg(s.d_filter_), arg(s.integral_), arg(s.previous_), arg(s.have_previous_)}); }
-[[maybe_unused]] static bool same(const fc::PID& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.gains_, (*got.rows)[0]) && same(want.d_filter_, (*got.rows)[1]) && same(want.integral_, (*got.rows)[2]) && same(want.previous_, (*got.rows)[3]) && same(want.have_previous_, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::PID& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.gains_, (*got.rows)[0]), ".gains_") && converted::at_place(same(want.d_filter_, (*got.rows)[1]), ".d_filter_") && converted::at_place(same(want.integral_, (*got.rows)[2]), ".integral_") && converted::at_place(same(want.previous_, (*got.rows)[3]), ".previous_") && converted::at_place(same(want.have_previous_, (*got.rows)[4]), ".have_previous_"); }
 [[maybe_unused]] static bool defined(const fc::PID& s) { return defined(s.gains_) && defined(s.d_filter_) && defined(s.integral_) && defined(s.previous_) && defined(s.have_previous_); }
 [[maybe_unused]] static std::string text(const fc::PID& s) { return std::string("{") + text(s.gains_) + ", " + text(s.d_filter_) + ", " + text(s.integral_) + ", " + text(s.previous_) + ", " + text(s.have_previous_) + "}"; }
 [[maybe_unused]] static void take(fc::PID& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<fc::Gains>(s.gains_, (*v.rows)[0]); converted::take_as<fc::PT1>(s.d_filter_, (*v.rows)[1]); converted::take_as<double>(s.integral_, (*v.rows)[2]); converted::take_as<double>(s.previous_, (*v.rows)[3]); converted::take_as<bool>(s.have_previous_, (*v.rows)[4]); }
@@ -2164,7 +2182,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Controller& s) { return converted::Value::structure({arg(s.attitude), arg(s.roll_pid_), arg(s.pitch_pid_), arg(s.yaw_pid_)}); }
-[[maybe_unused]] static bool same(const fc::Controller& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.attitude, (*got.rows)[0]) && same(want.roll_pid_, (*got.rows)[1]) && same(want.pitch_pid_, (*got.rows)[2]) && same(want.yaw_pid_, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const fc::Controller& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.attitude, (*got.rows)[0]), ".attitude") && converted::at_place(same(want.roll_pid_, (*got.rows)[1]), ".roll_pid_") && converted::at_place(same(want.pitch_pid_, (*got.rows)[2]), ".pitch_pid_") && converted::at_place(same(want.yaw_pid_, (*got.rows)[3]), ".yaw_pid_"); }
 [[maybe_unused]] static bool defined(const fc::Controller& s) { return defined(s.attitude) && defined(s.roll_pid_) && defined(s.pitch_pid_) && defined(s.yaw_pid_); }
 [[maybe_unused]] static std::string text(const fc::Controller& s) { return std::string("{") + text(s.attitude) + ", " + text(s.roll_pid_) + ", " + text(s.pitch_pid_) + ", " + text(s.yaw_pid_) + "}"; }
 [[maybe_unused]] static void take(fc::Controller& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<fc::Attitude>(s.attitude, (*v.rows)[0]); converted::take_as<fc::PID>(s.roll_pid_, (*v.rows)[1]); converted::take_as<fc::PID>(s.pitch_pid_, (*v.rows)[2]); converted::take_as<fc::PID>(s.yaw_pid_, (*v.rows)[3]); }
@@ -2178,7 +2196,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::ArmState& s) { return converted::Value::structure({arg(s.armed_), arg(s.saw_low_), arg(converted::shaped<converted::Whole>(s.since_us_))}); }
-[[maybe_unused]] static bool same(const fc::ArmState& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.armed_, (*got.rows)[0]) && same(want.saw_low_, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.since_us_), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::ArmState& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.armed_, (*got.rows)[0]), ".armed_") && converted::at_place(same(want.saw_low_, (*got.rows)[1]), ".saw_low_") && converted::at_place(same(converted::shaped<converted::Whole>(want.since_us_), (*got.rows)[2]), ".since_us_"); }
 [[maybe_unused]] static bool defined(const fc::ArmState& s) { return defined(s.armed_) && defined(s.saw_low_) && defined(converted::shaped<converted::Whole>(s.since_us_)); }
 [[maybe_unused]] static std::string text(const fc::ArmState& s) { return std::string("{") + text(s.armed_) + ", " + text(s.saw_low_) + ", " + text(converted::shaped<converted::Whole>(s.since_us_)) + "}"; }
 [[maybe_unused]] static void take(fc::ArmState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<bool>(s.armed_, (*v.rows)[0]); converted::take_as<bool>(s.saw_low_, (*v.rows)[1]); converted::take_as<converted::Whole>(s.since_us_, (*v.rows)[2]); }
@@ -2192,7 +2210,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::V3& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z)}); }
-[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z"); }
 [[maybe_unused]] static bool defined(const fc::V3& s) { return defined(s.x) && defined(s.y) && defined(s.z); }
 [[maybe_unused]] static std::string text(const fc::V3& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + "}"; }
 [[maybe_unused]] static void take(fc::V3& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); }
@@ -2215,7 +2233,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Runtime& s) { return converted::Value::structure({arg(s.filters_), arg(s.controller_), arg(s.arm_), arg(s.calibrated_), arg(s.calibration_count_), arg(s.gyro_sum_), arg(s.gyro_sq_sum_), arg(s.accel_sum_), arg(s.gyro_bias_), arg(s.bad_timing_), arg(s.fault_), arg(s.armed_)}); }
-[[maybe_unused]] static bool same(const fc::Runtime& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.filters_, (*got.rows)[0]) && same(want.controller_, (*got.rows)[1]) && same(want.arm_, (*got.rows)[2]) && same(want.calibrated_, (*got.rows)[3]) && same(want.calibration_count_, (*got.rows)[4]) && same(want.gyro_sum_, (*got.rows)[5]) && same(want.gyro_sq_sum_, (*got.rows)[6]) && same(want.accel_sum_, (*got.rows)[7]) && same(want.gyro_bias_, (*got.rows)[8]) && same(want.bad_timing_, (*got.rows)[9]) && same(want.fault_, (*got.rows)[10]) && same(want.armed_, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const fc::Runtime& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.filters_, (*got.rows)[0]), ".filters_") && converted::at_place(same(want.controller_, (*got.rows)[1]), ".controller_") && converted::at_place(same(want.arm_, (*got.rows)[2]), ".arm_") && converted::at_place(same(want.calibrated_, (*got.rows)[3]), ".calibrated_") && converted::at_place(same(want.calibration_count_, (*got.rows)[4]), ".calibration_count_") && converted::at_place(same(want.gyro_sum_, (*got.rows)[5]), ".gyro_sum_") && converted::at_place(same(want.gyro_sq_sum_, (*got.rows)[6]), ".gyro_sq_sum_") && converted::at_place(same(want.accel_sum_, (*got.rows)[7]), ".accel_sum_") && converted::at_place(same(want.gyro_bias_, (*got.rows)[8]), ".gyro_bias_") && converted::at_place(same(want.bad_timing_, (*got.rows)[9]), ".bad_timing_") && converted::at_place(same(want.fault_, (*got.rows)[10]), ".fault_") && converted::at_place(same(want.armed_, (*got.rows)[11]), ".armed_"); }
 [[maybe_unused]] static bool defined(const fc::Runtime& s) { return defined(s.filters_) && defined(s.controller_) && defined(s.arm_) && defined(s.calibrated_) && defined(s.calibration_count_) && defined(s.gyro_sum_) && defined(s.gyro_sq_sum_) && defined(s.accel_sum_) && defined(s.gyro_bias_) && defined(s.bad_timing_) && defined(s.fault_) && defined(s.armed_); }
 [[maybe_unused]] static std::string text(const fc::Runtime& s) { return std::string("{") + text(s.filters_) + ", " + text(s.controller_) + ", " + text(s.arm_) + ", " + text(s.calibrated_) + ", " + text(s.calibration_count_) + ", " + text(s.gyro_sum_) + ", " + text(s.gyro_sq_sum_) + ", " + text(s.accel_sum_) + ", " + text(s.gyro_bias_) + ", " + text(s.bad_timing_) + ", " + text(s.fault_) + ", " + text(s.armed_) + "}"; }
 [[maybe_unused]] static void take(fc::Runtime& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<fc::Filters>(s.filters_, (*v.rows)[0]); converted::take_as<fc::Controller>(s.controller_, (*v.rows)[1]); converted::take_as<fc::ArmState>(s.arm_, (*v.rows)[2]); converted::take_as<bool>(s.calibrated_, (*v.rows)[3]); converted::take_as<unsigned int>(s.calibration_count_, (*v.rows)[4]); converted::take_as<fc::V3>(s.gyro_sum_, (*v.rows)[5]); converted::take_as<fc::V3>(s.gyro_sq_sum_, (*v.rows)[6]); converted::take_as<fc::V3>(s.accel_sum_, (*v.rows)[7]); converted::take_as<fc::V3>(s.gyro_bias_, (*v.rows)[8]); converted::take_as<unsigned int>(s.bad_timing_, (*v.rows)[9]); converted::take_as<fc::FaultCode>(s.fault_, (*v.rows)[10]); converted::take_as<bool>(s.armed_, (*v.rows)[11]); }
@@ -2242,7 +2260,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateControllerDebug& s) { return converted::Value::structure({arg(s.desired_forward_mps), arg(s.measured_forward_mps), arg(s.desired_right_mps), arg(s.measured_right_mps), arg(s.target_yaw_deg), arg(s.measured_yaw_deg), arg(s.target_agl_m), arg(s.measured_agl_m), arg(s.target_vz_mps), arg(s.throttle), arg(s.roll_command), arg(s.pitch_command), arg(s.yaw_command), arg(s.forward_accel_mps2), arg(s.right_accel_mps2), arg(s.vertical_accel_mps2)}); }
-[[maybe_unused]] static bool same(const fc::StateControllerDebug& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.desired_forward_mps, (*got.rows)[0]) && same(want.measured_forward_mps, (*got.rows)[1]) && same(want.desired_right_mps, (*got.rows)[2]) && same(want.measured_right_mps, (*got.rows)[3]) && same(want.target_yaw_deg, (*got.rows)[4]) && same(want.measured_yaw_deg, (*got.rows)[5]) && same(want.target_agl_m, (*got.rows)[6]) && same(want.measured_agl_m, (*got.rows)[7]) && same(want.target_vz_mps, (*got.rows)[8]) && same(want.throttle, (*got.rows)[9]) && same(want.roll_command, (*got.rows)[10]) && same(want.pitch_command, (*got.rows)[11]) && same(want.yaw_command, (*got.rows)[12]) && same(want.forward_accel_mps2, (*got.rows)[13]) && same(want.right_accel_mps2, (*got.rows)[14]) && same(want.vertical_accel_mps2, (*got.rows)[15]); }
+[[maybe_unused]] static bool same(const fc::StateControllerDebug& want, const converted::Value& got) { return converted::rows_of(got, 16) && converted::at_place(same(want.desired_forward_mps, (*got.rows)[0]), ".desired_forward_mps") && converted::at_place(same(want.measured_forward_mps, (*got.rows)[1]), ".measured_forward_mps") && converted::at_place(same(want.desired_right_mps, (*got.rows)[2]), ".desired_right_mps") && converted::at_place(same(want.measured_right_mps, (*got.rows)[3]), ".measured_right_mps") && converted::at_place(same(want.target_yaw_deg, (*got.rows)[4]), ".target_yaw_deg") && converted::at_place(same(want.measured_yaw_deg, (*got.rows)[5]), ".measured_yaw_deg") && converted::at_place(same(want.target_agl_m, (*got.rows)[6]), ".target_agl_m") && converted::at_place(same(want.measured_agl_m, (*got.rows)[7]), ".measured_agl_m") && converted::at_place(same(want.target_vz_mps, (*got.rows)[8]), ".target_vz_mps") && converted::at_place(same(want.throttle, (*got.rows)[9]), ".throttle") && converted::at_place(same(want.roll_command, (*got.rows)[10]), ".roll_command") && converted::at_place(same(want.pitch_command, (*got.rows)[11]), ".pitch_command") && converted::at_place(same(want.yaw_command, (*got.rows)[12]), ".yaw_command") && converted::at_place(same(want.forward_accel_mps2, (*got.rows)[13]), ".forward_accel_mps2") && converted::at_place(same(want.right_accel_mps2, (*got.rows)[14]), ".right_accel_mps2") && converted::at_place(same(want.vertical_accel_mps2, (*got.rows)[15]), ".vertical_accel_mps2"); }
 [[maybe_unused]] static bool defined(const fc::StateControllerDebug& s) { return defined(s.desired_forward_mps) && defined(s.measured_forward_mps) && defined(s.desired_right_mps) && defined(s.measured_right_mps) && defined(s.target_yaw_deg) && defined(s.measured_yaw_deg) && defined(s.target_agl_m) && defined(s.measured_agl_m) && defined(s.target_vz_mps) && defined(s.throttle) && defined(s.roll_command) && defined(s.pitch_command) && defined(s.yaw_command) && defined(s.forward_accel_mps2) && defined(s.right_accel_mps2) && defined(s.vertical_accel_mps2); }
 [[maybe_unused]] static std::string text(const fc::StateControllerDebug& s) { return std::string("{") + text(s.desired_forward_mps) + ", " + text(s.measured_forward_mps) + ", " + text(s.desired_right_mps) + ", " + text(s.measured_right_mps) + ", " + text(s.target_yaw_deg) + ", " + text(s.measured_yaw_deg) + ", " + text(s.target_agl_m) + ", " + text(s.measured_agl_m) + ", " + text(s.target_vz_mps) + ", " + text(s.throttle) + ", " + text(s.roll_command) + ", " + text(s.pitch_command) + ", " + text(s.yaw_command) + ", " + text(s.forward_accel_mps2) + ", " + text(s.right_accel_mps2) + ", " + text(s.vertical_accel_mps2) + "}"; }
 [[maybe_unused]] static void take(fc::StateControllerDebug& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<double>(s.desired_forward_mps, (*v.rows)[0]); converted::take_as<double>(s.measured_forward_mps, (*v.rows)[1]); converted::take_as<double>(s.desired_right_mps, (*v.rows)[2]); converted::take_as<double>(s.measured_right_mps, (*v.rows)[3]); converted::take_as<double>(s.target_yaw_deg, (*v.rows)[4]); converted::take_as<double>(s.measured_yaw_deg, (*v.rows)[5]); converted::take_as<double>(s.target_agl_m, (*v.rows)[6]); converted::take_as<double>(s.measured_agl_m, (*v.rows)[7]); converted::take_as<double>(s.target_vz_mps, (*v.rows)[8]); converted::take_as<double>(s.throttle, (*v.rows)[9]); converted::take_as<double>(s.roll_command, (*v.rows)[10]); converted::take_as<double>(s.pitch_command, (*v.rows)[11]); converted::take_as<double>(s.yaw_command, (*v.rows)[12]); converted::take_as<double>(s.forward_accel_mps2, (*v.rows)[13]); converted::take_as<double>(s.right_accel_mps2, (*v.rows)[14]); converted::take_as<double>(s.vertical_accel_mps2, (*v.rows)[15]); }
@@ -2272,7 +2290,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateController& s) { return converted::Value::structure({arg(s.agl_estimate_m_), arg(s.agl_estimate_valid_), arg(s.active_), arg(s.heading_source_valid_), arg(s.manual_pitch_active_), arg(s.acceleration_estimator_valid_), arg(s.horizontal_target_initialized_), arg(s.vertical_accel_initialized_), arg(s.acceleration_sample_dt_s_), arg(s.previous_velocity_world_mps_), arg(s.measured_acceleration_world_mps2_), arg(s.horizontal_integral_forward_mps2_), arg(s.horizontal_integral_right_mps2_), arg(s.commanded_forward_mps_), arg(s.commanded_right_mps_), arg(s.vertical_accel_state_mps2_), arg(s.target_yaw_deg_), arg(s.hover_trim_), arg(s.debug_)}); }
-[[maybe_unused]] static bool same(const fc::StateController& want, const converted::Value& got) { return got.rows && got.rows->size() == 19 && same(want.agl_estimate_m_, (*got.rows)[0]) && same(want.agl_estimate_valid_, (*got.rows)[1]) && same(want.active_, (*got.rows)[2]) && same(want.heading_source_valid_, (*got.rows)[3]) && same(want.manual_pitch_active_, (*got.rows)[4]) && same(want.acceleration_estimator_valid_, (*got.rows)[5]) && same(want.horizontal_target_initialized_, (*got.rows)[6]) && same(want.vertical_accel_initialized_, (*got.rows)[7]) && same(want.acceleration_sample_dt_s_, (*got.rows)[8]) && same(want.previous_velocity_world_mps_, (*got.rows)[9]) && same(want.measured_acceleration_world_mps2_, (*got.rows)[10]) && same(want.horizontal_integral_forward_mps2_, (*got.rows)[11]) && same(want.horizontal_integral_right_mps2_, (*got.rows)[12]) && same(want.commanded_forward_mps_, (*got.rows)[13]) && same(want.commanded_right_mps_, (*got.rows)[14]) && same(want.vertical_accel_state_mps2_, (*got.rows)[15]) && same(want.target_yaw_deg_, (*got.rows)[16]) && same(want.hover_trim_, (*got.rows)[17]) && same(want.debug_, (*got.rows)[18]); }
+[[maybe_unused]] static bool same(const fc::StateController& want, const converted::Value& got) { return converted::rows_of(got, 19) && converted::at_place(same(want.agl_estimate_m_, (*got.rows)[0]), ".agl_estimate_m_") && converted::at_place(same(want.agl_estimate_valid_, (*got.rows)[1]), ".agl_estimate_valid_") && converted::at_place(same(want.active_, (*got.rows)[2]), ".active_") && converted::at_place(same(want.heading_source_valid_, (*got.rows)[3]), ".heading_source_valid_") && converted::at_place(same(want.manual_pitch_active_, (*got.rows)[4]), ".manual_pitch_active_") && converted::at_place(same(want.acceleration_estimator_valid_, (*got.rows)[5]), ".acceleration_estimator_valid_") && converted::at_place(same(want.horizontal_target_initialized_, (*got.rows)[6]), ".horizontal_target_initialized_") && converted::at_place(same(want.vertical_accel_initialized_, (*got.rows)[7]), ".vertical_accel_initialized_") && converted::at_place(same(want.acceleration_sample_dt_s_, (*got.rows)[8]), ".acceleration_sample_dt_s_") && converted::at_place(same(want.previous_velocity_world_mps_, (*got.rows)[9]), ".previous_velocity_world_mps_") && converted::at_place(same(want.measured_acceleration_world_mps2_, (*got.rows)[10]), ".measured_acceleration_world_mps2_") && converted::at_place(same(want.horizontal_integral_forward_mps2_, (*got.rows)[11]), ".horizontal_integral_forward_mps2_") && converted::at_place(same(want.horizontal_integral_right_mps2_, (*got.rows)[12]), ".horizontal_integral_right_mps2_") && converted::at_place(same(want.commanded_forward_mps_, (*got.rows)[13]), ".commanded_forward_mps_") && converted::at_place(same(want.commanded_right_mps_, (*got.rows)[14]), ".commanded_right_mps_") && converted::at_place(same(want.vertical_accel_state_mps2_, (*got.rows)[15]), ".vertical_accel_state_mps2_") && converted::at_place(same(want.target_yaw_deg_, (*got.rows)[16]), ".target_yaw_deg_") && converted::at_place(same(want.hover_trim_, (*got.rows)[17]), ".hover_trim_") && converted::at_place(same(want.debug_, (*got.rows)[18]), ".debug_"); }
 [[maybe_unused]] static bool defined(const fc::StateController& s) { return defined(s.agl_estimate_m_) && defined(s.agl_estimate_valid_) && defined(s.active_) && defined(s.heading_source_valid_) && defined(s.manual_pitch_active_) && defined(s.acceleration_estimator_valid_) && defined(s.horizontal_target_initialized_) && defined(s.vertical_accel_initialized_) && defined(s.acceleration_sample_dt_s_) && defined(s.previous_velocity_world_mps_) && defined(s.measured_acceleration_world_mps2_) && defined(s.horizontal_integral_forward_mps2_) && defined(s.horizontal_integral_right_mps2_) && defined(s.commanded_forward_mps_) && defined(s.commanded_right_mps_) && defined(s.vertical_accel_state_mps2_) && defined(s.target_yaw_deg_) && defined(s.hover_trim_) && defined(s.debug_); }
 [[maybe_unused]] static std::string text(const fc::StateController& s) { return std::string("{") + text(s.agl_estimate_m_) + ", " + text(s.agl_estimate_valid_) + ", " + text(s.active_) + ", " + text(s.heading_source_valid_) + ", " + text(s.manual_pitch_active_) + ", " + text(s.acceleration_estimator_valid_) + ", " + text(s.horizontal_target_initialized_) + ", " + text(s.vertical_accel_initialized_) + ", " + text(s.acceleration_sample_dt_s_) + ", " + text(s.previous_velocity_world_mps_) + ", " + text(s.measured_acceleration_world_mps2_) + ", " + text(s.horizontal_integral_forward_mps2_) + ", " + text(s.horizontal_integral_right_mps2_) + ", " + text(s.commanded_forward_mps_) + ", " + text(s.commanded_right_mps_) + ", " + text(s.vertical_accel_state_mps2_) + ", " + text(s.target_yaw_deg_) + ", " + text(s.hover_trim_) + ", " + text(s.debug_) + "}"; }
 [[maybe_unused]] static void take(fc::StateController& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<double>(s.agl_estimate_m_, (*v.rows)[0]); converted::take_as<bool>(s.agl_estimate_valid_, (*v.rows)[1]); converted::take_as<bool>(s.active_, (*v.rows)[2]); converted::take_as<bool>(s.heading_source_valid_, (*v.rows)[3]); converted::take_as<bool>(s.manual_pitch_active_, (*v.rows)[4]); converted::take_as<bool>(s.acceleration_estimator_valid_, (*v.rows)[5]); converted::take_as<bool>(s.horizontal_target_initialized_, (*v.rows)[6]); converted::take_as<bool>(s.vertical_accel_initialized_, (*v.rows)[7]); converted::take_as<double>(s.acceleration_sample_dt_s_, (*v.rows)[8]); converted::take_as<fc::V3>(s.previous_velocity_world_mps_, (*v.rows)[9]); converted::take_as<fc::V3>(s.measured_acceleration_world_mps2_, (*v.rows)[10]); converted::take_as<double>(s.horizontal_integral_forward_mps2_, (*v.rows)[11]); converted::take_as<double>(s.horizontal_integral_right_mps2_, (*v.rows)[12]); converted::take_as<double>(s.commanded_forward_mps_, (*v.rows)[13]); converted::take_as<double>(s.commanded_right_mps_, (*v.rows)[14]); converted::take_as<double>(s.vertical_accel_state_mps2_, (*v.rows)[15]); converted::take_as<double>(s.target_yaw_deg_, (*v.rows)[16]); converted::take_as<double>(s.hover_trim_, (*v.rows)[17]); converted::take_as<fc::StateControllerDebug>(s.debug_, (*v.rows)[18]); }
@@ -2287,7 +2305,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::StateRuntime& s) { return converted::Value::structure({arg(s.runtime_), arg(s.state_controller_), arg(s.last_yaw_deg_), arg(s.game_active_)}); }
-[[maybe_unused]] static bool same(const fc::StateRuntime& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.runtime_, (*got.rows)[0]) && same(want.state_controller_, (*got.rows)[1]) && same(want.last_yaw_deg_, (*got.rows)[2]) && same(want.game_active_, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const fc::StateRuntime& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.runtime_, (*got.rows)[0]), ".runtime_") && converted::at_place(same(want.state_controller_, (*got.rows)[1]), ".state_controller_") && converted::at_place(same(want.last_yaw_deg_, (*got.rows)[2]), ".last_yaw_deg_") && converted::at_place(same(want.game_active_, (*got.rows)[3]), ".game_active_"); }
 [[maybe_unused]] static bool defined(const fc::StateRuntime& s) { return defined(s.runtime_) && defined(s.state_controller_) && defined(s.last_yaw_deg_) && defined(s.game_active_); }
 [[maybe_unused]] static std::string text(const fc::StateRuntime& s) { return std::string("{") + text(s.runtime_) + ", " + text(s.state_controller_) + ", " + text(s.last_yaw_deg_) + ", " + text(s.game_active_) + "}"; }
 [[maybe_unused]] static void take(fc::StateRuntime& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<fc::Runtime>(s.runtime_, (*v.rows)[0]); converted::take_as<fc::StateController>(s.state_controller_, (*v.rows)[1]); converted::take_as<double>(s.last_yaw_deg_, (*v.rows)[2]); converted::take_as<bool>(s.game_active_, (*v.rows)[3]); }
@@ -2303,7 +2321,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::RC& s) { return converted::Value::structure({arg(std::vector<unsigned short>(s.ch.begin(), s.ch.end())), arg(s.lost), arg(s.failsafe), arg(s.valid), arg(converted::shaped<converted::Whole>(s.us))}); }
-[[maybe_unused]] static bool same(const fc::RC& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(std::vector<unsigned short>(want.ch.begin(), want.ch.end()), (*got.rows)[0]) && same(want.lost, (*got.rows)[1]) && same(want.failsafe, (*got.rows)[2]) && same(want.valid, (*got.rows)[3]) && same(converted::shaped<converted::Whole>(want.us), (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const fc::RC& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(std::vector<unsigned short>(want.ch.begin(), want.ch.end()), (*got.rows)[0]), ".ch") && converted::at_place(same(want.lost, (*got.rows)[1]), ".lost") && converted::at_place(same(want.failsafe, (*got.rows)[2]), ".failsafe") && converted::at_place(same(want.valid, (*got.rows)[3]), ".valid") && converted::at_place(same(converted::shaped<converted::Whole>(want.us), (*got.rows)[4]), ".us"); }
 [[maybe_unused]] static bool defined(const fc::RC& s) { return defined(std::vector<unsigned short>(s.ch.begin(), s.ch.end())) && defined(s.lost) && defined(s.failsafe) && defined(s.valid) && defined(converted::shaped<converted::Whole>(s.us)); }
 [[maybe_unused]] static std::string text(const fc::RC& s) { return std::string("{") + text(std::vector<unsigned short>(s.ch.begin(), s.ch.end())) + ", " + text(s.lost) + ", " + text(s.failsafe) + ", " + text(s.valid) + ", " + text(converted::shaped<converted::Whole>(s.us)) + "}"; }
 [[maybe_unused]] static void take(fc::RC& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.ch); ++k) converted::take_as<unsigned short>(s.ch[k], items.item(k)); } converted::take_as<bool>(s.lost, (*v.rows)[1]); converted::take_as<bool>(s.failsafe, (*v.rows)[2]); converted::take_as<bool>(s.valid, (*v.rows)[3]); converted::take_as<converted::Whole>(s.us, (*v.rows)[4]); }
@@ -2321,7 +2339,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::NavigationState& s) { return converted::Value::structure({arg(s.velocity_world_mps), arg(s.agl_m), arg(s.valid), arg(s.velocity_valid), arg(s.agl_valid), arg(s.heading_deg), arg(s.heading_valid)}); }
-[[maybe_unused]] static bool same(const fc::NavigationState& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.velocity_world_mps, (*got.rows)[0]) && same(want.agl_m, (*got.rows)[1]) && same(want.valid, (*got.rows)[2]) && same(want.velocity_valid, (*got.rows)[3]) && same(want.agl_valid, (*got.rows)[4]) && same(want.heading_deg, (*got.rows)[5]) && same(want.heading_valid, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const fc::NavigationState& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.velocity_world_mps, (*got.rows)[0]), ".velocity_world_mps") && converted::at_place(same(want.agl_m, (*got.rows)[1]), ".agl_m") && converted::at_place(same(want.valid, (*got.rows)[2]), ".valid") && converted::at_place(same(want.velocity_valid, (*got.rows)[3]), ".velocity_valid") && converted::at_place(same(want.agl_valid, (*got.rows)[4]), ".agl_valid") && converted::at_place(same(want.heading_deg, (*got.rows)[5]), ".heading_deg") && converted::at_place(same(want.heading_valid, (*got.rows)[6]), ".heading_valid"); }
 [[maybe_unused]] static bool defined(const fc::NavigationState& s) { return defined(s.velocity_world_mps) && defined(s.agl_m) && defined(s.valid) && defined(s.velocity_valid) && defined(s.agl_valid) && defined(s.heading_deg) && defined(s.heading_valid); }
 [[maybe_unused]] static std::string text(const fc::NavigationState& s) { return std::string("{") + text(s.velocity_world_mps) + ", " + text(s.agl_m) + ", " + text(s.valid) + ", " + text(s.velocity_valid) + ", " + text(s.agl_valid) + ", " + text(s.heading_deg) + ", " + text(s.heading_valid) + "}"; }
 [[maybe_unused]] static void take(fc::NavigationState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<fc::V3>(s.velocity_world_mps, (*v.rows)[0]); converted::take_as<double>(s.agl_m, (*v.rows)[1]); converted::take_as<bool>(s.valid, (*v.rows)[2]); converted::take_as<bool>(s.velocity_valid, (*v.rows)[3]); converted::take_as<bool>(s.agl_valid, (*v.rows)[4]); converted::take_as<double>(s.heading_deg, (*v.rows)[5]); converted::take_as<bool>(s.heading_valid, (*v.rows)[6]); }
@@ -2338,7 +2356,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::FirmwareRuntime& s) { return converted::Value::structure({arg(s.runtime_), arg(s.rc_snapshot_), arg(s.navigation_snapshot_), arg(converted::shaped<converted::Whole>(s.navigation_us_)), arg(s.last_navigation_sequence_), arg(s.have_navigation_sequence_)}); }
-[[maybe_unused]] static bool same(const fc::FirmwareRuntime& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.runtime_, (*got.rows)[0]) && same(want.rc_snapshot_, (*got.rows)[1]) && same(want.navigation_snapshot_, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.navigation_us_), (*got.rows)[3]) && same(want.last_navigation_sequence_, (*got.rows)[4]) && same(want.have_navigation_sequence_, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const fc::FirmwareRuntime& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.runtime_, (*got.rows)[0]), ".runtime_") && converted::at_place(same(want.rc_snapshot_, (*got.rows)[1]), ".rc_snapshot_") && converted::at_place(same(want.navigation_snapshot_, (*got.rows)[2]), ".navigation_snapshot_") && converted::at_place(same(converted::shaped<converted::Whole>(want.navigation_us_), (*got.rows)[3]), ".navigation_us_") && converted::at_place(same(want.last_navigation_sequence_, (*got.rows)[4]), ".last_navigation_sequence_") && converted::at_place(same(want.have_navigation_sequence_, (*got.rows)[5]), ".have_navigation_sequence_"); }
 [[maybe_unused]] static bool defined(const fc::FirmwareRuntime& s) { return defined(s.runtime_) && defined(s.rc_snapshot_) && defined(s.navigation_snapshot_) && defined(converted::shaped<converted::Whole>(s.navigation_us_)) && defined(s.last_navigation_sequence_) && defined(s.have_navigation_sequence_); }
 [[maybe_unused]] static std::string text(const fc::FirmwareRuntime& s) { return std::string("{") + text(s.runtime_) + ", " + text(s.rc_snapshot_) + ", " + text(s.navigation_snapshot_) + ", " + text(converted::shaped<converted::Whole>(s.navigation_us_)) + ", " + text(s.last_navigation_sequence_) + ", " + text(s.have_navigation_sequence_) + "}"; }
 [[maybe_unused]] static void take(fc::FirmwareRuntime& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<fc::StateRuntime>(s.runtime_, (*v.rows)[0]); converted::take_as<fc::RC>(s.rc_snapshot_, (*v.rows)[1]); converted::take_as<fc::NavigationState>(s.navigation_snapshot_, (*v.rows)[2]); converted::take_as<converted::Whole>(s.navigation_us_, (*v.rows)[3]); converted::take_as<unsigned short>(s.last_navigation_sequence_, (*v.rows)[4]); converted::take_as<bool>(s.have_navigation_sequence_, (*v.rows)[5]); }
@@ -2351,7 +2369,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Rng& s) { return converted::Value::structure({arg(s.s), arg(s.spare_), arg(s.has_spare_)}); }
-[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.s, (*got.rows)[0]) && same(want.spare_, (*got.rows)[1]) && same(want.has_spare_, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.s, (*got.rows)[0]), ".s") && converted::at_place(same(want.spare_, (*got.rows)[1]), ".spare_") && converted::at_place(same(want.has_spare_, (*got.rows)[2]), ".has_spare_"); }
 [[maybe_unused]] static bool defined(const Rng& s) { return defined(s.s) && defined(s.spare_) && defined(s.has_spare_); }
 [[maybe_unused]] static std::string text(const Rng& s) { return std::string("{") + text(s.s) + ", " + text(s.spare_) + ", " + text(s.has_spare_) + "}"; }
 [[maybe_unused]] static void take(Rng& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); converted::take_as<double>(s.spare_, (*v.rows)[1]); converted::take_as<bool>(s.has_spare_, (*v.rows)[2]); }
@@ -2377,7 +2395,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const DroneTelemetry& s) { return converted::Value::structure({arg(s.armed), arg(s.calibrating), arg(s.fault), arg(s.game), arg(s.nav_valid), arg(s.state), arg(std::vector<unsigned short>(s.pulses.begin(), s.pulses.end())), arg(std::vector<double>(s.omega.begin(), s.omega.end())), arg(std::vector<double>(s.motor_torque.begin(), s.motor_torque.end())), arg(std::vector<double>(s.prop_torque.begin(), s.prop_torque.end())), arg(s.battery_v), arg(s.battery_soc), arg(s.current_a), arg(s.agl), arg(s.speed), arg(s.vz), arg(converted::array_list(s.attitude_deg))}); }
-[[maybe_unused]] static bool same(const DroneTelemetry& want, const converted::Value& got) { return got.rows && got.rows->size() == 17 && same(want.armed, (*got.rows)[0]) && same(want.calibrating, (*got.rows)[1]) && same(want.fault, (*got.rows)[2]) && same(want.game, (*got.rows)[3]) && same(want.nav_valid, (*got.rows)[4]) && same(want.state, (*got.rows)[5]) && same(std::vector<unsigned short>(want.pulses.begin(), want.pulses.end()), (*got.rows)[6]) && same(std::vector<double>(want.omega.begin(), want.omega.end()), (*got.rows)[7]) && same(std::vector<double>(want.motor_torque.begin(), want.motor_torque.end()), (*got.rows)[8]) && same(std::vector<double>(want.prop_torque.begin(), want.prop_torque.end()), (*got.rows)[9]) && same(want.battery_v, (*got.rows)[10]) && same(want.battery_soc, (*got.rows)[11]) && same(want.current_a, (*got.rows)[12]) && same(want.agl, (*got.rows)[13]) && same(want.speed, (*got.rows)[14]) && same(want.vz, (*got.rows)[15]) && same(converted::array_list(want.attitude_deg), (*got.rows)[16]); }
+[[maybe_unused]] static bool same(const DroneTelemetry& want, const converted::Value& got) { return converted::rows_of(got, 17) && converted::at_place(same(want.armed, (*got.rows)[0]), ".armed") && converted::at_place(same(want.calibrating, (*got.rows)[1]), ".calibrating") && converted::at_place(same(want.fault, (*got.rows)[2]), ".fault") && converted::at_place(same(want.game, (*got.rows)[3]), ".game") && converted::at_place(same(want.nav_valid, (*got.rows)[4]), ".nav_valid") && converted::at_place(same(want.state, (*got.rows)[5]), ".state") && converted::at_place(same(std::vector<unsigned short>(want.pulses.begin(), want.pulses.end()), (*got.rows)[6]), ".pulses") && converted::at_place(same(std::vector<double>(want.omega.begin(), want.omega.end()), (*got.rows)[7]), ".omega") && converted::at_place(same(std::vector<double>(want.motor_torque.begin(), want.motor_torque.end()), (*got.rows)[8]), ".motor_torque") && converted::at_place(same(std::vector<double>(want.prop_torque.begin(), want.prop_torque.end()), (*got.rows)[9]), ".prop_torque") && converted::at_place(same(want.battery_v, (*got.rows)[10]), ".battery_v") && converted::at_place(same(want.battery_soc, (*got.rows)[11]), ".battery_soc") && converted::at_place(same(want.current_a, (*got.rows)[12]), ".current_a") && converted::at_place(same(want.agl, (*got.rows)[13]), ".agl") && converted::at_place(same(want.speed, (*got.rows)[14]), ".speed") && converted::at_place(same(want.vz, (*got.rows)[15]), ".vz") && converted::at_place(same(converted::array_list(want.attitude_deg), (*got.rows)[16]), ".attitude_deg"); }
 [[maybe_unused]] static bool defined(const DroneTelemetry& s) { return defined(s.armed) && defined(s.calibrating) && defined(s.fault) && defined(s.game) && defined(s.nav_valid) && defined(s.state) && defined(std::vector<unsigned short>(s.pulses.begin(), s.pulses.end())) && defined(std::vector<double>(s.omega.begin(), s.omega.end())) && defined(std::vector<double>(s.motor_torque.begin(), s.motor_torque.end())) && defined(std::vector<double>(s.prop_torque.begin(), s.prop_torque.end())) && defined(s.battery_v) && defined(s.battery_soc) && defined(s.current_a) && defined(s.agl) && defined(s.speed) && defined(s.vz) && defined(converted::array_list(s.attitude_deg)); }
 [[maybe_unused]] static std::string text(const DroneTelemetry& s) { return std::string("{") + text(s.armed) + ", " + text(s.calibrating) + ", " + text(s.fault) + ", " + text(s.game) + ", " + text(s.nav_valid) + ", " + text(s.state) + ", " + text(std::vector<unsigned short>(s.pulses.begin(), s.pulses.end())) + ", " + text(std::vector<double>(s.omega.begin(), s.omega.end())) + ", " + text(std::vector<double>(s.motor_torque.begin(), s.motor_torque.end())) + ", " + text(std::vector<double>(s.prop_torque.begin(), s.prop_torque.end())) + ", " + text(s.battery_v) + ", " + text(s.battery_soc) + ", " + text(s.current_a) + ", " + text(s.agl) + ", " + text(s.speed) + ", " + text(s.vz) + ", " + text(converted::array_list(s.attitude_deg)) + "}"; }
 [[maybe_unused]] static void take(DroneTelemetry& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 17) return; converted::take_as<bool>(s.armed, (*v.rows)[0]); converted::take_as<bool>(s.calibrating, (*v.rows)[1]); converted::take_as<bool>(s.fault, (*v.rows)[2]); converted::take_as<bool>(s.game, (*v.rows)[3]); converted::take_as<bool>(s.nav_valid, (*v.rows)[4]); converted::take_as<unsigned int>(s.state, (*v.rows)[5]); { const converted::Value& items = (*v.rows)[6]; for (std::size_t k = 0; k < items.size() && k < std::size(s.pulses); ++k) converted::take_as<unsigned short>(s.pulses[k], items.item(k)); } { const converted::Value& items = (*v.rows)[7]; for (std::size_t k = 0; k < items.size() && k < std::size(s.omega); ++k) converted::take_as<double>(s.omega[k], items.item(k)); } { const converted::Value& items = (*v.rows)[8]; for (std::size_t k = 0; k < items.size() && k < std::size(s.motor_torque); ++k) converted::take_as<double>(s.motor_torque[k], items.item(k)); } { const converted::Value& items = (*v.rows)[9]; for (std::size_t k = 0; k < items.size() && k < std::size(s.prop_torque); ++k) converted::take_as<double>(s.prop_torque[k], items.item(k)); } converted::take_as<double>(s.battery_v, (*v.rows)[10]); converted::take_as<double>(s.battery_soc, (*v.rows)[11]); converted::take_as<double>(s.current_a, (*v.rows)[12]); converted::take_as<double>(s.agl, (*v.rows)[13]); converted::take_as<double>(s.speed, (*v.rows)[14]); converted::take_as<double>(s.vz, (*v.rows)[15]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[16]); converted::array_from(s.attitude_deg, items); } }
@@ -2421,7 +2439,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Drone& s) { return converted::Value::structure({arg(s.p_), arg(s.fw_), arg(converted::array_list(s.motor_pos_)), arg(converted::array_list(s.omega_)), arg(converted::array_list(s.current_)), arg(converted::array_list(s.rotor_angle_)), arg(converted::array_list(s.motor_torque_)), arg(converted::array_list(s.prop_torque_)), arg(s.soc_), arg(s.vbatt_), arg(s.ibatt_), arg(s.back_emf_), arg(s.d4_), arg(s.d5_), arg(s.cdA_), arg(converted::array_list(s.pulses_)), arg(s.prev_velocity_), arg(s.world_accel_), arg(s.prev_omega_body_), arg(s.have_prev_), arg(s.now_us_), arg(s.sequence_), arg(s.sbus_elapsed_), arg(s.nav_elapsed_), arg(s.nav_filtered_), arg(s.nav_seq_), arg(s.reset_flag_), arg(s.noise_), arg(s.nav_noise_), arg(s.heading_noise_), arg(converted::array_list(s.gyro_bias_)), arg(converted::array_list(s.acc_bias_)), arg(s.parked_steps_), arg(s.parked_), arg(s.tele_)}); }
-[[maybe_unused]] static bool same(const Drone& want, const converted::Value& got) { return got.rows && got.rows->size() == 35 && same(want.p_, (*got.rows)[0]) && same(want.fw_, (*got.rows)[1]) && same(converted::array_list(want.motor_pos_), (*got.rows)[2]) && same(converted::array_list(want.omega_), (*got.rows)[3]) && same(converted::array_list(want.current_), (*got.rows)[4]) && same(converted::array_list(want.rotor_angle_), (*got.rows)[5]) && same(converted::array_list(want.motor_torque_), (*got.rows)[6]) && same(converted::array_list(want.prop_torque_), (*got.rows)[7]) && same(want.soc_, (*got.rows)[8]) && same(want.vbatt_, (*got.rows)[9]) && same(want.ibatt_, (*got.rows)[10]) && same(want.back_emf_, (*got.rows)[11]) && same(want.d4_, (*got.rows)[12]) && same(want.d5_, (*got.rows)[13]) && same(want.cdA_, (*got.rows)[14]) && same(converted::array_list(want.pulses_), (*got.rows)[15]) && same(want.prev_velocity_, (*got.rows)[16]) && same(want.world_accel_, (*got.rows)[17]) && same(want.prev_omega_body_, (*got.rows)[18]) && same(want.have_prev_, (*got.rows)[19]) && same(want.now_us_, (*got.rows)[20]) && same(want.sequence_, (*got.rows)[21]) && same(want.sbus_elapsed_, (*got.rows)[22]) && same(want.nav_elapsed_, (*got.rows)[23]) && same(want.nav_filtered_, (*got.rows)[24]) && same(want.nav_seq_, (*got.rows)[25]) && same(want.reset_flag_, (*got.rows)[26]) && same(want.noise_, (*got.rows)[27]) && same(want.nav_noise_, (*got.rows)[28]) && same(want.heading_noise_, (*got.rows)[29]) && same(converted::array_list(want.gyro_bias_), (*got.rows)[30]) && same(converted::array_list(want.acc_bias_), (*got.rows)[31]) && same(want.parked_steps_, (*got.rows)[32]) && same(want.parked_, (*got.rows)[33]) && same(want.tele_, (*got.rows)[34]); }
+[[maybe_unused]] static bool same(const Drone& want, const converted::Value& got) { return converted::rows_of(got, 35) && converted::at_place(same(want.p_, (*got.rows)[0]), ".p_") && converted::at_place(same(want.fw_, (*got.rows)[1]), ".fw_") && converted::at_place(same(converted::array_list(want.motor_pos_), (*got.rows)[2]), ".motor_pos_") && converted::at_place(same(converted::array_list(want.omega_), (*got.rows)[3]), ".omega_") && converted::at_place(same(converted::array_list(want.current_), (*got.rows)[4]), ".current_") && converted::at_place(same(converted::array_list(want.rotor_angle_), (*got.rows)[5]), ".rotor_angle_") && converted::at_place(same(converted::array_list(want.motor_torque_), (*got.rows)[6]), ".motor_torque_") && converted::at_place(same(converted::array_list(want.prop_torque_), (*got.rows)[7]), ".prop_torque_") && converted::at_place(same(want.soc_, (*got.rows)[8]), ".soc_") && converted::at_place(same(want.vbatt_, (*got.rows)[9]), ".vbatt_") && converted::at_place(same(want.ibatt_, (*got.rows)[10]), ".ibatt_") && converted::at_place(same(want.back_emf_, (*got.rows)[11]), ".back_emf_") && converted::at_place(same(want.d4_, (*got.rows)[12]), ".d4_") && converted::at_place(same(want.d5_, (*got.rows)[13]), ".d5_") && converted::at_place(same(want.cdA_, (*got.rows)[14]), ".cdA_") && converted::at_place(same(converted::array_list(want.pulses_), (*got.rows)[15]), ".pulses_") && converted::at_place(same(want.prev_velocity_, (*got.rows)[16]), ".prev_velocity_") && converted::at_place(same(want.world_accel_, (*got.rows)[17]), ".world_accel_") && converted::at_place(same(want.prev_omega_body_, (*got.rows)[18]), ".prev_omega_body_") && converted::at_place(same(want.have_prev_, (*got.rows)[19]), ".have_prev_") && converted::at_place(same(want.now_us_, (*got.rows)[20]), ".now_us_") && converted::at_place(same(want.sequence_, (*got.rows)[21]), ".sequence_") && converted::at_place(same(want.sbus_elapsed_, (*got.rows)[22]), ".sbus_elapsed_") && converted::at_place(same(want.nav_elapsed_, (*got.rows)[23]), ".nav_elapsed_") && converted::at_place(same(want.nav_filtered_, (*got.rows)[24]), ".nav_filtered_") && converted::at_place(same(want.nav_seq_, (*got.rows)[25]), ".nav_seq_") && converted::at_place(same(want.reset_flag_, (*got.rows)[26]), ".reset_flag_") && converted::at_place(same(want.noise_, (*got.rows)[27]), ".noise_") && converted::at_place(same(want.nav_noise_, (*got.rows)[28]), ".nav_noise_") && converted::at_place(same(want.heading_noise_, (*got.rows)[29]), ".heading_noise_") && converted::at_place(same(converted::array_list(want.gyro_bias_), (*got.rows)[30]), ".gyro_bias_") && converted::at_place(same(converted::array_list(want.acc_bias_), (*got.rows)[31]), ".acc_bias_") && converted::at_place(same(want.parked_steps_, (*got.rows)[32]), ".parked_steps_") && converted::at_place(same(want.parked_, (*got.rows)[33]), ".parked_") && converted::at_place(same(want.tele_, (*got.rows)[34]), ".tele_"); }
 [[maybe_unused]] static bool defined(const Drone& s) { return defined(s.p_) && defined(s.fw_) && defined(converted::array_list(s.motor_pos_)) && defined(converted::array_list(s.omega_)) && defined(converted::array_list(s.current_)) && defined(converted::array_list(s.rotor_angle_)) && defined(converted::array_list(s.motor_torque_)) && defined(converted::array_list(s.prop_torque_)) && defined(s.soc_) && defined(s.vbatt_) && defined(s.ibatt_) && defined(s.back_emf_) && defined(s.d4_) && defined(s.d5_) && defined(s.cdA_) && defined(converted::array_list(s.pulses_)) && defined(s.prev_velocity_) && defined(s.world_accel_) && defined(s.prev_omega_body_) && defined(s.have_prev_) && defined(s.now_us_) && defined(s.sequence_) && defined(s.sbus_elapsed_) && defined(s.nav_elapsed_) && defined(s.nav_filtered_) && defined(s.nav_seq_) && defined(s.reset_flag_) && defined(s.noise_) && defined(s.nav_noise_) && defined(s.heading_noise_) && defined(converted::array_list(s.gyro_bias_)) && defined(converted::array_list(s.acc_bias_)) && defined(s.parked_steps_) && defined(s.parked_) && defined(s.tele_); }
 [[maybe_unused]] static std::string text(const Drone& s) { return std::string("{") + text(s.p_) + ", " + text(s.fw_) + ", " + text(converted::array_list(s.motor_pos_)) + ", " + text(converted::array_list(s.omega_)) + ", " + text(converted::array_list(s.current_)) + ", " + text(converted::array_list(s.rotor_angle_)) + ", " + text(converted::array_list(s.motor_torque_)) + ", " + text(converted::array_list(s.prop_torque_)) + ", " + text(s.soc_) + ", " + text(s.vbatt_) + ", " + text(s.ibatt_) + ", " + text(s.back_emf_) + ", " + text(s.d4_) + ", " + text(s.d5_) + ", " + text(s.cdA_) + ", " + text(converted::array_list(s.pulses_)) + ", " + text(s.prev_velocity_) + ", " + text(s.world_accel_) + ", " + text(s.prev_omega_body_) + ", " + text(s.have_prev_) + ", " + text(s.now_us_) + ", " + text(s.sequence_) + ", " + text(s.sbus_elapsed_) + ", " + text(s.nav_elapsed_) + ", " + text(s.nav_filtered_) + ", " + text(s.nav_seq_) + ", " + text(s.reset_flag_) + ", " + text(s.noise_) + ", " + text(s.nav_noise_) + ", " + text(s.heading_noise_) + ", " + text(converted::array_list(s.gyro_bias_)) + ", " + text(converted::array_list(s.acc_bias_)) + ", " + text(s.parked_steps_) + ", " + text(s.parked_) + ", " + text(s.tele_) + "}"; }
 [[maybe_unused]] static void take(Drone& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 35) return; converted::take_as<DroneParams>(s.p_, (*v.rows)[0]); converted::take_as<fc::FirmwareRuntime>(s.fw_, (*v.rows)[1]); { std::vector<Vec3> items; converted::take_as<std::vector<Vec3>>(items, (*v.rows)[2]); converted::array_from(s.motor_pos_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[3]); converted::array_from(s.omega_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[4]); converted::array_from(s.current_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[5]); converted::array_from(s.rotor_angle_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[6]); converted::array_from(s.motor_torque_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[7]); converted::array_from(s.prop_torque_, items); } converted::take_as<double>(s.soc_, (*v.rows)[8]); converted::take_as<double>(s.vbatt_, (*v.rows)[9]); converted::take_as<double>(s.ibatt_, (*v.rows)[10]); converted::take_as<double>(s.back_emf_, (*v.rows)[11]); converted::take_as<double>(s.d4_, (*v.rows)[12]); converted::take_as<double>(s.d5_, (*v.rows)[13]); converted::take_as<Vec3>(s.cdA_, (*v.rows)[14]); { std::vector<unsigned short> items; converted::take_as<std::vector<unsigned short>>(items, (*v.rows)[15]); converted::array_from(s.pulses_, items); } converted::take_as<Vec3>(s.prev_velocity_, (*v.rows)[16]); converted::take_as<Vec3>(s.world_accel_, (*v.rows)[17]); converted::take_as<Vec3>(s.prev_omega_body_, (*v.rows)[18]); converted::take_as<bool>(s.have_prev_, (*v.rows)[19]); converted::take_as<double>(s.now_us_, (*v.rows)[20]); converted::take_as<unsigned int>(s.sequence_, (*v.rows)[21]); converted::take_as<double>(s.sbus_elapsed_, (*v.rows)[22]); converted::take_as<double>(s.nav_elapsed_, (*v.rows)[23]); converted::take_as<Vec3>(s.nav_filtered_, (*v.rows)[24]); converted::take_as<unsigned short>(s.nav_seq_, (*v.rows)[25]); converted::take_as<bool>(s.reset_flag_, (*v.rows)[26]); converted::take_as<Rng>(s.noise_, (*v.rows)[27]); converted::take_as<Rng>(s.nav_noise_, (*v.rows)[28]); converted::take_as<Rng>(s.heading_noise_, (*v.rows)[29]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[30]); converted::array_from(s.gyro_bias_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[31]); converted::array_from(s.acc_bias_, items); } converted::take_as<unsigned int>(s.parked_steps_, (*v.rows)[32]); converted::take_as<bool>(s.parked_, (*v.rows)[33]); converted::take_as<DroneTelemetry>(s.tele_, (*v.rows)[34]); }
@@ -2439,7 +2457,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const ColliderSpec& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(s.points), arg(s.friction), arg(s.restitution)}); }
-[[maybe_unused]] static bool same(const ColliderSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.kind, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(want.rotation, (*got.rows)[2]) && same(want.size, (*got.rows)[3]) && same(want.radius, (*got.rows)[4]) && same(want.length, (*got.rows)[5]) && same(want.points, (*got.rows)[6]) && same(want.friction, (*got.rows)[7]) && same(want.restitution, (*got.rows)[8]); }
+[[maybe_unused]] static bool same(const ColliderSpec& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.size, (*got.rows)[3]), ".size") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.length, (*got.rows)[5]), ".length") && converted::at_place(same(want.points, (*got.rows)[6]), ".points") && converted::at_place(same(want.friction, (*got.rows)[7]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[8]), ".restitution"); }
 [[maybe_unused]] static bool defined(const ColliderSpec& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(s.points) && defined(s.friction) && defined(s.restitution); }
 [[maybe_unused]] static std::string text(const ColliderSpec& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(s.points) + ", " + text(s.friction) + ", " + text(s.restitution) + "}"; }
 [[maybe_unused]] static void take(ColliderSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<std::vector<Vec3>>(s.points, (*v.rows)[6]); converted::take_as<double>(s.friction, (*v.rows)[7]); converted::take_as<double>(s.restitution, (*v.rows)[8]); }
@@ -2451,7 +2469,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MassSpec& s) { return converted::Value::structure({arg(s.mass), arg(s.center), arg(converted::array_list(s.inertia))}); }
-[[maybe_unused]] static bool same(const MassSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.mass, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(converted::array_list(want.inertia), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const MassSpec& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.mass, (*got.rows)[0]), ".mass") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(converted::array_list(want.inertia), (*got.rows)[2]), ".inertia"); }
 [[maybe_unused]] static bool defined(const MassSpec& s) { return defined(s.mass) && defined(s.center) && defined(converted::array_list(s.inertia)); }
 [[maybe_unused]] static std::string text(const MassSpec& s) { return std::string("{") + text(s.mass) + ", " + text(s.center) + ", " + text(converted::array_list(s.inertia)) + "}"; }
 [[maybe_unused]] static void take(MassSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.mass, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[2]); converted::array_from(s.inertia, items); } }
@@ -2465,7 +2483,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const RigidSpec& s) { return converted::Value::structure({arg(s.colliders), arg(s.mass), arg(s.linear_damping), arg(s.angular_damping), arg(s.bullet)}); }
-[[maybe_unused]] static bool same(const RigidSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.colliders, (*got.rows)[0]) && same(want.mass, (*got.rows)[1]) && same(want.linear_damping, (*got.rows)[2]) && same(want.angular_damping, (*got.rows)[3]) && same(want.bullet, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const RigidSpec& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.colliders, (*got.rows)[0]), ".colliders") && converted::at_place(same(want.mass, (*got.rows)[1]), ".mass") && converted::at_place(same(want.linear_damping, (*got.rows)[2]), ".linear_damping") && converted::at_place(same(want.angular_damping, (*got.rows)[3]), ".angular_damping") && converted::at_place(same(want.bullet, (*got.rows)[4]), ".bullet"); }
 [[maybe_unused]] static bool defined(const RigidSpec& s) { return defined(s.colliders) && defined(s.mass) && defined(s.linear_damping) && defined(s.angular_damping) && defined(s.bullet); }
 [[maybe_unused]] static std::string text(const RigidSpec& s) { return std::string("{") + text(s.colliders) + ", " + text(s.mass) + ", " + text(s.linear_damping) + ", " + text(s.angular_damping) + ", " + text(s.bullet) + "}"; }
 [[maybe_unused]] static void take(RigidSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::vector<ColliderSpec>>(s.colliders, (*v.rows)[0]); converted::take_as<MassSpec>(s.mass, (*v.rows)[1]); converted::take_as<double>(s.linear_damping, (*v.rows)[2]); converted::take_as<double>(s.angular_damping, (*v.rows)[3]); converted::take_as<bool>(s.bullet, (*v.rows)[4]); }
@@ -2478,7 +2496,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const BodyState& s) { return converted::Value::structure({arg(s.position), arg(s.velocity), arg(s.angular), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const BodyState& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.position, (*got.rows)[0]) && same(want.velocity, (*got.rows)[1]) && same(want.angular, (*got.rows)[2]) && same(want.rotation, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const BodyState& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.velocity, (*got.rows)[1]), ".velocity") && converted::at_place(same(want.angular, (*got.rows)[2]), ".angular") && converted::at_place(same(want.rotation, (*got.rows)[3]), ".rotation"); }
 [[maybe_unused]] static bool defined(const BodyState& s) { return defined(s.position) && defined(s.velocity) && defined(s.angular) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const BodyState& s) { return std::string("{") + text(s.position) + ", " + text(s.velocity) + ", " + text(s.angular) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(BodyState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Vec3>(s.velocity, (*v.rows)[1]); converted::take_as<Vec3>(s.angular, (*v.rows)[2]); converted::take_as<Quat>(s.rotation, (*v.rows)[3]); }
@@ -2489,7 +2507,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -2508,7 +2526,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const DroneSticks& s) { return converted::Value::structure({arg(s.roll), arg(s.pitch), arg(s.yaw), arg(s.throttle), arg(s.body_pitch), arg(s.clearance), arg(s.arm), arg(s.game_mode), arg(s.kill)}); }
-[[maybe_unused]] static bool same(const DroneSticks& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.roll, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]) && same(want.throttle, (*got.rows)[3]) && same(want.body_pitch, (*got.rows)[4]) && same(want.clearance, (*got.rows)[5]) && same(want.arm, (*got.rows)[6]) && same(want.game_mode, (*got.rows)[7]) && same(want.kill, (*got.rows)[8]); }
+[[maybe_unused]] static bool same(const DroneSticks& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.roll, (*got.rows)[0]), ".roll") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw") && converted::at_place(same(want.throttle, (*got.rows)[3]), ".throttle") && converted::at_place(same(want.body_pitch, (*got.rows)[4]), ".body_pitch") && converted::at_place(same(want.clearance, (*got.rows)[5]), ".clearance") && converted::at_place(same(want.arm, (*got.rows)[6]), ".arm") && converted::at_place(same(want.game_mode, (*got.rows)[7]), ".game_mode") && converted::at_place(same(want.kill, (*got.rows)[8]), ".kill"); }
 [[maybe_unused]] static bool defined(const DroneSticks& s) { return defined(s.roll) && defined(s.pitch) && defined(s.yaw) && defined(s.throttle) && defined(s.body_pitch) && defined(s.clearance) && defined(s.arm) && defined(s.game_mode) && defined(s.kill); }
 [[maybe_unused]] static std::string text(const DroneSticks& s) { return std::string("{") + text(s.roll) + ", " + text(s.pitch) + ", " + text(s.yaw) + ", " + text(s.throttle) + ", " + text(s.body_pitch) + ", " + text(s.clearance) + ", " + text(s.arm) + ", " + text(s.game_mode) + ", " + text(s.kill) + "}"; }
 [[maybe_unused]] static void take(DroneSticks& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<double>(s.roll, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); converted::take_as<double>(s.throttle, (*v.rows)[3]); converted::take_as<double>(s.body_pitch, (*v.rows)[4]); converted::take_as<double>(s.clearance, (*v.rows)[5]); converted::take_as<bool>(s.arm, (*v.rows)[6]); converted::take_as<bool>(s.game_mode, (*v.rows)[7]); converted::take_as<bool>(s.kill, (*v.rows)[8]); }
@@ -2521,7 +2539,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::QueryFilter& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(converted::shaped<converted::Whole>(s.category_bits))}); }
-[[maybe_unused]] static bool same(const physics::QueryFilter& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[0]) && same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::QueryFilter& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[0]), ".mask_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[1]), ".category_bits"); }
 [[maybe_unused]] static bool defined(const physics::QueryFilter& s) { return defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(converted::shaped<converted::Whole>(s.category_bits)); }
 [[maybe_unused]] static std::string text(const physics::QueryFilter& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + "}"; }
 [[maybe_unused]] static void take(physics::QueryFilter& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[0]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[1]); }
@@ -2533,7 +2551,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Shape& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Shape& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Shape& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Shape& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -2550,7 +2568,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::RayHit& s) { return converted::Value::structure({arg(s.hit), arg(s.shape), arg(s.body), arg(s.point), arg(s.normal), arg(s.fraction)}); }
-[[maybe_unused]] static bool same(const physics::RayHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.hit, (*got.rows)[0]) && same(want.shape, (*got.rows)[1]) && same(want.body, (*got.rows)[2]) && same(want.point, (*got.rows)[3]) && same(want.normal, (*got.rows)[4]) && same(want.fraction, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const physics::RayHit& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.hit, (*got.rows)[0]), ".hit") && converted::at_place(same(want.shape, (*got.rows)[1]), ".shape") && converted::at_place(same(want.body, (*got.rows)[2]), ".body") && converted::at_place(same(want.point, (*got.rows)[3]), ".point") && converted::at_place(same(want.normal, (*got.rows)[4]), ".normal") && converted::at_place(same(want.fraction, (*got.rows)[5]), ".fraction"); }
 [[maybe_unused]] static bool defined(const physics::RayHit& s) { return defined(s.hit) && defined(s.shape) && defined(s.body) && defined(s.point) && defined(s.normal) && defined(s.fraction); }
 [[maybe_unused]] static std::string text(const physics::RayHit& s) { return std::string("{") + text(s.hit) + ", " + text(s.shape) + ", " + text(s.body) + ", " + text(s.point) + ", " + text(s.normal) + ", " + text(s.fraction) + "}"; }
 [[maybe_unused]] static void take(physics::RayHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.hit, (*v.rows)[0]); converted::take_as<physics::Shape>(s.shape, (*v.rows)[1]); converted::take_as<physics::Body>(s.body, (*v.rows)[2]); converted::take_as<Vec3>(s.point, (*v.rows)[3]); converted::take_as<Vec3>(s.normal, (*v.rows)[4]); converted::take_as<double>(s.fraction, (*v.rows)[5]); }
@@ -2563,7 +2581,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[1]), ".rotation"); }
 [[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
@@ -2577,11 +2595,11 @@ inline physics::Pose World::pose(const physics::Body& body) const { const std::v
 inline Vec3 World::linear_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.linear_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::angular_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.angular_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 struct Out_Drone_imu_bytes { Drone Self; std::array<unsigned char, 14> out; };
-[[maybe_unused]] static bool same(const Out_Drone_imu_bytes& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Drone_imu_bytes& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_Drone_imu_bytes& s) { return defined(s.Self) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_Drone_imu_bytes& s) { return std::string("{") + text(s.Self) + ", " + text(s.out) + "}"; }
 struct Out_Drone_motor_tick { Drone Self; std::array<double, 4> thrust_out; std::array<double, 4> torque_out; };
-[[maybe_unused]] static bool same(const Out_Drone_motor_tick& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.thrust_out, (*got.rows)[1]) && same(want.torque_out, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_Drone_motor_tick& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.thrust_out, (*got.rows)[1]), ".thrust_out") && converted::at_place(same(want.torque_out, (*got.rows)[2]), ".torque_out"); }
 [[maybe_unused]] static bool defined(const Out_Drone_motor_tick& s) { return defined(s.Self) && defined(s.thrust_out) && defined(s.torque_out); }
 [[maybe_unused]] static std::string text(const Out_Drone_motor_tick& s) { return std::string("{") + text(s.Self) + ", " + text(s.thrust_out) + ", " + text(s.torque_out) + "}"; }
 
@@ -2590,7 +2608,7 @@ SC_TEST(converted_drone_cpp) {
   {  // battery_ocv
     converted::Tally tally("battery_ocv");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_drone_cpp::battery_ocv(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_drone_cpp::battery_ocv(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -2600,7 +2618,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2610,7 +2630,7 @@ SC_TEST(converted_drone_cpp) {
   {  // battery_under_load
     converted::Tally tally("battery_under_load");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_drone_cpp::battery_under_load(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return converted_drone_cpp::battery_under_load(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -2622,7 +2642,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2632,7 +2654,7 @@ SC_TEST(converted_drone_cpp) {
   {  // encode_sbus
     converted::Tally tally("encode_sbus");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::array<unsigned short, 16> a0, [[maybe_unused]] std::array<unsigned char, 25> a1) { converted::counted([&] { return converted_drone_cpp::encode_sbus(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] std::array<unsigned short, 16>& a0, [[maybe_unused]] std::array<unsigned char, 25>& a1) { converted::counted([&] { return converted_drone_cpp::encode_sbus(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       std::array<unsigned short, 16> a0 = converted::draw_array<std::array<unsigned short, 16>>([&]() -> unsigned short { return static_cast<unsigned short>(draw.below(40)); });
       std::array<unsigned char, 25> a1 = converted::draw_array<std::array<unsigned char, 25>>([&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -2642,7 +2664,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2652,7 +2676,7 @@ SC_TEST(converted_drone_cpp) {
   {  // put_be16
     converted::Tally tally("put_be16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::array<unsigned char, 14> a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] double a2) { converted::counted([&] { return converted_drone_cpp::put_be16(a0, std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::array<unsigned char, 14>& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return converted_drone_cpp::put_be16(a0, std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::array<unsigned char, 14> a0 = converted::draw_array<std::array<unsigned char, 14>>([&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -2663,7 +2687,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2673,7 +2699,7 @@ SC_TEST(converted_drone_cpp) {
   {  // quat_yaw_deg
     converted::Tally tally("quat_yaw_deg");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_drone_cpp::quat_yaw_deg(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0) { return converted::counted([&] { return converted_drone_cpp::quat_yaw_deg(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -2682,7 +2708,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2692,7 +2720,7 @@ SC_TEST(converted_drone_cpp) {
   {  // clearance_rate
     converted::Tally tally("clearance_rate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_drone_cpp::clearance_rate(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_drone_cpp::clearance_rate(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -2701,7 +2729,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2711,7 +2741,7 @@ SC_TEST(converted_drone_cpp) {
   {  // clearance_lead
     converted::Tally tally("clearance_lead");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_drone_cpp::clearance_lead(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_drone_cpp::clearance_lead(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -2720,7 +2750,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2730,7 +2762,7 @@ SC_TEST(converted_drone_cpp) {
   {  // Drone::reset
     converted::Tally tally("Drone_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Drone a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] Drone& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       Drone a0 = draw_Drone(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -2739,7 +2771,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2749,7 +2783,7 @@ SC_TEST(converted_drone_cpp) {
   {  // Drone::Drone
     converted::Tally tally("Drone_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] DroneParams a0) { return converted::counted([&] { return Drone(a0); }); };
+    const auto run = [&]([[maybe_unused]] DroneParams& a0) { return converted::counted([&] { return Drone(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       DroneParams a0 = draw_DroneParams(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -2758,7 +2792,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2768,7 +2804,7 @@ SC_TEST(converted_drone_cpp) {
   {  // Drone::rigid_spec
     converted::Tally tally("Drone_rigid_spec");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] DroneParams a0) { return converted::counted([&] { return Drone::rigid_spec(a0); }); };
+    const auto run = [&]([[maybe_unused]] DroneParams& a0) { return converted::counted([&] { return Drone::rigid_spec(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       DroneParams a0 = draw_DroneParams(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -2777,7 +2813,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2787,7 +2825,7 @@ SC_TEST(converted_drone_cpp) {
   {  // Drone::imu_bytes
     converted::Tally tally("Drone_imu_bytes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Drone a0, [[maybe_unused]] double a1, [[maybe_unused]] BodyState a2, [[maybe_unused]] std::array<unsigned char, 14> a3) { converted::counted([&] { return a0.imu_bytes(std::move(a1), a2, a3); }); return Out_Drone_imu_bytes{std::move(a0), std::move(a3)}; };
+    const auto run = [&]([[maybe_unused]] Drone& a0, [[maybe_unused]] double& a1, [[maybe_unused]] BodyState& a2, [[maybe_unused]] std::array<unsigned char, 14>& a3) { converted::counted([&] { return a0.imu_bytes(std::move(a1), a2, a3); }); return Out_Drone_imu_bytes{std::move(a0), std::move(a3)}; };
     for (int i = 0; tally.more(i); ++i) {
       Drone a0 = draw_Drone(draw);
       double a1 = draw.number();
@@ -2799,7 +2837,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2809,7 +2849,7 @@ SC_TEST(converted_drone_cpp) {
   {  // Drone::motor_tick
     converted::Tally tally("Drone_motor_tick");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Drone a0, [[maybe_unused]] double a1, [[maybe_unused]] BodyState a2, [[maybe_unused]] double a3, [[maybe_unused]] std::array<double, 4> a4, [[maybe_unused]] std::array<double, 4> a5) { converted::counted([&] { return a0.motor_tick(std::move(a1), a2, std::move(a3), a4, a5); }); return Out_Drone_motor_tick{std::move(a0), std::move(a4), std::move(a5)}; };
+    const auto run = [&]([[maybe_unused]] Drone& a0, [[maybe_unused]] double& a1, [[maybe_unused]] BodyState& a2, [[maybe_unused]] double& a3, [[maybe_unused]] std::array<double, 4>& a4, [[maybe_unused]] std::array<double, 4>& a5) { converted::counted([&] { return a0.motor_tick(std::move(a1), a2, std::move(a3), a4, a5); }); return Out_Drone_motor_tick{std::move(a0), std::move(a4), std::move(a5)}; };
     for (int i = 0; tally.more(i); ++i) {
       Drone a0 = draw_Drone(draw);
       double a1 = draw.number();
@@ -2823,7 +2863,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -2833,7 +2875,7 @@ SC_TEST(converted_drone_cpp) {
   {  // Drone::step
     converted::Tally tally("Drone_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Drone a0, [[maybe_unused]] World& a1, [[maybe_unused]] physics::Body a2, [[maybe_unused]] double a3, [[maybe_unused]] DroneSticks a4) { converted::counted([&] { return a0.step(a1, std::move(a2), std::move(a3), a4); }); return a0; };
+    const auto run = [&]([[maybe_unused]] Drone& a0, [[maybe_unused]] World& a1, [[maybe_unused]] physics::Body& a2, [[maybe_unused]] double& a3, [[maybe_unused]] DroneSticks& a4) { converted::counted([&] { return a0.step(a1, std::move(a2), std::move(a3), a4); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       Drone a0 = draw_Drone(draw);
       World& a1 = *converted::engine_object<World>(1 + draw.below(6));
@@ -2846,7 +2888,9 @@ SC_TEST(converted_drone_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1, std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

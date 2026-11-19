@@ -138,6 +138,7 @@ namespace logic { enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 }; }
+struct EngineValue;
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -155,10 +156,14 @@ struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Host : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -359,7 +364,7 @@ namespace net { struct Session {
   u8 self_slot() const { return self_slot_; }
 
   // ---- host page ----
-  
+  void push(u64 from, Span<const u8> bytes) { transport_.push_incoming({from}, bytes.data, static_cast<int>(bytes.size)); }
   bool take(u64& to, std::vector<u8>& bytes) { net::Address a; const bool ok = transport_.take_outgoing(a, bytes); to = a.id; return ok; }
 
   /// Per frame: networking; `me` is this player's state (sent at 30 Hz).
@@ -528,7 +533,7 @@ namespace net { struct Session {
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Address& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const net::Address& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const net::Address& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const net::Address& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const net::Address& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(net::Address& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -542,7 +547,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -577,7 +582,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::PlayerState& s) { return converted::Value::structure({arg(s.slot), arg(s.mode), arg(s.color), arg(s.flags), arg(s.t_ms), arg(s.position), arg(s.velocity), arg(s.rotation), arg(s.avatar), arg(s.avatar_yaw), arg(s.drone_pos), arg(s.jet_pos), arg(s.drone_rot), arg(s.jet_rot), arg(s.yaw), arg(s.pitch), arg(s.speed), arg(s.health), arg(s.thrust), arg(s.stars), arg(s.weapon), arg(s.day), arg(converted::array_list(s.hand)), arg(s.hands), arg(s.car)}); }
-[[maybe_unused]] static bool same(const net::PlayerState& want, const converted::Value& got) { return got.rows && got.rows->size() == 25 && same(want.slot, (*got.rows)[0]) && same(want.mode, (*got.rows)[1]) && same(want.color, (*got.rows)[2]) && same(want.flags, (*got.rows)[3]) && same(want.t_ms, (*got.rows)[4]) && same(want.position, (*got.rows)[5]) && same(want.velocity, (*got.rows)[6]) && same(want.rotation, (*got.rows)[7]) && same(want.avatar, (*got.rows)[8]) && same(want.avatar_yaw, (*got.rows)[9]) && same(want.drone_pos, (*got.rows)[10]) && same(want.jet_pos, (*got.rows)[11]) && same(want.drone_rot, (*got.rows)[12]) && same(want.jet_rot, (*got.rows)[13]) && same(want.yaw, (*got.rows)[14]) && same(want.pitch, (*got.rows)[15]) && same(want.speed, (*got.rows)[16]) && same(want.health, (*got.rows)[17]) && same(want.thrust, (*got.rows)[18]) && same(want.stars, (*got.rows)[19]) && same(want.weapon, (*got.rows)[20]) && same(want.day, (*got.rows)[21]) && same(converted::array_list(want.hand), (*got.rows)[22]) && same(want.hands, (*got.rows)[23]) && same(want.car, (*got.rows)[24]); }
+[[maybe_unused]] static bool same(const net::PlayerState& want, const converted::Value& got) { return converted::rows_of(got, 25) && converted::at_place(same(want.slot, (*got.rows)[0]), ".slot") && converted::at_place(same(want.mode, (*got.rows)[1]), ".mode") && converted::at_place(same(want.color, (*got.rows)[2]), ".color") && converted::at_place(same(want.flags, (*got.rows)[3]), ".flags") && converted::at_place(same(want.t_ms, (*got.rows)[4]), ".t_ms") && converted::at_place(same(want.position, (*got.rows)[5]), ".position") && converted::at_place(same(want.velocity, (*got.rows)[6]), ".velocity") && converted::at_place(same(want.rotation, (*got.rows)[7]), ".rotation") && converted::at_place(same(want.avatar, (*got.rows)[8]), ".avatar") && converted::at_place(same(want.avatar_yaw, (*got.rows)[9]), ".avatar_yaw") && converted::at_place(same(want.drone_pos, (*got.rows)[10]), ".drone_pos") && converted::at_place(same(want.jet_pos, (*got.rows)[11]), ".jet_pos") && converted::at_place(same(want.drone_rot, (*got.rows)[12]), ".drone_rot") && converted::at_place(same(want.jet_rot, (*got.rows)[13]), ".jet_rot") && converted::at_place(same(want.yaw, (*got.rows)[14]), ".yaw") && converted::at_place(same(want.pitch, (*got.rows)[15]), ".pitch") && converted::at_place(same(want.speed, (*got.rows)[16]), ".speed") && converted::at_place(same(want.health, (*got.rows)[17]), ".health") && converted::at_place(same(want.thrust, (*got.rows)[18]), ".thrust") && converted::at_place(same(want.stars, (*got.rows)[19]), ".stars") && converted::at_place(same(want.weapon, (*got.rows)[20]), ".weapon") && converted::at_place(same(want.day, (*got.rows)[21]), ".day") && converted::at_place(same(converted::array_list(want.hand), (*got.rows)[22]), ".hand") && converted::at_place(same(want.hands, (*got.rows)[23]), ".hands") && converted::at_place(same(want.car, (*got.rows)[24]), ".car"); }
 [[maybe_unused]] static bool defined(const net::PlayerState& s) { return defined(s.slot) && defined(s.mode) && defined(s.color) && defined(s.flags) && defined(s.t_ms) && defined(s.position) && defined(s.velocity) && defined(s.rotation) && defined(s.avatar) && defined(s.avatar_yaw) && defined(s.drone_pos) && defined(s.jet_pos) && defined(s.drone_rot) && defined(s.jet_rot) && defined(s.yaw) && defined(s.pitch) && defined(s.speed) && defined(s.health) && defined(s.thrust) && defined(s.stars) && defined(s.weapon) && defined(s.day) && defined(converted::array_list(s.hand)) && defined(s.hands) && defined(s.car); }
 [[maybe_unused]] static std::string text(const net::PlayerState& s) { return std::string("{") + text(s.slot) + ", " + text(s.mode) + ", " + text(s.color) + ", " + text(s.flags) + ", " + text(s.t_ms) + ", " + text(s.position) + ", " + text(s.velocity) + ", " + text(s.rotation) + ", " + text(s.avatar) + ", " + text(s.avatar_yaw) + ", " + text(s.drone_pos) + ", " + text(s.jet_pos) + ", " + text(s.drone_rot) + ", " + text(s.jet_rot) + ", " + text(s.yaw) + ", " + text(s.pitch) + ", " + text(s.speed) + ", " + text(s.health) + ", " + text(s.thrust) + ", " + text(s.stars) + ", " + text(s.weapon) + ", " + text(s.day) + ", " + text(converted::array_list(s.hand)) + ", " + text(s.hands) + ", " + text(s.car) + "}"; }
 [[maybe_unused]] static void take(net::PlayerState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<unsigned char>(s.slot, (*v.rows)[0]); converted::take_as<net::PlayerMode>(s.mode, (*v.rows)[1]); converted::take_as<unsigned char>(s.color, (*v.rows)[2]); converted::take_as<unsigned short>(s.flags, (*v.rows)[3]); converted::take_as<unsigned int>(s.t_ms, (*v.rows)[4]); converted::take_as<Vec3>(s.position, (*v.rows)[5]); converted::take_as<Vec3>(s.velocity, (*v.rows)[6]); converted::take_as<Quat>(s.rotation, (*v.rows)[7]); converted::take_as<Vec3>(s.avatar, (*v.rows)[8]); converted::take_as<double>(s.avatar_yaw, (*v.rows)[9]); converted::take_as<Vec3>(s.drone_pos, (*v.rows)[10]); converted::take_as<Vec3>(s.jet_pos, (*v.rows)[11]); converted::take_as<Quat>(s.drone_rot, (*v.rows)[12]); converted::take_as<Quat>(s.jet_rot, (*v.rows)[13]); converted::take_as<double>(s.yaw, (*v.rows)[14]); converted::take_as<double>(s.pitch, (*v.rows)[15]); converted::take_as<double>(s.speed, (*v.rows)[16]); converted::take_as<double>(s.health, (*v.rows)[17]); converted::take_as<double>(s.thrust, (*v.rows)[18]); converted::take_as<unsigned char>(s.stars, (*v.rows)[19]); converted::take_as<unsigned char>(s.weapon, (*v.rows)[20]); converted::take_as<double>(s.day, (*v.rows)[21]); { std::vector<signed char> items; converted::take_as<std::vector<signed char>>(items, (*v.rows)[22]); converted::array_from(s.hand, items); } converted::take_as<unsigned char>(s.hands, (*v.rows)[23]); converted::take_as<unsigned char>(s.car, (*v.rows)[24]); }
@@ -593,7 +598,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::PoseTimeline::Snap& s) { return converted::Value::structure({arg(s.p), arg(s.q), arg(s.v), arg(s.received), arg(s.source)}); }
-[[maybe_unused]] static bool same(const mp::PoseTimeline::Snap& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.p, (*got.rows)[0]) && same(want.q, (*got.rows)[1]) && same(want.v, (*got.rows)[2]) && same(want.received, (*got.rows)[3]) && same(want.source, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const mp::PoseTimeline::Snap& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.q, (*got.rows)[1]), ".q") && converted::at_place(same(want.v, (*got.rows)[2]), ".v") && converted::at_place(same(want.received, (*got.rows)[3]), ".received") && converted::at_place(same(want.source, (*got.rows)[4]), ".source"); }
 [[maybe_unused]] static bool defined(const mp::PoseTimeline::Snap& s) { return defined(s.p) && defined(s.q) && defined(s.v) && defined(s.received) && defined(s.source); }
 [[maybe_unused]] static std::string text(const mp::PoseTimeline::Snap& s) { return std::string("{") + text(s.p) + ", " + text(s.q) + ", " + text(s.v) + ", " + text(s.received) + ", " + text(s.source) + "}"; }
 [[maybe_unused]] static void take(mp::PoseTimeline::Snap& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<Quat>(s.q, (*v.rows)[1]); converted::take_as<Vec3>(s.v, (*v.rows)[2]); converted::take_as<double>(s.received, (*v.rows)[3]); converted::take_as<double>(s.source, (*v.rows)[4]); }
@@ -610,7 +615,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::PoseTimeline& s) { return converted::Value::structure({arg(s.snaps_), arg(s.offsets_), arg(s.offset_), arg(s.delay_), arg(s.lags_), arg(s.have_offset_)}); }
-[[maybe_unused]] static bool same(const mp::PoseTimeline& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.snaps_, (*got.rows)[0]) && same(want.offsets_, (*got.rows)[1]) && same(want.offset_, (*got.rows)[2]) && same(want.delay_, (*got.rows)[3]) && same(want.lags_, (*got.rows)[4]) && same(want.have_offset_, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const mp::PoseTimeline& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.snaps_, (*got.rows)[0]), ".snaps_") && converted::at_place(same(want.offsets_, (*got.rows)[1]), ".offsets_") && converted::at_place(same(want.offset_, (*got.rows)[2]), ".offset_") && converted::at_place(same(want.delay_, (*got.rows)[3]), ".delay_") && converted::at_place(same(want.lags_, (*got.rows)[4]), ".lags_") && converted::at_place(same(want.have_offset_, (*got.rows)[5]), ".have_offset_"); }
 [[maybe_unused]] static bool defined(const mp::PoseTimeline& s) { return defined(s.snaps_) && defined(s.offsets_) && defined(s.offset_) && defined(s.delay_) && defined(s.lags_) && defined(s.have_offset_); }
 [[maybe_unused]] static std::string text(const mp::PoseTimeline& s) { return std::string("{") + text(s.snaps_) + ", " + text(s.offsets_) + ", " + text(s.offset_) + ", " + text(s.delay_) + ", " + text(s.lags_) + ", " + text(s.have_offset_) + "}"; }
 [[maybe_unused]] static void take(mp::PoseTimeline& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<mp::PoseTimeline::Snap>>(s.snaps_, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.offsets_, (*v.rows)[1]); converted::take_as<double>(s.offset_, (*v.rows)[2]); converted::take_as<double>(s.delay_, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.lags_, (*v.rows)[4]); converted::take_as<bool>(s.have_offset_, (*v.rows)[5]); }
@@ -625,7 +630,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::NavTimeline::Snap& s) { return converted::Value::structure({arg(s.p), arg(s.heading), arg(s.mode), arg(s.at)}); }
-[[maybe_unused]] static bool same(const mp::NavTimeline::Snap& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.p, (*got.rows)[0]) && same(want.heading, (*got.rows)[1]) && same(want.mode, (*got.rows)[2]) && same(want.at, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const mp::NavTimeline::Snap& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.heading, (*got.rows)[1]), ".heading") && converted::at_place(same(want.mode, (*got.rows)[2]), ".mode") && converted::at_place(same(want.at, (*got.rows)[3]), ".at"); }
 [[maybe_unused]] static bool defined(const mp::NavTimeline::Snap& s) { return defined(s.p) && defined(s.heading) && defined(s.mode) && defined(s.at); }
 [[maybe_unused]] static std::string text(const mp::NavTimeline::Snap& s) { return std::string("{") + text(s.p) + ", " + text(s.heading) + ", " + text(s.mode) + ", " + text(s.at) + "}"; }
 [[maybe_unused]] static void take(mp::NavTimeline::Snap& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<double>(s.heading, (*v.rows)[1]); converted::take_as<unsigned char>(s.mode, (*v.rows)[2]); converted::take_as<double>(s.at, (*v.rows)[3]); }
@@ -637,7 +642,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::NavTimeline& s) { return converted::Value::structure({arg(s.snaps_)}); }
-[[maybe_unused]] static bool same(const mp::NavTimeline& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.snaps_, (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const mp::NavTimeline& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.snaps_, (*got.rows)[0]), ".snaps_"); }
 [[maybe_unused]] static bool defined(const mp::NavTimeline& s) { return defined(s.snaps_); }
 [[maybe_unused]] static std::string text(const mp::NavTimeline& s) { return std::string("{") + text(s.snaps_) + "}"; }
 [[maybe_unused]] static void take(mp::NavTimeline& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<mp::NavTimeline::Snap>>(s.snaps_, (*v.rows)[0]); }
@@ -650,7 +655,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::VoiceStream::Chunk& s) { return converted::Value::structure({arg(s.pcm), arg(s.gain)}); }
-[[maybe_unused]] static bool same(const mp::VoiceStream::Chunk& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.pcm, (*got.rows)[0]) && same(want.gain, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const mp::VoiceStream::Chunk& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.pcm, (*got.rows)[0]), ".pcm") && converted::at_place(same(want.gain, (*got.rows)[1]), ".gain"); }
 [[maybe_unused]] static bool defined(const mp::VoiceStream::Chunk& s) { return defined(s.pcm) && defined(s.gain); }
 [[maybe_unused]] static std::string text(const mp::VoiceStream::Chunk& s) { return std::string("{") + text(s.pcm) + ", " + text(s.gain) + "}"; }
 [[maybe_unused]] static void take(mp::VoiceStream::Chunk& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<double>>(s.pcm, (*v.rows)[0]); converted::take_as<double>(s.gain, (*v.rows)[1]); }
@@ -666,7 +671,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::VoiceStream& s) { return converted::Value::structure({arg(s.queue_), arg(s.pos_), arg(s.lead_), arg(s.last_seq_), arg(s.have_seq_)}); }
-[[maybe_unused]] static bool same(const mp::VoiceStream& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.queue_, (*got.rows)[0]) && same(want.pos_, (*got.rows)[1]) && same(want.lead_, (*got.rows)[2]) && same(want.last_seq_, (*got.rows)[3]) && same(want.have_seq_, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const mp::VoiceStream& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.queue_, (*got.rows)[0]), ".queue_") && converted::at_place(same(want.pos_, (*got.rows)[1]), ".pos_") && converted::at_place(same(want.lead_, (*got.rows)[2]), ".lead_") && converted::at_place(same(want.last_seq_, (*got.rows)[3]), ".last_seq_") && converted::at_place(same(want.have_seq_, (*got.rows)[4]), ".have_seq_"); }
 [[maybe_unused]] static bool defined(const mp::VoiceStream& s) { return defined(s.queue_) && defined(s.pos_) && defined(s.lead_) && defined(s.last_seq_) && defined(s.have_seq_); }
 [[maybe_unused]] static std::string text(const mp::VoiceStream& s) { return std::string("{") + text(s.queue_) + ", " + text(s.pos_) + ", " + text(s.lead_) + ", " + text(s.last_seq_) + ", " + text(s.have_seq_) + "}"; }
 [[maybe_unused]] static void take(mp::VoiceStream& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::vector<mp::VoiceStream::Chunk>>(s.queue_, (*v.rows)[0]); converted::take_as<double>(s.pos_, (*v.rows)[1]); converted::take_as<double>(s.lead_, (*v.rows)[2]); converted::take_as<unsigned int>(s.last_seq_, (*v.rows)[3]); converted::take_as<bool>(s.have_seq_, (*v.rows)[4]); }
@@ -689,7 +694,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Remote& s) { return converted::Value::structure({arg(s.state), arg(s.body), arg(s.person), arg(s.nav), arg(s.shown), arg(s.person_shown), arg(s.shown_rotation), arg(s.received_ms), arg(s.phase), arg(s.shown_hp), arg(s.voice), arg(s.speaking_until)}); }
-[[maybe_unused]] static bool same(const net::Remote& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.state, (*got.rows)[0]) && same(want.body, (*got.rows)[1]) && same(want.person, (*got.rows)[2]) && same(want.nav, (*got.rows)[3]) && same(want.shown, (*got.rows)[4]) && same(want.person_shown, (*got.rows)[5]) && same(want.shown_rotation, (*got.rows)[6]) && same(want.received_ms, (*got.rows)[7]) && same(want.phase, (*got.rows)[8]) && same(want.shown_hp, (*got.rows)[9]) && same(want.voice, (*got.rows)[10]) && same(want.speaking_until, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const net::Remote& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.state, (*got.rows)[0]), ".state") && converted::at_place(same(want.body, (*got.rows)[1]), ".body") && converted::at_place(same(want.person, (*got.rows)[2]), ".person") && converted::at_place(same(want.nav, (*got.rows)[3]), ".nav") && converted::at_place(same(want.shown, (*got.rows)[4]), ".shown") && converted::at_place(same(want.person_shown, (*got.rows)[5]), ".person_shown") && converted::at_place(same(want.shown_rotation, (*got.rows)[6]), ".shown_rotation") && converted::at_place(same(want.received_ms, (*got.rows)[7]), ".received_ms") && converted::at_place(same(want.phase, (*got.rows)[8]), ".phase") && converted::at_place(same(want.shown_hp, (*got.rows)[9]), ".shown_hp") && converted::at_place(same(want.voice, (*got.rows)[10]), ".voice") && converted::at_place(same(want.speaking_until, (*got.rows)[11]), ".speaking_until"); }
 [[maybe_unused]] static bool defined(const net::Remote& s) { return defined(s.state) && defined(s.body) && defined(s.person) && defined(s.nav) && defined(s.shown) && defined(s.person_shown) && defined(s.shown_rotation) && defined(s.received_ms) && defined(s.phase) && defined(s.shown_hp) && defined(s.voice) && defined(s.speaking_until); }
 [[maybe_unused]] static std::string text(const net::Remote& s) { return std::string("{") + text(s.state) + ", " + text(s.body) + ", " + text(s.person) + ", " + text(s.nav) + ", " + text(s.shown) + ", " + text(s.person_shown) + ", " + text(s.shown_rotation) + ", " + text(s.received_ms) + ", " + text(s.phase) + ", " + text(s.shown_hp) + ", " + text(s.voice) + ", " + text(s.speaking_until) + "}"; }
 [[maybe_unused]] static void take(net::Remote& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<net::PlayerState>(s.state, (*v.rows)[0]); converted::take_as<mp::PoseTimeline>(s.body, (*v.rows)[1]); converted::take_as<mp::PoseTimeline>(s.person, (*v.rows)[2]); converted::take_as<mp::NavTimeline>(s.nav, (*v.rows)[3]); converted::take_as<Vec3>(s.shown, (*v.rows)[4]); converted::take_as<Vec3>(s.person_shown, (*v.rows)[5]); converted::take_as<Quat>(s.shown_rotation, (*v.rows)[6]); converted::take_as<double>(s.received_ms, (*v.rows)[7]); converted::take_as<double>(s.phase, (*v.rows)[8]); converted::take_as<double>(s.shown_hp, (*v.rows)[9]); converted::take_as<mp::VoiceStream>(s.voice, (*v.rows)[10]); converted::take_as<double>(s.speaking_until, (*v.rows)[11]); }
@@ -706,7 +711,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Hit& s) { return converted::Value::structure({arg(s.target), arg(s.by), arg(s.weapon), arg(s.zone), arg(s.damage), arg(s.from)}); }
-[[maybe_unused]] static bool same(const net::Hit& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.target, (*got.rows)[0]) && same(want.by, (*got.rows)[1]) && same(want.weapon, (*got.rows)[2]) && same(want.zone, (*got.rows)[3]) && same(want.damage, (*got.rows)[4]) && same(want.from, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const net::Hit& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.target, (*got.rows)[0]), ".target") && converted::at_place(same(want.by, (*got.rows)[1]), ".by") && converted::at_place(same(want.weapon, (*got.rows)[2]), ".weapon") && converted::at_place(same(want.zone, (*got.rows)[3]), ".zone") && converted::at_place(same(want.damage, (*got.rows)[4]), ".damage") && converted::at_place(same(want.from, (*got.rows)[5]), ".from"); }
 [[maybe_unused]] static bool defined(const net::Hit& s) { return defined(s.target) && defined(s.by) && defined(s.weapon) && defined(s.zone) && defined(s.damage) && defined(s.from); }
 [[maybe_unused]] static std::string text(const net::Hit& s) { return std::string("{") + text(s.target) + ", " + text(s.by) + ", " + text(s.weapon) + ", " + text(s.zone) + ", " + text(s.damage) + ", " + text(s.from) + "}"; }
 [[maybe_unused]] static void take(net::Hit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<unsigned char>(s.target, (*v.rows)[0]); converted::take_as<unsigned char>(s.by, (*v.rows)[1]); converted::take_as<unsigned char>(s.weapon, (*v.rows)[2]); converted::take_as<unsigned char>(s.zone, (*v.rows)[3]); converted::take_as<double>(s.damage, (*v.rows)[4]); converted::take_as<Vec3>(s.from, (*v.rows)[5]); }
@@ -721,7 +726,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Kill& s) { return converted::Value::structure({arg(s.victim), arg(s.by), arg(s.weapon), arg(s.zone)}); }
-[[maybe_unused]] static bool same(const net::Kill& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.victim, (*got.rows)[0]) && same(want.by, (*got.rows)[1]) && same(want.weapon, (*got.rows)[2]) && same(want.zone, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const net::Kill& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.victim, (*got.rows)[0]), ".victim") && converted::at_place(same(want.by, (*got.rows)[1]), ".by") && converted::at_place(same(want.weapon, (*got.rows)[2]), ".weapon") && converted::at_place(same(want.zone, (*got.rows)[3]), ".zone"); }
 [[maybe_unused]] static bool defined(const net::Kill& s) { return defined(s.victim) && defined(s.by) && defined(s.weapon) && defined(s.zone); }
 [[maybe_unused]] static std::string text(const net::Kill& s) { return std::string("{") + text(s.victim) + ", " + text(s.by) + ", " + text(s.weapon) + ", " + text(s.zone) + "}"; }
 [[maybe_unused]] static void take(net::Kill& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned char>(s.victim, (*v.rows)[0]); converted::take_as<unsigned char>(s.by, (*v.rows)[1]); converted::take_as<unsigned char>(s.weapon, (*v.rows)[2]); converted::take_as<unsigned char>(s.zone, (*v.rows)[3]); }
@@ -737,7 +742,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Fx& s) { return converted::Value::structure({arg(s.kind), arg(s.owner), arg(s.p), arg(s.dir), arg(s.a)}); }
-[[maybe_unused]] static bool same(const net::Fx& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.kind, (*got.rows)[0]) && same(want.owner, (*got.rows)[1]) && same(want.p, (*got.rows)[2]) && same(want.dir, (*got.rows)[3]) && same(want.a, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const net::Fx& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.owner, (*got.rows)[1]), ".owner") && converted::at_place(same(want.p, (*got.rows)[2]), ".p") && converted::at_place(same(want.dir, (*got.rows)[3]), ".dir") && converted::at_place(same(want.a, (*got.rows)[4]), ".a"); }
 [[maybe_unused]] static bool defined(const net::Fx& s) { return defined(s.kind) && defined(s.owner) && defined(s.p) && defined(s.dir) && defined(s.a); }
 [[maybe_unused]] static std::string text(const net::Fx& s) { return std::string("{") + text(s.kind) + ", " + text(s.owner) + ", " + text(s.p) + ", " + text(s.dir) + ", " + text(s.a) + "}"; }
 [[maybe_unused]] static void take(net::Fx& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.kind, (*v.rows)[0]); converted::take_as<unsigned char>(s.owner, (*v.rows)[1]); converted::take_as<Vec3>(s.p, (*v.rows)[2]); converted::take_as<Vec3>(s.dir, (*v.rows)[3]); converted::take_as<double>(s.a, (*v.rows)[4]); }
@@ -754,7 +759,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::SwarmUnit& s) { return converted::Value::structure({arg(s.id), arg(s.kind), arg(s.flags), arg(s.p), arg(s.yaw), arg(s.aux)}); }
-[[maybe_unused]] static bool same(const net::SwarmUnit& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.id, (*got.rows)[0]) && same(want.kind, (*got.rows)[1]) && same(want.flags, (*got.rows)[2]) && same(want.p, (*got.rows)[3]) && same(want.yaw, (*got.rows)[4]) && same(want.aux, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const net::SwarmUnit& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.kind, (*got.rows)[1]), ".kind") && converted::at_place(same(want.flags, (*got.rows)[2]), ".flags") && converted::at_place(same(want.p, (*got.rows)[3]), ".p") && converted::at_place(same(want.yaw, (*got.rows)[4]), ".yaw") && converted::at_place(same(want.aux, (*got.rows)[5]), ".aux"); }
 [[maybe_unused]] static bool defined(const net::SwarmUnit& s) { return defined(s.id) && defined(s.kind) && defined(s.flags) && defined(s.p) && defined(s.yaw) && defined(s.aux); }
 [[maybe_unused]] static std::string text(const net::SwarmUnit& s) { return std::string("{") + text(s.id) + ", " + text(s.kind) + ", " + text(s.flags) + ", " + text(s.p) + ", " + text(s.yaw) + ", " + text(s.aux) + "}"; }
 [[maybe_unused]] static void take(net::SwarmUnit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<unsigned short>(s.id, (*v.rows)[0]); converted::take_as<net::SwarmKind>(s.kind, (*v.rows)[1]); converted::take_as<unsigned char>(s.flags, (*v.rows)[2]); converted::take_as<Vec3>(s.p, (*v.rows)[3]); converted::take_as<double>(s.yaw, (*v.rows)[4]); converted::take_as<double>(s.aux, (*v.rows)[5]); }
@@ -767,7 +772,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Swarm& s) { return converted::Value::structure({arg(s.owner), arg(s.units)}); }
-[[maybe_unused]] static bool same(const net::Swarm& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.owner, (*got.rows)[0]) && same(want.units, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const net::Swarm& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.units, (*got.rows)[1]), ".units"); }
 [[maybe_unused]] static bool defined(const net::Swarm& s) { return defined(s.owner) && defined(s.units); }
 [[maybe_unused]] static std::string text(const net::Swarm& s) { return std::string("{") + text(s.owner) + ", " + text(s.units) + "}"; }
 [[maybe_unused]] static void take(net::Swarm& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<std::vector<net::SwarmUnit>>(s.units, (*v.rows)[1]); }
@@ -783,7 +788,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::SwarmHit& s) { return converted::Value::structure({arg(s.from), arg(s.to), arg(s.id), arg(s.kind), arg(s.damage)}); }
-[[maybe_unused]] static bool same(const net::SwarmHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.from, (*got.rows)[0]) && same(want.to, (*got.rows)[1]) && same(want.id, (*got.rows)[2]) && same(want.kind, (*got.rows)[3]) && same(want.damage, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const net::SwarmHit& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.from, (*got.rows)[0]), ".from") && converted::at_place(same(want.to, (*got.rows)[1]), ".to") && converted::at_place(same(want.id, (*got.rows)[2]), ".id") && converted::at_place(same(want.kind, (*got.rows)[3]), ".kind") && converted::at_place(same(want.damage, (*got.rows)[4]), ".damage"); }
 [[maybe_unused]] static bool defined(const net::SwarmHit& s) { return defined(s.from) && defined(s.to) && defined(s.id) && defined(s.kind) && defined(s.damage); }
 [[maybe_unused]] static std::string text(const net::SwarmHit& s) { return std::string("{") + text(s.from) + ", " + text(s.to) + ", " + text(s.id) + ", " + text(s.kind) + ", " + text(s.damage) + "}"; }
 [[maybe_unused]] static void take(net::SwarmHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.from, (*v.rows)[0]); converted::take_as<unsigned char>(s.to, (*v.rows)[1]); converted::take_as<unsigned short>(s.id, (*v.rows)[2]); converted::take_as<net::SwarmKind>(s.kind, (*v.rows)[3]); converted::take_as<double>(s.damage, (*v.rows)[4]); }
@@ -798,7 +803,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::PingEvent& s) { return converted::Value::structure({arg(s.owner), arg(s.on), arg(s.p), arg(s.color)}); }
-[[maybe_unused]] static bool same(const net::PingEvent& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.owner, (*got.rows)[0]) && same(want.on, (*got.rows)[1]) && same(want.p, (*got.rows)[2]) && same(want.color, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const net::PingEvent& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.on, (*got.rows)[1]), ".on") && converted::at_place(same(want.p, (*got.rows)[2]), ".p") && converted::at_place(same(want.color, (*got.rows)[3]), ".color"); }
 [[maybe_unused]] static bool defined(const net::PingEvent& s) { return defined(s.owner) && defined(s.on) && defined(s.p) && defined(s.color); }
 [[maybe_unused]] static std::string text(const net::PingEvent& s) { return std::string("{") + text(s.owner) + ", " + text(s.on) + ", " + text(s.p) + ", " + text(s.color) + "}"; }
 [[maybe_unused]] static void take(net::PingEvent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<bool>(s.on, (*v.rows)[1]); converted::take_as<Vec3>(s.p, (*v.rows)[2]); converted::take_as<unsigned int>(s.color, (*v.rows)[3]); }
@@ -813,7 +818,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::VoiceFrame& s) { return converted::Value::structure({arg(s.from), arg(s.seq), arg(s.everywhere), arg(s.data)}); }
-[[maybe_unused]] static bool same(const net::VoiceFrame& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.from, (*got.rows)[0]) && same(want.seq, (*got.rows)[1]) && same(want.everywhere, (*got.rows)[2]) && same(want.data, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const net::VoiceFrame& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.from, (*got.rows)[0]), ".from") && converted::at_place(same(want.seq, (*got.rows)[1]), ".seq") && converted::at_place(same(want.everywhere, (*got.rows)[2]), ".everywhere") && converted::at_place(same(want.data, (*got.rows)[3]), ".data"); }
 [[maybe_unused]] static bool defined(const net::VoiceFrame& s) { return defined(s.from) && defined(s.seq) && defined(s.everywhere) && defined(s.data); }
 [[maybe_unused]] static std::string text(const net::VoiceFrame& s) { return std::string("{") + text(s.from) + ", " + text(s.seq) + ", " + text(s.everywhere) + ", " + text(s.data) + "}"; }
 [[maybe_unused]] static void take(net::VoiceFrame& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned char>(s.from, (*v.rows)[0]); converted::take_as<unsigned int>(s.seq, (*v.rows)[1]); converted::take_as<bool>(s.everywhere, (*v.rows)[2]); converted::take_as<std::vector<unsigned char>>(s.data, (*v.rows)[3]); }
@@ -827,7 +832,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::Score& s) { return converted::Value::structure({arg(s.slot), arg(s.kills), arg(s.deaths)}); }
-[[maybe_unused]] static bool same(const mp::Score& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.slot, (*got.rows)[0]) && same(want.kills, (*got.rows)[1]) && same(want.deaths, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const mp::Score& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.slot, (*got.rows)[0]), ".slot") && converted::at_place(same(want.kills, (*got.rows)[1]), ".kills") && converted::at_place(same(want.deaths, (*got.rows)[2]), ".deaths"); }
 [[maybe_unused]] static bool defined(const mp::Score& s) { return defined(s.slot) && defined(s.kills) && defined(s.deaths); }
 [[maybe_unused]] static std::string text(const mp::Score& s) { return std::string("{") + text(s.slot) + ", " + text(s.kills) + ", " + text(s.deaths) + "}"; }
 [[maybe_unused]] static void take(mp::Score& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.slot, (*v.rows)[0]); converted::take_as<unsigned short>(s.kills, (*v.rows)[1]); converted::take_as<unsigned short>(s.deaths, (*v.rows)[2]); }
@@ -839,7 +844,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::Scoreboard& s) { return converted::Value::structure({arg(s.rows_)}); }
-[[maybe_unused]] static bool same(const mp::Scoreboard& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.rows_, (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const mp::Scoreboard& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.rows_, (*got.rows)[0]), ".rows_"); }
 [[maybe_unused]] static bool defined(const mp::Scoreboard& s) { return defined(s.rows_); }
 [[maybe_unused]] static std::string text(const mp::Scoreboard& s) { return std::string("{") + text(s.rows_) + "}"; }
 [[maybe_unused]] static void take(mp::Scoreboard& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<mp::Score>>(s.rows_, (*v.rows)[0]); }
@@ -852,7 +857,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Session::Blob& s) { return converted::Value::structure({arg(s.from), arg(s.data)}); }
-[[maybe_unused]] static bool same(const net::Session::Blob& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.from, (*got.rows)[0]) && same(want.data, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const net::Session::Blob& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.from, (*got.rows)[0]), ".from") && converted::at_place(same(want.data, (*got.rows)[1]), ".data"); }
 [[maybe_unused]] static bool defined(const net::Session::Blob& s) { return defined(s.from) && defined(s.data); }
 [[maybe_unused]] static std::string text(const net::Session::Blob& s) { return std::string("{") + text(s.from) + ", " + text(s.data) + "}"; }
 [[maybe_unused]] static void take(net::Session::Blob& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned char>(s.from, (*v.rows)[0]); converted::take_as<std::vector<unsigned char>>(s.data, (*v.rows)[1]); }
@@ -868,7 +873,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Session::SwarmParts& s) { return converted::Value::structure({arg(s.owner), arg(s.serial), arg(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.have))), arg(s.last), arg(s.units)}); }
-[[maybe_unused]] static bool same(const net::Session::SwarmParts& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.owner, (*got.rows)[0]) && same(want.serial, (*got.rows)[1]) && same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.have)), (*got.rows)[2]) && same(want.last, (*got.rows)[3]) && same(want.units, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const net::Session::SwarmParts& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.serial, (*got.rows)[1]), ".serial") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.have)), (*got.rows)[2]), ".have") && converted::at_place(same(want.last, (*got.rows)[3]), ".last") && converted::at_place(same(want.units, (*got.rows)[4]), ".units"); }
 [[maybe_unused]] static bool defined(const net::Session::SwarmParts& s) { return defined(s.owner) && defined(s.serial) && defined(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.have))) && defined(s.last) && defined(s.units); }
 [[maybe_unused]] static std::string text(const net::Session::SwarmParts& s) { return std::string("{") + text(s.owner) + ", " + text(s.serial) + ", " + text(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.have))) + ", " + text(s.last) + ", " + text(s.units) + "}"; }
 [[maybe_unused]] static void take(net::Session::SwarmParts& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<unsigned char>(s.serial, (*v.rows)[1]); { std::vector<u64> items; converted::take_as<std::vector<converted::Whole>>(items, (*v.rows)[2]); converted::array_from(s.have, items); } converted::take_as<int>(s.last, (*v.rows)[3]); converted::take_as<std::vector<net::SwarmUnit>>(s.units, (*v.rows)[4]); }
@@ -887,7 +892,7 @@ namespace net { using converted::arg; using converted::same; using converted::de
 }
 namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const mp::Ballot& s) { return converted::Value::structure({arg(s.id), arg(s.key), arg(s.value), arg(s.host), arg(s.members), arg(s.yes), arg(s.expires_ms), arg(s.status)}); }
-[[maybe_unused]] static bool same(const mp::Ballot& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.id, (*got.rows)[0]) && same(want.key, (*got.rows)[1]) && same(want.value, (*got.rows)[2]) && same(want.host, (*got.rows)[3]) && same(want.members, (*got.rows)[4]) && same(want.yes, (*got.rows)[5]) && same(want.expires_ms, (*got.rows)[6]) && same(want.status, (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const mp::Ballot& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.key, (*got.rows)[1]), ".key") && converted::at_place(same(want.value, (*got.rows)[2]), ".value") && converted::at_place(same(want.host, (*got.rows)[3]), ".host") && converted::at_place(same(want.members, (*got.rows)[4]), ".members") && converted::at_place(same(want.yes, (*got.rows)[5]), ".yes") && converted::at_place(same(want.expires_ms, (*got.rows)[6]), ".expires_ms") && converted::at_place(same(want.status, (*got.rows)[7]), ".status"); }
 [[maybe_unused]] static bool defined(const mp::Ballot& s) { return defined(s.id) && defined(s.key) && defined(s.value) && defined(s.host) && defined(s.members) && defined(s.yes) && defined(s.expires_ms) && defined(s.status); }
 [[maybe_unused]] static std::string text(const mp::Ballot& s) { return std::string("{") + text(s.id) + ", " + text(s.key) + ", " + text(s.value) + ", " + text(s.host) + ", " + text(s.members) + ", " + text(s.yes) + ", " + text(s.expires_ms) + ", " + text(s.status) + "}"; }
 [[maybe_unused]] static void take(mp::Ballot& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<unsigned char>(s.key, (*v.rows)[1]); converted::take_as<bool>(s.value, (*v.rows)[2]); converted::take_as<unsigned char>(s.host, (*v.rows)[3]); converted::take_as<std::vector<unsigned char>>(s.members, (*v.rows)[4]); converted::take_as<std::vector<unsigned char>>(s.yes, (*v.rows)[5]); converted::take_as<double>(s.expires_ms, (*v.rows)[6]); converted::take_as<mp::Ballot::Status>(s.status, (*v.rows)[7]); }
@@ -901,7 +906,7 @@ namespace mp { using converted::arg; using converted::same; using converted::def
 }
 namespace seats { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const seats::Row& s) { return converted::Value::structure({arg(s.owner), arg(s.pilot), arg(s.passenger)}); }
-[[maybe_unused]] static bool same(const seats::Row& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.owner, (*got.rows)[0]) && same(want.pilot, (*got.rows)[1]) && same(want.passenger, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const seats::Row& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.pilot, (*got.rows)[1]), ".pilot") && converted::at_place(same(want.passenger, (*got.rows)[2]), ".passenger"); }
 [[maybe_unused]] static bool defined(const seats::Row& s) { return defined(s.owner) && defined(s.pilot) && defined(s.passenger); }
 [[maybe_unused]] static std::string text(const seats::Row& s) { return std::string("{") + text(s.owner) + ", " + text(s.pilot) + ", " + text(s.passenger) + "}"; }
 [[maybe_unused]] static void take(seats::Row& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<unsigned char>(s.pilot, (*v.rows)[1]); converted::take_as<unsigned char>(s.passenger, (*v.rows)[2]); }
@@ -914,7 +919,7 @@ namespace seats { using converted::arg; using converted::same; using converted::
 }
 namespace seats { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const seats::Table& s) { return converted::Value::structure({arg(s.rows_), arg(s.revision_)}); }
-[[maybe_unused]] static bool same(const seats::Table& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.rows_, (*got.rows)[0]) && same(want.revision_, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const seats::Table& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.rows_, (*got.rows)[0]), ".rows_") && converted::at_place(same(want.revision_, (*got.rows)[1]), ".revision_"); }
 [[maybe_unused]] static bool defined(const seats::Table& s) { return defined(s.rows_) && defined(s.revision_); }
 [[maybe_unused]] static std::string text(const seats::Table& s) { return std::string("{") + text(s.rows_) + ", " + text(s.revision_) + "}"; }
 [[maybe_unused]] static void take(seats::Table& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<seats::Row>>(s.rows_, (*v.rows)[0]); converted::take_as<unsigned int>(s.revision_, (*v.rows)[1]); }
@@ -978,7 +983,7 @@ namespace seats { using converted::arg; using converted::same; using converted::
 }
 namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const net::Session& s) { return converted::Value::structure({arg(s.role_), arg(s.transport_), arg(s.server_), arg(s.client_), arg(s.server_addr_), arg(s.remotes_), arg(s.hits_), arg(s.confirms_), arg(s.kills_), arg(s.fx_), arg(s.swarms_), arg(s.swarm_hits_), arg(s.world_), arg(s.pings_), arg(s.voice_), arg(s.pending_anchor_), arg(s.lon_), arg(s.lat_), arg(s.time_), arg(s.send_clock_), arg(s.scores_clock_), arg(s.rules_clock_), arg(s.have_origin_), arg(s.connect_pending_), arg(s.anchor_ready_), arg(s.ever_in_), arg(s.connect_at_), arg(s.connects_), arg(s.in_since_), arg(s.mates_), arg(s.anchor_), arg(s.self_slot_), arg(s.me_), arg(s.scores_), arg(s.friendly_fire_), arg(s.destroy_), arg(s.toss_), arg(s.proj_), arg(s.town_), arg(s.swarm_parts_), arg(s.swarm_serial_), arg(s.world_rules_), arg(s.have_world_rules_), arg(s.protected_), arg(s.ballot_), arg(s.remote_ballot_), arg(s.ballot_serial_), arg(s.vote_text_), arg(s.sent_poses_), arg(s.send_refused_), arg(s.refused_said_), arg(s.seats_), arg(s.seats_clock_)}); }
-[[maybe_unused]] static bool same(const net::Session& want, const converted::Value& got) { return got.rows && got.rows->size() == 53 && same(want.role_, (*got.rows)[0]) && same(want.transport_, (*got.rows)[1]) && same(want.server_, (*got.rows)[2]) && same(want.client_, (*got.rows)[3]) && same(want.server_addr_, (*got.rows)[4]) && same(want.remotes_, (*got.rows)[5]) && same(want.hits_, (*got.rows)[6]) && same(want.confirms_, (*got.rows)[7]) && same(want.kills_, (*got.rows)[8]) && same(want.fx_, (*got.rows)[9]) && same(want.swarms_, (*got.rows)[10]) && same(want.swarm_hits_, (*got.rows)[11]) && same(want.world_, (*got.rows)[12]) && same(want.pings_, (*got.rows)[13]) && same(want.voice_, (*got.rows)[14]) && same(want.pending_anchor_, (*got.rows)[15]) && same(want.lon_, (*got.rows)[16]) && same(want.lat_, (*got.rows)[17]) && same(want.time_, (*got.rows)[18]) && same(want.send_clock_, (*got.rows)[19]) && same(want.scores_clock_, (*got.rows)[20]) && same(want.rules_clock_, (*got.rows)[21]) && same(want.have_origin_, (*got.rows)[22]) && same(want.connect_pending_, (*got.rows)[23]) && same(want.anchor_ready_, (*got.rows)[24]) && same(want.ever_in_, (*got.rows)[25]) && same(want.connect_at_, (*got.rows)[26]) && same(want.connects_, (*got.rows)[27]) && same(want.in_since_, (*got.rows)[28]) && same(want.mates_, (*got.rows)[29]) && same(want.anchor_, (*got.rows)[30]) && same(want.self_slot_, (*got.rows)[31]) && same(want.me_, (*got.rows)[32]) && same(want.scores_, (*got.rows)[33]) && same(want.friendly_fire_, (*got.rows)[34]) && same(want.destroy_, (*got.rows)[35]) && same(want.toss_, (*got.rows)[36]) && same(want.proj_, (*got.rows)[37]) && same(want.town_, (*got.rows)[38]) && same(want.swarm_parts_, (*got.rows)[39]) && same(want.swarm_serial_, (*got.rows)[40]) && same(want.world_rules_, (*got.rows)[41]) && same(want.have_world_rules_, (*got.rows)[42]) && same(want.protected_, (*got.rows)[43]) && same(want.ballot_, (*got.rows)[44]) && same(want.remote_ballot_, (*got.rows)[45]) && same(want.ballot_serial_, (*got.rows)[46]) && same(want.vote_text_, (*got.rows)[47]) && same(want.sent_poses_, (*got.rows)[48]) && same(want.send_refused_, (*got.rows)[49]) && same(want.refused_said_, (*got.rows)[50]) && same(want.seats_, (*got.rows)[51]) && same(want.seats_clock_, (*got.rows)[52]); }
+[[maybe_unused]] static bool same(const net::Session& want, const converted::Value& got) { return converted::rows_of(got, 53) && converted::at_place(same(want.role_, (*got.rows)[0]), ".role_") && converted::at_place(same(want.transport_, (*got.rows)[1]), ".transport_") && converted::at_place(same(want.server_, (*got.rows)[2]), ".server_") && converted::at_place(same(want.client_, (*got.rows)[3]), ".client_") && converted::at_place(same(want.server_addr_, (*got.rows)[4]), ".server_addr_") && converted::at_place(same(want.remotes_, (*got.rows)[5]), ".remotes_") && converted::at_place(same(want.hits_, (*got.rows)[6]), ".hits_") && converted::at_place(same(want.confirms_, (*got.rows)[7]), ".confirms_") && converted::at_place(same(want.kills_, (*got.rows)[8]), ".kills_") && converted::at_place(same(want.fx_, (*got.rows)[9]), ".fx_") && converted::at_place(same(want.swarms_, (*got.rows)[10]), ".swarms_") && converted::at_place(same(want.swarm_hits_, (*got.rows)[11]), ".swarm_hits_") && converted::at_place(same(want.world_, (*got.rows)[12]), ".world_") && converted::at_place(same(want.pings_, (*got.rows)[13]), ".pings_") && converted::at_place(same(want.voice_, (*got.rows)[14]), ".voice_") && converted::at_place(same(want.pending_anchor_, (*got.rows)[15]), ".pending_anchor_") && converted::at_place(same(want.lon_, (*got.rows)[16]), ".lon_") && converted::at_place(same(want.lat_, (*got.rows)[17]), ".lat_") && converted::at_place(same(want.time_, (*got.rows)[18]), ".time_") && converted::at_place(same(want.send_clock_, (*got.rows)[19]), ".send_clock_") && converted::at_place(same(want.scores_clock_, (*got.rows)[20]), ".scores_clock_") && converted::at_place(same(want.rules_clock_, (*got.rows)[21]), ".rules_clock_") && converted::at_place(same(want.have_origin_, (*got.rows)[22]), ".have_origin_") && converted::at_place(same(want.connect_pending_, (*got.rows)[23]), ".connect_pending_") && converted::at_place(same(want.anchor_ready_, (*got.rows)[24]), ".anchor_ready_") && converted::at_place(same(want.ever_in_, (*got.rows)[25]), ".ever_in_") && converted::at_place(same(want.connect_at_, (*got.rows)[26]), ".connect_at_") && converted::at_place(same(want.connects_, (*got.rows)[27]), ".connects_") && converted::at_place(same(want.in_since_, (*got.rows)[28]), ".in_since_") && converted::at_place(same(want.mates_, (*got.rows)[29]), ".mates_") && converted::at_place(same(want.anchor_, (*got.rows)[30]), ".anchor_") && converted::at_place(same(want.self_slot_, (*got.rows)[31]), ".self_slot_") && converted::at_place(same(want.me_, (*got.rows)[32]), ".me_") && converted::at_place(same(want.scores_, (*got.rows)[33]), ".scores_") && converted::at_place(same(want.friendly_fire_, (*got.rows)[34]), ".friendly_fire_") && converted::at_place(same(want.destroy_, (*got.rows)[35]), ".destroy_") && converted::at_place(same(want.toss_, (*got.rows)[36]), ".toss_") && converted::at_place(same(want.proj_, (*got.rows)[37]), ".proj_") && converted::at_place(same(want.town_, (*got.rows)[38]), ".town_") && converted::at_place(same(want.swarm_parts_, (*got.rows)[39]), ".swarm_parts_") && converted::at_place(same(want.swarm_serial_, (*got.rows)[40]), ".swarm_serial_") && converted::at_place(same(want.world_rules_, (*got.rows)[41]), ".world_rules_") && converted::at_place(same(want.have_world_rules_, (*got.rows)[42]), ".have_world_rules_") && converted::at_place(same(want.protected_, (*got.rows)[43]), ".protected_") && converted::at_place(same(want.ballot_, (*got.rows)[44]), ".ballot_") && converted::at_place(same(want.remote_ballot_, (*got.rows)[45]), ".remote_ballot_") && converted::at_place(same(want.ballot_serial_, (*got.rows)[46]), ".ballot_serial_") && converted::at_place(same(want.vote_text_, (*got.rows)[47]), ".vote_text_") && converted::at_place(same(want.sent_poses_, (*got.rows)[48]), ".sent_poses_") && converted::at_place(same(want.send_refused_, (*got.rows)[49]), ".send_refused_") && converted::at_place(same(want.refused_said_, (*got.rows)[50]), ".refused_said_") && converted::at_place(same(want.seats_, (*got.rows)[51]), ".seats_") && converted::at_place(same(want.seats_clock_, (*got.rows)[52]), ".seats_clock_"); }
 [[maybe_unused]] static bool defined(const net::Session& s) { return defined(s.role_) && defined(s.transport_) && defined(s.server_) && defined(s.client_) && defined(s.server_addr_) && defined(s.remotes_) && defined(s.hits_) && defined(s.confirms_) && defined(s.kills_) && defined(s.fx_) && defined(s.swarms_) && defined(s.swarm_hits_) && defined(s.world_) && defined(s.pings_) && defined(s.voice_) && defined(s.pending_anchor_) && defined(s.lon_) && defined(s.lat_) && defined(s.time_) && defined(s.send_clock_) && defined(s.scores_clock_) && defined(s.rules_clock_) && defined(s.have_origin_) && defined(s.connect_pending_) && defined(s.anchor_ready_) && defined(s.ever_in_) && defined(s.connect_at_) && defined(s.connects_) && defined(s.in_since_) && defined(s.mates_) && defined(s.anchor_) && defined(s.self_slot_) && defined(s.me_) && defined(s.scores_) && defined(s.friendly_fire_) && defined(s.destroy_) && defined(s.toss_) && defined(s.proj_) && defined(s.town_) && defined(s.swarm_parts_) && defined(s.swarm_serial_) && defined(s.world_rules_) && defined(s.have_world_rules_) && defined(s.protected_) && defined(s.ballot_) && defined(s.remote_ballot_) && defined(s.ballot_serial_) && defined(s.vote_text_) && defined(s.sent_poses_) && defined(s.send_refused_) && defined(s.refused_said_) && defined(s.seats_) && defined(s.seats_clock_); }
 [[maybe_unused]] static std::string text(const net::Session& s) { return std::string("{") + text(s.role_) + ", " + text(s.transport_) + ", " + text(s.server_) + ", " + text(s.client_) + ", " + text(s.server_addr_) + ", " + text(s.remotes_) + ", " + text(s.hits_) + ", " + text(s.confirms_) + ", " + text(s.kills_) + ", " + text(s.fx_) + ", " + text(s.swarms_) + ", " + text(s.swarm_hits_) + ", " + text(s.world_) + ", " + text(s.pings_) + ", " + text(s.voice_) + ", " + text(s.pending_anchor_) + ", " + text(s.lon_) + ", " + text(s.lat_) + ", " + text(s.time_) + ", " + text(s.send_clock_) + ", " + text(s.scores_clock_) + ", " + text(s.rules_clock_) + ", " + text(s.have_origin_) + ", " + text(s.connect_pending_) + ", " + text(s.anchor_ready_) + ", " + text(s.ever_in_) + ", " + text(s.connect_at_) + ", " + text(s.connects_) + ", " + text(s.in_since_) + ", " + text(s.mates_) + ", " + text(s.anchor_) + ", " + text(s.self_slot_) + ", " + text(s.me_) + ", " + text(s.scores_) + ", " + text(s.friendly_fire_) + ", " + text(s.destroy_) + ", " + text(s.toss_) + ", " + text(s.proj_) + ", " + text(s.town_) + ", " + text(s.swarm_parts_) + ", " + text(s.swarm_serial_) + ", " + text(s.world_rules_) + ", " + text(s.have_world_rules_) + ", " + text(s.protected_) + ", " + text(s.ballot_) + ", " + text(s.remote_ballot_) + ", " + text(s.ballot_serial_) + ", " + text(s.vote_text_) + ", " + text(s.sent_poses_) + ", " + text(s.send_refused_) + ", " + text(s.refused_said_) + ", " + text(s.seats_) + ", " + text(s.seats_clock_) + "}"; }
 [[maybe_unused]] static void take(net::Session& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 53) return; converted::take_as<net::Session::Role>(s.role_, (*v.rows)[0]); converted::take_as<HostTransport>(s.transport_, (*v.rows)[1]); converted::take_as<std::unique_ptr<Server>>(s.server_, (*v.rows)[2]); converted::take_as<std::unique_ptr<Client>>(s.client_, (*v.rows)[3]); converted::take_as<net::Address>(s.server_addr_, (*v.rows)[4]); converted::take_as<std::vector<net::Remote>>(s.remotes_, (*v.rows)[5]); converted::take_as<std::vector<net::Hit>>(s.hits_, (*v.rows)[6]); converted::take_as<std::vector<net::Hit>>(s.confirms_, (*v.rows)[7]); converted::take_as<std::vector<net::Kill>>(s.kills_, (*v.rows)[8]); converted::take_as<std::vector<net::Fx>>(s.fx_, (*v.rows)[9]); converted::take_as<std::vector<net::Swarm>>(s.swarms_, (*v.rows)[10]); converted::take_as<std::vector<net::SwarmHit>>(s.swarm_hits_, (*v.rows)[11]); converted::take_as<std::vector<std::vector<unsigned char>>>(s.world_, (*v.rows)[12]); converted::take_as<std::vector<net::PingEvent>>(s.pings_, (*v.rows)[13]); converted::take_as<std::vector<net::VoiceFrame>>(s.voice_, (*v.rows)[14]); converted::take_as<std::vector<unsigned char>>(s.pending_anchor_, (*v.rows)[15]); converted::take_as<double>(s.lon_, (*v.rows)[16]); converted::take_as<double>(s.lat_, (*v.rows)[17]); converted::take_as<double>(s.time_, (*v.rows)[18]); converted::take_as<double>(s.send_clock_, (*v.rows)[19]); converted::take_as<double>(s.scores_clock_, (*v.rows)[20]); converted::take_as<double>(s.rules_clock_, (*v.rows)[21]); converted::take_as<bool>(s.have_origin_, (*v.rows)[22]); converted::take_as<bool>(s.connect_pending_, (*v.rows)[23]); converted::take_as<bool>(s.anchor_ready_, (*v.rows)[24]); converted::take_as<bool>(s.ever_in_, (*v.rows)[25]); converted::take_as<double>(s.connect_at_, (*v.rows)[26]); converted::take_as<unsigned int>(s.connects_, (*v.rows)[27]); converted::take_as<double>(s.in_since_, (*v.rows)[28]); converted::take_as<std::vector<unsigned char>>(s.mates_, (*v.rows)[29]); converted::take_as<Vec3>(s.anchor_, (*v.rows)[30]); converted::take_as<unsigned char>(s.self_slot_, (*v.rows)[31]); converted::take_as<net::PlayerState>(s.me_, (*v.rows)[32]); converted::take_as<mp::Scoreboard>(s.scores_, (*v.rows)[33]); converted::take_as<bool>(s.friendly_fire_, (*v.rows)[34]); converted::take_as<std::vector<net::Session::Blob>>(s.destroy_, (*v.rows)[35]); converted::take_as<std::vector<net::Session::Blob>>(s.toss_, (*v.rows)[36]); converted::take_as<std::vector<net::Session::Blob>>(s.proj_, (*v.rows)[37]); converted::take_as<std::vector<net::Session::Blob>>(s.town_, (*v.rows)[38]); converted::take_as<std::vector<net::Session::SwarmParts>>(s.swarm_parts_, (*v.rows)[39]); converted::take_as<unsigned char>(s.swarm_serial_, (*v.rows)[40]); converted::take_as<unsigned short>(s.world_rules_, (*v.rows)[41]); converted::take_as<bool>(s.have_world_rules_, (*v.rows)[42]); converted::take_as<std::vector<std::pair<unsigned char, double>>>(s.protected_, (*v.rows)[43]); converted::take_as<mp::Ballot>(s.ballot_, (*v.rows)[44]); converted::take_as<mp::Ballot>(s.remote_ballot_, (*v.rows)[45]); converted::take_as<unsigned int>(s.ballot_serial_, (*v.rows)[46]); converted::take_as<std::string>(s.vote_text_, (*v.rows)[47]); converted::take_as<unsigned int>(s.sent_poses_, (*v.rows)[48]); converted::take_as<unsigned int>(s.send_refused_, (*v.rows)[49]); converted::take_as<unsigned int>(s.refused_said_, (*v.rows)[50]); converted::take_as<seats::Table>(s.seats_, (*v.rows)[51]); converted::take_as<double>(s.seats_clock_, (*v.rows)[52]); }
@@ -986,67 +991,67 @@ namespace net { using converted::arg; using converted::same; using converted::de
 inline void HostTransport::push_incoming(const net::Address& from, const unsigned char* data, const int& bytes) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.host_transport.push_incoming", {converted::value_of(*this), converted::value_of(from), converted::value_of((data ? std::vector<unsigned char>{*data} : std::vector<unsigned char>{})), converted::value_of(bytes)}); }
 inline bool HostTransport::take_outgoing(net::Address& to, std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.host_transport.take_outgoing", {converted::value_of(*this), converted::value_of(to), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); converted::take_as<net::Address>(to, kern_out[1]); converted::take_as<std::vector<unsigned char>>(data, kern_out[2]); return kern_result; }
 struct Out_Session_take { net::Session Self; bool Result; u64 to; std::vector<unsigned char> bytes; };
-[[maybe_unused]] static bool same(const Out_Session_take& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.to), (*got.rows)[2]) && same(want.bytes, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Out_Session_take& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(converted::shaped<converted::Whole>(want.to), (*got.rows)[2]), ".to") && converted::at_place(same(want.bytes, (*got.rows)[3]), ".bytes"); }
 [[maybe_unused]] static bool defined(const Out_Session_take& s) { return defined(s.Self) && defined(s.Result) && defined(s.to) && defined(s.bytes); }
 [[maybe_unused]] static std::string text(const Out_Session_take& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.to) + ", " + text(s.bytes) + "}"; }
 struct Out_Session_take_hits { net::Session Self; std::vector<net::Hit> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_hits& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_hits& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_hits& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_hits& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_confirms { net::Session Self; std::vector<net::Hit> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_confirms& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_confirms& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_confirms& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_confirms& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_kills { net::Session Self; std::vector<net::Kill> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_kills& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_kills& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_kills& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_kills& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_fx { net::Session Self; std::vector<net::Fx> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_fx& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_fx& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_fx& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_fx& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_swarms { net::Session Self; std::vector<net::Swarm> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_swarms& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_swarms& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_swarms& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_swarms& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_swarm_hits { net::Session Self; std::vector<net::SwarmHit> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_swarm_hits& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_swarm_hits& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_swarm_hits& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_swarm_hits& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_world { net::Session Self; std::vector<std::vector<unsigned char>> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_world& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_world& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_world& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_world& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_destroy { net::Session Self; std::vector<net::Session::Blob> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_destroy& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_destroy& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_destroy& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_destroy& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_town { net::Session Self; std::vector<net::Session::Blob> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_town& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_town& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_town& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_town& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_toss { net::Session Self; std::vector<net::Session::Blob> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_toss& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_toss& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_toss& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_toss& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_proj { net::Session Self; std::vector<net::Session::Blob> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_proj& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_proj& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_proj& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_proj& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_pings { net::Session Self; std::vector<net::PingEvent> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_pings& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_pings& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_pings& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_pings& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_voice { net::Session Self; std::vector<net::VoiceFrame> Result; };
-[[maybe_unused]] static bool same(const Out_Session_take_voice& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_take_voice& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_voice& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Session_take_voice& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Session_take_anchor { net::Session Self; bool Result; Vec3 p; };
-[[maybe_unused]] static bool same(const Out_Session_take_anchor& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.p, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_Session_take_anchor& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.p, (*got.rows)[2]), ".p"); }
 [[maybe_unused]] static bool defined(const Out_Session_take_anchor& s) { return defined(s.Self) && defined(s.Result) && defined(s.p); }
 [[maybe_unused]] static std::string text(const Out_Session_take_anchor& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.p) + "}"; }
 struct Out_Session_world_rules { bool Result; unsigned short mask; };
-[[maybe_unused]] static bool same(const Out_Session_world_rules& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.mask, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Session_world_rules& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.mask, (*got.rows)[1]), ".mask"); }
 [[maybe_unused]] static bool defined(const Out_Session_world_rules& s) { return defined(s.Result) && defined(s.mask); }
 [[maybe_unused]] static std::string text(const Out_Session_world_rules& s) { return std::string("{") + text(s.Result) + ", " + text(s.mask) + "}"; }
 
@@ -1055,7 +1060,7 @@ SC_TEST(converted_net_session) {
   {  // Session::active
     converted::Tally tally("Session_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.active(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.active(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1064,7 +1069,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1074,7 +1081,7 @@ SC_TEST(converted_net_session) {
   {  // Session::hosting
     converted::Tally tally("Session_hosting");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.hosting(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.hosting(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1083,7 +1090,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1093,7 +1102,7 @@ SC_TEST(converted_net_session) {
   {  // Session::self_slot
     converted::Tally tally("Session_self_slot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.self_slot(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.self_slot(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1102,7 +1111,32 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::push
+    converted::Tally tally("Session_push");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] u64& a1, [[maybe_unused]] converted::wide::Span<const unsigned char>& a2) { converted::counted([&] { return a0.push(std::move(a1), a2); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      converted::wide::Span<const unsigned char> a2 = converted::kept_span(draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }));
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(converted::shaped<converted::Whole>(a1))};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1112,7 +1146,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take
     converted::Tally tally("Session_take");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0, [[maybe_unused]] u64 a1, [[maybe_unused]] std::vector<unsigned char> a2) { auto r = converted::counted([&] { return a0.take(a1, a2); }); return Out_Session_take{std::move(a0), std::move(r), std::move(a1), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] u64& a1, [[maybe_unused]] std::vector<unsigned char>& a2) { auto r = converted::counted([&] { return a0.take(a1, a2); }); return Out_Session_take{std::move(a0), std::move(r), std::move(a1), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       u64 a1 = static_cast<u64>(draw.bits());
@@ -1123,7 +1157,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1133,7 +1169,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_hits
     converted::Tally tally("Session_take_hits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_hits(); }); return Out_Session_take_hits{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_hits(); }); return Out_Session_take_hits{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1142,7 +1178,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1152,7 +1190,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_confirms
     converted::Tally tally("Session_take_confirms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_confirms(); }); return Out_Session_take_confirms{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_confirms(); }); return Out_Session_take_confirms{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1161,7 +1199,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1171,7 +1211,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_kills
     converted::Tally tally("Session_take_kills");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_kills(); }); return Out_Session_take_kills{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_kills(); }); return Out_Session_take_kills{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1180,7 +1220,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1190,7 +1232,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_fx
     converted::Tally tally("Session_take_fx");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_fx(); }); return Out_Session_take_fx{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_fx(); }); return Out_Session_take_fx{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1199,7 +1241,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1209,7 +1253,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_swarms
     converted::Tally tally("Session_take_swarms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_swarms(); }); return Out_Session_take_swarms{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_swarms(); }); return Out_Session_take_swarms{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1218,7 +1262,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1228,7 +1274,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_swarm_hits
     converted::Tally tally("Session_take_swarm_hits");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_swarm_hits(); }); return Out_Session_take_swarm_hits{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_swarm_hits(); }); return Out_Session_take_swarm_hits{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1237,7 +1283,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1247,7 +1295,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_world
     converted::Tally tally("Session_take_world");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_world(); }); return Out_Session_take_world{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_world(); }); return Out_Session_take_world{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1256,7 +1304,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1266,7 +1316,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_destroy
     converted::Tally tally("Session_take_destroy");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_destroy(); }); return Out_Session_take_destroy{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_destroy(); }); return Out_Session_take_destroy{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1275,7 +1325,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1285,7 +1337,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_town
     converted::Tally tally("Session_take_town");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_town(); }); return Out_Session_take_town{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_town(); }); return Out_Session_take_town{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1294,7 +1346,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1304,7 +1358,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_toss
     converted::Tally tally("Session_take_toss");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_toss(); }); return Out_Session_take_toss{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_toss(); }); return Out_Session_take_toss{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1313,7 +1367,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1323,7 +1379,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_proj
     converted::Tally tally("Session_take_proj");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_proj(); }); return Out_Session_take_proj{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_proj(); }); return Out_Session_take_proj{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1332,7 +1388,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1342,7 +1400,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_pings
     converted::Tally tally("Session_take_pings");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_pings(); }); return Out_Session_take_pings{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_pings(); }); return Out_Session_take_pings{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1351,7 +1409,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1361,7 +1421,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_voice
     converted::Tally tally("Session_take_voice");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { auto r = converted::counted([&] { return a0.take_voice(); }); return Out_Session_take_voice{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { auto r = converted::counted([&] { return a0.take_voice(); }); return Out_Session_take_voice{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1370,7 +1430,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1380,7 +1442,7 @@ SC_TEST(converted_net_session) {
   {  // Session::take_anchor
     converted::Tally tally("Session_take_anchor");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0, [[maybe_unused]] Vec3 a1) { auto r = converted::counted([&] { return a0.take_anchor(a1); }); return Out_Session_take_anchor{std::move(a0), std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] Vec3& a1) { auto r = converted::counted([&] { return a0.take_anchor(a1); }); return Out_Session_take_anchor{std::move(a0), std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       Vec3 a1 = draw.vector();
@@ -1390,7 +1452,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1400,7 +1464,7 @@ SC_TEST(converted_net_session) {
   {  // Session::friendly_fire
     converted::Tally tally("Session_friendly_fire");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.friendly_fire(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.friendly_fire(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1409,7 +1473,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1419,7 +1485,7 @@ SC_TEST(converted_net_session) {
   {  // Session::set_friendly_fire_initial
     converted::Tally tally("Session_set_friendly_fire_initial");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0, [[maybe_unused]] bool a1) { converted::counted([&] { return a0.set_friendly_fire_initial(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1) { converted::counted([&] { return a0.set_friendly_fire_initial(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       bool a1 = draw.flag();
@@ -1429,7 +1495,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1439,7 +1507,7 @@ SC_TEST(converted_net_session) {
   {  // Session::world_rules
     converted::Tally tally("Session_world_rules");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0, [[maybe_unused]] unsigned short a1) { auto r = converted::counted([&] { return a0.world_rules(a1); }); return Out_Session_world_rules{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned short& a1) { auto r = converted::counted([&] { return a0.world_rules(a1); }); return Out_Session_world_rules{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       unsigned short a1 = static_cast<unsigned short>(draw.below(40));
@@ -1449,7 +1517,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1459,7 +1529,7 @@ SC_TEST(converted_net_session) {
   {  // Session::now_ms
     converted::Tally tally("Session_now_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.now_ms(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.now_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1468,7 +1538,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1478,7 +1550,7 @@ SC_TEST(converted_net_session) {
   {  // Session::vote_pending
     converted::Tally tally("Session_vote_pending");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.vote_pending(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.vote_pending(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1487,7 +1559,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1497,7 +1571,7 @@ SC_TEST(converted_net_session) {
   {  // Session::sent_poses
     converted::Tally tally("Session_sent_poses");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.sent_poses(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.sent_poses(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1506,7 +1580,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1516,7 +1592,7 @@ SC_TEST(converted_net_session) {
   {  // Session::connects
     converted::Tally tally("Session_connects");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.connects(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.connects(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1525,7 +1601,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1535,7 +1613,7 @@ SC_TEST(converted_net_session) {
   {  // Session::send_refused
     converted::Tally tally("Session_send_refused");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] net::Session a0) { return converted::counted([&] { return a0.send_refused(); }); };
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.send_refused(); }); };
     for (int i = 0; tally.more(i); ++i) {
       net::Session a0 = draw_net__Session(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1544,7 +1622,9 @@ SC_TEST(converted_net_session) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

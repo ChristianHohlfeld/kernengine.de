@@ -57,96 +57,18 @@ struct Mesh : converted::EngineObject {
 struct HeightSampler : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
-namespace physics { struct Shape { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Joint { u64 id = 0; bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
 }; }
-namespace physics { struct BodySettings {
-  BodyType type = BodyType::dynamic;
-  Vec3 position;
-  Quat rotation;
-  Vec3 linear_velocity, angular_velocity;
-  f32 linear_damping = 0, angular_damping = 0, gravity_scale = 1;
-  bool enable_sleep = true, awake = true, enabled = true, bullet = false;
-  u64 user = 0;  // returned by World::body_user
-}; }
-namespace physics { struct ShapeMaterial {
-  f32 density = 1;            // kg/m^3
-  f32 friction = 0.6;
-  f32 restitution = 0;        // 0..1
-  f32 rolling_resistance = 0; // spheres, capsules, hulls (Box3D: a quarter of the inner radius)
-  bool sensor = false;
-  u64 category_bits = 1, mask_bits = ~0ull;
-  i32 group_index = 0;
-  bool contact_events = true, sensor_events = true, hit_events = false;
-  u64 user = 0;               // returned by World::shape_user
-  Surface surface = Surface::none;
-}; }
-namespace physics { struct ShapeSettings {
-  ShapeKind kind = ShapeKind::box;
-  Vec3 center;               // body-local placement of the shape
-  Quat rotation;
-  Vec3 size{1, 1, 1};        // box: full extents
-  f32 radius = 0.5;         // sphere, capsule
-  f32 length = 1;            // capsule: distance between the hemisphere centres, along the shape's Z
-  Span<const Vec3> points;   // hull: points in shape space (4..128 after hull reduction); mesh: vertices
-  Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
-  ShapeMaterial material;
-}; }
-namespace physics { struct JointSettings {
-  JointType type = JointType::revolute;
-  Body body_a, body_b;
-  Pose frame_a, frame_b;         // in body-local space
-  bool collide_connected = false;
-  // springs: revolute, prismatic, distance, spherical, wheel (suspension), parallel
-  bool enable_spring = false;
-  f32 hertz = 0, damping_ratio = 0;
-  // limits: revolute (radians), prismatic and wheel (metres), distance (min/max length), spherical (cone angle = upper)
-  bool enable_limit = false;
-  f32 lower = 0, upper = 0;
-  // motors: revolute and wheel use torque, prismatic and distance use force, spherical uses torque + motor_velocity
-  bool enable_motor = false;
-  f32 motor_speed = 0, max_motor_torque = 0, max_motor_force = 0;
-  Vec3 motor_velocity;
-  f32 length = 1;                // distance joint rest length
-  // weld joint softness (0 hertz = rigid)
-  f32 linear_hertz = 0, angular_hertz = 0, linear_damping_ratio = 1, angular_damping_ratio = 1;
-  // motor joint: velocity drive and spring towards frame alignment
-  Vec3 linear_velocity, angular_velocity;
-  f32 max_velocity_force = 0, max_velocity_torque = 0, max_spring_force = 0, max_spring_torque = 0;
-  // wheel joint steering (Box3D b3WheelJointDef): the wheel turns about the suspension axis towards
-  // `target_steering` (radians) with a spring-damper servo of at most `max_steering_torque`;
-  // without it the wheel is fixed forward
-  bool enable_steering = false, enable_steering_limit = false;
-  f32 steering_hertz = 0, steering_damping_ratio = 0, target_steering = 0, max_steering_torque = 0;
-  f32 steering_lower = 0, steering_upper = 0;
-  // parallel joint
-  f32 max_torque = 0;
-  // Joint softness of the solver (0 = Box3D defaults); keep below half the sub-step rate.
-  f32 constraint_hertz = 0, constraint_damping_ratio = 0;
-  u64 user = 0;
-}; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
-  bool body_valid(const physics::Body& body) const;
-  void destroy_body(const physics::Body& body) const;
-  physics::Body create_body(const physics::BodySettings& settings) const;
-  physics::Shape create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const;
-  physics::Joint create_joint(const physics::JointSettings& settings) const;
-  void set_pose(const physics::Body& body, const physics::Pose& pose) const;
-  void set_linear_velocity(const physics::Body& body, const Vec3& v) const;
-  void set_angular_velocity(const physics::Body& body, const Vec3& w) const;
-  void set_awake(const physics::Body& body, const bool& awake) const;
-  physics::BodyType body_type(const physics::Body& body) const;
-  bool joint_valid(const physics::Joint& joint) const;
   void apply_force_to_center(const physics::Body& body, const Vec3& force) const;
+  bool body_valid(const physics::Body& body) const;
   void apply_force(const physics::Body& body, const Vec3& force, const Vec3& point) const;
   physics::Pose pose(const physics::Body& body) const;
   Vec3 linear_velocity(const physics::Body& body) const;
@@ -159,11 +81,6 @@ struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 constexpr f32 kPi = 3.14159265358979323846;
-enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
-inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
-inline f32 sign0(f32 v) { return v > 0 ? 1.0 : (v < 0 ? -1.0 : 0.0); }
-inline Quat conj(Quat q) { return {-q.x, -q.y, -q.z, q.w}; }
-inline Vec3 to_local(Quat q, Vec3 v) { return conj(q).rotate(v); }
 struct BodyState {
   Vec3 position, velocity, angular;
   Quat rotation;
@@ -171,34 +88,6 @@ struct BodyState {
 inline BodyState read_body(const World& w, physics::Body b) {
   const physics::Pose p = w.pose(b);
   return {p.position, w.linear_velocity(b), w.angular_velocity(b), p.rotation};
-}
-struct ColliderSpec {
-  physics::ShapeKind kind = physics::ShapeKind::box;
-  Vec3 center;               // body frame
-  Quat rotation;
-  Vec3 size{1, 1, 1};        // box: full extents
-  f32 radius = 0.5, length = 1;  // sphere, capsule (along the shape's Z)
-  std::vector<Vec3> points;  // hull
-  f32 friction = 0.6, restitution = 0;
-};
-struct MassSpec {
-  f32 mass = 1;
-  Vec3 center;               // centre of mass, body frame
-  f32 inertia[6] = {1, 1, 1, 0, 0, 0};  // about the centre of mass: xx yy zz xy xz yz
-};
-struct RigidSpec {
-  std::vector<ColliderSpec> colliders;
-  MassSpec mass;
-  f32 linear_damping = 0, angular_damping = 0;
-  bool bullet = false;
-};
-inline void box_inertia(f32 m, Vec3 s, MassSpec& mass) {
-  mass.inertia[0] = m * (s.y * s.y + s.z * s.z) / 12;
-  mass.inertia[1] = m * (s.x * s.x + s.z * s.z) / 12;
-  mass.inertia[2] = m * (s.x * s.x + s.y * s.y) / 12;
-  mass.inertia[3] = 0;
-  mass.inertia[4] = 0;
-  mass.inertia[5] = 0;
 }
 struct CarSpec {
   const char* kind = "car";
@@ -218,14 +107,7 @@ struct CarSpec {
   f32 upper_half_width = 0.71, upper_dz = 0.54;
 
   
-  static CarSpec bus();
-};
-struct CarInput {
-  f32 pedal = 0;      // -1..1: throttle forward / brake / reverse (automatic)
-  f32 steer = 0;      // -1..1 (+ = left)
-  bool handbrake = false;
-  f32 max_speed = 32; // m/s rev limiter (player: 115 km/h)
-  f32 max_reverse = 9;
+  
 };
 struct WheelState {
   f32 omega = 0, angle = 0, travel = 0, load = 0, load_f = -1, fx = 0, fy = 0, kappa = 0, alpha = 0;
@@ -240,7 +122,7 @@ struct Car {
   
   /// Takes the wheels (bodies, joints) off: the chassis is no longer driven (parked far away
   /// without physics, moved by somebody else, removed). step() puts them on again.
-  void detach();
+  
   
   /// A car somebody else drives (shown only): its steering angle, and its wheels rolling at `v`.
   
@@ -250,11 +132,11 @@ struct Car {
   u64 hit_user = 0;
   /// One wheel body of the rig (valid while rigged): for whoever must know it (a ray's ignore).
   
-  static RigidSpec rigid_spec(const CarSpec& s);
+  
   /// Height of the chassis centre above flat ground at rest.
   
 
-  void reset();
+  
   
   /// The forces of the last step() again, in the chassis frame (no rays): AI traffic runs its
   /// tyres at 60 Hz as the original (world_rigid_body_runtime.mjs FIXED_DT 1/60) and holds them
@@ -267,7 +149,7 @@ struct Car {
   
   /// Engine load 0..1 and the wheel speed for the engine sound.
   
-  f32 wheel_speed() const;
+  
 
  private:
   CarSpec s_;
@@ -277,7 +159,7 @@ struct Car {
   struct Applied { Vec3 p, f; i32 on; };  // chassis-local point and force; on: wheel 0..3, or -1 the chassis' centre
   Applied applied_[6];
   i32 n_applied_ = 0;
-  void push(World& world, physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, i32 on);
+  
   // the wheels on their joints
   struct Rig { physics::Body body; physics::Joint joint, strut; };
   Rig rig_[4];
@@ -285,210 +167,23 @@ struct Car {
   physics::Body rig_chassis_;
   Vec3 last_pos_;
   bool has_last_ = false;
-  void attach(World& world, physics::Body chassis);
-  void place(World& world, const BodyState& st);
-  bool ensure_rig(World& world, physics::Body chassis, f32 dt);
+  
+  
+  
 };
-CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed);
-constexpr f32 kBodyDamping = 0.45;
-f32 steer_torque_at(const CarSpec& s, f32 v) { const f32 x = v / s.steer_assist_speed; return s.steer_hand + s.steer_assist / (1 + x * x); }
-CarSpec CarSpec::bus() {
-  CarSpec s;
-  s.kind = "bus";
-  s.half = {4, 1.17, 1.2};
-  s.mass = 9200; s.com_z = -0.52; s.com_x = 0;
-  s.radius = 0.46; s.wheel_width = 0.3; s.wheel_mass = 85; s.attach_z = -1.1;
-  s.wheels[0] = {2.6, 1.08, true}; s.wheels[1] = {2.6, -1.08, true}; s.wheels[2] = {-2.55, 1.08, false}; s.wheels[3] = {-2.55, -1.08, false};
-  s.susp_lower = -0.18; s.susp_upper = 0.14; s.sag = 0.08;
-  s.torque_front = 0; s.torque_rear = 4200; s.power = 230000;
-  s.steer_lag = 0.06; s.steer_damp_speed = 20; s.drag_area = 6.2; s.rolling_resistance = 0.008; s.wheel_inertia = 14;
-  s.brake = 9500; s.handbrake = 12000; s.coast = 200; s.steer_lock = 0.44; s.steer_hand = 2600; s.steer_assist = 5200; s.steer_assist_speed = 6;
-  s.friction = 1.0; s.rack_rate = 1.45; s.steer_servo = 6000;
-  s.upper_mass = 450;
-  s.upper_profile = {{-4, 2.6}, {-4, 2.9}, {-3.85, 3.05}, {3.8, 3.05}, {4, 2.85}, {4, 2.6}};
-  s.upper_half_width = 1.21; s.upper_dz = 1.48;
-  return s;
-}
-RigidSpec Car::rigid_spec(const CarSpec& s) {
-  RigidSpec r;
-  ColliderSpec box;
-  box.kind = physics::ShapeKind::box;
-  box.size = s.half * 2.0;
-  box.friction = 0.6;
-  r.colliders.push_back(box);
-  ColliderSpec upper;
-  upper.kind = physics::ShapeKind::hull;
-  for (f32 y : {-s.upper_half_width, s.upper_half_width})
-    for (const Vec2& p : s.upper_profile) upper.points.push_back({p.x, y, p.y - s.upper_dz});
-  upper.friction = 0.5;
-  r.colliders.push_back(upper);
-  // The chassis alone (world_vehicle_dynamics.mjs: spec.mass with its upper body); the wheels are
-  // bodies of their own on the wheel joints.
-  const f32 total = s.mass;
-  r.mass.mass = total;
-  r.mass.center = {s.com_x, 0, s.com_z};
-  box_inertia(total, s.half * 2.0, r.mass);
-  r.linear_damping = 0;
-  r.angular_damping = 0.05;
-  return r;
-}
-void Car::reset() {
-  for (WheelState& w : w_) w = WheelState{};
-  steer_ = steer_eq_f_ = vf_ = throttle_ = 0;
-  gear_ = 1;
-  n_applied_ = 0;
-  has_last_ = false;  // wherever the chassis is now: the wheels are put under it again
-}
-f32 Car::wheel_speed() const {
-  f32 m = 0;
-  for (const WheelState& w : w_) m = std::fmax(m, std::fabs(w.omega));
-  return m * s_.radius;
-}
-const Quat kWheelFrame{-0.5, -0.5, -0.5, 0.5};
-constexpr f32 kSpringZeta = 0.06, kStrutShare = 0.15, kStrutM = 0.55, kRubberFriction = 0.9;
-struct Tuning { f32 hertz, damping_ratio; };
-Tuning suspension_tuning(const CarSpec& s, f32 zeta, f32 k_share) {
-  const f32 q = s.mass / 4, m = s.wheel_mass * q / (s.wheel_mass + q), k = q * 9.81 / s.sag * k_share, w = kern::math::sqrt(k / m);
-  const f32 c = 2 * zeta * kern::math::sqrt(q * q * 9.81 / s.sag);
-  return {w / (2 * kPi), c / (2 * m * w)};
-}
-void Car::attach(World& world, physics::Body chassis) {
-  detach();
-  const CarSpec& s = s_;
-  const BodyState st = read_body(world, chassis);
-  const f32 r = s.radius, volume = 4.0 / 3.0 * kPi * r * r * r;
-  for (int i = 0; i < 4; ++i) {
-    const Vec3 local{converted::at(s.wheels, i).x, converted::at(s.wheels, i).y, s.attach_z};
-    physics::BodySettings bs;
-    bs.type = physics::BodyType::dynamic;
-    // (the hub where the spring holds it under the standing car - `sag` up its travel -, or where
-    // it was: a car put down at its ride height has its tyres on the ground, not in it)
-    bs.position = st.position + st.rotation.rotate(local + Vec3{0, 0, clampf(converted::at(w_, i).has_travel ? converted::at(w_, i).travel : s.sag, s.susp_lower, s.susp_upper)});
-    bs.rotation = st.rotation;
-    bs.linear_velocity = st.velocity;
-    bs.angular_damping = 0.05;
-    bs.linear_damping = 0.02;
-    Rig& g = converted::at(rig_, i);
-    g.body = world.create_body(bs);
-    // Two shapes, one sphere: the tyre on the ground has no solver friction (its grip is the tyre
-    // model's: rubber x surface, slip, load); against everything else (other cars, props) the
-    // same tyre rubs with rubber's friction.
-    physics::ShapeSettings ground;
-    ground.kind = physics::ShapeKind::sphere;
-    ground.radius = r;
-    ground.material.density = s.wheel_mass / volume;
-    ground.material.friction = 0;
-    ground.material.restitution = 0;
-    ground.material.category_bits = kCatVehicle;
-    ground.material.mask_bits = kCatWorld;
-    ground.material.user = hit_user;
-    world.create_shape(g.body, ground);
-    physics::ShapeSettings rubber = ground;
-    rubber.material.density = 0;
-    rubber.material.friction = kRubberFriction;
-    rubber.material.restitution = 0.05;
-    rubber.material.mask_bits = ~static_cast<u64>(kCatWorld);
-    world.create_shape(g.body, rubber);
-    // the wheel joint: suspension axis, spring, bump stops, the spin held (the wheel's rotation is
-    // the tyre model's own degree of freedom), the steering servo on the front axle
-    physics::JointSettings js;
-    js.type = physics::JointType::wheel;
-    js.body_a = chassis;
-    js.body_b = g.body;
-    js.frame_a = {local, kWheelFrame};
-    js.frame_b = {{0, 0, 0}, kWheelFrame};
-    js.collide_connected = false;
-    const Tuning spring = suspension_tuning(s, kSpringZeta, 1 - kStrutShare);
-    js.enable_spring = true;
-    js.hertz = spring.hertz;
-    js.damping_ratio = spring.damping_ratio;
-    js.enable_limit = true;
-    js.lower = s.susp_lower;
-    js.upper = s.susp_upper;
-    js.enable_motor = true;
-    js.motor_speed = 0;
-    js.max_motor_torque = s.mass * 40;
-    if (converted::at(s.wheels, i).front) {
-      js.enable_steering = true;
-      js.steering_hertz = 9;
-      js.steering_damping_ratio = 0.95;
-      js.max_steering_torque = s.steer_servo;
-      js.target_steering = steer_;
-      js.enable_steering_limit = true;
-      js.steering_lower = -s.steer_lock;
-      js.steering_upper = s.steer_lock;
-    }
-    g.joint = world.create_joint(js);
-    // the damper strut: a chassis mount 0.55 m over the hub -> the hub, at rest at zero travel; a
-    // soft spring-damper (implicit: stable though the light hub reacts faster than a step) that
-    // carries the body damping and a share of the stiffness
-    physics::JointSettings ds;
-    ds.type = physics::JointType::distance;
-    ds.body_a = chassis;
-    ds.body_b = g.body;
-    ds.frame_a = {{local.x, local.y, local.z + kStrutM}, Quat{}};
-    ds.frame_b = {{0, 0, 0}, Quat{}};
-    ds.collide_connected = false;
-    ds.length = kStrutM;
-    const Tuning strut = suspension_tuning(s, std::fmax(0.0, kBodyDamping - kSpringZeta), kStrutShare);
-    ds.enable_spring = true;
-    ds.hertz = strut.hertz;
-    ds.damping_ratio = strut.damping_ratio;
-    ds.enable_limit = false;
-    ds.lower = kStrutM - s.susp_upper - 0.25;
-    ds.upper = kStrutM - s.susp_lower + 0.25;
-    g.strut = world.create_joint(ds);
+constexpr f32 kKappaPeak = 0.1, kSlideGrip = 0.78;
+const f32 kAlphaPeak = kern::math::tan(6.5 * kPi / 180);
+void tyre(f32 kappa, f32 tan_a, f32 muN, std::array<f32, 2>& out) {
+  const f32 sx = kappa / kKappaPeak, sy = tan_a / kAlphaPeak, s = hypot_bp(sx, sy);
+  if (s < 1e-6 || !(muN > 0)) {
+    out[0] = 0;
+    out[1] = 0;
+    return;
   }
-  rig_world_ = &world;
-  rig_chassis_ = chassis;
-  last_pos_ = st.position;
-  has_last_ = true;
-}
-void Car::detach() {
-  if (!rig_world_) return;
-  World& w = *rig_world_;
-  for (Rig& g : rig_) {
-    // (destroying the body takes its joints along)
-    if (g.body.valid() && w.body_valid(g.body)) w.destroy_body(g.body);
-    g = Rig{};
-  }
-  rig_world_ = nullptr;
-  rig_chassis_ = {};
-  has_last_ = false;
-}
-void Car::place(World& world, const BodyState& st) {
-  // the wheels back under the chassis, moving with it (placeWheels: a teleport, a reset)
-  for (int i = 0; i < 4; ++i) {
-    const Rig& g = converted::at(rig_, i);
-    if (!g.body.valid() || !world.body_valid(g.body)) continue;
-    const Vec3 local{converted::at(s_.wheels, i).x, converted::at(s_.wheels, i).y, s_.attach_z + clampf(converted::at(w_, i).has_travel ? converted::at(w_, i).travel : s_.sag, s_.susp_lower, s_.susp_upper)};
-    const Vec3 arm = st.rotation.rotate(local);
-    world.set_pose(g.body, {st.position + arm, st.rotation});
-    world.set_linear_velocity(g.body, st.velocity + converted::wide::cross(st.angular, arm));
-    world.set_angular_velocity(g.body, st.angular);
-    world.set_awake(g.body, true);
-  }
-}
-bool Car::ensure_rig(World& world, physics::Body chassis, f32 dt) {
-  if (world.body_type(chassis) != physics::BodyType::dynamic) { detach(); return false; }  // moved by somebody else: no wheels to drive
-  bool whole = rig_world_ == &world && rig_chassis_ == chassis;
-  for (int i = 0; whole && i < 4; ++i) whole = converted::at(rig_, i).body.valid() && world.body_valid(converted::at(rig_, i).body) && world.joint_valid(converted::at(rig_, i).joint);
-  const BodyState st = read_body(world, chassis);
-  if (!whole) {
-    attach(world, chassis);
-    return true;
-  }
-  // The chassis was put somewhere else since the last step (a teleport, a respawn): the wheels go
-  // with it before the solver sees the joints stretched.
-  if (!has_last_ || converted::wide::length(st.position - last_pos_) > converted::wide::length(st.velocity) * std::fmax(dt, 1 / 240.0) * 2 + 0.6) place(world, st);
-  last_pos_ = st.position;
-  has_last_ = true;
-  return true;
-}
-void Car::push(World& world, physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, i32 on) {
-  if (on < 0) world.apply_force_to_center(body, f);
-  else world.apply_force(converted::at(rig_, on).body, f, p);
-  if (n_applied_ < 6) converted::at(applied_, n_applied_++) = {to_local(q, p - origin), to_local(q, f), on};
+  const f32 g = s < 1 ? s * (2 - s) : 1 - (1 - kSlideGrip) * std::fmin(1.0, (s - 1) / 2.5);
+  const f32 F = muN * g;
+  out[0] = F * sx / s;
+  out[1] = -F * sy / s;
 }
 void Car::reapply(World& world, physics::Body body) const {
   if (rig_world_ != &world || rig_chassis_ != body) return;
@@ -503,88 +198,22 @@ void Car::reapply(World& world, physics::Body body) const {
     else if (converted::at(rig_, a.on).body.valid() && world.body_valid(converted::at(rig_, a.on).body)) world.apply_force(converted::at(rig_, a.on).body, f, st.position + st.rotation.rotate(a.p));
   }
 }
-CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed) {
-  CarInput in;
-  const f32 dx = target.x - position.x, dy = target.y - position.y, dist = hypot_bp(dx, dy);
-  if (dist < 0.4) {
-    in.pedal = -0.4 * sign0(vf);
-    in.max_speed = std::fmax(4.0, target_speed * 1.2);
-    in.max_reverse = 4;
-    return in;
-  }
-  const f32 cr = forward.x * dy - forward.y * dx, dt = forward.x * dx + forward.y * dy, err = kern::math::atan2(cr, dt);
-  const f32 steer = clampf(err * 1.9, -1, 1);
-  const f32 R = dist / std::fmax(1e-3, 2 * std::fabs(kern::math::sin(err))), v_bend = kern::math::sqrt(0.45 * 9.81 * R);
-  const f32 ce = kern::math::cos(err);
-  const f32 want = std::fmin(target_speed * std::fmax(0.25, ce * ce), std::fmax(2.5, v_bend));
-  const f32 pedal = clampf((want - vf) * 0.45, -1, 1);
-  const bool behind = dt < 0 && dist < 6;
-  in.pedal = behind ? -0.6 : pedal;
-  in.steer = behind ? -steer : steer;
-  in.max_speed = std::fmax(6.0, target_speed * 1.25);
-  in.max_reverse = 5;
-  return in;
-}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static CarSpec::Wheel draw_CarSpec__Wheel(converted::Draw& draw) {
-  CarSpec::Wheel s{};
-  s.x = draw.number();
-  s.y = draw.number();
-  s.front = draw.flag();
+[[maybe_unused]] static physics::Body draw_kern__physics__Body(converted::Draw& draw) {
+  physics::Body s{};
+  s.id = static_cast<u64>(draw.bits());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const CarSpec::Wheel& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.front)}); }
-[[maybe_unused]] static bool same(const CarSpec::Wheel& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.front, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const CarSpec::Wheel& s) { return defined(s.x) && defined(s.y) && defined(s.front); }
-[[maybe_unused]] static std::string text(const CarSpec::Wheel& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.front) + "}"; }
-[[maybe_unused]] static void take(CarSpec::Wheel& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<bool>(s.front, (*v.rows)[2]); }
-[[maybe_unused]] static CarSpec draw_CarSpec(converted::Draw& draw) {
-  CarSpec s{};
-  s.kind = draw.c_word();
-  s.half = draw.vector();
-  s.mass = draw.number();
-  s.com_z = draw.number();
-  s.com_x = draw.number();
-  s.radius = draw.number();
-  s.wheel_width = draw.number();
-  s.wheel_mass = draw.number();
-  s.attach_z = draw.number();
-  converted::fill_array(s.wheels, [&]() -> CarSpec::Wheel { return draw_CarSpec__Wheel(draw); });
-  s.susp_lower = draw.number();
-  s.susp_upper = draw.number();
-  s.sag = draw.number();
-  s.torque_front = draw.number();
-  s.torque_rear = draw.number();
-  s.power = draw.number();
-  s.steer_lag = draw.number();
-  s.steer_damp_speed = draw.number();
-  s.drag_area = draw.number();
-  s.rolling_resistance = draw.number();
-  s.wheel_inertia = draw.number();
-  s.brake = draw.number();
-  s.handbrake = draw.number();
-  s.coast = draw.number();
-  s.steer_lock = draw.number();
-  s.steer_hand = draw.number();
-  s.steer_assist = draw.number();
-  s.steer_assist_speed = draw.number();
-  s.friction = draw.number();
-  s.rack_rate = draw.number();
-  s.steer_servo = draw.number();
-  s.upper_mass = draw.number();
-  s.upper_profile = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
-  s.upper_half_width = draw.number();
-  s.upper_dz = draw.number();
-  return s;
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
+[[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
 }
-[[maybe_unused]] static converted::Value arg(const CarSpec& s) { return converted::Value::structure({arg(s.kind), arg(s.half), arg(s.mass), arg(s.com_z), arg(s.com_x), arg(s.radius), arg(s.wheel_width), arg(s.wheel_mass), arg(s.attach_z), arg(converted::array_list(s.wheels)), arg(s.susp_lower), arg(s.susp_upper), arg(s.sag), arg(s.torque_front), arg(s.torque_rear), arg(s.power), arg(s.steer_lag), arg(s.steer_damp_speed), arg(s.drag_area), arg(s.rolling_resistance), arg(s.wheel_inertia), arg(s.brake), arg(s.handbrake), arg(s.coast), arg(s.steer_lock), arg(s.steer_hand), arg(s.steer_assist), arg(s.steer_assist_speed), arg(s.friction), arg(s.rack_rate), arg(s.steer_servo), arg(s.upper_mass), arg(s.upper_profile), arg(s.upper_half_width), arg(s.upper_dz)}); }
-[[maybe_unused]] static bool same(const CarSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 35 && same(want.kind, (*got.rows)[0]) && same(want.half, (*got.rows)[1]) && same(want.mass, (*got.rows)[2]) && same(want.com_z, (*got.rows)[3]) && same(want.com_x, (*got.rows)[4]) && same(want.radius, (*got.rows)[5]) && same(want.wheel_width, (*got.rows)[6]) && same(want.wheel_mass, (*got.rows)[7]) && same(want.attach_z, (*got.rows)[8]) && same(converted::array_list(want.wheels), (*got.rows)[9]) && same(want.susp_lower, (*got.rows)[10]) && same(want.susp_upper, (*got.rows)[11]) && same(want.sag, (*got.rows)[12]) && same(want.torque_front, (*got.rows)[13]) && same(want.torque_rear, (*got.rows)[14]) && same(want.power, (*got.rows)[15]) && same(want.steer_lag, (*got.rows)[16]) && same(want.steer_damp_speed, (*got.rows)[17]) && same(want.drag_area, (*got.rows)[18]) && same(want.rolling_resistance, (*got.rows)[19]) && same(want.wheel_inertia, (*got.rows)[20]) && same(want.brake, (*got.rows)[21]) && same(want.handbrake, (*got.rows)[22]) && same(want.coast, (*got.rows)[23]) && same(want.steer_lock, (*got.rows)[24]) && same(want.steer_hand, (*got.rows)[25]) && same(want.steer_assist, (*got.rows)[26]) && same(want.steer_assist_speed, (*got.rows)[27]) && same(want.friction, (*got.rows)[28]) && same(want.rack_rate, (*got.rows)[29]) && same(want.steer_servo, (*got.rows)[30]) && same(want.upper_mass, (*got.rows)[31]) && same(want.upper_profile, (*got.rows)[32]) && same(want.upper_half_width, (*got.rows)[33]) && same(want.upper_dz, (*got.rows)[34]); }
-[[maybe_unused]] static bool defined(const CarSpec& s) { return defined(s.kind) && defined(s.half) && defined(s.mass) && defined(s.com_z) && defined(s.com_x) && defined(s.radius) && defined(s.wheel_width) && defined(s.wheel_mass) && defined(s.attach_z) && defined(converted::array_list(s.wheels)) && defined(s.susp_lower) && defined(s.susp_upper) && defined(s.sag) && defined(s.torque_front) && defined(s.torque_rear) && defined(s.power) && defined(s.steer_lag) && defined(s.steer_damp_speed) && defined(s.drag_area) && defined(s.rolling_resistance) && defined(s.wheel_inertia) && defined(s.brake) && defined(s.handbrake) && defined(s.coast) && defined(s.steer_lock) && defined(s.steer_hand) && defined(s.steer_assist) && defined(s.steer_assist_speed) && defined(s.friction) && defined(s.rack_rate) && defined(s.steer_servo) && defined(s.upper_mass) && defined(s.upper_profile) && defined(s.upper_half_width) && defined(s.upper_dz); }
-[[maybe_unused]] static std::string text(const CarSpec& s) { return std::string("{") + text(s.kind) + ", " + text(s.half) + ", " + text(s.mass) + ", " + text(s.com_z) + ", " + text(s.com_x) + ", " + text(s.radius) + ", " + text(s.wheel_width) + ", " + text(s.wheel_mass) + ", " + text(s.attach_z) + ", " + text(converted::array_list(s.wheels)) + ", " + text(s.susp_lower) + ", " + text(s.susp_upper) + ", " + text(s.sag) + ", " + text(s.torque_front) + ", " + text(s.torque_rear) + ", " + text(s.power) + ", " + text(s.steer_lag) + ", " + text(s.steer_damp_speed) + ", " + text(s.drag_area) + ", " + text(s.rolling_resistance) + ", " + text(s.wheel_inertia) + ", " + text(s.brake) + ", " + text(s.handbrake) + ", " + text(s.coast) + ", " + text(s.steer_lock) + ", " + text(s.steer_hand) + ", " + text(s.steer_assist) + ", " + text(s.steer_assist_speed) + ", " + text(s.friction) + ", " + text(s.rack_rate) + ", " + text(s.steer_servo) + ", " + text(s.upper_mass) + ", " + text(s.upper_profile) + ", " + text(s.upper_half_width) + ", " + text(s.upper_dz) + "}"; }
-[[maybe_unused]] static void take(CarSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 35) return; converted::take_as<const char*>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.half, (*v.rows)[1]); converted::take_as<double>(s.mass, (*v.rows)[2]); converted::take_as<double>(s.com_z, (*v.rows)[3]); converted::take_as<double>(s.com_x, (*v.rows)[4]); converted::take_as<double>(s.radius, (*v.rows)[5]); converted::take_as<double>(s.wheel_width, (*v.rows)[6]); converted::take_as<double>(s.wheel_mass, (*v.rows)[7]); converted::take_as<double>(s.attach_z, (*v.rows)[8]); { std::vector<CarSpec::Wheel> items; converted::take_as<std::vector<CarSpec::Wheel>>(items, (*v.rows)[9]); converted::array_from(s.wheels, items); } converted::take_as<double>(s.susp_lower, (*v.rows)[10]); converted::take_as<double>(s.susp_upper, (*v.rows)[11]); converted::take_as<double>(s.sag, (*v.rows)[12]); converted::take_as<double>(s.torque_front, (*v.rows)[13]); converted::take_as<double>(s.torque_rear, (*v.rows)[14]); converted::take_as<double>(s.power, (*v.rows)[15]); converted::take_as<double>(s.steer_lag, (*v.rows)[16]); converted::take_as<double>(s.steer_damp_speed, (*v.rows)[17]); converted::take_as<double>(s.drag_area, (*v.rows)[18]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[19]); converted::take_as<double>(s.wheel_inertia, (*v.rows)[20]); converted::take_as<double>(s.brake, (*v.rows)[21]); converted::take_as<double>(s.handbrake, (*v.rows)[22]); converted::take_as<double>(s.coast, (*v.rows)[23]); converted::take_as<double>(s.steer_lock, (*v.rows)[24]); converted::take_as<double>(s.steer_hand, (*v.rows)[25]); converted::take_as<double>(s.steer_assist, (*v.rows)[26]); converted::take_as<double>(s.steer_assist_speed, (*v.rows)[27]); converted::take_as<double>(s.friction, (*v.rows)[28]); converted::take_as<double>(s.rack_rate, (*v.rows)[29]); converted::take_as<double>(s.steer_servo, (*v.rows)[30]); converted::take_as<double>(s.upper_mass, (*v.rows)[31]); converted::take_as<std::vector<Vec2>>(s.upper_profile, (*v.rows)[32]); converted::take_as<double>(s.upper_half_width, (*v.rows)[33]); converted::take_as<double>(s.upper_dz, (*v.rows)[34]); }
 [[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
   Quat s{};
   s.x = draw.number();
@@ -594,269 +223,10 @@ CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_s
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
-[[maybe_unused]] static ColliderSpec draw_ColliderSpec(converted::Draw& draw) {
-  ColliderSpec s{};
-  s.kind = static_cast<physics::ShapeKind>(draw.below(5));
-  s.center = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.size = draw.vector();
-  s.radius = draw.number();
-  s.length = draw.number();
-  s.points = draw_list(draw, [&]() -> Vec3 { return draw.vector(); });
-  s.friction = draw.number();
-  s.restitution = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const ColliderSpec& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(s.points), arg(s.friction), arg(s.restitution)}); }
-[[maybe_unused]] static bool same(const ColliderSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.kind, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(want.rotation, (*got.rows)[2]) && same(want.size, (*got.rows)[3]) && same(want.radius, (*got.rows)[4]) && same(want.length, (*got.rows)[5]) && same(want.points, (*got.rows)[6]) && same(want.friction, (*got.rows)[7]) && same(want.restitution, (*got.rows)[8]); }
-[[maybe_unused]] static bool defined(const ColliderSpec& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(s.points) && defined(s.friction) && defined(s.restitution); }
-[[maybe_unused]] static std::string text(const ColliderSpec& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(s.points) + ", " + text(s.friction) + ", " + text(s.restitution) + "}"; }
-[[maybe_unused]] static void take(ColliderSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<std::vector<Vec3>>(s.points, (*v.rows)[6]); converted::take_as<double>(s.friction, (*v.rows)[7]); converted::take_as<double>(s.restitution, (*v.rows)[8]); }
-[[maybe_unused]] static MassSpec draw_MassSpec(converted::Draw& draw) {
-  MassSpec s{};
-  s.mass = draw.number();
-  s.center = draw.vector();
-  converted::fill_array(s.inertia, [&]() -> double { return draw.number(); });
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MassSpec& s) { return converted::Value::structure({arg(s.mass), arg(s.center), arg(converted::array_list(s.inertia))}); }
-[[maybe_unused]] static bool same(const MassSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.mass, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(converted::array_list(want.inertia), (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const MassSpec& s) { return defined(s.mass) && defined(s.center) && defined(converted::array_list(s.inertia)); }
-[[maybe_unused]] static std::string text(const MassSpec& s) { return std::string("{") + text(s.mass) + ", " + text(s.center) + ", " + text(converted::array_list(s.inertia)) + "}"; }
-[[maybe_unused]] static void take(MassSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.mass, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[2]); converted::array_from(s.inertia, items); } }
-[[maybe_unused]] static RigidSpec draw_RigidSpec(converted::Draw& draw) {
-  RigidSpec s{};
-  s.colliders = draw_list(draw, [&]() -> ColliderSpec { return draw_ColliderSpec(draw); });
-  s.mass = draw_MassSpec(draw);
-  s.linear_damping = draw.number();
-  s.angular_damping = draw.number();
-  s.bullet = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const RigidSpec& s) { return converted::Value::structure({arg(s.colliders), arg(s.mass), arg(s.linear_damping), arg(s.angular_damping), arg(s.bullet)}); }
-[[maybe_unused]] static bool same(const RigidSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.colliders, (*got.rows)[0]) && same(want.mass, (*got.rows)[1]) && same(want.linear_damping, (*got.rows)[2]) && same(want.angular_damping, (*got.rows)[3]) && same(want.bullet, (*got.rows)[4]); }
-[[maybe_unused]] static bool defined(const RigidSpec& s) { return defined(s.colliders) && defined(s.mass) && defined(s.linear_damping) && defined(s.angular_damping) && defined(s.bullet); }
-[[maybe_unused]] static std::string text(const RigidSpec& s) { return std::string("{") + text(s.colliders) + ", " + text(s.mass) + ", " + text(s.linear_damping) + ", " + text(s.angular_damping) + ", " + text(s.bullet) + "}"; }
-[[maybe_unused]] static void take(RigidSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::vector<ColliderSpec>>(s.colliders, (*v.rows)[0]); converted::take_as<MassSpec>(s.mass, (*v.rows)[1]); converted::take_as<double>(s.linear_damping, (*v.rows)[2]); converted::take_as<double>(s.angular_damping, (*v.rows)[3]); converted::take_as<bool>(s.bullet, (*v.rows)[4]); }
-[[maybe_unused]] static WheelState draw_WheelState(converted::Draw& draw) {
-  WheelState s{};
-  s.omega = draw.number();
-  s.angle = draw.number();
-  s.travel = draw.number();
-  s.load = draw.number();
-  s.load_f = draw.number();
-  s.fx = draw.number();
-  s.fy = draw.number();
-  s.kappa = draw.number();
-  s.alpha = draw.number();
-  s.contact = draw.flag();
-  s.has_travel = draw.flag();
-  s.hub = draw.vector();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const WheelState& s) { return converted::Value::structure({arg(s.omega), arg(s.angle), arg(s.travel), arg(s.load), arg(s.load_f), arg(s.fx), arg(s.fy), arg(s.kappa), arg(s.alpha), arg(s.contact), arg(s.has_travel), arg(s.hub)}); }
-[[maybe_unused]] static bool same(const WheelState& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.omega, (*got.rows)[0]) && same(want.angle, (*got.rows)[1]) && same(want.travel, (*got.rows)[2]) && same(want.load, (*got.rows)[3]) && same(want.load_f, (*got.rows)[4]) && same(want.fx, (*got.rows)[5]) && same(want.fy, (*got.rows)[6]) && same(want.kappa, (*got.rows)[7]) && same(want.alpha, (*got.rows)[8]) && same(want.contact, (*got.rows)[9]) && same(want.has_travel, (*got.rows)[10]) && same(want.hub, (*got.rows)[11]); }
-[[maybe_unused]] static bool defined(const WheelState& s) { return defined(s.omega) && defined(s.angle) && defined(s.travel) && defined(s.load) && defined(s.load_f) && defined(s.fx) && defined(s.fy) && defined(s.kappa) && defined(s.alpha) && defined(s.contact) && defined(s.has_travel) && defined(s.hub); }
-[[maybe_unused]] static std::string text(const WheelState& s) { return std::string("{") + text(s.omega) + ", " + text(s.angle) + ", " + text(s.travel) + ", " + text(s.load) + ", " + text(s.load_f) + ", " + text(s.fx) + ", " + text(s.fy) + ", " + text(s.kappa) + ", " + text(s.alpha) + ", " + text(s.contact) + ", " + text(s.has_travel) + ", " + text(s.hub) + "}"; }
-[[maybe_unused]] static void take(WheelState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<double>(s.omega, (*v.rows)[0]); converted::take_as<double>(s.angle, (*v.rows)[1]); converted::take_as<double>(s.travel, (*v.rows)[2]); converted::take_as<double>(s.load, (*v.rows)[3]); converted::take_as<double>(s.load_f, (*v.rows)[4]); converted::take_as<double>(s.fx, (*v.rows)[5]); converted::take_as<double>(s.fy, (*v.rows)[6]); converted::take_as<double>(s.kappa, (*v.rows)[7]); converted::take_as<double>(s.alpha, (*v.rows)[8]); converted::take_as<bool>(s.contact, (*v.rows)[9]); converted::take_as<bool>(s.has_travel, (*v.rows)[10]); converted::take_as<Vec3>(s.hub, (*v.rows)[11]); }
-[[maybe_unused]] static Car::Applied draw_Car__Applied(converted::Draw& draw) {
-  Car::Applied s{};
-  s.p = draw.vector();
-  s.f = draw.vector();
-  s.on = static_cast<int>(draw.whole());
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Car::Applied& s) { return converted::Value::structure({arg(s.p), arg(s.f), arg(s.on)}); }
-[[maybe_unused]] static bool same(const Car::Applied& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.p, (*got.rows)[0]) && same(want.f, (*got.rows)[1]) && same(want.on, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const Car::Applied& s) { return defined(s.p) && defined(s.f) && defined(s.on); }
-[[maybe_unused]] static std::string text(const Car::Applied& s) { return std::string("{") + text(s.p) + ", " + text(s.f) + ", " + text(s.on) + "}"; }
-[[maybe_unused]] static void take(Car::Applied& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<Vec3>(s.f, (*v.rows)[1]); converted::take_as<int>(s.on, (*v.rows)[2]); }
-[[maybe_unused]] static physics::Body draw_kern__physics__Body(converted::Draw& draw) {
-  physics::Body s{};
-  s.id = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
-[[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
-[[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
-}
-[[maybe_unused]] static physics::Joint draw_kern__physics__Joint(converted::Draw& draw) {
-  physics::Joint s{};
-  s.id = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::Joint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const physics::Joint& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
-[[maybe_unused]] static std::string text(const physics::Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
-[[maybe_unused]] static void take(physics::Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
-}
-[[maybe_unused]] static Car::Rig draw_Car__Rig(converted::Draw& draw) {
-  Car::Rig s{};
-  s.body = draw_kern__physics__Body(draw);
-  s.joint = draw_kern__physics__Joint(draw);
-  s.strut = draw_kern__physics__Joint(draw);
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Car::Rig& s) { return converted::Value::structure({arg(s.body), arg(s.joint), arg(s.strut)}); }
-[[maybe_unused]] static bool same(const Car::Rig& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.body, (*got.rows)[0]) && same(want.joint, (*got.rows)[1]) && same(want.strut, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const Car::Rig& s) { return defined(s.body) && defined(s.joint) && defined(s.strut); }
-[[maybe_unused]] static std::string text(const Car::Rig& s) { return std::string("{") + text(s.body) + ", " + text(s.joint) + ", " + text(s.strut) + "}"; }
-[[maybe_unused]] static void take(Car::Rig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<physics::Body>(s.body, (*v.rows)[0]); converted::take_as<physics::Joint>(s.joint, (*v.rows)[1]); converted::take_as<physics::Joint>(s.strut, (*v.rows)[2]); }
-[[maybe_unused]] static Car draw_Car(converted::Draw& draw) {
-  Car s{};
-  s.hit_user = static_cast<u64>(draw.bits());
-  s.s_ = draw_CarSpec(draw);
-  converted::fill_array(s.w_, [&]() -> WheelState { return draw_WheelState(draw); });
-  s.steer_ = draw.number();
-  s.steer_eq_f_ = draw.number();
-  s.vf_ = draw.number();
-  s.throttle_ = draw.number();
-  s.gear_ = static_cast<int>(draw.whole());
-  converted::fill_array(s.applied_, [&]() -> Car::Applied { return draw_Car__Applied(draw); });
-  s.n_applied_ = static_cast<int>(draw.whole());
-  converted::fill_array(s.rig_, [&]() -> Car::Rig { return draw_Car__Rig(draw); });
-  s.rig_world_ = converted::engine_object<World>(1 + draw.below(6));
-  s.rig_chassis_ = draw_kern__physics__Body(draw);
-  s.last_pos_ = draw.vector();
-  s.has_last_ = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Car& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.hit_user)), arg(s.s_), arg(converted::array_list(s.w_)), arg(s.steer_), arg(s.steer_eq_f_), arg(s.vf_), arg(s.throttle_), arg(s.gear_), arg(converted::array_list(s.applied_)), arg(s.n_applied_), arg(converted::array_list(s.rig_)), arg(s.rig_world_), arg(s.rig_chassis_), arg(s.last_pos_), arg(s.has_last_)}); }
-[[maybe_unused]] static bool same(const Car& want, const converted::Value& got) { return got.rows && got.rows->size() == 15 && same(converted::shaped<converted::Whole>(want.hit_user), (*got.rows)[0]) && same(want.s_, (*got.rows)[1]) && same(converted::array_list(want.w_), (*got.rows)[2]) && same(want.steer_, (*got.rows)[3]) && same(want.steer_eq_f_, (*got.rows)[4]) && same(want.vf_, (*got.rows)[5]) && same(want.throttle_, (*got.rows)[6]) && same(want.gear_, (*got.rows)[7]) && same(converted::array_list(want.applied_), (*got.rows)[8]) && same(want.n_applied_, (*got.rows)[9]) && same(converted::array_list(want.rig_), (*got.rows)[10]) && same(want.rig_world_, (*got.rows)[11]) && same(want.rig_chassis_, (*got.rows)[12]) && same(want.last_pos_, (*got.rows)[13]) && same(want.has_last_, (*got.rows)[14]); }
-[[maybe_unused]] static bool defined(const Car& s) { return defined(converted::shaped<converted::Whole>(s.hit_user)) && defined(s.s_) && defined(converted::array_list(s.w_)) && defined(s.steer_) && defined(s.steer_eq_f_) && defined(s.vf_) && defined(s.throttle_) && defined(s.gear_) && defined(converted::array_list(s.applied_)) && defined(s.n_applied_) && defined(converted::array_list(s.rig_)) && defined(s.rig_world_) && defined(s.rig_chassis_) && defined(s.last_pos_) && defined(s.has_last_); }
-[[maybe_unused]] static std::string text(const Car& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.hit_user)) + ", " + text(s.s_) + ", " + text(converted::array_list(s.w_)) + ", " + text(s.steer_) + ", " + text(s.steer_eq_f_) + ", " + text(s.vf_) + ", " + text(s.throttle_) + ", " + text(s.gear_) + ", " + text(converted::array_list(s.applied_)) + ", " + text(s.n_applied_) + ", " + text(converted::array_list(s.rig_)) + ", " + text(s.rig_world_) + ", " + text(s.rig_chassis_) + ", " + text(s.last_pos_) + ", " + text(s.has_last_) + "}"; }
-[[maybe_unused]] static void take(Car& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 15) return; converted::take_as<converted::Whole>(s.hit_user, (*v.rows)[0]); converted::take_as<CarSpec>(s.s_, (*v.rows)[1]); { std::vector<WheelState> items; converted::take_as<std::vector<WheelState>>(items, (*v.rows)[2]); converted::array_from(s.w_, items); } converted::take_as<double>(s.steer_, (*v.rows)[3]); converted::take_as<double>(s.steer_eq_f_, (*v.rows)[4]); converted::take_as<double>(s.vf_, (*v.rows)[5]); converted::take_as<double>(s.throttle_, (*v.rows)[6]); converted::take_as<int>(s.gear_, (*v.rows)[7]); { std::vector<Car::Applied> items; converted::take_as<std::vector<Car::Applied>>(items, (*v.rows)[8]); converted::array_from(s.applied_, items); } converted::take_as<int>(s.n_applied_, (*v.rows)[9]); { std::vector<Car::Rig> items; converted::take_as<std::vector<Car::Rig>>(items, (*v.rows)[10]); converted::array_from(s.rig_, items); } converted::take_as<World*>(s.rig_world_, (*v.rows)[11]); converted::take_as<physics::Body>(s.rig_chassis_, (*v.rows)[12]); converted::take_as<Vec3>(s.last_pos_, (*v.rows)[13]); converted::take_as<bool>(s.has_last_, (*v.rows)[14]); }
-[[maybe_unused]] static Tuning draw_Tuning(converted::Draw& draw) {
-  Tuning s{};
-  s.hertz = draw.number();
-  s.damping_ratio = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Tuning& s) { return converted::Value::structure({arg(s.hertz), arg(s.damping_ratio)}); }
-[[maybe_unused]] static bool same(const Tuning& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.hertz, (*got.rows)[0]) && same(want.damping_ratio, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Tuning& s) { return defined(s.hertz) && defined(s.damping_ratio); }
-[[maybe_unused]] static std::string text(const Tuning& s) { return std::string("{") + text(s.hertz) + ", " + text(s.damping_ratio) + "}"; }
-[[maybe_unused]] static void take(Tuning& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.hertz, (*v.rows)[0]); converted::take_as<double>(s.damping_ratio, (*v.rows)[1]); }
-[[maybe_unused]] static BodyState draw_BodyState(converted::Draw& draw) {
-  BodyState s{};
-  s.position = draw.vector();
-  s.velocity = draw.vector();
-  s.angular = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const BodyState& s) { return converted::Value::structure({arg(s.position), arg(s.velocity), arg(s.angular), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const BodyState& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.position, (*got.rows)[0]) && same(want.velocity, (*got.rows)[1]) && same(want.angular, (*got.rows)[2]) && same(want.rotation, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const BodyState& s) { return defined(s.position) && defined(s.velocity) && defined(s.angular) && defined(s.rotation); }
-[[maybe_unused]] static std::string text(const BodyState& s) { return std::string("{") + text(s.position) + ", " + text(s.velocity) + ", " + text(s.angular) + ", " + text(s.rotation) + "}"; }
-[[maybe_unused]] static void take(BodyState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Vec3>(s.velocity, (*v.rows)[1]); converted::take_as<Vec3>(s.angular, (*v.rows)[2]); converted::take_as<Quat>(s.rotation, (*v.rows)[3]); }
-[[maybe_unused]] static CarInput draw_CarInput(converted::Draw& draw) {
-  CarInput s{};
-  s.pedal = draw.number();
-  s.steer = draw.number();
-  s.handbrake = draw.flag();
-  s.max_speed = draw.number();
-  s.max_reverse = draw.number();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const CarInput& s) { return converted::Value::structure({arg(s.pedal), arg(s.steer), arg(s.handbrake), arg(s.max_speed), arg(s.max_reverse)}); }
-[[maybe_unused]] static bool same(const CarInput& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.pedal, (*got.rows)[0]) && same(want.steer, (*got.rows)[1]) && same(want.handbrake, (*got.rows)[2]) && same(want.max_speed, (*got.rows)[3]) && same(want.max_reverse, (*got.rows)[4]); }
-[[maybe_unused]] static bool defined(const CarInput& s) { return defined(s.pedal) && defined(s.steer) && defined(s.handbrake) && defined(s.max_speed) && defined(s.max_reverse); }
-[[maybe_unused]] static std::string text(const CarInput& s) { return std::string("{") + text(s.pedal) + ", " + text(s.steer) + ", " + text(s.handbrake) + ", " + text(s.max_speed) + ", " + text(s.max_reverse) + "}"; }
-[[maybe_unused]] static void take(CarInput& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.pedal, (*v.rows)[0]); converted::take_as<double>(s.steer, (*v.rows)[1]); converted::take_as<bool>(s.handbrake, (*v.rows)[2]); converted::take_as<double>(s.max_speed, (*v.rows)[3]); converted::take_as<double>(s.max_reverse, (*v.rows)[4]); }
-[[maybe_unused]] static physics::BodySettings draw_kern__physics__BodySettings(converted::Draw& draw) {
-  physics::BodySettings s{};
-  s.type = static_cast<physics::BodyType>(draw.below(3));
-  s.position = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.linear_velocity = draw.vector();
-  s.angular_velocity = draw.vector();
-  s.linear_damping = draw.number();
-  s.angular_damping = draw.number();
-  s.gravity_scale = draw.number();
-  s.enable_sleep = draw.flag();
-  s.awake = draw.flag();
-  s.enabled = draw.flag();
-  s.bullet = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::BodySettings& s) { return converted::Value::structure({arg(s.type), arg(s.position), arg(s.rotation), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.linear_damping), arg(s.angular_damping), arg(s.gravity_scale), arg(s.enable_sleep), arg(s.awake), arg(s.enabled), arg(s.bullet), arg(converted::shaped<converted::Whole>(s.user))}); }
-[[maybe_unused]] static bool same(const physics::BodySettings& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.type, (*got.rows)[0]) && same(want.position, (*got.rows)[1]) && same(want.rotation, (*got.rows)[2]) && same(want.linear_velocity, (*got.rows)[3]) && same(want.angular_velocity, (*got.rows)[4]) && same(want.linear_damping, (*got.rows)[5]) && same(want.angular_damping, (*got.rows)[6]) && same(want.gravity_scale, (*got.rows)[7]) && same(want.enable_sleep, (*got.rows)[8]) && same(want.awake, (*got.rows)[9]) && same(want.enabled, (*got.rows)[10]) && same(want.bullet, (*got.rows)[11]) && same(converted::shaped<converted::Whole>(want.user), (*got.rows)[12]); }
-[[maybe_unused]] static bool defined(const physics::BodySettings& s) { return defined(s.type) && defined(s.position) && defined(s.rotation) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.linear_damping) && defined(s.angular_damping) && defined(s.gravity_scale) && defined(s.enable_sleep) && defined(s.awake) && defined(s.enabled) && defined(s.bullet) && defined(converted::shaped<converted::Whole>(s.user)); }
-[[maybe_unused]] static std::string text(const physics::BodySettings& s) { return std::string("{") + text(s.type) + ", " + text(s.position) + ", " + text(s.rotation) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.linear_damping) + ", " + text(s.angular_damping) + ", " + text(s.gravity_scale) + ", " + text(s.enable_sleep) + ", " + text(s.awake) + ", " + text(s.enabled) + ", " + text(s.bullet) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
-[[maybe_unused]] static void take(physics::BodySettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<physics::BodyType>(s.type, (*v.rows)[0]); converted::take_as<Vec3>(s.position, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[3]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[4]); converted::take_as<double>(s.linear_damping, (*v.rows)[5]); converted::take_as<double>(s.angular_damping, (*v.rows)[6]); converted::take_as<double>(s.gravity_scale, (*v.rows)[7]); converted::take_as<bool>(s.enable_sleep, (*v.rows)[8]); converted::take_as<bool>(s.awake, (*v.rows)[9]); converted::take_as<bool>(s.enabled, (*v.rows)[10]); converted::take_as<bool>(s.bullet, (*v.rows)[11]); converted::take_as<converted::Whole>(s.user, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeMaterial draw_kern__physics__ShapeMaterial(converted::Draw& draw) {
-  physics::ShapeMaterial s{};
-  s.density = draw.number();
-  s.friction = draw.number();
-  s.restitution = draw.number();
-  s.rolling_resistance = draw.number();
-  s.sensor = draw.flag();
-  s.category_bits = static_cast<u64>(draw.bits());
-  s.mask_bits = static_cast<u64>(draw.bits());
-  s.group_index = static_cast<int>(draw.whole());
-  s.contact_events = draw.flag();
-  s.sensor_events = draw.flag();
-  s.hit_events = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  s.surface = static_cast<physics::Surface>(draw.below(4));
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeMaterial& s) { return converted::Value::structure({arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.sensor), arg(converted::shaped<converted::Whole>(s.category_bits)), arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(s.group_index), arg(s.contact_events), arg(s.sensor_events), arg(s.hit_events), arg(converted::shaped<converted::Whole>(s.user)), arg(s.surface)}); }
-[[maybe_unused]] static bool same(const physics::ShapeMaterial& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.density, (*got.rows)[0]) && same(want.friction, (*got.rows)[1]) && same(want.restitution, (*got.rows)[2]) && same(want.rolling_resistance, (*got.rows)[3]) && same(want.sensor, (*got.rows)[4]) && same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[5]) && same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[6]) && same(want.group_index, (*got.rows)[7]) && same(want.contact_events, (*got.rows)[8]) && same(want.sensor_events, (*got.rows)[9]) && same(want.hit_events, (*got.rows)[10]) && same(converted::shaped<converted::Whole>(want.user), (*got.rows)[11]) && same(want.surface, (*got.rows)[12]); }
-[[maybe_unused]] static bool defined(const physics::ShapeMaterial& s) { return defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.sensor) && defined(converted::shaped<converted::Whole>(s.category_bits)) && defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(s.group_index) && defined(s.contact_events) && defined(s.sensor_events) && defined(s.hit_events) && defined(converted::shaped<converted::Whole>(s.user)) && defined(s.surface); }
-[[maybe_unused]] static std::string text(const physics::ShapeMaterial& s) { return std::string("{") + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.sensor) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + ", " + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(s.group_index) + ", " + text(s.contact_events) + ", " + text(s.sensor_events) + ", " + text(s.hit_events) + ", " + text(converted::shaped<converted::Whole>(s.user)) + ", " + text(s.surface) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeMaterial& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.density, (*v.rows)[0]); converted::take_as<double>(s.friction, (*v.rows)[1]); converted::take_as<double>(s.restitution, (*v.rows)[2]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[3]); converted::take_as<bool>(s.sensor, (*v.rows)[4]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[5]); converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[6]); converted::take_as<int>(s.group_index, (*v.rows)[7]); converted::take_as<bool>(s.contact_events, (*v.rows)[8]); converted::take_as<bool>(s.sensor_events, (*v.rows)[9]); converted::take_as<bool>(s.hit_events, (*v.rows)[10]); converted::take_as<converted::Whole>(s.user, (*v.rows)[11]); converted::take_as<physics::Surface>(s.surface, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeSettings draw_kern__physics__ShapeSettings(converted::Draw& draw) {
-  physics::ShapeSettings s{};
-  s.kind = static_cast<physics::ShapeKind>(draw.below(5));
-  s.center = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.size = draw.vector();
-  s.radius = draw.number();
-  s.length = draw.number();
-  static std::deque<std::vector<Vec3>> kept_points;
-  kept_points.push_back(draw_list(draw, [&]() -> Vec3 { return draw.vector(); }));
-  s.points = {kept_points.back().data(), kept_points.back().size()};
-  static std::deque<std::vector<unsigned int>> kept_indices;
-  kept_indices.push_back(draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }));
-  s.indices = {kept_indices.back().data(), kept_indices.back().size()};
-  s.material = draw_kern__physics__ShapeMaterial(draw);
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeSettings& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(std::vector<Vec3>(s.points.begin(), s.points.end())), arg(std::vector<unsigned int>(s.indices.begin(), s.indices.end())), arg(s.material)}); }
-[[maybe_unused]] static bool same(const physics::ShapeSettings& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.kind, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(want.rotation, (*got.rows)[2]) && same(want.size, (*got.rows)[3]) && same(want.radius, (*got.rows)[4]) && same(want.length, (*got.rows)[5]) && same(std::vector<Vec3>(want.points.begin(), want.points.end()), (*got.rows)[6]) && same(std::vector<unsigned int>(want.indices.begin(), want.indices.end()), (*got.rows)[7]) && same(want.material, (*got.rows)[8]); }
-[[maybe_unused]] static bool defined(const physics::ShapeSettings& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(std::vector<Vec3>(s.points.begin(), s.points.end())) && defined(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) && defined(s.material); }
-[[maybe_unused]] static std::string text(const physics::ShapeSettings& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(std::vector<Vec3>(s.points.begin(), s.points.end())) + ", " + text(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) + ", " + text(s.material) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<physics::ShapeMaterial>(s.material, (*v.rows)[8]); }
-}
-[[maybe_unused]] static physics::Shape draw_kern__physics__Shape(converted::Draw& draw) {
-  physics::Shape s{};
-  s.id = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::Shape& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Shape& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const physics::Shape& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
-[[maybe_unused]] static std::string text(const physics::Shape& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
-[[maybe_unused]] static void take(physics::Shape& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
-}
 [[maybe_unused]] static physics::Pose draw_kern__physics__Pose(converted::Draw& draw) {
   physics::Pose s{};
   s.position = draw.vector();
@@ -865,327 +235,38 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[1]), ".rotation"); }
 [[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
 }
-[[maybe_unused]] static physics::JointSettings draw_kern__physics__JointSettings(converted::Draw& draw) {
-  physics::JointSettings s{};
-  s.type = static_cast<physics::JointType>(draw.below(9));
-  s.body_a = draw_kern__physics__Body(draw);
-  s.body_b = draw_kern__physics__Body(draw);
-  s.frame_a = draw_kern__physics__Pose(draw);
-  s.frame_b = draw_kern__physics__Pose(draw);
-  s.collide_connected = draw.flag();
-  s.enable_spring = draw.flag();
-  s.hertz = draw.number();
-  s.damping_ratio = draw.number();
-  s.enable_limit = draw.flag();
-  s.lower = draw.number();
-  s.upper = draw.number();
-  s.enable_motor = draw.flag();
-  s.motor_speed = draw.number();
-  s.max_motor_torque = draw.number();
-  s.max_motor_force = draw.number();
-  s.motor_velocity = draw.vector();
-  s.length = draw.number();
-  s.linear_hertz = draw.number();
-  s.angular_hertz = draw.number();
-  s.linear_damping_ratio = draw.number();
-  s.angular_damping_ratio = draw.number();
-  s.linear_velocity = draw.vector();
-  s.angular_velocity = draw.vector();
-  s.max_velocity_force = draw.number();
-  s.max_velocity_torque = draw.number();
-  s.max_spring_force = draw.number();
-  s.max_spring_torque = draw.number();
-  s.enable_steering = draw.flag();
-  s.enable_steering_limit = draw.flag();
-  s.steering_hertz = draw.number();
-  s.steering_damping_ratio = draw.number();
-  s.target_steering = draw.number();
-  s.max_steering_torque = draw.number();
-  s.steering_lower = draw.number();
-  s.steering_upper = draw.number();
-  s.max_torque = draw.number();
-  s.constraint_hertz = draw.number();
-  s.constraint_damping_ratio = draw.number();
-  s.user = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::JointSettings& s) { return converted::Value::structure({arg(s.type), arg(s.body_a), arg(s.body_b), arg(s.frame_a), arg(s.frame_b), arg(s.collide_connected), arg(s.enable_spring), arg(s.hertz), arg(s.damping_ratio), arg(s.enable_limit), arg(s.lower), arg(s.upper), arg(s.enable_motor), arg(s.motor_speed), arg(s.max_motor_torque), arg(s.max_motor_force), arg(s.motor_velocity), arg(s.length), arg(s.linear_hertz), arg(s.angular_hertz), arg(s.linear_damping_ratio), arg(s.angular_damping_ratio), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.max_velocity_force), arg(s.max_velocity_torque), arg(s.max_spring_force), arg(s.max_spring_torque), arg(s.enable_steering), arg(s.enable_steering_limit), arg(s.steering_hertz), arg(s.steering_damping_ratio), arg(s.target_steering), arg(s.max_steering_torque), arg(s.steering_lower), arg(s.steering_upper), arg(s.max_torque), arg(s.constraint_hertz), arg(s.constraint_damping_ratio), arg(converted::shaped<converted::Whole>(s.user))}); }
-[[maybe_unused]] static bool same(const physics::JointSettings& want, const converted::Value& got) { return got.rows && got.rows->size() == 40 && same(want.type, (*got.rows)[0]) && same(want.body_a, (*got.rows)[1]) && same(want.body_b, (*got.rows)[2]) && same(want.frame_a, (*got.rows)[3]) && same(want.frame_b, (*got.rows)[4]) && same(want.collide_connected, (*got.rows)[5]) && same(want.enable_spring, (*got.rows)[6]) && same(want.hertz, (*got.rows)[7]) && same(want.damping_ratio, (*got.rows)[8]) && same(want.enable_limit, (*got.rows)[9]) && same(want.lower, (*got.rows)[10]) && same(want.upper, (*got.rows)[11]) && same(want.enable_motor, (*got.rows)[12]) && same(want.motor_speed, (*got.rows)[13]) && same(want.max_motor_torque, (*got.rows)[14]) && same(want.max_motor_force, (*got.rows)[15]) && same(want.motor_velocity, (*got.rows)[16]) && same(want.length, (*got.rows)[17]) && same(want.linear_hertz, (*got.rows)[18]) && same(want.angular_hertz, (*got.rows)[19]) && same(want.linear_damping_ratio, (*got.rows)[20]) && same(want.angular_damping_ratio, (*got.rows)[21]) && same(want.linear_velocity, (*got.rows)[22]) && same(want.angular_velocity, (*got.rows)[23]) && same(want.max_velocity_force, (*got.rows)[24]) && same(want.max_velocity_torque, (*got.rows)[25]) && same(want.max_spring_force, (*got.rows)[26]) && same(want.max_spring_torque, (*got.rows)[27]) && same(want.enable_steering, (*got.rows)[28]) && same(want.enable_steering_limit, (*got.rows)[29]) && same(want.steering_hertz, (*got.rows)[30]) && same(want.steering_damping_ratio, (*got.rows)[31]) && same(want.target_steering, (*got.rows)[32]) && same(want.max_steering_torque, (*got.rows)[33]) && same(want.steering_lower, (*got.rows)[34]) && same(want.steering_upper, (*got.rows)[35]) && same(want.max_torque, (*got.rows)[36]) && same(want.constraint_hertz, (*got.rows)[37]) && same(want.constraint_damping_ratio, (*got.rows)[38]) && same(converted::shaped<converted::Whole>(want.user), (*got.rows)[39]); }
-[[maybe_unused]] static bool defined(const physics::JointSettings& s) { return defined(s.type) && defined(s.body_a) && defined(s.body_b) && defined(s.frame_a) && defined(s.frame_b) && defined(s.collide_connected) && defined(s.enable_spring) && defined(s.hertz) && defined(s.damping_ratio) && defined(s.enable_limit) && defined(s.lower) && defined(s.upper) && defined(s.enable_motor) && defined(s.motor_speed) && defined(s.max_motor_torque) && defined(s.max_motor_force) && defined(s.motor_velocity) && defined(s.length) && defined(s.linear_hertz) && defined(s.angular_hertz) && defined(s.linear_damping_ratio) && defined(s.angular_damping_ratio) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.max_velocity_force) && defined(s.max_velocity_torque) && defined(s.max_spring_force) && defined(s.max_spring_torque) && defined(s.enable_steering) && defined(s.enable_steering_limit) && defined(s.steering_hertz) && defined(s.steering_damping_ratio) && defined(s.target_steering) && defined(s.max_steering_torque) && defined(s.steering_lower) && defined(s.steering_upper) && defined(s.max_torque) && defined(s.constraint_hertz) && defined(s.constraint_damping_ratio) && defined(converted::shaped<converted::Whole>(s.user)); }
-[[maybe_unused]] static std::string text(const physics::JointSettings& s) { return std::string("{") + text(s.type) + ", " + text(s.body_a) + ", " + text(s.body_b) + ", " + text(s.frame_a) + ", " + text(s.frame_b) + ", " + text(s.collide_connected) + ", " + text(s.enable_spring) + ", " + text(s.hertz) + ", " + text(s.damping_ratio) + ", " + text(s.enable_limit) + ", " + text(s.lower) + ", " + text(s.upper) + ", " + text(s.enable_motor) + ", " + text(s.motor_speed) + ", " + text(s.max_motor_torque) + ", " + text(s.max_motor_force) + ", " + text(s.motor_velocity) + ", " + text(s.length) + ", " + text(s.linear_hertz) + ", " + text(s.angular_hertz) + ", " + text(s.linear_damping_ratio) + ", " + text(s.angular_damping_ratio) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.max_velocity_force) + ", " + text(s.max_velocity_torque) + ", " + text(s.max_spring_force) + ", " + text(s.max_spring_torque) + ", " + text(s.enable_steering) + ", " + text(s.enable_steering_limit) + ", " + text(s.steering_hertz) + ", " + text(s.steering_damping_ratio) + ", " + text(s.target_steering) + ", " + text(s.max_steering_torque) + ", " + text(s.steering_lower) + ", " + text(s.steering_upper) + ", " + text(s.max_torque) + ", " + text(s.constraint_hertz) + ", " + text(s.constraint_damping_ratio) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
-[[maybe_unused]] static void take(physics::JointSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 40) return; converted::take_as<physics::JointType>(s.type, (*v.rows)[0]); converted::take_as<physics::Body>(s.body_a, (*v.rows)[1]); converted::take_as<physics::Body>(s.body_b, (*v.rows)[2]); converted::take_as<physics::Pose>(s.frame_a, (*v.rows)[3]); converted::take_as<physics::Pose>(s.frame_b, (*v.rows)[4]); converted::take_as<bool>(s.collide_connected, (*v.rows)[5]); converted::take_as<bool>(s.enable_spring, (*v.rows)[6]); converted::take_as<double>(s.hertz, (*v.rows)[7]); converted::take_as<double>(s.damping_ratio, (*v.rows)[8]); converted::take_as<bool>(s.enable_limit, (*v.rows)[9]); converted::take_as<double>(s.lower, (*v.rows)[10]); converted::take_as<double>(s.upper, (*v.rows)[11]); converted::take_as<bool>(s.enable_motor, (*v.rows)[12]); converted::take_as<double>(s.motor_speed, (*v.rows)[13]); converted::take_as<double>(s.max_motor_torque, (*v.rows)[14]); converted::take_as<double>(s.max_motor_force, (*v.rows)[15]); converted::take_as<Vec3>(s.motor_velocity, (*v.rows)[16]); converted::take_as<double>(s.length, (*v.rows)[17]); converted::take_as<double>(s.linear_hertz, (*v.rows)[18]); converted::take_as<double>(s.angular_hertz, (*v.rows)[19]); converted::take_as<double>(s.linear_damping_ratio, (*v.rows)[20]); converted::take_as<double>(s.angular_damping_ratio, (*v.rows)[21]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[22]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[23]); converted::take_as<double>(s.max_velocity_force, (*v.rows)[24]); converted::take_as<double>(s.max_velocity_torque, (*v.rows)[25]); converted::take_as<double>(s.max_spring_force, (*v.rows)[26]); converted::take_as<double>(s.max_spring_torque, (*v.rows)[27]); converted::take_as<bool>(s.enable_steering, (*v.rows)[28]); converted::take_as<bool>(s.enable_steering_limit, (*v.rows)[29]); converted::take_as<double>(s.steering_hertz, (*v.rows)[30]); converted::take_as<double>(s.steering_damping_ratio, (*v.rows)[31]); converted::take_as<double>(s.target_steering, (*v.rows)[32]); converted::take_as<double>(s.max_steering_torque, (*v.rows)[33]); converted::take_as<double>(s.steering_lower, (*v.rows)[34]); converted::take_as<double>(s.steering_upper, (*v.rows)[35]); converted::take_as<double>(s.max_torque, (*v.rows)[36]); converted::take_as<double>(s.constraint_hertz, (*v.rows)[37]); converted::take_as<double>(s.constraint_damping_ratio, (*v.rows)[38]); converted::take_as<converted::Whole>(s.user, (*v.rows)[39]); }
-}
-inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
-inline physics::Body World::create_body(const physics::BodySettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_body", {converted::value_of(*this), converted::value_of(settings)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
-inline physics::Shape World::create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_shape", {converted::value_of(*this), converted::value_of(body), converted::value_of(settings)}); physics::Shape kern_result = converted::quiet<physics::Shape>(); converted::take_as<physics::Shape>(kern_result, kern_out[0]); return kern_result; }
-inline physics::Joint World::create_joint(const physics::JointSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_joint", {converted::value_of(*this), converted::value_of(settings)}); physics::Joint kern_result = converted::quiet<physics::Joint>(); converted::take_as<physics::Joint>(kern_result, kern_out[0]); return kern_result; }
-inline void World::set_pose(const physics::Body& body, const physics::Pose& pose) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_pose", {converted::value_of(*this), converted::value_of(body), converted::value_of(pose)}); }
-inline void World::set_linear_velocity(const physics::Body& body, const Vec3& v) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_linear_velocity", {converted::value_of(*this), converted::value_of(body), converted::value_of(v)}); }
-inline void World::set_angular_velocity(const physics::Body& body, const Vec3& w) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_angular_velocity", {converted::value_of(*this), converted::value_of(body), converted::value_of(w)}); }
-inline void World::set_awake(const physics::Body& body, const bool& awake) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_awake", {converted::value_of(*this), converted::value_of(body), converted::value_of(awake)}); }
-inline physics::BodyType World::body_type(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_type", {converted::value_of(*this), converted::value_of(body)}); physics::BodyType kern_result = converted::quiet<physics::BodyType>(); converted::take_as<physics::BodyType>(kern_result, kern_out[0]); return kern_result; }
-inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::apply_force_to_center(const physics::Body& body, const Vec3& force) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_force_to_center", {converted::value_of(*this), converted::value_of(body), converted::value_of(force)}); }
+inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::apply_force(const physics::Body& body, const Vec3& force, const Vec3& point) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_force", {converted::value_of(*this), converted::value_of(body), converted::value_of(force), converted::value_of(point)}); }
 inline physics::Pose World::pose(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.pose", {converted::value_of(*this), converted::value_of(body)}); physics::Pose kern_result = converted::quiet<physics::Pose>(); converted::take_as<physics::Pose>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::linear_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.linear_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::angular_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.angular_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
-struct Out_Car_ensure_rig { Car Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_Car_ensure_rig& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Out_Car_ensure_rig& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_Car_ensure_rig& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_car_cpp) {
   converted::Blueprint bp("car_cpp");
-  {  // steer_torque_at
-    converted::Tally tally("steer_torque_at");
+  {  // tyre
+    converted::Tally tally("tyre");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CarSpec a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_car_cpp::steer_torque_at(a0, std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] std::array<double, 2>& a3) { converted::counted([&] { return converted_car_cpp::tyre(std::move(a0), std::move(a1), std::move(a2), a3); }); return std::move(a3); };
     for (int i = 0; tally.more(i); ++i) {
-      CarSpec a0 = draw_CarSpec(draw);
-      double a1 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // CarSpec::bus
-    converted::Tally tally("CarSpec_bus");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return CarSpec::bus(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Car::rigid_spec
-    converted::Tally tally("Car_rigid_spec");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CarSpec a0) { return converted::counted([&] { return Car::rigid_spec(a0); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      CarSpec a0 = draw_CarSpec(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Car::reset
-    converted::Tally tally("Car_reset");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { converted::counted([&] { return a0.reset(); }); return a0; };
-    for (int i = 0; tally.more(i); ++i) {
-      Car a0 = draw_Car(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Car::wheel_speed
-    converted::Tally tally("Car_wheel_speed");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { return converted::counted([&] { return a0.wheel_speed(); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      Car a0 = draw_Car(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // suspension_tuning
-    converted::Tally tally("suspension_tuning");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CarSpec a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_car_cpp::suspension_tuning(a0, std::move(a1), std::move(a2)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      CarSpec a0 = draw_CarSpec(draw);
+      double a0 = draw.number();
       double a1 = draw.number();
       double a2 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      std::array<double, 2> a3 = converted::draw_array<std::array<double, 2>>([&]() -> double { return draw.number(); });
+      const std::vector<converted::Value> given = {arg(a3), arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Car::detach
-    converted::Tally tally("Car_detach");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0) { converted::counted([&] { return a0.detach(); }); return a0; };
-    for (int i = 0; tally.more(i); ++i) {
-      Car a0 = draw_Car(draw);
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Car::attach
-    converted::Tally tally("Car_attach");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] World& a1, [[maybe_unused]] physics::Body a2) { converted::counted([&] { return a0.attach(a1, std::move(a2)); }); return a0; };
-    for (int i = 0; tally.more(i); ++i) {
-      Car a0 = draw_Car(draw);
-      World& a1 = *converted::engine_object<World>(1 + draw.below(6));
-      physics::Body a2 = draw_kern__physics__Body(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1, std::move(a2));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Car::place
-    converted::Tally tally("Car_place");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] World& a1, [[maybe_unused]] BodyState a2) { converted::counted([&] { return a0.place(a1, a2); }); return a0; };
-    for (int i = 0; tally.more(i); ++i) {
-      Car a0 = draw_Car(draw);
-      World& a1 = *converted::engine_object<World>(1 + draw.below(6));
-      BodyState a2 = draw_BodyState(draw);
-      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1, std::move(a2));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // Car::ensure_rig
-    converted::Tally tally("Car_ensure_rig");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] World& a1, [[maybe_unused]] physics::Body a2, [[maybe_unused]] double a3) { auto r = converted::counted([&] { return a0.ensure_rig(a1, std::move(a2), std::move(a3)); }); return Out_Car_ensure_rig{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      Car a0 = draw_Car(draw);
-      World& a1 = *converted::engine_object<World>(1 + draw.below(6));
-      physics::Body a2 = draw_kern__physics__Body(draw);
-      double a3 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1, std::move(a2), std::move(a3));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
-    }
-  }
-  {  // Car::push
-    converted::Tally tally("Car_push");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Car a0, [[maybe_unused]] World& a1, [[maybe_unused]] physics::Body a2, [[maybe_unused]] Quat a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec3 a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] int a7) { converted::counted([&] { return a0.push(a1, std::move(a2), a3, std::move(a4), std::move(a5), std::move(a6), std::move(a7)); }); return a0; };
-    for (int i = 0; tally.more(i); ++i) {
-      Car a0 = draw_Car(draw);
-      World& a1 = *converted::engine_object<World>(1 + draw.below(6));
-      physics::Body a2 = draw_kern__physics__Body(draw);
-      Quat a3 = draw_kern__Quat(draw);
-      Vec3 a4 = draw.vector();
-      Vec3 a5 = draw.vector();
-      Vec3 a6 = draw.vector();
-      int a7 = static_cast<int>(draw.whole());
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2), arg(a4), arg(a5), arg(a6), arg(a7)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // ai_drive
-    converted::Tally tally("ai_drive");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4) { return converted::counted([&] { return converted_car_cpp::ai_drive(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      Vec3 a0 = draw.vector();
-      Vec3 a1 = draw.vector();
-      double a2 = draw.number();
-      Vec3 a3 = draw.vector();
-      double a4 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
