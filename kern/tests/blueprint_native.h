@@ -232,8 +232,8 @@ struct Workshop : virtual kern::Library, virtual Parts {
   struct : kern::Node<20> { Int index = 0; } n20;
 };
 )kn";
-// Callbacks: a function of a library as a value only the engine calls (Make Callback) - bound to a variable, to an entry of a
-// list, or to nothing; the place is read where it stands when the value is called (native_show calls it, as the engine would).
+// Callbacks: a function of a library as a value only the engine calls (Make Callback) - bound to a variable, to a field in
+// one, or to nothing; the place is read where it stands when the value is called (native_show calls it, as the engine would).
 inline const char* kGround = R"kn(
 struct Ground : virtual kern::Library {
   KERN_STRUCT(Field) {
@@ -254,23 +254,28 @@ struct Ground : virtual kern::Library {
 )kn";
 inline const char* kSite = R"kn(
 struct Site : virtual kern::Blueprint, virtual Ground {
+  KERN_STRUCT(Twin) {
+    Field First = Field{1.0, 1.0};
+    Field Second = Field{3.0, -1.0};
+  };
+
   Field Here = Field{2.0, 0.5};
-  List<Field> Fields = List<Field>{Field{1.0, 1.0}, Field{3.0, -1.0}};
+  Twin Pair = Twin{Field{1.0, 1.0}, Field{3.0, -1.0}};
   Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
   Callback<Float(Float, Float)> Other = Callback<Float(Float, Float)>{};
 
   struct MakeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; Callback<Bool(Float)> up = Callback<Bool(Float)>{}; };
-  /// Callbacks bound to a variable and to an entry of a list; one without a place.
+  /// Callbacks bound to a variable and to a field in one; one without a place.
   MakeResult Make(Float base = 0.0) {
     Here.Base = base;
     Kept = callback<&Ground::height>(Here);
-    Other = callback<&Ground::height>(Fields[1]);
+    Other = callback<&Ground::height>(Pair.Second);
     return {callback<&Ground::height>(Here), callback<&Ground::high>()};
   }
   /// The places change: what the engine reads when it calls.
   void Again() {
     Here.Slope = 3.0;
-    Fields[1].Base = 7.0;
+    Pair.Second.Base = 7.0;
   }
 };
 )kn";

@@ -5612,6 +5612,7 @@ TEST(logic_callbacks) {
   };
   CHECK(says(read("Bad1", "struct Bad1 : virtual kern::Blueprint, virtual Ground {\n  Callback<Float(Float)> K = Callback<Float(Float)>{};\n\n  void Make() {\n    K = callback<&Ground::loud>(Here);\n  }\n};\n"), "Here"));
   CHECK(says(read("Bad2", "struct Bad2 : virtual kern::Library {\n  struct loudResult { Float h = 0.0; };\n  loudResult loud(Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad2::loud>()};\n  }\n};\n"), "needs the world"));
+  CHECK(says(read("Bad4", "struct Bad4 : virtual kern::Blueprint, virtual Ground {\n  List<Field> Fields = List<Field>{Field{1.0, 0.5}};\n  Callback<Float(Float, Float)> K = Callback<Float(Float, Float)>{};\n\n  void Make() {\n    K = callback<&Ground::height>(Fields[0]);\n  }\n};\n"), "an entry of a list"));
   CHECK(says(read("Bad3", "struct Bad3 : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct fResult { Float r = 0.0; };\n  KERN_PURE fResult f(Float x = 0.0) {\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad3::f>()};\n  }\n};\n"), "a Callback names a function of a library"));
 }
 

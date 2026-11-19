@@ -2232,6 +2232,31 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
           err(n.id, what + ": the engine hands a Callback Bools, Ints, Floats, Vectors and Int64s - \"" + f->inputs[k].name + "\" is " + type_text(declared(f->inputs[k])));
       if (const std::string why = needs(f->name, 0); !why.empty())
         err(n.id, what + ": the function needs the world (" + why + ") - a Callback only computes from its inputs and its place");
+      // (the place stays where it is: no entry of a list that may grow or of a map on its way - in C++ a pointer to it
+      // would point elsewhere then; one of a list of a fixed length stays)
+      if (!f->inputs.empty() && f->inputs[0].ref) {
+        const std::string prefix = ref_key(f->inputs[0].name, "");
+        Variable root;
+        std::vector<std::string> steps;
+        if (g.root_of(n, root, prefix) != Graph::Root::none && path_steps(n.param(prefix + "path"), steps)) {
+          TypeRef at{root.type, root.of, root.count};
+          for (const std::string& step : steps) {
+            if (step.empty()) {
+              if (at.type == PinType::map || !at.count) {
+                err(n.id, what + ": the place it binds is an entry of " + (at.type == PinType::map ? std::string("a map") : std::string("a list")) +
+                              " - it moves when that grows; a Callback binds a place that stays (a variable, a field, an entry of a list of a fixed length)");
+                break;
+              }
+              at = TypeRef{element_of(at.type), at.of};
+              continue;
+            }
+            const StructType* st = at.type == PinType::structure ? g.structure(at.of) : nullptr;
+            const int k = st ? st->field(step) : -1;
+            if (k < 0) break;
+            at = st->fields[static_cast<std::size_t>(k)].type;
+          }
+        }
+      }
     }
   }
   auto find_pin = [&](u32 node, const std::string& id, bool input) -> const PinDef* {
