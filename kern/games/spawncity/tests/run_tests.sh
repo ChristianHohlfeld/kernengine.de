@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Builds and runs SpawnCity's native unit tests (host compiler, no GL, sanitizers on).
-#   kern/games/spawncity/tests/run_tests.sh [name-filter]
+#   kern/games/spawncity/tests/run_tests.sh [name-filter | --name <whole name>...]
 # CXX / CC override the compilers (default c++ / cc). Objects are cached in
 # $SC_TEST_OUT (default $TMPDIR/spawncity-tests); Kern itself is not modified.
 # SC_TEST_RELEASE=1 builds them as the game is built (-O2, no sanitizers; objects in
@@ -76,6 +76,8 @@ cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
 # (every test runs, whatever an earlier one gave - see test_main.cpp; the run's result is that of all of it)
+# Up to KERN_JOBS tests at once (SC_TEST_JOBS: each in its own process, its lines as one piece in the order of the tests).
+export SC_TEST_JOBS="${SC_TEST_JOBS:-${KERN_JOBS:-$(nproc)}}"
 rc=0
 "$out/spawncity_tests" "$@" || rc=1
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
