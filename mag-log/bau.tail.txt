@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45212:10: warning: variable 'set_property_flag' set but not used [-Wunused-but-set-variable]
+ 45212 |     Bool set_property_flag = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45213:10: warning: variable 'set_property_number_3' set but not used [-Wunused-but-set-variable]
+ 45213 |     Bool set_property_number_3 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45214:10: warning: variable 'set_property_number_4' set but not used [-Wunused-but-set-variable]
+ 45214 |     Bool set_property_number_4 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45216:10: warning: variable 'set_property_number_5' set but not used [-Wunused-but-set-variable]
+ 45216 |     Bool set_property_number_5 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45217:10: warning: variable 'set_property_text_2' set but not used [-Wunused-but-set-variable]
+ 45217 |     Bool set_property_text_2 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45218:10: warning: variable 'set_property_number_6' set but not used [-Wunused-but-set-variable]
+ 45218 |     Bool set_property_number_6 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45219:10: warning: variable 'set_property_number_7' set but not used [-Wunused-but-set-variable]
+ 45219 |     Bool set_property_number_7 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45220:10: warning: variable 'set_property_number_8' set but not used [-Wunused-but-set-variable]
+ 45220 |     Bool set_property_number_8 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45221:10: warning: variable 'set_property_number_9' set but not used [-Wunused-but-set-variable]
+ 45221 |     Bool set_property_number_9 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45222:10: warning: variable 'set_property_number_10' set but not used [-Wunused-but-set-variable]
+ 45222 |     Bool set_property_number_10 = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45306:10: warning: unused variable 'xr' [-Wunused-variable]
+ 45306 |     Bool xr = false;
+       |          ^~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45307:10: warning: unused variable 'xr_2' [-Wunused-variable]
+ 45307 |     Bool xr_2 = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45308:10: warning: unused variable 'both' [-Wunused-variable]
+ 45308 |     Bool both = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/src/level_blueprints.cpp:45309:10: warning: unused variable 'xr_3' [-Wunused-variable]
+ 45309 |     Bool xr_3 = false;
+       |          ^~~~
+1 warning generated.
+1 warning generated.
+1 warning generated.
+51 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/converted/test_game_gaps_cpp.cpp:637:21: warning: unused variable 'draw' [-Wunused-variable]
+  637 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/converted/test_game_look_cpp.cpp:632:21: warning: unused variable 'draw' [-Wunused-variable]
+  632 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-154229-25045/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	20m28,193s
+user	261m59,000s
+sys	2m43,564s
