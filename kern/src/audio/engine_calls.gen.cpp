@@ -207,7 +207,7 @@ bool c14(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
   self->stop(std::move(a0), std::move(a1));
@@ -231,7 +231,7 @@ bool c16(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   decltype(auto) r = self->playing(std::move(a0));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -242,7 +242,7 @@ bool c17(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<float>>();
@@ -256,7 +256,7 @@ bool c18(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
   self->set_pitch(std::move(a0), std::move(a1));
@@ -268,7 +268,7 @@ bool c19(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<float>>();
   ev::take<ev::Float>(o, in, 2, a1);
   self->set_pan(std::move(a0), std::move(a1));
@@ -280,7 +280,7 @@ bool c20(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
   ev::take<ev::Vector>(o, in, 2, a1);
   auto a2 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -294,7 +294,7 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<bool>>();
   ev::take<ev::Bool>(o, in, 2, a1);
   self->set_paused(std::move(a0), std::move(a1));
@@ -316,7 +316,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::u64>>();
-  ev::take<ev::Int>(o, in, 1, a0);
+  ev::take<ev::Int64>(o, in, 1, a0);
   decltype(auto) r = self->position_of(std::move(a0));
   ev::give<ev::Float>(o, out, 0, r);
   return true;

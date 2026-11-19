@@ -1139,11 +1139,12 @@ struct Writer {
     const Info& X = at(x);
     const PinDef& p = X.in[static_cast<std::size_t>(k)];
     const json::Value* typed = X.node->value(p.id);
-    return literal(Value::from_json(typed ? *typed : p.def, p.type, s.g, p.of), p.of, s.g);
+    // (a value for a list of a fixed length is written with its type - Fixed<Float, 3>{...}, as for a place)
+    return literal(Value::from_json(typed ? *typed : p.def, p.type, s.g, p.of), TypeRef{p.type, p.of, p.count}, s.g);
   }
 
   /// What input `k` of `x` is given, as an expression standing in the body `c`.
-  std::string value(int x, int k, int c) {
+  std::string value(int x, int k, int c, bool convert = true) {
     const auto [from, o] = at(x).src[static_cast<std::size_t>(k)];
     if (from < 0) return literal_of(x, k);
     const PinDef pin = at(from).out[static_cast<std::size_t>(o)];
@@ -1159,7 +1160,17 @@ struct Writer {
       e = "n" + id(from) + "." + pin.id;
     }
     const PinType want = at(x).in[static_cast<std::size_t>(k)].type;
-    return pin.type == want ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
+    return pin.type == want || !convert ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
+  }
+  /// Is the formula `x` written as a formula of whole numbers - [](Int a) -> Int (Formula::whole,
+  /// and every input a wire from an Int)?
+  bool whole_formula(int x, const Formula& f) {
+    if (!f.whole()) return false;
+    for (int k : at(x).data_in) {
+      const auto [from, o] = at(x).src[static_cast<std::size_t>(k)];
+      if (from < 0 || at(from).out[static_cast<std::size_t>(o)].type != PinType::integer) return false;
+    }
+    return true;
   }
 
   /// The place a node names, as C++ writes it: its variable and from there its path - a field
@@ -1378,6 +1389,27 @@ struct Writer {
     }
     return reads == 1 && !needed_after(entry, name)[static_cast<std::size_t>(x)];
   }
+  /// Does the value `x` (a node that takes its first input over: NodeDef::takes_first) take over
+  /// the variable its first input reads? Where the one step that reads `x` sets that same
+  /// variable, as a whole, to what `x` gives - `O = text_append(std::move(O), x, "")`: nothing
+  /// reads the old value after `x` has it (the step sets it anew at once; what `x`'s other inputs
+  /// read is read before - and an input that is O itself is O as it was, text_append sees to it).
+  bool taken_first(int x, int k) {
+    const Info& X = at(x);
+    if (!X.def->takes_first || X.named || X.data_in.empty() || X.data_in[0] != k) return false;
+    const int got = X.src[static_cast<std::size_t>(k)].first;
+    if (got < 0 || at(got).named || at(got).def->type != "var.get" || !at(got).node->param("path").empty()) return false;
+    int reader = -1, readers = 0, got_readers = 0;
+    for (int i = 0; i < static_cast<int>(s.n.size()); ++i)
+      for (const auto& from : at(i).src) {
+        if (from.first == x) reader = i, ++readers;
+        if (from.first == got) ++got_readers;
+      }
+    if (readers != 1 || got_readers != 1) return false;
+    const Info& Y = at(reader);
+    return !Y.pure && Y.def->type == "var.set" && Y.node->param("path").empty() && Y.node->param("variable") == at(got).node->param("variable") &&
+           Y.node->param("scope") == at(got).node->param("scope");
+  }
   /// Is what the input `k` of the step `x` reads needed by nothing once `x` has it? Then the text
   /// hands it over - std::move(Points), as C++ writes it (the graph has nothing to say for it:
   /// the wire is the same wire):
@@ -1389,7 +1421,8 @@ struct Writer {
   /// nothing over.
   bool hands_over(int x, int k) {
     const Info& X = at(x);
-    if (X.pure || X.event || X.form == Form::loop_while) return false;
+    if (X.pure) return taken_first(x, k);
+    if (X.event || X.form == Form::loop_while) return false;
     return last_use(x, k) || from_step_before(x, k);
   }
   /// What input `k` of the step `x` is given: its value, handed over where `hands_over` says so.
@@ -1444,10 +1477,15 @@ struct Writer {
     if (t == "math.formula") {
       const std::string text = at(x).node->param("formula", "a + b");
       const Formula& f = Formula::cached(text);
+      // (a formula of whole numbers whose inputs are Ints: Int in, Int out - the same value, docs/blueprint_cpp.md "Formeln")
+      const bool whole = whole_formula(x, f);
+      const std::string type = whole ? "Int " : "Float ";
       std::string lambda = "[](";
-      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += (i ? ", Float " : "Float ") + f.inputs()[i];
-      lambda += ") -> Float { return " + f.cpp() + "; }";
-      const std::string args = inputs(x, c, {lambda});
+      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += (i ? ", " : "") + type + f.inputs()[i];
+      lambda += ") -> " + type + "{ return " + f.cpp() + "; }";
+      if (!whole) return "kern::formula(" + inputs(x, c, {lambda}) + ")";
+      std::string args = lambda;
+      for (int k : at(x).data_in) args += ", " + value(x, k, c, false);
       return "kern::formula(" + args + ")";
     }
     std::vector<std::string> head;
@@ -1986,11 +2024,13 @@ struct Reader {
     bool cast = false;
     PinType to = PinType::number;
     std::string of;     // a value written out: of which enum (when it is an enum's)
+    u32 count = 0;      // a value written out: a list of a fixed length (Fixed<T, N>{...}), N
     std::size_t tok = 0;
     bool root = false;  // the expression is one new value node (what a name can be given to)
     std::size_t moved = 0;  // std::move(value): the token it stands at, plus one
   };
   struct DataWire { int to; std::string in; Src from; };
+  std::vector<int> whole_formulas;  // (the formulas read as formulas of whole numbers: their inputs are Ints, as they are)
   struct ExecWire { int from; std::string out; int to; u32 to_id; std::string in; std::size_t tok; };
   /// An exec output that waits for its wire. node < 0 (kGone): a path that has ended in the graph
   /// where C++ would go on with the next statement (after a wait, a Sequence, go<id>()).
@@ -2355,7 +2395,8 @@ struct Reader {
       }
       v = list.type == PinType::structure_list ? Value::structures(std::move(structs)) : Value::from_json(items, list.type);
       if (list.count && !count) {
-        // (a value on its way through a pin is a list: only a place is declared with a length)
+        // (a value on its way through a pin is a list: only a place is declared with a length - and an
+        // input whose type has one, Reader::bind)
         fail(at, "a list of a fixed length is what a place is declared as - a value written out is " + cpp_type(TypeRef{list.type, list.of}) + "{...}");
         return true;
       }
@@ -3191,6 +3232,12 @@ struct Reader {
     if (src.cast) return fail(src.tok, "a value written out needs no kern::to: write the " + cpp_type(want) + " itself");
     Value v = src.value;
     if (v.type == PinType::integer && pin.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
+    // (a list of a fixed length says its length: the input's - Fixed<fc_PT1, 3>{...} for a field of three)
+    if (src.count && !pin.count)
+      return fail(src.tok, "a list of a fixed length is what a place is declared as - a value written out is " + cpp_type(TypeRef{v.type, src.of}) + "{...}");
+    if (src.count && src.count != pin.count)
+      return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(TypeRef{pin.type, pin.of, pin.count}) + ", this is " +
+                               cpp_type(TypeRef{v.type, src.of, src.count}));
     if (v.type != pin.type || src.of != pin.of)
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
@@ -3276,7 +3323,7 @@ struct Reader {
     s.tok = p;
     if (failed()) return s;
     Value v;
-    if (literal_here(v, &s.of)) {
+    if (literal_here(v, &s.of, &s.count)) {
       s.literal = true;
       s.value = v;
       return s;
@@ -3422,13 +3469,18 @@ struct Reader {
     s.tok = tok;
     std::vector<std::string> names;
     if (!expect("(") || !expect("[") || !expect("]") || !expect("(")) return s;
+    // (Float inputs and a Float - or, a formula of whole numbers, Int inputs and an Int: Formula::whole)
+    const bool whole = is("Int");
+    const char* type = whole ? "Int" : "Float";
     while (!is(")")) {
       std::string nm;
-      if (!expect("Float", "(a formula's inputs are Float)") || !word(nm, "the input's name")) return s;
+      if (!expect(type, whole ? "(the inputs of a formula of whole numbers are Int, every one)" : "(a formula's inputs are Float)") || !word(nm, "the input's name")) return s;
       names.push_back(nm);
       if (!accept(",")) break;
     }
-    if (!expect(")") || !expect("->") || !expect("Float") || !expect("{") || !expect("return")) return s;
+    if (!expect(")") || !expect("->") || !expect(type, whole ? "(a formula with Int inputs gives an Int)" : "(a formula with Float inputs gives a Float)") || !expect("{") ||
+        !expect("return"))
+      return s;
     const std::size_t from = peek().begin;
     int depth = 0;
     while (peek().kind != Tok::end && !(depth == 0 && (is(";") || is("}")))) {
@@ -3448,12 +3500,26 @@ struct Reader {
       fail(tok, "the formula reads (" + want + "): the lambda's parameters are exactly these, in this order");
       return s;
     }
+    if (whole && !f.whole()) {
+      fail(body_tok, "Int inputs and an Int are a formula of whole numbers: one whose value is a whole number by band, bor, bxor, shl, shr, wrap32, wrap32s or mul32 "
+                     "and that reads each input only as an argument of one of them or through +, - and * between them - this one is a formula of Floats: [](Float ...) -> Float");
+      return s;
+    }
     const int node = make("math.formula", tok, {{"formula", f.text()}});
     if (node < 0) return s;
     Args a{*this};
     a.first = false;  // (the lambda was the first argument)
+    const std::size_t wires_before = data_wires.size();
     if (!args_of(node, a, "this formula")) return s;
     if (!expect(")", "(one value per input of the formula)")) return s;
+    if (whole) {
+      // (every input a wire from an Int - what the graph has where the text says Int)
+      // (count the wires into this formula only: an argument may make wires of its own - p[kern::to<Int>(...)])
+      std::size_t into = 0;
+      for (std::size_t w = wires_before; w < data_wires.size(); ++w) into += data_wires[w].to == node;
+      if (into != names.size()) { fail(tok, "every input of a formula of whole numbers is an Int that is read (no number written out)"); return s; }
+      whole_formulas.push_back(node);
+    }
     s.node = node;
     s.root = true;
     return s;
@@ -4440,6 +4506,13 @@ struct Reader {
       if (!in) continue;
       const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
       const std::string need = cpp_type(to_type), have = cpp_type(from_type);
+      if (std::find(whole_formulas.begin(), whole_formulas.end(), w.to) != whole_formulas.end()) {
+        // (an Int into the Float input of the formula - the wire's own conversion, which the class does not write)
+        if (w.from.cast) return fail(w.from.tok, "an input of a formula of whole numbers is an Int as it is: no kern::to");
+        if (from_type.type != PinType::integer) return fail(w.from.tok, "this is " + have + ", an input of a formula of whole numbers is an Int");
+        g.links.push_back({f.node.id, out_pin->id, to.node.id, in->id});
+        continue;
+      }
       if (w.from.cast) {
         if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (from_type == to_type ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
         if (from_type == to_type) return fail(w.from.tok, "the value is " + need + " already: no kern::to");
@@ -4794,7 +4867,11 @@ std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Libra
       for (FunctionPin& p : pins) {
         const std::string old = p.name;
         const bool ok = cpp_name_ok(old) && !node_names.count(old) && old != "exec" && old != "then";
-        const std::string name = unique(ok ? old : better(old), [&](const std::string& x) { return used.count(x) || (inputs && taken.count(x)); });
+        // (a function held from a library has the library's pins: they are named there, among the library's names - an input of
+        // its that has the name of one of THIS Blueprint's variables stays as it is, as the reader lets it ("has the name of a
+        // variable or a function" is asked of a Blueprint's own functions). Renamed here, the Blueprint held another function
+        // than its library has: link() refused it as stale, and the Blueprint ran in the interpreter instead of as its class.)
+        const std::string name = unique(ok ? old : better(old), [&](const std::string& x) { return used.count(x) || (inputs && f.from.empty() && taken.count(x)); });
         used.insert(name);
         if (name == old) continue;
         // the pin on the function's nodes: the entry gives the inputs, the Return takes the outputs, the calls both
@@ -5008,7 +5085,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
                   events +
                   "  }\n"
-                  "  bool call(std::string_view function, const std::vector<kern::logic::Value>& args, std::vector<kern::logic::Value>& results) override {\n"
+                  "  bool call(std::string_view function, std::span<const kern::logic::Value> args, kern::logic::Results& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
   for (const Function& f : g.functions) {
     if (f.external || !f.from.empty()) continue;  // (a function of another Blueprint, or of a library: nothing of it is here to call by name)

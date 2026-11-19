@@ -236,6 +236,31 @@ template <bool ToSingle, bool FromSingle, class D, class S> void copy_bytes(D* t
     }
   }
 }
+/// std::memset into a list of numbers of the program (ToSingle: of floats - the test holds such a float as a
+/// 64-bit number): the `count` bytes the program sets, a float as its 32 bits. An entry set in part keeps its
+/// other bytes.
+template <bool ToSingle, class D> void* set_bytes(D* to, int value, std::size_t count) {
+  constexpr std::size_t kTo = ToSingle ? 4 : sizeof(D);
+  static_assert(!ToSingle || std::is_same_v<D, double>);
+  for (std::size_t j = 0; j * kTo < count; ++j) {
+    kern::u8 one[8];
+    if constexpr (ToSingle) {
+      const float f = static_cast<float>(to[j]);
+      std::memcpy(one, &f, sizeof f);
+    } else {
+      std::memcpy(one, &to[j], sizeof(D));
+    }
+    for (std::size_t b = 0; b < kTo && j * kTo + b < count; ++b) one[b] = static_cast<kern::u8>(value);
+    if constexpr (ToSingle) {
+      float f;
+      std::memcpy(&f, one, sizeof f);
+      to[j] = static_cast<double>(f);
+    } else {
+      std::memcpy(&to[j], one, sizeof(D));
+    }
+  }
+  return to;
+}
 }  // namespace layout
 
 /// A value of the source as the Blueprint holds it, where the two differ by more than their numbers: a
@@ -1501,6 +1526,7 @@ struct Tally {
   int compared = 0, outside = 0, wrong = 0, class_only = 0;
   int costlier = 0;                  // calls in which the class asked for memory more often than the source
   int refused = 0;                   // calls not compared: the engine itself refused a call of the source (real_engine)
+  std::string first_refused;         // (the first such call of the source: said in the note)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
   double slowest = 0;
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
@@ -1534,7 +1560,11 @@ struct Tally {
     // zeros of a call that did not happen, not what C++ says - nothing to compare; drawn again (the twenty
     // compared calls a function needs stay twenty). (A call refused on a side of the Blueprint only is in
     // its record of the engine's calls: that differs from the source's - see engine_same.)
-    if (g_engine_refused > 0) { ++outside; ++refused; return; }
+    if (g_engine_refused > 0) {
+      ++outside;
+      if (++refused == 1) first_refused = g_engine_refused_first;
+      return;
+    }
     if (state && !(set_state(*bp.native, *state) && set_state(*bp.interp, *state))) {
       ++compared;
       if (++wrong <= 3) std::printf("  %s(%s): the Blueprint's variables do not take the values of the source's object (%s)\n", function, describe().c_str(), g_untaken);
@@ -1625,7 +1655,8 @@ struct Tally {
       std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
                   function, class_only, compared, slowest * 1000);
     if (refused > 0)
-      std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared)\n", function, refused, compared);
+      std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared; the first: %s)\n", function, refused, compared,
+                  first_refused.c_str());
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     if (costlier > 0)
       std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
@@ -1685,14 +1716,42 @@ template <class C> constexpr std::size_t entries(const C& c) {
     return c.size;
   }
 }
+/// What an entry the source reads where there is none is in the test (the call is marked - C++ leaves it open -, and
+/// the source runs on with it): zero - and a C text the empty one, not null, which no function of texts takes
+/// (`std::string(p)` throws, strlen reads nowhere): the source runs on to the end of the call.
+template <class E> E none_entry() {
+  if constexpr (std::is_pointer_v<E> && std::is_same_v<std::remove_cv_t<std::remove_pointer_t<E>>, char>) {
+    static char empty[1] = {};
+    return empty;
+  } else {
+    return E{};
+  }
+}
+template <class T, class U> void copy_entry(T& to, const U& from) {
+  if constexpr (std::is_array_v<T>) {
+    for (std::size_t k = 0; k < std::extent_v<T>; ++k) copy_entry(to[k], from[k]);
+  } else {
+    to = from;
+  }
+}
 template <class C, class I> auto at(C&& c, I i) -> decltype(c[0]) {
   using R = decltype(c[0]);
   const long long n = static_cast<long long>(entries(c)), k = static_cast<long long>(i);
   if (k >= 0 && k < n) return c[static_cast<std::size_t>(k)];
   open_read();
   if constexpr (std::is_reference_v<R>) {
-    static std::remove_cvref_t<R> none;   // (an entry that is an array - T[3][2] - too: every entry of it zero)
-    fill_array(none, [] { return std::remove_all_extents_t<std::remove_cvref_t<R>>{}; });
+    // (an entry that is an array - T[3][2] - too: every entry of it none_entry). Of a list that has entries: a copy of its
+    // first one - also an entry of a struct with a C text in it (perf::Tier::name of `kTier[t]`) is then one the source
+    // can go on with; what is written to it is not the list's.
+    using E = std::remove_cvref_t<R>;
+    static E none;
+    if constexpr (std::is_copy_assignable_v<std::remove_all_extents_t<E>>) {
+      if (n > 0) {
+        copy_entry(none, c[0]);
+        return none;
+      }
+    }
+    fill_array(none, [] { return none_entry<std::remove_all_extents_t<E>>(); });
     return none;
   } else {
     static std::vector<bool> none(1);

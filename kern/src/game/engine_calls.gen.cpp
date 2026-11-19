@@ -1,10 +1,12 @@
 // The engine's nodes on the engine itself: the calls of the functions the headers of this component declare
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
+#include "kern/audio/audio.h"
 #include "kern/game/geometry.h"
 #include "kern/game/level.h"
 #include "kern/game/logic_nodes.h"
 #include "kern/game/runtime.h"
 #include "kern/game/sound.h"
+#include "kern/gfx/renderer.h"
 #include "kern/logic/engine_host.h"
 
 namespace kern::logic {
@@ -2987,11 +2989,14 @@ const EngineCall kCalls[] = {
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
 const EngineMaker kMakers[] = {
+    {EngineObjects::kind<kern::game::GameAudio>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::game::GameAudio>>(); auto& d0 = made->keep(new kern::audio::Mixer()); auto& d1 = made->keep(new kern::audio::Mixer()); auto& d2 = made->keep(new kern::game::SoundBank(d1)); made->object.emplace(d0, d2); return o.put_made<kern::game::GameAudio>(handle, std::move(made)); }},
+    {EngineObjects::kind<kern::game::GameWorld>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::game::GameWorld>>(); auto& d0 = made->keep(new kern::Renderer()); made->object.emplace(d0); return o.put_made<kern::game::GameWorld>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::game::GameWorld::PropertyChange>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::game::GameWorld::PropertyChange>(handle, std::unique_ptr<kern::game::GameWorld::PropertyChange>(new kern::game::GameWorld::PropertyChange())); }},
     {EngineObjects::kind<kern::game::MotionAsset>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::game::MotionAsset>(handle, std::unique_ptr<kern::game::MotionAsset>(new kern::game::MotionAsset())); }},
     {EngineObjects::kind<kern::game::NightWindows>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::game::NightWindows, kern::ShaderExtension>(handle, std::unique_ptr<kern::game::NightWindows>(new kern::game::NightWindows())); }},
     {EngineObjects::kind<kern::game::SoldierArtDelete>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::game::SoldierArtDelete>(handle, std::unique_ptr<kern::game::SoldierArtDelete>(new kern::game::SoldierArtDelete())); }},
     {EngineObjects::kind<kern::game::SoundAsset>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::game::SoundAsset>(handle, std::unique_ptr<kern::game::SoundAsset>(new kern::game::SoundAsset())); }},
+    {EngineObjects::kind<kern::game::SoundBank>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::game::SoundBank>>(); auto& d0 = made->keep(new kern::audio::Mixer()); made->object.emplace(d0); return o.put_made<kern::game::SoundBank>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::game::TextureAsset>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::game::TextureAsset>(handle, std::unique_ptr<kern::game::TextureAsset>(new kern::game::TextureAsset())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));

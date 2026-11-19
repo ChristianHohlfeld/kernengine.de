@@ -4470,7 +4470,7 @@ TEST(logic_native_blueprints) {
     f64 heat = 1;
     void attach(const logic::BlueprintWorld&) override {}
     void run(int, int) override {}
-    bool call(std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
+    bool call(std::string_view function, std::span<const logic::Value> args, logic::Results& results) override {
       results.clear();
       if (function != "Twice") return false;
       results = {logic::Value::number(2 * (args.empty() ? 0.0 : args[0].as_number()) + heat)};
@@ -5282,6 +5282,21 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a +; }, 1.0);"), "the formula:");
+  // (a formula of whole numbers, [](Int a) -> Int: only where Formula::whole holds, every input a wire from an Int as it is)
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a + 1.0; }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(kern::math::div(a, 2.0), 3.0); }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "this one is a formula of Floats");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::band(a, 3.0); }, Count));"), "(a formula with Int inputs gives an Int)");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "(the inputs of a formula of whole numbers are Int");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "an input of a formula of whole numbers is an Int");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, kern::to<Float>(Count)));"), "an Int as it is: no kern::to");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
+  // (a list of a fixed length written out on an input says the input's length: Fixed<Float, 3> for a field of three)
+  for (const char* wrong : {"Fixed<Float, 4>{1.5}", "Fixed<Float, 2>{1.5}"})
+    refused("  KERN_STRUCT(Trio) { Fixed<Float, 3> m = Fixed<Float, 3>{}; Int k = 0; };\n  Trio P = Trio{Fixed<Float, 3>{}, 0};\n" +
+                in_event(std::string("    P = struct_make<Trio>(") + wrong + ", 7);"),
+            "\"m\" of struct_make is Fixed<Float, 3>, this is Fixed<Float, ");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 1.0; } n1;\n  void Unused() {"), "starts empty");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 0.0; } n77;\n  void Unused() {"), "n77 names no node");
   refused("  Float Heat = 1.0;", "the variable Heat is declared twice");
@@ -5941,6 +5956,21 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
                    {"id":4,"type":"struct.break","params":{"struct":"S"}},{"id":5,"type":"struct.make","params":{"struct":"In"},"values":{"A":3}},
                    {"id":6,"type":"struct.set_field","params":{"variable":"V","field":"value"}}],
           "links":[[1,"then",2,"exec"],[1,"s",4,"value"],[5,"value",2,"value"],[2,"then",6,"exec"],[4,"value",6,"value"],[6,"then",3,"exec"],[4,"L",3,"all"],[2,"value",3,"one"]]})");
+  // A function held from a library has the library's pins: an input of its that has the name of one of this
+  // Blueprint's variables stays (the library named it; link() compares the held function with the library's -
+  // renamed, the Blueprint was stale and ran in the interpreter). The Blueprint's own function is renamed as before.
+  {
+    json::Value held;
+    logic::Graph g;
+    CHECK(json::parse(R"({"uses":["lib"],"variables":[{"name":"pad","type":"float","value":0}],
+            "functions":[{"name":"lib::hit","from":"lib","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]},
+              {"name":"own","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]}],
+            "nodes":[],"links":[]})", held) &&
+          logic::graph_from_json(held, g));
+    const auto renamed = logic::cpp_names(g);
+    CHECK(renamed.size() == 1 && renamed[0].first == "own.pad" && renamed[0].second == "own.pad2");
+    CHECK(g.functions.size() == 2 && g.functions[0].name == "lib::hit" && g.functions[0].inputs[0].name == "pad" && g.functions[1].inputs[0].name == "pad2");
+  }
   // Levels from before these rules: their names are made C++ names when they are loaded, and
   // everything that uses them follows.
   {
@@ -6384,6 +6414,22 @@ TEST(engine_calls_default_objects) {
     CHECK(out[0].i == 44100);
   }
   CHECK(a.size() == 1 && b.size() == 1);
+}
+
+TEST(engine_calls_default_objects_made_with) {
+  // a class whose constructor takes other objects of the engine (Client(Transport&, config, salt), GameWorld(Renderer&))
+  // is made for a handle with them - made the same way, without a handle; the release ends them all (ASan: nothing left)
+  logic::EngineObjects o;
+  o.on_missing(logic::engine_make_default);
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out) && !out[0].b);
+  out = {logic::Value::zero(logic::PinType::boolean), logic::Value::zero(logic::PinType::structure)};
+  CHECK(logic::call_engine(o, "engine.game_world.actor_matrix", {logic::Value::integer(4), logic::Value::integer(1), logic::Value::zero(logic::PinType::structure)}, out) && !out[0].b);
+  CHECK(o.size() == 2);   // (the transport and the renderer have no handle)
+  out.clear();
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  o.clear();
+  CHECK(o.size() == 0);
 }
 
 }  // namespace

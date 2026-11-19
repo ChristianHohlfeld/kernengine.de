@@ -11,10 +11,12 @@
 // nodes (kern/game/blueprint_nodes.h). logic::native_ready tells what a Blueprint still lacks.
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -67,13 +69,18 @@ struct Machine {
 
 /// kern::formula(lambda, values...): a Formula node. The lambda is the formula.
 template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(values...)); }
+/// (a formula of whole numbers - [](Int a) -> Int: its value is the double of the Int it gives, held as
+/// that whole number, kern::math::Exact: an Int takes it as it is, everything else as that double)
+template <class F, class... A>
+  requires std::same_as<std::invoke_result_t<F, A...>, logic::Whole>
+constexpr math::Exact formula(F&& f, A... values) { return {static_cast<i64>(f(values...))}; }
 
 /// kern::out(n7.stars, n7.found): where a call on another Blueprint puts what it gave, in the
 /// order of the function's outputs (func_call_on).
 template <class... O> struct Out {
   std::tuple<O&...> to;
-  void take(const std::vector<logic::Value>& results) { take(results, std::index_sequence_for<O...>{}); }
-  template <std::size_t... I> void take(const std::vector<logic::Value>& results, std::index_sequence<I...>) {
+  void take(std::span<const logic::Value> results) { take(results, std::index_sequence_for<O...>{}); }
+  template <std::size_t... I> void take(std::span<const logic::Value> results, std::index_sequence<I...>) {
     ((I < results.size() ? void(std::get<I>(to) = logic::from_value<O>(results[I])) : void()), ...);
   }
 };
@@ -118,9 +125,13 @@ struct BlueprintCore : logic::PureNodes {
   /// Call on Actor: runs the function `Name` of the Blueprint of `target` (Actor{0}: the Level's)
   /// with `args`, and `out` takes what it gave - func_call_on<"Stars">(who, kern::out(n7.stars), x);
   template <Setting Name, class... O, class... A> void func_call_on(Actor target, Out<O...> out, const A&... args) {
-    std::vector<logic::Value> results;
-    if (kern_world.runtime && kern_world.instance) kern_world.runtime->call_on(*kern_world.instance, Name.view(), target.id, {logic::to_value(args)...}, results);
-    out.take(results);
+    // (the arguments and what the function gives in places of this call: no memory asked for - Runtime::call_on)
+    const std::array<logic::Value, sizeof...(A)> in{logic::to_value(args)...};
+    std::array<logic::Value, sizeof...(O)> results{};
+    std::size_t given = 0;
+    if (kern_world.runtime && kern_world.instance)
+      given = kern_world.runtime->call_on(*kern_world.instance, Name.view(), target.id, std::span<const logic::Value>(in), std::span<logic::Value>(results));
+    out.take(std::span<const logic::Value>(results.data(), given));
   }
 
   /// Get Variable on Actor: what the variable `Name` of the Blueprint of `target` holds, as a T -
@@ -616,6 +627,11 @@ struct BlueprintCore : logic::PureNodes {
   static logic::format::Arg format_arg(Int v) { return logic::format::arg(static_cast<i64>(v)); }
   static logic::format::Arg format_arg(Float v) { return logic::format::arg(v); }
   static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
+  /// (a text that is no Text - what int64_text, int64_text_signed ... give: a view of that value itself, which
+  /// lives until text_format ends; made into a Text first, the view would be of a Text that is gone)
+  static logic::format::Arg format_arg(const std::string& v) { return logic::format::arg(std::string_view(v)); }
+  static logic::format::Arg format_arg(std::string_view v) { return logic::format::arg(v); }
+  static logic::format::Arg format_arg(const char* v) { return logic::format::arg(std::string_view(v)); }  // ("abc": the characters where they are)
 
   // ---- enums ----
   // An enum the Blueprint declares with KERN_ENUM; the nodes' setting "Enum" is the type:
