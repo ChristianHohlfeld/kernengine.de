@@ -1650,6 +1650,7 @@ struct Blueprint {
   const std::vector<std::string>& calls(bool in_class) { return (in_class ? compiled : interpreted)->host.stand_in.calls; }
   void before_call(bool in_class) {
     (in_class ? compiled : interpreted)->host.stand_in.calls.clear();
+    (in_class ? compiled : interpreted)->host.stand_in.kept.clear();   // (what objects of the engine were handed before: not of this call - see the source's)
     if (real_engine()) fresh_engine((in_class ? compiled : interpreted)->host.objects);
     (in_class ? compiled_actors : interpreted_actors).restore();
   }
@@ -2255,6 +2256,7 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
+    g_source_engine.kept.clear();   // (the Callbacks objects of the engine kept from an earlier call: each call begins with an engine that holds none - both sides alike)
     g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - rule_blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);
   }
