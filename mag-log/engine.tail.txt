@@ -1,0 +1,80 @@
+ok   micro_duck_steps_and_taps_sound
+ok   micro_duck_joints_stay_in_their_ranges
+ok   micro_duck_speaks_with_its_own_voice
+ok   micro_duck_picks_up_a_sock
+ok   micro_duck_answers_and_melts_when_petted
+ok   micro_duck_camera_sees_the_floor_in_front_when_looking_down
+ok   physics_materials_of_meshes_and_the_ground
+ok   micro_duck_plays_with_a_ball_on_its_own
+ok   micro_duck_plays_ball_as_pollens_brain_does
+ok   micro_duck_pickup_detector_matches_onnxruntime
+ok   micro_duck_pauses_in_the_hand_and_walks_when_put_down
+ok   micro_duck_goes_for_a_sock_and_bites
+ok   micro_duck_roams_on_its_own_with_its_tof
+ok   micro_duck_looks_around_when_left_alone
+ok   micro_duck_blueprint_nodes_drive_and_sense
+ok   micro_duck_example_level_runs
+ok   studio_robot_template_compiles
+ok   micro_duck_builds_from_its_mjcf
+ok   studio_player_presets_and_gameplay_blocks
+ok   game_gameplay_blocks
+ok   studio_shortcuts_follow_the_keyboard_layout
+ok   studio_logic_functions
+ok   studio_logic_local_variables
+ok   studio_logic_reference_inputs
+ok   studio_logic_libraries
+ok   studio_logic_call_on_actor
+ok   studio_logic_project_types
+ok   studio_logic_cpp_view
+ok   studio_logic_editor_commands
+ok   studio_logic_lists
+ok   studio_logic_enums
+ok   studio_logic_structs
+ok   studio_blueprint_breakpoints_pause_the_game
+ok   studio_blueprint_comments_reroutes_promote
+ok   studio_multiplayer_play
+ok   studio_shortcuts_and_commands
+ok   studio_outliner_hierarchy
+ok   studio_play_orb_run
+    orbRun: worst on-screen shake 0.026 deg
+    physicsLab: worst on-screen shake 0.020 deg
+ok   studio_fast_player_does_not_shake_on_screen
+ok   studio_simulate_keep_changes
+ok   studio_save_load_and_textures
+    seed 19088743: 30 history steps, 9 actors
+    seed 12648430: 76 history steps, 43 actors
+    seed 20261022: 103 history steps, 31 actors
+ok   studio_undo_redo_is_exact_and_deterministic
+ok   studio_undo_transactions_and_dirty_state
+ok   studio_autosave_only_while_unsaved
+ok   studio_user_settings
+ok   studio_player_only
+ok   app_input_and_args
+54571 checks, 0 failures
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/blueprint_native_main.cpp:8436:3: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 8436 |   [&] {
+      |   ^
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/blueprint_native_main.cpp: In lambda function:
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/blueprint_native_main.cpp:13779:3: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+13779 |   [&] {
+      |   ^
+In file included from /dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/blueprint_native_main.cpp:26:
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/bp_Engine.h: In member function ‘virtual bool {anonymous}::Engine_Native::get(std::string_view, kern::logic::Value&) const’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/bp_Engine.h:6341:8: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 6341 |   bool get(std::string_view variable, kern::logic::Value& out) const override {
+      |        ^~~
+In file included from /dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/blueprint_native_main.cpp:25:
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/bp_Nodes.h: In member function ‘virtual bool {anonymous}::Nodes_Native::call(std::string_view, std::span<const kern::logic::Value>, kern::logic::Results&)’:
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/native_gen/bp_Nodes.h:4726:8: note: variable tracking size limit exceeded with ‘-fvar-tracking-assignments’, retrying without
+ 4726 |   bool call(std::string_view function, std::span<const kern::logic::Value> args, kern::logic::Results& results) override {
+      |        ^~~~
+     Engine on the engine itself - what a clock gave (EngineFunction::clock), not compared: R120 R121
+ok   blueprint_native_test (60 Blueprints as their C++, 14102 calls on the class and by name through logic::Instance)
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/game_native_gen/arena_blueprints.cpp: 8 of 8 Blueprint(s) as C++ classes
+/dev/shm/spawncity-jobs-chris/work-zusammen-engine-075558-13914/tmp/kern-tests/game_native_gen/robot_blueprints.cpp: 1 of 1 Blueprint(s) as C++ classes
+ok   game_native_test (9 Blueprints of two levels as their C++ classes, 705 lines compared with the interpreter's)
+
+real	85m48,000s
+user	85m45,122s
+sys	1m37,219s
