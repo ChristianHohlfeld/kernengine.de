@@ -480,6 +480,9 @@ struct BlueprintCore : logic::PureNodes {
     const std::string_view v = a.view();
     return index >= 0 && static_cast<u64>(index) < v.size() ? static_cast<i64>(static_cast<u8>(v[static_cast<std::size_t>(static_cast<i64>(index))])) : 0;
   }
+  /// Set Code: text_set_code(text, index, code) - the character at the index becomes the one of that code (0 .. 255; the
+  /// low byte), where it stands: what `s[i] = c` does to a std::string. An index outside the text changes nothing.
+  static void text_set_code(Text& text, Int index, Int code) { text.set_at(static_cast<i64>(index), static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
   static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(static_cast<i64>(code)))); }
   // (what std::string and std::string_view do, on the characters where they are - logic::texts)
   static Int text_find(const Text& a, const Text& b, Int from) { return logic::texts::find(a.view(), b.view(), from); }

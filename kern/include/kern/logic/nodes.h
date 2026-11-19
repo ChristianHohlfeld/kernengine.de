@@ -348,6 +348,13 @@ class Text {
   std::string str() && { return holds_ ? std::move(made_) : std::string(written_); }
   friend bool operator==(const Text& a, const Text& b) { return a.view() == b.view(); }
   friend auto operator<=>(const Text& a, const Text& b) { return a.view() <=> b.view(); }
+  /// Set Code: the character at `index` becomes `c`, where it stands (a text of the program is first made the
+  /// text's own). An index outside the text changes nothing.
+  void set_at(i64 index, char c) {
+    if (index < 0 || static_cast<u64>(index) >= size()) return;
+    if (!holds_) hold(std::string(written_));
+    made_[static_cast<std::size_t>(index)] = c;
+  }
 
  private:
   /// (appended where its characters are - one character as std::string's += of a char adds it)

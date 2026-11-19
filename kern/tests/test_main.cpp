@@ -4057,7 +4057,7 @@ static logic::Graph every_node_graph(bool wired) {
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
       // (Copy Bytes on a list of whole numbers: its default numbers are bytes, u8; Insert Text Bytes takes only such a list)
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" || type == "list.insert_text" ? "LI" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" || type == "list.insert_text" ? "LI" : type == "text.set_code" ? "VT" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
                                     pd.kind == K::field ? "In" : pd.kind == K::function ? (pd.optional ? pd.def : def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }

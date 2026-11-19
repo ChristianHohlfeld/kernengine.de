@@ -559,6 +559,13 @@ inline const std::vector<Case>& cases() {
       // Texts as std::string reads them (find, rfind, find_*_of, substr, insert, erase, replace) and numbers
       // and words read as C reads them (strtod, strtof, strtoll, strtoull, sscanf) - every value made into
       // one text.
+      // A byte of a text variable set where it stands (Set Code: `s[i] = c` of a std::string) - outside the text: nothing.
+      {"text_set_code",
+       R"({"variables":[{"name":"Shown","type":"text","value":"ab\ncd"}],"nodes":[{"id":1,"type":"event.begin"},
+          {"id":2,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":2,"code":32}},
+          {"id":3,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":7,"code":33}},
+          {"id":4,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":0,"code":321}}],
+          "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})"},
       {"text_scan",
        R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
           {"id":2,"type":"var.set","params":{"variable":"Shown"}},
