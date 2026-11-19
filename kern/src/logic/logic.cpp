@@ -43,8 +43,12 @@ std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
   if (!pd.enums_only)
     for (const StructType& s : g.structs) r.push_back({PinType::structure, s.name});
+  if (pd.widths && !pd.with_lists)
+    for (std::string_view w : kWidthNames) r.push_back({PinType::integer, std::string(w)});
   if (pd.with_lists)
     for (std::size_t k = 0, n = r.size(); k < n; ++k) r.push_back({list_of(r[k].type), r[k].of});
+  if (pd.widths && pd.with_lists)
+    for (std::string_view w : kWidthNames) r.push_back({PinType::integer_list, std::string(w)});
   return r;
 }
 std::string type_text(const TypeRef& t) {
@@ -131,7 +135,8 @@ bool fits(const TypeRef& from, const TypeRef& to) {
   if (!convertible(from.type, to.type)) return false;
   // (a list of Ints of a fixed width is a list of that width and nothing else - U8 is no Int in a list:
   // in C++ a List<U8> is no List<Int>; one Int of a width is an Int, the place it goes to holds it)
-  if (from.type == PinType::integer_list && to.type == PinType::integer_list) return width_bits(from.of) == width_bits(to.of);
+  // (an input of kAnyWidth reads a list of Ints of each width - in C++ a function over its items)
+  if (from.type == PinType::integer_list && to.type == PinType::integer_list) return to.of == kAnyWidth || width_bits(from.of) == width_bits(to.of);
   return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
 }
 
@@ -2108,7 +2113,14 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   // An Int of a fixed width: its default is one of its values (C++ would store another there).
   auto width_ok = [&](const std::string& what, const TypeRef& t, const json::Value& value) {
     if (!has_width(t)) return;
-    if (t.type == PinType::integer_list) { err(0, what + " is a list of " + type_label({PinType::integer, t.of}) + ": a list of Ints of a fixed width is no type of the language yet"); return; }
+    if (t.type == PinType::integer_list) {
+      if (value.is_array())
+        for (std::size_t k = 0; k < value.size(); ++k) {
+          const Value e = Value::from_json(value[k], PinType::integer);
+          if (wrapped(e.i, t.of) != e.i) { err(0, what + " is a list of " + type_label({PinType::integer, t.of}) + ", its default holds " + std::to_string(e.i) + ", none of its values"); return; }
+        }
+      return;
+    }
     const Value v = Value::from_json(value, PinType::integer);
     const int bits = width_bits(t.of);
     const i64 lo = bits > 0 ? 0 : -(i64{1} << (-bits - 1)), hi = bits > 0 ? (i64{1} << bits) - 1 : (i64{1} << (-bits - 1)) - 1;

@@ -235,6 +235,11 @@ std::string literal(const Value& v, const std::string& of, const Graph& g, std::
     for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + one(v.item(k));
     return r + "}";
   }
+  if (v.type == PinType::integer_list && width_bits(of) != 0) {  // (a list of Ints of a fixed width: List<U8>{1, 255})
+    std::string r = cpp_type(TypeRef{v.type, of}) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + literal(v.item(k));
+    return r + "}";
+  }
   if (element_of(v.type) != PinType::enumeration) return literal(v);
   const EnumType* e = g.enumeration(of);
   auto one = [&](i64 index) { return of + "::" + (e && enums::is_value(e->values.size(), index) ? e->values[static_cast<std::size_t>(index)] : std::string("_") + std::to_string(index)); };
@@ -787,7 +792,7 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" ||
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" || t == "text.set_code" ||
              // (a map's or a set's steps put entries in or take them out - and move the others: a map's values are its entries)
              t == "map.set" || t == "map.add" || t == "map.remove" || t == "map.remove_at" || t == "map.clear" || t == "map.reserve" ||
              t == "set.add" || t == "set.remove" || t == "set.remove_at" || t == "set.clear" || t == "set.reserve";
@@ -848,7 +853,7 @@ struct Shape {
         w.root = at(x).node->param("variable");
         if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
         // (a Take puts the zero where something stood, like a Set; Sort puts other items there, Copy Bytes other bytes)
-        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes";
+        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes" && t != "text.set_code";
         w.node = x;
         writes[f].push_back(std::move(w));
       }
@@ -3283,10 +3288,12 @@ struct Reader {
                                cpp_type(TypeRef{v.type, src.of, src.count}));
     // (what flows into a pin is an Int: one of a fixed width is the place's - the place holds its low bits)
     const bool any_int = v.type == PinType::integer && pin.type == PinType::integer && src.of.empty() && has_width(pin.type, pin.of);
-    if (v.type != pin.type || (src.of != pin.of && !any_int))
+    // (an input of a list of Ints of any width: a list written out is a List<Int>{...} - kAnyWidth)
+    const bool any_list = v.type == PinType::integer_list && pin.of == kAnyWidth && src.of.empty();
+    if (v.type != pin.type || (src.of != pin.of && !any_int && !any_list))
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
-    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, pin.of}));
+    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, any_list ? std::string() : pin.of}));
     return true;
   }
   /// Wires the exec outputs `from` to the exec input `in` of `node` ("": its first), or of the step go<id>.
@@ -4586,7 +4593,9 @@ struct Reader {
       const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
       const std::string need = cpp_type(TypeRef{to_type.type, to_type.type == PinType::integer ? std::string() : to_type.of}), have = cpp_type(from_type);
       // (an Int is an Int, whatever width the place it comes from or goes to has: the place holds its low bits)
-      const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer);
+      // (an input that reads a list of Ints of any width takes each as it is: kAnyWidth)
+      const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer) ||
+                        (to_type.of == kAnyWidth && fits(from_type, to_type));
       if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::integer)
         return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
       if (int_inputs.count({w.to, w.in})) {
@@ -5036,6 +5045,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       for (std::size_t k = 0; k < in.size(); ++k) c += (k ? ", " : "") + inner(in[k]);
       return c + ")>";
     }
+    if (t == PinType::integer_list && width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
     return is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
   };
