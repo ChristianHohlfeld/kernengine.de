@@ -1759,7 +1759,8 @@ class Unit:
                 text = open(os.path.join(ROOT, "kern", "src", "logic", "engine_api.gen.cpp")).read()
             except OSError:
                 text = ""
-            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "(\w*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
+            # (what a pin names: a struct or an enum - a word -, or a Callback's signature - "float(float,float)")
+            pins = lambda t: [(m.group(1), m.group(2), m.group(3)) for m in re.finditer(r'\{"(\w+)", PinType::(\w+), "([\w(),]*)", "[^"]*"(?:, "\w*"(?:, \d+)?)?\}', t)]
             # (an entry may end with what the engine says of the node beyond its pins - `place`, `clock`, written only
             # where one is set: `{...outputs...}, true},` - the pins are the same node; read without them, the last
             # output was taken for the end of the entry and every such node "differed")
@@ -9885,6 +9886,8 @@ class Emit:
             raise Wait(f"a {t.split('<')[0].lower()} made of other arguments")
         if callback_parts(t) and not a:
             return t + "{}", t   # (a Callback as C++ makes it without arguments: unbound)
+        if callback_parts(t) and len(a) == 1 and self.tp_or_none(a[0]) == t:
+            return self.ex(a[0], t), t   # (a copy of one: the same function and place, as C++ copies them)
         raise Wait(f"a {t} made here")
 
     def listed(self, s0, st, first, last, t):
