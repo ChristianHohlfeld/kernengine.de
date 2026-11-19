@@ -1,0 +1,80 @@
+    put_vec3 (4): written
+    put_quat (4): written
+    put_bytes (4): written
+    Reader::get_u8 (6): written
+    Reader::get_i8 (7): written
+    Reader::get_u16 (7): written
+    Reader::get_i16 (7): written
+    Reader::get_u32 (7): written
+    Reader::get_i32 (7): written
+    Reader::get_u64 (7): written
+    Reader::get_i64 (7): written
+    Reader::get_f32 (7): written
+    Reader::get_f64 (7): written
+    Reader::get_vec3 (7): written
+    Reader::get_quat (7): written
+    Reader::get_bytes (7): written
+    Reader::done (1): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_net_session_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+561 of 671 functions of the program are written as Blueprints (3308 of 7644 lines), and 16 of the engine's headers that they call: 65 Blueprints - 6 of source files, 1 of states, 58 of headers and of shapes
+514 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     7 (   665)   it calls Game::mp_local_ready(), which waits
+     4 (   270)   gaps_riding() is defined in another file
+     1 (   268)   ctl_command() is defined in another file
+     7 (   265)   what it calls stands in a header and needs a source file that is not converted
+     4 (   255)   ensure() is defined in another file
+     2 (   183)   stars() is defined in another file
+     4 (   163)   claim() is defined in another file
+     1 (   136)   vr_menu_json() is defined in another file
+     4 (   130)   unproject() is defined in another file
+     1 (   117)   build_water_chunk_at(): it names a place: where it is called, the place stands - here the call could not be written so
+     1 (   111)   it calls register_node(), which waits
+    12 (   101)   it calls Session::to_host(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    93)   vr_hand_ray() is defined in another file
+     1 (    91)   it calls Terrain::ground_albedo(), which waits
+     1 (    87)   look_begin() is defined in another file
+     3 (    87)   begin() is defined in another file
+     1 (    86)   detach() is defined in another file
+     2 (    84)   combat_banner() is defined in another file
+     1 (    81)   it calls Terrain::plan_windows(), which waits
+     1 (    80)   the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+     1 (    76)   person() is defined in another file
+     5 (    75)   put() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     1 (    50)   it calls GeoProjector::init(), which waits
+     1 (    40)   it calls Game::remote_on_segment(), which waits
+     2 (    38)   it calls Game::player_position(), which waits
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    37)   its test cannot compare it yet (the class Graph is not written)
+     1 (    36)   it calls Terrain::image_bounds(), which waits
+     1 (    34)   it calls Game::standing_feet(), which waits
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     2 (    26)   reset() is defined in another file
+     1 (    24)   explosion() is defined in another file
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    17)   judge_hit() is defined in another file
+     2 (    15)   init() is defined in another file
+
+real	11m45,015s
+user	39m37,610s
+sys	1m51,792s
