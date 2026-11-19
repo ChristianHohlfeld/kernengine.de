@@ -5934,6 +5934,21 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
                    {"id":4,"type":"struct.break","params":{"struct":"S"}},{"id":5,"type":"struct.make","params":{"struct":"In"},"values":{"A":3}},
                    {"id":6,"type":"struct.set_field","params":{"variable":"V","field":"value"}}],
           "links":[[1,"then",2,"exec"],[1,"s",4,"value"],[5,"value",2,"value"],[2,"then",6,"exec"],[4,"value",6,"value"],[6,"then",3,"exec"],[4,"L",3,"all"],[2,"value",3,"one"]]})");
+  // A function held from a library has the library's pins: an input of its that has the name of one of this
+  // Blueprint's variables stays (the library named it; link() compares the held function with the library's -
+  // renamed, the Blueprint was stale and ran in the interpreter). The Blueprint's own function is renamed as before.
+  {
+    json::Value held;
+    logic::Graph g;
+    CHECK(json::parse(R"({"uses":["lib"],"variables":[{"name":"pad","type":"float","value":0}],
+            "functions":[{"name":"lib::hit","from":"lib","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]},
+              {"name":"own","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]}],
+            "nodes":[],"links":[]})", held) &&
+          logic::graph_from_json(held, g));
+    const auto renamed = logic::cpp_names(g);
+    CHECK(renamed.size() == 1 && renamed[0].first == "own.pad" && renamed[0].second == "own.pad2");
+    CHECK(g.functions.size() == 2 && g.functions[0].name == "lib::hit" && g.functions[0].inputs[0].name == "pad" && g.functions[1].inputs[0].name == "pad2");
+  }
   // Levels from before these rules: their names are made C++ names when they are loaded, and
   // everything that uses them follows.
   {
