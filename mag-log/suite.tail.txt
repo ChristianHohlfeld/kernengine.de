@@ -1,0 +1,80 @@
+  cost: TouchPlay_view_json: in 250 of 300 calls the class asks for memory more often than the source (up to 20 times instead of 11)
+ok   converted_touch_play_cpp (63.0 s, CPU 61.6 s)
+  cost: kind_of: in 1 of 300 calls the class asks for memory more often than the source (up to 4 times instead of 0)
+  cost: pack_lamps: in 236 of 300 calls the class asks for memory more often than the source (up to 7 times instead of 6)
+  time: pack_state: 1.8 s (the class 0.0 s, the interpreter 1.7 s, the Blueprints' variables and comparing 0.0 s, drawing and the source 0.0 s) - 300 calls drawn, 300 compared; 8746 values given and held, 2180 loop passes of the class (up to 13 in a call)
+  cost: pack_state: in 300 of 300 calls the class asks for memory more often than the source (up to 9 times instead of 8)
+ok   converted_town_sync_cpp (26.7 s, CPU 26.6 s)
+  time: rot: 1.1 s (the class 0.0 s, the interpreter 1.1 s, the Blueprints' variables and comparing 0.0 s, drawing and the source 0.0 s) - 300 calls drawn, 300 compared; 600 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: VehicleArt_make: 2.3 s (the class 0.5 s, the interpreter 1.0 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.6 s) - 300 calls drawn, 300 compared; 231373 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: VehicleArt_init: 18.1 s (the class 4.9 s, the interpreter 7.0 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 5.3 s) - 287 calls drawn, 287 compared; 1002410 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: VehicleArt_car: 3.3 s (the class 0.0 s, the interpreter 3.2 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.0 s) - 39 calls drawn, 39 compared; 144565 values given and held, 8748 loop passes of the class (up to 324 in a call)
+  cost: VehicleArt_car: in 39 of 39 calls the class asks for memory more often than the source (up to 10 times instead of 9)
+  time: VehicleArt_jet: 2.2 s (the class 0.0 s, the interpreter 1.9 s, the Blueprints' variables and comparing 0.2 s, drawing and the source 0.1 s) - 112 calls drawn, 112 compared; 412646 values given and held, 5924 loop passes of the class (up to 163 in a call)
+  time: VehicleArt_drone: 3.5 s (the class 0.0 s, the interpreter 3.4 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.0 s) - 41 calls drawn, 41 compared; 133953 values given and held, 8944 loop passes of the class (up to 344 in a call)
+  time: VehicleArt_parachute: 4.4 s (the class 0.0 s, the interpreter 4.2 s, the Blueprints' variables and comparing 0.2 s, drawing and the source 0.0 s) - 43 calls drawn, 43 compared; 156662 values given and held, 8528 loop passes of the class (up to 304 in a call)
+  time: VehicleArt_upload: 2.2 s (the class 0.3 s, the interpreter 0.4 s, the Blueprints' variables and comparing 1.1 s, drawing and the source 0.4 s) - 263 calls drawn, 263 compared; 1001042 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: VehicleArt_end: 15.0 s (the class 3.6 s, the interpreter 6.1 s, the Blueprints' variables and comparing 1.3 s, drawing and the source 4.0 s) - 281 calls drawn, 281 compared; 1001991 values given and held, 0 loop passes of the class (up to 0 in a call)
+ok   converted_vehicle_art_cpp (91.9 s, CPU 89.9 s)
+  time: hit_chance: 1.5 s (the class 0.0 s, the interpreter 1.4 s, the Blueprints' variables and comparing 0.0 s, drawing and the source 0.0 s) - 300 calls drawn, 300 compared; 900 values given and held, 3559 loop passes of the class (up to 22 in a call)
+ok   converted_wanted_cpp (27.7 s, CPU 27.6 s)
+ok   converted_water_look (5.4 s, CPU 5.3 s)
+  cost: WaterLook_attributes: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+ok   converted_water_look_cpp (25.3 s, CPU 24.8 s)
+ok   converted_weapons (8.2 s, CPU 8.2 s)
+ok   converted_wire (20.4 s, CPU 19.5 s)
+ok   converted_world_art (5.9 s, CPU 5.2 s)
+  time: WorldArt_part: 2.2 s (the class 0.5 s, the interpreter 1.0 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.6 s) - 300 calls drawn, 300 compared; 284468 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: WorldArt_init: 14.1 s (the class 3.8 s, the interpreter 6.1 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 4.2 s) - 300 calls drawn, 300 compared; 115723 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: WorldArt_end: 1.5 s (the class 0.4 s, the interpreter 0.7 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.4 s) - 300 calls drawn, 300 compared; 118656 values given and held, 635 loop passes of the class (up to 4 in a call)
+  time: WorldArt_set_mesh: 1.6 s (the class 0.4 s, the interpreter 0.6 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.5 s) - 300 calls drawn, 300 compared; 295181 values given and held, 0 loop passes of the class (up to 0 in a call)
+ok   converted_world_art_cpp (43.5 s, CPU 41.6 s)
+  time: Marks_clear: 3.2 s (the class 0.2 s, the interpreter 1.2 s, the Blueprints' variables and comparing 1.5 s, drawing and the source 0.3 s) - 300 calls drawn, 300 compared; 695947 values given and held, 618 loop passes of the class (up to 4 in a call)
+  time: Marks_add_soot: 3.6 s (the class 0.3 s, the interpreter 1.4 s, the Blueprints' variables and comparing 1.4 s, drawing and the source 0.5 s) - 250 calls drawn, 248 compared; 957652 values given and held, 462 loop passes of the class (up to 17 in a call)
+  time: Marks_spawn_rubble: 11.0 s (the class 0.2 s, the interpreter 10.5 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 52970 values given and held, 12282 loop passes of the class (up to 4954 in a call)
+  time: Marks_add_breach: 3.8 s (the class 0.4 s, the interpreter 1.4 s, the Blueprints' variables and comparing 1.5 s, drawing and the source 0.5 s) - 249 calls drawn, 249 compared; 956469 values given and held, 465 loop passes of the class (up to 4 in a call)
+  time: Marks_blast: 10.1 s (the class 0.4 s, the interpreter 3.9 s, the Blueprints' variables and comparing 1.4 s, drawing and the source 4.4 s) - 1248 calls drawn, 98 compared; 869164 values given and held, 1315 loop passes of the class (up to 53 in a call)
+  cost: Marks_blast: in 39 of 98 calls the class asks for memory more often than the source (up to 103 times instead of 1)
+  time: Marks_bullet: 5.0 s (the class 0.5 s, the interpreter 1.2 s, the Blueprints' variables and comparing 1.5 s, drawing and the source 1.9 s) - 502 calls drawn, 190 compared; 970944 values given and held, 375 loop passes of the class (up to 55 in a call)
+  cost: Marks_bullet: in 102 of 190 calls the class asks for memory more often than the source (up to 117 times instead of 0)
+  time: Marks_prune_walls: 7.6 s (the class 0.3 s, the interpreter 4.6 s, the Blueprints' variables and comparing 1.0 s, drawing and the source 1.7 s) - 417 calls drawn, 157 compared; 791308 values given and held, 2310 loop passes of the class (up to 256 in a call)
+  cost: Marks_prune_walls: in 78 of 157 calls the class asks for memory more often than the source (up to 728 times instead of 0)
+  time: Marks_update: 4.4 s (the class 0.5 s, the interpreter 2.2 s, the Blueprints' variables and comparing 1.0 s, drawing and the source 0.8 s) - 231 calls drawn, 178 compared; 910730 values given and held, 932 loop passes of the class (up to 77 in a call)
+  cost: Marks_update: in 26 of 178 calls the class asks for memory more often than the source (up to 651 times instead of 0)
+  time: Marks_rebuild: 64.7 s (the class 0.1 s, the interpreter 64.2 s, the Blueprints' variables and comparing 0.2 s, drawing and the source 0.2 s) - 65 calls drawn, 20 compared; 158112 values given and held, 49200 loop passes of the class (up to 13349 in a call)
+  note: Marks_rebuild: 3 of 20 calls compared with the compiled class only (a call in whose class loops pass more than 5000 times - here up to 13349 - is not run in the interpreter)
+  cost: Marks_rebuild: in 20 of 20 calls the class asks for memory more often than the source (up to 106 times instead of 41)
+  time: Marks_draw: 23.0 s (the class 0.2 s, the interpreter 22.0 s, the Blueprints' variables and comparing 0.3 s, drawing and the source 0.5 s) - 85 calls drawn, 66 compared; 396512 values given and held, 17824 loop passes of the class (up to 7502 in a call)
+  note: Marks_draw: 1 of 66 calls compared with the compiled class only (a call in whose class loops pass more than 5000 times - here up to 7502 - is not run in the interpreter)
+  cost: Marks_draw: in 9 of 66 calls the class asks for memory more often than the source (up to 12667 times instead of 12618)
+ok   converted_world_marks_cpp (358.8 s, CPU 349.0 s)
+  time: TrafficRules_rebuild: 6.4 s (the class 0.0 s, the interpreter 6.2 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.0 s) - 56 calls drawn, 56 compared; 13413 values given and held, 10948 loop passes of the class (up to 3213 in a call)
+  cost: TrafficRules_rebuild: in 41 of 56 calls the class asks for memory more often than the source (up to 1140 times instead of 0)
+  time: TrafficRules_near: 5.9 s (the class 0.0 s, the interpreter 5.8 s, the Blueprints' variables and comparing 0.1 s, drawing and the source 0.0 s) - 96 calls drawn, 94 compared; 32989 values given and held, 9800 loop passes of the class (up to 2352 in a call)
+  time: TrafficRules_light: 2.6 s (the class 0.1 s, the interpreter 2.2 s, the Blueprints' variables and comparing 0.2 s, drawing and the source 0.1 s) - 300 calls drawn, 300 compared; 70117 values given and held, 3500 loop passes of the class (up to 32 in a call)
+  time: TrafficRules_pursuit: 1.6 s (the class 0.0 s, the interpreter 1.3 s, the Blueprints' variables and comparing 0.2 s, drawing and the source 0.0 s) - 300 calls drawn, 300 compared; 3597 values given and held, 131 loop passes of the class (up to 5 in a call)
+  time: TrafficRules_gap_speed: 1.4 s (the class 0.1 s, the interpreter 1.0 s, the Blueprints' variables and comparing 0.2 s, drawing and the source 0.1 s) - 300 calls drawn, 300 compared; 63725 values given and held, 592 loop passes of the class (up to 13 in a call)
+  time: TrafficRules_limit: 5.6 s (the class 0.1 s, the interpreter 5.0 s, the Blueprints' variables and comparing 0.3 s, drawing and the source 0.1 s) - 312 calls drawn, 300 compared; 76103 values given and held, 5736 loop passes of the class (up to 57 in a call)
+  cost: TrafficRules_limit: in 266 of 300 calls the class asks for memory more often than the source (up to 2 times instead of 0)
+ok   converted_world_traffic_cpp (129.6 s, CPU 116.4 s)
+149 tests, 3759 checks, 1 failures (CPU of the tests 45318.6 s, 37 at once)
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-143319-13859/kern/games/spawncity/src/game_net.cpp:27:15: warning: unused variable 'kTracerLifeMs' [-Wunused-const-variable]
+   27 | constexpr f64 kTracerLifeMs = 1600;
+      |               ^~~~~~~~~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-143319-13859/kern/games/spawncity/src/game_gaps.cpp:125:15: warning: unused variable 'kPeopleEntryM' [-Wunused-const-variable]
+  125 | constexpr f32 kPeopleEntryM = 150, kPeopleEntryMobileM = 125, kVehicleEntryM = 600;  // world_procedural_population.mjs
+      |               ^~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-143319-13859/kern/games/spawncity/src/game_gaps.cpp:125:36: warning: unused variable 'kPeopleEntryMobileM' [-Wunused-const-variable]
+  125 | constexpr f32 kPeopleEntryM = 150, kPeopleEntryMobileM = 125, kVehicleEntryM = 600;  // world_procedural_population.mjs
+      |                                    ^~~~~~~~~~~~~~~~~~~
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-143319-13859/kern/games/spawncity/src/game_traffic.cpp:24:66: warning: unused variable 'kTruckHp' [-Wunused-const-variable]
+   24 |               kDriveSpeed = 14, kGiveUpS = 70, kWreckWaitS = 20, kTruckHp = 110;
+      |                                                                  ^~~~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-zusammen-voll-143319-13859/kern/games/spawncity/src/game_town.cpp:22:15: warning: unused variable 'kCarHp' [-Wunused-const-variable]
+   22 | constexpr f32 kCarHp = 300, kCarHit = 22, kCarCritical = 0.20f, kCarBurn = 2.45f /* critical_damage_logic.mjs car: 20 %, 2450 ms */, kCrashDv = 7, kCrashDamage = 16;
+      |               ^~~~~~
+1 warning generated.
+ok   the game's own sources compile (31 files)
