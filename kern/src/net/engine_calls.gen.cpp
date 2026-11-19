@@ -405,8 +405,9 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<unsigned char> a0;
   ev::take<ev::List<ev::Int>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->receive_packet(a0.empty() ? nullptr : a0.data(), std::move(a1));
   return true;
 }
@@ -491,8 +492,9 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<unsigned char> a0;
   ev::take<ev::List<ev::Int>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list payload has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->send_packet(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Int>(o, out, 0, r);
   return true;
@@ -504,8 +506,9 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<unsigned char> a0;
   ev::take<ev::List<ev::Int>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list packet has fewer entries than bytes says"; return false; }
   self->receive_packet(a0.empty() ? nullptr : a0.data(), std::move(a1));
   return true;
 }
@@ -590,8 +593,9 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<unsigned char> a0;
   ev::take<ev::List<ev::Int>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->write_bytes(a0.empty() ? nullptr : a0.data(), std::move(a1));
   return true;
 }
@@ -684,7 +688,7 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::BitReader>(o, in, 0, "bit_reader");
   if (!self) return false;
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 1, a1);
   ev::Written<unsigned char> a0(ev::room(a1) * 1);
   self->read_bytes(a0.data(), std::move(a1));
@@ -763,8 +767,9 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<unsigned char> a0;
   ev::take<ev::List<ev::Int>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->serialize_bytes(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -868,7 +873,7 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::net::ReadStream>(o, in, 0, "read_stream");
   if (!self) return false;
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 1, a1);
   ev::Written<unsigned char> a0(ev::room(a1) * 1);
   decltype(auto) r = self->serialize_bytes(a0.data(), std::move(a1));
@@ -968,8 +973,9 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   std::vector<unsigned char> a0;
   ev::take<ev::List<ev::Int>>(o, in, 1, a0);
-  auto a1 = ev::blank<std::remove_cvref_t<int>>();
+  auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
+  if (ev::numbers(a1) > a0.size()) { o.error = "the list value1 has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->serialize_bytes(a0.empty() ? nullptr : a0.data(), std::move(a1));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1039,8 +1045,9 @@ bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   std::vector<unsigned char> a1;
   ev::take<ev::List<ev::Int>>(o, in, 2, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<int>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 3, a2);
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->send(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1052,7 +1059,7 @@ bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
-  auto a2 = ev::blank<std::remove_cvref_t<int>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a2);
   ev::Written<unsigned char> a1(ev::room(a2) * 1);
   decltype(auto) r = self->receive(a0, a1.data(), std::move(a2));
@@ -1083,10 +1090,11 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Struct<S_net_Address>>(o, in, 2, a1);
   std::vector<unsigned char> a2;
   ev::take<ev::List<ev::Int>>(o, in, 3, a2);
-  auto a3 = ev::blank<std::remove_cvref_t<int>>();
+  auto a3 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 4, a3);
   auto a4 = ev::blank<std::remove_cvref_t<double>>();
   ev::take<ev::Float>(o, in, 5, a4);
+  if (ev::numbers(a3) > a2.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->send(std::move(a0), std::move(a1), a2.empty() ? nullptr : a2.data(), std::move(a3), std::move(a4));
   return true;
 }
@@ -1212,8 +1220,9 @@ bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   std::vector<unsigned char> a1;
   ev::take<ev::List<ev::Int>>(o, in, 2, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<int>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 3, a2);
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   decltype(auto) r = self->send(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
@@ -1225,7 +1234,7 @@ bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::net::Address&>>();
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
-  auto a2 = ev::blank<std::remove_cvref_t<int>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a2);
   ev::Written<unsigned char> a1(ev::room(a2) * 1);
   decltype(auto) r = self->receive(a0, a1.data(), std::move(a2));
@@ -1254,8 +1263,9 @@ bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   ev::take<ev::Struct<S_net_Address>>(o, in, 1, a0);
   std::vector<unsigned char> a1;
   ev::take<ev::List<ev::Int>>(o, in, 2, a1);
-  auto a2 = ev::blank<std::remove_cvref_t<int>>();
+  auto a2 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 3, a2);
+  if (ev::numbers(a2) > a1.size()) { o.error = "the list data has fewer entries than bytes says"; return false; }
   self->push_incoming(std::move(a0), a1.empty() ? nullptr : a1.data(), std::move(a2));
   return true;
 }
@@ -1550,10 +1560,12 @@ const EngineCall kCalls[] = {
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
 const EngineMaker kMakers[] = {
+    {EngineObjects::kind<kern::net::Client>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::net::Client>>(); auto& d0 = made->keep(new kern::net::HostTransport()); made->object.emplace(d0, ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>(), ev::blank<std::remove_cvref_t<kern::u64>>()); return o.put_made<kern::net::Client>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::net::Connection>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::Connection>(handle, std::unique_ptr<kern::net::Connection>(new kern::net::Connection())); }},
     {EngineObjects::kind<kern::net::HostTransport>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::HostTransport, kern::net::Transport>(handle, std::unique_ptr<kern::net::HostTransport>(new kern::net::HostTransport())); }},
     {EngineObjects::kind<kern::net::LoopbackNetwork>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::LoopbackNetwork>(handle, std::unique_ptr<kern::net::LoopbackNetwork>(new kern::net::LoopbackNetwork())); }},
     {EngineObjects::kind<kern::net::MeasureStream>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::MeasureStream>(handle, std::unique_ptr<kern::net::MeasureStream>(new kern::net::MeasureStream())); }},
+    {EngineObjects::kind<kern::net::Server>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::net::Server>>(); auto& d0 = made->keep(new kern::net::HostTransport()); made->object.emplace(d0, ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>(), ev::blank<std::remove_cvref_t<kern::u64>>()); return o.put_made<kern::net::Server>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::net::Simulator>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::Simulator>(handle, std::unique_ptr<kern::net::Simulator>(new kern::net::Simulator())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));

@@ -104,6 +104,7 @@ TypeRef setting_type(const Node& n, const Graph& g, bool lists) {
 PinDef typed_pin(std::string id, std::string label, const TypeRef& t, json::Value def = {}) {
   PinDef p = data(std::move(id), std::move(label), t.type, std::move(def));
   p.of = t.of;
+  p.count = t.count;
   return p;
 }
 /// What a pin of type `t` holds when nothing is typed in (a struct: its fields' defaults).
@@ -1824,8 +1825,12 @@ void add_math(Library& lib) {
   lib.add(pure("vector.lerp", "Lerp Vector", "Vector", {data("a", "A", K::vector, zero3), data("b", "B", K::vector, zero3), data("alpha", "Alpha", K::number, 0.5)}, vector, of(&P::vector_lerp), "",
                "interpolate"));
   // Text.
-  lib.add(pure("text.append", "Append", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, ""), data("c", "C", K::text, "")}, data("result", "", K::text), of(&P::text_append),
-               "Joins texts (numbers and vectors convert)", "concat string join format"));
+  {
+    NodeDef d = pure("text.append", "Append", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, ""), data("c", "C", K::text, "")}, data("result", "", K::text),
+                     of(&P::text_append), "Joins texts (numbers and vectors convert)", "concat string join format");
+    d.takes_first = true;
+    lib.add(d);
+  }
   lib.add(pure("text.equal", "Text Equals", "Text", {data("a", "A", K::text, ""), data("b", "B", K::text, "")}, boolean, of(&P::text_equal)));
   lib.add(pure("text.contains", "Contains", "Text", {data("a", "Text", K::text, ""), data("b", "Search", K::text, "")}, boolean, of(&P::text_contains)));
   lib.add(pure("text.length", "Text Length", "Text", {data("a", "Text", K::text, "")}, integer, of(&P::text_length)));
@@ -2069,7 +2074,7 @@ void add_functions(Library& lib) {
       if (which == 0 || which == 2)
         for (const FunctionPin& p : f->inputs) {
           if (!p.ref) {
-            (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value, false, p.of});
+            (which == 0 ? out : in).push_back({p.name, p.name, p.type, p.value, false, p.of, p.count});
             continue;
           }
           if (which != 2) continue;
@@ -2078,7 +2083,7 @@ void add_functions(Library& lib) {
             in.push_back({ref_key(p.name, path_pin(k)), p.name + (entries > 1 ? " index " + std::to_string(k + 1) : std::string(" index")), PinType::integer, json::Value(0), false, {}});
         }
       if (which == 1 || which == 2)
-        for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value, false, p.of});
+        for (const FunctionPin& p : f->outputs) (which == 1 ? in : out).push_back({p.name, p.name, p.type, p.value, false, p.of, p.count});
     };
   };
   auto named = [](const char* prefix) {

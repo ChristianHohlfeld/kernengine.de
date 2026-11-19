@@ -2539,19 +2539,37 @@ bool Instance::call_inside(std::string_view function, const std::vector<Value>& 
 bool Instance::call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, const std::vector<Spot>& places) {
   return call_function(function, args, results, true, &places);
 }
+bool Instance::call_class(std::string_view function, std::span<const Value> args, Results& results) {
+  if (disabled_) return false;
+  if (rt_.depth_ == 0) rt_.step_starts();  // (a call from outside any chain is a step of its own for the loop guard)
+  rt_.counters_[1] = static_cast<i32>(min_of<u64>(rt_.budget, 0x7fffffff));
+  ++rt_.depth_;
+  ++active_;
+  const beside::Visit visit;  // (the entries beside the lists that the class names are this visit's)
+  const bool known = blueprint_->call(function, args, results);
+  rt_.chain_ends(*this);
+  --rt_.depth_;
+  return known;
+}
+bool Instance::call_into(std::string_view function, std::span<const Value> args, std::span<Value> results, std::size_t& given) {
+  given = 0;
+  if (blueprint_) {
+    Results into(results);
+    const bool known = call_class(function, args, into);
+    given = into.size();
+    return known;
+  }
+  // (the interpreter, the JIT: their own way, with the values as vectors)
+  std::vector<Value> got;
+  const bool known = call(function, std::vector<Value>(args.begin(), args.end()), got);
+  for (; given < results.size() && given < got.size(); ++given) results[given] = std::move(got[given]);
+  return known;
+}
 bool Instance::call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places) {
   results.clear();
   if (blueprint_) {
-    if (disabled_) return false;
-    if (rt_.depth_ == 0) rt_.step_starts();  // (a call from outside any chain is a step of its own for the loop guard)
-    rt_.counters_[1] = static_cast<i32>(min_of<u64>(rt_.budget, 0x7fffffff));
-    ++rt_.depth_;
-    ++active_;
-    const beside::Visit visit;  // (the entries beside the lists that the class names are this visit's)
-    const bool known = blueprint_->call(function, args, results);
-    rt_.chain_ends(*this);
-    --rt_.depth_;
-    return known;
+    Results into(results);
+    return call_class(function, args, into);
   }
   auto it = fn_index_.find(std::string(function));
   if (it == fn_index_.end()) return false;
@@ -3024,6 +3042,38 @@ void Runtime::call_on(Instance& caller, std::string_view function, ActorRef targ
   if (!call_on(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, got, caller.name()) || !declared) return;
   for (std::size_t k = 0; k < results.size() && k < got.size(); ++k)
     results[k] = from_outside(got[k], logic::declared(declared->outputs[k]), g);
+}
+
+std::size_t Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, std::span<const Value> args, std::span<Value> results) {
+  // (as call_on above: the declared outputs, each what the call gave as the declared type, its default where it gave none)
+  const Graph& g = caller.graph();
+  const Function* declared = g.function(function);
+  const std::size_t n = declared ? min_of(results.size(), declared->outputs.size()) : 0;
+  std::size_t given = 0;
+  if (!call_on_into(target, declared && !declared->remote.empty() ? std::string_view(declared->remote) : function, args, results, given, caller.name()) || !declared) given = 0;
+  for (std::size_t k = 0; k < n; ++k) {
+    const FunctionPin& p = declared->outputs[k];
+    results[k] = k < given ? from_outside(results[k], logic::declared(p), g) : Value::from_json(p.value, logic::declared(p), g);
+  }
+  return n;
+}
+
+bool Runtime::call_on_into(ActorRef target, std::string_view function, std::span<const Value> args, std::span<Value> got, std::size_t& given, std::string_view caller) {
+  // (as call_on below, into the caller's places)
+  given = 0;
+  Instance* to = find(target);
+  if (!to || to->disabled_) return false;
+  if (depth_ >= 64) {
+    host_.error(std::string(caller) + ": calls on other Blueprints nest more than 64 deep - the call of " + std::string(function) + " is left out");
+    return false;
+  }
+  const bool at_work = !to->blueprint_ && to->active_ > 0;
+  Instance::Held held;
+  if (at_work) held = to->held_calls();
+  const bool known = to->call_into(function, args, got, given);
+  if (at_work) to->set_held_calls(std::move(held));
+  if (!known) given = 0;
+  return known;
 }
 
 bool Runtime::call_on(ActorRef target, std::string_view function, const std::vector<Value>& args, std::vector<Value>& got, std::string_view caller) {

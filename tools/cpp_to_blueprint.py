@@ -990,6 +990,10 @@ class Tree:
                 r = self.decl.get(o["parentDeclContextId"])
                 if r is not None and r.get("_q"):
                     self.owner[o["id"]] = r["_q"]
+                    # (a method defined outside its class - `void Field::rebuild(const std::vector<Spot>&)` -
+                    # stands in its class as its declaration there: C++ looks its names up in the class -
+                    # `Spot` is Field::Spot, not another Spot of the namespace)
+                    self.scope_of[o["id"]] = r["_q"] + "::"
 
 
 def enum_underlying(values):
@@ -1024,12 +1028,11 @@ def declared_length(tree, parm):
 
 
 def count_per(t):
-    """kern::Count<Per> - a count beside a pointer the engine writes numbers through, each thing it counts
-    `Per` numbers (kern/core/base.h): Per. A whole number that counts what it writes: 1. Else None."""
+    """kern::Count<Per> - the count beside a pointer of the engine, each thing it counts `Per` numbers (or entries)
+    of what the pointer shows (kern/core/base.h): Per. Else None - a whole number beside a pointer says nothing
+    about its length (only the type says it: no name is read)."""
     m = re.fullmatch(r"(?:kern::)?Count<\s*(\d+)\s*[uU]?\s*>", t.strip())
-    if m:
-        return int(m.group(1))
-    return 1 if NUMBER.get(t.strip()) == "Int" and t.strip() not in ("bool", "char") else None
+    return int(m.group(1)) if m else None
 
 
 def template_args(t):
@@ -3449,11 +3452,7 @@ class Emit:
                     if node is None or set(m.group(1)) - {"-"} or m.group(3) is not None or m.group(4) in ("h", "hh"):
                         raise Wait("a 64-bit number in a format Int64 to Text does not write so (a flag, a precision, X, o, c)")
                     spec = f"%{m.group(1)}{m.group(2)}s"
-                    # (the text in a variable of its own: Format Text reads its values where they lie, and the
-                    # text a node gives is a temporary - in the class it would be gone before it is read)
-                    digits = self.temp("digits", "Text")
-                    self.hoist([f"{digits} = {node}({self.ex(w, 'Int64')});"])
-                    values.append(digits)
+                    values.append(f"{node}({self.ex(w, 'Int64')})")
             out.append(spec)
             at += m.end()
         return "".join(out), values
@@ -4518,7 +4517,8 @@ class Emit:
         i = bare(inc) if inc else {}
         counting = (v is not None and NUMBER.get(self.ctype(v)) == "Int" and v.get("init") and c.get("kind") == "BinaryOperator" and c.get("opcode") in ("<", "<=")
                     and self.refers(kids(c)[0], v["id"]) and i.get("kind") == "UnaryOperator" and i.get("opcode") == "++" and self.refers(kids(i)[0], v["id"])
-                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break)
+                    and v["id"] not in self.assigned(body) and not any(x in self.assigned(body) for x in self.reads(kids(c)[1])) and not has_break
+                    and not self.asks_engine(kids(c)[1]))
         if counting:
             node = self.u.next_node
             self.u.next_node += 1
@@ -4540,6 +4540,18 @@ class Emit:
         loop = self.enter_loop(body)
         lines = self.loop_body(loop, [body], self.effect_stmt(inc) if inc else None)
         return out + self.loop_lines(condition, cond_pre, lines, loop)
+
+    def asks_engine(self, n):
+        """Does this expression call a function only the engine can do (Api.declared_only)? C++ works out the
+        condition of a loop before every round: a bound that asks the engine (`c < server_->max_clients()`)
+        is asked every round - the engine sees each call -, so it is no bound a counting loop works out once."""
+        tree = self.tree
+        for x in walk(n):
+            for i in (x.get("referencedDecl", {}).get("id"), x.get("referencedMemberDecl")):
+                e = tree.decl.get(i) if i else None
+                if e is not None and (e["id"] in self.u.engine_calls or self.u.api().declared_only(e)):
+                    return True
+        return False
 
     def effect_stmt(self, n):
         saved, self.pre = self.pre, []
@@ -4918,7 +4930,7 @@ class Emit:
             inner = self.unwrap(kids(b)[-1])
             if inner.get("kind") == "CallExpr" and callee_name(inner) in C_PARSE and C_PARSE[callee_name(inner)][0] in ("long", "unsigned") and not self.own(callee(inner).get("referencedDecl", {}).get("id")):
                 bits = self.parsed(inner, callee_name(inner), kids(inner)[1:], bits=True)[0]
-                return self.narrow(f"int64_low({bits})", "unsigned int", self.ctype(b), None), "Int"
+                return self.cut_low(f"int64_low({bits})", self.ctype(b)), "Int"
         return None
 
     def parsed(self, b, name, a, bits=False):
@@ -4939,7 +4951,7 @@ class Emit:
         if bits:
             return f"{call}.value", "Int64"
         if kind == "int":   # (atoi: the long strtol reads, cut to an int)
-            return self.narrow(f"int64_low({call}.value)", "unsigned int", "int", None), "Int"
+            return self.cut_low(f"int64_low({call}.value)", "int"), "Int"
         return f"int64_to_int({call}.value)", "Int"   # (a long: its bits read with their sign, as a Blueprint holds every long)
 
     def scanned(self, a, used=True):
@@ -6150,10 +6162,10 @@ class Emit:
                 continue
             name, bt = pin_in, in_pins[pin_in]
             raw = qtype(params[i]).strip()
-            if count_per(u.clean(raw)) not in (None, 1) and not NUMBER.get(u.clean(raw)):
+            if count_per(u.clean(raw)) is not None:
                 # (a kern::Count<Per> made of a whole number where it is handed over: that number)
                 while a.get("kind") in ("ImplicitCastExpr", "CXXConstructExpr", "CXXFunctionalCastExpr", "MaterializeTemporaryExpr", "ExprWithCleanups", "CXXBindTemporaryExpr") and \
-                        len([x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"]) == 1 and count_per(u.clean(qtype(a))) not in (None, 1):
+                        len([x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"]) == 1 and count_per(u.clean(qtype(a))) is not None:
                     a = [x for x in kids(a) if x.get("kind") != "CXXDefaultArgExpr"][0]
             nodes[name] = a
             made = self.unwrap(a)
@@ -8873,6 +8885,12 @@ class Emit:
             return True
         return False
 
+    def cut_low(self, low, want):
+        """The low 32 bits of a 64-bit pattern (`low`: an Int, as int64_low gives them), as the C type `want` keeps
+        them - a step of its own: what `narrow` gives is a formula's text, it stands in a formula."""
+        cut = self.narrow("x", "unsigned int", want, None)
+        return low if cut == "x" else f"kern::to<Int>(kern::formula([](Float x) -> Float {{ return {cut}; }}, kern::to<Float>({low})))"
+
     def narrow(self, text, have, want, inner):
         """A whole number converted to a C++ type that holds less of it: what that type keeps."""
         if have == want or want not in NUMBER or NUMBER[want] != "Int" or NUMBER.get(have) == "Bool":
@@ -9564,6 +9582,29 @@ class Api:
         self.tree, self.u = tree, unit
         self.by_class = {}   # a class or a namespace -> its functions that are declared only, in their order
         self.implicit_makers = {}   # a class of the engine without a constructor of its own -> the one C++ gives it
+        self.unsaid = []   # declarations with a whole number beside a pointer that is no kern::Count<Per> (engine_api.py stops on them)
+
+    def unsaid_count(self, d, p, after):
+        """A pointer to data (not a handle, not a text) with a whole number beside it that does not say in its
+        type that it counts what the pointer shows (kern::Count<Per>): no node guesses its length from a name -
+        the declaration is noted (Api.unsaid) and its function has no node (Wait); the generator stops on it."""
+        raw = qtype(p).strip()
+        if after is None or not re.search(r"\*\s*(const)?$", raw) or raw.replace(" ", "") in ("constchar*", "constchar*const", "char*", "char*const"):
+            return
+        count = self.u.clean(qtype(after).strip())
+        if count_per(count) is not None or NUMBER.get(count) != "Int" or count in ("bool", "char"):
+            return
+        if self.u.object_of(raw) is not None:
+            return
+        try:
+            inner = self.u.btype(re.sub(r"^const\s+", "", re.sub(r"\*\s*(const)?$", "", raw).strip()))
+        except Wait:
+            return   # (a pointer to what has no type in the language: no node either way)
+        if inner is None:
+            return
+        where = f"{self.home(d)}::{d['name']}({raw} {p.get('name', '')}, {qtype(after).strip()} {after.get('name', '')})"
+        self.unsaid.append(where)
+        raise Wait(f"a whole number beside a pointer that does not say it is its count (kern::Count<Per>): {where}")
 
     def opaque(self, q):
         """Is this class an object of the engine with a life of its own (a handle in a Blueprint)?"""
@@ -9622,16 +9663,25 @@ class Api:
             return t + "_list", of
         raise Wait(f"a {bt}")
 
-    def shape(self, bt):
-        """A value's form, written out: n i b v t, e<values>, {fields}, [items]."""
+    def shape(self, bt, raw=None):
+        """A value's form, written out: n i b v t, e<values>, {fields}, [items] - [N items] for a list of a fixed
+        length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it)."""
         if bt in ENGINE_PIN:
             return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
         if bt in self.u.enum_values:
             return f"e{len(self.u.enum_values[bt])}"
         if bt in self.u.struct_fields:
-            return "{" + "".join(self.shape(t) for _, t, _, _ in self.u.struct_fields[bt]) + "}"
+            q = next((k for k, n_ in self.u.structs.items() if n_ == bt and isinstance(k, str) and k in self.tree.records), None)
+            cpp = {c.get("name"): qtype(c) for c in kids(self.tree.records[q]) if c.get("kind") == "FieldDecl"} if q else {}
+            return "{" + "".join(self.shape(t, cpp.get(c)) for _, t, _, c in self.u.struct_fields[bt]) + "}"
         if bt.startswith("List<"):
-            return "[" + self.shape(bt[5:-1]) + "]"
+            n = self.u.entries(raw) if raw else None
+            inner = None
+            if n:   # (what each entry is in C++: T[3][2] -> T[2], std::array<X, N> -> X)
+                c = self.u.clean(raw)
+                m = re.match(r"std::array<(.*),\s*\d+[uUlL]*>$", c)
+                inner = template_args(c)[0].strip() if m else re.sub(r"\[\d+\]", "", c, count=1)
+            return "[" + (str(n) if n else "") + self.shape(bt[5:-1], inner) + "]"
         raise Wait(f"a {bt}")
 
     def home(self, d):
@@ -9750,7 +9800,9 @@ class Api:
         group = snake(q.split("::")[-1])
         nth = makers.index(d) + 1
         ins, params, taken = [], [], {"exec", "then", "result"}
-        for i, p in enumerate(x for x in kids(d) if x.get("kind") == "ParmVarDecl"):
+        parms = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
+        for i, p in enumerate(parms):
+            self.unsaid_count(d, p, parms[i + 1] if i + 1 < len(parms) else None)
             bt, writes, handle = self.handed(qtype(p))
             if writes:
                 raise Wait("a constructor that writes through a parameter")
@@ -9827,6 +9879,7 @@ class Api:
                 outs.append((name, optional, None))
                 params.append((None, name))
                 continue
+            self.unsaid_count(d, p, all_params[i + 1] if i + 1 < len(all_params) else None)
             written = self.written_list(p, all_params[i + 1] if i + 1 < len(all_params) else None)
             if written is not None:
                 name = name_of(p.get("name") or f"value{i + 1}")
@@ -9889,7 +9942,7 @@ class Api:
 
     def written_list(self, p, after):
         """A parameter that is a pointer to numbers the function writes through, with their count beside it -
-        the parameter after it, a whole number (`void render(f32* out, u32 frames)`): what the engine writes
+        the parameter after it, a kern::Count<Per> (`void render(f32* out, Count<2> frames)`): what the engine writes
         there is a further output, the list of those numbers (List<Float> ...); the count stays an input.
         None for any other parameter. (A call hands it a place in a list - `buf.data()`, `buf.data() + k`: the
         engine's numbers go there, entry by entry; the list keeps its length. The stand-in of the tests gives
@@ -9901,8 +9954,8 @@ class Api:
         if "*" in inner or "&" in inner or re.search(r"\bconst\b", inner) or self.u.object_of(raw) is not None:
             return None   # (a pointer to an object of the engine is its handle)
         count = self.u.clean(qtype(after).strip())
-        if count_per(count) is None and (NUMBER.get(count) != "Int" or count in ("bool", "char")):
-            return None
+        if count_per(count) is None:
+            return None   # (no count in its type: Api.unsaid_count reports it)
         if self.u.clean(inner) == "char":
             return None   # (characters: a text's, not numbers)
         try:
@@ -10152,7 +10205,23 @@ class TestWriter:
             while i.get("kind") in CAST and kids(i):
                 i = bare(kids(i)[-1])
             ref = self.tree.decl.get((i.get("referencedDecl") or {}).get("id")) if i.get("kind") == "DeclRefExpr" else None
-            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))))):
+            def fixed(v):
+                """A `const` variable is a constant place only where its value is one: constexpr, or set by what
+                no call reads (`const i32 t = L.gov.tier();` is a value of the run, whatever its type says -
+                game_look.cpp:228; its place in kTier is checked like any other)."""
+                if v.get("constexpr"):
+                    return True
+                todo = list(kids(v))
+                while todo:
+                    x = todo.pop()
+                    if x.get("kind") in ("CallExpr", "CXXMemberCallExpr", "CXXOperatorCallExpr", "MemberExpr", "CXXThisExpr", "ArraySubscriptExpr"):
+                        return False
+                    r = (x.get("referencedDecl") or {}) if x.get("kind") == "DeclRefExpr" else {}
+                    if r.get("kind") == "ParmVarDecl" or (r.get("kind") == "VarDecl" and not (self.tree.decl.get(r.get("id")) or {}).get("constexpr")):
+                        return False   # (a parameter, a variable that is no constant: a value of the run)
+                    todo += kids(x)
+                return True
+            if length is None or not (i.get("kind") == "IntegerLiteral" or (ref is not None and ref.get("kind") == "VarDecl" and (ref.get("constexpr") or re.search(r"\bconst\b", qtype(ref))) and fixed(ref))):
                 return False
             try:
                 at = Const(self.u).number(i)
@@ -10617,7 +10686,7 @@ class TestWriter:
             return f"converted::wide::Span<{const}{self.spell(inner)}>"
         if c in W64:
             return "u64" if c == "whole64u" else "i64"
-        if count_per(c) not in (None, 1) and c not in NUMBER:
+        if count_per(c) is not None:
             return "u32"   # (kern::Count<Per>: the whole number it holds - the source hands it one)
         if c in ("float", "double", "long double"):
             return "double"
@@ -11071,7 +11140,7 @@ class TestWriter:
                 inner = self.spell(re.sub(r"\*\s*(const)?$", "", raw))
                 after = ps[i + 1] if i + 1 < len(ps) else None
                 per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
-                counted = per is not None and re.search(r"count|size|len|num|^n$", after.get("name", ""))
+                counted = per is not None   # (only the type says it - no name is read)
                 fixed = declared_length(self.tree, p)   # (an array of a fixed length: so many)
                 data = (f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else
                         f"({name} ? std::vector<{inner}>({name}, {name} + {fixed}) : std::vector<{inner}>{{}})" if fixed else
@@ -12493,7 +12562,7 @@ class TestWriter:
                                        f"std::vector<{inner}> {lst} = draw_list(draw, [&]() -> {inner} {{ return {self.draw(entry)}; }}); {lst}.push_back({self.draw(entry)});"]
                         if extent and not n_fixed:   # (as many entries as the array has, at the least)
                             decl_lines.append(f"while ({lst}.size() < {int(extent.group(1))}) {lst}.push_back({self.draw(entry)});")
-                        decl_lines.append(f"const long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size(){room}) + 1));")
+                        decl_lines.append(f"long long {at} = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>({lst}.size(){room}) + 1));")
                         names += [lst, at]
                         held_lists.append(lst)
                         continue
@@ -12902,6 +12971,15 @@ class TestWriter:
             roots.setdefault(name, root[1] if root else (name, message))
         return message if root is None else f"{message} - that went with {root[1][0]}: {root[1][1]}"
 
+    @staticmethod
+    def test_compiler():
+        """The compiler that builds the tests - the one run_tests.sh takes (decision E13): CXX, else clang as it is
+        looked for there (CLANGXX, clang++, clang++-20 ... clang++-16). Whether a test compiles is told by that one."""
+        for c in (os.environ.get("CXX"), os.environ.get("CLANGXX"), "clang++", *(f"clang++-{v}" for v in range(20, 15, -1))):
+            if c and shutil.which(c):
+                return c
+        sys.exit("no clang (CXX, CLANGXX, clang++, clang++-20 ... clang++-16): the tests are built with the game's compiler")
+
     def compiles(self, text, stem):
         """What the compiler complains of in the test: [(line, complaint)], empty when it compiles."""
         d = tempfile.mkdtemp(prefix="kern-converted-check-")   # (nothing is kept between runs)
@@ -12914,12 +12992,17 @@ class TestWriter:
             os.makedirs(os.environ["TEST_KEEP"], exist_ok=True)
             n = len([x for x in os.listdir(os.environ["TEST_KEEP"]) if x.startswith(f"test_{stem}.")])
             shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
-        r = subprocess.run([os.environ.get("CXX", "g++"), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter",
+        # (the switches of the suite itself - run_tests.sh: -Wall -Wextra, no -Werror: what only warns there does not
+        # make a function wait here; its warnings are said in the log - see below)
+        r = subprocess.run([self.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Wno-unused-parameter",
                             # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
                             # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
                             "-Wno-missing-field-initializers",
                             *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
         errors = []
+        warned = sorted({w.group(1)[:160] for w in re.finditer(r"\bwarning: (.*)", r.stderr)})
+        if warned:
+            print(f"    (test_{stem}: compiles with {len(warned)} kind(s) of warning, as in the suite: {warned[0]}{' …' if len(warned) > 1 else ''})")
         if r.returncode != 0:
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
@@ -13575,6 +13658,7 @@ def main(argv):
                 for place, piece in pieces.items():
                     w.pieces.setdefault(place, piece)
         w.wanted = None if u in program else set(wanted[u])
+        w.bars = dict(held.get(u, {}))   # (what waits for good: see `held`)
         return (u, sources.get(part_of.get(u, u)), files_, namespace, flags, w, test)
 
     # ---- the Blueprints, each after those it calls ----
@@ -13593,13 +13677,21 @@ def main(argv):
     given = {}                              # a Blueprint -> what it was given when it was converted last
     gave = collections.defaultdict(list)    # a Blueprint -> what it has given (its table, its exports), each once
     version = {}                            # a Blueprint -> which of those it gives now (an index into gave)
-    met, rounds, took = set(), 0, {}
+    met, rounds, took = {}, 0, {}   # (met: a state -> the round that began from it)
+    # When the rounds go round (the same state twice), what turns in them is what one Blueprint gives taking from what
+    # another gives: a function written in one round and waiting in the next, or waiting with another reason each time. Such a
+    # function of a Blueprint that goes round waits for good from then on (World.bars), with the reason it gave first in those
+    # rounds and the Blueprint it went round with; its Blueprint is given that, and what it gives no longer turns on it. Each
+    # time the rounds go round more wait for good - there are only so many functions -, so the rounds end. Rounds that do not
+    # go round never come to this: what they write stays as it was.
+    held = {}                               # a Blueprint -> its functions that wait for good: key -> why
+    visited = collections.defaultdict(list) # a Blueprint -> (the round, the version it gave then), round by round
 
     def asked_of(u, needs):
         """What a Blueprint is given, told by what it is made of: its files, the functions to write, and which
         of what they gave the Blueprints it may call give now."""
         return (tuple(sorted(unit_files[u])), None if u in program else tuple(sorted(wanted[u])),
-                tuple((d, version.get(d)) for d in sorted(needs[u])))
+                tuple((d, version.get(d)) for d in sorted(needs[u])), tuple(sorted(held.get(u, {}).items())))
 
     while True:
         needs = {u: need_of(u) for u in deps}
@@ -13623,9 +13715,43 @@ def main(argv):
                     exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
+            for u in sorted(new):
+                # (what it gave in the rounds that went round: of two versions one after the other, what differs - the values)
+                ring = [v for at, v in visited[u] if at >= met[state]]
+                for a, b in sorted({(x, y) for x, y in zip(ring, ring[1:]) if x != y}):
+                    (ta, ea), (tb, eb) = gave[u][a], gave[u][b]
+                    for k in sorted(set(ta) | set(tb)):
+                        if ta.get(k) != tb.get(k):
+                            print(f"goes round: {u}: v{a} -> v{b}: table {k}: {repr(ta.get(k))[:600]} -> {repr(tb.get(k))[:600]}", flush=True)
+                    for i, (da, db) in enumerate(zip(ea, eb)):
+                        if isinstance(da, dict) and isinstance(db, dict):
+                            for k in sorted(set(da) | set(db), key=str):
+                                if da.get(k) != db.get(k):
+                                    print(f"goes round: {u}: v{a} -> v{b}: exports[{i}] {k}: {repr(da.get(k))[:900]} -> {repr(db.get(k))[:900]}", flush=True)
+            # What turns in the rounds that went round and waits in one of them waits for good (World.bars), with the
+            # reason it gave first there - a function written in one round and waiting in the next, or one that waits in
+            # each with another reason (what it names first changes with what the others give): each its own, the same
+            # whatever the order in which the round's jobs are done.
+            pinned = {}
+            for u in sorted(new):
+                ring = [v for at, v in visited[u] if at >= met[state]]
+                tabs = [gave[u][v][0] for v in ring]
+                for k in sorted(set().union(*tabs)):
+                    if k in held.get(u, {}):
+                        continue
+                    outcomes = [(t[k]["wait"] if k in t else "absent") for t in tabs]
+                    waits = [w for w in outcomes if w and w != "absent"]
+                    if len(set(outcomes)) > 1 and waits:
+                        pinned.setdefault(u, {})[k] = f"{waits[0]} (it went round with {u})"
+            if pinned:
+                for u, ks in sorted(pinned.items()):
+                    held.setdefault(u, {}).update(ks)
+                    for k, why in ks.items():
+                        print(f"{u}: {tables[u][k]['cpp'] if k in tables.get(u, {}) else k}() waits for good - the rounds went round: {why}", flush=True)
+                continue
             raise SystemExit("these Blueprints give, round after round, what they gave before (what one writes takes from the other what "
                              "it writes): " + ", ".join(sorted(new)))
-        met.add(state)
+        met[state] = rounds + 1
         now = sorted(u for u in new if all(d not in new or u in needs[d] for d in needs[u]))
         rounds += 1
         print(f"round {rounds}: {len(now)} Blueprints", flush=True)
@@ -13650,6 +13776,7 @@ def main(argv):
             if value not in gave[u]:
                 gave[u].append(value)
             version[u] = gave[u].index(value)
+            visited[u].append((rounds, version[u]))
         for u in now:
             # What it would call of a Blueprint that has no such function written: that Blueprint is one it calls
             # (the plan may not have known it, or not the call) - and of a header of the engine, one more

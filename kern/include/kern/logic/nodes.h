@@ -43,6 +43,13 @@ template <std::size_t N> struct Setting {
   constexpr std::string_view view() const { return {text, N - 1}; }
 };
 
+namespace logic {
+struct Whole;
+template <char Op, class A, class B> struct Sum;
+template <class T> inline constexpr bool is_sum = false;
+template <char Op, class A, class B> inline constexpr bool is_sum<Sum<Op, A, B>> = true;
+}  // namespace logic
+
 /// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
 namespace math {
 inline constexpr f64 pi = 3.14159265358979323846;
@@ -89,6 +96,7 @@ inline i64 bits_of(f64 a) {
   if (!(a == a)) return 0;
   return a > 0 ? std::numeric_limits<i64>::max() : std::numeric_limits<i64>::min();
 }
+inline i64 bits_of(const logic::Whole& a);  // (an Int: as the double it is - below, where Whole is)
 /// The whole number one of these functions gives (band bor bxor shl shr wrap32 wrap32s mul32):
 /// it stands for the double static_cast<f64>(v) - that is what it is everywhere a number is
 /// asked for. Handed on to another of these functions, the number is taken as it is where that
@@ -103,7 +111,7 @@ inline i64 bits_of(Exact a) {
   return a.v >= -exact && a.v <= exact ? a.v : bits_of(static_cast<f64>(a.v));
 }
 /// (what these functions take: a number, or the whole number another of them gave)
-template <class T> concept Bits = std::same_as<T, Exact> || std::is_arithmetic_v<T>;
+template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || logic::is_sum<T> || std::is_arithmetic_v<T>;
 template <Bits A, Bits B> inline Exact band(A a, B b) { return {bits_of(a) & bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bor(A a, B b) { return {bits_of(a) | bits_of(b)}; }
 template <Bits A, Bits B> inline Exact bxor(A a, B b) { return {bits_of(a) ^ bits_of(b)}; }
@@ -131,6 +139,9 @@ struct Whole {
   i64 v = 0;
   constexpr Whole() = default;
   constexpr Whole(i64 x) : v(normal(x)) {}       // NOLINT (implicit: an i64 is one)
+  /// (what a formula of whole numbers gives as an Int: the number its double holds as an Int -
+  /// whole(double(v)), which is normal(v): -> Int in a formula of whole numbers)
+  constexpr Whole(math::Exact x) : v(normal(x.v)) {}  // NOLINT
   constexpr operator i64() const { return v; }   // NOLINT
   Whole& operator+=(Whole amount) {
     v = whole_add(v, amount.v);
@@ -138,6 +149,69 @@ struct Whole {
   }
   u64 hash() const { return KeyHash<i64>{}(v); }  // (a key of a Map, a Set)
 };
+}  // namespace logic
+namespace math {
+/// An Int handed to band ... mul32 (a formula of whole numbers): its bits are those of the double
+/// it is (bits_of(double(v))) - as Exact's, without the way through the double.
+inline i64 bits_of(const logic::Whole& a) { return bits_of(Exact{a.v}); }
+}  // namespace math
+namespace logic {
+/// +, - and * in a formula of whole numbers (docs/blueprint_cpp.md, "Formeln"): where one side is
+/// an Int (or such a sum) and the other an Int, what band ... mul32 give, or a number. Its value
+/// is what the formula's arithmetic of doubles gives - the two numbers as doubles (an Int and
+/// what band ... mul32 give: static_cast<f64>(v)), added, subtracted or multiplied as doubles -,
+/// worked out where it is asked for: as a number (f64) exactly that way; handed to band ...
+/// mul32 as the whole number it is, by the arithmetic of i64 where that is the same - every
+/// number in it is a whole number of at most 2^53 and so is every result on the way (then each
+/// double operation is exact: its double is that whole number) -, and else through the doubles.
+/// So it is the same value for every number, and the way through the double only where it
+/// makes a difference.
+template <class T> concept SumSide = std::same_as<T, Whole> || is_sum<T>;
+template <class T> concept SumOperand = SumSide<T> || std::same_as<T, math::Exact> || std::is_floating_point_v<T>;
+inline constexpr i64 kSumExact = i64{1} << 53;
+/// (a side as the formula's double)
+inline f64 sum_number(f64 x) { return x; }
+inline f64 sum_number(math::Exact x) { return static_cast<f64>(x.v); }
+inline f64 sum_number(Whole x) { return static_cast<f64>(x.v); }
+template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s);
+/// (a side as a whole number of at most 2^53 that its double is exactly - false where it is none)
+inline bool sum_exact(f64 x, i64& r) {
+  if (!(x >= -0x1p53 && x <= 0x1p53)) return false;  // (not a number fails it too)
+  r = static_cast<i64>(x);
+  return static_cast<f64>(r) == x;
+}
+inline bool sum_exact(math::Exact x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
+inline bool sum_exact(Whole x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
+template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r);
+template <char Op, class A, class B> struct Sum {
+  A a;
+  B b;
+  operator f64() const {  // NOLINT (implicit: it is that number)
+    const f64 x = sum_number(a), y = sum_number(b);
+    if constexpr (Op == '+') return x + y;
+    else if constexpr (Op == '-') return x - y;
+    else return x * y;
+  }
+};
+template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s) { return static_cast<f64>(s); }
+template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r) {
+  i64 x = 0, y = 0;
+  if (!sum_exact(s.a, x) || !sum_exact(s.b, y)) return false;
+  if constexpr (Op == '+') r = x + y;  // (|x|, |y| <= 2^53: no overflow)
+  else if constexpr (Op == '-') r = x - y;
+  else if (__builtin_mul_overflow(x, y, &r)) return false;
+  return r >= -kSumExact && r <= kSumExact;
+}
+/// (handed to band ... mul32: the whole number where it is exact, else bits_of of the double)
+template <char Op, class A, class B> inline i64 bits_of(const Sum<Op, A, B>& s) {
+  i64 r = 0;
+  return sum_exact(s, r) ? r : math::bits_of(static_cast<f64>(s));
+}
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'+', A, B> operator+(A a, B b) { return {a, b}; }
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'-', A, B> operator-(A a, B b) { return {a, b}; }
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'*', A, B> operator*(A a, B b) { return {a, b}; }
+}  // namespace logic
+namespace logic {
 
 /// `Text` in a Blueprint's C++. A text written out in the program - "abc": a value typed into a
 /// pin, the default of a variable or of a field - is part of the program: a Text made of it
@@ -2132,7 +2206,7 @@ template <class C, class R, class... A> std::tuple<std::remove_cvref_t<A>...> pa
 /// NativeParam<&Door::Tune, 0>. What holds a reference input for a call by name - a variable of
 /// exactly the class's type, so the function's reference binds to it (logic::native_glue).
 template <auto Function, std::size_t K> using NativeParam = std::tuple_element_t<K, decltype(detail::params_of(Function))>;
-template <class T> T native_arg(const std::vector<Value>& args, std::size_t i, const T& fallback) {
+template <class T> T native_arg(std::span<const Value> args, std::size_t i, const T& fallback) {
   return i < args.size() ? from_value<T>(args[i].converted(pin_type_of<T>())) : fallback;
 }
 /// A value an event brought, as the C++ type of its handler's parameter: output `out` of the
@@ -2526,10 +2600,24 @@ inline f64 tween_step(f64* m, f64 now, std::string_view ease, bool first, bool& 
 /// Switch on Int with `cases` cases: the exec output (the case, or `cases` for Default).
 inline int switch_int(int cases, i64 selection) { return selection >= 0 && selection < cases ? static_cast<int>(selection) : cases; }
 /// Switch on Text: the exec output (the case that equals the selection, or the count for Default).
+/// (the cases as setting_cases has them - each piece between commas without the blanks around it,
+/// empty ones left out -, read where they stand: no list of them is made)
 inline int switch_text(std::string_view cases, std::string_view selection) {
-  const std::vector<std::string> list = setting_cases(cases);
-  for (std::size_t i = 0; i < list.size(); ++i) if (list[i] == selection) return static_cast<int>(i);
-  return static_cast<int>(list.size());
+  int index = 0, found = -1;
+  std::size_t from = 0;
+  while (from <= cases.size()) {
+    std::size_t to = cases.find(',', from);
+    if (to == std::string_view::npos) to = cases.size();
+    std::string_view one = cases.substr(from, to - from);
+    while (!one.empty() && one.front() == ' ') one.remove_prefix(1);
+    while (!one.empty() && one.back() == ' ') one.remove_suffix(1);
+    if (!one.empty()) {
+      if (found < 0 && one == selection) found = index;
+      ++index;
+    }
+    from = to + 1;
+  }
+  return found >= 0 ? found : index;
 }
 }  // namespace flow
 
@@ -2559,6 +2647,7 @@ template <> struct To<Whole> : To<i64> {
     r.v = whole(v);
     return r;
   }
+  static Whole from(math::Exact v) { return Whole(v); }  // (a formula of whole numbers: whole(double(v)) is normal(v))
 };
 template <> struct To<f64> {
   static f64 from(bool v) { return v ? 1 : 0; }
@@ -2575,10 +2664,12 @@ template <> struct To<Vec3> {
 };
 template <> struct To<std::string> {
   template <class S> static std::string from(const S& v) { return to_value(v).as_text(); }  // (everything prints, as the interpreter prints it)
+  static std::string from(math::Exact v) { return from(static_cast<f64>(v)); }
 };
 template <> struct To<Text> {
   static Text from(const Text& v) { return v; }
   template <class S> static Text from(const S& v) { return Text(to_value(v).as_text()); }  // (everything prints, as the interpreter prints it)
+  static Text from(math::Exact v) { return from(static_cast<f64>(v)); }
 };
 template <> struct To<ActorHandle> {
   static ActorHandle from(ActorHandle v) { return v; }

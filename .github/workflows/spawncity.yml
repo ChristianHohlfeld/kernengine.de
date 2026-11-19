@@ -48,7 +48,7 @@ jobs:
             sc-obj-
             kern-obj-
       - name: Native tests (ASan/UBSan)
-        run: CXX=g++ CC=gcc kern/games/spawncity/tests/run_tests.sh
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
       - name: Build the game
         run: |
           set -euo pipefail

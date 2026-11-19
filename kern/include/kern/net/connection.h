@@ -98,7 +98,7 @@ class Connection {
   /// Builds the next packet payload (messages of every channel) and sends it through the endpoint.
   void send_packet();
   /// Hands a datagram received from the remote side to the endpoint.
-  void receive_packet(const u8* data, int bytes);
+  void receive_packet(const u8* data, Count<1> bytes);
   void advance_time(f64 time);
   ConnectionError error() const { return error_; }
   const EndpointStats& stats() const { return endpoint_.stats(); }

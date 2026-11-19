@@ -26,7 +26,7 @@ int failures = 0, checks = 0;
 
 // The allocator says every piece of memory it is asked for (cost.h): with the sanitizers, their
 // allocator through its hook; without them, operator new itself.
-#if defined(__SANITIZE_ADDRESS__)
+#if defined(SC_ASAN)
 // (the sanitizers' own interface - sanitizer/allocator_interface.h, where a compiler brings that header)
 extern "C" int __sanitizer_install_malloc_and_free_hooks(void (*asked)(const volatile void*, std::size_t), void (*given_back)(const volatile void*));
 // (and what it gives is zeroed: what C++ leaves open in an object that nothing sets is then the zero the
@@ -210,6 +210,10 @@ int main(int argc, char** argv) {
     const pid_t child = fork();
     if (child == 0) {
       close(pipe_fd[0]);
+      // (the test's own counts: the child begins with what the tests before it added up - without this each test
+      // gave the sum so far once more, the sum doubled from test to test, and one failure failed every test after it)
+      sct::checks = 0;
+      sct::failures = 0;
       c.fn();
       counts[0] = sct::checks;
       counts[1] = sct::failures;

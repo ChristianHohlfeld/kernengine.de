@@ -102,6 +102,14 @@ class EngineObjects {
     place(handle, kinds_of<T, Bases...>(at), [](void* p) { delete static_cast<T*>(p); });
     return at;
   }
+  /// ... made together with the objects of the engine its constructor takes (MadeWith - they have no
+  /// handle): this ends them all, the object first.
+  template <class T, class... Bases, class H> T* put_made(i64 handle, std::unique_ptr<H> made) {
+    T* at = &*made->object;
+    H* owner = made.release();
+    place(handle, kinds_of<T, Bases...>(at), [](void* p) { delete static_cast<H*>(p); }, owner);
+    return at;
+  }
 
   /// A text that stays as long as these objects - where the engine holds a text as `const char*` (a field of
   /// a struct it is given): the same text, the same characters.
@@ -129,10 +137,11 @@ class EngineObjects {
   struct Entry {
     void* at = nullptr;
     void (*end)(void*) = nullptr;  // (null: the host's own)
+    void* owner = nullptr;          // what `end` ends, if not the object itself: what holds it (MadeWith)
     Kinds kinds;  // its class first, then those it derives from
   };
   i64 put(Kinds kinds, void (*end)(void*));
-  void place(i64 handle, Kinds kinds, void (*end)(void*));
+  void place(i64 handle, Kinds kinds, void (*end)(void*), void* owner = nullptr);
   void* find(i64 handle, Kind k) const;
   bool end(i64 handle, Kind k);
 
@@ -219,6 +228,25 @@ template <class T> T blank() {
     return std::bit_cast<T>(Bytes{});
   }
 }
+
+/// An object of the engine made for a handle a host has none of (EngineObjects::on_missing), whose
+/// constructor takes other objects of the engine (`Client(Transport&, ...)`): those are made with it, the
+/// way each is made without a handle, and kept here - they end after it, in the reverse order they came.
+template <class T> struct MadeWith {
+  std::vector<std::pair<void*, void (*)(void*)>> kept;
+  std::optional<T> object;
+  MadeWith() = default;
+  MadeWith(const MadeWith&) = delete;
+  MadeWith& operator=(const MadeWith&) = delete;
+  ~MadeWith() {
+    object.reset();
+    for (auto it = kept.rbegin(); it != kept.rend(); ++it) it->second(it->first);
+  }
+  template <class D> D& keep(D* d) {
+    kept.emplace_back(d, [](void* p) { delete static_cast<D*>(p); });
+    return *d;
+  }
+};
 
 template <class C> inline constexpr bool is_count = false;
 template <u32 Per> inline constexpr bool is_count<Count<Per>> = true;

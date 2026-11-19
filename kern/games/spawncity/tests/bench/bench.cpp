@@ -1,7 +1,12 @@
 // The measurement (bench.h): the class side of every case and the clock. Built and run by
 // tools/blueprint_bench.sh, which writes classes.h (tools/blueprint_cpp.sh --classes) first.
 //
-//   bench [rounds] [case ...]     (default 15 rounds, every case)
+//   bench [--check <limit>] [rounds] [case ...]     (default 15 rounds, every case)
+//
+// --check: the time as a test - it fails (exit 1) when for a case the class's best time is more
+// than <limit> times the source's (the best of the rounds, both measured in turn: noise only makes
+// a run slower, so the best is the steadiest - on this machine the best ratio moved by at most 6 %
+// between runs, the median by up to 15 %), or when the checksums differ where they must not.
 //
 // Prints per case: the time per call of the source and of the class (minimum and median over the
 // rounds, each round long enough for the clock), their ratio (class / source), and whether the
@@ -358,6 +363,12 @@ double median(std::vector<double> v) {
 }  // namespace
 
 int main(int argc, char** argv) {
+  double limit = 0;
+  if (argc > 2 && std::string(argv[1]) == "--check") {
+    limit = std::atof(argv[2]);
+    argv += 2, argc -= 2;
+  }
+  int failed = 0;
   int rounds = argc > 1 ? std::atoi(argv[1]) : 15;
   if (rounds < 1) rounds = 15;
   std::vector<std::string> only(argv + std::min(argc, 2), argv + argc);
@@ -376,8 +387,12 @@ int main(int argc, char** argv) {
     const double smin = *std::min_element(ts.begin(), ts.end()), kmin = *std::min_element(tk.begin(), tk.end());
     const double smed = median(ts), kmed = median(tk);
     const char* same = s == k ? "=" : c.same ? "ABWEICHUNG" : "f32";
+    const bool over = limit > 0 && kmin / smin > limit;
+    failed += (s != k && c.same) || over ? 1 : 0;
     std::printf("%-20s %-20s %10.2f %10.2f %10.2f %10.2f %7.2f %7.2f %s\n", c.name, c.kind, smin * 1e6, smed * 1e6, kmin * 1e6, kmed * 1e6, kmin / smin, kmed / smed, same);
+    if (over) std::printf("  ^ %s: die Klasse braucht %.2f-mal die Zeit der Quelle (Grenze %.2f)\n", c.name, kmin / smin, limit);
   }
   std::printf("(Zeiten in µs je Aufruf eines Falls; min/med: Klasse geteilt durch C++)\n");
-  return 0;
+  if (failed) std::printf("%d Fall/Fälle über der Grenze oder mit abweichender Prüfsumme\n", failed);
+  return failed ? 1 : 0;
 }

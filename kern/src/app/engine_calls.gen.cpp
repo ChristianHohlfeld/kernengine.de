@@ -1,6 +1,7 @@
 // The engine's nodes on the engine itself: the calls of the functions the headers of this component declare
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
 #include "kern/app/app.h"
+#include "kern/gfx/renderer.h"
 #include "kern/logic/engine_host.h"
 
 namespace kern::logic {
@@ -897,6 +898,7 @@ const EngineCall kCalls[] = {
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
 const EngineMaker kMakers[] = {
+    {EngineObjects::kind<kern::Engine>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::Engine>>(); auto& d0 = made->keep(new kern::Renderer()); made->object.emplace(d0); return o.put_made<kern::Engine>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::Input>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::Input>(handle, std::unique_ptr<kern::Input>(new kern::Input())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));

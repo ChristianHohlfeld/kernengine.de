@@ -346,6 +346,11 @@ void on1(Actor actor, Float value, Text text) {
 ### Listen fester Länge
 
 Ein **Platz** kann als Liste fester Länge deklariert sein: Er hat immer genau so viele Einträge.
+Ein Wert, der an einem **Eingang** steht, dessen Typ eine Liste fester Länge ist (das Feld einer Struktur bei Make Struct,
+der Eingang einer Funktion), wird ebenso mit seinem Typ geschrieben: `struct_make<Trio>(Fixed<Float, 3>{1.5, -2.0}, 7)` – die
+Länge ist die des Eingangs (`PinDef::count`, aus dem Typ des Felds bzw. des Eingangs). Der Leser lehnt eine andere Länge ab;
+`List<Float>{…}` dort liest er wie bisher (dieselben Einträge, der Rest null). In C++ fordert das keinen Speicher an.
+
 In C++ ist `Fixed<Float, 16>` ein `std::array` – es liegt dort, wo es steht, und fordert keinen
 Speicher an (eine `List` ist ein `std::vector`: Jede hat ihren eigenen Speicher). Damit kostet
 eine Matrix im Blueprint, was sie im C++ kostet.
@@ -854,6 +859,11 @@ LeerenResult Leeren() {
     Runde liest, wird kopiert; was jede Runde erst neu setzt, wird übergeben. Jeder Aufruf hat
     seine lokalen Variablen für sich (in der Klasse sind es die von C++), darum ist das allein
     eine Frage der Schritte dieses Aufrufs.
+  - **die Variable, die ein Wert als ersten Eingang liest und die der eine Schritt, der diesen Wert liest,
+    als Ganzes auf ihn setzt** – bei einem Knoten, der das von sich sagt (`NodeDef::takes_first`: Append):
+    `O = text_append(std::move(O), x, "");` hängt dort an, wo O seine Zeichen hat. Den alten Wert liest danach
+    nichts mehr (der Schritt setzt O sofort neu); was die anderen Eingänge lesen, ist vorher gelesen, und ist
+    ein anderer Eingang O selbst (`text_append(std::move(O), O, "")`), nimmt text_append O, wie es war.
   - **was der Schritt direkt davor gab** (`n4.punkte`), wenn dieser Eingang es als einziger liest.
     „Direkt davor“: ein einfacher Schritt, dessen einer Weg zu diesem Schritt führt, und kein
     anderer Weg führt hierher – der Schritt läuft genau einmal nach jedem seiner Läufe, und
@@ -1170,7 +1180,8 @@ ein Knoten (`tools/engine_api.py` liest die Header der Engine und schreibt die T
 ist `engine.world.cast_ray`, im Text `engine_world_cast_ray(world, from, to …)`. Interpreter und
 JIT rufen ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertreter
 `logic::EngineStandIn`, der aus der Form jedes Ausgangs antwortet – gleich in jeder Stufe – oder
-die Engine selbst. Die Klasse ruft die Funktion der Engine selbst (unten: „In der Klasse der Aufruf
+die Engine selbst. Eine Liste in der Form hat 0 bis 2 Einträge; eine Liste fester Länge – ein Feld,
+das in C++ ein Array ist (`f32 m[16]` von `Mat4`: Form `{[16n]}`) – genau so viele, wie C++ hält. Die Klasse ruft die Funktion der Engine selbst (unten: „In der Klasse der Aufruf
 selbst“).
 
 - **In der Klasse der Aufruf selbst** (`kern/logic/engine_direct.h`): Gibt der Host der Klasse die
@@ -1219,16 +1230,21 @@ selbst“).
 - **Was eine Funktion durch einen Parameter schreibt, ist ein weiterer Ausgang:** durch eine
   Referenz (`std::vector<u64>& out`), durch einen Zeiger, der null sein darf (`bool* changed =
   nullptr` – der Aufruf nimmt den Wert, wo er ihn will, oder nirgends), und durch einen Zeiger auf
-  Zahlen mit ihrer Anzahl daneben (`void render(f32* out, u32 frames)`): eine Liste der Zahlen,
+  Zahlen mit ihrer Anzahl daneben (`void render(f32* out, Count<2> frames)`): eine Liste der Zahlen,
   die die Engine dort hinschreibt (`out`, List<Float>), die Anzahl bleibt ein Eingang. In der
   Tabelle nennt der Ausgang seine Anzahl (`EnginePin::count`); der Stellvertreter gibt nicht mehr
   Einträge, als sie sagt – den Platz, den der Aufruf ihm gibt. Der Aufruf `mixer_.render(out_.data(),
   frames)` schreibt die Zahlen des Knotens in die Liste, auf die der Zeiger zeigt, ab dem Eintrag,
-  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++. Zählt die
-  Anzahl Dinge aus mehreren Zahlen, sagt ihr Typ es: `void render(f32* out, Count<2> frames)`
-  (`kern::Count<Per>`, kern/core/base.h – die ganze Zahl, die er hält) schreibt 2 × frames Zahlen;
-  die Tabelle sagt es (`EnginePin::per`), der Stellvertreter gibt so viele, der Aufruf im Test nimmt
-  so viele.
+  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++. **Dass die
+  Zahl neben einem Zeiger seine Anzahl ist, sagt allein ihr Typ:** `kern::Count<Per>` (kern/core/base.h
+  – die ganze Zahl, die er hält; Per Zahlen oder Einträge je Gezähltem): `void render(f32* out,
+  Count<2> frames)` schreibt 2 × frames Zahlen; die Tabelle sagt es (`EnginePin::per`), der
+  Stellvertreter gibt so viele, der Aufruf im Test nimmt so viele. Ebenso für einen Zeiger, den die
+  Engine liest: `push_incoming(from, const u8* data, Count<1> bytes)`, `triangulate(const f64* xy,
+  Count<2> vertex_count, …)` – die Tür und die Klasse weisen eine kürzere Liste ab, der Test der
+  Quelle zeichnet Per × Anzahl Werte auf. Steht neben einem Zeiger eine ganze Zahl eines anderen
+  Typs, sagt sie nichts über seine Länge: `tools/engine_api.py` hält mit der Liste dieser
+  Erklärungen an (kein Name wird gelesen, keine Länge geraten).
 - **Der Knoten auf der Engine selbst** (`kern/logic/engine_host.h`): `logic::call_engine(objects,
   function, in, out)` ruft die echte Funktion eines Knotens – `tools/engine_api.py` schreibt jeden
   Aufruf aus den Headern (`kern/src/<Teil>/engine_calls.gen.cpp`, ein Teil der Engine je Datei: ein
@@ -1245,7 +1261,15 @@ selbst“).
   dasselbe Handle. Handles zählen ab 1 in der Reihenfolge, in der die Objekte kamen. Der Host eines
   Spiels (`GameWorld`) ruft so die Engine; ein Test, der Quelle und Blueprint gegen die echte Engine
   vergleicht, gibt jeder Seite eigene Objekte, gleich aufgesetzt: Ein Handle, das sie noch nicht
-  kennt, nennt ein Objekt, wie C++ es ohne Argumente macht (`engine_make_default`).
+  kennt, nennt ein Objekt, wie C++ es ohne Argumente macht (`engine_make_default`). Nimmt sein
+  Konstruktor Werte und andere Objekte der Engine (`Client(Transport&, config, salt)`,
+  `GameWorld(Renderer&)`), bekommt jeder Wert seine Null (wie C++ ihn ohne Argumente macht), ein
+  Zeiger auf ein Objekt null, und jedes Objekt hinter einer Referenz wird ebenso mitgemacht – ohne
+  Handle, gehalten mit dem Objekt (`MadeWith`) und nach ihm beendet; ein Parameter mit Default bleibt
+  beim Default. Hat die Engine von der Klasse hinter der Referenz keinen Konstruktor (`Transport`),
+  wird die eine Klasse gemacht, die von ihr abgeleitet ist und so gemacht werden kann – gibt es keine
+  oder mehrere, wird das Objekt nicht gemacht (`tools/engine_api.py --list` nennt, welche Klassen und
+  warum). Erzeugt in `kMakers` jeder `engine_calls.gen.cpp`; keine Liste von Klassen.
 
 ### Formeln
 
@@ -1267,6 +1291,30 @@ Durch 0 ergibt es 0, wie `mod`. Damit wird ein Winkel auf −180 … 180 gebrach
 der Konverter schreibt `std::remainder` und `remainderf` damit.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
+
+**Formel ganzer Zahlen.** `band`, `bor`, `bxor`, `shl`, `shr`, `wrap32`, `wrap32s` und `mul32` geben für
+jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
+bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
+Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
+Funktion liest (`Formula::whole()`), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
+und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
+`Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
+Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
+Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double; die Klasse reicht die ganze Zahl
+weiter (`kern::math::Exact`) – ihre Bits sind die des doubles, das sie ist (genau, solange sie in ±2^53
+liegt, sonst über dieses double), und ihr Int ist `normal` von ihr, also `whole` ihres doubles. Zahlen im
+Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0).
+`+`, `−` und `×` dürfen zwischen solchen Funktionen stehen (`wrap32(a + b)`, `wrap32(base + mul32(i, s))`,
+`band(a * b - 1.0, 255.0)`): ganz sind sie dort, wo sie nur Eingänge, geschriebene Zahlen, solche Funktionen
+und einander bekommen und ihr Wert selbst als ganze Zahl gelesen wird (`kWholeOperators` in formula.cpp,
+neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Zahlen als double, als double
+verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
+Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
+(`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
+Formel, an `band` … `mul32` als ganze Zahl). Ist ein Eingang ein Float, eine
+geschriebene Zahl oder liest die Formel einen Eingang anders (`a + 1` an der Wurzel, `-a`, `a / 2`, `a < b`),
+ist sie eine Formel über Floats wie oben. Der Leser lehnt `[](Int …) -> Int` für eine Formel ab, die das nicht hergibt, ebenso
+gemischte Eingänge, eine geschriebene Zahl oder ein `kern::to` an einem ihrer Eingänge.
 
 ## Wo was steht
 
