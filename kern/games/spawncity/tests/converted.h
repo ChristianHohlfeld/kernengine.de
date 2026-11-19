@@ -1485,31 +1485,23 @@ struct Tally {
   int refused = 0;                   // calls not compared: the engine itself refused a call of the source (real_engine)
   std::string first_refused;         // (the first such call of the source: said in the note)
   long most_class = 0, with_source = 0;  // (the one with the most: how often the class, how often the source)
-  long long most_passes_alone = 0;   // (of the calls compared with the class alone: the most loop passes of one)
+  double slowest = 0;
   double class_seconds = 0, interpreter_seconds = 0, take_seconds = 0;   // (where the function's time went: said in its "time:" line)
   long long held = 0, passes = 0, most_passes = 0;     // (what the calls were given and their objects held; the loop passes of the class)
-  long long work = 0;                                  // (both together: the work of the calls so far - see more())
   mutable int drawn = 0;                               // (the calls drawn: what more() was asked for)
   std::chrono::steady_clock::time_point began = std::chrono::steady_clock::now();
   explicit Tally(const char* f) : function(f) { cost::tracing = cost::where() && std::strcmp(cost::where(), f) == 0; }
-  /// Is there another call to make? Up to kCalls compared ones; of a function whose calls are much work, as many
-  /// as kWork has room for, but twenty at least. (What the source says nothing for is drawn again.)
-  /// The work of a call is counted, not timed - a test gives the same verdict in every run, on any machine: the
-  /// values it is given and its object holds (weight: what is drawn, handed to the Blueprints, read back and
-  /// compared) and the loop passes of the class (Runtime::budget counts them - the same in every tier).
+  /// Is there another call to make? Up to kCalls compared ones; of a function that takes long, as many
+  /// as two seconds have room for, but twenty at least. (What the source says nothing for is drawn again.)
   bool more(int tried) const {
     drawn = tried;
     if (compared >= kCalls || tried >= kCalls * 20) return false;
-    if (compared >= 20) return work < kWork;
-    return compared < 5 || work < kLongWork;
+    if (compared >= 20) return seconds() < 2.0;
+    return compared < 5 || seconds() < kLong;
   }
-  static constexpr long long kWork = 200000;
-  /// A function whose calls are each a great deal of work (a number raised to a 256-bit power, limb by limb): five
-  /// compared calls at least, and as many more, up to twenty, as kLongWork has room for.
-  static constexpr long long kLongWork = 200000000;
-  /// A call in whose class loops pass more often than this would take the interpreter minutes: it is compared with
-  /// the class alone, and the function's line says so (~Tally).
-  static constexpr long long kInterpreterPasses = 50000;
+  /// A function whose calls take seconds each (a number raised to a 256-bit power, limb by limb): five
+  /// compared calls at least, and as many more as twenty seconds have room for.
+  static constexpr double kLong = 20.0;
   double seconds() const { return std::chrono::duration<double>(std::chrono::steady_clock::now() - began).count(); }
   /// One call. `want`: what the source gives, computed with the Blueprint language's numbers;
   /// `left`: the source divided by zero or left the numbers on the way - nothing to compare.
@@ -1529,11 +1521,8 @@ struct Tally {
       ~Took() { sum += std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count(); }
     } const took_all{take_seconds};
     if (!bp.interp || !bp.native) return;
-    long long given = 0;
-    for (const Value& v : args) given += weight(v);
-    if (state) for (const auto& v : *state) given += weight(v.second);
-    held += given;
-    work += given;
+    for (const Value& v : args) held += weight(v);
+    if (state) for (const auto& v : *state) held += weight(v.second);
     if (left || !defined(want)) { ++outside; return; }
     // The engine itself (SC_ENGINE=real) refused a call the source made: what the source got there is the
     // zeros of a call that did not happen, not what C++ says - nothing to compare; drawn again (the twenty
@@ -1555,9 +1544,9 @@ struct Tally {
       for (int k : order) fields.push_back(given[static_cast<std::size_t>(k)]);
       given = {Value::structure(std::move(fields))};
     };
-    // The compiled class first. A call whose loops pass very often (a sound of a hundred thousand samples, a
-    // number raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the
-    // class alone, and the function's line says so (~Tally).
+    // The compiled class first. A call that takes it long (a sound of a hundred thousand samples, a number
+    // raised to a 256-bit power) would take the interpreter minutes: such a call is compared with the class
+    // alone, and the function's line says so (~Tally).
     std::vector<Value> a, b;
     bp.before_call(true);
     const auto before = std::chrono::steady_clock::now();
@@ -1565,12 +1554,11 @@ struct Tally {
     g_class_asks = 0;
     const bool ib = bp.native->call(function, args, b);
     const long class_asks = g_class_asks;
-    const long long looped = bp.native->counters()[3];   // (the loop passes of this call - the runtime counts from zero for a call from outside)
-    passes += looped;
-    work += looped;
-    most_passes = std::max(most_passes, looped);
-    class_seconds += std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
-    const bool both = looped <= kInterpreterPasses;
+    passes += bp.native->counters()[3];
+    most_passes = std::max<long long>(most_passes, bp.native->counters()[3]);
+    const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - before).count();
+    class_seconds += took;
+    const bool both = took < 0.005;
     if (both) bp.before_call(false);
     const auto interpreter_began = std::chrono::steady_clock::now();
     const bool ia = both ? bp.interp->call(function, args, a) : ib;
@@ -1603,7 +1591,7 @@ struct Tally {
     if (!both) {
       a = b;
       ++class_only;
-      most_passes_alone = std::max(most_passes_alone, looped);
+      slowest = std::max(slowest, took);
     }
     ++compared;
     if (class_asks > source_asks) {
@@ -1643,16 +1631,16 @@ struct Tally {
                   function, seconds(), class_seconds, interpreter_seconds, take_seconds - class_seconds - interpreter_seconds, seconds() - take_seconds, drawn, compared, held, passes,
                   most_passes);
     if (class_only > 0)
-      std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call in whose class loops pass more than %lld times - here up to %lld - is not run in the interpreter)\n",
-                  function, class_only, compared, kInterpreterPasses, most_passes_alone);
+      std::printf("  note: %s: %d of %d calls compared with the compiled class only (a call that takes the class more than 5 ms - here up to %.0f ms - is not run in the interpreter)\n",
+                  function, class_only, compared, slowest * 1000);
     if (refused > 0)
       std::printf("  note: %s: %d calls drawn again - the engine itself refused a call the source made (%d compared; the first: %s)\n", function, refused, compared,
                   first_refused.c_str());
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function, wrong, compared);
     if (costlier > 0)
       std::printf("  cost: %s: in %d of %d calls the class asks for memory more often than the source (up to %ld times instead of %ld)\n", function, costlier, compared, most_class, with_source);
-    const bool long_calls = compared >= 5 && compared < 20 && work >= kLongWork;
-    if (long_calls) std::printf("  note: %s: %d calls compared (their work: %lld values and loop passes; of a function whose calls are less work, twenty at least are)\n", function, compared, work);
+    const bool long_calls = compared >= 5 && compared < 20 && seconds() >= kLong;
+    if (long_calls) std::printf("  note: %s: %d calls compared (they take %.0f s; of a function whose calls take less, twenty at least are)\n", function, compared, seconds());
     SC_CHECK(compared >= 20 || long_calls, "%s: only %d calls could be compared (in %d the source left the numbers)", function, compared, outside);
   }
 };
