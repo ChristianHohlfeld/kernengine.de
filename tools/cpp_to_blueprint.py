@@ -1322,6 +1322,7 @@ class Function:
         self.name = name
         self.cpp = name
         self.pure = True
+        self.asks_engine = False   # (it calls the engine - itself or through what it calls: the engine sees each call)
         self.params = []      # (name, type)
         self.kinds = []       # per parameter: "" an input by value, "ref" a reference the function changes (T& x), "const" one it reads (const T& x)
         self.fixed = {}       # per parameter (by place) that is a list of a fixed length (std::array, T[N]): its length - it is declared Fixed<T, N>
@@ -2419,6 +2420,7 @@ class Unit:
             f.self_type, f.mutates, f.refs, f.value, f.ctor = e["self_type"], e["mutates"], list(e["refs"]), e["value"], e["ctor"]
             f.out_fields = [(n, t, tuple(src) if isinstance(src, list) else src) for n, t, src in e["out_fields"]]
             f.open, f.state = e["open"], e["state"]
+            f.asks_engine = e.get("engine", False)
             if f.state and e["unit"] != self.name and not f.wait:
                 f.wait = f"a function of {e['unit']}, the Blueprint of the program's one object: only its own functions call it"
             f.on_actors = [(a, None) for a in e.get("actors", ())]   # (the actors whose Blueprints it calls on them, itself or through what it calls)
@@ -2459,7 +2461,7 @@ class Unit:
                 "fixed": dict(f.fixed), "result_fixed": f.result_fixed,
                 "indexes": f.indexes, "self_type": f.self_type, "mutates": f.mutates, "refs": f.refs, "value": f.value, "ctor": f.ctor, "out_fields": f.out_fields,
                 "open": self.job in self.world.source_units, "state": f.state, "pointers": f.pointers, "logic": f.logic,
-                "actors": sorted(actors_called(f))}
+                "actors": sorted(actors_called(f)), "engine": f.asks_engine}
 
     def uses(self):
         """The Blueprints whose functions the written functions call."""
@@ -6271,6 +6273,7 @@ class Emit:
         mine = (f["value"], [(n, *u.api().pin(bt)) for n, bt, _ in f["ins"]], [(n, *u.api().pin(bt)) for n, bt, _ in f["outs"]])
         if known != mine:
             raise Wait(f"the engine's {d.get('name')}() (its node is another one in the engine: {'none' if known is None else 'its pins differ'})")
+        self.f.asks_engine = True
         if f.get("place"):
             # (what it gives is a reference to something the engine holds: written as a node that gives a value, a change
             # through the reference - `world.sound_cues().clear()` - would change a copy. The node that binds the place
@@ -8016,6 +8019,11 @@ class Emit:
         chosen = self.chosen_place(g, args, obj)
         if chosen is not None:
             return chosen
+        if g.asks_engine and self.cond_depth:
+            # (a function that calls the engine - pure or not - in a part of an expression C++ does not always work
+            # out, c ? body(a) : body(b): called only where C++ calls it - the engine sees every call; see guarded)
+            raise Hoists("a call that asks the engine, in a part of an expression that does not always run")
+        self.f.asks_engine = self.f.asks_engine or g.asks_engine
         self.f.calls.append(g)
         self.f.indexes = self.f.indexes or g.indexes
         if g.state and g.mutates and self.f.state and not self.f.mutates:
