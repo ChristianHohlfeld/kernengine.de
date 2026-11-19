@@ -208,9 +208,9 @@ n="$1"
 one() {  # one <ordner> [SC_ENGINE=real]
   local rc
   if command -v script > /dev/null 2>&1; then
-    env $2 script -qec "timeout -k 10 ${HANG:-1200} '$T' '$n'" /dev/null < /dev/null 2>&1 | tr -d '\r' > "$E/$1/$n.txt"; rc=${PIPESTATUS[0]}
+    env $2 script -qec "timeout -k 10 ${HANG:-1200} '$T' --name '$n'" /dev/null < /dev/null 2>&1 | tr -d '\r' > "$E/$1/$n.txt"; rc=${PIPESTATUS[0]}
   else
-    env $2 timeout -k 10 "${HANG:-1200}" "$T" "$n" > "$E/$1/$n.txt" 2>&1; rc=$?
+    env $2 timeout -k 10 "${HANG:-1200}" "$T" --name "$n" > "$E/$1/$n.txt" 2>&1; rc=$?
   fi
   echo "$n rc=$rc" >> "$E/$1.rc"
 }
@@ -233,8 +233,8 @@ LAUF
            fi ;;
       esac
     done
-    { grep -hE '^(ok|FAIL) ' "$W/tmp/$m"/*.txt | sort -u; cat "$W/tmp/$m.ab"
-      echo "--- $(grep -hE '^ok ' "$W/tmp/$m"/*.txt | sort -u | wc -l) ok, $(grep -hE '^FAIL ' "$W/tmp/$m"/*.txt | sort -u | wc -l) FAIL, $(grep -c '^ABBRUCH' "$W/tmp/$m.ab") ABBRUCH, $(grep -c '^LECK' "$W/tmp/$m.ab") LECK, $(grep -c '^ZEIT' "$W/tmp/$m.ab") ZEIT, von $(wc -l < "$W/tmp/namen.txt") Tests; cost: $(grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u | wc -l), note: $(grep -hE '^  note:' "$W/tmp/$m"/*.txt | sort -u | wc -l)"
+    { grep -hE '^(ok|FAIL) ' "$W/tmp/$m"/*.txt | awk '{print $1, $2}' | sort -u; cat "$W/tmp/$m.ab"
+      echo "--- $(grep -hE '^ok ' "$W/tmp/$m"/*.txt | awk '{print $1, $2}' | sort -u | wc -l) ok, $(grep -hE '^FAIL ' "$W/tmp/$m"/*.txt | awk '{print $1, $2}' | sort -u | wc -l) FAIL, $(grep -c '^ABBRUCH' "$W/tmp/$m.ab") ABBRUCH, $(grep -c '^LECK' "$W/tmp/$m.ab") LECK, $(grep -c '^ZEIT' "$W/tmp/$m.ab") ZEIT, von $(wc -l < "$W/tmp/namen.txt") Tests; cost: $(grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u | wc -l), note: $(grep -hE '^  note:' "$W/tmp/$m"/*.txt | sort -u | wc -l)"
     } > "$o"
     grep -hE 'check failed|calls differ' "$W/tmp/$m"/*.txt | sed -E 's#^.*converted\.h:[0-9]+: ##' | sort -u > "${o%.txt}-abweichungen.txt"
     grep -hE '^  cost:' "$W/tmp/$m"/*.txt | sort -u > "${o%.txt}-cost.txt"
