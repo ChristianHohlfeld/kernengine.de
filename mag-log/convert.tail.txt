@@ -1,0 +1,71 @@
+round 1: 45 Blueprints
+round 2: 5 Blueprints
+round 3: 7 Blueprints
+concurrent.futures.process._RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/usr/lib/python3.12/concurrent/futures/process.py", line 263, in _process_worker
+    r = call_item.fn(*call_item.args, **call_item.kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 13590, in convert_timed
+    r = convert_unit(job)
+        ^^^^^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 13524, in convert_unit
+    unit.function(d["id"])
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 2367, in function
+    Emit(self, f).run()
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 3260, in run
+    lines += self.block(kids(body))
+             ^^^^^^^^^^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 3887, in block
+    out, ended = self.block_of(stmts)
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 4295, in block_of
+    lines, ends = self.stmt(s)
+                  ^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 4337, in stmt
+    lines, ends = self.stmt1(s)
+                  ^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 4578, in stmt1
+    return self.effect(s), False
+           ^^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 5527, in effect
+    text = "0" if self.nothing(ops[1]) else self.ex(ops[1], "Int")
+                                            ^^^^^^^^^^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 8154, in ex
+    text, have = self.value(n)
+                 ^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 8463, in value
+    return self.call(b)
+           ^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 9163, in call
+    return self.made(fit[0], a), "Int"
+           ^^^^^^^^^^^^^^^^^^^^
+TypeError: 'set' object is not callable
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 14204, in <module>
+    sys.exit(main(sys.argv))
+             ^^^^^^^^^^^^^^
+  File "/dev/shm/spawncity-jobs-chris/work-k-vergleich-075447-11897/kern/games/spawncity/../../../tools/cpp_to_blueprint.py", line 13983, in main
+    took[u], got[u] = futures[u].result()
+                      ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/concurrent/futures/_base.py", line 401, in __get_result
+    raise self._exception
+TypeError: 'set' object is not callable
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+
+real	9m52,474s
+user	24m47,845s
+sys	1m17,150s
