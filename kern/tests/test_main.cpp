@@ -4619,6 +4619,81 @@ TEST(game_blueprints_as_classes) {
   }
 }
 
+TEST(logic_fixed_widths) {
+  // An Int place of a fixed width (U8 ... I32): what flows is an Int, the place holds its low
+  // bits as C++ stores them - in every tier, at every place (a variable, a field, an input, an
+  // output, a local variable), by Set, Add to Variable, a call and from outside.
+  const std::string text =
+      "struct B : kern::Blueprint {\n"
+      "  KERN_STRUCT(P) {\n    U16 a = 65535;\n  };\n"
+      "  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n  I32 Big = 0;\n  Int Plain = 0;\n  P Pt = P{65535};\n"
+      "  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x) {\n    I16 Here = 0;\n    Here = x;\n    return {Here};\n  }\n"
+      "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n"
+      "    Small = 300;\n    Signed = kern::to<Int>(value);\n    Big = Hash;\n    Pt.a = kern::to<Int>(value);\n    Small += 220;\n    Hash += -4000000001;\n  }\n};\n";
+  logic::Graph g, back;
+  std::string error, written, twice;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(g.variable("Small") && g.variable("Small")->type == logic::PinType::integer && g.variable("Small")->of == "u8" && g.structure("P") && g.structure("P")->fields[0].type.of == "u16");
+  for (const logic::Issue& i : logic::check(g))
+    if (i.error) { std::printf("check: %s\n", i.text.c_str()); CHECK(false); }
+  CHECK(logic::to_cpp(g, "B", written, &error, logic::library(), false));
+  CHECK(written.find("  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n") != std::string::npos && written.find("  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x = 0) {\n    I16 Here = 0;\n") != std::string::npos);
+  CHECK(logic::from_cpp(written, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == written);
+  if (twice != written) std::printf("%s\n---\n%s\n", written.c_str(), twice.c_str());
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+  CHECK(logic::type_label({logic::PinType::integer, "u32"}) == "U32" && logic::type_text({logic::PinType::integer, "i16"}) == "i16");
+  logic::TypeRef named;
+  CHECK(logic::type_from_text("u8", g, named) && named.type == logic::PinType::integer && named.of == "u8" && !logic::type_from_text("map<u8>float", g, named));
+  // the ends of every width, and Ints beyond them: static_cast<u32>(x), two's complement for a signed width
+  CHECK(logic::wrapped(256, "u8") == 0 && logic::wrapped(-1, "u8") == 255 && logic::wrapped(128, "i8") == -128 && logic::wrapped(-129, "i8") == 127);
+  CHECK(logic::wrapped(65536 + 7, "u16") == 7 && logic::wrapped(32768, "i16") == -32768 && logic::wrapped(i64{1} << 32, "u32") == 0 && logic::wrapped(-1, "u32") == 4294967295);
+  CHECK(logic::wrapped(i64{2147483648}, "i32") == -2147483648LL && logic::wrapped(9223372036854775807LL, "u32") == 4294967295 && logic::wrapped(-9223372036854775807LL, "i32") == 1);
+  CHECK(logic::wrapped((i64{1} << 53) + 2, "u32") == 2 && logic::wrapped(-(i64{1} << 53), "i16") == 0 && logic::wrapped(5, "") == 5);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    rt.begin();
+    rt.call("Go", 0, {{"value", logic::Value::number(200.7)}});
+    CHECK(host.errors.empty());
+    CHECK(inst->get("Small").i == 8 && inst->get("Signed").i == -56 && inst->get("Big").i == -294967296 && inst->get("Pt").field(0)->i == 200);  // (300 -> 44, + 220 -> 8)
+    CHECK(inst->get("Hash").i == 4294967295);  // (4000000000 - 4000000001)
+    CHECK(inst->set("Small", logic::Value::integer(-1)) && inst->get("Small").i == 255 && inst->set("Signed", logic::Value::number(1e30)) && inst->get("Signed").i == -1);
+    std::vector<logic::Value> results;
+    CHECK(inst->call("Twice", {logic::Value::integer(65537 + 255)}, results) && results.size() == 1 && results[0].i == 0);  // (65792 as I16 is 256, as U8 0)
+    CHECK(inst->call("Twice", {logic::Value::integer(40000)}, results) && results.size() == 1 && results[0].i == 64);  // (40000 as I16 is -25536, as U8 64)
+  }
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph h;
+    std::string e;
+    const bool is_read = logic::from_cpp("struct B : kern::Blueprint {\n" + body + "};\n", h, nullptr, &e);
+    for (const logic::Issue& i : is_read ? logic::check(h) : std::vector<logic::Issue>())
+      if (i.error) e += " | " + i.text;
+    const bool right = e.find(why) != std::string::npos;
+    if (!right) std::printf("expected \"%s\", got: %s\n", why, e.empty() ? "(nothing is wrong with it)" : e.c_str());
+    return right;
+  };
+  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = kern::to<I8>(value);\n  }\n", "kern::to<Int>, not kern::to<I8>"));
+  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = value;\n  }\n", "this is Float, the input is Int: write kern::to<Int>(...)"));
+  CHECK(says("  U8 Bad = 256;\n", "256 is no U8 (it would hold 0)"));
+  CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
+  CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
+  CHECK(says("  Map<Int, U32> Bad = Map<Int, U32>{};\n", "Int of a fixed width"));
+  CHECK(says("  List<U8> Bytes = List<U8>{};\n", "a list of Ints of a fixed width is no type of the language yet"));
+  {
+    // ... and a graph that says it wrong
+    logic::Graph h;
+    h.variables.push_back({"W", logic::PinType::integer, json::Value(70000.0), {}, "u16"});
+    h.variables.push_back({"X", logic::PinType::integer, json::Value(-1.0), {}, "u32"});
+    std::string all;
+    for (const logic::Issue& i : logic::check(h)) all += i.text + "\n";
+    CHECK(all.find("variable \"W\" is U16, its default 70000 is none of its values (0 .. 65535)") != std::string::npos && all.find("variable \"X\"") != std::string::npos);
+  }
+}
+
 TEST(logic_fixed_lists) {
   // A place can be declared as a list of a fixed length - Fixed<Float, 3>, std::array in a
   // Blueprint's C++: a variable, a field, an input, an output, a local variable. What flows

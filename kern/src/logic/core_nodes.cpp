@@ -533,10 +533,15 @@ void add_variables(Library& lib) {
     d.run = [](Context& c) {
       const f64 amount = c.in_number("amount");
       const std::vector<i64> at = c.path();
+      Variable named;
+      const Graph& g = c.instance().graph();
+      const TypeRef type = g.place_of(c.node(), named) ? declared(named) : TypeRef{};
       Value now;
       c.instance().change(c.node(), at, [&](Value& v) {
-        // (the number where it is: a whole number stays one - as a variable's slot holds it)
+        // (the number where it is: a whole number stays one - as a variable's slot holds it; one of a
+        // fixed width holds the low bits, as C++'s += stores them)
         v = v.type == PinType::integer ? Value::integer(whole(v.as_number() + amount)) : Value::number(v.as_number() + amount);
+        if (v.type == PinType::integer && has_width(type)) v.i = wrapped(v.i, type.of);
         now = v;
       });
       c.out("value", now);
@@ -1506,7 +1511,7 @@ void add_structs(Library& lib) {
       const StructType* s = g.structure(c.param("struct"));
       std::vector<Value> fields;
       // (the fields one after the other, in their order - a list of a fixed length at its length)
-      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(s && k < s->fields.size() && s->fields[k].type.count ? fitted(c.in(k), s->fields[k].type, g) : c.in(k));
+      for (std::size_t k = 0; k < c.input_count(); ++k) fields.push_back(s && k < s->fields.size() && (s->fields[k].type.count || has_width(s->fields[k].type)) ? fitted(c.in(k), s->fields[k].type, g) : c.in(k));
       c.out(std::size_t{0}, structs::make(std::move(fields)));
       return kStop;
     };
@@ -2128,7 +2133,7 @@ void add_functions(Library& lib) {
       const Function* f = c.instance().graph().function(c.param("function"));
       std::vector<std::pair<std::string, Value>> values;
       if (f)
-        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, p.count ? fitted(c.in(p.name), declared(p), c.instance().graph()) : c.in(p.name));
+        for (const FunctionPin& p : f->outputs) values.emplace_back(p.name, (p.count || has_width(declared(p))) ? fitted(c.in(p.name), declared(p), c.instance().graph()) : c.in(p.name));
       c.instance().return_values(c.param("function"), values);
       return kStop;
     };
