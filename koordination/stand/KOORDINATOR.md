@@ -1,4 +1,15 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 03:30 **Lauf 020121: `engine rc=0` (02:37), `suite rc=1` (03:19) – und die Spiel-Suite ist in beiden Durchgängen nach 25 bzw. 27 Tests abgeschnitten.**
+  Ursache im Testrahmen (Kindprozess je Test, test_main.cpp): das Kind erbte die Summen der Tests vor ihm und meldete sie mit seinen eigenen zurück – die Summe
+  verdoppelte sich je Test (Überlauf in int nach ~26 Tests, UBSan beendete den Durchgang, test_main.cpp:232), und ein Fehlschlag ließ jeden Test danach als FAIL
+  erscheinen. In Einzelläufen (`vergleich`) fiel das nie auf. **Behoben vom Koordinator: work-zusammen d15559ba** (das Kind beginnt mit eigenen Zählern; Kleinstfall
+  alt/neu). **Die ganze Liste rechnet jetzt `work-zusammen-suite-alle-032626-8142`** (Zweig work-zusammen-suite = Level und Tests des gültigen Laufs + der Fix; jeder
+  converted_-Test einzeln, beide Durchgänge).
+  · Aus dem abgeschnittenen Protokoll sicher: Durchgang 1 – 24 Tests ok (Firmware-Einheiten, car, city_jobs, city_stream, combat_*, common, controls, destruction,
+    drone, engine_geo_*), **converted_engine_math_math FAIL**: Mat4_perspective 300/300 und projection_matrix 62/300, „first difference at .m[15]: the source 1, the
+    Blueprint 0“. Durchgang 2 (gegen die Engine): die ersten 9 ok, dann **converted_city_stream_cpp bricht mit ASan ab** (danach alles Folgefehler der Zählung).
+    121 cost-Zeilen von 21:15 sind auf wenige gefallen (Car_new 61/300 „1 instead of 0“, combat_audio render …) – genaue Zahl aus „alle“.
+  · Vierter Neustart des Servers hinter der Sitzung (03:10): t1b automatisch fortgesetzt.
 - 02:45 **GÜLTIG: `work-zusammen-voll-020121-10802` auf 4748a503 – `convert rc=0` (02:32, 18 Runden, 31 min).** Der erste gültige Lauf seit 20:53.
   „1637 of 1844 functions of the program are written as Blueprints (19218 of 30978 lines) … 156 Blueprints“; „1594 functions … compared with their source“.
   (203000: 1632 / 18813 Zeilen / 1589.) Die Suiten rechnen (Spiel-Suite mit clang, beide Durchgänge; Engine-Suite). `grundlage` für `vergleich` ist jetzt dieser Lauf.
