@@ -113,7 +113,7 @@ struct Jet {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const JetSpec::Gear& s) { return converted::Value::structure({arg(s.p), arg(s.load), arg(s.steer)}); }
-[[maybe_unused]] static bool same(const JetSpec::Gear& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.p, (*got.rows)[0]) && same(want.load, (*got.rows)[1]) && same(want.steer, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const JetSpec::Gear& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.load, (*got.rows)[1]), ".load") && converted::at_place(same(want.steer, (*got.rows)[2]), ".steer"); }
 [[maybe_unused]] static bool defined(const JetSpec::Gear& s) { return defined(s.p) && defined(s.load) && defined(s.steer); }
 [[maybe_unused]] static std::string text(const JetSpec::Gear& s) { return std::string("{") + text(s.p) + ", " + text(s.load) + ", " + text(s.steer) + "}"; }
 [[maybe_unused]] static void take(JetSpec::Gear& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<double>(s.load, (*v.rows)[1]); converted::take_as<bool>(s.steer, (*v.rows)[2]); }
@@ -179,7 +179,7 @@ struct Jet {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const JetSpec& s) { return converted::Value::structure({arg(s.mass), arg(s.inertia), arg(s.wing_area), arg(s.span), arg(s.chord), arg(s.thrust_dry), arg(s.thrust_max), arg(s.spool_up), arg(s.spool_down), arg(s.CL0), arg(s.CLa), arg(s.alpha_stall), arg(s.CD0), arg(s.K), arg(s.CYb), arg(s.gear_CD), arg(s.brake_CD), arg(s.Cm0), arg(s.Cma), arg(s.Cmq), arg(s.Cmde), arg(s.Clb), arg(s.Clp), arg(s.Clr), arg(s.Clda), arg(s.Cnb), arg(s.Cnr), arg(s.Cnp), arg(s.Cndr), arg(s.de_max), arg(s.da_max), arg(s.dr_max), arg(s.surface_rate), arg(s.rcs_max), arg(s.nozzle_rate), arg(converted::array_list(s.gear)), arg(s.strut_rest), arg(s.gear_height), arg(s.strut_static), arg(s.strut_max), arg(s.strut_zeta), arg(s.tyre_mu), arg(s.roll_mu), arg(s.brake_mu), arg(s.g_limit), arg(s.g_push), arg(s.alpha_limit), arg(s.p_max), arg(s.q_max), arg(s.hover_speed), arg(s.hover_climb), arg(s.hover_sink), arg(s.hover_tilt), arg(s.wing_borne_v), arg(s.hover_law_v), arg(s.transition_nozzle), arg(s.braking_nozzle)}); }
-[[maybe_unused]] static bool same(const JetSpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 57 && same(want.mass, (*got.rows)[0]) && same(want.inertia, (*got.rows)[1]) && same(want.wing_area, (*got.rows)[2]) && same(want.span, (*got.rows)[3]) && same(want.chord, (*got.rows)[4]) && same(want.thrust_dry, (*got.rows)[5]) && same(want.thrust_max, (*got.rows)[6]) && same(want.spool_up, (*got.rows)[7]) && same(want.spool_down, (*got.rows)[8]) && same(want.CL0, (*got.rows)[9]) && same(want.CLa, (*got.rows)[10]) && same(want.alpha_stall, (*got.rows)[11]) && same(want.CD0, (*got.rows)[12]) && same(want.K, (*got.rows)[13]) && same(want.CYb, (*got.rows)[14]) && same(want.gear_CD, (*got.rows)[15]) && same(want.brake_CD, (*got.rows)[16]) && same(want.Cm0, (*got.rows)[17]) && same(want.Cma, (*got.rows)[18]) && same(want.Cmq, (*got.rows)[19]) && same(want.Cmde, (*got.rows)[20]) && same(want.Clb, (*got.rows)[21]) && same(want.Clp, (*got.rows)[22]) && same(want.Clr, (*got.rows)[23]) && same(want.Clda, (*got.rows)[24]) && same(want.Cnb, (*got.rows)[25]) && same(want.Cnr, (*got.rows)[26]) && same(want.Cnp, (*got.rows)[27]) && same(want.Cndr, (*got.rows)[28]) && same(want.de_max, (*got.rows)[29]) && same(want.da_max, (*got.rows)[30]) && same(want.dr_max, (*got.rows)[31]) && same(want.surface_rate, (*got.rows)[32]) && same(want.rcs_max, (*got.rows)[33]) && same(want.nozzle_rate, (*got.rows)[34]) && same(converted::array_list(want.gear), (*got.rows)[35]) && same(want.strut_rest, (*got.rows)[36]) && same(want.gear_height, (*got.rows)[37]) && same(want.strut_static, (*got.rows)[38]) && same(want.strut_max, (*got.rows)[39]) && same(want.strut_zeta, (*got.rows)[40]) && same(want.tyre_mu, (*got.rows)[41]) && same(want.roll_mu, (*got.rows)[42]) && same(want.brake_mu, (*got.rows)[43]) && same(want.g_limit, (*got.rows)[44]) && same(want.g_push, (*got.rows)[45]) && same(want.alpha_limit, (*got.rows)[46]) && same(want.p_max, (*got.rows)[47]) && same(want.q_max, (*got.rows)[48]) && same(want.hover_speed, (*got.rows)[49]) && same(want.hover_climb, (*got.rows)[50]) && same(want.hover_sink, (*got.rows)[51]) && same(want.hover_tilt, (*got.rows)[52]) && same(want.wing_borne_v, (*got.rows)[53]) && same(want.hover_law_v, (*got.rows)[54]) && same(want.transition_nozzle, (*got.rows)[55]) && same(want.braking_nozzle, (*got.rows)[56]); }
+[[maybe_unused]] static bool same(const JetSpec& want, const converted::Value& got) { return converted::rows_of(got, 57) && converted::at_place(same(want.mass, (*got.rows)[0]), ".mass") && converted::at_place(same(want.inertia, (*got.rows)[1]), ".inertia") && converted::at_place(same(want.wing_area, (*got.rows)[2]), ".wing_area") && converted::at_place(same(want.span, (*got.rows)[3]), ".span") && converted::at_place(same(want.chord, (*got.rows)[4]), ".chord") && converted::at_place(same(want.thrust_dry, (*got.rows)[5]), ".thrust_dry") && converted::at_place(same(want.thrust_max, (*got.rows)[6]), ".thrust_max") && converted::at_place(same(want.spool_up, (*got.rows)[7]), ".spool_up") && converted::at_place(same(want.spool_down, (*got.rows)[8]), ".spool_down") && converted::at_place(same(want.CL0, (*got.rows)[9]), ".CL0") && converted::at_place(same(want.CLa, (*got.rows)[10]), ".CLa") && converted::at_place(same(want.alpha_stall, (*got.rows)[11]), ".alpha_stall") && converted::at_place(same(want.CD0, (*got.rows)[12]), ".CD0") && converted::at_place(same(want.K, (*got.rows)[13]), ".K") && converted::at_place(same(want.CYb, (*got.rows)[14]), ".CYb") && converted::at_place(same(want.gear_CD, (*got.rows)[15]), ".gear_CD") && converted::at_place(same(want.brake_CD, (*got.rows)[16]), ".brake_CD") && converted::at_place(same(want.Cm0, (*got.rows)[17]), ".Cm0") && converted::at_place(same(want.Cma, (*got.rows)[18]), ".Cma") && converted::at_place(same(want.Cmq, (*got.rows)[19]), ".Cmq") && converted::at_place(same(want.Cmde, (*got.rows)[20]), ".Cmde") && converted::at_place(same(want.Clb, (*got.rows)[21]), ".Clb") && converted::at_place(same(want.Clp, (*got.rows)[22]), ".Clp") && converted::at_place(same(want.Clr, (*got.rows)[23]), ".Clr") && converted::at_place(same(want.Clda, (*got.rows)[24]), ".Clda") && converted::at_place(same(want.Cnb, (*got.rows)[25]), ".Cnb") && converted::at_place(same(want.Cnr, (*got.rows)[26]), ".Cnr") && converted::at_place(same(want.Cnp, (*got.rows)[27]), ".Cnp") && converted::at_place(same(want.Cndr, (*got.rows)[28]), ".Cndr") && converted::at_place(same(want.de_max, (*got.rows)[29]), ".de_max") && converted::at_place(same(want.da_max, (*got.rows)[30]), ".da_max") && converted::at_place(same(want.dr_max, (*got.rows)[31]), ".dr_max") && converted::at_place(same(want.surface_rate, (*got.rows)[32]), ".surface_rate") && converted::at_place(same(want.rcs_max, (*got.rows)[33]), ".rcs_max") && converted::at_place(same(want.nozzle_rate, (*got.rows)[34]), ".nozzle_rate") && converted::at_place(same(converted::array_list(want.gear), (*got.rows)[35]), ".gear") && converted::at_place(same(want.strut_rest, (*got.rows)[36]), ".strut_rest") && converted::at_place(same(want.gear_height, (*got.rows)[37]), ".gear_height") && converted::at_place(same(want.strut_static, (*got.rows)[38]), ".strut_static") && converted::at_place(same(want.strut_max, (*got.rows)[39]), ".strut_max") && converted::at_place(same(want.strut_zeta, (*got.rows)[40]), ".strut_zeta") && converted::at_place(same(want.tyre_mu, (*got.rows)[41]), ".tyre_mu") && converted::at_place(same(want.roll_mu, (*got.rows)[42]), ".roll_mu") && converted::at_place(same(want.brake_mu, (*got.rows)[43]), ".brake_mu") && converted::at_place(same(want.g_limit, (*got.rows)[44]), ".g_limit") && converted::at_place(same(want.g_push, (*got.rows)[45]), ".g_push") && converted::at_place(same(want.alpha_limit, (*got.rows)[46]), ".alpha_limit") && converted::at_place(same(want.p_max, (*got.rows)[47]), ".p_max") && converted::at_place(same(want.q_max, (*got.rows)[48]), ".q_max") && converted::at_place(same(want.hover_speed, (*got.rows)[49]), ".hover_speed") && converted::at_place(same(want.hover_climb, (*got.rows)[50]), ".hover_climb") && converted::at_place(same(want.hover_sink, (*got.rows)[51]), ".hover_sink") && converted::at_place(same(want.hover_tilt, (*got.rows)[52]), ".hover_tilt") && converted::at_place(same(want.wing_borne_v, (*got.rows)[53]), ".wing_borne_v") && converted::at_place(same(want.hover_law_v, (*got.rows)[54]), ".hover_law_v") && converted::at_place(same(want.transition_nozzle, (*got.rows)[55]), ".transition_nozzle") && converted::at_place(same(want.braking_nozzle, (*got.rows)[56]), ".braking_nozzle"); }
 [[maybe_unused]] static bool defined(const JetSpec& s) { return defined(s.mass) && defined(s.inertia) && defined(s.wing_area) && defined(s.span) && defined(s.chord) && defined(s.thrust_dry) && defined(s.thrust_max) && defined(s.spool_up) && defined(s.spool_down) && defined(s.CL0) && defined(s.CLa) && defined(s.alpha_stall) && defined(s.CD0) && defined(s.K) && defined(s.CYb) && defined(s.gear_CD) && defined(s.brake_CD) && defined(s.Cm0) && defined(s.Cma) && defined(s.Cmq) && defined(s.Cmde) && defined(s.Clb) && defined(s.Clp) && defined(s.Clr) && defined(s.Clda) && defined(s.Cnb) && defined(s.Cnr) && defined(s.Cnp) && defined(s.Cndr) && defined(s.de_max) && defined(s.da_max) && defined(s.dr_max) && defined(s.surface_rate) && defined(s.rcs_max) && defined(s.nozzle_rate) && defined(converted::array_list(s.gear)) && defined(s.strut_rest) && defined(s.gear_height) && defined(s.strut_static) && defined(s.strut_max) && defined(s.strut_zeta) && defined(s.tyre_mu) && defined(s.roll_mu) && defined(s.brake_mu) && defined(s.g_limit) && defined(s.g_push) && defined(s.alpha_limit) && defined(s.p_max) && defined(s.q_max) && defined(s.hover_speed) && defined(s.hover_climb) && defined(s.hover_sink) && defined(s.hover_tilt) && defined(s.wing_borne_v) && defined(s.hover_law_v) && defined(s.transition_nozzle) && defined(s.braking_nozzle); }
 [[maybe_unused]] static std::string text(const JetSpec& s) { return std::string("{") + text(s.mass) + ", " + text(s.inertia) + ", " + text(s.wing_area) + ", " + text(s.span) + ", " + text(s.chord) + ", " + text(s.thrust_dry) + ", " + text(s.thrust_max) + ", " + text(s.spool_up) + ", " + text(s.spool_down) + ", " + text(s.CL0) + ", " + text(s.CLa) + ", " + text(s.alpha_stall) + ", " + text(s.CD0) + ", " + text(s.K) + ", " + text(s.CYb) + ", " + text(s.gear_CD) + ", " + text(s.brake_CD) + ", " + text(s.Cm0) + ", " + text(s.Cma) + ", " + text(s.Cmq) + ", " + text(s.Cmde) + ", " + text(s.Clb) + ", " + text(s.Clp) + ", " + text(s.Clr) + ", " + text(s.Clda) + ", " + text(s.Cnb) + ", " + text(s.Cnr) + ", " + text(s.Cnp) + ", " + text(s.Cndr) + ", " + text(s.de_max) + ", " + text(s.da_max) + ", " + text(s.dr_max) + ", " + text(s.surface_rate) + ", " + text(s.rcs_max) + ", " + text(s.nozzle_rate) + ", " + text(converted::array_list(s.gear)) + ", " + text(s.strut_rest) + ", " + text(s.gear_height) + ", " + text(s.strut_static) + ", " + text(s.strut_max) + ", " + text(s.strut_zeta) + ", " + text(s.tyre_mu) + ", " + text(s.roll_mu) + ", " + text(s.brake_mu) + ", " + text(s.g_limit) + ", " + text(s.g_push) + ", " + text(s.alpha_limit) + ", " + text(s.p_max) + ", " + text(s.q_max) + ", " + text(s.hover_speed) + ", " + text(s.hover_climb) + ", " + text(s.hover_sink) + ", " + text(s.hover_tilt) + ", " + text(s.wing_borne_v) + ", " + text(s.hover_law_v) + ", " + text(s.transition_nozzle) + ", " + text(s.braking_nozzle) + "}"; }
 [[maybe_unused]] static void take(JetSpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 57) return; converted::take_as<double>(s.mass, (*v.rows)[0]); converted::take_as<Vec3>(s.inertia, (*v.rows)[1]); converted::take_as<double>(s.wing_area, (*v.rows)[2]); converted::take_as<double>(s.span, (*v.rows)[3]); converted::take_as<double>(s.chord, (*v.rows)[4]); converted::take_as<double>(s.thrust_dry, (*v.rows)[5]); converted::take_as<double>(s.thrust_max, (*v.rows)[6]); converted::take_as<double>(s.spool_up, (*v.rows)[7]); converted::take_as<double>(s.spool_down, (*v.rows)[8]); converted::take_as<double>(s.CL0, (*v.rows)[9]); converted::take_as<double>(s.CLa, (*v.rows)[10]); converted::take_as<double>(s.alpha_stall, (*v.rows)[11]); converted::take_as<double>(s.CD0, (*v.rows)[12]); converted::take_as<double>(s.K, (*v.rows)[13]); converted::take_as<double>(s.CYb, (*v.rows)[14]); converted::take_as<double>(s.gear_CD, (*v.rows)[15]); converted::take_as<double>(s.brake_CD, (*v.rows)[16]); converted::take_as<double>(s.Cm0, (*v.rows)[17]); converted::take_as<double>(s.Cma, (*v.rows)[18]); converted::take_as<double>(s.Cmq, (*v.rows)[19]); converted::take_as<double>(s.Cmde, (*v.rows)[20]); converted::take_as<double>(s.Clb, (*v.rows)[21]); converted::take_as<double>(s.Clp, (*v.rows)[22]); converted::take_as<double>(s.Clr, (*v.rows)[23]); converted::take_as<double>(s.Clda, (*v.rows)[24]); converted::take_as<double>(s.Cnb, (*v.rows)[25]); converted::take_as<double>(s.Cnr, (*v.rows)[26]); converted::take_as<double>(s.Cnp, (*v.rows)[27]); converted::take_as<double>(s.Cndr, (*v.rows)[28]); converted::take_as<double>(s.de_max, (*v.rows)[29]); converted::take_as<double>(s.da_max, (*v.rows)[30]); converted::take_as<double>(s.dr_max, (*v.rows)[31]); converted::take_as<double>(s.surface_rate, (*v.rows)[32]); converted::take_as<Vec3>(s.rcs_max, (*v.rows)[33]); converted::take_as<double>(s.nozzle_rate, (*v.rows)[34]); { std::vector<JetSpec::Gear> items; converted::take_as<std::vector<JetSpec::Gear>>(items, (*v.rows)[35]); converted::array_from(s.gear, items); } converted::take_as<double>(s.strut_rest, (*v.rows)[36]); converted::take_as<double>(s.gear_height, (*v.rows)[37]); converted::take_as<double>(s.strut_static, (*v.rows)[38]); converted::take_as<double>(s.strut_max, (*v.rows)[39]); converted::take_as<double>(s.strut_zeta, (*v.rows)[40]); converted::take_as<double>(s.tyre_mu, (*v.rows)[41]); converted::take_as<double>(s.roll_mu, (*v.rows)[42]); converted::take_as<double>(s.brake_mu, (*v.rows)[43]); converted::take_as<double>(s.g_limit, (*v.rows)[44]); converted::take_as<double>(s.g_push, (*v.rows)[45]); converted::take_as<double>(s.alpha_limit, (*v.rows)[46]); converted::take_as<double>(s.p_max, (*v.rows)[47]); converted::take_as<double>(s.q_max, (*v.rows)[48]); converted::take_as<double>(s.hover_speed, (*v.rows)[49]); converted::take_as<double>(s.hover_climb, (*v.rows)[50]); converted::take_as<double>(s.hover_sink, (*v.rows)[51]); converted::take_as<double>(s.hover_tilt, (*v.rows)[52]); converted::take_as<double>(s.wing_borne_v, (*v.rows)[53]); converted::take_as<double>(s.hover_law_v, (*v.rows)[54]); converted::take_as<double>(s.transition_nozzle, (*v.rows)[55]); converted::take_as<double>(s.braking_nozzle, (*v.rows)[56]); }
@@ -201,7 +201,7 @@ struct Jet {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const JetTelemetry& s) { return converted::Value::structure({arg(s.V), arg(s.agl), arg(s.mach), arg(s.alpha), arg(s.beta), arg(s.nz), arg(s.thrust), arg(s.nozzle), arg(s.contacts), arg(s.pitch), arg(s.roll), arg(s.heading), arg(s.w_flight)}); }
-[[maybe_unused]] static bool same(const JetTelemetry& want, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(want.V, (*got.rows)[0]) && same(want.agl, (*got.rows)[1]) && same(want.mach, (*got.rows)[2]) && same(want.alpha, (*got.rows)[3]) && same(want.beta, (*got.rows)[4]) && same(want.nz, (*got.rows)[5]) && same(want.thrust, (*got.rows)[6]) && same(want.nozzle, (*got.rows)[7]) && same(want.contacts, (*got.rows)[8]) && same(want.pitch, (*got.rows)[9]) && same(want.roll, (*got.rows)[10]) && same(want.heading, (*got.rows)[11]) && same(want.w_flight, (*got.rows)[12]); }
+[[maybe_unused]] static bool same(const JetTelemetry& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.V, (*got.rows)[0]), ".V") && converted::at_place(same(want.agl, (*got.rows)[1]), ".agl") && converted::at_place(same(want.mach, (*got.rows)[2]), ".mach") && converted::at_place(same(want.alpha, (*got.rows)[3]), ".alpha") && converted::at_place(same(want.beta, (*got.rows)[4]), ".beta") && converted::at_place(same(want.nz, (*got.rows)[5]), ".nz") && converted::at_place(same(want.thrust, (*got.rows)[6]), ".thrust") && converted::at_place(same(want.nozzle, (*got.rows)[7]), ".nozzle") && converted::at_place(same(want.contacts, (*got.rows)[8]), ".contacts") && converted::at_place(same(want.pitch, (*got.rows)[9]), ".pitch") && converted::at_place(same(want.roll, (*got.rows)[10]), ".roll") && converted::at_place(same(want.heading, (*got.rows)[11]), ".heading") && converted::at_place(same(want.w_flight, (*got.rows)[12]), ".w_flight"); }
 [[maybe_unused]] static bool defined(const JetTelemetry& s) { return defined(s.V) && defined(s.agl) && defined(s.mach) && defined(s.alpha) && defined(s.beta) && defined(s.nz) && defined(s.thrust) && defined(s.nozzle) && defined(s.contacts) && defined(s.pitch) && defined(s.roll) && defined(s.heading) && defined(s.w_flight); }
 [[maybe_unused]] static std::string text(const JetTelemetry& s) { return std::string("{") + text(s.V) + ", " + text(s.agl) + ", " + text(s.mach) + ", " + text(s.alpha) + ", " + text(s.beta) + ", " + text(s.nz) + ", " + text(s.thrust) + ", " + text(s.nozzle) + ", " + text(s.contacts) + ", " + text(s.pitch) + ", " + text(s.roll) + ", " + text(s.heading) + ", " + text(s.w_flight) + "}"; }
 [[maybe_unused]] static void take(JetTelemetry& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.V, (*v.rows)[0]); converted::take_as<double>(s.agl, (*v.rows)[1]); converted::take_as<double>(s.mach, (*v.rows)[2]); converted::take_as<double>(s.alpha, (*v.rows)[3]); converted::take_as<double>(s.beta, (*v.rows)[4]); converted::take_as<double>(s.nz, (*v.rows)[5]); converted::take_as<double>(s.thrust, (*v.rows)[6]); converted::take_as<double>(s.nozzle, (*v.rows)[7]); converted::take_as<int>(s.contacts, (*v.rows)[8]); converted::take_as<double>(s.pitch, (*v.rows)[9]); converted::take_as<double>(s.roll, (*v.rows)[10]); converted::take_as<double>(s.heading, (*v.rows)[11]); converted::take_as<double>(s.w_flight, (*v.rows)[12]); }
@@ -213,7 +213,7 @@ struct Jet {
   s.thrust_scale = draw.number();
   s.fuel = draw.number();
   s.s_ = draw_JetSpec(draw);
-  s.mode_ = static_cast<Jet::Mode>(draw.below(2));
+  s.mode_ = converted::enum_value<Jet::Mode>(draw.below(2));
   s.lever_ = draw.number();
   s.thrust_ = draw.number();
   s.thrust_cmd_ = draw.number();
@@ -236,7 +236,7 @@ struct Jet {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Jet& s) { return converted::Value::structure({arg(s.engine_on), arg(s.pilot), arg(s.arcade), arg(s.thrust_scale), arg(s.fuel), arg(s.s_), arg(s.mode_), arg(s.lever_), arg(s.thrust_), arg(s.thrust_cmd_), arg(s.nozzle_), arg(s.de_), arg(s.da_), arg(s.dr_), arg(s.steer_), arg(s.vz_i_), arg(s.vz_cmd_), arg(s.vz_cmd_valid_), arg(s.gamma_valid_), arg(s.gamma_hold_), arg(s.gear_down_), arg(s.speed_brake_), arg(s.landed_), arg(s.contacts_), arg(s.gear_impact_), arg(s.tele_)}); }
-[[maybe_unused]] static bool same(const Jet& want, const converted::Value& got) { return got.rows && got.rows->size() == 26 && same(want.engine_on, (*got.rows)[0]) && same(want.pilot, (*got.rows)[1]) && same(want.arcade, (*got.rows)[2]) && same(want.thrust_scale, (*got.rows)[3]) && same(want.fuel, (*got.rows)[4]) && same(want.s_, (*got.rows)[5]) && same(want.mode_, (*got.rows)[6]) && same(want.lever_, (*got.rows)[7]) && same(want.thrust_, (*got.rows)[8]) && same(want.thrust_cmd_, (*got.rows)[9]) && same(want.nozzle_, (*got.rows)[10]) && same(want.de_, (*got.rows)[11]) && same(want.da_, (*got.rows)[12]) && same(want.dr_, (*got.rows)[13]) && same(want.steer_, (*got.rows)[14]) && same(want.vz_i_, (*got.rows)[15]) && same(want.vz_cmd_, (*got.rows)[16]) && same(want.vz_cmd_valid_, (*got.rows)[17]) && same(want.gamma_valid_, (*got.rows)[18]) && same(want.gamma_hold_, (*got.rows)[19]) && same(want.gear_down_, (*got.rows)[20]) && same(want.speed_brake_, (*got.rows)[21]) && same(want.landed_, (*got.rows)[22]) && same(want.contacts_, (*got.rows)[23]) && same(want.gear_impact_, (*got.rows)[24]) && same(want.tele_, (*got.rows)[25]); }
+[[maybe_unused]] static bool same(const Jet& want, const converted::Value& got) { return converted::rows_of(got, 26) && converted::at_place(same(want.engine_on, (*got.rows)[0]), ".engine_on") && converted::at_place(same(want.pilot, (*got.rows)[1]), ".pilot") && converted::at_place(same(want.arcade, (*got.rows)[2]), ".arcade") && converted::at_place(same(want.thrust_scale, (*got.rows)[3]), ".thrust_scale") && converted::at_place(same(want.fuel, (*got.rows)[4]), ".fuel") && converted::at_place(same(want.s_, (*got.rows)[5]), ".s_") && converted::at_place(same(want.mode_, (*got.rows)[6]), ".mode_") && converted::at_place(same(want.lever_, (*got.rows)[7]), ".lever_") && converted::at_place(same(want.thrust_, (*got.rows)[8]), ".thrust_") && converted::at_place(same(want.thrust_cmd_, (*got.rows)[9]), ".thrust_cmd_") && converted::at_place(same(want.nozzle_, (*got.rows)[10]), ".nozzle_") && converted::at_place(same(want.de_, (*got.rows)[11]), ".de_") && converted::at_place(same(want.da_, (*got.rows)[12]), ".da_") && converted::at_place(same(want.dr_, (*got.rows)[13]), ".dr_") && converted::at_place(same(want.steer_, (*got.rows)[14]), ".steer_") && converted::at_place(same(want.vz_i_, (*got.rows)[15]), ".vz_i_") && converted::at_place(same(want.vz_cmd_, (*got.rows)[16]), ".vz_cmd_") && converted::at_place(same(want.vz_cmd_valid_, (*got.rows)[17]), ".vz_cmd_valid_") && converted::at_place(same(want.gamma_valid_, (*got.rows)[18]), ".gamma_valid_") && converted::at_place(same(want.gamma_hold_, (*got.rows)[19]), ".gamma_hold_") && converted::at_place(same(want.gear_down_, (*got.rows)[20]), ".gear_down_") && converted::at_place(same(want.speed_brake_, (*got.rows)[21]), ".speed_brake_") && converted::at_place(same(want.landed_, (*got.rows)[22]), ".landed_") && converted::at_place(same(want.contacts_, (*got.rows)[23]), ".contacts_") && converted::at_place(same(want.gear_impact_, (*got.rows)[24]), ".gear_impact_") && converted::at_place(same(want.tele_, (*got.rows)[25]), ".tele_"); }
 [[maybe_unused]] static bool defined(const Jet& s) { return defined(s.engine_on) && defined(s.pilot) && defined(s.arcade) && defined(s.thrust_scale) && defined(s.fuel) && defined(s.s_) && defined(s.mode_) && defined(s.lever_) && defined(s.thrust_) && defined(s.thrust_cmd_) && defined(s.nozzle_) && defined(s.de_) && defined(s.da_) && defined(s.dr_) && defined(s.steer_) && defined(s.vz_i_) && defined(s.vz_cmd_) && defined(s.vz_cmd_valid_) && defined(s.gamma_valid_) && defined(s.gamma_hold_) && defined(s.gear_down_) && defined(s.speed_brake_) && defined(s.landed_) && defined(s.contacts_) && defined(s.gear_impact_) && defined(s.tele_); }
 [[maybe_unused]] static std::string text(const Jet& s) { return std::string("{") + text(s.engine_on) + ", " + text(s.pilot) + ", " + text(s.arcade) + ", " + text(s.thrust_scale) + ", " + text(s.fuel) + ", " + text(s.s_) + ", " + text(s.mode_) + ", " + text(s.lever_) + ", " + text(s.thrust_) + ", " + text(s.thrust_cmd_) + ", " + text(s.nozzle_) + ", " + text(s.de_) + ", " + text(s.da_) + ", " + text(s.dr_) + ", " + text(s.steer_) + ", " + text(s.vz_i_) + ", " + text(s.vz_cmd_) + ", " + text(s.vz_cmd_valid_) + ", " + text(s.gamma_valid_) + ", " + text(s.gamma_hold_) + ", " + text(s.gear_down_) + ", " + text(s.speed_brake_) + ", " + text(s.landed_) + ", " + text(s.contacts_) + ", " + text(s.gear_impact_) + ", " + text(s.tele_) + "}"; }
 [[maybe_unused]] static void take(Jet& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 26) return; converted::take_as<bool>(s.engine_on, (*v.rows)[0]); converted::take_as<bool>(s.pilot, (*v.rows)[1]); converted::take_as<bool>(s.arcade, (*v.rows)[2]); converted::take_as<double>(s.thrust_scale, (*v.rows)[3]); converted::take_as<double>(s.fuel, (*v.rows)[4]); converted::take_as<JetSpec>(s.s_, (*v.rows)[5]); converted::take_as<Jet::Mode>(s.mode_, (*v.rows)[6]); converted::take_as<double>(s.lever_, (*v.rows)[7]); converted::take_as<double>(s.thrust_, (*v.rows)[8]); converted::take_as<double>(s.thrust_cmd_, (*v.rows)[9]); converted::take_as<double>(s.nozzle_, (*v.rows)[10]); converted::take_as<double>(s.de_, (*v.rows)[11]); converted::take_as<double>(s.da_, (*v.rows)[12]); converted::take_as<double>(s.dr_, (*v.rows)[13]); converted::take_as<double>(s.steer_, (*v.rows)[14]); converted::take_as<double>(s.vz_i_, (*v.rows)[15]); converted::take_as<double>(s.vz_cmd_, (*v.rows)[16]); converted::take_as<bool>(s.vz_cmd_valid_, (*v.rows)[17]); converted::take_as<bool>(s.gamma_valid_, (*v.rows)[18]); converted::take_as<double>(s.gamma_hold_, (*v.rows)[19]); converted::take_as<bool>(s.gear_down_, (*v.rows)[20]); converted::take_as<bool>(s.speed_brake_, (*v.rows)[21]); converted::take_as<bool>(s.landed_, (*v.rows)[22]); converted::take_as<int>(s.contacts_, (*v.rows)[23]); converted::take_as<double>(s.gear_impact_, (*v.rows)[24]); converted::take_as<JetTelemetry>(s.tele_, (*v.rows)[25]); }
@@ -246,7 +246,7 @@ SC_TEST(converted_jet) {
   {  // Jet::mode
     converted::Tally tally("Jet_mode");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.mode(); }); };
+    const auto run = [&]([[maybe_unused]] Jet& a0) { return converted::counted([&] { return a0.mode(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Jet a0 = draw_Jet(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -255,7 +255,9 @@ SC_TEST(converted_jet) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -265,7 +267,7 @@ SC_TEST(converted_jet) {
   {  // Jet::landed
     converted::Tally tally("Jet_landed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.landed(); }); };
+    const auto run = [&]([[maybe_unused]] Jet& a0) { return converted::counted([&] { return a0.landed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Jet a0 = draw_Jet(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -274,7 +276,9 @@ SC_TEST(converted_jet) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -284,7 +288,7 @@ SC_TEST(converted_jet) {
   {  // Jet::gear_down
     converted::Tally tally("Jet_gear_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.gear_down(); }); };
+    const auto run = [&]([[maybe_unused]] Jet& a0) { return converted::counted([&] { return a0.gear_down(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Jet a0 = draw_Jet(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -293,7 +297,9 @@ SC_TEST(converted_jet) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -303,7 +309,7 @@ SC_TEST(converted_jet) {
   {  // Jet::gear_impact
     converted::Tally tally("Jet_gear_impact");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.gear_impact(); }); };
+    const auto run = [&]([[maybe_unused]] Jet& a0) { return converted::counted([&] { return a0.gear_impact(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Jet a0 = draw_Jet(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -312,7 +318,9 @@ SC_TEST(converted_jet) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -322,7 +330,7 @@ SC_TEST(converted_jet) {
   {  // Jet::nozzle
     converted::Tally tally("Jet_nozzle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.nozzle(); }); };
+    const auto run = [&]([[maybe_unused]] Jet& a0) { return converted::counted([&] { return a0.nozzle(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Jet a0 = draw_Jet(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -331,7 +339,9 @@ SC_TEST(converted_jet) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -341,7 +351,7 @@ SC_TEST(converted_jet) {
   {  // Jet::thrust
     converted::Tally tally("Jet_thrust");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.thrust(); }); };
+    const auto run = [&]([[maybe_unused]] Jet& a0) { return converted::counted([&] { return a0.thrust(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Jet a0 = draw_Jet(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -350,7 +360,9 @@ SC_TEST(converted_jet) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -360,7 +372,7 @@ SC_TEST(converted_jet) {
   {  // Jet::lever
     converted::Tally tally("Jet_lever");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Jet a0) { return converted::counted([&] { return a0.lever(); }); };
+    const auto run = [&]([[maybe_unused]] Jet& a0) { return converted::counted([&] { return a0.lever(); }); };
     for (int i = 0; tally.more(i); ++i) {
       Jet a0 = draw_Jet(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -369,7 +381,9 @@ SC_TEST(converted_jet) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

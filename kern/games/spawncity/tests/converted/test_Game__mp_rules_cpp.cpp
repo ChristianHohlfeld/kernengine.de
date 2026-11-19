@@ -40,33 +40,8 @@ namespace logic { enum class PinType : u8 {
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
   map, set, count
 }; }
-namespace mp { bool bind(::kern::logic::Runtime& logic); }
 namespace mp { const std::vector<u32>& palette(); }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
-namespace mp { f64 kSpawnProtectMs = 0, kRegenDelayMs = 0, kRegenTickMs = 0, kRespawnCooldownMs = 0, kBallotMs = 0, kPingLifeMs = 0, kPingHoldMs = 0; }
-namespace mp { f32 kRegenHpPerS = 0, kRespawnRadiusMin = 0, kRespawnRadiusMax = 0, kVoiceRadius = 0, kPingRemoveM = 0; }
-namespace mp { rules::Blueprint g_rules{"Multiplayer"}; }
 namespace mp { std::vector<u32> g_palette; }
-namespace mp { bool bind(::kern::logic::Runtime& logic) {
-  const bool runs = g_rules.bind(logic);
-  g_palette.clear();
-  kSpawnProtectMs = g_rules.get<f64>("SpawnProtectMs");
-  kRegenDelayMs = g_rules.get<f64>("RegenDelayMs");
-  kRegenTickMs = g_rules.get<f64>("RegenTickMs");
-  kRespawnCooldownMs = g_rules.get<f64>("RespawnCooldownMs");
-  kBallotMs = g_rules.get<f64>("BallotMs");
-  kPingLifeMs = g_rules.get<f64>("PingLifeMs");
-  kPingHoldMs = g_rules.get<f64>("PingHoldMs");
-  kRegenHpPerS = static_cast<f32>(g_rules.get<f64>("RegenHpPerS"));
-  kRespawnRadiusMin = static_cast<f32>(g_rules.get<f64>("RespawnRadiusMin"));
-  kRespawnRadiusMax = static_cast<f32>(g_rules.get<f64>("RespawnRadiusMax"));
-  kVoiceRadius = static_cast<f32>(g_rules.get<f64>("VoiceRadius"));
-  kPingRemoveM = static_cast<f32>(g_rules.get<f64>("PingRemoveM"));
-  g_palette = g_rules.get<std::vector<u32>>("Palette");
-  return runs;
-} }
 namespace mp { const std::vector<u32>& palette() { return g_palette; } }
 #undef private
 #undef protected
@@ -75,54 +50,16 @@ namespace mp { const std::vector<u32>& palette() { return g_palette; } }
 [[maybe_unused]] static std::unique_ptr<converted::NoObject> draw_state_Game(converted::Draw& draw) {
   auto s = std::make_unique<converted::NoObject>();
   mp::g_palette = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
-  mp::kSpawnProtectMs = draw.number();
-  mp::kRegenDelayMs = draw.number();
-  mp::kRegenTickMs = draw.number();
-  mp::kRespawnCooldownMs = draw.number();
-  mp::kBallotMs = draw.number();
-  mp::kPingLifeMs = draw.number();
-  mp::kPingHoldMs = draw.number();
-  mp::kRegenHpPerS = draw.number();
-  mp::kRespawnRadiusMin = draw.number();
-  mp::kRespawnRadiusMax = draw.number();
-  mp::kVoiceRadius = draw.number();
-  mp::kPingRemoveM = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Variables variables_Game(const converted::NoObject& s) { return {{"mp_rules_g_palette", arg(mp::g_palette)}, {"mp_kSpawnProtectMs", arg(mp::kSpawnProtectMs)}, {"mp_kRegenDelayMs", arg(mp::kRegenDelayMs)}, {"mp_kRegenTickMs", arg(mp::kRegenTickMs)}, {"mp_kRespawnCooldownMs", arg(mp::kRespawnCooldownMs)}, {"mp_kBallotMs", arg(mp::kBallotMs)}, {"mp_kPingLifeMs", arg(mp::kPingLifeMs)}, {"mp_kPingHoldMs", arg(mp::kPingHoldMs)}, {"mp_kRegenHpPerS", arg(mp::kRegenHpPerS)}, {"mp_kRespawnRadiusMin", arg(mp::kRespawnRadiusMin)}, {"mp_kRespawnRadiusMax", arg(mp::kRespawnRadiusMax)}, {"mp_kVoiceRadius", arg(mp::kVoiceRadius)}, {"mp_kPingRemoveM", arg(mp::kPingRemoveM)}}; }
+[[maybe_unused]] static converted::Variables variables_Game(const converted::NoObject& s) { return {{"mp_rules_g_palette", arg(mp::g_palette)}}; }
 struct State_Game { const converted::NoObject* s; };
-[[maybe_unused]] static bool same(const State_Game& w, const converted::Value& got) { return got.rows && got.rows->size() == 13 && same(mp::g_palette, (*got.rows)[0]) && same(mp::kSpawnProtectMs, (*got.rows)[1]) && same(mp::kRegenDelayMs, (*got.rows)[2]) && same(mp::kRegenTickMs, (*got.rows)[3]) && same(mp::kRespawnCooldownMs, (*got.rows)[4]) && same(mp::kBallotMs, (*got.rows)[5]) && same(mp::kPingLifeMs, (*got.rows)[6]) && same(mp::kPingHoldMs, (*got.rows)[7]) && same(mp::kRegenHpPerS, (*got.rows)[8]) && same(mp::kRespawnRadiusMin, (*got.rows)[9]) && same(mp::kRespawnRadiusMax, (*got.rows)[10]) && same(mp::kVoiceRadius, (*got.rows)[11]) && same(mp::kPingRemoveM, (*got.rows)[12]); }
-[[maybe_unused]] static bool defined(const State_Game& w) { return defined(mp::g_palette) && defined(mp::kSpawnProtectMs) && defined(mp::kRegenDelayMs) && defined(mp::kRegenTickMs) && defined(mp::kRespawnCooldownMs) && defined(mp::kBallotMs) && defined(mp::kPingLifeMs) && defined(mp::kPingHoldMs) && defined(mp::kRegenHpPerS) && defined(mp::kRespawnRadiusMin) && defined(mp::kRespawnRadiusMax) && defined(mp::kVoiceRadius) && defined(mp::kPingRemoveM); }
-[[maybe_unused]] static std::string text(const State_Game& w) { return std::string("{") + "mp_rules_g_palette = " + text(mp::g_palette) + ", " + "mp_kSpawnProtectMs = " + text(mp::kSpawnProtectMs) + ", " + "mp_kRegenDelayMs = " + text(mp::kRegenDelayMs) + ", " + "mp_kRegenTickMs = " + text(mp::kRegenTickMs) + ", " + "mp_kRespawnCooldownMs = " + text(mp::kRespawnCooldownMs) + ", " + "mp_kBallotMs = " + text(mp::kBallotMs) + ", " + "mp_kPingLifeMs = " + text(mp::kPingLifeMs) + ", " + "mp_kPingHoldMs = " + text(mp::kPingHoldMs) + ", " + "mp_kRegenHpPerS = " + text(mp::kRegenHpPerS) + ", " + "mp_kRespawnRadiusMin = " + text(mp::kRespawnRadiusMin) + ", " + "mp_kRespawnRadiusMax = " + text(mp::kRespawnRadiusMax) + ", " + "mp_kVoiceRadius = " + text(mp::kVoiceRadius) + ", " + "mp_kPingRemoveM = " + text(mp::kPingRemoveM) + "}"; }
-struct Out_bind { State_Game State; bool Result; };
-[[maybe_unused]] static bool same(const Out_bind& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Out_bind& s) { return defined(s.State) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_bind& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
+[[maybe_unused]] static bool same(const State_Game& w, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(mp::g_palette, (*got.rows)[0]), ".mp_rules_g_palette"); }
+[[maybe_unused]] static bool defined(const State_Game& w) { return defined(mp::g_palette); }
+[[maybe_unused]] static std::string text(const State_Game& w) { return std::string("{") + "mp_rules_g_palette = " + text(mp::g_palette) + "}"; }
 
 SC_TEST(converted_Game__mp_rules_cpp) {
-  converted::Blueprint bp("Game", {"Multiplayer"});
-  mp::g_rules.bind(bp.source_logic());
-  {  // bind
-    converted::Tally tally("bind");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { auto r = converted::counted([&] { return converted_Game__mp_rules_cpp::mp::bind(bp.source_logic()); }); return Out_bind{State_Game{s.get()}, std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0}, &vars, true);
-    }
-  }
+  converted::Blueprint bp("Game");
   {  // palette
     converted::Tally tally("palette");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -137,7 +74,9 @@ SC_TEST(converted_Game__mp_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
