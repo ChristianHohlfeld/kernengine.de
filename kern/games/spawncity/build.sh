@@ -59,8 +59,11 @@ if [ "$skip_wasm" = 0 ]; then
     wrapped+=("$w")
   done
   # (the heap is grown once at start by the game itself - main.cpp start(); the job workers run
-  # the same module and must stay small, so no big initial memory here)
-  "$root/kern/build.sh" --app --game --commercial "$wasm" "${wrapped[@]}" -I"$here/src"
+  # the same module and must stay small, so no big initial memory here: Kern's 32 MiB, and the level
+  # the module carries in its data (level_data.cpp) on top - in whole 64 KiB pages)
+  level_bytes=$(wc -c < "$here/level/spawncity.klevel")
+  initial=$(( (33554432 + level_bytes + 65535) / 65536 * 65536 ))
+  KERN_INITIAL_MEMORY="${KERN_INITIAL_MEMORY:-$initial}" "$root/kern/build.sh" --app --game --commercial "$wasm" "${wrapped[@]}" -I"$here/src"
 fi
 [ -s "$wasm" ] || { echo "missing $wasm (run without --skip-wasm)" >&2; exit 1; }
 
