@@ -199,6 +199,9 @@ struct Callable {
   /// Calls the function with `args` (its inputs after the bound place, in their order); `result`
   /// gets its output. False: it is unbound now (the Blueprint it was made in has ended).
   virtual bool call(std::span<const struct Value> args, struct Value& result) const = 0;
+  /// Of one a Blueprint's class made (logic::detail::NativeCallable): which one (its signature's own mark) - the class
+  /// takes it back as it was. Null: one of the interpreter or the JIT.
+  virtual const void* native_kind() const { return nullptr; }
 };
 
 /// A value on a data pin.

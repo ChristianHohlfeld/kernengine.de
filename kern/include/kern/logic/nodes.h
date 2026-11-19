@@ -880,6 +880,8 @@ template <class S> inline constexpr bool is_callback<Callback<S>> = true;
 template <class R, class... A> struct NativeCallable final : Callable {
   Callback<R(A...)> held;
   explicit NativeCallable(Callback<R(A...)> c) : held(c) {}
+  static constexpr char kind = 0;
+  const void* native_kind() const override { return &kind; }
   bool call(std::span<const Value> args, Value& result) const override { return call(args, result, std::index_sequence_for<A...>{}); }
   template <std::size_t... I> bool call(std::span<const Value> args, Value& result, std::index_sequence<I...>) const {
     if (!held.fn) return false;
@@ -893,7 +895,7 @@ template <class R, class... A> struct Held<Callback<R(A...)>> {
   /// (one the class made, back as it was; one the interpreter made calls the Blueprint there - in a class it is
   /// unbound: a Callback goes from a Blueprint to the engine, not from one tier into another)
   static Callback<R(A...)> from(const Value& v) {
-    if (const auto* n = dynamic_cast<const NativeCallable<R, A...>*>(v.call.get())) return n->held;
+    if (v.call && v.call->native_kind() == &NativeCallable<R, A...>::kind) return static_cast<const NativeCallable<R, A...>&>(*v.call).held;
     return {};
   }
 };
