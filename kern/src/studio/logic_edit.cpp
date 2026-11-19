@@ -556,9 +556,14 @@ json::Value Studio::logic_json() const {
         pj.set("id", p.id);
         pj.set("label", p.label);
         pj.set("type", logic::pin_type_name(p.type));
-        if (!p.of.empty()) pj.set("of", p.of);
+        if (!p.of.empty() && p.of != logic::kAnyWidth) pj.set("of", p.of);
         // (a pin that takes the type of the first wire: the types it can be)
         for (const auto& [id, types] : generic) if (id == p.id) pj.set("generic", types);
+        if (p.of == logic::kAnyWidth) {  // (it reads a list of Ints of each width: List<Int>, List<U8> ...)
+          std::string types = "int_list";
+          for (std::string_view w : logic::kWidthNames) types += " " + std::string(w) + "_list";
+          pj.set("generic", types);
+        }
         bool linked = false;
         for (const logic::Link& l : g->links)
           if ((output && l.from == n.id && l.out == p.id) || (!output && l.to == n.id && l.in == p.id)) linked = true;
