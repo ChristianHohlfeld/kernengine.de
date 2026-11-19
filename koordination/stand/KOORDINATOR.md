@@ -1,4 +1,9 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 12:15 **work-zusammen = 6998a56e** (t1 ab817fdf: E19 Maß statt Uhr, Enum = Stelle, text_end; k 977e515b: E18 gehaltener Eintrag; p 1831e165: Int-Formeln;
+  t2 80d7d98b: E15; t1-Rahmen nebeneinander). **ALLE: vor dem nächsten `vergleich`/`alle` origin/work-zusammen einmischen** – das mag-Skript ruft die Tests
+  jetzt mit `--name <ganzer Name>`; ein Stand ohne den Rahmen (vor 25445622) findet damit keinen Test. `mag.sh vergleich` braucht Pfade `src/<datei>.cpp`.
+  Entscheidungen: E18 (V1), E19, E20 (ganze Zahlen fester Breite u8…i32 als Typen der Sprache; p baut). Chris: Entwurfsfragen entscheidet der Koordinator bzw.
+  der Agent nach den Zielen; Token sparen – kurze Berichte, keine Läufe zur Sicherheit.
 - 08:45 **QUOTE KNAPP (Woche 58 %, laut App heute Nacht erreicht).** Ab jetzt nur der Weg zum ersten grünen Stand: t1 (Rahmen), k (Abweichungen), d (gegen die
   Engine); t2 beendet E15. **p und e: nur den laufenden Schritt belegen, „BEREIT ZUM MERGEN“ melden, Übergabe schreiben, enden.** Alle: sparsam – keine
   Proben „zur Sicherheit“, kurze Berichte, Stand und Übergabe immer aktuell (jeder Lauf kann der letzte vor der Pause sein). Stand des Ganzen: UEBERGABE 16.24.
