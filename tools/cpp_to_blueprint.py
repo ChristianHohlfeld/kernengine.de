@@ -10754,6 +10754,59 @@ class TestWriter:
             return expr
         return f"converted::shaped<{re.sub(r'\b[ui]64\b', 'converted::Whole', spelled)}>({expr})"
 
+    def logic_value(self, q):
+        """Is `q` a class of the engine's logic that is a value of the language - plain data (Unit.engine_object):
+        a Graph, a Node - and not its machinery (Runtime, ActorBlueprint, Instance: in a test the engine's own)?"""
+        return q.startswith(ENGINE + "::logic::") and q in self.tree.records and not self.u.engine_object(q)
+
+    def hands_logic(self, d, seen=None):
+        """What the function `d` - or a function of the program it calls - hands to the engine's logic itself (a
+        function or a method of it - Node::set_value, graph_to_json, Runtime ... - whose object, parameters or result
+        are a value of it, logic_value): the reason it waits, or None. In a test the logic is the engine's own, and
+        the test holds such a value as the Blueprint does, field by field (its own class): the two do not meet."""
+        tree, u = self.tree, self.u
+        seen = set() if seen is None else seen
+        if d["id"] in seen:
+            return None
+        seen.add(d["id"])
+        def values_in(text):
+            out = []
+            for word in sorted(set(re.findall(r"[A-Za-z_][\w:]*", text))):
+                try:
+                    q = u.find_type(word)
+                except Wait:
+                    continue
+                if q and self.logic_value(q) and q not in out:
+                    out.append(q)
+            return out
+        for x in walk_source(tree.body.get(d["id"], d)):
+            k = x.get("kind")
+            r = None
+            if k == "DeclRefExpr":
+                r = x.get("referencedDecl", {})
+            elif k == "MemberExpr":
+                r = tree.decl.get(x.get("referencedMemberDecl"), {})
+            elif k == "CXXConstructExpr":
+                r = constructor_of(tree, x)
+            if not r or r.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
+                continue
+            i = r.get("id")
+            scope = tree.owner.get(i) or tree.scope_of.get(i, "")
+            if scope.startswith(ENGINE + "::logic"):
+                if r.get("isImplicit"):
+                    continue   # (what the compiler makes of a class - its copy, its assignment: the test's class has its own)
+                owner = tree.owner.get(i) or ""
+                values = ([owner] if self.logic_value(owner) else []) + [q for q in values_in(qtype(tree.decl.get(i, r))) if q != owner]
+                if values:
+                    name = "::".join(x for x in [owner.split("::")[-1] if owner else "", r.get("name", "")] if x)
+                    return (f"it hands a value of the engine's logic ({', '.join(q.split('::')[-1] for q in values)}) to the engine's logic itself "
+                            f"({name}): in a test that is the engine's own, and the test holds such a value as the Blueprint does, field by field")
+            elif not scope.startswith(ENGINE + "::") and i in tree.body:
+                why = self.hands_logic(tree.body[i], seen)
+                if why:
+                    return why
+        return None
+
     def object_name(self, q):
         """The stand-in of a class of the engine in the test (its objects are handles in the Blueprint)."""
         if q not in self.objects:
@@ -11604,7 +11657,10 @@ class TestWriter:
                     table.setdefault("::".join([name, *parts[k:]]), local)
         # (the engine's logic - how C++ runs and calls a Blueprint - is in a test the engine's own: `logic::Graph`
         # in the engine's source is ::kern::logic::Graph there, see gather)
-        logic = re.compile(r"(?<![\w:.>])(?:::)?(?:" + ENGINE + r"::)?logic::")
+        # (- but for a value of it the test holds, compiled along: a Graph, a Node, and the stand-ins of what they hold -
+        # it is the test's own, by the name the test gives it)
+        held = sorted({q[len(ENGINE + "::logic::"):].split("::")[0] for q in [*self.names, *self.enum_names] if q.startswith(ENGINE + "::logic::")})
+        logic = re.compile(r"(?<![\w:.>])(?:::)?(?:" + ENGINE + r"::)?logic::" + (r"(?!(?:" + "|".join(map(re.escape, held)) + r")\b)" if held else ""))
         def own(code):
             return logic.sub(f"::{ENGINE}::logic::", code)
         own_logic = own
@@ -11831,13 +11887,18 @@ class TestWriter:
         converted = self.converted
         G = Held()
         todo, seen_types = [], set()
+        in_value = [False]   # (scanning a value of the engine's logic: an object of it there is a part of that value)
         def want_record(q):
             t = self.home_of(q)
             if t != self.top_of(q):
                 want_record(self.top_of(q))   # (a class defined outside its class: with that class, after it)
             d = tree.records.get(t)
-            if t.startswith(ENGINE + "::logic::"):
-                return   # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints)
+            if t.startswith(ENGINE + "::logic::") and not self.logic_value(t) and not (in_value[0] and u.engine_object(t)):
+                # (the engine's logic - how C++ calls a Blueprint: in a test the engine's own, which runs the Blueprints.
+                # A class of it that is plain data - a Graph, a Node: a struct of the language - is a value like any
+                # struct of the engine, compiled along; what such a value holds that is an object of the engine - a
+                # Variable, a json::Value - is a stand-in, by its handle, as the Blueprint has it)
+                return
             parts = t.split("::")
             if t.startswith(ENGINE + "::") and any("::".join(parts[:i]) in tree.records and u.engine_object("::".join(parts[:i])) for i in range(2, len(parts))):
                 return   # (what an object of the engine has inside it - LightPool::Request -: its stand-in has none of it)
@@ -12071,7 +12132,9 @@ class TestWriter:
             want_record(q)
         while todo:
             kind, d = todo.pop()
+            in_value[0] = kind == "record" and self.logic_value(d.get("_q") or "")
             scan_record(d) if kind == "record" else scan(d)
+            in_value[0] = False
             scan_text(d)
             if kind == "record":
                 want_comparisons(d)
@@ -12229,13 +12292,14 @@ class TestWriter:
         [(the declaration, its text, the name it gives (a pair))]."""
         numbers = {"f32", "f64", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "i64"}
         words = set(re.findall(r"[A-Za-z_]\w*", "\n".join(texts)))
+        logic_words = {w for q in self.names if self.logic_value(q) for w in re.findall(r"[A-Za-z_]\w*", self.tree.source(self.tree.records[q]))}
         out, taken = [], set()
         for _ in range(4):
             for o, scope in self.tree.alias_decls:
                 if o["id"] in taken or o.get("name") in numbers or o.get("name") not in words:
                     continue
-                if (scope or "").startswith(ENGINE + "::logic::"):
-                    continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather)
+                if (scope or "").startswith(ENGINE + "::logic::") and o.get("name") not in logic_words:
+                    continue   # (the engine's logic - how C++ runs and calls a Blueprint: in a test the engine's own, see gather - but for what a value of it the test holds names: logic_value)
                 # (one in a class the test compiles along stands in its text; one in a class it does not has the
                 # namespace of the class's name - in_classes)
                 if o.get("_at", (None, None))[0] is None or o["_at"][1] is None or self.inside(o, decls) is not None or self.in_function(o):
@@ -12625,6 +12689,10 @@ class TestWriter:
                 continue
             if not f.out_fields:
                 skipped.append((f, "it gives nothing"))
+                continue
+            handed = self.hands_logic(d)
+            if handed:
+                skipped.append((f, handed))
                 continue
             if f.indexes and d["id"] in unguarded:
                 skipped.append((f, f"it reads a list at a place, shifts bits or divides whole numbers by an amount it computes, {unguarded[d['id']]}: C++ leaves open what that gives outside the range the function is made for, and the test cannot tell where that is"))
