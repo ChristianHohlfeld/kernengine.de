@@ -1,0 +1,80 @@
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:470:3: note: candidate constructor not viable: no known conversion from 'kern::logic::List<kern::logic::Whole>' to 'const Fixed<Sized<unsigned char>, 64> &' for 1st argument
+  470 |   Fixed(const Fixed&) = default;
+      |   ^     ~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:471:3: note: candidate constructor not viable: no known conversion from 'kern::logic::List<kern::logic::Whole>' to 'Fixed<Sized<unsigned char>, 64> &&' for 1st argument
+  471 |   Fixed(Fixed&&) = default;
+      |   ^     ~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:466:28: note: candidate template ignored: could not match 'Fixed' against 'List'
+  466 |   template <std::size_t M> Fixed(const Fixed<T, M>& other) { take(other.items.data(), M); }                    // NOLINT (implicit: a list of another length)
+      |                            ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:467:28: note: candidate template ignored: could not match 'Fixed' against 'List'
+  467 |   template <std::size_t M> Fixed(Fixed<T, M>&& other) {                                                        // NOLINT
+      |                            ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:464:12: note: explicit constructor is not a candidate
+  464 |   explicit Fixed(std::in_place_t, V&&... entries) : items{Item(std::forward<V>(entries))...} {}
+      |            ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/games/spawncity/src/level_blueprints.cpp:23619:13: error: no viable conversion from 'kern::logic::List<kern::logic::Whole>' to 'Fixed<U32, 8>' (aka 'Fixed<kern::logic::Sized<unsigned int>, 8UL>')
+ 23619 |     return {from_value<kern::List<kern::logic::Whole>>(*v.field(0))};
+       |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:460:3: note: candidate constructor not viable: no known conversion from 'kern::logic::List<kern::logic::Whole>' to 'std::initializer_list<Item>' (aka 'initializer_list<kern::logic::Sized<unsigned int>>') for 1st argument
+  460 |   Fixed(std::initializer_list<Item> given) { take(given.begin(), given.size()); }                              // Fixed<Float, 3>{1.0, 2.5}
+      |   ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:465:3: note: candidate constructor not viable: no known conversion from 'kern::logic::List<kern::logic::Whole>' to 'const std::vector<Item> &' (aka 'const vector<kern::logic::Sized<unsigned int>> &') for 1st argument
+  465 |   Fixed(const std::vector<Item>& list) { take(list.data(), list.size()); }                                     // NOLINT (implicit: a list set at the place)
+      |   ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:470:3: note: candidate constructor not viable: no known conversion from 'kern::logic::List<kern::logic::Whole>' to 'const Fixed<Sized<unsigned int>, 8> &' for 1st argument
+  470 |   Fixed(const Fixed&) = default;
+      |   ^     ~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:471:3: note: candidate constructor not viable: no known conversion from 'kern::logic::List<kern::logic::Whole>' to 'Fixed<Sized<unsigned int>, 8> &&' for 1st argument
+  471 |   Fixed(Fixed&&) = default;
+      |   ^     ~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:466:28: note: candidate template ignored: could not match 'Fixed' against 'List'
+  466 |   template <std::size_t M> Fixed(const Fixed<T, M>& other) { take(other.items.data(), M); }                    // NOLINT (implicit: a list of another length)
+      |                            ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:467:28: note: candidate template ignored: could not match 'Fixed' against 'List'
+  467 |   template <std::size_t M> Fixed(Fixed<T, M>&& other) {                                                        // NOLINT
+      |                            ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:464:12: note: explicit constructor is not a candidate
+  464 |   explicit Fixed(std::in_place_t, V&&... entries) : items{Item(std::forward<V>(entries))...} {}
+      |            ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/games/spawncity/src/level_blueprints.cpp:24166:8: error: no viable overloaded operator[] for type 'List<I32>' (aka 'List<kern::logic::Sized<int>>')
+ 24166 |       r[i] = pos;
+       |       ~^~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:435:9: note: candidate template ignored: constraints not satisfied [with I = I32]
+  435 |   Item& operator[](I index) {
+      |         ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:434:14: note: because 'std::is_integral_v<kern::logic::Sized<int> >' evaluated to false
+  434 |     requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:434:39: note: and 'std::is_same_v<kern::logic::Sized<int>, Whole>' evaluated to false
+  434 |     requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:442:15: note: candidate template ignored: constraints not satisfied [with I = I32]
+  442 |   const Item& operator[](I index) const {
+      |               ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:441:14: note: because 'std::is_integral_v<kern::logic::Sized<int> >' evaluated to false
+  441 |     requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+      |              ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/include/kern/logic/nodes.h:441:39: note: and 'std::is_same_v<kern::logic::Sized<int>, Whole>' evaluated to false
+  441 |     requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+      |                                       ^
+fatal error: too many errors emitted, stopping now [-ferror-limit=]
+3 warnings and 20 errors generated.
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-160137-576/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+
+real	3m11,148s
+user	30m20,969s
+sys	0m48,704s
