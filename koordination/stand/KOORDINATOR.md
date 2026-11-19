@@ -1,4 +1,10 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 07:20 **work-zusammen = 821208ac** (+ d work-d-belege2: leck, weld, app, key, release – Engine-Suite 062159 rc=0; + Tabellen-Fix 1007cb7e now_ms).
+  Voller Lauf **`work-zusammen-voll-070328-32111`** rechnet darauf (Konvertierung bis ~07:45). Engine-Suiten grün: fe83683e (im Lauf 055004), f03f0f53 (060116).
+  · **Die Spiel-Suite läuft ihre Tests nacheinander (ein Kern): 41 von 150 Tests in ~40 Minuten** – Suite von 055004 abgebrochen (40 ok, 1 FAIL
+    converted_engine_math_math, vor ks Fix). t1 baut: Kinder nebeneinander (KERN_JOBS), Zeit je Test, CPU-Summe. Bis dahin gibt es Listen nur aus Einzel-Läufen
+    (`alle`). **Alle: `mag.sh vergleich` braucht Pfade `src/<datei>.cpp`** (relativ zu kern/games/spawncity) – ohne `src/` schreibt die Probe keinen Test.
+  · Neu gestartet: **e** (Rekursion – Entwurf zuerst; PAKET3_e.md) und **p** Nachfolger 2 (Zeit-Test, Entwürfe an den Koordinator). d5 beendet, alles gemergt.
 - 06:48 **Entscheidung E15 (ersetzt E12; t2, Graph):** ein Typ aus kern::logic, den die Regel des Konverters selbst (Unit.engine_object) als einfache Daten
   einstuft (Graph, Node, Link, StateMachine, Function …), ist im Test eine Struktur wie jede Struktur der Engine – mitübersetzt, Feld für Feld gezogen und
   verglichen; seine Objekt-Teile (Variable, FunctionPin, json::Value) sind Stellvertreter mit Handle (wie TextureAsset in Level). Die Maschinerie der Logik

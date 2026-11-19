@@ -269,3 +269,7 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
   Fix work-d-app d11cb0cf (run_tests.sh + kern_create_app in tests/test_main.cpp).
 - Beleg-Zweig work-d-belege2 f5030c78 = alle drei; vergleich work-d-belege2-vergleich-050059-20415, danach `mag.sh engine origin/work-d-belege2`.
 - Danach: work-d aktuell halten (git merge origin/work-zusammen), Platz der Engine erst nach erstem grünen Stand.
+- 07:05: alle fünf Fixe belegt und als BEREIT ZUM MERGEN gemeldet (stand/d.md): leck 16d72b56, weld f31ea939, app d11cb0cf+3cb92099, key 2562e856,
+  release 7b1a05ed; Belege 044258-11385, 055045-6922, Engine-Suite 062159-12230 rc=0. work-d = 9949fd00 (work-zusammen eingemischt, Konflikt in place:
+  Generation + owner). Beim späteren Mischen von leck in work-d: ++generation_ in place/end/clear behalten.
+- Offen: im nächsten vollen Lauf prüfen, dass interiors/game_gaps/game_town (gleiche Leck-Ursache) ohne LECK sind; Platz der Engine erst nach erstem grünen Stand.

@@ -209,3 +209,18 @@
   Einziges FAIL: converted_Game__game_look_cpp in BEIDEN Durchgängen – SEGV strlen(nullptr) in look_apply_tier (Testtext :5610, std::string aus nullptr);
   genauso in der Basis 032626 und 043356 → nicht von d (Familie „std::string aus nullptr“ wie converted_life_cpp, t1).
 - Engine-Suite läuft: `work-d-belege2-engine-062159-12230`.
+- Berichtigung: work-d-key = **2562e856**, work-d-release = **7b1a05ed**, work-d-belege2 = **28b67b2b** (oben vertauscht genannt).
+- **Engine-Suite `work-d-belege2-engine-062159-12230` auf 28b67b2b: engine rc=0** (u. a. ok weld_and_hash, engine_calls_default_objects(_made_with, _by_class),
+  app_input_and_args).
+
+## BEREIT ZUM MERGEN (d, 07:05) – fünf kurze Zweige, je ein Commit auf work-zusammen 12438d1c (sauber mischbar; zusammen = work-d-belege2 28b67b2b)
+1. **work-d-leck 16d72b56** (D1, Engine: EngineObjects je Handle mehrere Einträge – kein Überschreiben) – Belege `work-d-leck-vergleich-044258-11385`
+   (17/17 beide Durchgänge, 0 LECK), `work-d-belege2-vergleich-055045-6922`, Engine-Suite 062159 rc=0.
+2. **work-d-weld f31ea939** (D2, Engine: weld prüft Längen der Ströme wie upsert) – converted_city_stream(_cpp) ok gegen die Engine in 052701 und 055045; Engine-Suite rc=0.
+3. **work-d-app d11cb0cf + 3cb92099** (D3, Testbau: app und api gelinkt wie im Spiel, kern_create_app in tests/test_main.cpp) – kein „this build has no function“ mehr
+   (055045; converted_Game__game_cpp, converted_game_controls_cpp ok gegen die Engine).
+4. **work-d-key 2562e856** (Engine: Input liest keine Taste ab Key::count) – nötig mit 3: sonst UBSan app.h:40 in game_controls (052701); in 055045 ok; Engine-Suite rc=0.
+5. **work-d-release 7b1a05ed** (Engine-Objekte: release eines Handles ohne Objekt beendet das von on_missing gemachte – Client/RoadBuilder/Earcut/LightPool,
+   BEFUND t1 look_apply_tier) – in 055045 kein „refused“ mehr; Engine-Suite rc=0.
+- Nicht von d: converted_Game__game_look_cpp FAIL in beiden Durchgängen (SEGV std::string aus nullptr in look_apply_tier, Testtext :5610) – wie in 032626/043356.
+- Hinweis beim Mischen in work-d (Platz der Engine): work-d zählt in EngineObjects::place/end/clear eine Generation (++generation_) – beim Mischen von 1 dort beibehalten.

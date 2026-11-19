@@ -908,3 +908,35 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
 - **Was für den ersten grünen Stand in `work` fehlt:** die Punkte von k und d oben belegt und gemergt, dann ein voller Lauf mit `convert rc=0`, `suite rc=0`
   (beide Durchgänge), `engine rc=0` → work-zusammen + „Level und Tests“ nach `work`, CI (der Job native-spawncity läuft bisher in seine 45-Minuten-Grenze).
 
+
+### 16.23 Stand 07:20 (19.11.) – gültiger Lauf 055004 (1707 geschrieben, 1664 verglichen, 3 warten am Test); die Suite läuft nacheinander und ist so nicht zu Ende zu rechnen
+- **`work-zusammen-voll-055004-6649` (fe83683e): convert rc=0 (06:19), engine rc=0.** 1707 von 1844 Funktionen geschrieben (22249 von 30978 Zeilen), 1664
+  verglichen; „cannot compare it yet“ nur noch 3 Zeilen (vehicle_actor: Graph; Game::audio_init/ui_audio_init: SoundBank::request_level); 18 „waits for good“
+  (Rekursion). `grundlage` für `vergleich` ist dieser Lauf. **Die Spiel-Suite habe ich 07:10 abgebrochen (suite rc=143):** nach ~40 Minuten standen erst 41 von
+  150 Tests des ersten Durchgangs (40 ok, 1 FAIL converted_engine_math_math – ks Fix B1 war noch nicht im Stand). Ursache: test_main.cpp startet je Test ein Kind
+  und wartet (fork + waitpid) – ein Kern. **Auftrag an t1 (Vorrang):** Kinder nebeneinander (KERN_JOBS), Ausgabe in Reihenfolge, Zeit je Test, Summe der CPU-Zeit
+  je Durchgang – erst mit diesen Zahlen eine Entscheidung zu Aufrufzahl/Zeitregeln und zur CI (45-Minuten-Grenze).
+- **work-zusammen = 821208ac:** + k 09dd6818 (B3, Beleg 060032: 52 von 52 in beiden Durchgängen, die vier Funktionen der Abweichung zeigt erst der volle Lauf),
+  + d work-d-belege2 28b67b2b (leck 16d72b56, weld f31ea939, app d11cb0cf+3cb92099, key 2562e856, release 7b1a05ed; Belege 044258, 055045 – 52 von 53 in beiden
+  Durchgängen, 0 LECK –, Engine-Suite 062159 rc=0), + **work-tabelle 1007cb7e (Koordinator):** `engine_table()` las die 8 Tabelleneinträge mit Schaltern am Ende
+  (`, true` place; `, false, true` clock) ohne Ausgänge → seit 6f622012 warteten 33 Funktionen (1682 Zeilen: CityStream::update/work/…, Terrain::update/…,
+  Decoder::step, Game::update/fixed_step/…) an „the engine's now_ms() (… its pins differ)“. Knoten mit place warten weiter, mit dem wahren Grund, bis „Platz der
+  Engine“ eingemischt ist (shots 6, sound_cues 2 Funktionen). Beleg: `work-tabelle-vergleich-070253-30791` (wartet auf Kerne) und der volle Lauf.
+  Engine-Suite auf f03f0f53 (k 5d804704, voice-Eingänge Int64): `work-zusammen-engine-060116-9012` rc=0.
+- **Voller Lauf `work-zusammen-voll-070328-32111` auf 821208ac** läuft seit 07:11 (Konvertierung bis ~07:45). Seine Suite liefe wieder nacheinander: nach der
+  Konvertierung `MAG_NOWAIT=1 ./mag.sh alle origin/mag/ergebnis-work-zusammen-voll-070328-32111` ablegen (jeder Test einzeln, beide Durchgänge, ~40 min) und den
+  vollen Lauf abbrechen, sobald `engine rc` in seinem when steht (`./mag.sh abbrechen <name>`). Ein voller Lauf als Kandidat für `work` erst mit t1s Rahmen.
+- **Entscheidung E15 (ersetzt E12):** Typen aus kern::logic, die Unit.engine_object als einfache Daten einstuft (Graph, Node, Link …), sind im Test Strukturen wie
+  jede der Engine – Feld für Feld gezogen und verglichen, Objekt-Teile (Variable, FunctionPin, json::Value) als Stellvertreter mit Handle; die Maschinerie der Logik
+  bleibt ausgenommen. Grund: über die Serialisierung ist kein Bit-für-Bit-Vergleich möglich (Handles). t2 baut es.
+- **Was die 137 nicht geschriebenen Funktionen aufhält: `$S/wartet_055004.txt`.** Blöcke: now_ms 33 (behoben, unbelegt); Rekursion ~35 (18 „went round“ + Ketten
+  über ctl_strike_confirm/hit_scan/step_heli) → **Paket e gestartet (PAKET3_e.md): Entwurf zuerst**, Vorgabe: kein Verhalten anders als das C++ in jeder Tiefe,
+  die das C++ erreicht – eine feste Grenze 64 genügt nicht; „an entry of a list handed to change to a function that may run handlers“ 8; Destruktoren ~Car/~Ragdolls 8;
+  Plätze der Engine 8 (+ Ketten step_cop …); „a pointer“ 5; „a member of Int is set“ 3; Einzelfälle ~25 (Vektor-Konstante als CallExpr 306 Zeilen, goto, tuple/variant,
+  Lambda mit auto, find_if/remove_if, variadisches fail() …) → Nachfolger k, sobald k2 endet.
+- **Agenten (07:20):** t1 Nachfolger 6 (Rahmen nebeneinander + Zeiten; ein Test gibt immer dasselbe Urteil – das Einzel-Skript ließ Tests doppelt laufen und
+  zeigte FAIL/ok desselben Tests; Zeiger hinter das Ende eines Texts/number_at; danach Auswertung des Einzel-Laufs), t2 (E15), e (Rekursion, Entwurf), p Nachfolger 2
+  (Zeit-Test: 25 von 29 Fällen über 1,10; Entwürfe an den Koordinator), k2 (endet; B3-Beleg `work-k-vergleich-062739-13858` läuft). d5 beendet (alles gemergt).
+  IDs in /home/claude/agenten.txt. **Noch nicht gestartet:** Nachfolger k (Abweichungen draw_events, mp_hud_json, Session_update, life_hud + Regeln der Warteliste),
+  d („Platz der Engine“ auf work-d belegen: Schritt 7 Konverter; einmischen nach dem ersten grünen Stand), c (Rückrufe), s5 (Umschalten), Abschluss (Abschnitt 12).
+- **Quote (Chris):** 53 % um 06:34 (42 % um 22:31; Wochengrenze, neu am 25.11. 13:00). Höchstens ~5 Agenten.
