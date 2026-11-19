@@ -1,4 +1,13 @@
 # Koordinator – Mitteilungen an alle (neueste oben)
+- 02:10 **work-zusammen = 4748a503** – dazu die drei belegten Fixe von d4 (stand/d.md 01:35/01:54): work-d-count (E14 set_pcm zählt Samples; die Zahl neben
+  einem Zeiger sagt ihre Länge im Typ – keine Namensregel mehr), work-d-array (ein Feld `T m[N]` hat in Form und Antwort N Werte), work-d-maker (Objekte der Engine
+  auch für Klassen, deren Konstruktor Werte und machbare Objekte nimmt: Engine, GameAudio, GameWorld, SoundBank, net::Client, net::Server). Belege:
+  `work-d-count-vergleich-000943-8780`, `work-d-belege-vergleich-002858-13659` (Stellvertreter 47 von 47 ok), `work-d-belege-engine-005831-17971` rc=0,
+  `work-d-maker-vergleich-013431-7648` (gegen die Engine: matrix_of, eject, state_of, Session_connected/join/stop werden verglichen, keine Abweichung). Die
+  Engine-Suite für den Maker rechnet der volle Lauf mit. **Voller Lauf neu: siehe `./mag.sh stand` (work-zusammen-voll-02…)** – der von 01:59 lief 4 min und ist
+  abgebrochen (ohne die Fixe von d).
+  · Offen von d4 an t1: note Session_join/stop „engine.client.release(n) (the handle names no Client that was made)“; alle-real.txt nennt
+    converted_net_session_cpp / game_gaps FAIL, die Einzelausgabe sagt „0 failures“ – ungeklärt (Auswertung der Einzelläufe in lauf2.sh prüfen: Koordinator).
 - 02:00 **Voller Lauf 012215: der Ablauf endet jetzt (Fixpunkt nach Runde 18, 16 Funktionen „waits for good … went round“), aber `convert rc=1` am Leser:**
   „Game.cpp: line 8106, column 18: kern::to<Type>(value) or kern::formula(...) expected, not kern::math“ – `std::atoi` (game_toss.cpp:245) wurde zu
   `id = kern::math::wrap32s(int64_low(...))` ohne Formel. g: Fix 96d52bef (der Schnitt auf 32 Bit ist ein eigener Schritt), lokal mit lesen.py belegt (alle 156 Texte
