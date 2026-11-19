@@ -48,6 +48,7 @@ std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
   return r;
 }
 std::string type_text(const TypeRef& t) {
+  if (t.type == PinType::callback) return "callback<" + t.of + ">";  // ("callback<float(float,float)>")
   if (is_keyed(t.type)) return std::string(pin_type_name(t.type)) + "<" + t.of + ">";  // ("map<int>float>", "set<text>")
   // (a list of a fixed length says its length: "float_list[16]" - in messages; a setting names no such type)
   const std::string length = t.count ? "[" + std::to_string(t.count) + "]" : std::string();
@@ -55,6 +56,17 @@ std::string type_text(const TypeRef& t) {
   return (is_list(t.type) ? t.of + "_list" : t.of) + length;
 }
 bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
+  if (text.size() > 10 && text.substr(0, 9) == "callback<" && text.back() == '>') {
+    const TypeRef t{PinType::callback, std::string(text.substr(9, text.size() - 10))};
+    const TypeRef r = callback_result(t);
+    const std::vector<TypeRef> in = callback_inputs(t);
+    if (r.type != PinType::exec && !callback_type_ok(r.type)) return false;
+    for (const TypeRef& x : in)
+      if (!callback_type_ok(x.type)) return false;
+    if (callback_of(r, in) != t.of) return false;  // (one spelling)
+    out = t;
+    return true;
+  }
   for (PinType keyed : {PinType::map, PinType::set}) {
     const std::string_view head = pin_type_name(keyed);
     if (text.size() > head.size() + 2 && text.substr(0, head.size()) == head && text[head.size()] == '<' && text.back() == '>') {
@@ -64,7 +76,7 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
       if (keyed == PinType::map) {
         const TypeRef value = value_type(t);
         TypeRef named;
-        if (value.type == PinType::exec || is_keyed(value.type) || !type_from_text(type_text(value), g, named)) return false;
+        if (value.type == PinType::exec || is_keyed(value.type) || value.type == PinType::callback || !type_from_text(type_text(value), g, named)) return false;
       } else if (t.of.find('>') != std::string::npos) {
         return false;
       }
@@ -92,6 +104,13 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
   return false;
 }
 std::string type_label(const TypeRef& t) {
+  if (t.type == PinType::callback) {  // "Callback of Float(Float, Float)"
+    const TypeRef r = callback_result(t);
+    std::string s = "Callback of " + (r.type == PinType::exec ? std::string("Nothing") : type_label(r)) + "(";
+    const std::vector<TypeRef> in = callback_inputs(t);
+    for (std::size_t k = 0; k < in.size(); ++k) s += (k ? ", " : "") + type_label(in[k]);
+    return s + ")";
+  }
   if (t.type == PinType::map) return "Map of " + type_label(key_type(t)) + " to " + type_label(value_type(t));
   if (t.type == PinType::set) return "Set of " + type_label(key_type(t));
   static const char* const kLabels[] = {"Exec", "Boolean", "Integer", "Float", "Vector", "Text", "Actor", "Enum", "Struct", "Int64"};
@@ -101,6 +120,7 @@ std::string type_label(const TypeRef& t) {
 }
 
 bool fits(const TypeRef& from, const TypeRef& to) {
+  if (from.type == PinType::callback || to.type == PinType::callback) return from.type == to.type && from.of == to.of;  // (the same signature)
   if (is_keyed(from.type) || is_keyed(to.type)) return from.type == to.type && from.of == to.of;  // (the same keys, the same values)
   if (!convertible(from.type, to.type)) return false;
   return !declared_type(from.type) || !declared_type(to.type) || from.of == to.of;
@@ -113,6 +133,7 @@ bool convertible(PinType from, PinType to) {
   // by itself - Enum to Text, Enum to Index say which is meant. A struct is its fields: Break
   // gives each of them)
   if (declared_type(from) || declared_type(to)) return false;
+  if (from == PinType::callback || to == PinType::callback) return false;  // (only the engine calls one: it is nothing else)
   if (is_keyed(from) || is_keyed(to)) return false;  // (a map is a map of its keys and values, a set a set of its keys)
   if (element_of(from) == PinType::int64 || element_of(to) == PinType::int64) return false;  // (64 bits: the Int64 nodes say what they are as another type)
   if (to == PinType::text) return true;  // everything prints
@@ -146,6 +167,40 @@ TypeRef value_type(const TypeRef& map) {
   return at == std::string::npos ? TypeRef{PinType::exec, {}} : named_type(std::string_view(map.of).substr(at + 1));
 }
 std::string keyed_of(const TypeRef& key, const TypeRef* value) { return type_named(key) + (value ? ">" + type_named(*value) : std::string()); }
+
+TypeRef callback_result(const TypeRef& t) {
+  const std::size_t open = t.of.find('(');
+  if (open == 0 || open == std::string::npos) return {PinType::exec, {}};
+  return named_type(std::string_view(t.of).substr(0, open));
+}
+std::vector<TypeRef> callback_inputs(const TypeRef& t) {
+  std::vector<TypeRef> r;
+  const std::size_t open = t.of.find('(');
+  if (open == std::string::npos || t.of.back() != ')') return r;
+  std::string_view list = std::string_view(t.of).substr(open + 1, t.of.size() - open - 2);
+  while (!list.empty()) {
+    const std::size_t comma = list.find(',');
+    r.push_back(named_type(list.substr(0, comma)));
+    if (comma == std::string_view::npos) break;
+    list = list.substr(comma + 1);
+  }
+  return r;
+}
+std::string callback_of(const TypeRef& result, const std::vector<TypeRef>& inputs) {
+  std::string s = result.type == PinType::exec ? std::string() : type_named(result);
+  s += "(";
+  for (std::size_t k = 0; k < inputs.size(); ++k) s += (k ? "," : "") + type_named(inputs[k]);
+  return s + ")";
+}
+bool call_back(const Value& callback, const TypeRef& type, std::span<const Value> args, Value& result) {
+  const TypeRef r = callback_result(type);
+  result = r.type == PinType::exec ? Value{} : Value::zero(r.type);
+  if (!callback.call) return false;
+  Value got = result;
+  if (!callback.call->call(args, got)) return false;
+  if (r.type != PinType::exec) result = got.type == r.type ? got : got.converted(r.type);
+  return true;
+}
 
 std::vector<TypeRef> types_named(const TypeRef& t) {
   std::vector<TypeRef> r;
@@ -255,6 +310,7 @@ std::string Value::as_text() const {
     case PinType::actor: return a ? "actor " + std::to_string(a) : "none";
     case PinType::enumeration: return std::to_string(i);  // (its place; its name is the enum's to say - Enum to Text)
     case PinType::int64: return std::to_string(static_cast<u64>(i));  // (its bits as a u64 - Int64 to Text says it otherwise)
+    case PinType::callback: return call ? "callback" : "unbound";  // (in messages: a Blueprint does not print one)
     case PinType::structure: {
       // (what it holds, in the order of its fields; their names are the struct's to say - Break)
       std::string r = "{";
@@ -472,6 +528,7 @@ bool identical(const Value& a, const Value& b, const TypeRef& t, const Graph& g,
     case PinType::text: return a.s == b.s;
     case PinType::actor: return a.a == b.a;
     case PinType::int64: return a.i == b.i;
+    case PinType::callback: return !a.call == !b.call;  // (what it calls is compared by calling it: the stand-in of the engine)
     default: break;
   }
   if (a.type == PinType::structure) {
@@ -791,6 +848,7 @@ bool Value::operator==(const Value& o) const {
     case PinType::actor: return a == o.a;
     case PinType::int64: return i == o.i;
     case PinType::enumeration: return i == o.i;
+    case PinType::callback: return !call == !o.call;  // (bound or not: what it calls, a call says)
     default: break;
   }
   if (element_of(type) == PinType::structure) {
@@ -1108,7 +1166,7 @@ bool split_library_function(std::string_view name, std::string& library, std::st
 }
 // (a node that runs a function of the Blueprint: a call - and Sort List with its order, which it asks
 // again and again: a library's function it names comes along like one it calls)
-bool calls_function(const Node& n) { return n.type == "func.call" || n.type == "func.pure" || (n.type == "list.sort" && !n.param("function").empty()); }
+bool calls_function(const Node& n) { return n.type == "func.call" || n.type == "func.pure" || n.type == "func.callback" || (n.type == "list.sort" && !n.param("function").empty()); }
 bool same_pins(const std::vector<FunctionPin>& a, const std::vector<FunctionPin>& b) {
   if (a.size() != b.size()) return false;
   for (std::size_t k = 0; k < a.size(); ++k)
@@ -1636,7 +1694,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
   // A type in the file: its name, and for an enum's or a struct's values which one ("of").
   auto type_of = [&](const json::Value& v, PinType& type, std::string& of) {
     if (!pin_type_from_name(v["type"].as_string(), type) || type == PinType::exec) return false;
-    if (is_keyed(type)) {  // (a map's or a set's: what its keys and values are - types the Blueprint has above here)
+    if (is_keyed(type) || type == PinType::callback) {  // (a map's or a set's: what its keys and values are - types the Blueprint has above here; a callback's signature)
       of = v["of"].as_string();
       TypeRef t;
       return type_from_text(type_text({type, of}), g, t);
@@ -1976,9 +2034,10 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         if (f.name == s.fields[b].name) err(0, "struct \"" + s.name + "\" has two fields called \"" + f.name + "\"");
       if (f.type.type == PinType::exec || f.type.type >= PinType::count) { err(0, what + " has no type"); sound = false; }
       TypeRef named = f.type;  // (what names a type of the Blueprint: of a map its values, of a set its keys)
-      if (is_keyed(f.type.type)) {
+      if (is_keyed(f.type.type) || f.type.type == PinType::callback) {
         TypeRef sure;
         if (!type_from_text(type_text(f.type), g, sure)) { err(0, what + " is " + type_text(f.type) + ", which this Blueprint cannot have"); sound = false; continue; }
+        if (f.type.type == PinType::callback) continue;
         named = f.type.type == PinType::map ? value_type(f.type) : key_type(f.type);
       }
       if (element_of(named.type) == PinType::enumeration && !g.enumeration(named.of)) { err(0, what + " is of the enum \"" + named.of + "\", which this Blueprint does not have"); sound = false; }
@@ -1996,7 +2055,7 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   // What is of an enum's or a struct's type names one the Blueprint has, and its default holds
   // values of the enums only.
   auto typed_ok = [&](const std::string& what, PinType type, const std::string& of, const json::Value& value) {
-    if (is_keyed(type)) {
+    if (is_keyed(type) || type == PinType::callback) {
       TypeRef sure;
       if (!type_from_text(type_text({type, of}), g, sure)) { err(0, what + " is " + type_text({type, of}) + ", which this Blueprint cannot have"); return; }
       held_ok(0, what, Value::from_json(value, type, g, of), {type, of}, 0);
@@ -2110,14 +2169,16 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       if (reads && root == Graph::Root::input && n.param("path").empty())
         err(n.id, lib.title(n) + ": an input by value is read from the Function Entry; a Get names a place in it (" + v.name + ".Field, " + v.name + "[index])");
     }
-    if (n.type != "func.call" && n.type != "func.pure" && n.type != "func.call_on") continue;
+    if (n.type != "func.call" && n.type != "func.pure" && n.type != "func.call_on" && n.type != "func.callback") continue;
     const Function* f = g.function(n.param("function"));
     if (!f) continue;
     for (const FunctionPin& in : f->inputs) {
       if (!in.ref) continue;
       const std::string prefix = ref_key(in.name, ""), what = lib.title(n) + ": the reference input \"" + in.name + "\"";
       std::string why;
-      if (n.type == "func.call_on") {
+      if (n.type == "func.callback" && (&in != &f->inputs[0] || !in.constant)) {
+        err(n.id, what + ": a Callback binds one place, its first input, as a const reference - the engine hands it the other inputs as values");
+      } else if (n.type == "func.call_on") {
         err(n.id, what + " needs a place, and a call on another actor's Blueprint gives values");
       } else if (n.param(prefix + "variable").empty()) {
         err(n.id, what + " needs a place: a variable, or a field or a list entry in one (" + n.param("function") + "(Variable.Field, ...))");
@@ -2130,6 +2191,47 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       } else if (Variable root; !in.constant && !Graph::writable(g.root_of(n, root, prefix))) {
         err(n.id, what + " is changed by the function, but " + root.name + " is only read here (a constant, an input by value or a const reference)");
       }
+    }
+  }
+  // Make Callback: a function of a library with at most one output, inputs the engine hands over as values, and
+  // nothing of the world on its way - the engine calls it whenever it wants, as often as it wants.
+  {
+    std::unordered_map<std::string, std::string> worldly;  // function -> why it needs the world ("": it does not)
+    std::function<std::string(const std::string&, int)> needs = [&](const std::string& name, int depth) -> std::string {
+      if (auto it = worldly.find(name); it != worldly.end()) return it->second;
+      worldly[name] = "";  // (a call of itself: no further world)
+      std::string why;
+      const Node* entry = nullptr;
+      for (const Node& m : g.nodes)
+        if (m.type == "func.entry" && m.param("function") == name) entry = &m;
+      if (!entry) return "";  // (a library's function this Blueprint calls: the library's own check judges its body)
+      for (u32 id : body_nodes(g, entry->id, lib)) {
+        if (!why.empty()) break;
+        const Node& m = *g.find(id);
+        const NodeDef* d = lib.find(m.type);
+        if (!d) continue;
+        const bool core = Library::core().find(m.type) != nullptr;
+        if (d->world || d->latent || d->raises || d->memory || (d->kind == NodeKind::event && m.type != "func.entry") || !core) why = lib.title(m) + " (" + d->label + ")";
+        else if (calls_function(m) && depth < 64)
+          if (const std::string inner = needs(m.param("function"), depth + 1); !inner.empty()) why = inner;
+      }
+      return worldly[name] = why;
+    };
+    for (const Node& n : g.nodes) {
+      if (n.type != "func.callback") continue;
+      const Function* f = g.function(n.param("function"));
+      const std::string what = lib.title(n);
+      if (!f) { err(n.id, what + ": no function \"" + n.param("function") + "\""); continue; }
+      if (f->from.empty() && !g.library) err(n.id, what + ": a Callback names a function of a library (one that keeps nothing: the engine calls it without this Blueprint)");
+      if (f->external) err(n.id, what + ": a function of another Blueprint is no Callback");
+      if (f->outputs.size() > 1) err(n.id, what + ": a Callback gives one value at most - " + f->name + " has " + std::to_string(f->outputs.size()) + " outputs");
+      for (const FunctionPin& p : f->outputs)
+        if (!callback_type_ok(p.type)) err(n.id, what + ": a Callback gives a Bool, an Int, a Float, a Vector or an Int64 - \"" + p.name + "\" is " + type_text(declared(p)));
+      for (std::size_t k = 0; k < f->inputs.size(); ++k)
+        if (!f->inputs[k].ref && !callback_type_ok(f->inputs[k].type))
+          err(n.id, what + ": the engine hands a Callback Bools, Ints, Floats, Vectors and Int64s - \"" + f->inputs[k].name + "\" is " + type_text(declared(f->inputs[k])));
+      if (const std::string why = needs(f->name, 0); !why.empty())
+        err(n.id, what + ": the function needs the world (" + why + ") - a Callback only computes from its inputs and its place");
     }
   }
   auto find_pin = [&](u32 node, const std::string& id, bool input) -> const PinDef* {
@@ -2539,6 +2641,49 @@ bool Instance::call_inside(std::string_view function, const std::vector<Value>& 
 bool Instance::call_inside(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, const std::vector<Spot>& places) {
   return call_function(function, args, results, true, &places);
 }
+namespace {
+/// A Callback made in the interpreter or the JIT: the function of the Blueprint (with its libraries)
+/// and the place its first input is bound to. It finds its Blueprint by its id: once that has ended,
+/// it is unbound.
+struct InstanceCallable final : Callable {
+  i32 id = 0;
+  std::string function;
+  bool bound = false;
+  Instance::Spot place;
+  bool call(std::span<const Value> args, Value& result) const override {
+    Instance* inst = Runtime::instance_by_id(id);
+    if (!inst) return false;
+    std::vector<Value> in, out;
+    std::vector<Instance::Spot> places;
+    in.reserve(args.size() + (bound ? 1 : 0));
+    if (bound) {
+      in.emplace_back();  // (the place: read where it is)
+      places.push_back(place);
+      places.resize(args.size() + 1);
+    }
+    in.insert(in.end(), args.begin(), args.end());
+    const bool known = bound ? inst->call_inside(function, in, out, places) : inst->call_inside(function, in, out);
+    if (!out.empty()) result = std::move(out[0]);
+    return known;
+  }
+};
+}  // namespace
+
+std::shared_ptr<const Callable> Instance::callable(const std::string& function, bool bound, Spot place) {
+  auto c = std::make_shared<InstanceCallable>();
+  c->id = id_;
+  c->function = function;
+  c->bound = bound;
+  c->place = std::move(place);
+  return c;
+}
+
+std::string callback_of(const Function& f) {
+  std::vector<TypeRef> in;
+  for (std::size_t k = !f.inputs.empty() && f.inputs[0].ref ? 1 : 0; k < f.inputs.size(); ++k) in.push_back({f.inputs[k].type, f.inputs[k].of});
+  return callback_of(f.outputs.empty() ? TypeRef{PinType::exec, {}} : TypeRef{f.outputs[0].type, f.outputs[0].of}, in);
+}
+
 bool Instance::call_class(std::string_view function, std::span<const Value> args, Results& results) {
   if (disabled_) return false;
   if (rt_.depth_ == 0) rt_.step_starts();  // (a call from outside any chain is a step of its own for the loop guard)

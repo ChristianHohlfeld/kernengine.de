@@ -28,6 +28,7 @@ void add_engine_nodes(Library& lib) {
     d.help = f.help;
     d.keywords = f.cpp;
     d.kind = f.value ? NodeKind::pure : NodeKind::action;
+    d.world = true;  // (the engine: what a Callback's function does not ask)
     d.native = true;
     if (!f.value) {
       d.inputs.push_back({"exec", "", PinType::exec, {}});

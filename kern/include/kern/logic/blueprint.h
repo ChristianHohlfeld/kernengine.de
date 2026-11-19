@@ -121,6 +121,37 @@ struct Layout {
   void next_id(u32) {}
 };
 
+namespace logic {
+/// The object of a library a Callback's thunk calls the library's function on (a library keeps nothing: its
+/// functions need no other).
+template <class L> inline L the_library{};
+namespace callbacks {
+template <class T> constexpr bool gives_nothing = std::is_void_v<T> || std::is_empty_v<T>;
+template <class T> auto only(T&& r) {
+  auto&& [x] = r;  // (a function's one output: its Result struct holds it)
+  return x;
+}
+template <class Res> struct given { using type = decltype(only(std::declval<Res>())); };
+template <class Res> requires gives_nothing<Res> struct given<Res> { using type = void; };
+template <auto F, class L, class Res, class P, class... A> Callback<typename given<Res>::type(A...)> bound(Res (L::*)(const P&, A...), const P& place) {
+  using R = typename given<Res>::type;
+  return {[](void* p, A... a) -> R {
+            if constexpr (std::is_void_v<R>) (the_library<L>.*F)(*static_cast<const P*>(p), a...);
+            else return only((the_library<L>.*F)(*static_cast<const P*>(p), a...));
+          },
+          const_cast<P*>(&place)};
+}
+template <auto F, class L, class Res, class... A> Callback<typename given<Res>::type(A...)> free(Res (L::*)(A...)) {
+  using R = typename given<Res>::type;
+  return {[](void*, A... a) -> R {
+            if constexpr (std::is_void_v<R>) (the_library<L>.*F)(a...);
+            else return only((the_library<L>.*F)(a...));
+          },
+          nullptr};
+}
+}  // namespace callbacks
+}  // namespace logic
+
 /// The nodes of the core library (src/logic/core_nodes.cpp). kern::Blueprint, below, is these and
 /// the gameplay nodes.
 struct BlueprintCore : logic::PureNodes {
@@ -135,6 +166,12 @@ struct BlueprintCore : logic::PureNodes {
   /// A map of values under their keys and a set of keys, in the order the keys came: Map<Int, Float>, Set<Int>.
   template <class K, class V> using Map = logic::Map<K, V>;
   template <class K> using Set = logic::Set<K>;
+  /// A function of a library the engine calls, with the place it is bound to: Callback<Float(Float, Float)>.
+  template <class S> using Callback = logic::Callback<S>;
+  /// Make Callback: callback<&Terrain_lib::height_at>(self) - the library's function, its first input bound to
+  /// the place (a const reference: read when the engine calls); callback<&Lib::fn>() binds none.
+  template <auto F, class P> static auto callback(const P& place) { return logic::callbacks::bound<F>(F, place); }
+  template <auto F> static auto callback() { return logic::callbacks::free<F>(F); }
 
   /// The world the Blueprint runs in (the engine sets it; see logic::BlueprintWorld).
   logic::BlueprintWorld kern_world;

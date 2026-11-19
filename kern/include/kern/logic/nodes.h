@@ -853,6 +853,52 @@ template <class K> Value to_value(const Set<K>& s) {
   return r;
 }
 
+/// A Callback in a Blueprint's C++ (Callback<Float(Float, Float)>, Make Callback: callback<&Lib::fn>(place)): a
+/// function the engine calls and the place it is bound to - two words, as a function pointer with its void* is
+/// (kern::HeightSampler). fn is a thunk that calls the library's function on that place; none: unbound (a call
+/// gives the zero of R).
+template <class S> struct Callback;
+template <class R, class... A> struct Callback<R(A...)> {
+  R (*fn)(void*, A...) = nullptr;
+  void* place = nullptr;
+  R operator()(A... a) const {
+    if constexpr (std::is_void_v<R>) {
+      if (fn) fn(place, a...);
+    } else {
+      return fn ? fn(place, a...) : R{};
+    }
+  }
+};
+namespace detail {
+template <class S> inline constexpr bool is_callback = false;
+template <class S> inline constexpr bool is_callback<Callback<S>> = true;
+/// A Callback of a Blueprint's class as a value (the door to the engine, a stand-in in a test): calls the thunk
+/// with the values made into its C++ types.
+template <class R, class... A> struct NativeCallable final : Callable {
+  Callback<R(A...)> held;
+  explicit NativeCallable(Callback<R(A...)> c) : held(c) {}
+  bool call(std::span<const Value> args, Value& result) const override { return call(args, result, std::index_sequence_for<A...>{}); }
+  template <std::size_t... I> bool call(std::span<const Value> args, Value& result, std::index_sequence<I...>) const {
+    if (!held.fn) return false;
+    if constexpr (std::is_void_v<R>) held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...);
+    else result = to_value(held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...));
+    return true;
+  }
+};
+template <class R, class... A> struct Held<Callback<R(A...)>> {
+  static constexpr PinType type = PinType::callback;
+  /// (one the class made, back as it was; one the interpreter made calls the Blueprint there - in a class it is
+  /// unbound: a Callback goes from a Blueprint to the engine, not from one tier into another)
+  static Callback<R(A...)> from(const Value& v) {
+    if (const auto* n = dynamic_cast<const NativeCallable<R, A...>*>(v.call.get())) return n->held;
+    return {};
+  }
+};
+}  // namespace detail
+template <class R, class... A> Value to_value(const Callback<R(A...)>& c) {
+  return Value::callback(c.fn ? std::make_shared<detail::NativeCallable<R, A...>>(c) : nullptr);
+}
+
 /// What the nodes of a map do - on a Map of a Blueprint's class and on the interpreter's entries
 /// (MapEntries) alike: the same steps on the same container.
 namespace map {
