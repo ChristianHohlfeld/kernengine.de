@@ -5686,6 +5686,15 @@ TEST(logic_callbacks) {
     if (got.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, got.empty() ? "(nothing wrong)" : got.c_str());
     return got.find(why) != std::string::npos;
   };
+  // a loop keeps where it is only while it runs (set anew whenever it starts): a Callback's function may have one
+  {
+    const std::string loops = read("Loops", "struct Loops : virtual kern::Library {\n  struct stepsResult { Float h = 0.0; };\n  stepsResult steps(Float x = 0.0) {\n"
+                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\">(kern::to<Float>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
+                                            "    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n"
+                                            "    return {callback<&Loops::steps>()};\n  }\n\n  struct : kern::Node<1> { Int index = 0; } n1;\n};\n");
+    CHECK(loops.empty());
+    if (!loops.empty()) std::printf("Loops: %s", loops.c_str());
+  }
   CHECK(says(read("Bad1", "struct Bad1 : virtual kern::Blueprint, virtual Ground {\n  Callback<Float(Float)> K = Callback<Float(Float)>{};\n\n  void Make() {\n    K = callback<&Ground::loud>(Here);\n  }\n};\n"), "Here"));
   CHECK(says(read("Bad2", "struct Bad2 : virtual kern::Library {\n  struct loudResult { Float h = 0.0; };\n  loudResult loud(Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad2::loud>()};\n  }\n};\n"), "needs the world"));
   CHECK(says(read("Bad4", "struct Bad4 : virtual kern::Blueprint, virtual Ground {\n  List<Field> Fields = List<Field>{Field{1.0, 0.5}};\n  Callback<Float(Float, Float)> K = Callback<Float(Float, Float)>{};\n\n  void Make() {\n    K = callback<&Ground::height>(Fields[0]);\n  }\n};\n"), "an entry of a list"));

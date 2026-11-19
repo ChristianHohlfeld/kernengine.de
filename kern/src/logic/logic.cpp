@@ -2250,7 +2250,8 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
         const NodeDef* d = lib.find(m.type);
         if (!d) continue;
         const bool core = Library::core().find(m.type) != nullptr;
-        if (d->world || d->latent || d->raises || d->memory || (d->kind == NodeKind::event && m.type != "func.entry") || !core) why = lib.title(m) + " (" + d->label + ")";
+        // (a loop keeps where it is only while it runs - set anew whenever it starts, as a library's rule has it: no memory)
+        if (d->world || d->latent || d->raises || (d->memory && !d->loop) || (d->kind == NodeKind::event && m.type != "func.entry") || !core) why = lib.title(m) + " (" + d->label + ")";
         else if (calls_function(m) && depth < 64)
           if (const std::string inner = needs(m.param("function"), depth + 1); !inner.empty()) why = inner;
       }

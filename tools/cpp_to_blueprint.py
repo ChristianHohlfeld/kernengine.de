@@ -6236,9 +6236,6 @@ class Emit:
             raise Wait("a Callback of a lambda that uses an object outside a method")
         outer = self.f.decl
         raw_type = qtype(method)
-        if drop:
-            raw_type = re.sub(r"\(lambda at [^)]*\)", "\x00", raw_type)
-            raw_type = re.sub(r"\s*,\s*[^,()]*\x00[^,()]*(?=[,)])|(?<=\()\s*[^,()]*\x00[^,()]*,?\s*", "", raw_type)
         trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
         if trailing:
             raw_type = f"{trailing.group(2)} {trailing.group(1)}"
@@ -6340,9 +6337,6 @@ class Emit:
         first = dict(params[0], type={"qualType": "const " + owner + " &"})
         outer = self.f.decl
         raw_type = qtype(method)
-        if drop:
-            raw_type = re.sub(r"\(lambda at [^)]*\)", "\x00", raw_type)
-            raw_type = re.sub(r"\s*,\s*[^,()]*\x00[^,()]*(?=[,)])|(?<=\()\s*[^,()]*\x00[^,()]*,?\s*", "", raw_type)
         trailing = re.match(r"auto\s*(\(.*\)[^()]*?)\s*->\s*(.+)$", raw_type)
         if trailing:
             raw_type = f"{trailing.group(2)} {trailing.group(1)}"
@@ -6610,6 +6604,9 @@ class Emit:
             if b.get("kind") == "CXXMemberCallExpr":
                 if callee(b).get("name") != "data" or not kids(callee(b)):
                     break
+                if self.u.object_of(self.ctype(kids(callee(b))[0])):
+                    # (the data of an object of the engine - kern::RoadStream::data() -: its own node, the list it gives)
+                    return self.ex(b, bt)
                 b = self.unwrap(kids(callee(b))[0])
             elif len(kids(b)) == 1:
                 b = self.unwrap(kids(b)[0])
@@ -9948,8 +9945,8 @@ class Emit:
                            + self.count_loop(i0, i1, lambda i: [f"set_add({node}, {made}, {self.conv(f'list_get<{st[5:-1]}>({src}, {i})', st[5:-1], kt)});"]))
                 return made, t
             raise Wait(f"a {t.split('<')[0].lower()} made of other arguments")
-        if callback_parts(t) and not a:
-            return t + "{}", t   # (a Callback as C++ makes it without arguments: unbound)
+        if callback_parts(t) and all(x.get("kind") in ("ImplicitValueInitExpr", "CXXDefaultInitExpr") for x in a):
+            return t + "{}", t   # (a Callback as C++ makes it without arguments - also `HeightSampler{}`, its fields zero: unbound)
         if callback_parts(t) and len(a) == 1 and self.tp_or_none(a[0]) == t:
             return self.ex(a[0], t), t   # (a copy of one: the same function and place, as C++ copies them)
         raise Wait(f"a {t} made here")
