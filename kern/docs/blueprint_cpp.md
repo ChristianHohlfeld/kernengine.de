@@ -1261,7 +1261,15 @@ selbst“).
   dasselbe Handle. Handles zählen ab 1 in der Reihenfolge, in der die Objekte kamen. Der Host eines
   Spiels (`GameWorld`) ruft so die Engine; ein Test, der Quelle und Blueprint gegen die echte Engine
   vergleicht, gibt jeder Seite eigene Objekte, gleich aufgesetzt: Ein Handle, das sie noch nicht
-  kennt, nennt ein Objekt, wie C++ es ohne Argumente macht (`engine_make_default`).
+  kennt, nennt ein Objekt, wie C++ es ohne Argumente macht (`engine_make_default`). Nimmt sein
+  Konstruktor Werte und andere Objekte der Engine (`Client(Transport&, config, salt)`,
+  `GameWorld(Renderer&)`), bekommt jeder Wert seine Null (wie C++ ihn ohne Argumente macht), ein
+  Zeiger auf ein Objekt null, und jedes Objekt hinter einer Referenz wird ebenso mitgemacht – ohne
+  Handle, gehalten mit dem Objekt (`MadeWith`) und nach ihm beendet; ein Parameter mit Default bleibt
+  beim Default. Hat die Engine von der Klasse hinter der Referenz keinen Konstruktor (`Transport`),
+  wird die eine Klasse gemacht, die von ihr abgeleitet ist und so gemacht werden kann – gibt es keine
+  oder mehrere, wird das Objekt nicht gemacht (`tools/engine_api.py --list` nennt, welche Klassen und
+  warum). Erzeugt in `kMakers` jeder `engine_calls.gen.cpp`; keine Liste von Klassen.
 
 ### Formeln
 

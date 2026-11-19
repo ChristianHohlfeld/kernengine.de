@@ -1560,10 +1560,12 @@ const EngineCall kCalls[] = {
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
 const EngineMaker kMakers[] = {
+    {EngineObjects::kind<kern::net::Client>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::net::Client>>(); auto& d0 = made->keep(new kern::net::HostTransport()); made->object.emplace(d0, ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>(), ev::blank<std::remove_cvref_t<kern::u64>>()); return o.put_made<kern::net::Client>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::net::Connection>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::Connection>(handle, std::unique_ptr<kern::net::Connection>(new kern::net::Connection())); }},
     {EngineObjects::kind<kern::net::HostTransport>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::HostTransport, kern::net::Transport>(handle, std::unique_ptr<kern::net::HostTransport>(new kern::net::HostTransport())); }},
     {EngineObjects::kind<kern::net::LoopbackNetwork>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::LoopbackNetwork>(handle, std::unique_ptr<kern::net::LoopbackNetwork>(new kern::net::LoopbackNetwork())); }},
     {EngineObjects::kind<kern::net::MeasureStream>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::MeasureStream>(handle, std::unique_ptr<kern::net::MeasureStream>(new kern::net::MeasureStream())); }},
+    {EngineObjects::kind<kern::net::Server>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::net::Server>>(); auto& d0 = made->keep(new kern::net::HostTransport()); made->object.emplace(d0, ev::blank<std::remove_cvref_t<kern::net::ClientServerConfig const&>>(), ev::blank<std::remove_cvref_t<kern::u64>>()); return o.put_made<kern::net::Server>(handle, std::move(made)); }},
     {EngineObjects::kind<kern::net::Simulator>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::Simulator>(handle, std::unique_ptr<kern::net::Simulator>(new kern::net::Simulator())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));
