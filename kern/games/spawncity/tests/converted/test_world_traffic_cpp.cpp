@@ -37,7 +37,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
-namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
@@ -50,7 +49,9 @@ struct Lane {
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
 struct TrafficRules {
@@ -73,9 +74,11 @@ struct TrafficRules {
   };
 
   /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
-  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call -
-  /// and takes its distances and times. True: the actor has a Blueprint that runs there.
-  
+  /// tests the one they run) - the Blueprint of the actor "Traffic", found by its name at every call.
+  /// True: the actor has a Blueprint that runs there.
+  static bool bind(kern::logic::Runtime& logic);
+  /// Takes the distances and times of the bound Blueprint (zeros where none runs).
+  void take_laws();
   
   u64 built_from = ~0ull;
   /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session
@@ -102,12 +105,15 @@ struct TrafficRules {
   /// lies 1..40 m ahead and no further to the side than half the own body (1.25 m, bus 1.6 m) +
   /// 0.6 m; the gap is the distance between the centres less both half lengths (1.9 m, bus 4 m);
   /// 2.5 m of it are kept, the rest is driven at 1.6 s headway. `limiter`: who it is (or -1).
-  
+  f32 gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const;
   /// Junctions near p (drawing).
-  void near(Vec2 p, f32 r, std::vector<i32>& out) const;
+  
 
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
+  /// The distances and times of the Blueprint (take_laws).
+  struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; };
+  Laws laws_;
   std::vector<Junction> junctions_;
   converted::wide::Map<u64, std::vector<i32>> grid_;
   converted::wide::Map<i32, Blocked> blocked_;
@@ -119,7 +125,7 @@ namespace rules { inline f64 decimal(f32 x) {
   f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
   for (f64 m = a; m < 1; m *= 10) scale *= 10;
   for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
     const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
     if (static_cast<f32>(c) == x) return c;
   }
@@ -128,20 +134,16 @@ namespace rules { inline f64 decimal(f32 x) {
 namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
   using ActorBlueprint::ActorBlueprint;
 }; }
-constexpr f32 kCell = 40;
 rules::Blueprint g_rules{"Traffic"};
 u64 cell(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); }
-void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
-  out.clear();
-  const i32 cx0 = static_cast<i32>(converted::fits<int>(std::floor((p.x - r) / kCell))), cx1 = static_cast<i32>(converted::fits<int>(std::floor((p.x + r) / kCell)));
-  const i32 cy0 = static_cast<i32>(converted::fits<int>(std::floor((p.y - r) / kCell))), cy1 = static_cast<i32>(converted::fits<int>(std::floor((p.y + r) / kCell)));
-  for (i32 y = cy0; y <= cy1; ++y)
-    for (i32 x = cx0; x <= cx1; ++x) {
-      auto it = grid_.find(cell(x, y));
-      if (it == grid_.end()) continue;
-      for (i32 j : it->second)
-        if (hypot_bp(converted::at(junctions_, j).p.x - p.x, converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
-    }
+bool TrafficRules::bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
+void TrafficRules::take_laws() {
+  laws_.ahead_min = static_cast<f32>(g_rules.get<f64>("AheadMinM"));
+  laws_.ahead_max = static_cast<f32>(g_rules.get<f64>("AheadMaxM"));
+  laws_.stop_line = static_cast<f32>(g_rules.get<f64>("StopLineM"));
+  laws_.first_come = static_cast<f32>(g_rules.get<f64>("FirstComeM"));
+  laws_.claim_s = static_cast<f32>(g_rules.get<f64>("ClaimS"));
+  laws_.patience_s = static_cast<f32>(g_rules.get<f64>("PatienceS"));
 }
 i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
   if (!j.lights) return -1;
@@ -154,26 +156,26 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   const i32 n = static_cast<i32>(lane.points.size());
   if (n < 2) { out.target = n ? converted::at(lane.points, 0) : pos; out.passed = true; return out; }
   dir = dir < 0 ? -1 : 1;
-  i32 i = std::clamp(index, 0, n - 1);
-  if (i - dir < 0 || i - dir >= n) i += dir;  // (the lane's first point in this direction: the stretch after it)
-  Vec2 a = converted::at(lane.points, i - dir), b = converted::at(lane.points, i);
+  i32 i = std::clamp(index, 0, converted::minus(n, 1));
+  if (converted::minus(i, dir) < 0 || converted::minus(i, dir) >= n) converted::plus_to(i, dir);  // (the lane's first point in this direction: the stretch after it)
+  Vec2 a = converted::at(lane.points, converted::minus(i, dir)), b = converted::at(lane.points, i);
   auto along = [](Vec2 from, Vec2 to, Vec2& t) { const Vec2 d = to - from; const f32 l = hypot_bp(d.x, d.y); if (l > 1e-3) t = d * (1.0 / l); return l; };
   Vec2 t{1, 0};
   f32 len = along(a, b, t);
   // where the car is along the stretch that leads to lane point `index`
   const f32 at = (pos.x - a.x) * t.x + (pos.y - a.y) * t.y;
-  out.passed = i != std::clamp(index, 0, n - 1) ? false : at >= len - 0.5;
+  out.passed = i != std::clamp(index, 0, converted::minus(n, 1)) ? false : at >= len - 0.5;
   const f32 s = clampf(at, 0, len);
   Vec2 cur = a + t * s;
   f32 left = len - s, want = std::fmax(0.0, look);
   out.end = left;
-  for (i32 k = i; k + dir >= 0 && k + dir < n; k += dir) out.end += hypot_bp(converted::at(lane.points, k + dir).x - converted::at(lane.points, k).x, converted::at(lane.points, k + dir).y - converted::at(lane.points, k).y);
+  for (i32 k = i; converted::plus(k, dir) >= 0 && converted::plus(k, dir) < n; converted::plus_to(k, dir)) out.end += hypot_bp(converted::at(lane.points, converted::plus(k, dir)).x - converted::at(lane.points, k).x, converted::at(lane.points, converted::plus(k, dir)).y - converted::at(lane.points, k).y);
   while (want > left) {
-    if (i + dir < 0 || i + dir >= n) { want = left; break; }  // the lane ends here
+    if (converted::plus(i, dir) < 0 || converted::plus(i, dir) >= n) { want = left; break; }  // the lane ends here
     want -= left;
     cur = b;
     a = b;
-    i += dir;
+    converted::plus_to(i, dir);
     b = converted::at(lane.points, i);
     left = along(a, b, t);
   }
@@ -181,10 +183,45 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   out.target = cur + t * want + Vec2{t.y, -t.x} * off;
   return out;
 }
+f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const {
+  const f32 side = static_cast<f32>(g_rules.number("SideReach", bus)), far = laws_.ahead_max;
+  const f32 bodies[2] = {static_cast<f32>(g_rules.number("Bodies", bus, false)), static_cast<f32>(g_rules.number("Bodies", bus, true))};
+  f32 gap = 1e9;
+  i32 who = -1;
+  for (std::size_t i = 0; i < all.size(); converted::pre_inc(i)) {
+    const Vehicle& o = converted::at(all, i);
+    if (!o.there || static_cast<i32>(i) == self) continue;
+    const f32 dx = o.p.x - pos.x, dy = o.p.y - pos.y;
+    if (std::fabs(dx) > far || std::fabs(dy) > far) continue;
+    const f32 along = dx * fwd.x + dy * fwd.y;
+    if (along < laws_.ahead_min || along > far) continue;
+    if (std::fabs(-dx * fwd.y + dy * fwd.x) > side) continue;
+    const f32 g = along - converted::at(bodies, o.bus ? 1 : 0);
+    if (g < gap) { gap = g; who = static_cast<i32>(i); }
+  }
+  limiter = who;
+  if (who < 0) return 1e9;
+  return static_cast<f32>(g_rules.number("GapSpeed", rules::decimal(gap)));
+}
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static TrafficRules::Laws draw_TrafficRules__Laws(converted::Draw& draw) {
+  TrafficRules::Laws s{};
+  s.ahead_min = draw.number();
+  s.ahead_max = draw.number();
+  s.stop_line = draw.number();
+  s.first_come = draw.number();
+  s.claim_s = draw.number();
+  s.patience_s = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const TrafficRules::Laws& s) { return converted::Value::structure({arg(s.ahead_min), arg(s.ahead_max), arg(s.stop_line), arg(s.first_come), arg(s.claim_s), arg(s.patience_s)}); }
+[[maybe_unused]] static bool same(const TrafficRules::Laws& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.ahead_min, (*got.rows)[0]), ".ahead_min") && converted::at_place(same(want.ahead_max, (*got.rows)[1]), ".ahead_max") && converted::at_place(same(want.stop_line, (*got.rows)[2]), ".stop_line") && converted::at_place(same(want.first_come, (*got.rows)[3]), ".first_come") && converted::at_place(same(want.claim_s, (*got.rows)[4]), ".claim_s") && converted::at_place(same(want.patience_s, (*got.rows)[5]), ".patience_s"); }
+[[maybe_unused]] static bool defined(const TrafficRules::Laws& s) { return defined(s.ahead_min) && defined(s.ahead_max) && defined(s.stop_line) && defined(s.first_come) && defined(s.claim_s) && defined(s.patience_s); }
+[[maybe_unused]] static std::string text(const TrafficRules::Laws& s) { return std::string("{") + text(s.ahead_min) + ", " + text(s.ahead_max) + ", " + text(s.stop_line) + ", " + text(s.first_come) + ", " + text(s.claim_s) + ", " + text(s.patience_s) + "}"; }
+[[maybe_unused]] static void take(TrafficRules::Laws& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.ahead_min, (*v.rows)[0]); converted::take_as<double>(s.ahead_max, (*v.rows)[1]); converted::take_as<double>(s.stop_line, (*v.rows)[2]); converted::take_as<double>(s.first_come, (*v.rows)[3]); converted::take_as<double>(s.claim_s, (*v.rows)[4]); converted::take_as<double>(s.patience_s, (*v.rows)[5]); }
 [[maybe_unused]] static TrafficRules::Arm draw_TrafficRules__Arm(converted::Draw& draw) {
   TrafficRules::Arm s{};
   s.dir = draw.vector2();
@@ -194,7 +231,7 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TrafficRules::Arm& s) { return converted::Value::structure({arg(s.dir), arg(s.width), arg(s.pole), arg(s.has_pole)}); }
-[[maybe_unused]] static bool same(const TrafficRules::Arm& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.dir, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(want.pole, (*got.rows)[2]) && same(want.has_pole, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const TrafficRules::Arm& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.dir, (*got.rows)[0]), ".dir") && converted::at_place(same(want.width, (*got.rows)[1]), ".width") && converted::at_place(same(want.pole, (*got.rows)[2]), ".pole") && converted::at_place(same(want.has_pole, (*got.rows)[3]), ".has_pole"); }
 [[maybe_unused]] static bool defined(const TrafficRules::Arm& s) { return defined(s.dir) && defined(s.width) && defined(s.pole) && defined(s.has_pole); }
 [[maybe_unused]] static std::string text(const TrafficRules::Arm& s) { return std::string("{") + text(s.dir) + ", " + text(s.width) + ", " + text(s.pole) + ", " + text(s.has_pole) + "}"; }
 [[maybe_unused]] static void take(TrafficRules::Arm& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec2>(s.dir, (*v.rows)[0]); converted::take_as<double>(s.width, (*v.rows)[1]); converted::take_as<Vec2>(s.pole, (*v.rows)[2]); converted::take_as<bool>(s.has_pole, (*v.rows)[3]); }
@@ -211,7 +248,7 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TrafficRules::Junction& s) { return converted::Value::structure({arg(s.p), arg(s.arms), arg(s.lights), arg(s.offset), arg(s.radius), arg(s.axis), arg(s.claim), arg(s.claim_at)}); }
-[[maybe_unused]] static bool same(const TrafficRules::Junction& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.p, (*got.rows)[0]) && same(want.arms, (*got.rows)[1]) && same(want.lights, (*got.rows)[2]) && same(want.offset, (*got.rows)[3]) && same(want.radius, (*got.rows)[4]) && same(want.axis, (*got.rows)[5]) && same(want.claim, (*got.rows)[6]) && same(want.claim_at, (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const TrafficRules::Junction& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.arms, (*got.rows)[1]), ".arms") && converted::at_place(same(want.lights, (*got.rows)[2]), ".lights") && converted::at_place(same(want.offset, (*got.rows)[3]), ".offset") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.axis, (*got.rows)[5]), ".axis") && converted::at_place(same(want.claim, (*got.rows)[6]), ".claim") && converted::at_place(same(want.claim_at, (*got.rows)[7]), ".claim_at"); }
 [[maybe_unused]] static bool defined(const TrafficRules::Junction& s) { return defined(s.p) && defined(s.arms) && defined(s.lights) && defined(s.offset) && defined(s.radius) && defined(s.axis) && defined(s.claim) && defined(s.claim_at); }
 [[maybe_unused]] static std::string text(const TrafficRules::Junction& s) { return std::string("{") + text(s.p) + ", " + text(s.arms) + ", " + text(s.lights) + ", " + text(s.offset) + ", " + text(s.radius) + ", " + text(s.axis) + ", " + text(s.claim) + ", " + text(s.claim_at) + "}"; }
 [[maybe_unused]] static void take(TrafficRules::Junction& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<std::vector<TrafficRules::Arm>>(s.arms, (*v.rows)[1]); converted::take_as<bool>(s.lights, (*v.rows)[2]); converted::take_as<double>(s.offset, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<Vec2>(s.axis, (*v.rows)[5]); converted::take_as<int>(s.claim, (*v.rows)[6]); converted::take_as<double>(s.claim_at, (*v.rows)[7]); }
@@ -223,7 +260,7 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TrafficRules::Blocked& s) { return converted::Value::structure({arg(s.since), arg(s.next_honk), arg(s.wait_since)}); }
-[[maybe_unused]] static bool same(const TrafficRules::Blocked& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.since, (*got.rows)[0]) && same(want.next_honk, (*got.rows)[1]) && same(want.wait_since, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const TrafficRules::Blocked& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.since, (*got.rows)[0]), ".since") && converted::at_place(same(want.next_honk, (*got.rows)[1]), ".next_honk") && converted::at_place(same(want.wait_since, (*got.rows)[2]), ".wait_since"); }
 [[maybe_unused]] static bool defined(const TrafficRules::Blocked& s) { return defined(s.since) && defined(s.next_honk) && defined(s.wait_since); }
 [[maybe_unused]] static std::string text(const TrafficRules::Blocked& s) { return std::string("{") + text(s.since) + ", " + text(s.next_honk) + ", " + text(s.wait_since) + "}"; }
 [[maybe_unused]] static void take(TrafficRules::Blocked& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.since, (*v.rows)[0]); converted::take_as<double>(s.next_honk, (*v.rows)[1]); converted::take_as<double>(s.wait_since, (*v.rows)[2]); }
@@ -231,16 +268,17 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   TrafficRules s{};
   s.built_from = static_cast<u64>(draw.bits());
   s.lights_time = draw.number();
+  s.laws_ = draw_TrafficRules__Laws(draw);
   s.junctions_ = draw_list(draw, [&]() -> TrafficRules::Junction { return draw_TrafficRules__Junction(draw); });
   s.grid_ = converted::draw_map<converted::wide::Map<u64, std::vector<int>>>(draw, [&]() -> u64 { return static_cast<u64>(draw.bits()); }, [&]() -> std::vector<int> { return draw_list(draw, [&]() -> int { return static_cast<int>(draw.whole()); }); });
   s.blocked_ = converted::draw_map<converted::wide::Map<int, TrafficRules::Blocked>>(draw, [&]() -> int { return static_cast<int>(draw.whole()); }, [&]() -> TrafficRules::Blocked { return draw_TrafficRules__Blocked(draw); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const TrafficRules& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.lights_time), arg(s.junctions_), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)), arg(s.blocked_)}); }
-[[maybe_unused]] static bool same(const TrafficRules& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.lights_time, (*got.rows)[1]) && same(want.junctions_, (*got.rows)[2]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[3]) && same(want.blocked_, (*got.rows)[4]); }
-[[maybe_unused]] static bool defined(const TrafficRules& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.lights_time) && defined(s.junctions_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) && defined(s.blocked_); }
-[[maybe_unused]] static std::string text(const TrafficRules& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.lights_time) + ", " + text(s.junctions_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + ", " + text(s.blocked_) + "}"; }
-[[maybe_unused]] static void take(TrafficRules& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<double>(s.lights_time, (*v.rows)[1]); converted::take_as<std::vector<TrafficRules::Junction>>(s.junctions_, (*v.rows)[2]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[3]); converted::take_as<converted::wide::Map<int, TrafficRules::Blocked>>(s.blocked_, (*v.rows)[4]); }
+[[maybe_unused]] static converted::Value arg(const TrafficRules& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.lights_time), arg(s.laws_), arg(s.junctions_), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)), arg(s.blocked_)}); }
+[[maybe_unused]] static bool same(const TrafficRules& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]), ".built_from") && converted::at_place(same(want.lights_time, (*got.rows)[1]), ".lights_time") && converted::at_place(same(want.laws_, (*got.rows)[2]), ".laws_") && converted::at_place(same(want.junctions_, (*got.rows)[3]), ".junctions_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[4]), ".grid_") && converted::at_place(same(want.blocked_, (*got.rows)[5]), ".blocked_"); }
+[[maybe_unused]] static bool defined(const TrafficRules& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.lights_time) && defined(s.laws_) && defined(s.junctions_) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) && defined(s.blocked_); }
+[[maybe_unused]] static std::string text(const TrafficRules& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.lights_time) + ", " + text(s.laws_) + ", " + text(s.junctions_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + ", " + text(s.blocked_) + "}"; }
+[[maybe_unused]] static void take(TrafficRules& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<double>(s.lights_time, (*v.rows)[1]); converted::take_as<TrafficRules::Laws>(s.laws_, (*v.rows)[2]); converted::take_as<std::vector<TrafficRules::Junction>>(s.junctions_, (*v.rows)[3]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[4]); converted::take_as<converted::wide::Map<int, TrafficRules::Blocked>>(s.blocked_, (*v.rows)[5]); }
 [[maybe_unused]] static Lane draw_Lane(converted::Draw& draw) {
   Lane s{};
   s.points = draw_list(draw, [&]() -> Vec2 { return draw.vector2(); });
@@ -250,7 +288,7 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Lane& s) { return converted::Value::structure({arg(s.points), arg(s.width), arg(converted::shaped<converted::Whole>(s.tile)), arg(s.alive)}); }
-[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.points, (*got.rows)[0]) && same(want.width, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]) && same(want.alive, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Lane& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.points, (*got.rows)[0]), ".points") && converted::at_place(same(want.width, (*got.rows)[1]), ".width") && converted::at_place(same(converted::shaped<converted::Whole>(want.tile), (*got.rows)[2]), ".tile") && converted::at_place(same(want.alive, (*got.rows)[3]), ".alive"); }
 [[maybe_unused]] static bool defined(const Lane& s) { return defined(s.points) && defined(s.width) && defined(converted::shaped<converted::Whole>(s.tile)) && defined(s.alive); }
 [[maybe_unused]] static std::string text(const Lane& s) { return std::string("{") + text(s.points) + ", " + text(s.width) + ", " + text(converted::shaped<converted::Whole>(s.tile)) + ", " + text(s.alive) + "}"; }
 [[maybe_unused]] static void take(Lane& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<Vec2>>(s.points, (*v.rows)[0]); converted::take_as<double>(s.width, (*v.rows)[1]); converted::take_as<converted::Whole>(s.tile, (*v.rows)[2]); converted::take_as<bool>(s.alive, (*v.rows)[3]); }
@@ -263,10 +301,26 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const TrafficRules::Pursuit& s) { return converted::Value::structure({arg(s.target), arg(s.tangent), arg(s.passed), arg(s.end)}); }
-[[maybe_unused]] static bool same(const TrafficRules::Pursuit& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.target, (*got.rows)[0]) && same(want.tangent, (*got.rows)[1]) && same(want.passed, (*got.rows)[2]) && same(want.end, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const TrafficRules::Pursuit& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.target, (*got.rows)[0]), ".target") && converted::at_place(same(want.tangent, (*got.rows)[1]), ".tangent") && converted::at_place(same(want.passed, (*got.rows)[2]), ".passed") && converted::at_place(same(want.end, (*got.rows)[3]), ".end"); }
 [[maybe_unused]] static bool defined(const TrafficRules::Pursuit& s) { return defined(s.target) && defined(s.tangent) && defined(s.passed) && defined(s.end); }
 [[maybe_unused]] static std::string text(const TrafficRules::Pursuit& s) { return std::string("{") + text(s.target) + ", " + text(s.tangent) + ", " + text(s.passed) + ", " + text(s.end) + "}"; }
 [[maybe_unused]] static void take(TrafficRules::Pursuit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec2>(s.target, (*v.rows)[0]); converted::take_as<Vec2>(s.tangent, (*v.rows)[1]); converted::take_as<bool>(s.passed, (*v.rows)[2]); converted::take_as<double>(s.end, (*v.rows)[3]); }
+[[maybe_unused]] static TrafficRules::Vehicle draw_TrafficRules__Vehicle(converted::Draw& draw) {
+  TrafficRules::Vehicle s{};
+  s.p = draw.vector2();
+  s.bus = draw.flag();
+  s.there = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const TrafficRules::Vehicle& s) { return converted::Value::structure({arg(s.p), arg(s.bus), arg(s.there)}); }
+[[maybe_unused]] static bool same(const TrafficRules::Vehicle& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.bus, (*got.rows)[1]), ".bus") && converted::at_place(same(want.there, (*got.rows)[2]), ".there"); }
+[[maybe_unused]] static bool defined(const TrafficRules::Vehicle& s) { return defined(s.p) && defined(s.bus) && defined(s.there); }
+[[maybe_unused]] static std::string text(const TrafficRules::Vehicle& s) { return std::string("{") + text(s.p) + ", " + text(s.bus) + ", " + text(s.there) + "}"; }
+[[maybe_unused]] static void take(TrafficRules::Vehicle& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<bool>(s.bus, (*v.rows)[1]); converted::take_as<bool>(s.there, (*v.rows)[2]); }
+struct Out_TrafficRules_gap_speed { double Result; int limiter; };
+[[maybe_unused]] static bool same(const Out_TrafficRules_gap_speed& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.limiter, (*got.rows)[1]), ".limiter"); }
+[[maybe_unused]] static bool defined(const Out_TrafficRules_gap_speed& s) { return defined(s.Result) && defined(s.limiter); }
+[[maybe_unused]] static std::string text(const Out_TrafficRules_gap_speed& s) { return std::string("{") + text(s.Result) + ", " + text(s.limiter) + "}"; }
 
 SC_TEST(converted_world_traffic_cpp) {
   converted::Blueprint bp("world_traffic_cpp", {"Traffic"});
@@ -274,7 +328,7 @@ SC_TEST(converted_world_traffic_cpp) {
   {  // cell
     converted::Tally tally("cell");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_world_traffic_cpp::cell(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0, [[maybe_unused]] int& a1) { return converted::counted([&] { return converted_world_traffic_cpp::cell(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       int a1 = static_cast<int>(draw.whole());
@@ -284,29 +338,50 @@ SC_TEST(converted_world_traffic_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
-  {  // TrafficRules::near
-    converted::Tally tally("TrafficRules_near");
+  {  // TrafficRules::bind
+    converted::Tally tally("TrafficRules_bind");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TrafficRules a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2, [[maybe_unused]] std::vector<int> a3) { converted::counted([&] { return a0.near(std::move(a1), std::move(a2), a3); }); return a3; };
+    const auto run = [&]() { return converted::counted([&] { return TrafficRules::bind(bp.source_logic()); }); };
     for (int i = 0; tally.more(i); ++i) {
-      TrafficRules a0 = draw_TrafficRules(draw);
-      Vec2 a1 = draw.vector2();
-      double a2 = draw.number();
-      std::vector<int> a3 = draw_list(draw, [&]() -> int { return static_cast<int>(draw.whole()); });
-      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // TrafficRules::take_laws
+    converted::Tally tally("TrafficRules_take_laws");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] TrafficRules& a0) { converted::counted([&] { return a0.take_laws(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      TrafficRules a0 = draw_TrafficRules(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -316,7 +391,7 @@ SC_TEST(converted_world_traffic_cpp) {
   {  // TrafficRules::light
     converted::Tally tally("TrafficRules_light");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] TrafficRules a0, [[maybe_unused]] TrafficRules::Junction a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] double a3) { return converted::counted([&] { return a0.light(a1, std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] TrafficRules& a0, [[maybe_unused]] TrafficRules::Junction& a1, [[maybe_unused]] Vec2& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return a0.light(a1, std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       TrafficRules a0 = draw_TrafficRules(draw);
       TrafficRules::Junction a1 = draw_TrafficRules__Junction(draw);
@@ -328,7 +403,9 @@ SC_TEST(converted_world_traffic_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -338,7 +415,7 @@ SC_TEST(converted_world_traffic_cpp) {
   {  // TrafficRules::pursuit
     converted::Tally tally("TrafficRules_pursuit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Lane a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2, [[maybe_unused]] Vec2 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return TrafficRules::pursuit(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
+    const auto run = [&]([[maybe_unused]] Lane& a0, [[maybe_unused]] int& a1, [[maybe_unused]] int& a2, [[maybe_unused]] Vec2& a3, [[maybe_unused]] double& a4, [[maybe_unused]] double& a5) { return converted::counted([&] { return TrafficRules::pursuit(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Lane a0 = draw_Lane(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -352,11 +429,40 @@ SC_TEST(converted_world_traffic_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // TrafficRules::gap_speed
+    converted::Tally tally("TrafficRules_gap_speed");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] TrafficRules& a0, [[maybe_unused]] int& a1, [[maybe_unused]] Vec2& a2, [[maybe_unused]] Vec2& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] std::vector<TrafficRules::Vehicle>& a5, [[maybe_unused]] int& a6) { auto r = converted::counted([&] { return a0.gap_speed(std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5, a6); }); return Out_TrafficRules_gap_speed{std::move(r), std::move(a6)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      TrafficRules a0 = draw_TrafficRules(draw);
+      int a1 = static_cast<int>(draw.whole());
+      Vec2 a2 = draw.vector2();
+      Vec2 a3 = draw.vector2();
+      bool a4 = draw.flag();
+      std::vector<TrafficRules::Vehicle> a5 = draw_list(draw, [&]() -> TrafficRules::Vehicle { return draw_TrafficRules__Vehicle(draw); });
+      int a6 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a5), arg(a6), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
 }

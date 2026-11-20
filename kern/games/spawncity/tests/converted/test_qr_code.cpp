@@ -36,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 namespace qr { struct Code {
   i32 version = 0, size = 0;
   std::vector<u8> modules;  // size * size, 1 = dark, row major
-  bool dark(i32 x, i32 y) const { return x >= 0 && y >= 0 && x < size && y < size && converted::at(modules, static_cast<std::size_t>(y * size + x)); }
+  bool dark(i32 x, i32 y) const { return x >= 0 && y >= 0 && x < size && y < size && converted::at(modules, static_cast<std::size_t>(converted::plus(converted::times(y, size), x))); }
 }; }
 #undef private
 #undef protected
@@ -51,7 +51,7 @@ namespace qr { struct Code {
 }
 namespace qr { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const qr::Code& s) { return converted::Value::structure({arg(s.version), arg(s.size), arg(s.modules)}); }
-[[maybe_unused]] static bool same(const qr::Code& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.version, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.modules, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const qr::Code& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.version, (*got.rows)[0]), ".version") && converted::at_place(same(want.size, (*got.rows)[1]), ".size") && converted::at_place(same(want.modules, (*got.rows)[2]), ".modules"); }
 [[maybe_unused]] static bool defined(const qr::Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
 [[maybe_unused]] static std::string text(const qr::Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
 [[maybe_unused]] static void take(qr::Code& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.version, (*v.rows)[0]); converted::take_as<int>(s.size, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.modules, (*v.rows)[2]); }
@@ -62,7 +62,7 @@ SC_TEST(converted_qr_code) {
   {  // Code::dark
     converted::Tally tally("Code_dark");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] qr::Code a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { return converted::counted([&] { return a0.dark(std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] qr::Code& a0, [[maybe_unused]] int& a1, [[maybe_unused]] int& a2) { return converted::counted([&] { return a0.dark(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       qr::Code a0 = draw_qr__Code(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -73,7 +73,9 @@ SC_TEST(converted_qr_code) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

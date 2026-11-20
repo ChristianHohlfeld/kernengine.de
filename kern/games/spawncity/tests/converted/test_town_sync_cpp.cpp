@@ -143,6 +143,13 @@ namespace wire { struct Reader {
 
 
 
+  
+
+
+
+
+
+
   i64 get_i64(const std::vector<u8>& b) {
     if (converted::plus(at, 8) > b.size()) { ok = false; return 0; }
     I64 x;
@@ -378,7 +385,7 @@ namespace town { bool unpack_state(const std::vector<u8>& blob, State& s) {
 }
 namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const town::LampRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.state)}); }
-[[maybe_unused]] static bool same(const town::LampRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.state, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const town::LampRec& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(want.state, (*got.rows)[1]), ".state"); }
 [[maybe_unused]] static bool defined(const town::LampRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.state); }
 [[maybe_unused]] static std::string text(const town::LampRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.state) + "}"; }
 [[maybe_unused]] static void take(town::LampRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.state, (*v.rows)[1]); }
@@ -393,7 +400,7 @@ namespace town { using converted::arg; using converted::same; using converted::d
 }
 namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const town::PlankRec& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.door), arg(s.doors), arg(s.planks)}); }
-[[maybe_unused]] static bool same(const town::PlankRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.planks, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const town::PlankRec& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(want.door, (*got.rows)[1]), ".door") && converted::at_place(same(want.doors, (*got.rows)[2]), ".doors") && converted::at_place(same(want.planks, (*got.rows)[3]), ".planks"); }
 [[maybe_unused]] static bool defined(const town::PlankRec& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.door) && defined(s.doors) && defined(s.planks); }
 [[maybe_unused]] static std::string text(const town::PlankRec& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.planks) + "}"; }
 [[maybe_unused]] static void take(town::PlankRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.door, (*v.rows)[1]); converted::take_as<unsigned char>(s.doors, (*v.rows)[2]); converted::take_as<unsigned char>(s.planks, (*v.rows)[3]); }
@@ -407,7 +414,7 @@ namespace town { using converted::arg; using converted::same; using converted::d
 }
 namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const town::MarkRec& s) { return converted::Value::structure({arg(s.at), arg(s.radius), arg(s.strength)}); }
-[[maybe_unused]] static bool same(const town::MarkRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.at, (*got.rows)[0]) && same(want.radius, (*got.rows)[1]) && same(want.strength, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const town::MarkRec& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.at, (*got.rows)[0]), ".at") && converted::at_place(same(want.radius, (*got.rows)[1]), ".radius") && converted::at_place(same(want.strength, (*got.rows)[2]), ".strength"); }
 [[maybe_unused]] static bool defined(const town::MarkRec& s) { return defined(s.at) && defined(s.radius) && defined(s.strength); }
 [[maybe_unused]] static std::string text(const town::MarkRec& s) { return std::string("{") + text(s.at) + ", " + text(s.radius) + ", " + text(s.strength) + "}"; }
 [[maybe_unused]] static void take(town::MarkRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.at, (*v.rows)[0]); converted::take_as<double>(s.radius, (*v.rows)[1]); converted::take_as<double>(s.strength, (*v.rows)[2]); }
@@ -416,12 +423,12 @@ namespace town { using converted::arg; using converted::same; using converted::d
   town::CarHit s{};
   s.car = static_cast<unsigned char>(draw.below(40));
   s.damage = draw.number();
-  s.cause = static_cast<town::Cause>(draw.below(3));
+  s.cause = converted::enum_value<town::Cause>(draw.below(3));
   return s;
 }
 namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const town::CarHit& s) { return converted::Value::structure({arg(s.car), arg(s.damage), arg(s.cause)}); }
-[[maybe_unused]] static bool same(const town::CarHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.car, (*got.rows)[0]) && same(want.damage, (*got.rows)[1]) && same(want.cause, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const town::CarHit& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.car, (*got.rows)[0]), ".car") && converted::at_place(same(want.damage, (*got.rows)[1]), ".damage") && converted::at_place(same(want.cause, (*got.rows)[2]), ".cause"); }
 [[maybe_unused]] static bool defined(const town::CarHit& s) { return defined(s.car) && defined(s.damage) && defined(s.cause); }
 [[maybe_unused]] static std::string text(const town::CarHit& s) { return std::string("{") + text(s.car) + ", " + text(s.damage) + ", " + text(s.cause) + "}"; }
 [[maybe_unused]] static void take(town::CarHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.car, (*v.rows)[0]); converted::take_as<double>(s.damage, (*v.rows)[1]); converted::take_as<town::Cause>(s.cause, (*v.rows)[2]); }
@@ -437,7 +444,7 @@ namespace town { using converted::arg; using converted::same; using converted::d
 }
 namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const town::PersonHit& s) { return converted::Value::structure({arg(s.person), arg(s.seed), arg(s.damage), arg(s.by), arg(s.push)}); }
-[[maybe_unused]] static bool same(const town::PersonHit& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.person, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]) && same(want.damage, (*got.rows)[2]) && same(want.by, (*got.rows)[3]) && same(want.push, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const town::PersonHit& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.person, (*got.rows)[0]), ".person") && converted::at_place(same(want.seed, (*got.rows)[1]), ".seed") && converted::at_place(same(want.damage, (*got.rows)[2]), ".damage") && converted::at_place(same(want.by, (*got.rows)[3]), ".by") && converted::at_place(same(want.push, (*got.rows)[4]), ".push"); }
 [[maybe_unused]] static bool defined(const town::PersonHit& s) { return defined(s.person) && defined(s.seed) && defined(s.damage) && defined(s.by) && defined(s.push); }
 [[maybe_unused]] static std::string text(const town::PersonHit& s) { return std::string("{") + text(s.person) + ", " + text(s.seed) + ", " + text(s.damage) + ", " + text(s.by) + ", " + text(s.push) + "}"; }
 [[maybe_unused]] static void take(town::PersonHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.person, (*v.rows)[0]); converted::take_as<unsigned int>(s.seed, (*v.rows)[1]); converted::take_as<double>(s.damage, (*v.rows)[2]); converted::take_as<unsigned char>(s.by, (*v.rows)[3]); converted::take_as<Vec3>(s.push, (*v.rows)[4]); }
@@ -452,7 +459,7 @@ namespace town { using converted::arg; using converted::same; using converted::d
 }
 namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const town::PlankStep& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.door), arg(s.doors), arg(s.step)}); }
-[[maybe_unused]] static bool same(const town::PlankStep& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.door, (*got.rows)[1]) && same(want.doors, (*got.rows)[2]) && same(want.step, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const town::PlankStep& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(want.door, (*got.rows)[1]), ".door") && converted::at_place(same(want.doors, (*got.rows)[2]), ".doors") && converted::at_place(same(want.step, (*got.rows)[3]), ".step"); }
 [[maybe_unused]] static bool defined(const town::PlankStep& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.door) && defined(s.doors) && defined(s.step); }
 [[maybe_unused]] static std::string text(const town::PlankStep& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.door) + ", " + text(s.doors) + ", " + text(s.step) + "}"; }
 [[maybe_unused]] static void take(town::PlankStep& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<unsigned char>(s.door, (*v.rows)[1]); converted::take_as<unsigned char>(s.doors, (*v.rows)[2]); converted::take_as<signed char>(s.step, (*v.rows)[3]); }
@@ -469,33 +476,33 @@ namespace town { using converted::arg; using converted::same; using converted::d
 }
 namespace town { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const town::State& s) { return converted::Value::structure({arg(s.epoch), arg(s.first), arg(s.last), arg(s.lamps), arg(s.planks), arg(s.marks)}); }
-[[maybe_unused]] static bool same(const town::State& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.epoch, (*got.rows)[0]) && same(want.first, (*got.rows)[1]) && same(want.last, (*got.rows)[2]) && same(want.lamps, (*got.rows)[3]) && same(want.planks, (*got.rows)[4]) && same(want.marks, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const town::State& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.epoch, (*got.rows)[0]), ".epoch") && converted::at_place(same(want.first, (*got.rows)[1]), ".first") && converted::at_place(same(want.last, (*got.rows)[2]), ".last") && converted::at_place(same(want.lamps, (*got.rows)[3]), ".lamps") && converted::at_place(same(want.planks, (*got.rows)[4]), ".planks") && converted::at_place(same(want.marks, (*got.rows)[5]), ".marks"); }
 [[maybe_unused]] static bool defined(const town::State& s) { return defined(s.epoch) && defined(s.first) && defined(s.last) && defined(s.lamps) && defined(s.planks) && defined(s.marks); }
 [[maybe_unused]] static std::string text(const town::State& s) { return std::string("{") + text(s.epoch) + ", " + text(s.first) + ", " + text(s.last) + ", " + text(s.lamps) + ", " + text(s.planks) + ", " + text(s.marks) + "}"; }
 [[maybe_unused]] static void take(town::State& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<unsigned int>(s.epoch, (*v.rows)[0]); converted::take_as<bool>(s.first, (*v.rows)[1]); converted::take_as<bool>(s.last, (*v.rows)[2]); converted::take_as<std::vector<town::LampRec>>(s.lamps, (*v.rows)[3]); converted::take_as<std::vector<town::PlankRec>>(s.planks, (*v.rows)[4]); converted::take_as<std::vector<town::MarkRec>>(s.marks, (*v.rows)[5]); }
 }
 struct Out_unpack { bool Result; town::CarHit h; };
-[[maybe_unused]] static bool same(const Out_unpack& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.h, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_unpack& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.h, (*got.rows)[1]), ".h"); }
 [[maybe_unused]] static bool defined(const Out_unpack& s) { return defined(s.Result) && defined(s.h); }
 [[maybe_unused]] static std::string text(const Out_unpack& s) { return std::string("{") + text(s.Result) + ", " + text(s.h) + "}"; }
 struct Out_unpack_2 { bool Result; town::PersonHit h; };
-[[maybe_unused]] static bool same(const Out_unpack_2& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.h, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_unpack_2& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.h, (*got.rows)[1]), ".h"); }
 [[maybe_unused]] static bool defined(const Out_unpack_2& s) { return defined(s.Result) && defined(s.h); }
 [[maybe_unused]] static std::string text(const Out_unpack_2& s) { return std::string("{") + text(s.Result) + ", " + text(s.h) + "}"; }
 struct Out_unpack_lamps { bool Result; std::vector<town::LampRec> lamps; };
-[[maybe_unused]] static bool same(const Out_unpack_lamps& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.lamps, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_unpack_lamps& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.lamps, (*got.rows)[1]), ".lamps"); }
 [[maybe_unused]] static bool defined(const Out_unpack_lamps& s) { return defined(s.Result) && defined(s.lamps); }
 [[maybe_unused]] static std::string text(const Out_unpack_lamps& s) { return std::string("{") + text(s.Result) + ", " + text(s.lamps) + "}"; }
 struct Out_unpack_3 { bool Result; town::PlankStep s; };
-[[maybe_unused]] static bool same(const Out_unpack_3& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.s, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_unpack_3& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.s, (*got.rows)[1]), ".s"); }
 [[maybe_unused]] static bool defined(const Out_unpack_3& s) { return defined(s.Result) && defined(s.s); }
 [[maybe_unused]] static std::string text(const Out_unpack_3& s) { return std::string("{") + text(s.Result) + ", " + text(s.s) + "}"; }
 struct Out_unpack_4 { bool Result; town::PlankRec r; };
-[[maybe_unused]] static bool same(const Out_unpack_4& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.r, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_unpack_4& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.r, (*got.rows)[1]), ".r"); }
 [[maybe_unused]] static bool defined(const Out_unpack_4& s) { return defined(s.Result) && defined(s.r); }
 [[maybe_unused]] static std::string text(const Out_unpack_4& s) { return std::string("{") + text(s.Result) + ", " + text(s.r) + "}"; }
 struct Out_unpack_state { bool Result; town::State s; };
-[[maybe_unused]] static bool same(const Out_unpack_state& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.s, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_unpack_state& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.s, (*got.rows)[1]), ".s"); }
 [[maybe_unused]] static bool defined(const Out_unpack_state& s) { return defined(s.Result) && defined(s.s); }
 [[maybe_unused]] static std::string text(const Out_unpack_state& s) { return std::string("{") + text(s.Result) + ", " + text(s.s) + "}"; }
 
@@ -504,7 +511,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // vec_finite
     converted::Tally tally("vec_finite");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_town_sync_cpp::town::vec_finite(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::vec_finite(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -513,7 +520,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -523,7 +532,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // lamp_ok
     converted::Tally tally("lamp_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] town::LampRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::lamp_ok(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::LampRec& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::lamp_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       town::LampRec a0 = draw_town__LampRec(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -532,7 +541,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -542,7 +553,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // plank_ok
     converted::Tally tally("plank_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] town::PlankRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::plank_ok(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::PlankRec& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::plank_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       town::PlankRec a0 = draw_town__PlankRec(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -551,7 +562,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -561,7 +574,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // mark_ok
     converted::Tally tally("mark_ok");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] town::MarkRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::mark_ok(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::MarkRec& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::mark_ok(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       town::MarkRec a0 = draw_town__MarkRec(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -570,7 +583,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -580,7 +595,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // kind_of
     converted::Tally tally("kind_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0) { return converted::counted([&] { return converted_town_sync_cpp::town::kind_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::kind_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -589,7 +604,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -599,7 +616,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // pack
     converted::Tally tally("pack");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] town::CarHit a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::CarHit& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       town::CarHit a0 = draw_town__CarHit(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -608,7 +625,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -618,7 +637,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // unpack
     converted::Tally tally("unpack");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::CarHit a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] town::CarHit& a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       town::CarHit a1 = draw_town__CarHit(draw);
@@ -628,7 +647,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -638,7 +659,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // pack
     converted::Tally tally("pack_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] town::PersonHit a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::PersonHit& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       town::PersonHit a0 = draw_town__PersonHit(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -647,7 +668,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -657,7 +680,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // unpack
     converted::Tally tally("unpack_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::PersonHit a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_2{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] town::PersonHit& a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_2{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       town::PersonHit a1 = draw_town__PersonHit(draw);
@@ -667,7 +690,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -677,7 +702,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // pack_lamps
     converted::Tally tally("pack_lamps");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<town::LampRec> a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack_lamps(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<town::LampRec>& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack_lamps(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<town::LampRec> a0 = draw_list(draw, [&]() -> town::LampRec { return draw_town__LampRec(draw); });
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -686,7 +711,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -696,7 +723,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // unpack_lamps
     converted::Tally tally("unpack_lamps");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<town::LampRec> a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack_lamps(a0, a1); }); return Out_unpack_lamps{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] std::vector<town::LampRec>& a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack_lamps(a0, a1); }); return Out_unpack_lamps{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       std::vector<town::LampRec> a1 = draw_list(draw, [&]() -> town::LampRec { return draw_town__LampRec(draw); });
@@ -706,7 +733,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -716,7 +745,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // pack
     converted::Tally tally("pack_3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] town::PlankStep a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::PlankStep& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       town::PlankStep a0 = draw_town__PlankStep(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -725,7 +754,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -735,7 +766,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // unpack
     converted::Tally tally("unpack_3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::PlankStep a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_3{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] town::PlankStep& a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_3{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       town::PlankStep a1 = draw_town__PlankStep(draw);
@@ -745,7 +776,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -755,7 +788,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // pack
     converted::Tally tally("pack_4");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] town::PlankRec a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
+    const auto run = [&]([[maybe_unused]] town::PlankRec& a0) { return converted::counted([&] { return converted_town_sync_cpp::town::pack(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       town::PlankRec a0 = draw_town__PlankRec(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -764,7 +797,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -774,7 +809,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // unpack
     converted::Tally tally("unpack_4");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::PlankRec a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_4{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] town::PlankRec& a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack(a0, a1); }); return Out_unpack_4{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       town::PlankRec a1 = draw_town__PlankRec(draw);
@@ -784,7 +819,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -802,7 +839,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -812,7 +851,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // pack_state
     converted::Tally tally("pack_state");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] std::vector<town::LampRec> a1, [[maybe_unused]] std::vector<town::PlankRec> a2, [[maybe_unused]] std::vector<town::MarkRec> a3) { return converted::counted([&] { return converted_town_sync_cpp::town::pack_state(std::move(a0), a1, a2, a3); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] std::vector<town::LampRec>& a1, [[maybe_unused]] std::vector<town::PlankRec>& a2, [[maybe_unused]] std::vector<town::MarkRec>& a3) { return converted::counted([&] { return converted_town_sync_cpp::town::pack_state(std::move(a0), a1, a2, a3); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       std::vector<town::LampRec> a1 = draw_list(draw, [&]() -> town::LampRec { return draw_town__LampRec(draw); });
@@ -824,7 +863,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -834,7 +875,7 @@ SC_TEST(converted_town_sync_cpp) {
   {  // unpack_state
     converted::Tally tally("unpack_state");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] town::State a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack_state(a0, a1); }); return Out_unpack_state{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] town::State& a1) { auto r = converted::counted([&] { return converted_town_sync_cpp::town::unpack_state(a0, a1); }); return Out_unpack_state{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       town::State a1 = draw_town__State(draw);
@@ -844,7 +885,9 @@ SC_TEST(converted_town_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

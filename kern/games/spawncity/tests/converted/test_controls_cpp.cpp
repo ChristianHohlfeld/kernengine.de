@@ -41,7 +41,9 @@ struct Value : converted::EngineObject {
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
 struct Variable : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -53,7 +55,7 @@ struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
-namespace controls { bool bind(::kern::logic::Runtime& logic); }
+namespace controls { bool bind(kern::logic::Runtime& logic); }
 namespace controls { f32 smoothstep01(f32 t); }
 namespace controls { f32 walk_pad_axis(f32 v); }
 namespace controls { Vec2 shape_first_person_move(f32 x, f32 y, f32 move_fineness, bool invert_h); }
@@ -121,14 +123,14 @@ namespace controls { struct GrenadeCook {
   bool cooking = false;
   f32 at = 0, power = 0.7;  // pulled at (s), throw strength 0..1
   int source = 0;            // 0 keyboard, 1 pad, 2 touch
-  bool pull(f32 now, int from);
+  
   /// Drag "up" by d px in the game's frame.
   void drag(f32 up_px);
   /// Ends the cook (thrown): returns the fuse time left (s).
-  f32 release(f32 now);
+  
   /// Per frame: regeneration; true when the fuse burnt down in the hand (cooked off).
-  bool step(f32 now);
-  f32 left(f32 now) const;
+  
+  
   f32 speed() const;
   
 }; }
@@ -158,7 +160,7 @@ namespace rules { inline f64 decimal(f32 x) {
   f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
   for (f64 m = a; m < 1; m *= 10) scale *= 10;
   for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
     const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
     if (static_cast<f32>(c) == x) return c;
   }
@@ -198,7 +200,7 @@ namespace controls { void take(const Cook& c, GrenadeCook& g) {
   g.power = static_cast<f32>(c.power);
   g.source = c.source;
 } }
-namespace controls { bool bind(::kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
+namespace controls { bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
 namespace controls { f32 smoothstep01(f32 t) { return static_cast<f32>(g_rules.number("Smoothstep01", rules::decimal(static_cast<f32>(t)))); } }
 namespace controls { f32 walk_pad_axis(f32 v) { return static_cast<f32>(g_rules.number("WalkPadAxis", rules::decimal(static_cast<f32>(v)))); } }
 namespace controls { Vec2 shape_first_person_move(f32 x, f32 y, f32 move_fineness, bool invert_h) {
@@ -313,29 +315,7 @@ namespace controls { bool ReleaseLatch::step(const std::array<f32, 9>& values) {
   g_rules.call("ReleaseLatchStep", std::tie(neutral, armed), armed, list);
   return neutral;
 } }
-namespace controls { bool GrenadeCook::pull(f32 now, int from) {
-  Cook c;
-  bool pulled = false;
-  g_rules.call("GrenadePull", std::tie(c, pulled), cook_of(*this), rules::decimal(now), from);
-  take(c, *this);
-  return pulled;
-} }
 namespace controls { void GrenadeCook::drag(f32 up_px) { power = static_cast<f32>(g_rules.number("GrenadeDrag", rules::decimal(static_cast<f32>(up_px)))); } }
-namespace controls { f32 GrenadeCook::release(f32 now) {
-  Cook c;
-  f64 left = 0;
-  g_rules.call("GrenadeRelease", std::tie(c, left), cook_of(*this), rules::decimal(now));
-  take(c, *this);
-  return static_cast<f32>(left);
-} }
-namespace controls { bool GrenadeCook::step(f32 now) {
-  Cook c;
-  bool cooked_off = false;
-  g_rules.call("GrenadeStep", std::tie(c, cooked_off), cook_of(*this), rules::decimal(now));
-  take(c, *this);
-  return cooked_off;
-} }
-namespace controls { f32 GrenadeCook::left(f32 now) const { return static_cast<f32>(g_rules.number("GrenadeLeft", cook_of(*this), rules::decimal(now))); } }
 namespace controls { f32 GrenadeCook::speed() const { return static_cast<f32>(g_rules.number("GrenadeSpeed", rules::decimal(static_cast<f32>(power)))); } }
 namespace controls { f32 grenade_fuse() { return static_cast<f32>(g_rules.get<f64>("GrenadeFuse")); } }
 namespace controls { void Devices::platform(bool fine_pointer, bool coarse_pointer, i32 max_touch_points) {
@@ -371,7 +351,7 @@ namespace controls { std::string hint_line(const char* mode, const char* weapon,
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::Devices& s) { return converted::Value::structure({arg(s.fine), arg(s.coarse), arg(s.touch_points), arg(s.desktop), arg(s.pad), arg(s.changes)}); }
-[[maybe_unused]] static bool same(const controls::Devices& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.fine, (*got.rows)[0]) && same(want.coarse, (*got.rows)[1]) && same(want.touch_points, (*got.rows)[2]) && same(want.desktop, (*got.rows)[3]) && same(want.pad, (*got.rows)[4]) && same(want.changes, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const controls::Devices& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.fine, (*got.rows)[0]), ".fine") && converted::at_place(same(want.coarse, (*got.rows)[1]), ".coarse") && converted::at_place(same(want.touch_points, (*got.rows)[2]), ".touch_points") && converted::at_place(same(want.desktop, (*got.rows)[3]), ".desktop") && converted::at_place(same(want.pad, (*got.rows)[4]), ".pad") && converted::at_place(same(want.changes, (*got.rows)[5]), ".changes"); }
 [[maybe_unused]] static bool defined(const controls::Devices& s) { return defined(s.fine) && defined(s.coarse) && defined(s.touch_points) && defined(s.desktop) && defined(s.pad) && defined(s.changes); }
 [[maybe_unused]] static std::string text(const controls::Devices& s) { return std::string("{") + text(s.fine) + ", " + text(s.coarse) + ", " + text(s.touch_points) + ", " + text(s.desktop) + ", " + text(s.pad) + ", " + text(s.changes) + "}"; }
 [[maybe_unused]] static void take(controls::Devices& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.fine, (*v.rows)[0]); converted::take_as<bool>(s.coarse, (*v.rows)[1]); converted::take_as<int>(s.touch_points, (*v.rows)[2]); converted::take_as<bool>(s.desktop, (*v.rows)[3]); converted::take_as<bool>(s.pad, (*v.rows)[4]); converted::take_as<unsigned int>(s.changes, (*v.rows)[5]); }
@@ -387,7 +367,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::WorldLook& s) { return converted::Value::structure({arg(s.yaw_deg), arg(s.pitch_deg), arg(s.snapping), arg(s.idle), arg(s.owned)}); }
-[[maybe_unused]] static bool same(const controls::WorldLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.yaw_deg, (*got.rows)[0]) && same(want.pitch_deg, (*got.rows)[1]) && same(want.snapping, (*got.rows)[2]) && same(want.idle, (*got.rows)[3]) && same(want.owned, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const controls::WorldLook& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.yaw_deg, (*got.rows)[0]), ".yaw_deg") && converted::at_place(same(want.pitch_deg, (*got.rows)[1]), ".pitch_deg") && converted::at_place(same(want.snapping, (*got.rows)[2]), ".snapping") && converted::at_place(same(want.idle, (*got.rows)[3]), ".idle") && converted::at_place(same(want.owned, (*got.rows)[4]), ".owned"); }
 [[maybe_unused]] static bool defined(const controls::WorldLook& s) { return defined(s.yaw_deg) && defined(s.pitch_deg) && defined(s.snapping) && defined(s.idle) && defined(s.owned); }
 [[maybe_unused]] static std::string text(const controls::WorldLook& s) { return std::string("{") + text(s.yaw_deg) + ", " + text(s.pitch_deg) + ", " + text(s.snapping) + ", " + text(s.idle) + ", " + text(s.owned) + "}"; }
 [[maybe_unused]] static void take(controls::WorldLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.yaw_deg, (*v.rows)[0]); converted::take_as<double>(s.pitch_deg, (*v.rows)[1]); converted::take_as<bool>(s.snapping, (*v.rows)[2]); converted::take_as<double>(s.idle, (*v.rows)[3]); converted::take_as<bool>(s.owned, (*v.rows)[4]); }
@@ -403,7 +383,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::Look& s) { return converted::Value::structure({arg(s.yaw), arg(s.pitch), arg(s.snapping), arg(s.idle), arg(s.owned)}); }
-[[maybe_unused]] static bool same(const controls::Look& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.yaw, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.snapping, (*got.rows)[2]) && same(want.idle, (*got.rows)[3]) && same(want.owned, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const controls::Look& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.yaw, (*got.rows)[0]), ".yaw") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.snapping, (*got.rows)[2]), ".snapping") && converted::at_place(same(want.idle, (*got.rows)[3]), ".idle") && converted::at_place(same(want.owned, (*got.rows)[4]), ".owned"); }
 [[maybe_unused]] static bool defined(const controls::Look& s) { return defined(s.yaw) && defined(s.pitch) && defined(s.snapping) && defined(s.idle) && defined(s.owned); }
 [[maybe_unused]] static std::string text(const controls::Look& s) { return std::string("{") + text(s.yaw) + ", " + text(s.pitch) + ", " + text(s.snapping) + ", " + text(s.idle) + ", " + text(s.owned) + "}"; }
 [[maybe_unused]] static void take(controls::Look& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.yaw, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<bool>(s.snapping, (*v.rows)[2]); converted::take_as<double>(s.idle, (*v.rows)[3]); converted::take_as<bool>(s.owned, (*v.rows)[4]); }
@@ -420,7 +400,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::GrenadeCook& s) { return converted::Value::structure({arg(s.carry), arg(s.regen_at), arg(s.cooking), arg(s.at), arg(s.power), arg(s.source)}); }
-[[maybe_unused]] static bool same(const controls::GrenadeCook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.carry, (*got.rows)[0]) && same(want.regen_at, (*got.rows)[1]) && same(want.cooking, (*got.rows)[2]) && same(want.at, (*got.rows)[3]) && same(want.power, (*got.rows)[4]) && same(want.source, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const controls::GrenadeCook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.carry, (*got.rows)[0]), ".carry") && converted::at_place(same(want.regen_at, (*got.rows)[1]), ".regen_at") && converted::at_place(same(want.cooking, (*got.rows)[2]), ".cooking") && converted::at_place(same(want.at, (*got.rows)[3]), ".at") && converted::at_place(same(want.power, (*got.rows)[4]), ".power") && converted::at_place(same(want.source, (*got.rows)[5]), ".source"); }
 [[maybe_unused]] static bool defined(const controls::GrenadeCook& s) { return defined(s.carry) && defined(s.regen_at) && defined(s.cooking) && defined(s.at) && defined(s.power) && defined(s.source); }
 [[maybe_unused]] static std::string text(const controls::GrenadeCook& s) { return std::string("{") + text(s.carry) + ", " + text(s.regen_at) + ", " + text(s.cooking) + ", " + text(s.at) + ", " + text(s.power) + ", " + text(s.source) + "}"; }
 [[maybe_unused]] static void take(controls::GrenadeCook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<int>(s.carry, (*v.rows)[0]); converted::take_as<double>(s.regen_at, (*v.rows)[1]); converted::take_as<bool>(s.cooking, (*v.rows)[2]); converted::take_as<double>(s.at, (*v.rows)[3]); converted::take_as<double>(s.power, (*v.rows)[4]); converted::take_as<int>(s.source, (*v.rows)[5]); }
@@ -437,7 +417,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::Cook& s) { return converted::Value::structure({arg(s.carry), arg(s.regen_at), arg(s.cooking), arg(s.at), arg(s.power), arg(s.source)}); }
-[[maybe_unused]] static bool same(const controls::Cook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.carry, (*got.rows)[0]) && same(want.regen_at, (*got.rows)[1]) && same(want.cooking, (*got.rows)[2]) && same(want.at, (*got.rows)[3]) && same(want.power, (*got.rows)[4]) && same(want.source, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const controls::Cook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.carry, (*got.rows)[0]), ".carry") && converted::at_place(same(want.regen_at, (*got.rows)[1]), ".regen_at") && converted::at_place(same(want.cooking, (*got.rows)[2]), ".cooking") && converted::at_place(same(want.at, (*got.rows)[3]), ".at") && converted::at_place(same(want.power, (*got.rows)[4]), ".power") && converted::at_place(same(want.source, (*got.rows)[5]), ".source"); }
 [[maybe_unused]] static bool defined(const controls::Cook& s) { return defined(s.carry) && defined(s.regen_at) && defined(s.cooking) && defined(s.at) && defined(s.power) && defined(s.source); }
 [[maybe_unused]] static std::string text(const controls::Cook& s) { return std::string("{") + text(s.carry) + ", " + text(s.regen_at) + ", " + text(s.cooking) + ", " + text(s.at) + ", " + text(s.power) + ", " + text(s.source) + "}"; }
 [[maybe_unused]] static void take(controls::Cook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<int>(s.carry, (*v.rows)[0]); converted::take_as<double>(s.regen_at, (*v.rows)[1]); converted::take_as<bool>(s.cooking, (*v.rows)[2]); converted::take_as<double>(s.at, (*v.rows)[3]); converted::take_as<double>(s.power, (*v.rows)[4]); converted::take_as<int>(s.source, (*v.rows)[5]); }
@@ -449,7 +429,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::LookAxis& s) { return converted::Value::structure({arg(s.velocity)}); }
-[[maybe_unused]] static bool same(const controls::LookAxis& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.velocity, (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const controls::LookAxis& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.velocity, (*got.rows)[0]), ".velocity"); }
 [[maybe_unused]] static bool defined(const controls::LookAxis& s) { return defined(s.velocity); }
 [[maybe_unused]] static std::string text(const controls::LookAxis& s) { return std::string("{") + text(s.velocity) + "}"; }
 [[maybe_unused]] static void take(controls::LookAxis& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<double>(s.velocity, (*v.rows)[0]); }
@@ -464,7 +444,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::AimAssist& s) { return converted::Value::structure({arg(s.active), arg(s.slowdown), arg(s.yaw), arg(s.pitch)}); }
-[[maybe_unused]] static bool same(const controls::AimAssist& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.active, (*got.rows)[0]) && same(want.slowdown, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]) && same(want.pitch, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const controls::AimAssist& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.slowdown, (*got.rows)[1]), ".slowdown") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw") && converted::at_place(same(want.pitch, (*got.rows)[3]), ".pitch"); }
 [[maybe_unused]] static bool defined(const controls::AimAssist& s) { return defined(s.active) && defined(s.slowdown) && defined(s.yaw) && defined(s.pitch); }
 [[maybe_unused]] static std::string text(const controls::AimAssist& s) { return std::string("{") + text(s.active) + ", " + text(s.slowdown) + ", " + text(s.yaw) + ", " + text(s.pitch) + "}"; }
 [[maybe_unused]] static void take(controls::AimAssist& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<double>(s.slowdown, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); converted::take_as<double>(s.pitch, (*v.rows)[3]); }
@@ -479,7 +459,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::DroneAxes& s) { return converted::Value::structure({arg(s.roll), arg(s.pitch), arg(s.yaw), arg(s.body_pitch)}); }
-[[maybe_unused]] static bool same(const controls::DroneAxes& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.roll, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]) && same(want.body_pitch, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const controls::DroneAxes& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.roll, (*got.rows)[0]), ".roll") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw") && converted::at_place(same(want.body_pitch, (*got.rows)[3]), ".body_pitch"); }
 [[maybe_unused]] static bool defined(const controls::DroneAxes& s) { return defined(s.roll) && defined(s.pitch) && defined(s.yaw) && defined(s.body_pitch); }
 [[maybe_unused]] static std::string text(const controls::DroneAxes& s) { return std::string("{") + text(s.roll) + ", " + text(s.pitch) + ", " + text(s.yaw) + ", " + text(s.body_pitch) + "}"; }
 [[maybe_unused]] static void take(controls::DroneAxes& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.roll, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); converted::take_as<double>(s.body_pitch, (*v.rows)[3]); }
@@ -493,7 +473,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::RateStick& s) { return converted::Value::structure({arg(s.full_px_s), arg(s.tau), arg(s.rate)}); }
-[[maybe_unused]] static bool same(const controls::RateStick& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.full_px_s, (*got.rows)[0]) && same(want.tau, (*got.rows)[1]) && same(want.rate, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const controls::RateStick& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.full_px_s, (*got.rows)[0]), ".full_px_s") && converted::at_place(same(want.tau, (*got.rows)[1]), ".tau") && converted::at_place(same(want.rate, (*got.rows)[2]), ".rate"); }
 [[maybe_unused]] static bool defined(const controls::RateStick& s) { return defined(s.full_px_s) && defined(s.tau) && defined(s.rate); }
 [[maybe_unused]] static std::string text(const controls::RateStick& s) { return std::string("{") + text(s.full_px_s) + ", " + text(s.tau) + ", " + text(s.rate) + "}"; }
 [[maybe_unused]] static void take(controls::RateStick& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.full_px_s, (*v.rows)[0]); converted::take_as<double>(s.tau, (*v.rows)[1]); converted::take_as<Vec2>(s.rate, (*v.rows)[2]); }
@@ -506,7 +486,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::CarHeadSpring& s) { return converted::Value::structure({arg(s.yaw), arg(s.pitch)}); }
-[[maybe_unused]] static bool same(const controls::CarHeadSpring& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.yaw, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const controls::CarHeadSpring& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.yaw, (*got.rows)[0]), ".yaw") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch"); }
 [[maybe_unused]] static bool defined(const controls::CarHeadSpring& s) { return defined(s.yaw) && defined(s.pitch); }
 [[maybe_unused]] static std::string text(const controls::CarHeadSpring& s) { return std::string("{") + text(s.yaw) + ", " + text(s.pitch) + "}"; }
 [[maybe_unused]] static void take(controls::CarHeadSpring& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.yaw, (*v.rows)[0]); converted::take_as<double>(s.pitch, (*v.rows)[1]); }
@@ -521,7 +501,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::ViewButton& s) { return converted::Value::structure({arg(s.was), arg(s.held_map), arg(s.down_at), arg(s.map_at)}); }
-[[maybe_unused]] static bool same(const controls::ViewButton& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.was, (*got.rows)[0]) && same(want.held_map, (*got.rows)[1]) && same(want.down_at, (*got.rows)[2]) && same(want.map_at, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const controls::ViewButton& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.was, (*got.rows)[0]), ".was") && converted::at_place(same(want.held_map, (*got.rows)[1]), ".held_map") && converted::at_place(same(want.down_at, (*got.rows)[2]), ".down_at") && converted::at_place(same(want.map_at, (*got.rows)[3]), ".map_at"); }
 [[maybe_unused]] static bool defined(const controls::ViewButton& s) { return defined(s.was) && defined(s.held_map) && defined(s.down_at) && defined(s.map_at); }
 [[maybe_unused]] static std::string text(const controls::ViewButton& s) { return std::string("{") + text(s.was) + ", " + text(s.held_map) + ", " + text(s.down_at) + ", " + text(s.map_at) + "}"; }
 [[maybe_unused]] static void take(controls::ViewButton& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.was, (*v.rows)[0]); converted::take_as<bool>(s.held_map, (*v.rows)[1]); converted::take_as<double>(s.down_at, (*v.rows)[2]); converted::take_as<double>(s.map_at, (*v.rows)[3]); }
@@ -535,7 +515,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::VoiceChord& s) { return converted::Value::structure({arg(s.r3), arg(s.y), arg(s.latched)}); }
-[[maybe_unused]] static bool same(const controls::VoiceChord& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.r3, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.latched, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const controls::VoiceChord& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.r3, (*got.rows)[0]), ".r3") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.latched, (*got.rows)[2]), ".latched"); }
 [[maybe_unused]] static bool defined(const controls::VoiceChord& s) { return defined(s.r3) && defined(s.y) && defined(s.latched); }
 [[maybe_unused]] static std::string text(const controls::VoiceChord& s) { return std::string("{") + text(s.r3) + ", " + text(s.y) + ", " + text(s.latched) + "}"; }
 [[maybe_unused]] static void take(controls::VoiceChord& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<bool>(s.r3, (*v.rows)[0]); converted::take_as<bool>(s.y, (*v.rows)[1]); converted::take_as<bool>(s.latched, (*v.rows)[2]); }
@@ -549,7 +529,7 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::VoiceChord::Out& s) { return converted::Value::structure({arg(s.mic), arg(s.mute), arg(s.suppress_weapon)}); }
-[[maybe_unused]] static bool same(const controls::VoiceChord::Out& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.mic, (*got.rows)[0]) && same(want.mute, (*got.rows)[1]) && same(want.suppress_weapon, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const controls::VoiceChord::Out& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.mic, (*got.rows)[0]), ".mic") && converted::at_place(same(want.mute, (*got.rows)[1]), ".mute") && converted::at_place(same(want.suppress_weapon, (*got.rows)[2]), ".suppress_weapon"); }
 [[maybe_unused]] static bool defined(const controls::VoiceChord::Out& s) { return defined(s.mic) && defined(s.mute) && defined(s.suppress_weapon); }
 [[maybe_unused]] static std::string text(const controls::VoiceChord::Out& s) { return std::string("{") + text(s.mic) + ", " + text(s.mute) + ", " + text(s.suppress_weapon) + "}"; }
 [[maybe_unused]] static void take(controls::VoiceChord::Out& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<bool>(s.mic, (*v.rows)[0]); converted::take_as<bool>(s.mute, (*v.rows)[1]); converted::take_as<bool>(s.suppress_weapon, (*v.rows)[2]); }
@@ -561,43 +541,31 @@ namespace controls { using converted::arg; using converted::same; using converte
 }
 namespace controls { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const controls::ReleaseLatch& s) { return converted::Value::structure({arg(s.armed)}); }
-[[maybe_unused]] static bool same(const controls::ReleaseLatch& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.armed, (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const controls::ReleaseLatch& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.armed, (*got.rows)[0]), ".armed"); }
 [[maybe_unused]] static bool defined(const controls::ReleaseLatch& s) { return defined(s.armed); }
 [[maybe_unused]] static std::string text(const controls::ReleaseLatch& s) { return std::string("{") + text(s.armed) + "}"; }
 [[maybe_unused]] static void take(controls::ReleaseLatch& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<bool>(s.armed, (*v.rows)[0]); }
 }
 struct Out_LookAxis_step { controls::LookAxis Self; double Result; };
-[[maybe_unused]] static bool same(const Out_LookAxis_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_LookAxis_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_LookAxis_step& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_LookAxis_step& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_touch_look_delta { double yaw; double pitch; };
-[[maybe_unused]] static bool same(const Out_touch_look_delta& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.yaw, (*got.rows)[0]) && same(want.pitch, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_touch_look_delta& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.yaw, (*got.rows)[0]), ".yaw") && converted::at_place(same(want.pitch, (*got.rows)[1]), ".pitch"); }
 [[maybe_unused]] static bool defined(const Out_touch_look_delta& s) { return defined(s.yaw) && defined(s.pitch); }
 [[maybe_unused]] static std::string text(const Out_touch_look_delta& s) { return std::string("{") + text(s.yaw) + ", " + text(s.pitch) + "}"; }
 struct Out_ViewButton_step { controls::ViewButton Self; int Result; };
-[[maybe_unused]] static bool same(const Out_ViewButton_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_ViewButton_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_ViewButton_step& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_ViewButton_step& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_VoiceChord_step { controls::VoiceChord Self; controls::VoiceChord::Out Result; };
-[[maybe_unused]] static bool same(const Out_VoiceChord_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_VoiceChord_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_VoiceChord_step& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_VoiceChord_step& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_ReleaseLatch_step { controls::ReleaseLatch Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_ReleaseLatch_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_ReleaseLatch_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_ReleaseLatch_step& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_ReleaseLatch_step& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
-struct Out_GrenadeCook_pull { controls::GrenadeCook Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_GrenadeCook_pull& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Out_GrenadeCook_pull& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_GrenadeCook_pull& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
-struct Out_GrenadeCook_release { controls::GrenadeCook Self; double Result; };
-[[maybe_unused]] static bool same(const Out_GrenadeCook_release& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Out_GrenadeCook_release& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_GrenadeCook_release& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
-struct Out_GrenadeCook_step { controls::GrenadeCook Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_GrenadeCook_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Out_GrenadeCook_step& s) { return defined(s.Self) && defined(s.Result); }
-[[maybe_unused]] static std::string text(const Out_GrenadeCook_step& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_controls_cpp) {
   converted::Blueprint bp("controls_cpp", {"Controls"});
@@ -605,17 +573,19 @@ SC_TEST(converted_controls_cpp) {
   {  // Devices::input
     converted::Tally tally("Devices_input");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0, [[maybe_unused]] controls::Devices::Event a1) { converted::counted([&] { return a0.input(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0, [[maybe_unused]] controls::Devices::Event& a1) { converted::counted([&] { return a0.input(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
-      controls::Devices::Event a1 = static_cast<controls::Devices::Event>(draw.below(5));
+      controls::Devices::Event a1 = converted::enum_value<controls::Devices::Event>(draw.below(5));
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -625,7 +595,7 @@ SC_TEST(converted_controls_cpp) {
   {  // Devices::touch_down
     converted::Tally tally("Devices_touch_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0) { converted::counted([&] { return a0.touch_down(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0) { converted::counted([&] { return a0.touch_down(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -634,7 +604,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -644,7 +616,7 @@ SC_TEST(converted_controls_cpp) {
   {  // Devices::mouse_down
     converted::Tally tally("Devices_mouse_down");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0) { converted::counted([&] { return a0.mouse_down(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0) { converted::counted([&] { return a0.mouse_down(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -653,7 +625,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -663,7 +637,7 @@ SC_TEST(converted_controls_cpp) {
   {  // Devices::mouse_move
     converted::Tally tally("Devices_mouse_move");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0) { converted::counted([&] { return a0.mouse_move(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0) { converted::counted([&] { return a0.mouse_move(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -672,7 +646,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -682,7 +658,7 @@ SC_TEST(converted_controls_cpp) {
   {  // Devices::key
     converted::Tally tally("Devices_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0) { converted::counted([&] { return a0.key(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0) { converted::counted([&] { return a0.key(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -691,7 +667,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -701,7 +679,7 @@ SC_TEST(converted_controls_cpp) {
   {  // Devices::pad_button
     converted::Tally tally("Devices_pad_button");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0) { converted::counted([&] { return a0.pad_button(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0) { converted::counted([&] { return a0.pad_button(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -710,7 +688,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -720,7 +700,7 @@ SC_TEST(converted_controls_cpp) {
   {  // look_of
     converted::Tally tally("look_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::WorldLook a0) { return converted::counted([&] { return converted_controls_cpp::controls::look_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] controls::WorldLook& a0) { return converted::counted([&] { return converted_controls_cpp::controls::look_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       controls::WorldLook a0 = draw_controls__WorldLook(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -729,7 +709,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -739,7 +721,7 @@ SC_TEST(converted_controls_cpp) {
   {  // take
     converted::Tally tally("take");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Look a0, [[maybe_unused]] controls::WorldLook a1) { converted::counted([&] { return converted_controls_cpp::controls::take(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] controls::Look& a0, [[maybe_unused]] controls::WorldLook& a1) { converted::counted([&] { return converted_controls_cpp::controls::take(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Look a0 = draw_controls__Look(draw);
       controls::WorldLook a1 = draw_controls__WorldLook(draw);
@@ -749,7 +731,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -759,7 +743,7 @@ SC_TEST(converted_controls_cpp) {
   {  // cook_of
     converted::Tally tally("cook_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0) { return converted::counted([&] { return converted_controls_cpp::controls::cook_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] controls::GrenadeCook& a0) { return converted::counted([&] { return converted_controls_cpp::controls::cook_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -768,7 +752,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -778,7 +764,7 @@ SC_TEST(converted_controls_cpp) {
   {  // take
     converted::Tally tally("take_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Cook a0, [[maybe_unused]] controls::GrenadeCook a1) { converted::counted([&] { return converted_controls_cpp::controls::take(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] controls::Cook& a0, [[maybe_unused]] controls::GrenadeCook& a1) { converted::counted([&] { return converted_controls_cpp::controls::take(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Cook a0 = draw_controls__Cook(draw);
       controls::GrenadeCook a1 = draw_controls__GrenadeCook(draw);
@@ -788,7 +774,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -806,7 +794,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -816,7 +806,7 @@ SC_TEST(converted_controls_cpp) {
   {  // smoothstep01
     converted::Tally tally("smoothstep01");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_controls_cpp::controls::smoothstep01(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_controls_cpp::controls::smoothstep01(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -825,7 +815,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -835,7 +827,7 @@ SC_TEST(converted_controls_cpp) {
   {  // walk_pad_axis
     converted::Tally tally("walk_pad_axis");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_controls_cpp::controls::walk_pad_axis(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_controls_cpp::controls::walk_pad_axis(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -844,7 +836,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -854,7 +848,7 @@ SC_TEST(converted_controls_cpp) {
   {  // shape_first_person_move
     converted::Tally tally("shape_first_person_move");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { return converted::counted([&] { return converted_controls_cpp::controls::shape_first_person_move(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] bool& a3) { return converted::counted([&] { return converted_controls_cpp::controls::shape_first_person_move(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -866,7 +860,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -876,7 +872,7 @@ SC_TEST(converted_controls_cpp) {
   {  // fps_dynamic_curve
     converted::Tally tally("fps_dynamic_curve");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_controls_cpp::controls::fps_dynamic_curve(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_controls_cpp::controls::fps_dynamic_curve(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -885,7 +881,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -895,7 +893,7 @@ SC_TEST(converted_controls_cpp) {
   {  // look_curve_strength
     converted::Tally tally("look_curve_strength");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_controls_cpp::controls::look_curve_strength(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_controls_cpp::controls::look_curve_strength(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -904,7 +902,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -914,7 +914,7 @@ SC_TEST(converted_controls_cpp) {
   {  // shape_fps_stick
     converted::Tally tally("shape_fps_stick");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_controls_cpp::controls::shape_fps_stick(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return converted_controls_cpp::controls::shape_fps_stick(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -926,7 +926,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -936,7 +938,7 @@ SC_TEST(converted_controls_cpp) {
   {  // LookAxis::step
     converted::Tally tally("LookAxis_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::LookAxis a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return Out_LookAxis_step{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] controls::LookAxis& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return Out_LookAxis_step{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       controls::LookAxis a0 = draw_controls__LookAxis(draw);
       double a1 = draw.number();
@@ -947,7 +949,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -957,7 +961,7 @@ SC_TEST(converted_controls_cpp) {
   {  // touch_look_delta
     converted::Tally tally("touch_look_delta");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return converted_controls_cpp::controls::touch_look_delta(std::move(a0), std::move(a1), std::move(a2), a3, a4); }); return Out_touch_look_delta{std::move(a3), std::move(a4)}; };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return converted_controls_cpp::controls::touch_look_delta(std::move(a0), std::move(a1), std::move(a2), a3, a4); }); return Out_touch_look_delta{std::move(a3), std::move(a4)}; };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -970,7 +974,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -980,7 +986,7 @@ SC_TEST(converted_controls_cpp) {
   {  // fps_aim_assist
     converted::Tally tally("fps_aim_assist");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5, [[maybe_unused]] double a6) { return converted::counted([&] { return converted_controls_cpp::controls::fps_aim_assist(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] double& a5, [[maybe_unused]] double& a6) { return converted::counted([&] { return converted_controls_cpp::controls::fps_aim_assist(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -995,7 +1001,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1005,7 +1013,7 @@ SC_TEST(converted_controls_cpp) {
   {  // aim_ellipse
     converted::Tally tally("aim_ellipse");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_controls_cpp::controls::aim_ellipse(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_controls_cpp::controls::aim_ellipse(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1015,7 +1023,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1025,7 +1035,7 @@ SC_TEST(converted_controls_cpp) {
   {  // gamepad_axis
     converted::Tally tally("gamepad_axis");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_controls_cpp::controls::gamepad_axis(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_controls_cpp::controls::gamepad_axis(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1035,7 +1045,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1045,7 +1057,7 @@ SC_TEST(converted_controls_cpp) {
   {  // hard_cut
     converted::Tally tally("hard_cut");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_controls_cpp::controls::hard_cut(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_controls_cpp::controls::hard_cut(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1055,7 +1067,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1065,7 +1079,7 @@ SC_TEST(converted_controls_cpp) {
   {  // height_axis
     converted::Tally tally("height_axis");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_controls_cpp::controls::height_axis(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_controls_cpp::controls::height_axis(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1075,7 +1089,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1085,7 +1101,7 @@ SC_TEST(converted_controls_cpp) {
   {  // phone_axis
     converted::Tally tally("phone_axis");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_controls_cpp::controls::phone_axis(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_controls_cpp::controls::phone_axis(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1095,7 +1111,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1105,7 +1123,7 @@ SC_TEST(converted_controls_cpp) {
   {  // game_state_stick_magnitude
     converted::Tally tally("game_state_stick_magnitude");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_controls_cpp::controls::game_state_stick_magnitude(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_controls_cpp::controls::game_state_stick_magnitude(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1114,7 +1132,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1124,7 +1144,7 @@ SC_TEST(converted_controls_cpp) {
   {  // inverse_game_state_stick_magnitude
     converted::Tally tally("inverse_game_state_stick_magnitude");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_controls_cpp::controls::inverse_game_state_stick_magnitude(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_controls_cpp::controls::inverse_game_state_stick_magnitude(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1133,7 +1153,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1143,7 +1165,7 @@ SC_TEST(converted_controls_cpp) {
   {  // apply_game_stick_left
     converted::Tally tally("apply_game_stick_left");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::DroneAxes a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] bool a4, [[maybe_unused]] double a5) { converted::counted([&] { return converted_controls_cpp::controls::apply_game_stick_left(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::DroneAxes& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] double& a5) { converted::counted([&] { return converted_controls_cpp::controls::apply_game_stick_left(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::DroneAxes a0 = draw_controls__DroneAxes(draw);
       double a1 = draw.number();
@@ -1157,7 +1179,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1167,7 +1191,7 @@ SC_TEST(converted_controls_cpp) {
   {  // apply_game_stick_right
     converted::Tally tally("apply_game_stick_right");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::DroneAxes a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] bool a4, [[maybe_unused]] bool a5) { converted::counted([&] { return converted_controls_cpp::controls::apply_game_stick_right(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::DroneAxes& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] bool& a5) { converted::counted([&] { return converted_controls_cpp::controls::apply_game_stick_right(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::DroneAxes a0 = draw_controls__DroneAxes(draw);
       double a1 = draw.number();
@@ -1181,7 +1205,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1191,7 +1217,7 @@ SC_TEST(converted_controls_cpp) {
   {  // clearance_pad_axis
     converted::Tally tally("clearance_pad_axis");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_controls_cpp::controls::clearance_pad_axis(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_controls_cpp::controls::clearance_pad_axis(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1202,7 +1228,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1212,7 +1240,7 @@ SC_TEST(converted_controls_cpp) {
   {  // RateStick::step
     converted::Tally tally("RateStick_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::RateStick a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::RateStick& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::RateStick a0 = draw_controls__RateStick(draw);
       Vec2 a1 = draw.vector2();
@@ -1223,7 +1251,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1233,7 +1263,7 @@ SC_TEST(converted_controls_cpp) {
   {  // WorldLook::add
     converted::Tally tally("WorldLook_add");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::WorldLook a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.add(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::WorldLook& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return a0.add(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::WorldLook a0 = draw_controls__WorldLook(draw);
       double a1 = draw.number();
@@ -1246,7 +1276,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1256,7 +1288,7 @@ SC_TEST(converted_controls_cpp) {
   {  // WorldLook::set
     converted::Tally tally("WorldLook_set");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::WorldLook a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::WorldLook& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.set(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::WorldLook a0 = draw_controls__WorldLook(draw);
       double a1 = draw.number();
@@ -1267,7 +1299,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1277,7 +1311,7 @@ SC_TEST(converted_controls_cpp) {
   {  // WorldLook::release
     converted::Tally tally("WorldLook_release");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::WorldLook a0) { converted::counted([&] { return a0.release(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::WorldLook& a0) { converted::counted([&] { return a0.release(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::WorldLook a0 = draw_controls__WorldLook(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1286,7 +1320,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1296,7 +1332,7 @@ SC_TEST(converted_controls_cpp) {
   {  // WorldLook::step
     converted::Tally tally("WorldLook_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::WorldLook a0, [[maybe_unused]] double a1, [[maybe_unused]] bool a2) { converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::WorldLook& a0, [[maybe_unused]] double& a1, [[maybe_unused]] bool& a2) { converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::WorldLook a0 = draw_controls__WorldLook(draw);
       double a1 = draw.number();
@@ -1307,7 +1343,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1317,7 +1355,7 @@ SC_TEST(converted_controls_cpp) {
   {  // CarHeadSpring::step
     converted::Tally tally("CarHeadSpring_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::CarHeadSpring a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.step(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::CarHeadSpring& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.step(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::CarHeadSpring a0 = draw_controls__CarHeadSpring(draw);
       double a1 = draw.number();
@@ -1329,7 +1367,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1339,7 +1379,7 @@ SC_TEST(converted_controls_cpp) {
   {  // ViewButton::step
     converted::Tally tally("ViewButton_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::ViewButton a0, [[maybe_unused]] bool a1, [[maybe_unused]] double a2) { auto r = converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return Out_ViewButton_step{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] controls::ViewButton& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.step(std::move(a1), std::move(a2)); }); return Out_ViewButton_step{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       controls::ViewButton a0 = draw_controls__ViewButton(draw);
       bool a1 = draw.flag();
@@ -1350,7 +1390,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1360,7 +1402,7 @@ SC_TEST(converted_controls_cpp) {
   {  // VoiceChord::step
     converted::Tally tally("VoiceChord_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::VoiceChord a0, [[maybe_unused]] bool a1, [[maybe_unused]] bool a2, [[maybe_unused]] bool a3) { auto r = converted::counted([&] { return a0.step(std::move(a1), std::move(a2), std::move(a3)); }); return Out_VoiceChord_step{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] controls::VoiceChord& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] bool& a3) { auto r = converted::counted([&] { return a0.step(std::move(a1), std::move(a2), std::move(a3)); }); return Out_VoiceChord_step{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       controls::VoiceChord a0 = draw_controls__VoiceChord(draw);
       bool a1 = draw.flag();
@@ -1372,7 +1414,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1382,7 +1426,7 @@ SC_TEST(converted_controls_cpp) {
   {  // ReleaseLatch::step
     converted::Tally tally("ReleaseLatch_step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::ReleaseLatch a0, [[maybe_unused]] std::array<double, 9> a1) { auto r = converted::counted([&] { return a0.step(a1); }); return Out_ReleaseLatch_step{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] controls::ReleaseLatch& a0, [[maybe_unused]] std::array<double, 9>& a1) { auto r = converted::counted([&] { return a0.step(a1); }); return Out_ReleaseLatch_step{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       controls::ReleaseLatch a0 = draw_controls__ReleaseLatch(draw);
       std::array<double, 9> a1 = converted::draw_array<std::array<double, 9>>([&]() -> double { return draw.number(); });
@@ -1392,28 +1436,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
-    }
-  }
-  {  // GrenadeCook::pull
-    converted::Tally tally("GrenadeCook_pull");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0, [[maybe_unused]] double a1, [[maybe_unused]] int a2) { auto r = converted::counted([&] { return a0.pull(std::move(a1), std::move(a2)); }); return Out_GrenadeCook_pull{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
-      double a1 = draw.number();
-      int a2 = static_cast<int>(draw.whole());
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1423,7 +1448,7 @@ SC_TEST(converted_controls_cpp) {
   {  // GrenadeCook::drag
     converted::Tally tally("GrenadeCook_drag");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.drag(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::GrenadeCook& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return a0.drag(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
       double a1 = draw.number();
@@ -1433,67 +1458,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
-    }
-  }
-  {  // GrenadeCook::release
-    converted::Tally tally("GrenadeCook_release");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return a0.release(std::move(a1)); }); return Out_GrenadeCook_release{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
-      double a1 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
-    }
-  }
-  {  // GrenadeCook::step
-    converted::Tally tally("GrenadeCook_step");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return a0.step(std::move(a1)); }); return Out_GrenadeCook_step{std::move(a0), std::move(r)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
-      double a1 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
-    }
-  }
-  {  // GrenadeCook::left
-    converted::Tally tally("GrenadeCook_left");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0, [[maybe_unused]] double a1) { return converted::counted([&] { return a0.left(std::move(a1)); }); };
-    for (int i = 0; tally.more(i); ++i) {
-      controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
-      double a1 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1503,7 +1470,7 @@ SC_TEST(converted_controls_cpp) {
   {  // GrenadeCook::speed
     converted::Tally tally("GrenadeCook_speed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::GrenadeCook a0) { return converted::counted([&] { return a0.speed(); }); };
+    const auto run = [&]([[maybe_unused]] controls::GrenadeCook& a0) { return converted::counted([&] { return a0.speed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       controls::GrenadeCook a0 = draw_controls__GrenadeCook(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1512,7 +1479,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1530,7 +1499,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1540,7 +1511,7 @@ SC_TEST(converted_controls_cpp) {
   {  // Devices::platform
     converted::Tally tally("Devices_platform");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] controls::Devices a0, [[maybe_unused]] bool a1, [[maybe_unused]] bool a2, [[maybe_unused]] int a3) { converted::counted([&] { return a0.platform(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] controls::Devices& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] int& a3) { converted::counted([&] { return a0.platform(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       controls::Devices a0 = draw_controls__Devices(draw);
       bool a1 = draw.flag();
@@ -1552,7 +1523,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1562,10 +1535,10 @@ SC_TEST(converted_controls_cpp) {
   {  // hint_line
     converted::Tally tally("hint_line");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const char* a0, [[maybe_unused]] const char* a1, [[maybe_unused]] bool a2) { return converted::counted([&] { return converted_controls_cpp::controls::hint_line(a0, a1, std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] const char*& a0, [[maybe_unused]] const char*& a1, [[maybe_unused]] bool& a2) { return converted::counted([&] { return converted_controls_cpp::controls::hint_line(a0, a1, std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const char* a0 = draw.c_word();
-      const char* a1 = draw.c_word();
+      const char* a0 = draw.said_c_word({"HintLine"});
+      const char* a1 = draw.said_c_word({"HintLine"});
       bool a2 = draw.flag();
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
@@ -1573,7 +1546,9 @@ SC_TEST(converted_controls_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, a1, std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

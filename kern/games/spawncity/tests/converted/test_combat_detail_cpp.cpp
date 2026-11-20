@@ -34,7 +34,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace detail { bool bind(::kern::logic::Runtime& logic); }
+namespace detail { bool bind(kern::logic::Runtime& logic); }
 namespace detail { enum class Critical : u8 { car, bus, police_drone, drone }; }
 namespace detail { bool is_critical(Critical k, f32 hp, f32 max_hp); }
 namespace detail { f32 detonation_at(Critical k, f32 now); }
@@ -56,7 +56,7 @@ namespace rules { inline f64 decimal(f32 x) {
   f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
   for (f64 m = a; m < 1; m *= 10) scale *= 10;
   for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
     const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
     if (static_cast<f32>(c) == x) return c;
   }
@@ -66,7 +66,7 @@ namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
   using ActorBlueprint::ActorBlueprint;
 }; }
 namespace detail { rules::Blueprint g_rules{"CombatDetail"}; }
-namespace detail { bool bind(::kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
+namespace detail { bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
 using rules::decimal; namespace detail { bool is_critical(Critical k, f32 hp, f32 max_hp) {
   bool critical = false;
   g_rules.call("IsCritical", std::tie(critical), k, decimal(hp), decimal(max_hp));
@@ -113,13 +113,13 @@ namespace detail { f32 projectile_gravity() { return static_cast<f32>(g_rules.ge
 }
 namespace detail { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const detail::CriticalClock& s) { return converted::Value::structure({arg(s.at), arg(s.last_hp)}); }
-[[maybe_unused]] static bool same(const detail::CriticalClock& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.last_hp, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const detail::CriticalClock& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.at, (*got.rows)[0]), ".at") && converted::at_place(same(want.last_hp, (*got.rows)[1]), ".last_hp"); }
 [[maybe_unused]] static bool defined(const detail::CriticalClock& s) { return defined(s.at) && defined(s.last_hp); }
 [[maybe_unused]] static std::string text(const detail::CriticalClock& s) { return std::string("{") + text(s.at) + ", " + text(s.last_hp) + "}"; }
 [[maybe_unused]] static void take(detail::CriticalClock& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.at, (*v.rows)[0]); converted::take_as<double>(s.last_hp, (*v.rows)[1]); }
 }
 struct Out_CriticalClock_update { detail::CriticalClock Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_CriticalClock_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_CriticalClock_update& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_CriticalClock_update& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_CriticalClock_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -137,7 +137,9 @@ SC_TEST(converted_combat_detail_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -147,9 +149,9 @@ SC_TEST(converted_combat_detail_cpp) {
   {  // is_critical
     converted::Tally tally("is_critical");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] detail::Critical a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_detail_cpp::detail::is_critical(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] detail::Critical& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_combat_detail_cpp::detail::is_critical(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      detail::Critical a0 = static_cast<detail::Critical>(draw.below(4));
+      detail::Critical a0 = converted::enum_value<detail::Critical>(draw.below(4));
       double a1 = draw.number();
       double a2 = draw.number();
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
@@ -158,7 +160,9 @@ SC_TEST(converted_combat_detail_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -168,9 +172,9 @@ SC_TEST(converted_combat_detail_cpp) {
   {  // detonation_at
     converted::Tally tally("detonation_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] detail::Critical a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_combat_detail_cpp::detail::detonation_at(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] detail::Critical& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_combat_detail_cpp::detail::detonation_at(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      detail::Critical a0 = static_cast<detail::Critical>(draw.below(4));
+      detail::Critical a0 = converted::enum_value<detail::Critical>(draw.below(4));
       double a1 = draw.number();
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
@@ -178,7 +182,9 @@ SC_TEST(converted_combat_detail_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -188,9 +194,9 @@ SC_TEST(converted_combat_detail_cpp) {
   {  // accelerate
     converted::Tally tally("accelerate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] detail::Critical a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_detail_cpp::detail::accelerate(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] detail::Critical& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_combat_detail_cpp::detail::accelerate(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      detail::Critical a0 = static_cast<detail::Critical>(draw.below(4));
+      detail::Critical a0 = converted::enum_value<detail::Critical>(draw.below(4));
       double a1 = draw.number();
       double a2 = draw.number();
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
@@ -199,7 +205,9 @@ SC_TEST(converted_combat_detail_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -209,10 +217,10 @@ SC_TEST(converted_combat_detail_cpp) {
   {  // CriticalClock::update
     converted::Tally tally("CriticalClock_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] detail::CriticalClock a0, [[maybe_unused]] detail::Critical a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_CriticalClock_update{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] detail::CriticalClock& a0, [[maybe_unused]] detail::Critical& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_CriticalClock_update{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       detail::CriticalClock a0 = draw_detail__CriticalClock(draw);
-      detail::Critical a1 = static_cast<detail::Critical>(draw.below(4));
+      detail::Critical a1 = converted::enum_value<detail::Critical>(draw.below(4));
       double a2 = draw.number();
       double a3 = draw.number();
       double a4 = draw.number();
@@ -222,7 +230,9 @@ SC_TEST(converted_combat_detail_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -232,16 +242,18 @@ SC_TEST(converted_combat_detail_cpp) {
   {  // momentum_ns
     converted::Tally tally("momentum_ns");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] detail::Round a0) { return converted::counted([&] { return converted_combat_detail_cpp::detail::momentum_ns(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] detail::Round& a0) { return converted::counted([&] { return converted_combat_detail_cpp::detail::momentum_ns(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      detail::Round a0 = static_cast<detail::Round>(draw.below(3));
+      detail::Round a0 = converted::enum_value<detail::Round>(draw.below(3));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -251,17 +263,19 @@ SC_TEST(converted_combat_detail_cpp) {
   {  // bullet_impulse
     converted::Tally tally("bullet_impulse");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] detail::Round a1) { return converted::counted([&] { return converted_combat_detail_cpp::detail::bullet_impulse(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] detail::Round& a1) { return converted::counted([&] { return converted_combat_detail_cpp::detail::bullet_impulse(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
-      detail::Round a1 = static_cast<detail::Round>(draw.below(3));
+      detail::Round a1 = converted::enum_value<detail::Round>(draw.below(3));
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -279,7 +293,9 @@ SC_TEST(converted_combat_detail_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
