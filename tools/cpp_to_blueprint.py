@@ -13565,6 +13565,9 @@ class TestWriter:
                         t = tree.decl.get(n["_unnamed"])
                         if t is None or not here(t) or not namespace_level(t) or not own(t):
                             continue
+                        ta = t.get("_at", (None, None))[0]
+                        if t.get("_file") == d["_file"] and ta is not None and d["_at"][0] <= ta < d["_at"][1]:
+                            continue   # (an enum the function declares itself - `enum { coast, drive } mode = coast;`, Car::step: its own name)
                         said, home_of = tuple(x["name"] for x in kids(t) if x.get("kind") == "EnumConstantDecl" and x.get("name")), t
                     else:
                         if n.get("kind") != "DeclRefExpr":
@@ -14348,7 +14351,11 @@ class TestWriter:
                 said = [x for x in r.stderr.split("\n") if x.strip()]
                 firsts = [i for i, x in enumerate(said) if re.search(r"\berror: ", x)][:3]
                 for i in firsts:
-                    for x in said[max(0, i - 2):i + 3]:
+                    # (with the notes that follow it - which candidate did not fit, and why -, up to the next error)
+                    upto = next((j for j in range(i + 1, min(len(said), i + 40)) if re.search(r"\berror: ", said[j])), min(len(said), i + 40))
+                    for x in said[max(0, i - 2):upto]:
+                        if x.lstrip().startswith(("In file included", "|")) or re.match(r"\s*\d+ \|", x):
+                            continue
                         sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
