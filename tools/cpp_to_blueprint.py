@@ -6202,6 +6202,9 @@ class Emit:
                 # value first, then the old one ends (unique_ptr::operator=: the pointer stored, then the old deleted)
                 self.moved_into(ops[1], qtype(callee(n)))
                 got = self.spot(ops[0])
+                if got is None and self.is_slot(ops[0]):
+                    # (m[key] = std::move(v): the key's entry - made where the key is new, as operator[] does -, then replaced)
+                    got = self.spot(self.held_by(ops[0]))
                 if got is None or not self.writable(got[0]):
                     raise Wait("an owned value that holds objects of the engine, replaced where it is no place")
                 lt = got[1]
@@ -12403,7 +12406,9 @@ class TestWriter:
                 per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
                 counted = per is not None   # (only the type says it - no name is read)
                 fixed = declared_length(self.tree, p)   # (an array of a fixed length: so many)
-                data = (f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else
+                # (counted: as many as the count says - of numbers the test took from the stand-in itself, all it holds, as the
+                # Blueprint hands the list its node gave: the stand-in answers data() and size() each on its own; converted::room)
+                data = (f"std::vector<{inner}>({name}, {name} + converted::room({name}, {per} * static_cast<std::size_t>({after['name']})))" if counted else
                         f"({name} ? std::vector<{inner}>({name}, {name} + {fixed}) : std::vector<{inner}>{{}})" if fixed else
                         f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})")
                 params.append((f"const {inner}* {name}", default))
