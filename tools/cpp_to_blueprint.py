@@ -13471,7 +13471,7 @@ class TestWriter:
         return [m for m in members if m["id"] not in inner_templates], unconverted
 
     # ---- what a test in another file holds of this file's source ----
-    def exports(self):
+    def exports(self, known=()):
         """The test of a file that calls a function of this Blueprint holds that function's source once more,
         and all it names (`gather`) - what stands in this source file is not in that file's tree. For every
         function of the Blueprint that is written and has a name the linker knows: the places of the pieces
@@ -13483,6 +13483,8 @@ class TestWriter:
         for f in self.u.order:
             if f.lifted or not f.key or "@" in f.key:
                 continue   # (a function of its file alone - static, in a namespace without a name: no other file calls it)
+            if f.key in known:
+                continue   # (`known`: what an earlier try handed on already - the first try's stands, see convert_unit)
             order = []
             for place, piece in self.items(self.gather([f.decl["id"]])):
                 pieces.setdefault(place, piece)
@@ -14689,7 +14691,7 @@ def convert_unit(job):
             # (the source of a function is what it is, whether its test compares it yet or not: the tests of other files
             # that call it hold it - in a circle of functions over files, each test needs the others' source before any
             # test of them compares)
-            tried = writer.exports()
+            tried = writer.exports(exported[0])   # (each function once over the tries: the first try that has it gives it)
             for k, v in tried[0].items():
                 exported[0].setdefault(k, v)
             for k, v in tried[1].items():
