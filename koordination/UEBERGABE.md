@@ -984,3 +984,24 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   darüber steht es, bis er sie anhebt). **„Du hältst dich zurück, koordinierst nur“** – der Koordinator behebt und untersucht nichts mehr selbst: Belege
   prüfen, einmischen, Läufe starten, Listen und Entscheidungen weitergeben; alles andere an die Agenten. Kontrollen etwa stündlich, kurz. Drei Agenten
   (t1, k, d) auf dem Weg zum ersten grünen Stand, bis Chris mehr freigibt. Danach: neue Koordinator-Sitzung mit dieser Übergabe (billiger je Schritt).
+
+### 16.25 Stand 08:00 (20.11.) – WOCHENLIMIT ERREICHT, Credits aufgebraucht (Agenten-Fehler 429 um ~06:00); bester Stand bisher
+- **Voller Lauf `work-zusammen-voll-045421-10862` auf bdb99729 (work-zusammen):** convert rc=0 – **1755 von 1846 Funktionen geschrieben (24072 von 30980 Zeilen),
+  1710 verglichen**, 47 „cannot compare it yet“ (v. a. ~30 Kreis-Funktionen der Rekursion: Test übersetzt nicht – undeclared combat_blast/explosion/
+  player_position/jet_attack); **engine rc=0; suite rc=1: 270 Tests / 3 failures (Stellvertreter), 150 / 3 (Engine)** – rot: converted_city_stream_cpp und
+  converted_terrain_cpp (beide Durchgänge, „ended with 1“ – Abbruch/UBSan; Verdacht: c's Befund „reference binding to null pointer CorridorSet“ im Test von
+  Terrain::sampler, und begin_roads/behaltene Callbacks: c's Fixe b835e56d, a6127013, 4bca8f52 liegen UNBELEGT auf work-c 4bca8f52, nicht gemergt),
+  converted_Game__game_cpp (Stellvertreter, 1572 s), details_blueprint (ein Durchgang). `grundlage` = dieser Lauf. `work` unverändert (42831863).
+- **In work-zusammen (bdb99729) seit 16.24:** E16 Rekursion (Sprungbrett, neue Form der Klasse), E18 gehaltener Eintrag, E19 Maß statt Uhr, E20 U8…I32 und
+  List<U8> in der Sprache (Schritte 1–3), c Rückrufe (Callback), Destruktoren als Funktion, k-Regeln (Zeiger, Index, text.set_code, either_place, Lambda mit auto …),
+  d optional-Form/jobs::reset/Macher nie 0/Uhren, t1 Rahmen nebeneinander + --name + Überlauf markiert + Rückschritt-Fixe (Runtime, make_unique, Konstruktor
+  eines Engine-Objekts), CI-Matrix (12 Teile je Durchgang; in der CI noch unbelegt). mag-Skript: `--name`, cap 84.
+- **Nicht gemergt, auf Zweigen:** work-p 39ce0076 (E20 Schritt 4: Breiten im Konverter, `int` → I32 – konvert 1643/1598, es fehlen Breiten in Map-Werten:
+  Bauplan uebergabe/p.md „Nachfolger 7“); work-d e9ed65ca (Platz der Engine + Feld-Plätze + run_buildings, ungeprüft) und work-d-fail 5500074b (engine.fail/log,
+  Engine-Suite ausstehend); work-s5 f39a76a1 (Bau-Weg --only-blueprints, Exporte KERN_EXPORT_AS, main.cpp konvertierbar; Startspeicher-Fix 3641f098; Tabellen
+  und Level müssen zusammen neu erzeugt werden); work-c 4bca8f52 (drei unbelegte Fixe); work-t1 (nach 87aa6e95: Probe mit mehr Protokoll für die Kreis-Tests).
+- **Nächste Schritte nach dem Reset (Mi 25.11. 13:00) oder mit neuen Credits – neue Koordinator-Sitzung mit dieser Übergabe:** (1) t1: die drei roten Tests
+  (city_stream/terrain Abbruch, Game__game_cpp, details_blueprint) und die Tests der Kreis-Funktionen; c's drei Fixe belegen; (2) voller Lauf → grün → `work`
+  (Abschnitt 10; engine_api.py neu erzeugen und mit dem Level committen), CI mit der Matrix; (3) p Map-Werte + Schritt 4 einmischen, messen; d Platz;
+  k Warteliste des Laufs 045421; s5 Endzustand ($S/luecken.txt neu erzeugen). Entscheidungen E15–E20 gelten; Chris: Entwurfsfragen entscheidet der Koordinator
+  nach den Zielen, Agenten Opus (mittel, einfache Sachen niedrig), Token sparen, Meldungen nur bei Meilensteinen.

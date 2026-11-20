@@ -177,3 +177,22 @@ ruft heute genau diese Methode nach dem Umwandeln. Beleg: Engine-Suite; vergleic
   `clang++ -fsyntax-only -ferror-limit=0 -Ikern/include -Ikern/third_party/box3d/include -Ikern/games/spawncity/src out.cpp`
   (findet alle Klassenfehler auf einmal; der Werkzeugbau nach Engine-Änderung dauert ~18 min unter der Sperre).
 - Belege: vergleich 163201 14/15 (terrain: Befund k, nicht p). Offen: engine 165514, konvert 165517, CI, Zeit-Test.
+- 20.11. 02:45: ac4f6862 (Merge d5f527c5; engine_api.py neu: 815 Knoten). Danach: Kreuzung an Actor-Blueprints nimmt U8…I32 als int,
+  Sort List über Breitenlisten, const void* = List<U8>. konvert 013136: 1643/1598 (Bezug 173143: 1699/1654); Rest = Maps mit
+  Breitenlisten als Wert (stand/p.md). Offen: Map<K, List<U8>> in der Sprache, vergleich 001918, Zeit-Test, dann Schritt 5, (b).
+
+### Nachfolger 7: Bauplan Map<K, List<U8>> (entschieden JA, Koordinator 02:50) – NICHT begonnen
+Stand: work-p = 39ce0076 (work-zusammen 0f55c2f4 eingemischt, engine_api.py ohne Änderung, gepusht).
+- Kodierung ist schon da: keyed_of/type_named schreiben "int_list:u8" (logic.cpp ~172/183), value_type liest es zurück.
+- Leser: notation.cpp ~2681 verbietet `has_width(value)` → für Map-Werte zulassen (List<U8> … und wohl auch U8 … als Wert;
+  `value.count` (Fixed) bleibt verboten). Schreiber/cpp_type der Map: kern::Map<K, List<Sized<u8>>> (prüfen: type_in für map, Glue held()).
+- Interpreter: Speichern in einen Map-Wert wickelt (map.set / Zeile per Index, list.add/insert/resize auf einer Map-Wert-Liste:
+  width_of_place/stored_as, core_nodes.cpp ~28; hold/fitted für Variablen vom Typ map: fit() in logic.cpp ~648 kennt nur Liste/Struktur
+  → für map die Werte fitten). JIT über die CI. Klasse wickelt von selbst (Sized).
+- Engine-Fall (logic_cases.h, wie Fall 1095/1130) + Fixpunkt + Doku blueprint_cpp.md (Abschnitt Breiten: „Map-Werte nie“ ändern),
+  Editor-Typwahl (ParamDef::widths: „Map-Werte nie“ in core_nodes/logic_edit prüfen).
+- Konverter: in Unit.btype (KEYED_KERN) die Übergangsregel `value[5:-1] in WIDTHS → List<Int>` (15201aee) zurücknehmen.
+- Beleg: engine + konvert (Bezug: dann aktuelles work-zusammen ohne p; heute 173143: 1699/1654; meins ac4f6862: 1643/1598, Rest =
+  35 Map-Wert-Fälle) + vergleich (nostr qr_code mvt city_jobs lamps) + Zeit-Test, dann BEREIT mit „x von 29 über 1,10“.
+- vergleich 001918 (d38bc5ac) hing >2,5 h; 02:55 abgebrochen – `./mag.sh holen work-p-vergleich-001918-8866`, alle*.txt: welcher Test
+  ZEIT/ABBRUCH → Befund an t1. BEFUND k (set_water_cell) ist mit k 3af75896 behoben.

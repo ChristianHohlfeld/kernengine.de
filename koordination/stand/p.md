@@ -1,5 +1,18 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+## 03:00 – Map<K, List<U8>> entschieden (JA), Bauplan in uebergabe/p.md „Nachfolger 7“; work-p 39ce0076 (0f55c2f4 eingemischt). vergleich 001918 abgebrochen (Hänger, Auswertung offen). Kontext erschöpft – Nachfolger nötig.
+
+## E20 Schritt 4 – Stand 02:45 (20.11.), ac4f6862 (work-zusammen d5f527c5 eingemischt) – NOCH NICHT BEREIT
+- engine `work-p-engine-165514-3888` (15201aee): rc=0, 55596 checks, 0 failures. CI 44560240329 (344551db): native, build, input,
+  determinism grün; e2e rot (Level auf work-p ist alt: Engine-Pins jetzt List<U8>, alte Blueprints List<Int> – löst der volle Lauf).
+- konvert `work-p-konvert-013136-793` (ac4f6862): convert rc=0, **1643 geschrieben / 1598 verglichen** (Bezug 173143: 1699/1654).
+  Rest des Rückgangs: 35× „a List<Int> where a List<U32|I32|U8> is needed“ – alles Maps mit Listen fester Breite als Wert
+  (city_stream cell_items/cell_old/cell_ids Map<u64, vector<u32>>, game_gaps planks Map<i64, vector<u8>>, lamps/world_traffic grid_
+  Map<…, vector<i32>>). Die Sprache verbietet Breiten in Map-Werten (notation.cpp ~2681, keyed_of); 15201aee schreibt solche Werte
+  als List<Int> – dann passen sie nicht zu den C++-Plätzen derselben Liste (Parameter, Kopien). Nächster Schritt (allgemein): Map<K, List<U8>>
+  in der Sprache (Kodierung im of, Interpreter wickelt beim Speichern in den Wert, Klasse hat es schon) – dann die Regel in btype zurücknehmen.
+- vergleich `work-p-vergleich-001918-8866` (d38bc5ac) läuft seit 00:19 (vermutlich ein Hänger), Ergebnis offen. Zeit-Test: nicht gemessen.
+
 ## E20 Schritt 4 (Konverter schreibt die Breiten) – gebaut bis 344551db, Belege laufen (16:55)
 Commits: 5f0d81f9 (Konverter: Plätze u8…i32 und int → U8…I32, List<U8>…; wire/put, Wurzel-Wegnahme beim Speichern),
 4d612317 (Bytes of Text/S geben List<U8>; Engine-Pins in den Breiten ihrer Listen, engine_api.py neu), c2244413 + Folgende

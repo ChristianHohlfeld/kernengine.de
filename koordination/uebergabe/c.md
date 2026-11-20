@@ -78,3 +78,6 @@ fail/go_offline warten an anderem (remove/erase). register_node (game.cpp) ist k
 - Offen (später, soweit das Spiel es braucht): NativeCallable hält das Lebenszeichen der Instanz nicht; JIT-Fall mit Bibliothek; Jobs (KERN_JOB);
   BEFUND s5: ShaderExtension (Fassaden/Wasser), App-Ereignisse – Engine ruft Funktionen/Ereignisse eines Blueprints (eigener Entwurf nötig).
 - Kleinstfälle: /tmp/c_gl/k (generisches Lambda), /tmp/c_gl/r (RoadStream/RoadBuilder), /tmp/c_gl/cs (lokal city_stream+terrain, STAND_INS=1).
+- 01:30 (20.11.): work-c = 4bca8f52. a6127013 kept.clear() je Aufruf im Testrahmen; 4bca8f52 m[key]=move(box mit Engine-Objekten).
+  Beleg ausstehend: work-c-vergleich-001825-8576 (mag hing), danach vergleich city_stream+terrain auf 4bca8f52. Weiter: register_node/ShaderExtension/
+  App-Ereignisse (Entwurf), BEFUND t1 (leerer unique_ptr, den die Quelle dereferenziert).

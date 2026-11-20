@@ -26,7 +26,8 @@
   Beleg läuft: work-k-vergleich-182152-5898 (game_gaps, game_barricades, game.cpp).
 
 ## BEREIT ZUM MERGEN: 4e562137 (+ c684e716, 521274be, 0679bafe, 54dcd7cd, 3af75896 schon gemergt) – Beleg 171851-19774, 175551-12446;
-   4e562137 selbst unbelegt bis zum laufenden vergleich (gaps_draw).
+   work-k-vergleich-182152-5898 (5ce2b49c ⊇ 4e562137; game_gaps, game_barricades, game.cpp): 49/49 ok in beiden Durchgängen, kein Rückschritt;
+   gaps_draw kommt jetzt bis `gaps::SmokeField::size()` (gaps.cpp, nicht in der Probe) – unbelegt, zeigt der volle Lauf.
 - Beleg (alt): work-k-vergleich-163507-23262 (0679bafe; car, terrain, game_gaps, game_controls, game_weapons, game.cpp).
 - Nicht meins (Liste 143319): mp_local_ready/round_meets_mate/melee_hit/gaps_hud = Test-Schreiber (t1, „undeclared identifier Game“);
   step_heli/hit_scan/look_blast/explosion/CityStream::work = Rekursion (E16, gemergt); step_cop/handle_shots/run_buildings = Platz der Engine (d);

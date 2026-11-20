@@ -247,3 +247,4 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
   4e562137: either_place mit *gaps_/p->x. Der Beleg work-k-vergleich-182152-5898 läuft (gaps_draw).
   e1362b36 wirkte nicht und ist mit 5ce2b49c zurückgenommen. Das Problem ~Car/~Ragdolls im Test ist an t1 übergeben (stand/k.md).
   BEFUND t1: UB in der Quelle durch gezogene Eingaben (build_water_chunk ci*80).
+- 19:02 Beleg 182152-5898: 49/49 beide; gaps_draw wartet nur noch an size() (gaps.cpp). work-k = 5ce2b49c.

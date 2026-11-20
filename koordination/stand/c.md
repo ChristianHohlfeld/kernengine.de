@@ -94,3 +94,20 @@ Entscheidungen beim Bau (nach den Zielen, ohne Freigabe – Chris).
   Terrain::corridor_set (`*corridors_[i]`) ohne Prüfung liest. **BEFUND FÜR t1:** ein leerer unique_ptr, den die Quelle dereferenziert, ist
   ein Ort, den C++ offen lässt (wie ein Eintrag außerhalb der Liste) – der Rahmen fängt ihn nicht (open_read) → Abbruch durch UBSan.
 - Läuft: work-c-vergleich-184821-26350 (ce74f7d4; city_stream, terrain).
+- 19:10 b835e56d: converted::room gibt alle gehaltenen Zahlen weiter (184821: begin_roads 161/162 – Quelle [x], Blueprint [x, y]). Läuft 190838.
+- **Befund 184821 (ASan stack-use-after-scope):** der Stellvertreter behält die Callbacks eines Engine-Objekts (RoadBuilder 6) über den Testaufruf
+  hinaus und ruft sie beim nächsten Aufruf auf dem Objekt; der Callback der KLASSE zeigt dann auf das CityStream-Objekt des beendeten Aufrufs
+  (Callback {fn, place} ohne Lebenszeichen) → Terrain_deformed liest einen toten Stack. Im Interpreter wird der Callback mit dem Ende der Instanz
+  ungebunden; in der Klasse nicht. = offener Punkt „behaltener Callback nach Ende der Klasse“ – nötig: NativeCallable hält ein Lebenszeichen des
+  Objekts, dessen Platz gebunden ist (Klasse: Lebenszeichen je Blueprint-Objekt), sonst ungebunden wie im Interpreter.
+
+## Stand 01:30 (20.11.) – work-c = 4bca8f52 (gepusht; enthält work-zusammen d5f527c5)
+- 190838 (b835e56d): begin_roads 160/162 – der Blueprint-Seite rief der Stellvertreter zusätzlich Callbacks, die RoadBuilder 6 aus einem FRÜHEREN
+  Aufruf behielt (kept über Aufrufe hinweg; Seiten verschieden; Klasse: Platz tot → ASan stack-use-after-scope). → a6127013: converted.h leert
+  stand_in.kept je verglichenem Aufruf (Quelle und Blueprint), wie calls. Beleg: work-c-vergleich-001825-8576 (a6127013) – läuft seit 00:18,
+  mag hängt offenbar (auch work-p-vergleich-001918, work-t1-probe-002234 seit 00:19 „läuft“) → Koordinator.
+- 4bca8f52: Konverter `m[key] = std::move(v)` eines besessenen Werts mit Engine-Objekten (request_around, go_offline): Eintrag per operator[]
+  (map_add), Altes beendet, ersetzt. Kleinstfall /tmp/c_gl/m richtig. Unbelegt auf dem Spiel (nächster vergleich city_stream, terrain).
+- Offen: terrain UB (leerer unique_ptr in corridors_, BEFUND t1); register_node (game.cpp: eigener Knoten der Bibliothek zur Laufzeit, Lambda
+  ruft game().fixed_step) und s5-BEFUND (ShaderExtension, App configure/start/update/stop) = „die Engine ruft ein Ereignis/eine Funktion eines
+  Blueprints“ – Entwurf nötig (Ereignis des Game-Blueprints statt NodeDef zur Laufzeit), nicht begonnen.
