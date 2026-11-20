@@ -39,13 +39,15 @@ namespace json { enum class Type : u8 { null, boolean, number, string, array, ob
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
-namespace combat { bool bind_military(::kern::logic::Runtime& logic); }
-namespace combat { bool bind_zombies(::kern::logic::Runtime& logic); }
-namespace combat { bool bind_sandbox(::kern::logic::Runtime& logic); }
-namespace combat { bool bind_fun(::kern::logic::Runtime& logic); }
-namespace combat { bool bind_race(::kern::logic::Runtime& logic); }
+namespace combat { bool bind_military(kern::logic::Runtime& logic); }
+namespace combat { bool bind_zombies(kern::logic::Runtime& logic); }
+namespace combat { bool bind_sandbox(kern::logic::Runtime& logic); }
+namespace combat { bool bind_fun(kern::logic::Runtime& logic); }
+namespace combat { bool bind_race(kern::logic::Runtime& logic); }
 namespace combat { enum class MilEvent : u8 { none, alert, cancelled, start, stop }; }
 namespace combat { enum class EnemyType : u8 { cop, swat, heavy }; }
 namespace combat { struct EnemySpec { std::string name; f32 hp, speed, range, shot_s; i32 burst; f32 dmg, acc; i32 score; f32 scale; Vec3 color, stripe; }; }
@@ -150,7 +152,7 @@ namespace combat { std::vector<Gate> g_gates; }
 namespace combat { const EnemySpec kNoEnemy = {"", 1, 0, 0, 1, 1, 0, 0, 0, 1, {}, {}}; }
 namespace combat { const Contract kNoContract = {"", "", "", 1, 0}; }
 namespace combat { const Gate kNoGate = {"", {}, 1, 1, false}; }
-namespace combat { bool bind_military(::kern::logic::Runtime& logic) {
+namespace combat { bool bind_military(kern::logic::Runtime& logic) {
   const bool runs = g_military.bind(logic);
   kTriggerHeat = kTriggerHoldS = kTriggerExtremeHeat = kAlertS = kReinforceS = kFirstReinforceS = kEndStars = kSquad = kMaxSoldiers = converted::fits<int>(kSoldierHp = kMilHit = kHeliHp = kTankHp = kHeliDmg = kHeliDmgDrone = kSoldierDmg = kSoldierDmgDrone = kShellDmg = kSoldierReactS = kBurstWindowS = kSoldierBursts = converted::fits<int>(kFlakCell = kFlakChance = kFlakRange = kFlakMinAgl = kFlakMuzzle = kFlakRps = kFlakOn = kFlakOff = kFlakSpread = kFlakBurstR = kFlakHp = kJetSpeed = kSoundMps = kJetAltMin = kJetAltMax = kJetSpan = kAmbientMinS = kAmbientMaxS = kStrikeCooldownS = kBombRadius = kBombDamage = kStickLen = kStick = converted::fits<int>(kPunchDmg = kStabDmg = kGangGunDmg = 0)));
   if (!runs) return false;
@@ -203,7 +205,7 @@ namespace combat { bool bind_military(::kern::logic::Runtime& logic) {
   kGangGunDmg = static_cast<f32>(g_military.get<f64>("GangGunDmg"));
   return true;
 } }
-namespace combat { bool bind_zombies(::kern::logic::Runtime& logic) {
+namespace combat { bool bind_zombies(kern::logic::Runtime& logic) {
   const bool runs = g_zombies.bind(logic);
   kZombieCap = converted::fits<int>(kZombieHit = kZombieMelee = kZombieMeleeS = kZombieSpawnMin = kZombieSpawnMax = kZombieHitPts = kZombieKillPts = 0);
   if (!runs) return false;
@@ -217,7 +219,7 @@ namespace combat { bool bind_zombies(::kern::logic::Runtime& logic) {
   kZombieKillPts = static_cast<i32>(converted::fits<int>(g_zombies.get<f64>("ZombieKillPts")));
   return true;
 } }
-namespace combat { bool bind_sandbox(::kern::logic::Runtime& logic) {
+namespace combat { bool bind_sandbox(kern::logic::Runtime& logic) {
   const bool runs = g_sandbox.bind(logic);
   g_enemies.clear();
   kEnemySpawnS = static_cast<f32>(g_sandbox.get<f64>("EnemySpawnS"));
@@ -233,7 +235,7 @@ namespace combat { bool bind_sandbox(::kern::logic::Runtime& logic) {
   return true;
 } }
 namespace combat { const EnemySpec& enemy_spec(EnemyType t) { return static_cast<std::size_t>(t) < g_enemies.size() ? converted::at(g_enemies, static_cast<std::size_t>(t)) : kNoEnemy; } }
-namespace combat { bool bind_fun(::kern::logic::Runtime& logic) {
+namespace combat { bool bind_fun(kern::logic::Runtime& logic) {
   const bool runs = g_fun.bind(logic);
   g_contracts.clear();
   kContracts = 0;
@@ -246,8 +248,8 @@ namespace combat { bool bind_fun(::kern::logic::Runtime& logic) {
   kContracts = static_cast<i32>(g_contracts.size());
   return true;
 } }
-namespace combat { const Contract& contract(i32 index) { return kContracts > 0 ? converted::at(g_contracts, static_cast<std::size_t>(converted::rem(((converted::rem(index, kContracts)) + kContracts), kContracts))) : kNoContract; } }
-namespace combat { bool bind_race(::kern::logic::Runtime& logic) {
+namespace combat { const Contract& contract(i32 index) { return kContracts > 0 ? converted::at(g_contracts, static_cast<std::size_t>(converted::rem((converted::plus((converted::rem(index, kContracts)), kContracts)), kContracts))) : kNoContract; } }
+namespace combat { bool bind_race(kern::logic::Runtime& logic) {
   const bool runs = g_race.bind(logic);
   g_gate_rows.clear();
   g_gates.clear();
@@ -256,7 +258,7 @@ namespace combat { bool bind_race(::kern::logic::Runtime& logic) {
   kCourseScale = static_cast<f32>(g_race.get<f64>("CourseScale"));
   const i32 n = static_cast<i32>(g_race.get<std::vector<GateRow>>("Gates").size());
   if (!runs || n < 2) return false;
-  for (i32 i = 0; i < n; ++i) {  // (each gate as it stands in the world: the Blueprint's GateAt)
+  for (i32 i = 0; i < n; converted::pre_inc(i)) {  // (each gate as it stands in the world: the Blueprint's GateAt)
     GateRow g;
     g_race.call("GateAt", std::tie(g), i);
     g_gate_rows.push_back(g);
@@ -265,7 +267,7 @@ namespace combat { bool bind_race(::kern::logic::Runtime& logic) {
   kGates = static_cast<i32>(g_gates.size());
   return true;
 } }
-namespace combat { const Gate& gate(i32 i) { return kGates > 0 ? converted::at(g_gates, static_cast<std::size_t>(converted::rem(((converted::rem(i, kGates)) + kGates), kGates))) : kNoGate; } }
+namespace combat { const Gate& gate(i32 i) { return kGates > 0 ? converted::at(g_gates, static_cast<std::size_t>(converted::rem((converted::plus((converted::rem(i, kGates)), kGates)), kGates))) : kNoGate; } }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -288,7 +290,7 @@ namespace combat { const Gate& gate(i32 i) { return kGates > 0 ? converted::at(g
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::EnemySpec& s) { return converted::Value::structure({arg(s.name), arg(s.hp), arg(s.speed), arg(s.range), arg(s.shot_s), arg(s.burst), arg(s.dmg), arg(s.acc), arg(s.score), arg(s.scale), arg(s.color), arg(s.stripe)}); }
-[[maybe_unused]] static bool same(const combat::EnemySpec& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.name, (*got.rows)[0]) && same(want.hp, (*got.rows)[1]) && same(want.speed, (*got.rows)[2]) && same(want.range, (*got.rows)[3]) && same(want.shot_s, (*got.rows)[4]) && same(want.burst, (*got.rows)[5]) && same(want.dmg, (*got.rows)[6]) && same(want.acc, (*got.rows)[7]) && same(want.score, (*got.rows)[8]) && same(want.scale, (*got.rows)[9]) && same(want.color, (*got.rows)[10]) && same(want.stripe, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const combat::EnemySpec& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.hp, (*got.rows)[1]), ".hp") && converted::at_place(same(want.speed, (*got.rows)[2]), ".speed") && converted::at_place(same(want.range, (*got.rows)[3]), ".range") && converted::at_place(same(want.shot_s, (*got.rows)[4]), ".shot_s") && converted::at_place(same(want.burst, (*got.rows)[5]), ".burst") && converted::at_place(same(want.dmg, (*got.rows)[6]), ".dmg") && converted::at_place(same(want.acc, (*got.rows)[7]), ".acc") && converted::at_place(same(want.score, (*got.rows)[8]), ".score") && converted::at_place(same(want.scale, (*got.rows)[9]), ".scale") && converted::at_place(same(want.color, (*got.rows)[10]), ".color") && converted::at_place(same(want.stripe, (*got.rows)[11]), ".stripe"); }
 [[maybe_unused]] static bool defined(const combat::EnemySpec& s) { return defined(s.name) && defined(s.hp) && defined(s.speed) && defined(s.range) && defined(s.shot_s) && defined(s.burst) && defined(s.dmg) && defined(s.acc) && defined(s.score) && defined(s.scale) && defined(s.color) && defined(s.stripe); }
 [[maybe_unused]] static std::string text(const combat::EnemySpec& s) { return std::string("{") + text(s.name) + ", " + text(s.hp) + ", " + text(s.speed) + ", " + text(s.range) + ", " + text(s.shot_s) + ", " + text(s.burst) + ", " + text(s.dmg) + ", " + text(s.acc) + ", " + text(s.score) + ", " + text(s.scale) + ", " + text(s.color) + ", " + text(s.stripe) + "}"; }
 [[maybe_unused]] static void take(combat::EnemySpec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<double>(s.hp, (*v.rows)[1]); converted::take_as<double>(s.speed, (*v.rows)[2]); converted::take_as<double>(s.range, (*v.rows)[3]); converted::take_as<double>(s.shot_s, (*v.rows)[4]); converted::take_as<int>(s.burst, (*v.rows)[5]); converted::take_as<double>(s.dmg, (*v.rows)[6]); converted::take_as<double>(s.acc, (*v.rows)[7]); converted::take_as<int>(s.score, (*v.rows)[8]); converted::take_as<double>(s.scale, (*v.rows)[9]); converted::take_as<Vec3>(s.color, (*v.rows)[10]); converted::take_as<Vec3>(s.stripe, (*v.rows)[11]); }
@@ -311,7 +313,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::EnemyRow& s) { return converted::Value::structure({arg(s.name), arg(s.hp), arg(s.speed), arg(s.range), arg(s.shot_s), arg(s.burst), arg(s.dmg), arg(s.acc), arg(s.score), arg(s.scale), arg(s.color), arg(s.stripe)}); }
-[[maybe_unused]] static bool same(const combat::EnemyRow& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.name, (*got.rows)[0]) && same(want.hp, (*got.rows)[1]) && same(want.speed, (*got.rows)[2]) && same(want.range, (*got.rows)[3]) && same(want.shot_s, (*got.rows)[4]) && same(want.burst, (*got.rows)[5]) && same(want.dmg, (*got.rows)[6]) && same(want.acc, (*got.rows)[7]) && same(want.score, (*got.rows)[8]) && same(want.scale, (*got.rows)[9]) && same(want.color, (*got.rows)[10]) && same(want.stripe, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const combat::EnemyRow& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.hp, (*got.rows)[1]), ".hp") && converted::at_place(same(want.speed, (*got.rows)[2]), ".speed") && converted::at_place(same(want.range, (*got.rows)[3]), ".range") && converted::at_place(same(want.shot_s, (*got.rows)[4]), ".shot_s") && converted::at_place(same(want.burst, (*got.rows)[5]), ".burst") && converted::at_place(same(want.dmg, (*got.rows)[6]), ".dmg") && converted::at_place(same(want.acc, (*got.rows)[7]), ".acc") && converted::at_place(same(want.score, (*got.rows)[8]), ".score") && converted::at_place(same(want.scale, (*got.rows)[9]), ".scale") && converted::at_place(same(want.color, (*got.rows)[10]), ".color") && converted::at_place(same(want.stripe, (*got.rows)[11]), ".stripe"); }
 [[maybe_unused]] static bool defined(const combat::EnemyRow& s) { return defined(s.name) && defined(s.hp) && defined(s.speed) && defined(s.range) && defined(s.shot_s) && defined(s.burst) && defined(s.dmg) && defined(s.acc) && defined(s.score) && defined(s.scale) && defined(s.color) && defined(s.stripe); }
 [[maybe_unused]] static std::string text(const combat::EnemyRow& s) { return std::string("{") + text(s.name) + ", " + text(s.hp) + ", " + text(s.speed) + ", " + text(s.range) + ", " + text(s.shot_s) + ", " + text(s.burst) + ", " + text(s.dmg) + ", " + text(s.acc) + ", " + text(s.score) + ", " + text(s.scale) + ", " + text(s.color) + ", " + text(s.stripe) + "}"; }
 [[maybe_unused]] static void take(combat::EnemyRow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<double>(s.hp, (*v.rows)[1]); converted::take_as<double>(s.speed, (*v.rows)[2]); converted::take_as<double>(s.range, (*v.rows)[3]); converted::take_as<double>(s.shot_s, (*v.rows)[4]); converted::take_as<int>(s.burst, (*v.rows)[5]); converted::take_as<double>(s.dmg, (*v.rows)[6]); converted::take_as<double>(s.acc, (*v.rows)[7]); converted::take_as<int>(s.score, (*v.rows)[8]); converted::take_as<double>(s.scale, (*v.rows)[9]); converted::take_as<Vec3>(s.color, (*v.rows)[10]); converted::take_as<Vec3>(s.stripe, (*v.rows)[11]); }
@@ -327,7 +329,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::Contract& s) { return converted::Value::structure({arg(s.id), arg(s.name), arg(s.hint), arg(s.target), arg(s.reward)}); }
-[[maybe_unused]] static bool same(const combat::Contract& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.id, (*got.rows)[0]) && same(want.name, (*got.rows)[1]) && same(want.hint, (*got.rows)[2]) && same(want.target, (*got.rows)[3]) && same(want.reward, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const combat::Contract& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.name, (*got.rows)[1]), ".name") && converted::at_place(same(want.hint, (*got.rows)[2]), ".hint") && converted::at_place(same(want.target, (*got.rows)[3]), ".target") && converted::at_place(same(want.reward, (*got.rows)[4]), ".reward"); }
 [[maybe_unused]] static bool defined(const combat::Contract& s) { return defined(s.id) && defined(s.name) && defined(s.hint) && defined(s.target) && defined(s.reward); }
 [[maybe_unused]] static std::string text(const combat::Contract& s) { return std::string("{") + text(s.id) + ", " + text(s.name) + ", " + text(s.hint) + ", " + text(s.target) + ", " + text(s.reward) + "}"; }
 [[maybe_unused]] static void take(combat::Contract& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.id, (*v.rows)[0]); converted::take_as<std::string>(s.name, (*v.rows)[1]); converted::take_as<std::string>(s.hint, (*v.rows)[2]); converted::take_as<int>(s.target, (*v.rows)[3]); converted::take_as<int>(s.reward, (*v.rows)[4]); }
@@ -343,7 +345,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::ContractRow& s) { return converted::Value::structure({arg(s.id), arg(s.name), arg(s.hint), arg(s.target), arg(s.reward)}); }
-[[maybe_unused]] static bool same(const combat::ContractRow& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.id, (*got.rows)[0]) && same(want.name, (*got.rows)[1]) && same(want.hint, (*got.rows)[2]) && same(want.target, (*got.rows)[3]) && same(want.reward, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const combat::ContractRow& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.name, (*got.rows)[1]), ".name") && converted::at_place(same(want.hint, (*got.rows)[2]), ".hint") && converted::at_place(same(want.target, (*got.rows)[3]), ".target") && converted::at_place(same(want.reward, (*got.rows)[4]), ".reward"); }
 [[maybe_unused]] static bool defined(const combat::ContractRow& s) { return defined(s.id) && defined(s.name) && defined(s.hint) && defined(s.target) && defined(s.reward); }
 [[maybe_unused]] static std::string text(const combat::ContractRow& s) { return std::string("{") + text(s.id) + ", " + text(s.name) + ", " + text(s.hint) + ", " + text(s.target) + ", " + text(s.reward) + "}"; }
 [[maybe_unused]] static void take(combat::ContractRow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.id, (*v.rows)[0]); converted::take_as<std::string>(s.name, (*v.rows)[1]); converted::take_as<std::string>(s.hint, (*v.rows)[2]); converted::take_as<int>(s.target, (*v.rows)[3]); converted::take_as<int>(s.reward, (*v.rows)[4]); }
@@ -359,7 +361,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::GateRow& s) { return converted::Value::structure({arg(s.name), arg(s.center), arg(s.width), arg(s.height), arg(s.start)}); }
-[[maybe_unused]] static bool same(const combat::GateRow& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.name, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(want.width, (*got.rows)[2]) && same(want.height, (*got.rows)[3]) && same(want.start, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const combat::GateRow& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.width, (*got.rows)[2]), ".width") && converted::at_place(same(want.height, (*got.rows)[3]), ".height") && converted::at_place(same(want.start, (*got.rows)[4]), ".start"); }
 [[maybe_unused]] static bool defined(const combat::GateRow& s) { return defined(s.name) && defined(s.center) && defined(s.width) && defined(s.height) && defined(s.start); }
 [[maybe_unused]] static std::string text(const combat::GateRow& s) { return std::string("{") + text(s.name) + ", " + text(s.center) + ", " + text(s.width) + ", " + text(s.height) + ", " + text(s.start) + "}"; }
 [[maybe_unused]] static void take(combat::GateRow& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<double>(s.width, (*v.rows)[2]); converted::take_as<double>(s.height, (*v.rows)[3]); converted::take_as<bool>(s.start, (*v.rows)[4]); }
@@ -375,7 +377,7 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 namespace combat { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat::Gate& s) { return converted::Value::structure({arg(s.name), arg(s.center), arg(s.width), arg(s.height), arg(s.start)}); }
-[[maybe_unused]] static bool same(const combat::Gate& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.name, (*got.rows)[0]) && same(want.center, (*got.rows)[1]) && same(want.width, (*got.rows)[2]) && same(want.height, (*got.rows)[3]) && same(want.start, (*got.rows)[4]); }
+[[maybe_unused]] static bool same(const combat::Gate& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.width, (*got.rows)[2]), ".width") && converted::at_place(same(want.height, (*got.rows)[3]), ".height") && converted::at_place(same(want.start, (*got.rows)[4]), ".start"); }
 [[maybe_unused]] static bool defined(const combat::Gate& s) { return defined(s.name) && defined(s.center) && defined(s.width) && defined(s.height) && defined(s.start); }
 [[maybe_unused]] static std::string text(const combat::Gate& s) { return std::string("{") + text(s.name) + ", " + text(s.center) + ", " + text(s.width) + ", " + text(s.height) + ", " + text(s.start) + "}"; }
 [[maybe_unused]] static void take(combat::Gate& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<double>(s.width, (*v.rows)[2]); converted::take_as<double>(s.height, (*v.rows)[3]); converted::take_as<bool>(s.start, (*v.rows)[4]); }
@@ -456,27 +458,27 @@ namespace combat { using converted::arg; using converted::same; using converted:
 }
 [[maybe_unused]] static converted::Variables variables_Game(const converted::NoObject& s) { return {{"combat_kTriggerHeat", arg(combat::kTriggerHeat)}, {"combat_kTriggerHoldS", arg(combat::kTriggerHoldS)}, {"combat_kTriggerExtremeHeat", arg(combat::kTriggerExtremeHeat)}, {"combat_kAlertS", arg(combat::kAlertS)}, {"combat_kReinforceS", arg(combat::kReinforceS)}, {"combat_kFirstReinforceS", arg(combat::kFirstReinforceS)}, {"combat_kEndStars", arg(combat::kEndStars)}, {"combat_kSquad", arg(combat::kSquad)}, {"combat_kMaxSoldiers", arg(combat::kMaxSoldiers)}, {"combat_kSoldierHp", arg(combat::kSoldierHp)}, {"combat_kMilHit", arg(combat::kMilHit)}, {"combat_kHeliHp", arg(combat::kHeliHp)}, {"combat_kTankHp", arg(combat::kTankHp)}, {"combat_kHeliDmg", arg(combat::kHeliDmg)}, {"combat_kHeliDmgDrone", arg(combat::kHeliDmgDrone)}, {"combat_kSoldierDmg", arg(combat::kSoldierDmg)}, {"combat_kSoldierDmgDrone", arg(combat::kSoldierDmgDrone)}, {"combat_kShellDmg", arg(combat::kShellDmg)}, {"combat_kSoldierReactS", arg(combat::kSoldierReactS)}, {"combat_kBurstWindowS", arg(combat::kBurstWindowS)}, {"combat_kSoldierBursts", arg(combat::kSoldierBursts)}, {"combat_kFlakCell", arg(combat::kFlakCell)}, {"combat_kFlakChance", arg(combat::kFlakChance)}, {"combat_kFlakRange", arg(combat::kFlakRange)}, {"combat_kFlakMinAgl", arg(combat::kFlakMinAgl)}, {"combat_kFlakMuzzle", arg(combat::kFlakMuzzle)}, {"combat_kFlakRps", arg(combat::kFlakRps)}, {"combat_kFlakOn", arg(combat::kFlakOn)}, {"combat_kFlakOff", arg(combat::kFlakOff)}, {"combat_kFlakSpread", arg(combat::kFlakSpread)}, {"combat_kFlakBurstR", arg(combat::kFlakBurstR)}, {"combat_kFlakHp", arg(combat::kFlakHp)}, {"combat_kJetSpeed", arg(combat::kJetSpeed)}, {"combat_kSoundMps", arg(combat::kSoundMps)}, {"combat_kJetAltMin", arg(combat::kJetAltMin)}, {"combat_kJetAltMax", arg(combat::kJetAltMax)}, {"combat_kJetSpan", arg(combat::kJetSpan)}, {"combat_kAmbientMinS", arg(combat::kAmbientMinS)}, {"combat_kAmbientMaxS", arg(combat::kAmbientMaxS)}, {"combat_kStrikeCooldownS", arg(combat::kStrikeCooldownS)}, {"combat_kBombRadius", arg(combat::kBombRadius)}, {"combat_kBombDamage", arg(combat::kBombDamage)}, {"combat_kStickLen", arg(combat::kStickLen)}, {"combat_kStick", arg(combat::kStick)}, {"combat_kPunchDmg", arg(combat::kPunchDmg)}, {"combat_kStabDmg", arg(combat::kStabDmg)}, {"combat_kGangGunDmg", arg(combat::kGangGunDmg)}, {"combat_kZombieCap", arg(combat::kZombieCap)}, {"combat_kZombieHit", arg(combat::kZombieHit)}, {"combat_kZombieMelee", arg(combat::kZombieMelee)}, {"combat_kZombieMeleeS", arg(combat::kZombieMeleeS)}, {"combat_kZombieSpawnMin", arg(combat::kZombieSpawnMin)}, {"combat_kZombieSpawnMax", arg(combat::kZombieSpawnMax)}, {"combat_kZombieHitPts", arg(combat::kZombieHitPts)}, {"combat_kZombieKillPts", arg(combat::kZombieKillPts)}, {"combat_rules_g_enemies", arg(combat::g_enemies)}, {"combat_kEnemySpawnS", arg(combat::kEnemySpawnS)}, {"combat_kComboS", arg(combat::kComboS)}, {"combat_rules_g_enemy_rows", arg(combat::g_enemy_rows)}, {"combat_rules_g_contracts", arg(combat::g_contracts)}, {"combat_kContracts", arg(combat::kContracts)}, {"combat_kFunComboS", arg(combat::kFunComboS)}, {"combat_kOverdriveS", arg(combat::kOverdriveS)}, {"combat_kMomentumTarget", arg(combat::kMomentumTarget)}, {"combat_rules_g_contract_rows", arg(combat::g_contract_rows)}, {"combat_rules_g_gate_rows", arg(combat::g_gate_rows)}, {"combat_rules_g_gates", arg(combat::g_gates)}, {"combat_kGates", arg(combat::kGates)}, {"combat_kRaceLaps", arg(combat::kRaceLaps)}, {"combat_kCourseScale", arg(combat::kCourseScale)}}; }
 struct State_Game { const converted::NoObject* s; };
-[[maybe_unused]] static bool same(const State_Game& w, const converted::Value& got) { return got.rows && got.rows->size() == 70 && same(combat::kTriggerHeat, (*got.rows)[0]) && same(combat::kTriggerHoldS, (*got.rows)[1]) && same(combat::kTriggerExtremeHeat, (*got.rows)[2]) && same(combat::kAlertS, (*got.rows)[3]) && same(combat::kReinforceS, (*got.rows)[4]) && same(combat::kFirstReinforceS, (*got.rows)[5]) && same(combat::kEndStars, (*got.rows)[6]) && same(combat::kSquad, (*got.rows)[7]) && same(combat::kMaxSoldiers, (*got.rows)[8]) && same(combat::kSoldierHp, (*got.rows)[9]) && same(combat::kMilHit, (*got.rows)[10]) && same(combat::kHeliHp, (*got.rows)[11]) && same(combat::kTankHp, (*got.rows)[12]) && same(combat::kHeliDmg, (*got.rows)[13]) && same(combat::kHeliDmgDrone, (*got.rows)[14]) && same(combat::kSoldierDmg, (*got.rows)[15]) && same(combat::kSoldierDmgDrone, (*got.rows)[16]) && same(combat::kShellDmg, (*got.rows)[17]) && same(combat::kSoldierReactS, (*got.rows)[18]) && same(combat::kBurstWindowS, (*got.rows)[19]) && same(combat::kSoldierBursts, (*got.rows)[20]) && same(combat::kFlakCell, (*got.rows)[21]) && same(combat::kFlakChance, (*got.rows)[22]) && same(combat::kFlakRange, (*got.rows)[23]) && same(combat::kFlakMinAgl, (*got.rows)[24]) && same(combat::kFlakMuzzle, (*got.rows)[25]) && same(combat::kFlakRps, (*got.rows)[26]) && same(combat::kFlakOn, (*got.rows)[27]) && same(combat::kFlakOff, (*got.rows)[28]) && same(combat::kFlakSpread, (*got.rows)[29]) && same(combat::kFlakBurstR, (*got.rows)[30]) && same(combat::kFlakHp, (*got.rows)[31]) && same(combat::kJetSpeed, (*got.rows)[32]) && same(combat::kSoundMps, (*got.rows)[33]) && same(combat::kJetAltMin, (*got.rows)[34]) && same(combat::kJetAltMax, (*got.rows)[35]) && same(combat::kJetSpan, (*got.rows)[36]) && same(combat::kAmbientMinS, (*got.rows)[37]) && same(combat::kAmbientMaxS, (*got.rows)[38]) && same(combat::kStrikeCooldownS, (*got.rows)[39]) && same(combat::kBombRadius, (*got.rows)[40]) && same(combat::kBombDamage, (*got.rows)[41]) && same(combat::kStickLen, (*got.rows)[42]) && same(combat::kStick, (*got.rows)[43]) && same(combat::kPunchDmg, (*got.rows)[44]) && same(combat::kStabDmg, (*got.rows)[45]) && same(combat::kGangGunDmg, (*got.rows)[46]) && same(combat::kZombieCap, (*got.rows)[47]) && same(combat::kZombieHit, (*got.rows)[48]) && same(combat::kZombieMelee, (*got.rows)[49]) && same(combat::kZombieMeleeS, (*got.rows)[50]) && same(combat::kZombieSpawnMin, (*got.rows)[51]) && same(combat::kZombieSpawnMax, (*got.rows)[52]) && same(combat::kZombieHitPts, (*got.rows)[53]) && same(combat::kZombieKillPts, (*got.rows)[54]) && same(combat::g_enemies, (*got.rows)[55]) && same(combat::kEnemySpawnS, (*got.rows)[56]) && same(combat::kComboS, (*got.rows)[57]) && same(combat::g_enemy_rows, (*got.rows)[58]) && same(combat::g_contracts, (*got.rows)[59]) && same(combat::kContracts, (*got.rows)[60]) && same(combat::kFunComboS, (*got.rows)[61]) && same(combat::kOverdriveS, (*got.rows)[62]) && same(combat::kMomentumTarget, (*got.rows)[63]) && same(combat::g_contract_rows, (*got.rows)[64]) && same(combat::g_gate_rows, (*got.rows)[65]) && same(combat::g_gates, (*got.rows)[66]) && same(combat::kGates, (*got.rows)[67]) && same(combat::kRaceLaps, (*got.rows)[68]) && same(combat::kCourseScale, (*got.rows)[69]); }
+[[maybe_unused]] static bool same(const State_Game& w, const converted::Value& got) { return converted::rows_of(got, 70) && converted::at_place(same(combat::kTriggerHeat, (*got.rows)[0]), ".combat_kTriggerHeat") && converted::at_place(same(combat::kTriggerHoldS, (*got.rows)[1]), ".combat_kTriggerHoldS") && converted::at_place(same(combat::kTriggerExtremeHeat, (*got.rows)[2]), ".combat_kTriggerExtremeHeat") && converted::at_place(same(combat::kAlertS, (*got.rows)[3]), ".combat_kAlertS") && converted::at_place(same(combat::kReinforceS, (*got.rows)[4]), ".combat_kReinforceS") && converted::at_place(same(combat::kFirstReinforceS, (*got.rows)[5]), ".combat_kFirstReinforceS") && converted::at_place(same(combat::kEndStars, (*got.rows)[6]), ".combat_kEndStars") && converted::at_place(same(combat::kSquad, (*got.rows)[7]), ".combat_kSquad") && converted::at_place(same(combat::kMaxSoldiers, (*got.rows)[8]), ".combat_kMaxSoldiers") && converted::at_place(same(combat::kSoldierHp, (*got.rows)[9]), ".combat_kSoldierHp") && converted::at_place(same(combat::kMilHit, (*got.rows)[10]), ".combat_kMilHit") && converted::at_place(same(combat::kHeliHp, (*got.rows)[11]), ".combat_kHeliHp") && converted::at_place(same(combat::kTankHp, (*got.rows)[12]), ".combat_kTankHp") && converted::at_place(same(combat::kHeliDmg, (*got.rows)[13]), ".combat_kHeliDmg") && converted::at_place(same(combat::kHeliDmgDrone, (*got.rows)[14]), ".combat_kHeliDmgDrone") && converted::at_place(same(combat::kSoldierDmg, (*got.rows)[15]), ".combat_kSoldierDmg") && converted::at_place(same(combat::kSoldierDmgDrone, (*got.rows)[16]), ".combat_kSoldierDmgDrone") && converted::at_place(same(combat::kShellDmg, (*got.rows)[17]), ".combat_kShellDmg") && converted::at_place(same(combat::kSoldierReactS, (*got.rows)[18]), ".combat_kSoldierReactS") && converted::at_place(same(combat::kBurstWindowS, (*got.rows)[19]), ".combat_kBurstWindowS") && converted::at_place(same(combat::kSoldierBursts, (*got.rows)[20]), ".combat_kSoldierBursts") && converted::at_place(same(combat::kFlakCell, (*got.rows)[21]), ".combat_kFlakCell") && converted::at_place(same(combat::kFlakChance, (*got.rows)[22]), ".combat_kFlakChance") && converted::at_place(same(combat::kFlakRange, (*got.rows)[23]), ".combat_kFlakRange") && converted::at_place(same(combat::kFlakMinAgl, (*got.rows)[24]), ".combat_kFlakMinAgl") && converted::at_place(same(combat::kFlakMuzzle, (*got.rows)[25]), ".combat_kFlakMuzzle") && converted::at_place(same(combat::kFlakRps, (*got.rows)[26]), ".combat_kFlakRps") && converted::at_place(same(combat::kFlakOn, (*got.rows)[27]), ".combat_kFlakOn") && converted::at_place(same(combat::kFlakOff, (*got.rows)[28]), ".combat_kFlakOff") && converted::at_place(same(combat::kFlakSpread, (*got.rows)[29]), ".combat_kFlakSpread") && converted::at_place(same(combat::kFlakBurstR, (*got.rows)[30]), ".combat_kFlakBurstR") && converted::at_place(same(combat::kFlakHp, (*got.rows)[31]), ".combat_kFlakHp") && converted::at_place(same(combat::kJetSpeed, (*got.rows)[32]), ".combat_kJetSpeed") && converted::at_place(same(combat::kSoundMps, (*got.rows)[33]), ".combat_kSoundMps") && converted::at_place(same(combat::kJetAltMin, (*got.rows)[34]), ".combat_kJetAltMin") && converted::at_place(same(combat::kJetAltMax, (*got.rows)[35]), ".combat_kJetAltMax") && converted::at_place(same(combat::kJetSpan, (*got.rows)[36]), ".combat_kJetSpan") && converted::at_place(same(combat::kAmbientMinS, (*got.rows)[37]), ".combat_kAmbientMinS") && converted::at_place(same(combat::kAmbientMaxS, (*got.rows)[38]), ".combat_kAmbientMaxS") && converted::at_place(same(combat::kStrikeCooldownS, (*got.rows)[39]), ".combat_kStrikeCooldownS") && converted::at_place(same(combat::kBombRadius, (*got.rows)[40]), ".combat_kBombRadius") && converted::at_place(same(combat::kBombDamage, (*got.rows)[41]), ".combat_kBombDamage") && converted::at_place(same(combat::kStickLen, (*got.rows)[42]), ".combat_kStickLen") && converted::at_place(same(combat::kStick, (*got.rows)[43]), ".combat_kStick") && converted::at_place(same(combat::kPunchDmg, (*got.rows)[44]), ".combat_kPunchDmg") && converted::at_place(same(combat::kStabDmg, (*got.rows)[45]), ".combat_kStabDmg") && converted::at_place(same(combat::kGangGunDmg, (*got.rows)[46]), ".combat_kGangGunDmg") && converted::at_place(same(combat::kZombieCap, (*got.rows)[47]), ".combat_kZombieCap") && converted::at_place(same(combat::kZombieHit, (*got.rows)[48]), ".combat_kZombieHit") && converted::at_place(same(combat::kZombieMelee, (*got.rows)[49]), ".combat_kZombieMelee") && converted::at_place(same(combat::kZombieMeleeS, (*got.rows)[50]), ".combat_kZombieMeleeS") && converted::at_place(same(combat::kZombieSpawnMin, (*got.rows)[51]), ".combat_kZombieSpawnMin") && converted::at_place(same(combat::kZombieSpawnMax, (*got.rows)[52]), ".combat_kZombieSpawnMax") && converted::at_place(same(combat::kZombieHitPts, (*got.rows)[53]), ".combat_kZombieHitPts") && converted::at_place(same(combat::kZombieKillPts, (*got.rows)[54]), ".combat_kZombieKillPts") && converted::at_place(same(combat::g_enemies, (*got.rows)[55]), ".combat_rules_g_enemies") && converted::at_place(same(combat::kEnemySpawnS, (*got.rows)[56]), ".combat_kEnemySpawnS") && converted::at_place(same(combat::kComboS, (*got.rows)[57]), ".combat_kComboS") && converted::at_place(same(combat::g_enemy_rows, (*got.rows)[58]), ".combat_rules_g_enemy_rows") && converted::at_place(same(combat::g_contracts, (*got.rows)[59]), ".combat_rules_g_contracts") && converted::at_place(same(combat::kContracts, (*got.rows)[60]), ".combat_kContracts") && converted::at_place(same(combat::kFunComboS, (*got.rows)[61]), ".combat_kFunComboS") && converted::at_place(same(combat::kOverdriveS, (*got.rows)[62]), ".combat_kOverdriveS") && converted::at_place(same(combat::kMomentumTarget, (*got.rows)[63]), ".combat_kMomentumTarget") && converted::at_place(same(combat::g_contract_rows, (*got.rows)[64]), ".combat_rules_g_contract_rows") && converted::at_place(same(combat::g_gate_rows, (*got.rows)[65]), ".combat_rules_g_gate_rows") && converted::at_place(same(combat::g_gates, (*got.rows)[66]), ".combat_rules_g_gates") && converted::at_place(same(combat::kGates, (*got.rows)[67]), ".combat_kGates") && converted::at_place(same(combat::kRaceLaps, (*got.rows)[68]), ".combat_kRaceLaps") && converted::at_place(same(combat::kCourseScale, (*got.rows)[69]), ".combat_kCourseScale"); }
 [[maybe_unused]] static bool defined(const State_Game& w) { return defined(combat::kTriggerHeat) && defined(combat::kTriggerHoldS) && defined(combat::kTriggerExtremeHeat) && defined(combat::kAlertS) && defined(combat::kReinforceS) && defined(combat::kFirstReinforceS) && defined(combat::kEndStars) && defined(combat::kSquad) && defined(combat::kMaxSoldiers) && defined(combat::kSoldierHp) && defined(combat::kMilHit) && defined(combat::kHeliHp) && defined(combat::kTankHp) && defined(combat::kHeliDmg) && defined(combat::kHeliDmgDrone) && defined(combat::kSoldierDmg) && defined(combat::kSoldierDmgDrone) && defined(combat::kShellDmg) && defined(combat::kSoldierReactS) && defined(combat::kBurstWindowS) && defined(combat::kSoldierBursts) && defined(combat::kFlakCell) && defined(combat::kFlakChance) && defined(combat::kFlakRange) && defined(combat::kFlakMinAgl) && defined(combat::kFlakMuzzle) && defined(combat::kFlakRps) && defined(combat::kFlakOn) && defined(combat::kFlakOff) && defined(combat::kFlakSpread) && defined(combat::kFlakBurstR) && defined(combat::kFlakHp) && defined(combat::kJetSpeed) && defined(combat::kSoundMps) && defined(combat::kJetAltMin) && defined(combat::kJetAltMax) && defined(combat::kJetSpan) && defined(combat::kAmbientMinS) && defined(combat::kAmbientMaxS) && defined(combat::kStrikeCooldownS) && defined(combat::kBombRadius) && defined(combat::kBombDamage) && defined(combat::kStickLen) && defined(combat::kStick) && defined(combat::kPunchDmg) && defined(combat::kStabDmg) && defined(combat::kGangGunDmg) && defined(combat::kZombieCap) && defined(combat::kZombieHit) && defined(combat::kZombieMelee) && defined(combat::kZombieMeleeS) && defined(combat::kZombieSpawnMin) && defined(combat::kZombieSpawnMax) && defined(combat::kZombieHitPts) && defined(combat::kZombieKillPts) && defined(combat::g_enemies) && defined(combat::kEnemySpawnS) && defined(combat::kComboS) && defined(combat::g_enemy_rows) && defined(combat::g_contracts) && defined(combat::kContracts) && defined(combat::kFunComboS) && defined(combat::kOverdriveS) && defined(combat::kMomentumTarget) && defined(combat::g_contract_rows) && defined(combat::g_gate_rows) && defined(combat::g_gates) && defined(combat::kGates) && defined(combat::kRaceLaps) && defined(combat::kCourseScale); }
 [[maybe_unused]] static std::string text(const State_Game& w) { return std::string("{") + "combat_kTriggerHeat = " + text(combat::kTriggerHeat) + ", " + "combat_kTriggerHoldS = " + text(combat::kTriggerHoldS) + ", " + "combat_kTriggerExtremeHeat = " + text(combat::kTriggerExtremeHeat) + ", " + "combat_kAlertS = " + text(combat::kAlertS) + ", " + "combat_kReinforceS = " + text(combat::kReinforceS) + ", " + "combat_kFirstReinforceS = " + text(combat::kFirstReinforceS) + ", " + "combat_kEndStars = " + text(combat::kEndStars) + ", " + "combat_kSquad = " + text(combat::kSquad) + ", " + "combat_kMaxSoldiers = " + text(combat::kMaxSoldiers) + ", " + "combat_kSoldierHp = " + text(combat::kSoldierHp) + ", " + "combat_kMilHit = " + text(combat::kMilHit) + ", " + "combat_kHeliHp = " + text(combat::kHeliHp) + ", " + "combat_kTankHp = " + text(combat::kTankHp) + ", " + "combat_kHeliDmg = " + text(combat::kHeliDmg) + ", " + "combat_kHeliDmgDrone = " + text(combat::kHeliDmgDrone) + ", " + "combat_kSoldierDmg = " + text(combat::kSoldierDmg) + ", " + "combat_kSoldierDmgDrone = " + text(combat::kSoldierDmgDrone) + ", " + "combat_kShellDmg = " + text(combat::kShellDmg) + ", " + "combat_kSoldierReactS = " + text(combat::kSoldierReactS) + ", " + "combat_kBurstWindowS = " + text(combat::kBurstWindowS) + ", " + "combat_kSoldierBursts = " + text(combat::kSoldierBursts) + ", " + "combat_kFlakCell = " + text(combat::kFlakCell) + ", " + "combat_kFlakChance = " + text(combat::kFlakChance) + ", " + "combat_kFlakRange = " + text(combat::kFlakRange) + ", " + "combat_kFlakMinAgl = " + text(combat::kFlakMinAgl) + ", " + "combat_kFlakMuzzle = " + text(combat::kFlakMuzzle) + ", " + "combat_kFlakRps = " + text(combat::kFlakRps) + ", " + "combat_kFlakOn = " + text(combat::kFlakOn) + ", " + "combat_kFlakOff = " + text(combat::kFlakOff) + ", " + "combat_kFlakSpread = " + text(combat::kFlakSpread) + ", " + "combat_kFlakBurstR = " + text(combat::kFlakBurstR) + ", " + "combat_kFlakHp = " + text(combat::kFlakHp) + ", " + "combat_kJetSpeed = " + text(combat::kJetSpeed) + ", " + "combat_kSoundMps = " + text(combat::kSoundMps) + ", " + "combat_kJetAltMin = " + text(combat::kJetAltMin) + ", " + "combat_kJetAltMax = " + text(combat::kJetAltMax) + ", " + "combat_kJetSpan = " + text(combat::kJetSpan) + ", " + "combat_kAmbientMinS = " + text(combat::kAmbientMinS) + ", " + "combat_kAmbientMaxS = " + text(combat::kAmbientMaxS) + ", " + "combat_kStrikeCooldownS = " + text(combat::kStrikeCooldownS) + ", " + "combat_kBombRadius = " + text(combat::kBombRadius) + ", " + "combat_kBombDamage = " + text(combat::kBombDamage) + ", " + "combat_kStickLen = " + text(combat::kStickLen) + ", " + "combat_kStick = " + text(combat::kStick) + ", " + "combat_kPunchDmg = " + text(combat::kPunchDmg) + ", " + "combat_kStabDmg = " + text(combat::kStabDmg) + ", " + "combat_kGangGunDmg = " + text(combat::kGangGunDmg) + ", " + "combat_kZombieCap = " + text(combat::kZombieCap) + ", " + "combat_kZombieHit = " + text(combat::kZombieHit) + ", " + "combat_kZombieMelee = " + text(combat::kZombieMelee) + ", " + "combat_kZombieMeleeS = " + text(combat::kZombieMeleeS) + ", " + "combat_kZombieSpawnMin = " + text(combat::kZombieSpawnMin) + ", " + "combat_kZombieSpawnMax = " + text(combat::kZombieSpawnMax) + ", " + "combat_kZombieHitPts = " + text(combat::kZombieHitPts) + ", " + "combat_kZombieKillPts = " + text(combat::kZombieKillPts) + ", " + "combat_rules_g_enemies = " + text(combat::g_enemies) + ", " + "combat_kEnemySpawnS = " + text(combat::kEnemySpawnS) + ", " + "combat_kComboS = " + text(combat::kComboS) + ", " + "combat_rules_g_enemy_rows = " + text(combat::g_enemy_rows) + ", " + "combat_rules_g_contracts = " + text(combat::g_contracts) + ", " + "combat_kContracts = " + text(combat::kContracts) + ", " + "combat_kFunComboS = " + text(combat::kFunComboS) + ", " + "combat_kOverdriveS = " + text(combat::kOverdriveS) + ", " + "combat_kMomentumTarget = " + text(combat::kMomentumTarget) + ", " + "combat_rules_g_contract_rows = " + text(combat::g_contract_rows) + ", " + "combat_rules_g_gate_rows = " + text(combat::g_gate_rows) + ", " + "combat_rules_g_gates = " + text(combat::g_gates) + ", " + "combat_kGates = " + text(combat::kGates) + ", " + "combat_kRaceLaps = " + text(combat::kRaceLaps) + ", " + "combat_kCourseScale = " + text(combat::kCourseScale) + "}"; }
 struct Out_bind_military { State_Game State; bool Result; };
-[[maybe_unused]] static bool same(const Out_bind_military& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_bind_military& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_bind_military& s) { return defined(s.State) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_bind_military& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 struct Out_bind_zombies { State_Game State; bool Result; };
-[[maybe_unused]] static bool same(const Out_bind_zombies& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_bind_zombies& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_bind_zombies& s) { return defined(s.State) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_bind_zombies& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 struct Out_bind_sandbox { State_Game State; bool Result; };
-[[maybe_unused]] static bool same(const Out_bind_sandbox& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_bind_sandbox& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_bind_sandbox& s) { return defined(s.State) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_bind_sandbox& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 struct Out_bind_fun { State_Game State; bool Result; };
-[[maybe_unused]] static bool same(const Out_bind_fun& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_bind_fun& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_bind_fun& s) { return defined(s.State) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_bind_fun& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 struct Out_bind_race { State_Game State; bool Result; };
-[[maybe_unused]] static bool same(const Out_bind_race& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.State, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_bind_race& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_bind_race& s) { return defined(s.State) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_bind_race& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 
@@ -501,7 +503,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -522,7 +526,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -543,7 +549,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -554,10 +562,10 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("enemy_spec");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] combat::EnemyType a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::enemy_spec(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] combat::EnemyType& a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::enemy_spec(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
-      combat::EnemyType a0 = static_cast<combat::EnemyType>(draw.below(3));
+      combat::EnemyType a0 = converted::enum_value<combat::EnemyType>(draw.below(3));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
       const converted::Watch watch;
@@ -565,7 +573,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -586,7 +596,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -597,7 +609,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("contract");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::contract(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::contract(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       int a0 = static_cast<int>(draw.whole());
@@ -608,7 +620,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -629,7 +643,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -640,7 +656,7 @@ SC_TEST(converted_Game__combat_rules_cpp) {
     converted::Tally tally("gate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
     std::unique_ptr<converted::NoObject> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::gate(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_Game__combat_rules_cpp::combat::gate(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       s = draw_state_Game(draw);
       int a0 = static_cast<int>(draw.whole());
@@ -651,7 +667,9 @@ SC_TEST(converted_Game__combat_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
