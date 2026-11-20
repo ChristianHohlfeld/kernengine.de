@@ -1156,6 +1156,11 @@ template <class T> void take(kern::Span<T>& to, const Value& v) {
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
 /// Numbers the engine gives at a place of its own (`const f64* RoadStream::data()`): the test keeps those its stand-in
 /// answers, and the source reads them where the pointer points - as long as the test runs.
+/// How many numbers there are where a pointer the test took (take of a const T*) points - none for any other pointer.
+inline std::map<const void*, std::size_t>& rooms() {
+  static std::map<const void*, std::size_t> r;
+  return r;
+}
 template <class T>
   requires std::is_arithmetic_v<T>
 void take(const T*& to, const Value& v) {
@@ -1163,6 +1168,15 @@ void take(const T*& to, const Value& v) {
   kept.emplace_back();
   take(kept.back(), v);
   to = kept.back().data();
+  rooms()[to] = kept.back().size();
+}
+/// How many entries the source hands the engine from a pointer, a count beside it: as many as the count says - but where
+/// the pointer is one the test took from the stand-in (data() of an object of the engine), the numbers it holds, all
+/// of them: the Blueprint hands the engine the list that node gave it, and the stand-in answers size() on its own
+/// (the count is handed beside them, and compared as well).
+template <class T> std::size_t room(const T* p, std::size_t count) {
+  const auto it = rooms().find(static_cast<const void*>(p));
+  return it == rooms().end() ? count : it->second;
 }
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
@@ -1443,6 +1457,12 @@ template <class... A> std::vector<Value> probe_values(std::tuple<A...>*, std::si
   std::size_t k = from;
   return {probe_value<std::remove_cvref_t<A>>(at[k++ % std::size(at)])...};
 }
+/// The source's callback called at a place to compare it (same_call) is a call of the source as the one the test made:
+/// it runs as that one does - where it goes through a place C++ leaves open (g_open), or is given up (g_bail), its
+/// answer is nothing C++ says, and the test's call is counted with those it has nothing to compare for (g_probe_open,
+/// Tally::take) - as when the call itself had gone there. (Defined below, with the places C++ leaves open.)
+inline bool g_probe_open = false;
+inline bool probe_source(const std::function<bool(std::span<const Value>, Value&)>& f, std::span<const Value> in, Value& out);
 /// Is what the Blueprint gives this callback? The same, bound or not, and where bound, the same answer at a few places
 /// (1.5, -2.25, 4, …), bit for bit - what the engine would get from either.
 template <class R, class Args> bool same_call(const std::function<bool(std::span<const Value>, Value&)>& want, const Value& got) {
@@ -1450,7 +1470,8 @@ template <class R, class Args> bool same_call(const std::function<bool(std::span
   for (int round = 0; round < 3; ++round) {
     const std::vector<Value> in = probe_values(static_cast<Args*>(nullptr), static_cast<std::size_t>(round));
     Value a, b;
-    const bool wa = want(in, a);
+    const bool wa = probe_source(want, in, a);
+    if (g_probe_open) return true;   // (not compared: see Tally::take)
     const bool gb = got.call && got.call->call(in, b);
     if (wa != gb) return differ_at([&] { return std::string(wa ? "bound" : "unbound"); }, [&] { return std::string(gb ? "bound" : "unbound"); });
     if (!wa) return true;
@@ -1467,8 +1488,6 @@ template <FnAndUser S> bool same(const S& want, const Value& got) {
   const Value w = arg(want);
   return same_call<typename Sig::Result, typename Sig::Args>([&](std::span<const Value> in, Value& out) { return w.call && w.call->call(in, out); }, got);
 }
-template <class R, class... A> bool defined(const std::function<R(A...)>&) { return true; }
-template <FnAndUser S> bool defined(const S&) { return true; }
 template <class R, class... A> std::string text(const std::function<R(A...)>& f) { return f ? "(a callback)" : "(no callback)"; }
 template <FnAndUser S> std::string text(const S& s) { return s.fn ? "(a callback)" : "(no callback)"; }
 /// What the Blueprint gives, as the source's callback: one that calls it (the value kept as long as the test runs).
@@ -1636,6 +1655,7 @@ struct Blueprint {
   const std::vector<std::string>& calls(bool in_class) { return (in_class ? compiled : interpreted)->host.stand_in.calls; }
   void before_call(bool in_class) {
     (in_class ? compiled : interpreted)->host.stand_in.calls.clear();
+    (in_class ? compiled : interpreted)->host.stand_in.kept.clear();   // (what objects of the engine were handed before: not of this call - see the source's)
     if (real_engine()) fresh_engine((in_class ? compiled : interpreted)->host.objects);
     (in_class ? compiled_actors : interpreted_actors).restore();
   }
@@ -1835,6 +1855,14 @@ struct Tally {
       ++class_only;
       most_passes_alone = std::max(most_passes_alone, looped);
     }
+    // (a callback the source gives, called to compare it, that went where C++ says nothing: not compared - probe_source)
+    g_probe_open = false;
+    const bool equal = ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0]);
+    if (g_probe_open) {
+      g_probe_open = false;
+      ++outside;
+      return;
+    }
     ++compared;
     if (class_asks > source_asks) {
       if (++costlier == 1 && cost::tracing) {
@@ -1845,7 +1873,7 @@ struct Tally {
       }
       if (class_asks - source_asks > most_class - with_source) most_class = class_asks, with_source = source_asks;
     }
-    if (ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0])) return;
+    if (equal) return;
     if (++wrong <= 3) {
       std::printf("  %s(%s): the source gives %s, the Blueprint %s (interpreter) and %s (class)\n", function, describe().c_str(), text(want).c_str(),
                   !both ? "(not run)" : ia && a.size() == 1 ? shown(a[0]).c_str() : "nothing", ib && b.size() == 1 ? shown(b[0]).c_str() : "nothing");
@@ -1946,6 +1974,42 @@ template <class P> P&& present(P&& p) {
   }
   return std::forward<P>(p);
 }
+
+/// (declared above same_call) The source's callback, called as the source is in a test's call: watched (g_open, the
+/// floating-point flags) and given up where it reads on for ever or holds nothing (g_bail); what the call itself
+/// left stays as it was.
+inline bool probe_source(const std::function<bool(std::span<const Value>, Value&)>& f, std::span<const Value> in, Value& out) {
+  const bool was_open = g_open, could = g_can_bail;
+  const long was_reads = g_open_reads;
+  std::fexcept_t flags;
+  std::fegetexceptflag(&flags, FE_ALL_EXCEPT);
+  std::feclearexcept(FE_ALL_EXCEPT);
+  std::jmp_buf outer;
+  std::memcpy(&outer, &g_bail, sizeof(std::jmp_buf));
+  g_open = false;
+  g_open_reads = 0;
+  volatile bool bound = false, open = false;
+  if (setjmp(g_bail) == 0) {
+    g_can_bail = true;
+    may_bail(true);
+    bound = f(in, out);
+    g_can_bail = false;
+  } else {
+    open = true;
+  }
+  may_bail(false);
+  if (g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0) open = true;
+  std::memcpy(&g_bail, &outer, sizeof(std::jmp_buf));
+  g_can_bail = could;
+  if (could) may_bail(true);
+  g_open = was_open;
+  g_open_reads = was_reads;
+  std::fesetexceptflag(&flags, FE_ALL_EXCEPT);
+  if (open) g_probe_open = true;
+  return bound;
+}
+template <class R, class... A> bool defined(const std::function<R(A...)>&) { return true; }
+template <FnAndUser S> bool defined(const S&) { return true; }
 
 /// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
 template <class C> constexpr std::size_t entries(const C& c) {
@@ -2263,6 +2327,7 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
+    g_source_engine.kept.clear();   // (the Callbacks objects of the engine kept from an earlier call: each call begins with an engine that holds none - both sides alike)
     g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - rule_blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);
   }

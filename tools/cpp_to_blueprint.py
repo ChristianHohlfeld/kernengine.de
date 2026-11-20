@@ -6230,6 +6230,9 @@ class Emit:
                 # value first, then the old one ends (unique_ptr::operator=: the pointer stored, then the old deleted)
                 self.moved_into(ops[1], qtype(callee(n)))
                 got = self.spot(ops[0])
+                if got is None and self.is_slot(ops[0]):
+                    # (m[key] = std::move(v): the key's entry - made where the key is new, as operator[] does -, then replaced)
+                    got = self.spot(self.held_by(ops[0]))
                 if got is None or not self.writable(got[0]):
                     raise Wait("an owned value that holds objects of the engine, replaced where it is no place")
                 lt = got[1]
@@ -12497,7 +12500,9 @@ class TestWriter:
                 per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
                 counted = per is not None   # (only the type says it - no name is read)
                 fixed = declared_length(self.tree, p)   # (an array of a fixed length: so many)
-                data = (f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else
+                # (counted: as many as the count says - of numbers the test took from the stand-in itself, all it holds, as the
+                # Blueprint hands the list its node gave: the stand-in answers data() and size() each on its own; converted::room)
+                data = (f"std::vector<{inner}>({name}, {name} + converted::room({name}, {per} * static_cast<std::size_t>({after['name']})))" if counted else
                         f"({name} ? std::vector<{inner}>({name}, {name} + {fixed}) : std::vector<{inner}>{{}})" if fixed else
                         f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})")
                 params.append((f"const {inner}* {name}", default))
@@ -15251,6 +15256,10 @@ def main(argv):
                     exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
+                # (and what its test left out in the last of these rounds, as the compiler said it - TEST_ERRORS: the cause to look for)
+                dropped = [x for x in (results.get(u) or {}).get("errors", "").split("\n") if x.startswith("--- ") and ": without the " in x]
+                for x in dropped[:12]:
+                    print(f"goes round: {u}: last round {x[4:][:400]}", flush=True)
             for u in sorted(new):
                 # (what it gave in the rounds that went round: of two versions one after the other, what differs - the values)
                 ring = [v for at, v in visited[u] if at >= met[state]]
