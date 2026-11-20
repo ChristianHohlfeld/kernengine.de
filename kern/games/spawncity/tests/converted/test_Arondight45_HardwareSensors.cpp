@@ -49,8 +49,41 @@ template <class T> const T& converted_pointed(const T* p, long long i) {
   if (p != nullptr && !held) return p[i];
   converted::open_read();
   static T none;
-  none = T{};
+  none = converted::none_entry<T>();
   return none;
+}
+// p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
+// any other is marked (C++ leaves it open) and stands at p - a range up to it is empty, nothing is read there.
+template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
+  const auto at = reinterpret_cast<std::uintptr_t>(p);
+  const long long k = static_cast<long long>(n);
+  for (const auto& [first, last] : converted_pointed_lists) {
+    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
+    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
+    const long long e = static_cast<long long>((at - a) / sizeof(T)) + k;
+    if (e >= 0 && e <= static_cast<long long>((b - a) / sizeof(T))) return p + k;
+    converted::open_read();
+    return p;
+  }
+  if (p != nullptr || k == 0) return p + k;
+  converted::open_read();
+  return p;
+}
+template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }
+// n entries from p, as a value of the library is made of them (`std::string_view s(p, n)`): where they do not all
+// stand in the list p points into, the call is marked (C++ leaves it open) and the value has none of them.
+template <class T> struct converted_pointed_range_t {
+  const T* p;
+  std::size_t n;
+  template <class V> requires (!std::is_pointer_v<V> && std::is_constructible_v<V, const T*, std::size_t>) operator V() const { return V(p, n); }
+};
+template <class T, class N> converted_pointed_range_t<T> converted_pointed_range(const T* p, N n) {
+  if ((std::is_signed_v<N> && static_cast<long long>(n) < 0) || static_cast<unsigned long long>(n) > 0x7fffffffffffffffull) {
+    converted::open_read();   // (more entries than any list has)
+    return {p, 0};
+  }
+  const T* e = converted_pointed_end(p, static_cast<long long>(n));
+  return {p, static_cast<std::size_t>(e - p)};
 }
 
 // ---- Arondight45_HardwareSensors.hpp and what it uses, as it stands ----
@@ -172,12 +205,12 @@ namespace hwcontract { inline fc::V3 orient_target(fc::V3 value) {
 namespace hwcontract { inline bool decode_icm42688_registers(const uint8_t raw[14], fc::Imu& out) {
     if (!raw) return false;
     const int16_t bad = std::numeric_limits<int16_t>::min();
-    const int16_t ax = read_be_i16(raw + 2);
-    const int16_t ay = read_be_i16(raw + 4);
-    const int16_t az = read_be_i16(raw + 6);
-    const int16_t gx = read_be_i16(raw + 8);
-    const int16_t gy = read_be_i16(raw + 10);
-    const int16_t gz = read_be_i16(raw + 12);
+    const int16_t ax = read_be_i16(converted_pointed_end(raw, 2));
+    const int16_t ay = read_be_i16(converted_pointed_end(raw, 4));
+    const int16_t az = read_be_i16(converted_pointed_end(raw, 6));
+    const int16_t gx = read_be_i16(converted_pointed_end(raw, 8));
+    const int16_t gy = read_be_i16(converted_pointed_end(raw, 10));
+    const int16_t gz = read_be_i16(converted_pointed_end(raw, 12));
     if (ax == bad || ay == bad || az == bad || gx == bad || gy == bad || gz == bad) return false;
     out.a = orient_target({ax / 2048.0, ay / 2048.0, az / 2048.0});
     out.g = orient_target({gx / 16.4, gy / 16.4, gz / 16.4});
@@ -315,7 +348,7 @@ private:
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::V3& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z)}); }
-[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const fc::V3& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z"); }
 [[maybe_unused]] static bool defined(const fc::V3& s) { return defined(s.x) && defined(s.y) && defined(s.z); }
 [[maybe_unused]] static std::string text(const fc::V3& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + "}"; }
 [[maybe_unused]] static void take(fc::V3& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); }
@@ -328,7 +361,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::Imu& s) { return converted::Value::structure({arg(s.a), arg(s.g)}); }
-[[maybe_unused]] static bool same(const fc::Imu& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.a, (*got.rows)[0]) && same(want.g, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const fc::Imu& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.a, (*got.rows)[0]), ".a") && converted::at_place(same(want.g, (*got.rows)[1]), ".g"); }
 [[maybe_unused]] static bool defined(const fc::Imu& s) { return defined(s.a) && defined(s.g); }
 [[maybe_unused]] static std::string text(const fc::Imu& s) { return std::string("{") + text(s.a) + ", " + text(s.g) + "}"; }
 [[maybe_unused]] static void take(fc::Imu& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<fc::V3>(s.a, (*v.rows)[0]); converted::take_as<fc::V3>(s.g, (*v.rows)[1]); }
@@ -348,7 +381,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace hwcontract { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const hwcontract::NavigationWireFrame& s) { return converted::Value::structure({arg(s.magic), arg(s.version), arg(s.sequence), arg(s.vx_cms), arg(s.vy_cms), arg(s.vz_cms), arg(s.agl_mm), arg(s.flags), arg(s.crc16)}); }
-[[maybe_unused]] static bool same(const hwcontract::NavigationWireFrame& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.magic, (*got.rows)[0]) && same(want.version, (*got.rows)[1]) && same(want.sequence, (*got.rows)[2]) && same(want.vx_cms, (*got.rows)[3]) && same(want.vy_cms, (*got.rows)[4]) && same(want.vz_cms, (*got.rows)[5]) && same(want.agl_mm, (*got.rows)[6]) && same(want.flags, (*got.rows)[7]) && same(want.crc16, (*got.rows)[8]); }
+[[maybe_unused]] static bool same(const hwcontract::NavigationWireFrame& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.magic, (*got.rows)[0]), ".magic") && converted::at_place(same(want.version, (*got.rows)[1]), ".version") && converted::at_place(same(want.sequence, (*got.rows)[2]), ".sequence") && converted::at_place(same(want.vx_cms, (*got.rows)[3]), ".vx_cms") && converted::at_place(same(want.vy_cms, (*got.rows)[4]), ".vy_cms") && converted::at_place(same(want.vz_cms, (*got.rows)[5]), ".vz_cms") && converted::at_place(same(want.agl_mm, (*got.rows)[6]), ".agl_mm") && converted::at_place(same(want.flags, (*got.rows)[7]), ".flags") && converted::at_place(same(want.crc16, (*got.rows)[8]), ".crc16"); }
 [[maybe_unused]] static bool defined(const hwcontract::NavigationWireFrame& s) { return defined(s.magic) && defined(s.version) && defined(s.sequence) && defined(s.vx_cms) && defined(s.vy_cms) && defined(s.vz_cms) && defined(s.agl_mm) && defined(s.flags) && defined(s.crc16); }
 [[maybe_unused]] static std::string text(const hwcontract::NavigationWireFrame& s) { return std::string("{") + text(s.magic) + ", " + text(s.version) + ", " + text(s.sequence) + ", " + text(s.vx_cms) + ", " + text(s.vy_cms) + ", " + text(s.vz_cms) + ", " + text(s.agl_mm) + ", " + text(s.flags) + ", " + text(s.crc16) + "}"; }
 [[maybe_unused]] static void take(hwcontract::NavigationWireFrame& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<unsigned int>(s.magic, (*v.rows)[0]); converted::take_as<unsigned short>(s.version, (*v.rows)[1]); converted::take_as<unsigned short>(s.sequence, (*v.rows)[2]); converted::take_as<short>(s.vx_cms, (*v.rows)[3]); converted::take_as<short>(s.vy_cms, (*v.rows)[4]); converted::take_as<short>(s.vz_cms, (*v.rows)[5]); converted::take_as<unsigned short>(s.agl_mm, (*v.rows)[6]); converted::take_as<unsigned short>(s.flags, (*v.rows)[7]); converted::take_as<unsigned short>(s.crc16, (*v.rows)[8]); }
@@ -366,7 +399,7 @@ namespace hwcontract { using converted::arg; using converted::same; using conver
 }
 namespace fc { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const fc::NavigationState& s) { return converted::Value::structure({arg(s.velocity_world_mps), arg(s.agl_m), arg(s.valid), arg(s.velocity_valid), arg(s.agl_valid), arg(s.heading_deg), arg(s.heading_valid)}); }
-[[maybe_unused]] static bool same(const fc::NavigationState& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.velocity_world_mps, (*got.rows)[0]) && same(want.agl_m, (*got.rows)[1]) && same(want.valid, (*got.rows)[2]) && same(want.velocity_valid, (*got.rows)[3]) && same(want.agl_valid, (*got.rows)[4]) && same(want.heading_deg, (*got.rows)[5]) && same(want.heading_valid, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const fc::NavigationState& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.velocity_world_mps, (*got.rows)[0]), ".velocity_world_mps") && converted::at_place(same(want.agl_m, (*got.rows)[1]), ".agl_m") && converted::at_place(same(want.valid, (*got.rows)[2]), ".valid") && converted::at_place(same(want.velocity_valid, (*got.rows)[3]), ".velocity_valid") && converted::at_place(same(want.agl_valid, (*got.rows)[4]), ".agl_valid") && converted::at_place(same(want.heading_deg, (*got.rows)[5]), ".heading_deg") && converted::at_place(same(want.heading_valid, (*got.rows)[6]), ".heading_valid"); }
 [[maybe_unused]] static bool defined(const fc::NavigationState& s) { return defined(s.velocity_world_mps) && defined(s.agl_m) && defined(s.valid) && defined(s.velocity_valid) && defined(s.agl_valid) && defined(s.heading_deg) && defined(s.heading_valid); }
 [[maybe_unused]] static std::string text(const fc::NavigationState& s) { return std::string("{") + text(s.velocity_world_mps) + ", " + text(s.agl_m) + ", " + text(s.valid) + ", " + text(s.velocity_valid) + ", " + text(s.agl_valid) + ", " + text(s.heading_deg) + ", " + text(s.heading_valid) + "}"; }
 [[maybe_unused]] static void take(fc::NavigationState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<fc::V3>(s.velocity_world_mps, (*v.rows)[0]); converted::take_as<double>(s.agl_m, (*v.rows)[1]); converted::take_as<bool>(s.valid, (*v.rows)[2]); converted::take_as<bool>(s.velocity_valid, (*v.rows)[3]); converted::take_as<bool>(s.agl_valid, (*v.rows)[4]); converted::take_as<double>(s.heading_deg, (*v.rows)[5]); converted::take_as<bool>(s.heading_valid, (*v.rows)[6]); }
@@ -379,7 +412,7 @@ namespace fc { using converted::arg; using converted::same; using converted::def
 }
 namespace hwcontract { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const hwcontract::NavigationWireParser& s) { return converted::Value::structure({arg(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())), arg(s.size_)}); }
-[[maybe_unused]] static bool same(const hwcontract::NavigationWireParser& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(std::vector<unsigned char>(want.buffer_.begin(), want.buffer_.end()), (*got.rows)[0]) && same(want.size_, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const hwcontract::NavigationWireParser& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(std::vector<unsigned char>(want.buffer_.begin(), want.buffer_.end()), (*got.rows)[0]), ".buffer_") && converted::at_place(same(want.size_, (*got.rows)[1]), ".size_"); }
 [[maybe_unused]] static bool defined(const hwcontract::NavigationWireParser& s) { return defined(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())) && defined(s.size_); }
 [[maybe_unused]] static std::string text(const hwcontract::NavigationWireParser& s) { return std::string("{") + text(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())) + ", " + text(s.size_) + "}"; }
 [[maybe_unused]] static void take(hwcontract::NavigationWireParser& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.buffer_); ++k) converted::take_as<unsigned char>(s.buffer_[k], items.item(k)); } converted::take_as<unsigned long>(s.size_, (*v.rows)[1]); }
@@ -393,25 +426,25 @@ namespace hwcontract { using converted::arg; using converted::same; using conver
 }
 namespace hwcontract { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const hwcontract::SbusWireParser& s) { return converted::Value::structure({arg(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())), arg(s.size_), arg(converted::shaped<converted::Whole>(s.last_us_))}); }
-[[maybe_unused]] static bool same(const hwcontract::SbusWireParser& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(std::vector<unsigned char>(want.buffer_.begin(), want.buffer_.end()), (*got.rows)[0]) && same(want.size_, (*got.rows)[1]) && same(converted::shaped<converted::Whole>(want.last_us_), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const hwcontract::SbusWireParser& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(std::vector<unsigned char>(want.buffer_.begin(), want.buffer_.end()), (*got.rows)[0]), ".buffer_") && converted::at_place(same(want.size_, (*got.rows)[1]), ".size_") && converted::at_place(same(converted::shaped<converted::Whole>(want.last_us_), (*got.rows)[2]), ".last_us_"); }
 [[maybe_unused]] static bool defined(const hwcontract::SbusWireParser& s) { return defined(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())) && defined(s.size_) && defined(converted::shaped<converted::Whole>(s.last_us_)); }
 [[maybe_unused]] static std::string text(const hwcontract::SbusWireParser& s) { return std::string("{") + text(std::vector<unsigned char>(s.buffer_.begin(), s.buffer_.end())) + ", " + text(s.size_) + ", " + text(converted::shaped<converted::Whole>(s.last_us_)) + "}"; }
 [[maybe_unused]] static void take(hwcontract::SbusWireParser& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; { const converted::Value& items = (*v.rows)[0]; for (std::size_t k = 0; k < items.size() && k < std::size(s.buffer_); ++k) converted::take_as<unsigned char>(s.buffer_[k], items.item(k)); } converted::take_as<unsigned long>(s.size_, (*v.rows)[1]); converted::take_as<converted::Whole>(s.last_us_, (*v.rows)[2]); }
 }
 struct Out_decode_icm42688_registers { bool Result; fc::Imu out; };
-[[maybe_unused]] static bool same(const Out_decode_icm42688_registers& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_decode_icm42688_registers& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_decode_icm42688_registers& s) { return defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_decode_icm42688_registers& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_decode_navigation_wire { bool Result; fc::NavigationState out; };
-[[maybe_unused]] static bool same(const Out_decode_navigation_wire& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.out, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_decode_navigation_wire& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_decode_navigation_wire& s) { return defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_decode_navigation_wire& s) { return std::string("{") + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_NavigationWireParser_feed { hwcontract::NavigationWireParser Self; bool Result; hwcontract::NavigationWireFrame out; };
-[[maybe_unused]] static bool same(const Out_NavigationWireParser_feed& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.out, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_NavigationWireParser_feed& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.out, (*got.rows)[2]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_NavigationWireParser_feed& s) { return defined(s.Self) && defined(s.Result) && defined(s.out); }
 [[maybe_unused]] static std::string text(const Out_NavigationWireParser_feed& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.out) + "}"; }
 struct Out_SbusWireParser_feed { hwcontract::SbusWireParser Self; bool Result; std::array<unsigned char, 25> frame; };
-[[maybe_unused]] static bool same(const Out_SbusWireParser_feed& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.frame, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_SbusWireParser_feed& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.frame, (*got.rows)[2]), ".frame"); }
 [[maybe_unused]] static bool defined(const Out_SbusWireParser_feed& s) { return defined(s.Self) && defined(s.Result) && defined(s.frame); }
 [[maybe_unused]] static std::string text(const Out_SbusWireParser_feed& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.frame) + "}"; }
 
@@ -420,10 +453,10 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // crc16_ccitt
     converted::Tally tally("crc16_ccitt");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long a1, [[maybe_unused]] unsigned long a2) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::crc16_ccitt((a1 < 0 ? nullptr : a0.data() + a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long& a1, [[maybe_unused]] unsigned long& a2) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::crc16_ccitt((a1 < 0 ? nullptr : a0.data() + a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0(20); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
-      const long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
+      long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
       unsigned long a2 = static_cast<unsigned long>(draw.below(40));
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
@@ -432,7 +465,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, a1, std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -442,10 +477,10 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // read_be_i16
     converted::Tally tally("read_be_i16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long a1) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::read_be_i16((a1 < 0 ? nullptr : a0.data() + a1)); }); };
+    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long& a1) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::read_be_i16((a1 < 0 ? nullptr : a0.data() + a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0(14); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
-      const long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
+      long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size()) + 1));
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
@@ -453,7 +488,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, a1);
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -463,7 +500,7 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // orient_target
     converted::Tally tally("orient_target");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] fc::V3 a0) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::orient_target(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] fc::V3& a0) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::orient_target(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       fc::V3 a0 = draw_fc__V3(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -472,7 +509,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -482,10 +521,10 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // decode_icm42688_registers
     converted::Tally tally("decode_icm42688_registers");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long a1, [[maybe_unused]] fc::Imu a2) { auto r = converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::decode_icm42688_registers((a1 < 0 ? nullptr : a0.data() + a1), a2); }); return Out_decode_icm42688_registers{std::move(r), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] const std::vector<unsigned char>& a0, [[maybe_unused]] long long& a1, [[maybe_unused]] fc::Imu& a2) { auto r = converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::decode_icm42688_registers((a1 < 0 ? nullptr : a0.data() + a1), a2); }); return Out_decode_icm42688_registers{std::move(r), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0(14); for (auto& e : a0) e = static_cast<unsigned char>(draw.below(40));
-      const long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size() - 14) + 1));
+      long long a1 = draw.below(8) == 0 ? -1 : static_cast<long long>(draw.below(static_cast<u32>(a0.size() - 14) + 1));
       fc::Imu a2 = draw_fc__Imu(draw);
       converted_pointed_lists = {{reinterpret_cast<const unsigned char*>(a0.data()), reinterpret_cast<const unsigned char*>(a0.data() + a0.size())}};
       const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
@@ -494,7 +533,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, a1, std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -504,7 +545,7 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // decode_navigation_wire
     converted::Tally tally("decode_navigation_wire");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] hwcontract::NavigationWireFrame a0, [[maybe_unused]] fc::NavigationState a1) { auto r = converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::decode_navigation_wire(a0, a1); }); return Out_decode_navigation_wire{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] hwcontract::NavigationWireFrame& a0, [[maybe_unused]] fc::NavigationState& a1) { auto r = converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::decode_navigation_wire(a0, a1); }); return Out_decode_navigation_wire{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       hwcontract::NavigationWireFrame a0 = draw_hwcontract__NavigationWireFrame(draw);
       fc::NavigationState a1 = draw_fc__NavigationState(draw);
@@ -514,7 +555,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -524,7 +567,7 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // encode_navigation_wire
     converted::Tally tally("encode_navigation_wire");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned short a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5, [[maybe_unused]] bool a6, [[maybe_unused]] double a7, [[maybe_unused]] bool a8) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::encode_navigation_wire(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned short& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] bool& a5, [[maybe_unused]] bool& a6, [[maybe_unused]] double& a7, [[maybe_unused]] bool& a8) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::encode_navigation_wire(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned short a0 = static_cast<unsigned short>(draw.below(40));
       double a1 = draw.number();
@@ -541,7 +584,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7), std::move(a8));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6, a7, a8))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6, a7, a8); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -551,7 +596,7 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // encode_navigation_wire
     converted::Tally tally("encode_navigation_wire_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned short a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::encode_navigation_wire(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned short& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] bool& a5) { return converted::counted([&] { return converted_Arondight45_HardwareSensors::hwcontract::encode_navigation_wire(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned short a0 = static_cast<unsigned short>(draw.below(40));
       double a1 = draw.number();
@@ -565,7 +610,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -575,7 +622,7 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // NavigationWireParser::feed
     converted::Tally tally("NavigationWireParser_feed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] hwcontract::NavigationWireParser a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] hwcontract::NavigationWireFrame a2) { auto r = converted::counted([&] { return a0.feed(std::move(a1), a2); }); return Out_NavigationWireParser_feed{std::move(a0), std::move(r), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] hwcontract::NavigationWireParser& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] hwcontract::NavigationWireFrame& a2) { auto r = converted::counted([&] { return a0.feed(std::move(a1), a2); }); return Out_NavigationWireParser_feed{std::move(a0), std::move(r), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       hwcontract::NavigationWireParser a0 = draw_hwcontract__NavigationWireParser(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -586,7 +633,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -596,7 +645,7 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
   {  // SbusWireParser::feed
     converted::Tally tally("SbusWireParser_feed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] hwcontract::SbusWireParser a0, [[maybe_unused]] unsigned char a1, [[maybe_unused]] u64 a2, [[maybe_unused]] std::array<unsigned char, 25> a3) { auto r = converted::counted([&] { return a0.feed(std::move(a1), std::move(a2), a3); }); return Out_SbusWireParser_feed{std::move(a0), std::move(r), std::move(a3)}; };
+    const auto run = [&]([[maybe_unused]] hwcontract::SbusWireParser& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] u64& a2, [[maybe_unused]] std::array<unsigned char, 25>& a3) { auto r = converted::counted([&] { return a0.feed(std::move(a1), std::move(a2), a3); }); return Out_SbusWireParser_feed{std::move(a0), std::move(r), std::move(a3)}; };
     for (int i = 0; tally.more(i); ++i) {
       hwcontract::SbusWireParser a0 = draw_hwcontract__SbusWireParser(draw);
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -608,7 +657,9 @@ SC_TEST(converted_Arondight45_HardwareSensors) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
