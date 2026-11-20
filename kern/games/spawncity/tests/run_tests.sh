@@ -77,18 +77,25 @@ printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
 cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
+# SC_TEST_BUILD_ONLY=1 (the CI: one job builds, the jobs of the tests take its objects - SC_TEST_OUT - and only link): stop here.
+[ "${SC_TEST_BUILD_ONLY:-}" = 1 ] && { echo "built $out/spawncity_tests"; exit 0; }
 # SC_TEST_SHARD=k/n (the CI: n jobs): this job runs the k-th of every n tests, in both passes; the steps after the
 # tests - the game's own sources, the rules' Blueprint as C++ - the first job alone.
 whole=1
 case "${SC_TEST_SHARD:-}" in "" | 1/*) ;; *) whole=0 ;; esac
+# SC_TEST_PASS=1 or 2 (the CI: a job for each): only the first pass (against the engine's stand-in) or only the second
+# (against the engine itself); the steps after the tests go with the first. Unset: both, one after the other.
+pass="${SC_TEST_PASS:-}"
+case "$pass" in "" | 1 | 2) ;; *) echo "FAIL SC_TEST_PASS=$pass (1 or 2)"; exit 1 ;; esac
+[ "$pass" = 2 ] && whole=0
 # (every test runs, whatever an earlier one gave - see test_main.cpp; the run's result is that of all of it)
 # (up to KERN_JOBS tests at once, else as many as there are cores - test_main.cpp; each in its own process, its lines as one piece in the order of the tests)
 rc=0
-"$out/spawncity_tests" "$@" || rc=1
+[ "$pass" = 2 ] || "$out/spawncity_tests" "$@" || rc=1
 # The converted functions once more against the engine itself: the source and its Blueprint (interpreter,
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
 # for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
-if [ $# -eq 0 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
+if [ $# -eq 0 ] && [ "$pass" != 1 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
 if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
