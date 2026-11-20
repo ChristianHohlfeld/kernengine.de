@@ -1,0 +1,80 @@
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43508:10: warning: unused variable 'connected' [-Wunused-variable]
+ 43508 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43552:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 43552 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43736:9: warning: unused variable 'max_clients' [-Wunused-variable]
+ 43736 |     Int max_clients = 0;
+       |         ^~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43739:10: warning: unused variable 'client_connected' [-Wunused-variable]
+ 43739 |     Bool client_connected = false;
+       |          ^~~~~~~~~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43816:10: warning: unused variable 'connected' [-Wunused-variable]
+ 43816 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43819:10: warning: unused variable 'send' [-Wunused-variable]
+ 43819 |     Bool send = false;
+       |          ^~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43865:10: warning: unused variable 'connected' [-Wunused-variable]
+ 43865 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43868:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 43868 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43888:10: warning: unused variable 'connected' [-Wunused-variable]
+ 43888 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43891:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 43891 |     Bool send = false;
+       |          ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43911:10: warning: unused variable 'connected' [-Wunused-variable]
+ 43911 |     Bool connected = false;
+       |          ^~~~~~~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:43914:10: warning: variable 'send' set but not used [-Wunused-but-set-variable]
+ 43914 |     Bool send = false;
+       |          ^
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/src/level_blueprints.cpp:44011:9: warning: unused variable 'connected_clients' [-Wunused-variable]
+ 44011 |     Int connected_clients = 0;
+       |         ^~~~~~~~~~~~~~~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/converted/test_facades.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/converted/test_net_session_cpp.cpp:1728:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1728 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+3 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-p-vergleich-094253-24884/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+1 warning generated.
+4 warnings generated.
+1 warning generated.
+22 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	4m36,456s
+user	37m53,132s
+sys	0m57,428s
