@@ -1,0 +1,212 @@
+// The town's people: pedestrians on the pavements of the streamed streets and the police
+// officers (SpawnCity world_procedural_population.mjs, pedestrian_agents.mjs, police_ground_units.mjs).
+//
+// People are light agents, not Box3D bodies (SpawnCity's are too): they walk along the pavement
+// beside a street centre line, keep to it from street to street, and run away when something
+// frightens them. A free move (fleeing, an officer closing in) tests the way with a Box3D ray at
+// waist height so nobody walks through a wall. Shots are tested against each person's capsule,
+// vehicles knock people down by their footprint and speed.
+#pragma once
+
+#include <vector>
+
+#include "city_stream.h"
+#include "common.h"
+#include "spawn_guard.h"
+#include "wanted.h"
+
+namespace sc {
+
+/// A vehicle as the people see it (for being run over and for scattering from low flights).
+struct VehicleView {
+  Vec3 position, velocity;
+  Quat rotation;
+  Vec2 half;              // footprint half extents (body X forward, Y left)
+  bool player = false;    // driven / flown by the player (crimes count)
+  bool airborne = false;  // drone / jet: frightens from above, does not run people over
+};
+
+/// The world as the people see it this frame: values. The streamed city they walk in the
+/// functions are given by reference.
+struct PeopleView {
+  const kern::physics::World* physics = nullptr;
+  Vec3 focus;             // where the player is (spawn ring around it)
+  Vec3 player;            // the player's feet (or vehicle)
+  f32 player_speed = 0;
+  bool player_on_foot = true, player_alive = true;
+  // spawn_visibility_guard.mjs: may someone appear here unseen? When `spawn_watched`, nobody of
+  // `spawn_viewers` may see a person `spawn_height` tall appear (spawn::can_spawn; beyond
+  // `spawn_far_entry` an arrival in view is allowed); otherwise anybody may appear anywhere.
+  bool spawn_watched = false;
+  std::vector<spawn::Viewer> spawn_viewers;
+  f32 spawn_far_entry = 0, spawn_height = 0;
+  std::vector<VehicleView> vehicles;
+  std::vector<Vec3> foci;  // the other players (MP host): people live around everybody
+};
+
+/// What the people saw that the wanted tracker hears about.
+struct CrimeReport {
+  wanted::Crime crime;
+  Vec3 at;
+  bool witnessed;
+};
+
+class People {
+ public:
+  // soldier / zombie / enemy: driven by game_military.cpp / game_events.cpp like the officers
+  // (military_response.mjs, zombie_nights.mjs, sandbox_game.mjs); `fight`: a citizen who squares
+  // up to the player (pedestrian_agents.mjs provoke), moved by game_events.cpp.
+  enum class Kind : u8 { citizen, officer, soldier, zombie, enemy };
+  enum class State : u8 { walk, wait, flee, down, gone, officer, fight };
+  struct Person {
+    Kind kind = Kind::citizen;
+    State state = State::walk;
+    Vec3 pos;
+    f32 yaw = 0, speed = 0, v = 0;  // heading (rad), walking pace, current speed
+    f32 hp = 100;                   // world_procedural_population.mjs: a person has 100
+    f32 phase = 0;                  // gait phase (drawing)
+    Vec3 shirt, pants, skin;
+    // pavement route
+    i32 lane = -1, seg = 0, dir = 1;
+    f32 along = 0, side = 1, off = 4;
+    // fright
+    f32 flee_until = 0, burst_until = 0, flee_speed = 0, hands_up_until = 0, shaken_until = 0, wait_until = 0;
+    Vec2 flee_dir;
+    f32 fitness = 1;
+    f32 down_at = 0;                // death time (bodies stay a while)
+    Vec3 fall_dir;                  // which way the body fell
+    // officer (driven by Police)
+    i32 unit = -1;
+    bool aiming = false;
+    f32 aim_pitch = 0;  // rad, + down: where the aiming arms (and the head) point - a mate's view (game_net.cpp)
+    i32 held = -1;      // a weapon in the right hand (weapons::Id; -1 none): a mate's, drawn by PeopleArt
+    bool hands = false; // a VR mate: his arms reach his real hands (world places)
+    Vec3 hand_l, hand_r;
+    u8 punch = 0;       // a mate's blow: bit 0 the right hand jabs, bit 1 the left, bit 2 a knife slash
+    u32 seed = 0;
+    // fighting back (pedestrian_agents.mjs) and the scripted kinds
+    f32 provoked_at = -99, fight_until = 0, last_attack = -99;
+    bool provoked_hit = false;
+    u8 role = 0;                    // enemy type / soldier slot (drawing, rules)
+    f32 knocked_until = 0;          // thrown by a car and getting up again (ragdoll.h, M3 life)
+    f32 hurt_at = -99;              // the last hit taken (the pain voice, game_gaps.cpp)
+    bool remote = false;            // MP: a mate's unit shown here (game_swarm.cpp) - a hit on it is noted for him, nothing is applied here
+    i32 net = -1;                   // MP client: the host's index of this citizen (a puppet of his world)
+    Vec3 net_to;                    // ... where the host has him (eased towards)
+    f32 net_at = 0;                 // ... when (on our clock): he walks on from there at his pace
+  };
+  /// A citizen of the host's world as his snapshot has him (game_worldsync.cpp).
+  struct NetPerson { u8 idx = 0, state = 0, flags = 0; u32 seed = 0; Vec3 pos; f32 yaw = 0, v = 0, at = 0; };
+  /// A death since the last take_deaths() (points, kill feed).
+  struct Death { i32 index; Kind kind; bool by_player; bool head; };
+
+  void set_budget(u32 people) { budget_ = people; }
+  void set_ranges(f32 show, f32 hide) { show_ = show; hide_ = hide; }
+  void clear() { people_.clear(); }
+  /// Walks, flees, spawns and retires people around the focus; knocks people down under vehicles.
+  void update(f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng);
+  /// What the spawn gate (PeopleView::spawn_viewers) said in the last update: arrivals it
+  /// allowed, arrivals it denied.
+  u32 spawns_allowed() const { return spawns_allowed_; }
+  u32 spawns_denied() const { return spawns_denied_; }
+  /// A bullet from `from` to `to`: the first person on that line takes `damage` (x3 on the head).
+  /// Returns the index hit (-1: nobody) and shortens `to` to the hit point.
+  /// Passers-by take hits as world_procedural_population.mjs handleProceduralHit: a round does 55
+  /// (sniper 200, head 165 / Glock and sniper 999), a hit that is not fatal knocks the person down
+  /// (ragdoll, gets up again); someone lying there is no target. `melee_ns` >= 0: a fist or knife
+  /// (punch: damage, at hp <= 35 down, else a stagger of .22 x max(.5, ns / 30) m).
+  /// `self_r`: a person this close (2-D) to `from` is the shooter and skipped - 0 for the player's
+  /// rounds, grenades and blows (a fist starts inside that radius of the one it hits).
+  i32 shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 melee_ns = -1, f32 self_r = 0.5f);
+  /// An explosion: damage falling off over `radius`, everyone in 2.5 x radius runs.
+  void blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now);
+  /// Everyone within `radius` runs away from `at` (shots, low flights, crashes).
+  void frighten(Vec3 at, f32 radius, f32 now, f32 strength = 1);
+  /// Crimes since the last call (to the wanted tracker).
+  void take_reports(std::vector<CrimeReport>& out) { out.insert(out.end(), reports_.begin(), reports_.end()); reports_.clear(); }
+
+  // officers (Police places and moves them; they share hits and drawing with everybody else)
+  i32 add_officer(Vec3 at, f32 yaw, i32 unit, u32 seed);
+  /// A citizen put somewhere in plain sight (a driver who gets out of his car); the caller sets
+  /// his pavement route (lane, seg, along, side, off) and what he does.
+  i32 add_citizen(Vec3 at, f32 yaw, u32 seed);
+  Person& at(i32 i) { return people_[static_cast<std::size_t>(i)]; }
+  const std::vector<Person>& all() const { return people_; }
+  /// A free step along `dir` that does not go through walls (tries turned directions).
+  bool free_move(const kern::physics::World& w, Person& p, Vec2 dir, f32 step, bool keep);
+  /// Someone sees the place (a living citizen within 45 m): crimes there are witnessed.
+  bool witnessed(Vec3 at) const;
+  u32 count(Kind k, bool alive_only = true) const;
+  /// A scripted person (soldier, zombie, enemy) at `at`; returns its index.
+  i32 add_scripted(Kind k, Vec3 at, f32 yaw, f32 hp, u32 seed, Vec3 shirt, Vec3 pants, Vec3 skin, u8 role);
+  /// Damage to person `i` from somewhere else (a mate's round on our zombie): down at 0.
+  void hurt(i32 i, f32 damage, Vec3 from_dir, bool by_player, f32 now) {
+    Person& p = at(i);
+    if (p.state == State::down || p.state == State::gone) return;
+    p.hp -= damage;
+    p.hurt_at = now;
+    if (p.hp <= 0) kill(i, from_dir, by_player, now, false);
+  }
+  void take_deaths(std::vector<Death>& out) { out.insert(out.end(), deaths_.begin(), deaths_.end()); deaths_.clear(); }
+  /// MP: what our rounds and blows did to a mate's unit (Person::remote) since the last call: the
+  /// damage by the unit's own rule (an officer 25 a counted hit, the others damage x 3 on the head) -
+  /// its owner applies it. Blasts are not noted: every machine runs a mate's blast on its own units.
+  struct RemoteHit { i32 index; f32 damage; };
+  void take_remote_hits(std::vector<RemoteHit>& out) { out.insert(out.end(), remote_hits_.begin(), remote_hits_.end()); remote_hits_.clear(); }
+  /// MP client: what we did to a citizen of the host's town that he survived (a round, a blow, our
+  /// car) since the last call - the host applies it (mate_hurt), so the person is hurt and runs for
+  /// everybody. A death goes its own way (take_deaths, "npc-death").
+  enum class HurtBy : u8 { round, blow, vehicle, kLast = vehicle };
+  struct Hurt { u8 net; u32 seed; f32 damage; HurtBy by; Vec3 push; };
+  void take_hurts(std::vector<Hurt>& out) { out.insert(out.end(), hurts_.begin(), hurts_.end()); hurts_.clear(); }
+  /// MP host: a mate's hit on citizen `index` (seed: it is still the same person), by the rules a
+  /// hit of our own follows - down at 0, a ragdoll that gets up again (a blow: only at 35 or less),
+  /// the people around run. No crime of ours.
+  void mate_hurt(i32 index, u32 seed, f32 damage, HurtBy by, Vec3 push, f32 now);
+  /// A fall since the last take_falls() (ragdolls, M3 life): `push` is the car's throw (m/s,
+  /// people_impacts.mjs) for `car`, else the direction of the shot or blast; `alive`: knocked down
+  /// by a car and getting up again (the person waits until stand_up()).
+  struct Fall { i32 index; Vec3 push; bool car; bool alive; };
+  void take_falls(std::vector<Fall>& out) { out.insert(out.end(), falls_.begin(), falls_.end()); falls_.clear(); }
+  void stand_up(i32 i, Vec3 feet, f32 yaw) { Person& p = at(i); p.pos = feet; p.yaw = yaw; p.knocked_until = 0; }
+  /// MP client: the citizens are the host's (puppets eased to his snapshots, no own spawning).
+  void set_puppets(bool on) { if (on != puppets_) { puppets_ = on; for (Person& p : people_) if (p.kind == Kind::citizen) p.state = State::gone; } }
+  bool puppets() const { return puppets_; }
+  /// One snapshot of the host's citizens (all of them near any player): new ones appear, known
+  /// ones move there, a death or a fall there is one here, the ones not in it are gone.
+  void apply_snapshot(const std::vector<NetPerson>& list, f32 now);
+  /// The colours and pace a citizen's seed gives (the same on every machine).
+  static void dress(Person& p);
+  /// Whether the last hit of shot() was on the head (headshot_feedback.mjs).
+  bool last_head() const { return last_head_; }
+
+ public:
+  /// VR grab: the person goes down as a ragdoll (gets up again later), pushed by `push`.
+  void grab_knock(i32 index, Vec3 push, f32 now) { if (index >= 0 && index < static_cast<i32>(people_.size())) knock(index, push, now); }
+
+ private:
+  void spawn(const PeopleView& view, const CityStream& city, Rng& rng, f32 now);
+  void walk(Person& p, f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng);
+  /// Person `i` (its place in people_) down for good.
+  void kill(i32 i, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car);
+  /// Down as a ragdoll that gets up again (world_procedural_population.mjs knockPerson).
+  void knock(i32 i, Vec3 push, f32 now) {
+    Person& p = people_[static_cast<std::size_t>(i)];
+    falls_.push_back({i, push, false, true});
+    p.knocked_until = now + 6;
+    p.v = 0;
+  }
+  bool route_point(const Person& p, const std::vector<Lane>& lanes, Vec3& out, f32& heading) const;
+  std::vector<Person> people_;
+  std::vector<CrimeReport> reports_;
+  std::vector<Death> deaths_;
+  std::vector<Fall> falls_;
+  std::vector<RemoteHit> remote_hits_;
+  std::vector<Hurt> hurts_;
+  bool last_head_ = false, puppets_ = false;
+  u32 budget_ = 60, serial_ = 1;
+  u32 spawns_allowed_ = 0, spawns_denied_ = 0;
+  f32 show_ = 170, hide_ = 190;
+};
+
+}  // namespace sc

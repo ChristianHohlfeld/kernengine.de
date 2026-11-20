@@ -180,6 +180,127 @@ KERN_LAYOUT(shapes) {
   next_id(1);
 }
 
+}  // namespace kern_blueprint_6025b4a819f918d1
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Float_2_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::f64>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Float_2_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::f64>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Float_2_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Float_3_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::f64>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Float_3_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::f64>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Float_3_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Float_4_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::f64>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Float_4_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::f64>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Float_4_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Float_5_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::f64>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Float_5_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::f64>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Float_5_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Float_Vector_pair> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::f64>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Float_Vector_pair from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::Vec3>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Float_Vector_pair& s) { return Value::structure({to_value(s.first), to_value(s.second)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Int64_Int_pair> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Int64_Int_pair from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<kern::i64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Int64_Int_pair& s) { return Value::structure({to_value(s.first), to_value(s.second)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Int_4_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::logic::Whole>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Int_4_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::logic::Whole>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Int_4_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Int_Bool_pair> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::i64>(*v.field(0)) && is_value<bool>(*v.field(1)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Int_Bool_pair from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<bool>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Int_Bool_pair& s) { return Value::structure({to_value(s.first), to_value(s.second)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Int_Float_pair> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::i64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Int_Float_pair from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::f64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Int_Float_pair& s) { return Value::structure({to_value(s.first), to_value(s.second)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Int_Int_pair> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Int_Int_pair from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Int_Int_pair& s) { return Value::structure({to_value(s.first), to_value(s.second)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Int_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::logic::Whole>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Int_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::logic::Whole>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Int_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Vector_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::Vec3>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Vector_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::Vec3>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Vector_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_6025b4a819f918d1::shapes::Vector_row_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<::kern_blueprint_6025b4a819f918d1::shapes::Vector_row>>(*v.field(0)); }
+  static ::kern_blueprint_6025b4a819f918d1::shapes::Vector_row_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_6025b4a819f918d1::shapes::Vector_row>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6025b4a819f918d1::shapes::Vector_row_row& s) { return Value::structure({to_value(s.items)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_6025b4a819f918d1 {
 
 }  // namespace kern_blueprint_6025b4a819f918d1
 
@@ -226,6 +347,19 @@ KERN_LAYOUT(engine_geo_roads) {
   next_id(17);
 }
 
+}  // namespace kern_blueprint_c57f7a6bcfc775fb
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_c57f7a6bcfc775fb::engine_geo_roads::GeoProjector> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)); }
+  static ::kern_blueprint_c57f7a6bcfc775fb::engine_geo_roads::GeoProjector from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_c57f7a6bcfc775fb::engine_geo_roads::GeoProjector& s) { return Value::structure({to_value(s.lon0), to_value(s.lat0), to_value(s.cos_lat)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_c57f7a6bcfc775fb {
 
 }  // namespace kern_blueprint_c57f7a6bcfc775fb
 
@@ -1037,6 +1171,46 @@ KERN_LAYOUT(engine_math_math) {
   next_id(527);
 }
 
+}  // namespace kern_blueprint_388516bead732334
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_388516bead732334::engine_math_math::Mat4> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::f64>>(*v.field(0)); }
+  static ::kern_blueprint_388516bead732334::engine_math_math::Mat4 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::f64>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_388516bead732334::engine_math_math::Mat4& s) { return Value::structure({to_value(s.m)}); }
+};
+template <> struct Held<::kern_blueprint_388516bead732334::engine_math_math::Quat> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)); }
+  static ::kern_blueprint_388516bead732334::engine_math_math::Quat from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_388516bead732334::engine_math_math::Quat& s) { return Value::structure({to_value(s.x), to_value(s.y), to_value(s.z), to_value(s.w)}); }
+};
+template <> struct Held<::kern_blueprint_388516bead732334::engine_math_math::Vec4> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)); }
+  static ::kern_blueprint_388516bead732334::engine_math_math::Vec4 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_388516bead732334::engine_math_math::Vec4& s) { return Value::structure({to_value(s.x), to_value(s.y), to_value(s.z), to_value(s.w)}); }
+};
+template <> struct Held<::kern_blueprint_388516bead732334::engine_math_math::Camera> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 10 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<bool>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<bool>(*v.field(8)) && is_value<::kern_blueprint_388516bead732334::engine_math_math::Mat4>(*v.field(9)); }
+  static ::kern_blueprint_388516bead732334::engine_math_math::Camera from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<bool>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<bool>(*v.field(8)), from_value<::kern_blueprint_388516bead732334::engine_math_math::Mat4>(*v.field(9))};
+  }
+  static Value to(const ::kern_blueprint_388516bead732334::engine_math_math::Camera& s) { return Value::structure({to_value(s.eye), to_value(s.target), to_value(s.up), to_value(s.fov), to_value(s.near), to_value(s.far), to_value(s.orthographic), to_value(s.ortho_height), to_value(s.has_projection), to_value(s.projection)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_388516bead732334 {
 
 }  // namespace kern_blueprint_388516bead732334
 
@@ -1086,6 +1260,28 @@ KERN_LAYOUT(jet_seats) {
   next_id(12);
 }
 
+}  // namespace kern_blueprint_9e16ff6b0cc7a88d
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::i64>(*v.field(2)); }
+  static ::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::i64>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Row& s) { return Value::structure({to_value(s.owner), to_value(s.pilot), to_value(s.passenger)}); }
+};
+template <> struct Held<::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Table> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::List<::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Row>>(*v.field(0)) && is_value<kern::i64>(*v.field(1)); }
+  static ::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Table from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Row>>(*v.field(0)), from_value<kern::i64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_9e16ff6b0cc7a88d::jet_seats::seats_Table& s) { return Value::structure({to_value(s.rows_), to_value(s.revision_)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_9e16ff6b0cc7a88d {
 
 }  // namespace kern_blueprint_9e16ff6b0cc7a88d
 
@@ -1532,6 +1728,19 @@ KERN_LAYOUT(qr_code) {
   next_id(374);
 }
 
+}  // namespace kern_blueprint_f1248d4ad2e4cc95
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_f1248d4ad2e4cc95::qr_code::qr_Code> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::List<kern::logic::Whole>>(*v.field(2)); }
+  static ::kern_blueprint_f1248d4ad2e4cc95::qr_code::qr_Code from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::List<kern::logic::Whole>>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_f1248d4ad2e4cc95::qr_code::qr_Code& s) { return Value::structure({to_value(s.version), to_value(s.size), to_value(s.modules)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_f1248d4ad2e4cc95 {
 
 }  // namespace kern_blueprint_f1248d4ad2e4cc95
 
@@ -1719,6 +1928,100 @@ KERN_LAYOUT(engine_physics_physics) {
   next_id(33);
 }
 
+}  // namespace kern_blueprint_ba8d70e522c7d944
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::logic::Int64>(*v.field(0)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body& s) { return Value::structure({to_value(s.id)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Joint> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::logic::Int64>(*v.field(0)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Joint from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Joint& s) { return Value::structure({to_value(s.id)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_QueryFilter> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<kern::logic::Int64>(*v.field(1)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_QueryFilter from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<kern::logic::Int64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_QueryFilter& s) { return Value::structure({to_value(s.mask_bits), to_value(s.category_bits)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Shape> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::logic::Int64>(*v.field(0)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Shape from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Shape& s) { return Value::structure({to_value(s.id)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_BodySettings> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 13 && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_BodyType>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::Quat>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)) && is_value<kern::Vec3>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<bool>(*v.field(8)) && is_value<bool>(*v.field(9)) && is_value<bool>(*v.field(10)) && is_value<bool>(*v.field(11)) && is_value<kern::logic::Int64>(*v.field(12)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_BodySettings from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_BodyType>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::Quat>(*v.field(2)), from_value<kern::Vec3>(*v.field(3)), from_value<kern::Vec3>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<bool>(*v.field(8)), from_value<bool>(*v.field(9)), from_value<bool>(*v.field(10)), from_value<bool>(*v.field(11)), from_value<kern::logic::Int64>(*v.field(12))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_BodySettings& s) { return Value::structure({to_value(s.type), to_value(s.position), to_value(s.rotation), to_value(s.linear_velocity), to_value(s.angular_velocity), to_value(s.linear_damping), to_value(s.angular_damping), to_value(s.gravity_scale), to_value(s.enable_sleep), to_value(s.awake), to_value(s.enabled), to_value(s.bullet), to_value(s.user)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Pose> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::Vec3>(*v.field(0)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::Quat>(*v.field(1)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Pose from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::Quat>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Pose& s) { return Value::structure({to_value(s.position), to_value(s.rotation)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_RayHit> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 6 && is_value<bool>(*v.field(0)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Shape>(*v.field(1)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)) && is_value<kern::Vec3>(*v.field(4)) && is_value<kern::f64>(*v.field(5)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_RayHit from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<bool>(*v.field(0)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Shape>(*v.field(1)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body>(*v.field(2)), from_value<kern::Vec3>(*v.field(3)), from_value<kern::Vec3>(*v.field(4)), from_value<kern::f64>(*v.field(5))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_RayHit& s) { return Value::structure({to_value(s.hit), to_value(s.shape), to_value(s.body), to_value(s.point), to_value(s.normal), to_value(s.fraction)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeMaterial> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 13 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<kern::logic::Int64>(*v.field(5)) && is_value<kern::logic::Int64>(*v.field(6)) && is_value<kern::i64>(*v.field(7)) && is_value<bool>(*v.field(8)) && is_value<bool>(*v.field(9)) && is_value<bool>(*v.field(10)) && is_value<kern::logic::Int64>(*v.field(11)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Surface>(*v.field(12)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeMaterial from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<kern::logic::Int64>(*v.field(5)), from_value<kern::logic::Int64>(*v.field(6)), from_value<kern::i64>(*v.field(7)), from_value<bool>(*v.field(8)), from_value<bool>(*v.field(9)), from_value<bool>(*v.field(10)), from_value<kern::logic::Int64>(*v.field(11)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Surface>(*v.field(12))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeMaterial& s) { return Value::structure({to_value(s.density), to_value(s.friction), to_value(s.restitution), to_value(s.rolling_resistance), to_value(s.sensor), to_value(s.category_bits), to_value(s.mask_bits), to_value(s.group_index), to_value(s.contact_events), to_value(s.sensor_events), to_value(s.hit_events), to_value(s.user), to_value(s.surface)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_JointSettings> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 40 && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_JointType>(*v.field(0)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body>(*v.field(1)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body>(*v.field(2)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Pose>(*v.field(3)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Pose>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<bool>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<bool>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<kern::f64>(*v.field(11)) && is_value<bool>(*v.field(12)) && is_value<kern::f64>(*v.field(13)) && is_value<kern::f64>(*v.field(14)) && is_value<kern::f64>(*v.field(15)) && is_value<kern::Vec3>(*v.field(16)) && is_value<kern::f64>(*v.field(17)) && is_value<kern::f64>(*v.field(18)) && is_value<kern::f64>(*v.field(19)) && is_value<kern::f64>(*v.field(20)) && is_value<kern::f64>(*v.field(21)) && is_value<kern::Vec3>(*v.field(22)) && is_value<kern::Vec3>(*v.field(23)) && is_value<kern::f64>(*v.field(24)) && is_value<kern::f64>(*v.field(25)) && is_value<kern::f64>(*v.field(26)) && is_value<kern::f64>(*v.field(27)) && is_value<bool>(*v.field(28)) && is_value<bool>(*v.field(29)) && is_value<kern::f64>(*v.field(30)) && is_value<kern::f64>(*v.field(31)) && is_value<kern::f64>(*v.field(32)) && is_value<kern::f64>(*v.field(33)) && is_value<kern::f64>(*v.field(34)) && is_value<kern::f64>(*v.field(35)) && is_value<kern::f64>(*v.field(36)) && is_value<kern::f64>(*v.field(37)) && is_value<kern::f64>(*v.field(38)) && is_value<kern::logic::Int64>(*v.field(39)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_JointSettings from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_JointType>(*v.field(0)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body>(*v.field(1)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Body>(*v.field(2)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Pose>(*v.field(3)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_Pose>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<bool>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<bool>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<kern::f64>(*v.field(11)), from_value<bool>(*v.field(12)), from_value<kern::f64>(*v.field(13)), from_value<kern::f64>(*v.field(14)), from_value<kern::f64>(*v.field(15)), from_value<kern::Vec3>(*v.field(16)), from_value<kern::f64>(*v.field(17)), from_value<kern::f64>(*v.field(18)), from_value<kern::f64>(*v.field(19)), from_value<kern::f64>(*v.field(20)), from_value<kern::f64>(*v.field(21)), from_value<kern::Vec3>(*v.field(22)), from_value<kern::Vec3>(*v.field(23)), from_value<kern::f64>(*v.field(24)), from_value<kern::f64>(*v.field(25)), from_value<kern::f64>(*v.field(26)), from_value<kern::f64>(*v.field(27)), from_value<bool>(*v.field(28)), from_value<bool>(*v.field(29)), from_value<kern::f64>(*v.field(30)), from_value<kern::f64>(*v.field(31)), from_value<kern::f64>(*v.field(32)), from_value<kern::f64>(*v.field(33)), from_value<kern::f64>(*v.field(34)), from_value<kern::f64>(*v.field(35)), from_value<kern::f64>(*v.field(36)), from_value<kern::f64>(*v.field(37)), from_value<kern::f64>(*v.field(38)), from_value<kern::logic::Int64>(*v.field(39))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_JointSettings& s) { return Value::structure({to_value(s.type), to_value(s.body_a), to_value(s.body_b), to_value(s.frame_a), to_value(s.frame_b), to_value(s.collide_connected), to_value(s.enable_spring), to_value(s.hertz), to_value(s.damping_ratio), to_value(s.enable_limit), to_value(s.lower), to_value(s.upper), to_value(s.enable_motor), to_value(s.motor_speed), to_value(s.max_motor_torque), to_value(s.max_motor_force), to_value(s.motor_velocity), to_value(s.length), to_value(s.linear_hertz), to_value(s.angular_hertz), to_value(s.linear_damping_ratio), to_value(s.angular_damping_ratio), to_value(s.linear_velocity), to_value(s.angular_velocity), to_value(s.max_velocity_force), to_value(s.max_velocity_torque), to_value(s.max_spring_force), to_value(s.max_spring_torque), to_value(s.enable_steering), to_value(s.enable_steering_limit), to_value(s.steering_hertz), to_value(s.steering_damping_ratio), to_value(s.target_steering), to_value(s.max_steering_torque), to_value(s.steering_lower), to_value(s.steering_upper), to_value(s.max_torque), to_value(s.constraint_hertz), to_value(s.constraint_damping_ratio), to_value(s.user)}); }
+};
+template <> struct Held<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeSettings> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 9 && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeKind>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::Quat>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::List<kern::Vec3>>(*v.field(6)) && is_value<kern::List<kern::logic::Whole>>(*v.field(7)) && is_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeMaterial>(*v.field(8)); }
+  static ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeSettings from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeKind>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::Quat>(*v.field(2)), from_value<kern::Vec3>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::List<kern::Vec3>>(*v.field(6)), from_value<kern::List<kern::logic::Whole>>(*v.field(7)), from_value<::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeMaterial>(*v.field(8))};
+  }
+  static Value to(const ::kern_blueprint_ba8d70e522c7d944::engine_physics_physics::physics_ShapeSettings& s) { return Value::structure({to_value(s.kind), to_value(s.center), to_value(s.rotation), to_value(s.size), to_value(s.radius), to_value(s.length), to_value(s.points), to_value(s.indices), to_value(s.material)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_ba8d70e522c7d944 {
 
 }  // namespace kern_blueprint_ba8d70e522c7d944
 
@@ -2185,6 +2488,37 @@ KERN_LAYOUT(common) {
   next_id(266);
 }
 
+}  // namespace kern_blueprint_416f27166223668d
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_416f27166223668d::common::Rng> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::i64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<bool>(*v.field(2)); }
+  static ::kern_blueprint_416f27166223668d::common::Rng from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<bool>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_416f27166223668d::common::Rng& s) { return Value::structure({to_value(s.s), to_value(s.spare_), to_value(s.has_spare_)}); }
+};
+template <> struct Held<::kern_blueprint_416f27166223668d::common::the_RayResult_> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<bool>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)); }
+  static ::kern_blueprint_416f27166223668d::common::the_RayResult_ from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<bool>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::Vec3>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_416f27166223668d::common::the_RayResult_& s) { return Value::structure({to_value(s.hit), to_value(s.distance), to_value(s.point), to_value(s.normal)}); }
+};
+template <> struct Held<::kern_blueprint_416f27166223668d::common::BodyState> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<::kern_blueprint_416f27166223668d::common::Quat>(*v.field(3)); }
+  static ::kern_blueprint_416f27166223668d::common::BodyState from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<::kern_blueprint_416f27166223668d::common::Quat>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_416f27166223668d::common::BodyState& s) { return Value::structure({to_value(s.position), to_value(s.velocity), to_value(s.angular), to_value(s.rotation)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_416f27166223668d {
 
 }  // namespace kern_blueprint_416f27166223668d
 
@@ -2267,6 +2601,46 @@ KERN_LAYOUT(lamps) {
   next_id(147);
 }
 
+}  // namespace kern_blueprint_315081d4e46950aa
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_315081d4e46950aa::lamps::lamps_Field_BlastHit> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::f64>(*v.field(3)); }
+  static ::kern_blueprint_315081d4e46950aa::lamps::lamps_Field_BlastHit from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::f64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_315081d4e46950aa::lamps::lamps_Field_BlastHit& s) { return Value::structure({to_value(s.lamp), to_value(s.state), to_value(s.dir), to_value(s.speed)}); }
+};
+template <> struct Held<::kern_blueprint_315081d4e46950aa::lamps::lamps_Field_CarHit> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::i64>(*v.field(0)) && is_value<bool>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<bool>(*v.field(3)); }
+  static ::kern_blueprint_315081d4e46950aa::lamps::lamps_Field_CarHit from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<bool>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<bool>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_315081d4e46950aa::lamps::lamps_Field_CarHit& s) { return Value::structure({to_value(s.lamp), to_value(s.topple), to_value(s.impulse), to_value(s.clang)}); }
+};
+template <> struct Held<::kern_blueprint_315081d4e46950aa::lamps::lamps_Lamp> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 6 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<kern::logic::Int64>(*v.field(4)) && is_value<kern::i64>(*v.field(5)); }
+  static ::kern_blueprint_315081d4e46950aa::lamps::lamps_Lamp from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<kern::logic::Int64>(*v.field(4)), from_value<kern::i64>(*v.field(5))};
+  }
+  static Value to(const ::kern_blueprint_315081d4e46950aa::lamps::lamps_Lamp& s) { return Value::structure({to_value(s.foot), to_value(s.yaw), to_value(s.head), to_value(s.state), to_value(s.key), to_value(s.lane)}); }
+};
+template <> struct Held<::kern_blueprint_315081d4e46950aa::lamps::lamps_Field> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::List<::kern_blueprint_315081d4e46950aa::lamps::lamps_Lamp>>(*v.field(0)) && is_value<kern::logic::Set<kern::logic::Int64>>(*v.field(1)) && is_value<kern::logic::Map<kern::logic::Int64, kern::logic::Whole>>(*v.field(2)) && is_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(3)); }
+  static ::kern_blueprint_315081d4e46950aa::lamps::lamps_Field from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_315081d4e46950aa::lamps::lamps_Lamp>>(*v.field(0)), from_value<kern::logic::Set<kern::logic::Int64>>(*v.field(1)), from_value<kern::logic::Map<kern::logic::Int64, kern::logic::Whole>>(*v.field(2)), from_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_315081d4e46950aa::lamps::lamps_Field& s) { return Value::structure({to_value(s.lamps_), to_value(s.seen_), to_value(s.broken_), to_value(s.grid_)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_315081d4e46950aa {
 
 }  // namespace kern_blueprint_315081d4e46950aa
 
@@ -2358,6 +2732,91 @@ KERN_LAYOUT(mvt) {
   next_id(112);
 }
 
+}  // namespace kern_blueprint_5eb1d61c7210d38b
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Piece> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Piece from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Piece& s) { return Value::structure({to_value(s.at), to_value(s.end)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Feature> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_GeomType>(*v.field(1)) && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::Int_Int_pair>>(*v.field(2)) && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::Vector_row>>(*v.field(3)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Feature from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_GeomType>(*v.field(1)), from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::Int_Int_pair>>(*v.field(2)), from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::Vector_row>>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Feature& s) { return Value::structure({to_value(s.id), to_value(s.type), to_value(s.tags), to_value(s.parts)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value_Kind>(*v.field(0)) && is_value<kern::logic::Text>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<bool>(*v.field(3)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value_Kind>(*v.field(0)), from_value<kern::logic::Text>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<bool>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value& s) { return Value::structure({to_value(s.kind), to_value(s.s), to_value(s.n), to_value(s.b)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::Text_mvt_Value_pair> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::logic::Text>(*v.field(0)) && is_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value>(*v.field(1)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::Text_mvt_Value_pair from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Text>(*v.field(0)), from_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::Text_mvt_Value_pair& s) { return Value::structure({to_value(s.first), to_value(s.second)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Layer> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 5 && is_value<kern::logic::Text>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::List<kern::logic::Text>>(*v.field(2)) && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value>>(*v.field(3)) && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Feature>>(*v.field(4)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Layer from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Text>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::List<kern::logic::Text>>(*v.field(2)), from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value>>(*v.field(3)), from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Feature>>(*v.field(4))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Layer& s) { return Value::structure({to_value(s.name), to_value(s.extent), to_value(s.keys), to_value(s.values), to_value(s.features)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer_PendingLayer> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 5 && is_value<kern::logic::Text>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::List<kern::logic::Text>>(*v.field(2)) && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value>>(*v.field(3)) && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::Int_row>>(*v.field(4)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer_PendingLayer from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Text>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::List<kern::logic::Text>>(*v.field(2)), from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Value>>(*v.field(3)), from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::Int_row>>(*v.field(4))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer_PendingLayer& s) { return Value::structure({to_value(s.name), to_value(s.extent), to_value(s.keys), to_value(s.values), to_value(s.features)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Tile> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Layer>>(*v.field(0)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Tile from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Layer>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Tile& s) { return Value::structure({to_value(s.layers)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer_PendingLayer>(*v.field(0)) && is_value<kern::List<kern::logic::Whole>>(*v.field(1)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer_PendingLayer>(*v.field(0)), from_value<kern::List<kern::logic::Whole>>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Writer& s) { return Value::structure({to_value(s.layer_), to_value(s.out_)}); }
+};
+template <> struct Held<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Decoder> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 8 && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Piece>>(*v.field(0)) && is_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Piece>>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<bool>(*v.field(6)) && is_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Tile>(*v.field(7)); }
+  static ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Decoder from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Piece>>(*v.field(0)), from_value<kern::List<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Piece>>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<bool>(*v.field(6)), from_value<::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Tile>(*v.field(7))};
+  }
+  static Value to(const ::kern_blueprint_5eb1d61c7210d38b::mvt::mvt_Decoder& s) { return Value::structure({to_value(s.layers_), to_value(s.features_), to_value(s.layer_), to_value(s.feature_), to_value(s.layer_open_), to_value(s.done_), to_value(s.failed_), to_value(s.tile_)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_5eb1d61c7210d38b {
 
 }  // namespace kern_blueprint_5eb1d61c7210d38b
 
@@ -2408,6 +2867,28 @@ KERN_LAYOUT(road_graph) {
   next_id(348);
 }
 
+}  // namespace kern_blueprint_3a4ae1d57fed8576
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph_Node> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::List<::kern_blueprint_3a4ae1d57fed8576::road_graph::Int_Float_pair>>(*v.field(1)); }
+  static ::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph_Node from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::List<::kern_blueprint_3a4ae1d57fed8576::road_graph::Int_Float_pair>>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph_Node& s) { return Value::structure({to_value(s.p), to_value(s.edges)}); }
+};
+template <> struct Held<::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<kern::List<::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph_Node>>(*v.field(1)) && is_value<kern::logic::Map<kern::logic::Int64, kern::logic::Whole>>(*v.field(2)); }
+  static ::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<kern::List<::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph_Node>>(*v.field(1)), from_value<kern::logic::Map<kern::logic::Int64, kern::logic::Whole>>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_3a4ae1d57fed8576::road_graph::RoadGraph& s) { return Value::structure({to_value(s.built_from), to_value(s.nodes_), to_value(s.cells_)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_3a4ae1d57fed8576 {
 
 }  // namespace kern_blueprint_3a4ae1d57fed8576
 
@@ -2562,6 +3043,28 @@ KERN_LAYOUT(perf) {
   next_id(228);
 }
 
+}  // namespace kern_blueprint_1b97e0faae1f6c60
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_1b97e0faae1f6c60::perf::perf_Governor> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 11 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<bool>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::List<kern::f64>>(*v.field(8)) && is_value<kern::List<kern::f64>>(*v.field(9)) && is_value<kern::i64>(*v.field(10)); }
+  static ::kern_blueprint_1b97e0faae1f6c60::perf::perf_Governor from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<bool>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::List<kern::f64>>(*v.field(8)), from_value<kern::List<kern::f64>>(*v.field(9)), from_value<kern::i64>(*v.field(10))};
+  }
+  static Value to(const ::kern_blueprint_1b97e0faae1f6c60::perf::perf_Governor& s) { return Value::structure({to_value(s.tier_), to_value(s.max_), to_value(s.auto_), to_value(s.avg_dt_), to_value(s.clock_), to_value(s.since_change_), to_value(s.low_), to_value(s.high_), to_value(s.block_until_), to_value(s.block_len_), to_value(s.changes_)}); }
+};
+template <> struct Held<::kern_blueprint_1b97e0faae1f6c60::perf::perf_Meter> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 7 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::List<kern::f64>>(*v.field(2)) && is_value<kern::List<kern::f64>>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)); }
+  static ::kern_blueprint_1b97e0faae1f6c60::perf::perf_Meter from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::List<kern::f64>>(*v.field(2)), from_value<kern::List<kern::f64>>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::f64>(*v.field(6))};
+  }
+  static Value to(const ::kern_blueprint_1b97e0faae1f6c60::perf::perf_Meter& s) { return Value::structure({to_value(s.start_), to_value(s.last_), to_value(s.cur_), to_value(s.avg_), to_value(s.update_), to_value(s.render_), to_value(s.gpu_)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_1b97e0faae1f6c60 {
 
 }  // namespace kern_blueprint_1b97e0faae1f6c60
 
@@ -2657,6 +3160,64 @@ KERN_LAYOUT(tiles) {
   next_id(556);
 }
 
+}  // namespace kern_blueprint_508646ea29b97f65
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Spot> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::f64>(*v.field(1)); }
+  static ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Spot from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::f64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Spot& s) { return Value::structure({to_value(s.p), to_value(s.a)}); }
+};
+template <> struct Held<::kern_blueprint_508646ea29b97f65::tiles::TileKey> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::i64>(*v.field(2)); }
+  static ::kern_blueprint_508646ea29b97f65::tiles::TileKey from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::i64>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_508646ea29b97f65::tiles::TileKey& s) { return Value::structure({to_value(s.z), to_value(s.x), to_value(s.y)}); }
+};
+template <> struct Held<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Area> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::Vector_row>>(*v.field(0)) && is_value<::kern_blueprint_508646ea29b97f65::tiles::AreaKind>(*v.field(1)); }
+  static ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Area from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::Vector_row>>(*v.field(0)), from_value<::kern_blueprint_508646ea29b97f65::tiles::AreaKind>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Area& s) { return Value::structure({to_value(s.rings), to_value(s.kind)}); }
+};
+template <> struct Held<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Building> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 6 && is_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::Vector_row>>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<bool>(*v.field(5)); }
+  static ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Building from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::Vector_row>>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<bool>(*v.field(5))};
+  }
+  static Value to(const ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Building& s) { return Value::structure({to_value(s.rings), to_value(s.base), to_value(s.top), to_value(s.seed), to_value(s.full_top), to_value(s.leveled)}); }
+};
+template <> struct Held<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Road> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::List<kern::Vec3>>(*v.field(0)) && is_value<::kern_blueprint_508646ea29b97f65::tiles::RoadClass>(*v.field(1)) && is_value<bool>(*v.field(2)); }
+  static ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Road from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::Vec3>>(*v.field(0)), from_value<::kern_blueprint_508646ea29b97f65::tiles::RoadClass>(*v.field(1)), from_value<bool>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Road& s) { return Value::structure({to_value(s.points), to_value(s.cls), to_value(s.bridge)}); }
+};
+template <> struct Held<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 6 && is_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Building>>(*v.field(0)) && is_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Road>>(*v.field(1)) && is_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Area>>(*v.field(2)) && is_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Spot>>(*v.field(3)) && is_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Spot>>(*v.field(4)) && is_value<bool>(*v.field(5)); }
+  static ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Building>>(*v.field(0)), from_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Road>>(*v.field(1)), from_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Area>>(*v.field(2)), from_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Spot>>(*v.field(3)), from_value<kern::List<::kern_blueprint_508646ea29b97f65::tiles::MapFeatures_Spot>>(*v.field(4)), from_value<bool>(*v.field(5))};
+  }
+  static Value to(const ::kern_blueprint_508646ea29b97f65::tiles::MapFeatures& s) { return Value::structure({to_value(s.buildings), to_value(s.roads), to_value(s.areas), to_value(s.trees), to_value(s.lamps), to_value(s.procedural)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_508646ea29b97f65 {
 
 }  // namespace kern_blueprint_508646ea29b97f65
 
@@ -2936,6 +3497,154 @@ KERN_LAYOUT(terrain) {
   next_id(277);
 }
 
+}  // namespace kern_blueprint_9a4bfed9ca9dc51a
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TerrainStats> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 12 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<kern::i64>(*v.field(4)) && is_value<kern::i64>(*v.field(5)) && is_value<kern::i64>(*v.field(6)) && is_value<kern::i64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<bool>(*v.field(10)) && is_value<bool>(*v.field(11)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::TerrainStats from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<kern::i64>(*v.field(4)), from_value<kern::i64>(*v.field(5)), from_value<kern::i64>(*v.field(6)), from_value<kern::i64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<bool>(*v.field(10)), from_value<bool>(*v.field(11))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::TerrainStats& s) { return Value::structure({to_value(s.windows), to_value(s.dem_tiles), to_value(s.dem_failed), to_value(s.render_tiles), to_value(s.collision_tiles), to_value(s.water_cells), to_value(s.craters), to_value(s.rebuilds), to_value(s.min_height), to_value(s.max_height), to_value(s.dem), to_value(s.settled)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Bridge> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Bridge from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Bridge& s) { return Value::structure({to_value(s.c), to_value(s.hl), to_value(s.hw), to_value(s.yaw)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSeg> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 8 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSeg from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSeg& s) { return Value::structure({to_value(s.ax), to_value(s.ay), to_value(s.dx), to_value(s.dy), to_value(s.l2), to_value(s.ha), to_value(s.hb), to_value(s.half)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Crater> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Crater from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Crater& s) { return Value::structure({to_value(s.c), to_value(s.r), to_value(s.depth), to_value(s.rim)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CraterRec> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CraterRec from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CraterRec& s) { return Value::structure({to_value(s.x), to_value(s.y), to_value(s.r), to_value(s.depth)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 7 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<kern::List<kern::f64>>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<kern::List<kern::f64>>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::f64>(*v.field(6))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid& s) { return Value::structure({to_value(s.x0), to_value(s.y0), to_value(s.step), to_value(s.n), to_value(s.h), to_value(s.cx), to_value(s.cy)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_RenderTile> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::i64>(*v.field(0)) && is_value<bool>(*v.field(1)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_RenderTile from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<bool>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_RenderTile& s) { return Value::structure({to_value(s.mesh), to_value(s.skirt)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_WaterBlock> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::List<kern::logic::Int64>>(*v.field(0)) && is_value<kern::List<kern::Vec3>>(*v.field(1)) && is_value<kern::List<kern::f64>>(*v.field(2)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_WaterBlock from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::logic::Int64>>(*v.field(0)), from_value<kern::List<kern::Vec3>>(*v.field(1)), from_value<kern::List<kern::f64>>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_WaterBlock& s) { return Value::structure({to_value(s.bits), to_value(s.flow), to_value(s.speed)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CollisionTile> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::physics_Body>(*v.field(0)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CollisionTile from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::physics_Body>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CollisionTile& s) { return Value::structure({to_value(s.body)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>(*v.field(1)) && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>(*v.field(2)) && is_value<kern::logic::Map<kern::logic::Int64, kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSeg>>>(*v.field(3)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>(*v.field(1)), from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>(*v.field(2)), from_value<kern::logic::Map<kern::logic::Int64, kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSeg>>>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet& s) { return Value::structure({to_value(s.owner), to_value(s.bounds), to_value(s.box), to_value(s.grid)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_DemTile> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 6 && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>(*v.field(0)) && is_value<kern::List<kern::f64>>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<bool>(*v.field(5)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_DemTile from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>(*v.field(0)), from_value<kern::List<kern::f64>>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<bool>(*v.field(5))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_DemTile& s) { return Value::structure({to_value(s.key), to_value(s.h), to_value(s.w), to_value(s.hgt), to_value(s.failed), to_value(s.requested)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Image> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>(*v.field(0)) && is_value<kern::List<kern::f64>>(*v.field(1)) && is_value<bool>(*v.field(2)) && is_value<bool>(*v.field(3)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Image from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>(*v.field(0)), from_value<kern::List<kern::f64>>(*v.field(1)), from_value<bool>(*v.field(2)), from_value<bool>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Image& s) { return Value::structure({to_value(s.key), to_value(s.albedo), to_value(s.requested), to_value(s.failed)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Job> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 7 && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<bool>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<kern::i64>(*v.field(4)) && is_value<kern::i64>(*v.field(5)) && is_value<kern::i64>(*v.field(6)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Job from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<bool>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<kern::i64>(*v.field(4)), from_value<kern::i64>(*v.field(5)), from_value<kern::i64>(*v.field(6))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Job& s) { return Value::structure({to_value(s.g), to_value(s.id), to_value(s.side), to_value(s.x0), to_value(s.y0), to_value(s.x1), to_value(s.y1)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Tint> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vector_row>>(*v.field(3)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Tint from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vector_row>>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Tint& s) { return Value::structure({to_value(s.owner), to_value(s.box), to_value(s.lin), to_value(s.rings)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet_row> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet>>(*v.field(0)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet_row from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet_row& s) { return Value::structure({to_value(s.items)}); }
+};
+template <> struct Held<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 43 && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>>(*v.field(0)) && is_value<bool>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::List<kern::Vec3>>(*v.field(3)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet_row>>(*v.field(4)) && is_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Image>>(*v.field(5)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>>(*v.field(6)) && is_value<kern::Vec3>(*v.field(7)) && is_value<kern::i64>(*v.field(8)) && is_value<kern::i64>(*v.field(9)) && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::GeoProjector>(*v.field(10)) && is_value<bool>(*v.field(11)) && is_value<bool>(*v.field(12)) && is_value<bool>(*v.field(13)) && is_value<kern::f64>(*v.field(14)) && is_value<bool>(*v.field(15)) && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid>(*v.field(16)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid>>(*v.field(17)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Job>>(*v.field(18)) && is_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_DemTile>>(*v.field(19)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>>(*v.field(20)) && is_value<kern::i64>(*v.field(21)) && is_value<kern::f64>(*v.field(22)) && is_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_WaterBlock>>(*v.field(23)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Bridge>>(*v.field(24)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Crater>>(*v.field(25)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Tint>>(*v.field(26)) && is_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_RenderTile>>(*v.field(27)) && is_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CollisionTile>>(*v.field(28)) && is_value<kern::logic::Map<kern::logic::Int64, kern::logic::Whole>>(*v.field(29)) && is_value<kern::logic::Map<kern::logic::Int64, bool>>(*v.field(30)) && is_value<kern::logic::Set<kern::logic::Int64>>(*v.field(31)) && is_value<kern::logic::Set<kern::logic::Int64>>(*v.field(32)) && is_value<kern::logic::Set<kern::logic::Int64>>(*v.field(33)) && is_value<kern::List<kern::logic::Int64>>(*v.field(34)) && is_value<kern::List<kern::logic::Int64>>(*v.field(35)) && is_value<kern::List<kern::logic::Int64>>(*v.field(36)) && is_value<kern::Vec3>(*v.field(37)) && is_value<kern::Vec3>(*v.field(38)) && is_value<kern::List<kern::Vec3>>(*v.field(39)) && is_value<bool>(*v.field(40)) && is_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>>(*v.field(41)) && is_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TerrainStats>(*v.field(42)); }
+  static ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>>(*v.field(0)), from_value<bool>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::List<kern::Vec3>>(*v.field(3)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CorridorSet_row>>(*v.field(4)), from_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Image>>(*v.field(5)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>>(*v.field(6)), from_value<kern::Vec3>(*v.field(7)), from_value<kern::i64>(*v.field(8)), from_value<kern::i64>(*v.field(9)), from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::GeoProjector>(*v.field(10)), from_value<bool>(*v.field(11)), from_value<bool>(*v.field(12)), from_value<bool>(*v.field(13)), from_value<kern::f64>(*v.field(14)), from_value<bool>(*v.field(15)), from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid>(*v.field(16)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Grid>>(*v.field(17)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Job>>(*v.field(18)), from_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_DemTile>>(*v.field(19)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TileKey>>(*v.field(20)), from_value<kern::i64>(*v.field(21)), from_value<kern::f64>(*v.field(22)), from_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_WaterBlock>>(*v.field(23)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Bridge>>(*v.field(24)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Crater>>(*v.field(25)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_Tint>>(*v.field(26)), from_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_RenderTile>>(*v.field(27)), from_value<kern::logic::Map<kern::logic::Int64, ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain_CollisionTile>>(*v.field(28)), from_value<kern::logic::Map<kern::logic::Int64, kern::logic::Whole>>(*v.field(29)), from_value<kern::logic::Map<kern::logic::Int64, bool>>(*v.field(30)), from_value<kern::logic::Set<kern::logic::Int64>>(*v.field(31)), from_value<kern::logic::Set<kern::logic::Int64>>(*v.field(32)), from_value<kern::logic::Set<kern::logic::Int64>>(*v.field(33)), from_value<kern::List<kern::logic::Int64>>(*v.field(34)), from_value<kern::List<kern::logic::Int64>>(*v.field(35)), from_value<kern::List<kern::logic::Int64>>(*v.field(36)), from_value<kern::Vec3>(*v.field(37)), from_value<kern::Vec3>(*v.field(38)), from_value<kern::List<kern::Vec3>>(*v.field(39)), from_value<bool>(*v.field(40)), from_value<kern::List<::kern_blueprint_9a4bfed9ca9dc51a::terrain::Vec4>>(*v.field(41)), from_value<::kern_blueprint_9a4bfed9ca9dc51a::terrain::TerrainStats>(*v.field(42))};
+  }
+  static Value to(const ::kern_blueprint_9a4bfed9ca9dc51a::terrain::Terrain& s) { return Value::structure({to_value(s.needs), to_value(s.corridors_expected), to_value(s.lead), to_value(s.extra), to_value(s.corridors_), to_value(s.images_), to_value(s.image_requests_), to_value(s.image_at_), to_value(s.r_), to_value(s.world_), to_value(s.proj_), to_value(s.dem_), to_value(s.settled_), to_value(s.grid_ready_), to_value(s.ref_height_), to_value(s.ref_ready_), to_value(s.grid_), to_value(s.side_), to_value(s.job_), to_value(s.dem_tiles_), to_value(s.requests_), to_value(s.dem_failures_), to_value(s.retry_at_), to_value(s.water_), to_value(s.bridges_), to_value(s.craters_), to_value(s.tints_), to_value(s.render_), to_value(s.collision_), to_value(s.water_meshes_), to_value(s.water_detail_), to_value(s.dirty_render_), to_value(s.dirty_collision_), to_value(s.dirty_water_), to_value(s.want_render_), to_value(s.want_collision_), to_value(s.want_water_), to_value(s.planned_focus_), to_value(s.planned_anchor_), to_value(s.planned_extra_), to_value(s.replan_), to_value(s.changes_), to_value(s.stats_)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_9a4bfed9ca9dc51a {
 
 }  // namespace kern_blueprint_9a4bfed9ca9dc51a
 
@@ -3191,6 +3900,100 @@ KERN_LAYOUT(city_stream) {
   next_id(149);
 }
 
+}  // namespace kern_blueprint_0265b76c2a3d1e83
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_AreaRef> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<kern::logic::Int64>(*v.field(1)) && is_value<kern::i64>(*v.field(2)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_AreaRef from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<kern::logic::Int64>(*v.field(1)), from_value<kern::i64>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_AreaRef& s) { return Value::structure({to_value(s.key), to_value(s.tile), to_value(s.index)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_BuildingRef> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::logic::Int64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_BuildingRef from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0)), from_value<kern::i64>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_BuildingRef& s) { return Value::structure({to_value(s.tile), to_value(s.index)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Damage> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::f64>(*v.field(0)) && is_value<bool>(*v.field(1)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Damage from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<bool>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Damage& s) { return Value::structure({to_value(s.height), to_value(s.leveled)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_DamageRec> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::i64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<bool>(*v.field(2)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_DamageRec from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<bool>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_DamageRec& s) { return Value::structure({to_value(s.seed), to_value(s.height), to_value(s.leveled)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Wall> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 8 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::i64>(*v.field(6)) && is_value<kern::i64>(*v.field(7)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Wall from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::i64>(*v.field(6)), from_value<kern::i64>(*v.field(7))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Wall& s) { return Value::structure({to_value(s.a), to_value(s.dir), to_value(s.normal), to_value(s.len), to_value(s.base), to_value(s.top), to_value(s.seed), to_value(s.edge)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::Lane> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::List<kern::Vec3>>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::logic::Int64>(*v.field(2)) && is_value<bool>(*v.field(3)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::Lane from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::Vec3>>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::logic::Int64>(*v.field(2)), from_value<bool>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::Lane& s) { return Value::structure({to_value(s.points), to_value(s.width), to_value(s.tile), to_value(s.alive)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::StreamStats> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 22 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<kern::i64>(*v.field(4)) && is_value<kern::i64>(*v.field(5)) && is_value<kern::i64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<kern::f64>(*v.field(11)) && is_value<kern::f64>(*v.field(12)) && is_value<kern::f64>(*v.field(13)) && is_value<kern::f64>(*v.field(14)) && is_value<kern::f64>(*v.field(15)) && is_value<kern::logic::Text>(*v.field(16)) && is_value<kern::f64>(*v.field(17)) && is_value<kern::i64>(*v.field(18)) && is_value<kern::i64>(*v.field(19)) && is_value<kern::i64>(*v.field(20)) && is_value<kern::i64>(*v.field(21)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::StreamStats from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<kern::i64>(*v.field(4)), from_value<kern::i64>(*v.field(5)), from_value<kern::i64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<kern::f64>(*v.field(11)), from_value<kern::f64>(*v.field(12)), from_value<kern::f64>(*v.field(13)), from_value<kern::f64>(*v.field(14)), from_value<kern::f64>(*v.field(15)), from_value<kern::logic::Text>(*v.field(16)), from_value<kern::f64>(*v.field(17)), from_value<kern::i64>(*v.field(18)), from_value<kern::i64>(*v.field(19)), from_value<kern::i64>(*v.field(20)), from_value<kern::i64>(*v.field(21))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::StreamStats& s) { return Value::structure({to_value(s.tiles_ready), to_value(s.tiles_loading), to_value(s.tiles_failed), to_value(s.buildings), to_value(s.colliders), to_value(s.triangles), to_value(s.meshes), to_value(s.last_slice_ms), to_value(s.t_request), to_value(s.t_data), to_value(s.t_decoded), to_value(s.t_terrain), to_value(s.t_built), to_value(s.t_collision), to_value(s.work_ms), to_value(s.worst_ms), to_value(s.worst_step), to_value(s.worst_step_ms), to_value(s.rebuilds), to_value(s.relays), to_value(s.uploads), to_value(s.upload_vertices)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_NearCollision> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 13 && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(0)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Int64_Int_pair>>(*v.field(5)) && is_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Shape>>(*v.field(6)) && is_value<kern::i64>(*v.field(7)) && is_value<bool>(*v.field(8)) && is_value<bool>(*v.field(9)) && is_value<bool>(*v.field(10)) && is_value<kern::List<kern::Vec3>>(*v.field(11)) && is_value<kern::i64>(*v.field(12)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_NearCollision from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(0)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::Vec3>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Int64_Int_pair>>(*v.field(5)), from_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Shape>>(*v.field(6)), from_value<kern::i64>(*v.field(7)), from_value<bool>(*v.field(8)), from_value<bool>(*v.field(9)), from_value<bool>(*v.field(10)), from_value<kern::List<kern::Vec3>>(*v.field(11)), from_value<kern::i64>(*v.field(12))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_NearCollision& s) { return Value::structure({to_value(s.body), to_value(s.old_body), to_value(s.at), to_value(s.ahead), to_value(s.at_ms), to_value(s.list), to_value(s.shapes), to_value(s.next), to_value(s.building), to_value(s.dirty), to_value(s.built), to_value(s.mates_at), to_value(s.colliders)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Tile> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 40 && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Tile_State>(*v.field(0)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::TileKey>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::MapFeatures>(*v.field(5)) && is_value<kern::i64>(*v.field(6)) && is_value<kern::i64>(*v.field(7)) && is_value<kern::i64>(*v.field(8)) && is_value<kern::i64>(*v.field(9)) && is_value<kern::List<kern::logic::Whole>>(*v.field(10)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(11)) && is_value<kern::i64>(*v.field(12)) && is_value<kern::i64>(*v.field(13)) && is_value<kern::i64>(*v.field(14)) && is_value<kern::i64>(*v.field(15)) && is_value<kern::Vec3>(*v.field(16)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::Vec4>(*v.field(17)) && is_value<kern::List<kern::logic::Whole>>(*v.field(18)) && is_value<kern::List<kern::logic::Whole>>(*v.field(19)) && is_value<bool>(*v.field(20)) && is_value<bool>(*v.field(21)) && is_value<kern::Vec3>(*v.field(22)) && is_value<kern::List<kern::Vec3>>(*v.field(23)) && is_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(24)) && is_value<kern::logic::Set<kern::logic::Int64>>(*v.field(25)) && is_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(26)) && is_value<bool>(*v.field(27)) && is_value<kern::i64>(*v.field(28)) && is_value<kern::i64>(*v.field(29)) && is_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(30)) && is_value<kern::logic::Set<kern::logic::Int64>>(*v.field(31)) && is_value<kern::List<kern::logic::Int64>>(*v.field(32)) && is_value<kern::i64>(*v.field(33)) && is_value<kern::List<kern::logic::Whole>>(*v.field(34)) && is_value<kern::i64>(*v.field(35)) && is_value<bool>(*v.field(36)) && is_value<kern::i64>(*v.field(37)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(38)) && is_value<bool>(*v.field(39)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Tile from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Tile_State>(*v.field(0)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::TileKey>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::MapFeatures>(*v.field(5)), from_value<kern::i64>(*v.field(6)), from_value<kern::i64>(*v.field(7)), from_value<kern::i64>(*v.field(8)), from_value<kern::i64>(*v.field(9)), from_value<kern::List<kern::logic::Whole>>(*v.field(10)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(11)), from_value<kern::i64>(*v.field(12)), from_value<kern::i64>(*v.field(13)), from_value<kern::i64>(*v.field(14)), from_value<kern::i64>(*v.field(15)), from_value<kern::Vec3>(*v.field(16)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::Vec4>(*v.field(17)), from_value<kern::List<kern::logic::Whole>>(*v.field(18)), from_value<kern::List<kern::logic::Whole>>(*v.field(19)), from_value<bool>(*v.field(20)), from_value<bool>(*v.field(21)), from_value<kern::Vec3>(*v.field(22)), from_value<kern::List<kern::Vec3>>(*v.field(23)), from_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(24)), from_value<kern::logic::Set<kern::logic::Int64>>(*v.field(25)), from_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(26)), from_value<bool>(*v.field(27)), from_value<kern::i64>(*v.field(28)), from_value<kern::i64>(*v.field(29)), from_value<kern::logic::Map<kern::logic::Int64, kern::List<kern::logic::Whole>>>(*v.field(30)), from_value<kern::logic::Set<kern::logic::Int64>>(*v.field(31)), from_value<kern::List<kern::logic::Int64>>(*v.field(32)), from_value<kern::i64>(*v.field(33)), from_value<kern::List<kern::logic::Whole>>(*v.field(34)), from_value<kern::i64>(*v.field(35)), from_value<bool>(*v.field(36)), from_value<kern::i64>(*v.field(37)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::physics_Body>(*v.field(38)), from_value<bool>(*v.field(39))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Tile& s) { return Value::structure({to_value(s.state), to_value(s.key), to_value(s.tries), to_value(s.retry_ms), to_value(s.procedural), to_value(s.features), to_value(s.footprints), to_value(s.roads), to_value(s.buildings), to_value(s.road_builder), to_value(s.meshes), to_value(s.body), to_value(s.collide_next), to_value(s.upload_next), to_value(s.colliders), to_value(s.triangles), to_value(s.center), to_value(s.bounds), to_value(s.lay_meshes), to_value(s.old_lay), to_value(s.relay), to_value(s.relay_again), to_value(s.roads_at), to_value(s.cent), to_value(s.cell_items), to_value(s.want_cells), to_value(s.cell_old), to_value(s.cell_uploading), to_value(s.tile_job), to_value(s.build_job), to_value(s.cell_ids), to_value(s.dirty_cells), to_value(s.job_cells), to_value(s.cell_job), to_value(s.built_bytes), to_value(s.built_at), to_value(s.prepared), to_value(s.skip), to_value(s.old_body), to_value(s.recollide)}); }
+};
+template <> struct Held<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 42 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::i64>(*v.field(3)) && is_value<kern::List<kern::Vec3>>(*v.field(4)) && is_value<kern::i64>(*v.field(5)) && is_value<bool>(*v.field(6)) && is_value<kern::i64>(*v.field(7)) && is_value<kern::i64>(*v.field(8)) && is_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Vec4>>(*v.field(9)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_NearCollision>(*v.field(10)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::StreamStats>(*v.field(11)) && is_value<kern::f64>(*v.field(12)) && is_value<kern::f64>(*v.field(13)) && is_value<kern::f64>(*v.field(14)) && is_value<kern::logic::Text>(*v.field(15)) && is_value<kern::f64>(*v.field(16)) && is_value<kern::i64>(*v.field(17)) && is_value<kern::i64>(*v.field(18)) && is_value<kern::i64>(*v.field(19)) && is_value<kern::logic::Int64>(*v.field(20)) && is_value<kern::Vec3>(*v.field(21)) && is_value<kern::Vec3>(*v.field(22)) && is_value<kern::Vec3>(*v.field(23)) && is_value<kern::f64>(*v.field(24)) && is_value<kern::logic::Map<kern::logic::Whole, ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Damage>>(*v.field(25)) && is_value<kern::List<kern::logic::Whole>>(*v.field(26)) && is_value<bool>(*v.field(27)) && is_value<kern::i64>(*v.field(28)) && is_value<kern::i64>(*v.field(29)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::GeoProjector>(*v.field(30)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::TileKey>(*v.field(31)) && is_value<kern::logic::Map<kern::logic::Int64, kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Tile>>>(*v.field(32)) && is_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::TileKey>>(*v.field(33)) && is_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Lane>>(*v.field(34)) && is_value<bool>(*v.field(35)) && is_value<kern::i64>(*v.field(36)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::StreamStats>(*v.field(37)) && is_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::Terrain>(*v.field(38)) && is_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Vec4>>(*v.field(39)) && is_value<kern::logic::Int64>(*v.field(40)) && is_value<kern::i64>(*v.field(41)); }
+  static ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::i64>(*v.field(3)), from_value<kern::List<kern::Vec3>>(*v.field(4)), from_value<kern::i64>(*v.field(5)), from_value<bool>(*v.field(6)), from_value<kern::i64>(*v.field(7)), from_value<kern::i64>(*v.field(8)), from_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Vec4>>(*v.field(9)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_NearCollision>(*v.field(10)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::StreamStats>(*v.field(11)), from_value<kern::f64>(*v.field(12)), from_value<kern::f64>(*v.field(13)), from_value<kern::f64>(*v.field(14)), from_value<kern::logic::Text>(*v.field(15)), from_value<kern::f64>(*v.field(16)), from_value<kern::i64>(*v.field(17)), from_value<kern::i64>(*v.field(18)), from_value<kern::i64>(*v.field(19)), from_value<kern::logic::Int64>(*v.field(20)), from_value<kern::Vec3>(*v.field(21)), from_value<kern::Vec3>(*v.field(22)), from_value<kern::Vec3>(*v.field(23)), from_value<kern::f64>(*v.field(24)), from_value<kern::logic::Map<kern::logic::Whole, ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Damage>>(*v.field(25)), from_value<kern::List<kern::logic::Whole>>(*v.field(26)), from_value<bool>(*v.field(27)), from_value<kern::i64>(*v.field(28)), from_value<kern::i64>(*v.field(29)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::GeoProjector>(*v.field(30)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::TileKey>(*v.field(31)), from_value<kern::logic::Map<kern::logic::Int64, kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream_Tile>>>(*v.field(32)), from_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::TileKey>>(*v.field(33)), from_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Lane>>(*v.field(34)), from_value<bool>(*v.field(35)), from_value<kern::i64>(*v.field(36)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::StreamStats>(*v.field(37)), from_value<::kern_blueprint_0265b76c2a3d1e83::city_stream::Terrain>(*v.field(38)), from_value<kern::List<::kern_blueprint_0265b76c2a3d1e83::city_stream::Vec4>>(*v.field(39)), from_value<kern::logic::Int64>(*v.field(40)), from_value<kern::i64>(*v.field(41))};
+  }
+  static Value to(const ::kern_blueprint_0265b76c2a3d1e83::city_stream::CityStream& s) { return Value::structure({to_value(s.anchor), to_value(s.view_lead), to_value(s.building_budget), to_value(s.ring), to_value(s.extra_foci), to_value(s.mate_ring), to_value(s.training_offline), to_value(s.damage_serial_), to_value(s.furniture_serial_), to_value(s.ground_changes_), to_value(s.near_), to_value(s.ms_), to_value(s.start_ms_), to_value(s.worst_), to_value(s.worst_at_), to_value(s.worst_step_), to_value(s.worst_step_ms_), to_value(s.rebuilds_), to_value(s.relays_), to_value(s.upload_count_), to_value(s.upload_vertices_), to_value(s.focus_), to_value(s.vis_at_), to_value(s.vis_ahead_), to_value(s.vis_ms_), to_value(s.damage_), to_value(s.damage_log_), to_value(s.damage_quiet_), to_value(s.r_), to_value(s.world_), to_value(s.proj_), to_value(s.origin_tile_), to_value(s.tiles_), to_value(s.requests_), to_value(s.lanes_), to_value(s.offline_), to_value(s.real_tiles_), to_value(s.stats_), to_value(s.terrain_), to_value(s.terrain_changes_), to_value(s.excl_tile_), to_value(s.excl_index_)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_0265b76c2a3d1e83 {
 
 }  // namespace kern_blueprint_0265b76c2a3d1e83
 
@@ -5228,6 +6031,37 @@ KERN_LAYOUT(nostr_cpp) {
   next_id(1002);
 }
 
+}  // namespace kern_blueprint_6cb2cf0da8e6380e
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_Hasher> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::List<kern::logic::Whole>>(*v.field(0)) && is_value<kern::List<kern::logic::Whole>>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::logic::Int64>(*v.field(3)); }
+  static ::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_Hasher from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::logic::Whole>>(*v.field(0)), from_value<kern::List<kern::logic::Whole>>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::logic::Int64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_Hasher& s) { return Value::structure({to_value(s.h), to_value(s.chunk), to_value(s.filled), to_value(s.length)}); }
+};
+template <> struct Held<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::List<kern::logic::Whole>>(*v.field(0)); }
+  static ::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::List<kern::logic::Whole>>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256& s) { return Value::structure({to_value(s.w)}); }
+};
+template <> struct Held<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_Pt> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256>(*v.field(0)) && is_value<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256>(*v.field(1)) && is_value<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256>(*v.field(2)); }
+  static ::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_Pt from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256>(*v.field(0)), from_value<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256>(*v.field(1)), from_value<::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_U256>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_6cb2cf0da8e6380e::nostr_cpp::nostr_Pt& s) { return Value::structure({to_value(s.x), to_value(s.y), to_value(s.z)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_6cb2cf0da8e6380e {
 
 }  // namespace kern_blueprint_6cb2cf0da8e6380e
 
@@ -6444,6 +7278,19 @@ KERN_LAYOUT(qr_code_cpp) {
   next_id(770);
 }
 
+}  // namespace kern_blueprint_fe59a0c6af5496ca
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_fe59a0c6af5496ca::qr_code_cpp::qr_Grid> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::i64>(*v.field(0)) && is_value<kern::List<kern::logic::Whole>>(*v.field(1)) && is_value<kern::List<kern::logic::Whole>>(*v.field(2)); }
+  static ::kern_blueprint_fe59a0c6af5496ca::qr_code_cpp::qr_Grid from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::List<kern::logic::Whole>>(*v.field(1)), from_value<kern::List<kern::logic::Whole>>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_fe59a0c6af5496ca::qr_code_cpp::qr_Grid& s) { return Value::structure({to_value(s.size), to_value(s.m), to_value(s.fn)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_fe59a0c6af5496ca {
 
 }  // namespace kern_blueprint_fe59a0c6af5496ca
 
@@ -8420,6 +9267,19 @@ KERN_LAYOUT(mvt_cpp) {
   next_id(683);
 }
 
+}  // namespace kern_blueprint_02f7c0a1316e6ec3
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_02f7c0a1316e6ec3::mvt_cpp::mvt_Reader> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<bool>(*v.field(2)); }
+  static ::kern_blueprint_02f7c0a1316e6ec3::mvt_cpp::mvt_Reader from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<bool>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_02f7c0a1316e6ec3::mvt_cpp::mvt_Reader& s) { return Value::structure({to_value(s.p), to_value(s.end), to_value(s.ok)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_02f7c0a1316e6ec3 {
 
 }  // namespace kern_blueprint_02f7c0a1316e6ec3
 
@@ -11324,6 +12184,19 @@ KERN_LAYOUT(combat_audio_cpp) {
   next_id(1266);
 }
 
+}  // namespace kern_blueprint_adfee05bc649fab0
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_adfee05bc649fab0::combat_audio_cpp::combat_audio_Random> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::i64>(*v.field(0)); }
+  static ::kern_blueprint_adfee05bc649fab0::combat_audio_cpp::combat_audio_Random from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_adfee05bc649fab0::combat_audio_cpp::combat_audio_Random& s) { return Value::structure({to_value(s.s)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_adfee05bc649fab0 {
 
 }  // namespace kern_blueprint_adfee05bc649fab0
 
@@ -12837,6 +13710,109 @@ KERN_LAYOUT(wire) {
   next_id(444);
 }
 
+}  // namespace kern_blueprint_df1fc2456b534203
+namespace kern::logic::detail {
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_F32> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::f64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_F32 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_F32& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_F64> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::f64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_F64 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_F64& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_I16> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::i64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_I16 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_I16& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_I64> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::logic::Int64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_I64 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_I64& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_I8> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::i64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_I8 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_I8& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_Q4> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_Q4 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_Q4& s) { return Value::structure({to_value(s.x), to_value(s.y), to_value(s.z), to_value(s.w)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_Reader> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 2 && is_value<kern::i64>(*v.field(0)) && is_value<bool>(*v.field(1)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_Reader from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<bool>(*v.field(1))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_Reader& s) { return Value::structure({to_value(s.at), to_value(s.ok)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_U16> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::i64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_U16 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_U16& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_U32> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::i64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_U32 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_U32& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_U64> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::logic::Int64>(*v.field(0)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_U64 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Int64>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_U64& s) { return Value::structure({to_value(s.v)}); }
+};
+template <> struct Held<::kern_blueprint_df1fc2456b534203::wire::wire_V3> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)); }
+  static ::kern_blueprint_df1fc2456b534203::wire::wire_V3 from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_df1fc2456b534203::wire::wire_V3& s) { return Value::structure({to_value(s.x), to_value(s.y), to_value(s.z)}); }
+};
+}  // namespace kern::logic::detail
+namespace kern_blueprint_df1fc2456b534203 {
 
 }  // namespace kern_blueprint_df1fc2456b534203
 

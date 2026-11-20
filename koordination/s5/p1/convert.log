@@ -1,0 +1,558 @@
+round 1: 38 Blueprints
+round 2: 4 Blueprints
+round 3: 4 Blueprints
+round 4: 3 Blueprints
+round 5: 2 Blueprints
+round 6: 2 Blueprints
+round 7: 2 Blueprints
+Arondight45_DroneFC_Core        0 /   38 functions        0 /    417 lines
+    mag (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    finite (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PT1::PT1 (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PT1::run (11): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PT1::reset (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Filters::run (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Attitude::reset (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Attitude::run (33): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PID::PID (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PID::run (17): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PID::reset (6): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PID::integral (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    sbus_end (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    decode_sbus (23): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    SbusParser::feed (25): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    centered (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    throttle (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    shape (7): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    finite (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    sanitize (7): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    command (7): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    mix (26): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    pulse (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    ArmState::run (36): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Controller::reset (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Controller::run (10): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::Runtime (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::reset (14): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::step (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::step_command (71): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::calibrated (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::armed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::fault (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::fault_name (11): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::calibrate (35): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::set_fault (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::to_cdeg (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Runtime::finalize (17): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+Arondight45_FirmwareRuntime     4 /    7 functions        4 /     66 lines
+    FirmwareRuntime::FirmwareRuntime (1): it calls StateRuntime::StateRuntime(), which waits
+    FirmwareRuntime::reset (8): it calls StateRuntime::reset(), which waits
+    FirmwareRuntime::step (53): it calls decode_sbus(), which waits
+    FirmwareRuntime::state_runtime (1): a name for a place - written where it is called
+    FirmwareRuntime::state_runtime (1): a name for a place - written where it is called
+    FirmwareRuntime::receiver_snapshot (1): a name for a place - written where it is called
+    FirmwareRuntime::navigation_snapshot (1): a name for a place - written where it is called
+Arondight45_HardwareSensors     0 /    9 functions        0 /    150 lines
+    crc16_ccitt (10): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    read_be_i16 (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    orient_target (17): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    decode_icm42688_registers (14): it calls read_be_i16(), which waits
+    decode_navigation_wire (29): it calls crc16_ccitt(), which waits
+    encode_navigation_wire (29): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    encode_navigation_wire (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    NavigationWireParser::feed (17): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    SbusWireParser::feed (26): it calls decode_sbus(), which waits
+Arondight45_StateControl        4 /   27 functions        4 /    459 lines
+    navigation_velocity_valid (3): it calls finite(), which waits
+    navigation_agl_valid (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    navigation_heading_valid (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    finite (3): it calls navigation_velocity_valid(), which waits
+    wrap_degrees (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    state_intent (35): it calls centered(), which waits
+    StateController::reset (10): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::leave_mode (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::run (219): it calls state_intent(), which waits
+    StateController::degraded_attitude_command (22): it calls state_intent(), which waits
+    StateController::debug (1): a name for a place - written where it is called
+    StateController::hover_trim (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::kinematic_vertical_speed (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::reset_horizontal_state (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::reset_command_targets (7): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::update_command_targets (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::limit_vertical_accel_jerk (11): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::clamp_horizontal_integral (9): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateController::update_acceleration_estimator (31): it calls finite(), which waits
+    StateRuntime::StateRuntime (1): it calls Runtime::Runtime(), which waits
+    StateRuntime::reset (6): it calls Runtime::reset(), which waits
+    StateRuntime::step (53): it calls state_intent(), which waits
+    StateRuntime::inner (1): a name for a place - written where it is called
+    StateRuntime::inner (1): a name for a place - written where it is called
+    StateRuntime::state_controller (1): a name for a place - written where it is called
+    StateRuntime::game_active (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    StateRuntime::update_attitude (3): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+Game/game                       4 /   11 functions        4 /     11 lines
+    Game::net (1): a name for a place - written where it is called
+    Game::city (1): a name for a place - written where it is called
+    Game::key_down_event (1): it calls Devices::key(), which waits
+    Game::mouse_move (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Game::pointer_locked (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Game::windows (1): a name for a place - written where it is called
+    Game::water_look (1): a name for a place - written where it is called
+    Game::body (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Game::state_of (1): it calls read_body(), which waits
+    Game::player_driving (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Game::respawn_wait (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+Game/game_cpp                   0 /   34 functions        0 /   1565 lines
+    register_node (18): an object of the engine (NodeDef) copied or moved as a whole
+    Game::Game (1): CityStream() is defined in another file
+    Game::build_level (99): an object of the engine as a local that is not made by a constructor of it
+    Game::start (116): it calls register_node(), which waits
+    Game::stop (4): it calls Ragdolls::~Ragdolls(), which waits
+    Game::matrix_of (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Game::player_position (13): it calls Mat4::translation(), which waits
+    Game::focus_position (4): it calls Mat4::translation(), which waits
+    Game::clear_spot (39): it calls CityStream::ground_height(), which waits
+    Game::spawn_guard (26): it calls Mat4::translation(), which waits
+    Game::place_world (43): it calls Game::clear_spot(), which waits
+    Game::hide_soldier (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Game::show_soldier (9): it calls CityStream::ground_height(), which waits
+    Game::put_down (8): it calls CityStream::ground_height(), which waits
+    Game::spawn_guard_step (34): it calls Mat4::translation(), which waits
+    Game::standing_feet (11): it calls CityStream::ground_height(), which waits
+    Game::toggle_drone (41): gaps_riding() is defined in another file
+    Game::switch_mode (34): it calls Game::toggle_drone(), which waits
+    Game::try_enter (18): gaps_seat_press() is defined in another file
+    Game::exit_vehicle (31): it calls Game::state_of(), which waits
+    Game::eject (14): it calls Game::state_of(), which waits
+    Game::fixed_step (34): it calls Game::spawn_guard_step(), which waits
+    Game::drive_traffic (86): detach() is defined in another file
+    Game::traffic_advance (26): it calls Rng::next(), which waits
+    Game::step_parachute (20): it calls Game::body(), which waits
+    Game::manage_traffic (98): it calls Game::focus_position(), which waits
+    Game::update (87): look_begin() is defined in another file
+    Game::update_camera (149): it calls CityStream::ground_height(), which waits
+    Game::draw_vehicles (27): begin() is defined in another file
+    Game::audio_init (11): init() is defined in another file
+    Game::audio_render (13): ui_render_music() is defined in another file
+    Game::update_sound (38): ui_mix_cues() is defined in another file
+    Game::hud_json (136): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Game::command (268): ctl_command() is defined in another file
+Game/main_cpp                   0 /   26 functions        0 /     61 lines
+    result (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    sc_result_length (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    sc_tile_requests (1): it calls result(), which waits
+    sc_tile_data (3): provide() is defined in another file
+    sc_tile_failed (1): fail() is defined in another file
+    sc_offline (1): go_offline() is defined in another file
+    sc_dem_requests (1): it calls result(), which waits
+    sc_dem_data (3): provide() is defined in another file
+    sc_dem_failed (1): fail() is defined in another file
+    sc_image_requests (1): it calls result(), which waits
+    sc_image_data (3): provide_image() is defined in another file
+    sc_image_failed (1): fail_image() is defined in another file
+    sc_gamepad (9): a reference to something it changes
+    sc_vr_hand (3): vr_set_hand() is defined in another file
+    sc_mouse (1): it calls Game::mouse_move(), which waits
+    sc_pointer_lock (1): it calls Game::pointer_locked(), which waits
+    sc_touch_frame (3): set_touch_frame() is defined in another file
+    sc_touch (3): touch() is defined in another file
+    sc_touch_view (1): it calls result(), which waits
+    sc_hud (1): it calls result(), which waits
+    sc_command (1): it calls result(), which waits
+    sc_net_push (3): it calls Session::push(), which waits
+    sc_net_take (11): a pointer
+    sc_voice_push (1): voice_capture() is defined in another file
+    sc_audio_init (1): init() is defined in another file
+    sc_audio_render (1): a pointer
+blueprint_call                  0 /    1 functions        0 /     13 lines
+    decimal (13): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+car                             2 /   14 functions        2 /     14 lines
+    CarSpec::car (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::Car (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::~Car (1): detach() is defined in another file
+    Car::rigged (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::show (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::roll (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::wheel_body (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::ground_offset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::spec (1): a name for a place - written where it is called
+    Car::wheel (1): a name for a place - written where it is called
+    Car::steer_angle (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::forward_speed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::gear (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Car::throttle (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+city_stream                     7 /   15 functions        7 /     15 lines
+    CityStream::projector (1): a name for a place - written where it is called
+    CityStream::offline (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CityStream::has_real_data (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CityStream::lanes (1): a name for a place - written where it is called
+    CityStream::ground_height (1): height() is defined in another file
+    CityStream::terrain (1): a name for a place - written where it is called
+    CityStream::terrain (1): a name for a place - written where it is called
+    CityStream::stats (1): a name for a place - written where it is called
+    CityStream::furniture_serial (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CityStream::take_ground_changes (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CityStream::building (1): a name for a place - written where it is called
+    CityStream::area (1): a name for a place - written where it is called
+    CityStream::damaged_buildings (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CityStream::damage_serial (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CityStream::take_damage_log (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+combat_detail                   0 /    2 functions        0 /      2 lines
+    CriticalClock::armed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CriticalClock::reset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+common                          0 /   18 functions        0 /     51 lines
+    clampf (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    sign0 (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    rate_limit (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    damp_alpha (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    wrap_pi (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    conj (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    to_local (1): it calls Quat::rotate(), which waits
+    qnormalize (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    yaw_quat (1): it calls Quat::axis_angle(), which waits
+    heading_of (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    slerp (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    read_body (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Rng::seeded (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Rng::next (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Rng::unit (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Rng::range (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Rng::gaussian (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    cast (10): it calls QueryFilter::QueryFilter(), which waits
+controls                        0 /    8 functions        0 /      8 lines
+    RateStick::reset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GrenadeCook::reset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Devices::touch_down (1): input() is defined in another file
+    Devices::mouse_down (1): input() is defined in another file
+    Devices::mouse_move (1): input() is defined in another file
+    Devices::key (1): input() is defined in another file
+    Devices::pad_button (1): input() is defined in another file
+    Devices::set (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+destruction                     1 /    4 functions        1 /      8 lines
+    Destruction::init (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Destruction::stats (1): a name for a place - written where it is called
+    Destruction::take_points_log (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Destruction::points_list (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+drone                           2 /    5 functions        2 /      5 lines
+    Drone::telemetry (1): a name for a place - written where it is called
+    Drone::params (1): a name for a place - written where it is called
+    Drone::motor_position (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Drone::rotor_angle (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Drone::parked (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+engine_logic_logic              0 /    5 functions        0 /      5 lines   (what the program calls of it)
+    Instance::name (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Instance::graph (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Instance::disabled (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Instance::tier (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Runtime::instances (1): a function of Runtime, an object of the engine (a handle in a Blueprint), that is no node of it
+engine_math_math                0 /    5 functions        0 /     21 lines   (what the program calls of it)
+    Quat::axis_angle (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Quat::rotate (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Mat4::translation (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Mat4::operator* (9): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Mat4::translate (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+engine_physics_physics          0 /    3 functions        0 /      3 lines   (what the program calls of it)
+    Body::valid (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Body::operator== (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    QueryFilter::QueryFilter (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+equipment                       1 /    5 functions        1 /      5 lines
+    FlightLog::flights (1): a name for a place - written where it is called
+    FlightLog::flying (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    FlightLog::serial (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    MusicSynth::programme (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    MusicSynth::level (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+facades                         0 /    1 functions        0 /      1 lines
+    Facades::name (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+game                            0 /    2 functions        0 /      2 lines
+    PadState::down (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PadState::hit (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+game_cpp                        0 /    4 functions        0 /     61 lines
+    car_color (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    vehicle_actor (37): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    json_escape (9): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    mode_name (10): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+gaps_rules                      1 /    4 functions        1 /      8 lines
+    SmokeField::of (5): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    SmokeField::puffs (1): a name for a place - written where it is called
+    SmokeField::effects (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    VisualPose::invalidate (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+gps_live                        0 /   11 functions        0 /     11 lines
+    GpsLive::stop (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::active (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::compass (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::has_fix (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::shown (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::position (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::heading (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::speed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::distance (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::accuracy (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    GpsLive::elapsed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+interiors                       1 /    3 functions        1 /      3 lines
+    Interiors::init (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Interiors::active (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Interiors::plan (1): a name for a place - written where it is called
+jet                             2 /   11 functions        2 /     11 lines
+    Jet::Jet (1): reset() is defined in another file
+    Jet::mode (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Jet::toggle_mode (1): set_mode() is defined in another file
+    Jet::telemetry (1): a name for a place - written where it is called
+    Jet::landed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Jet::gear_down (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Jet::gear_impact (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Jet::nozzle (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Jet::thrust (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Jet::lever (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Jet::spec (1): a name for a place - written where it is called
+jet_seats                       1 /    3 functions        1 /      3 lines
+    Table::rows (1): a name for a place - written where it is called
+    Table::revision (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Table::clear (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+lamps                           2 /    5 functions        2 /      5 lines
+    Field::clear (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Field::all (1): a name for a place - written where it is called
+    Field::all (1): a name for a place - written where it is called
+    Field::reset_broken (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Field::broken (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+life                           12 /   29 functions       12 /     36 lines
+    LifeOut::clear (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::ragdolls (1): a name for a place - written where it is called
+    Life::ragdolls (1): a name for a place - written where it is called
+    Life::cows (1): a name for a place - written where it is called
+    Life::flocks (1): a name for a place - written where it is called
+    Life::trees_down (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::birds (1): a name for a place - written where it is called
+    Life::trees (1): a name for a place - written where it is called
+    Life::pets (1): a name for a place - written where it is called
+    Life::cat_attack (1): a name for a place - written where it is called
+    Life::epoch (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::has_chain (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::chain (1): a name for a place - written where it is called
+    Life::set_remote_joggers (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::animal_of (5): it calls Body::operator==(), which waits
+    Life::cow_body (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::pet_body (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::remote_animals (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::pet_anchors (1): a name for a place - written where it is called
+    Life::anchor_of (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::net_kill_pet (1): kill_pet() is defined in another file
+    Life::voices (1): a name for a place - written where it is called
+    Life::cow_hits (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::bird_hits (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::jogger_streak (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::shouts (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::honks (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Life::hold_animal (4): it calls Body::operator==(), which waits
+    Life::loose_birds (1): a name for a place - written where it is called
+life_art                        0 /    4 functions        0 /      4 lines
+    LifeArt::box (1): put() is defined in another file
+    LifeArt::ball (1): put() is defined in another file
+    LifeArt::cylinder (1): put() is defined in another file
+    LifeArt::glow (1): put() is defined in another file
+look                            0 /    3 functions        0 /      3 lines
+    impact_trauma (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Stabilizer::reset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    lamp_glow (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+main_cpp                        0 /    5 functions        0 /     45 lines
+    SpawnCityApp::configure (9): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    SpawnCityApp::extensions (7): a static local variable (kept from one call to the next: a library keeps nothing)
+    SpawnCityApp::start (27): a pointer
+    SpawnCityApp::update (1): the state of the Blueprint Game (its one object is that Blueprint, no value)
+    SpawnCityApp::stop (1): the state of the Blueprint Game (its one object is that Blueprint, no value)
+mp_art                          0 /    1 functions        0 /      1 lines
+    MpArt::ready (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+mp_rules                        2 /   15 functions        2 /     15 lines
+    PoseTimeline::reset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PoseTimeline::empty (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PoseTimeline::last_position (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PoseTimeline::clock_offset_ms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PoseTimeline::delay_ms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    NavTimeline::reset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    rgb (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Scoreboard::clear (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Scoreboard::rows (1): a name for a place - written where it is called
+    Scoreboard::set (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    VoiceStream::speaking (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    VoiceStream::reset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    VoiceCapture::clear (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PingBoard::clear_all (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    PingBoard::all (1): a name for a place - written where it is called
+mvt                             2 /    4 functions        2 /      4 lines
+    Decoder::done (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Decoder::failed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+net_session                     6 /   33 functions        6 /     33 lines
+    Session::active (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::hosting (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::self_slot (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::push (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::seats (1): a name for a place - written where it is called
+    Session::seats (1): a name for a place - written where it is called
+    Session::take_hits (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_confirms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_kills (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_fx (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_swarms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_swarm_hits (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_world (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_destroy (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_town (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_toss (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_proj (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_pings (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_voice (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::take_anchor (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::remotes (1): a name for a place - written where it is called
+    Session::remotes (1): a name for a place - written where it is called
+    Session::scores (1): a name for a place - written where it is called
+    Session::friendly_fire (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::set_friendly_fire_initial (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::world_rules (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::now_ms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::vote_text (1): a name for a place - written where it is called
+    Session::vote_pending (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::sent_poses (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::connects (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Session::send_refused (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+people                          2 /   19 functions        2 /     30 lines
+    People::set_budget (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::set_ranges (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::clear (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::spawns_allowed (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::spawns_denied (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::take_reports (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::at (1): a name for a place - written where it is called
+    People::all (1): a name for a place - written where it is called
+    People::hurt (7): kill() is defined in another file
+    People::take_deaths (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::take_remote_hits (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::take_hurts (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::take_falls (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::stand_up (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::set_puppets (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::puppets (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::last_head (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::grab_knock (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    People::knock (6): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+perf                            0 /   12 functions        0 /     12 lines
+    Meter::begin_frame (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Meter::ms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Meter::update_ms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Meter::render_ms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Meter::gpu_ms (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Governor::tier (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Governor::max_tier (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Governor::automatic (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Governor::set_auto (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Governor::fps (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Governor::changes (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Governor::blocked (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+ragdoll                         1 /    7 functions        1 /      7 lines
+    Ragdolls::~Ragdolls (1): clear() is defined in another file
+    Ragdolls::init (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Ragdolls::has (1): find() is defined in another file
+    Ragdolls::take_ups (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Ragdolls::spawned (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Ragdolls::bone_body (1): find() is defined in another file
+    Ragdolls::colors (1): a name for a place - written where it is called
+rigid_spec                      0 /    3 functions        0 /     51 lines
+    capsule_between (14): it calls Quat::axis_angle(), which waits
+    create_body (29): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    box_inertia (8): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+road_graph                      0 /    2 functions        0 /      2 lines
+    RoadGraph::empty (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    RoadGraph::size (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+settings                        0 /    3 functions        0 /      3 lines
+    Settings::get (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Settings::on (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Settings::version (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+sound_fx                        0 /    1 functions        0 /      1 lines
+    SoundFx::ready (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+terrain                         1 /    9 functions        1 /     12 lines
+    Terrain::settled (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Terrain::has_dem (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Terrain::crater_count (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    CraterRec::operator== (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Terrain::take_changes (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+tiles                           0 /    2 functions        0 /      2 lines
+    TileKey::operator== (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TileKey::hash (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+touch_play                      2 /   16 functions        2 /     16 lines
+    TouchPlay::right_inset (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::move (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::look (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::move_live (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::look_live (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::look_edge (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::clearance (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::grenade_drag (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::inject (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::any (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::no_sticks (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+    TouchPlay::add (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+water_look                      0 /    1 functions        0 /      1 lines
+    WaterLook::name (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+weapons                         1 /    2 functions        1 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+world_art                       0 /    1 functions        0 /      1 lines
+    WorldArt::renderer (1): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+63 of 442 functions of the program are written as Blueprints (63 of 3241 lines): 8 Blueprints - 0 of source files, 1 of states, 7 of headers and of shapes
+0 functions of the Blueprints are compared with their source, bit for bit, by the tests in /home/claude/kernengine.de/koordination/s5/p1/tests - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+   278 (  1100)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: '/home/claude/kernengine.de/koordination/s5/p1/converted.h' file not found)
+     3 (   294)   it calls state_intent(), which waits
+     1 (   268)   ctl_command() is defined in another file
+     5 (   216)   it calls CityStream::ground_height(), which waits
+     1 (   116)   it calls register_node(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     2 (    87)   detach() is defined in another file
+     1 (    87)   look_begin() is defined in another file
+     2 (    79)   it calls decode_sbus(), which waits
+     4 (    77)   it calls Mat4::translation(), which waits
+     2 (    45)   it calls Game::state_of(), which waits
+     1 (    43)   it calls Game::clear_spot(), which waits
+     1 (    41)   gaps_riding() is defined in another file
+     3 (    39)   a pointer
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    35)   it calls centered(), which waits
+     2 (    34)   it calls finite(), which waits
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    29)   it calls crc16_ccitt(), which waits
+     1 (    27)   begin() is defined in another file
+     1 (    26)   it calls Rng::next(), which waits
+     1 (    20)   it calls Game::body(), which waits
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     2 (    15)   it calls Quat::axis_angle(), which waits
+     1 (    14)   it calls read_be_i16(), which waits
+     1 (    13)   ui_render_music() is defined in another file
+     2 (    12)   init() is defined in another file
+     1 (    10)   it calls QueryFilter::QueryFilter(), which waits
+     1 (     9)   a reference to something it changes
+     2 (     9)   it calls Body::operator==(), which waits
+     1 (     8)   it calls StateRuntime::reset(), which waits
+     1 (     7)   a static local variable (kept from one call to the next: a library keeps nothing)
+     1 (     7)   kill() is defined in another file
+     1 (     6)   it calls Runtime::reset(), which waits
+     6 (     6)   it calls result(), which waits
+     2 (     6)   provide() is defined in another file
+     5 (     5)   input() is defined in another file

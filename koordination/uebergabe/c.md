@@ -81,3 +81,13 @@ fail/go_offline warten an anderem (remove/erase). register_node (game.cpp) ist k
 - 01:30 (20.11.): work-c = 4bca8f52. a6127013 kept.clear() je Aufruf im Testrahmen; 4bca8f52 m[key]=move(box mit Engine-Objekten).
   Beleg ausstehend: work-c-vergleich-001825-8576 (mag hing), danach vergleich city_stream+terrain auf 4bca8f52. Weiter: register_node/ShaderExtension/
   App-Ereignisse (Entwurf), BEFUND t1 (leerer unique_ptr, den die Quelle dereferenziert).
+
+## Nachfolger 20.11. (08:00–09:50) – work-c = 53c9ac69, BEREIT ZUM MERGEN (stand/c.md)
+- Aufgabe 1 erledigt: city_stream/terrain grün in beiden Durchgängen (work-c-vergleich-093342-22177). Ursachen: (1) Callback der Quelle lief im Vergleich
+  außerhalb g_bail → t1 probe_source (in work-zusammen; c's gleiche Fassung beim Merge entfernt); (2) Callback der KLASSE gebunden an den Referenz-Eingang
+  des Klebers (lokal) → 45c54236: notation.cpp native_glue hält Referenz-Eingänge als Glieder place_<f>_<k> (wie die Variable des Aufrufs im Interpreter),
+  busy_<f> für einen Aufruf mitten im eigenen. Damit ist auch das Risiko „behaltener Callback nach Ende der Klasse“ für Aufrufe beim Namen behoben;
+  für direkte Aufrufe der Klasse (Stufe 5) gilt C++: der Callback lebt so lange wie das Objekt, an das er gebunden ist.
+- Aufgabe 2: entschieden (stand/c.md „Aufgabe 2 – Entscheidung“: E-c2 Blueprint als Umsetzung einer Schnittstelle der Engine; register_node = Ereignis
+  des Game-Blueprints), Bau NICHT begonnen. Reihenfolge dort.
+- Kleinstfall /tmp/c_gl/df (defined/probe eines Callbacks, gegen /tmp/cbk/o + musl gebaut).

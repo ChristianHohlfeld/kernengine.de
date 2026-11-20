@@ -1,0 +1,18 @@
+// Kern Blueprint, C++ notation 1: this text and the graph in Kern Studio are one thing in two
+// notations, each read from the other without loss (kern/docs/blueprint_cpp.md).
+#include "kern/logic/blueprint.h"
+
+struct Level : kern::Blueprint {
+  // ---- variables ----
+  Int Count = 0;
+
+  // ---- functions ----
+  void Note() {
+    engine_game_world_events(n2, 1);
+    list_add(n2.result, "x");
+    Count = list_length<Text>(n2.result);
+  }
+
+  // ---- what nodes give and keep ----
+  struct { engine_game_world_events_place<List<Text>> result = {}; } n2;
+};

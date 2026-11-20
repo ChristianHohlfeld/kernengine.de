@@ -1,0 +1,57 @@
+Fall                 Art                    C++ min   C64 min   Kl. min     min     med   min64   med64 gleich gleich64
+qr_encode            Int, Liste, Text         26.80     37.22    132.94    4.96    4.95    3.57    3.53 =      =
+  ^ qr_encode: die Klasse braucht 3.57-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+qr_gf_mul            Int (Bits)                1.48      1.51      5.13    3.46    3.43    3.39    3.39 =      =
+  ^ qr_gf_mul: die Klasse braucht 3.39-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+qr_rs_remainder      Int, Liste               52.33     67.63    266.42    5.09    5.05    3.94    3.94 =      =
+  ^ qr_rs_remainder: die Klasse braucht 3.94-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+nostr_sha256         Int (Bits), Fixed         2.96      2.79     19.68    6.64    6.31    7.06    6.86 =      =
+  ^ nostr_sha256: die Klasse braucht 7.06-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+nostr_mulm           Int, Struktur, Fixed     37.39     65.91    227.47    6.08    6.25    3.45    3.52 =      =
+  ^ nostr_mulm: die Klasse braucht 3.45-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+nostr_from_hex       Text, Fixed               0.93      0.94      4.73    5.09    5.09    5.01    5.00 =      =
+  ^ nostr_from_hex: die Klasse braucht 5.01-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+common_rng_next      Int (Bits), Ref           0.39      0.40      0.65    1.67    1.68    1.63    1.64 =      =
+  ^ common_rng_next: die Klasse braucht 1.63-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+tiles_key_hash       Int64                     0.37      0.37      0.38    1.03    1.03    1.03    1.05 =      =
+lamps_grid_key       Float->Int64              0.73      0.97      1.01    1.37    1.35    1.04    1.03 =      =
+mvt_zigzag           Int64                     0.45      0.45      0.45    1.00    0.99    1.00    1.00 =      =
+mvt_read_geometry    Bytes, Listen             1.72      3.00      4.32    2.51    2.51    1.44    1.43 =      =
+  ^ mvt_read_geometry: die Klasse braucht 1.44-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+wire_put_u32         Bytes, Liste              2.78      2.76      4.25    1.53    1.52    1.54    1.52 =      =
+  ^ wire_put_u32: die Klasse braucht 1.54-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+wire_get_u32         Bytes, Struktur           0.36      0.39      1.39    3.89    3.89    3.57    3.56 =      =
+  ^ wire_get_u32: die Klasse braucht 3.57-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+settings_escape      Text                      1.52      1.50      5.01    3.30    3.39    3.33    3.26 =      =
+  ^ settings_escape: die Klasse braucht 3.33-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+settings_num         Float->Text               9.81      9.76     12.56    1.28    1.27    1.29    1.27 =      =
+  ^ settings_num: die Klasse braucht 1.29-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+common_wrap_pi       Float, Schleife           0.52      0.46      0.78    1.48    1.56    1.67    1.75 f32    =
+  ^ common_wrap_pi: die Klasse braucht 1.67-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+common_damp_alpha    Float, exp                1.43      1.49      1.49    1.04    1.04    1.00    0.99 f32    =
+common_qnormalize    Quat                      1.68      1.59      2.01    1.20    1.20    1.26    1.26 f32    =
+  ^ common_qnormalize: die Klasse braucht 1.26-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+common_slerp         Quat, Bibl.              12.96     15.04     15.21    1.17    1.16    1.01    1.02 f32    =
+common_to_local      Vektor, Bibl.             3.16      3.60      4.18    1.32    1.25    1.16    1.16 f32    =
+  ^ common_to_local: die Klasse braucht 1.16-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+common_rng_unit      Int->Float                0.64      0.62      1.17    1.82    1.81    1.90    1.90 =      =
+  ^ common_rng_unit: die Klasse braucht 1.90-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+person_hit           Vektor, Bibl.            12.60     14.33     18.37    1.46    1.48    1.28    1.32 f32    =
+  ^ person_hit: die Klasse braucht 1.28-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+person_sphere        Vektor                    1.59      1.55      1.55    0.97    0.97    1.00    1.00 f32    =
+wire_put_f32         Float->Bytes              2.76      2.79      4.25    1.54    1.54    1.52    1.52 =      =
+  ^ wire_put_f32: die Klasse braucht 1.52-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+mvt_ring_area        Liste v. Vektor           0.22      0.61      0.77    3.44    3.45    1.27    1.27 =      =
+  ^ mvt_ring_area: die Klasse braucht 1.27-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+perf_governor        Struktur, Float           1.29      1.33      1.89    1.46    1.50    1.42    1.45 =      =
+  ^ perf_governor: die Klasse braucht 1.42-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+audio_render         Float, Liste            103.75    114.52    145.70    1.40    1.42    1.27    1.31 f32    =
+  ^ audio_render: die Klasse braucht 1.27-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+lamps_place_road     Map, Set, Liste           4.49      4.93      6.33    1.41    1.36    1.28    1.27 =      =
+  ^ lamps_place_road: die Klasse braucht 1.28-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+lamps_near           Map, Liste               12.32     16.59     56.04    4.55    4.54    3.38    3.29 =      =
+  ^ lamps_near: die Klasse braucht 3.38-mal die Zeit der Quelle in den Zahlen der Sprache (Grenze 1.10)
+(Zeiten in µs je Aufruf eines Falls; C++: die Quelle, wie das Spiel sie baut; C64: die Quelle in den Zahlen der Sprache, wie der
+ Vergleichstest sie baut (tests/converted); min/med: Klasse geteilt durch C++, min64/med64: Klasse geteilt durch C64)
+gegen die Quelle (f32): 25 von 29 Fällen über 1,10; gegen die Quelle in 64 Bit: 23 von 29 Fällen über 1,10
+23 Fall/Fälle über der Grenze oder mit abweichender Prüfsumme

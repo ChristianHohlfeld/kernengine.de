@@ -1,0 +1,105 @@
+// SpawnCity's player settings: mouse, drone, on foot, car, camera, audio and the WORLD options of
+// the title menu. The table is a Blueprint's: the level's actor "Settings" (level/spawncity.klevel,
+// open it in Kern Studio) has one row per setting in its variable Options - key, section, label,
+// help, range, step, default - and the functions Snap (a value as a setting takes it), Word and
+// InSection. Here: the values a player has, and what the page gets. The page builds its menus
+// from `schema_json()` and sends changes as commands ("set <key> <value>"); it keeps a copy in
+// localStorage only as a convenience and replays it with "set" at start. Values, ranges and the
+// one-line help come from SpawnCity:
+//   mouse_settings.mjs, drone_control_settings.mjs + control_semantics.mjs, first_person_control_settings.mjs,
+//   vehicle_control_settings.mjs, camera_settings.mjs, stereo_sbs.mjs, audio_settings.mjs,
+//   world_options.mjs, settings_help.mjs (help lines, here in German).
+#pragma once
+
+#include <string>
+#include <string_view>
+#include <vector>
+
+#include "common.h"
+#include "kern/logic/logic.h"
+
+namespace sc {
+
+/// The settings, in the order of the rows of the Blueprint's table Options.
+enum class Opt : u8 {
+  // mouse_settings.mjs
+  mouse_sensitivity, mouse_invert_y,
+  // drone (control_semantics.mjs DEFAULT_PHONE_SETTINGS)
+  drone_left_fineness, drone_right_fineness, drone_invert_yaw, drone_invert_roll, drone_invert_pitch, drone_max_speed_kmh, drone_hover_agl,
+  // on foot (first_person_control_settings.mjs)
+  foot_move_fineness, foot_look_fineness, foot_look_h, foot_look_v, foot_deadzone, foot_invert_move_h, foot_invert_look_h, foot_invert_look_v,
+  // car (vehicle_control_settings.mjs)
+  car_steering, car_throttle, car_max_kmh, car_reverse_kmh, car_cam_distance, car_cam_height,
+  // camera (camera_settings.mjs, stereo_sbs.mjs)
+  cam_fpv_tilt, cam_fov, cam_third_distance, cam_stereo,
+  // audio (audio_settings.mjs)
+  audio_on, audio_drone, audio_shots, audio_fx, audio_steps, audio_vehicle, audio_ambient, music_on, music_volume,
+  // world options (world_options.mjs)
+  world_people, world_traffic, world_dogs, world_cats, world_birds, world_zombies, world_police, world_military, world_flak, world_jetpack,
+  world_friendly_fire, world_terrain, world_guided, world_always_day,
+  // view and helpers (settings_help.mjs: worldGrid, worldKeepLook, worldMinimapAxisLock, box3dColliderDebug; aim assist)
+  foot_aim_assist, pad_aim_scheme, view_grid, view_keep_look, view_minimap_north, debug_colliders,
+  // VR (game_vr.cpp): the locomotion - 0 the sticks, 1 the arms
+  vr_arms, vr_level, vr_tunnel, vr_smooth_turn,
+  count
+};
+
+struct OptSpec {
+  std::string key;      // command / storage key
+  std::string section;  // menu section: maus, drohne, fuss, auto, kamera, ton, welt
+  std::string label;    // menu label (German)
+  std::string help;     // one line (settings_help.mjs)
+  f32 min, max, step, def;
+  bool toggle;
+  bool live;            // false: a WORLD kind the game does not have yet (shown as "bald")
+};
+
+/// The Blueprint's struct Option, as it gives and takes it.
+struct Option {
+  std::string key, section, label, help;
+  f64 min = 0, max = 0, step = 0, def = 0;
+  bool toggle = false, live = false;
+};
+
+/// The table of the settings, as the Blueprint of the level's actor "Settings" has it: its rows (what
+/// Snap and InSection take) and the specs made of them. There is one table for the program: the game
+/// holds it (bind_settings fills it), and every function that needs it is handed it.
+struct SettingsTable {
+  std::vector<Option> rows;
+  std::vector<OptSpec> specs;
+};
+
+/// Binds the settings to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run) - the Blueprint of the actor "Settings", found by its name at every call -
+/// and takes its table. False when the actor has no Blueprint that runs there or the table has not
+/// one row per Opt (the table is then empty).
+bool bind_settings(kern::logic::Runtime& logic, SettingsTable& table);
+/// A setting's row (an empty one while the table is empty).
+const OptSpec& opt_spec(const SettingsTable& table, Opt o);
+bool find_opt(const SettingsTable& table, std::string_view key, Opt& out);
+
+class Settings {
+ public:
+  /// Every setting at 0 (as an empty table has it).
+  Settings() = default;
+  /// Every setting at its default (as the table has it).
+  explicit Settings(const SettingsTable& table);
+  f32 get(Opt o) const { return v_[static_cast<u32>(o)]; }
+  bool on(Opt o) const { return get(o) > 0.5f; }
+  /// Clamped and snapped to the step; false for an unknown key or a non-number.
+  bool set(const SettingsTable& table, std::string_view key, std::string_view value);
+  void set(const SettingsTable& table, Opt o, f32 value);
+  void reset_section(const SettingsTable& table, std::string_view section);  // "" = everything
+  /// Increases on every change (the game re-applies what depends on the settings).
+  u32 version() const { return version_; }
+  /// {"key":value,...}
+  std::string values_json(const SettingsTable& table) const;
+  /// [{"key":..,"section":..,"label":..,"help":..,"min":..,"max":..,"step":..,"def":..,"toggle":..,"live":..,"value":..},...]
+  std::string schema_json(const SettingsTable& table) const;
+
+ private:
+  f32 v_[static_cast<u32>(Opt::count)] = {};
+  u32 version_ = 1;
+};
+
+}  // namespace sc

@@ -1,0 +1,31 @@
+Fall                 Art                     C++ min    C++ med    Kl. min    Kl. med     min     med gleich
+qr_encode            Int, Liste, Text          26.84      27.86     133.47     135.34    4.97    4.86 =
+qr_gf_mul            Int (Bits)                 1.49       2.48       5.14       7.58    3.46    3.06 =
+qr_rs_remainder      Int, Liste                51.99      53.04     262.33     264.63    5.05    4.99 =
+nostr_sha256         Int (Bits), Fixed          2.84       3.16      37.88      44.57   13.34   14.11 =
+nostr_mulm           Int, Struktur, Fixed      33.97      38.03     251.09     256.15    7.39    6.74 =
+nostr_from_hex       Text, Fixed                1.13       1.14       6.28       6.37    5.57    5.60 =
+common_rng_next      Int (Bits), Ref            0.50       0.50       0.85       0.86    1.69    1.70 =
+tiles_key_hash       Int64                      0.45       0.45       0.47       0.47    1.04    1.03 =
+lamps_grid_key       Float->Int64               0.73       0.74       1.02       1.03    1.39    1.39 =
+mvt_zigzag           Int64                      0.44       0.45       0.44       0.45    1.00    1.00 =
+mvt_read_geometry    Bytes, Listen              1.71       1.73       4.34       4.36    2.54    2.52 =
+wire_put_u32         Bytes, Liste               2.79       2.82       4.25       4.28    1.52    1.52 =
+wire_get_u32         Bytes, Struktur            0.35       0.36       1.39       1.40    3.95    3.92 =
+settings_escape      Text                       1.85       1.90      14.44      14.69    7.80    7.73 =
+settings_num         Float->Text               10.75      11.09      13.82      13.98    1.29    1.26 =
+common_wrap_pi       Float, Schleife            0.52       0.53       0.65       0.72    1.26    1.35 f32
+common_damp_alpha    Float, exp                 1.42       1.45       1.48       1.50    1.04    1.03 f32
+common_qnormalize    Quat                       1.67       1.69       2.00       2.02    1.20    1.20 f32
+common_slerp         Quat, Bibl.               12.43      12.63      14.89      15.01    1.20    1.19 f32
+common_to_local      Vektor, Bibl.              3.13       3.16       4.18       4.20    1.34    1.33 f32
+common_rng_unit      Int->Float                 0.65       0.66       1.16       1.18    1.80    1.79 =
+person_hit           Vektor, Bibl.             12.66      12.84      18.45      18.91    1.46    1.47 f32
+person_sphere        Vektor                     1.59       1.61       1.56       1.59    0.98    0.98 f32
+wire_put_f32         Float->Bytes               2.77       2.89       4.27       4.32    1.54    1.49 =
+mvt_ring_area        Liste v. Vektor            0.22       0.23       0.78       0.78    3.45    3.47 =
+perf_governor        Struktur, Float            1.31       1.33       1.87       1.92    1.42    1.44 f32
+audio_render         Float, Liste             105.47     105.74     145.30     146.42    1.38    1.38 f32
+lamps_place_road     Map, Set, Liste            3.72       3.76       4.38       4.44    1.18    1.18 f32
+lamps_near           Map, Liste                12.13      13.15      51.65      52.98    4.26    4.03 f32
+(Zeiten in µs je Aufruf eines Falls; min/med: Klasse geteilt durch C++)

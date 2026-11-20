@@ -1,0 +1,547 @@
+round 1: 37 Blueprints
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+round 2: 4 Blueprints
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+round 3: 4 Blueprints
+round 4: 3 Blueprints
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+round 5: 2 Blueprints
+round 6: 2 Blueprints
+Arondight45_DroneFC_Core       38 /   38 functions      417 /    417 lines
+    mag (3): written
+    finite (3): written
+    PT1::PT1 (1): written
+    PT1::run (11): written
+    PT1::reset (4): written
+    Filters::run (4): written
+    Attitude::reset (5): written
+    Attitude::run (33): written
+    PID::PID (1): written
+    PID::run (17): written
+    PID::reset (6): written
+    PID::integral (1): written
+    sbus_end (3): written
+    decode_sbus (23): written
+    SbusParser::feed (25): written
+    centered (3): written
+    throttle (3): written
+    shape (7): written
+    finite (4): written
+    sanitize (7): written
+    command (7): written
+    mix (26): written
+    pulse (4): written
+    ArmState::run (36): written
+    Controller::reset (5): written
+    Controller::run (10): written
+    Runtime::Runtime (1): written
+    Runtime::reset (14): written
+    Runtime::step (5): written
+    Runtime::step_command (71): written
+    Runtime::calibrated (1): written
+    Runtime::armed (1): written
+    Runtime::fault (1): written
+    Runtime::fault_name (11): written
+    Runtime::calibrate (35): written
+    Runtime::set_fault (4): written
+    Runtime::to_cdeg (4): written
+    Runtime::finalize (17): written
+Arondight45_FirmwareRuntime     7 /    7 functions       66 /     66 lines
+    FirmwareRuntime::FirmwareRuntime (1): written
+    FirmwareRuntime::reset (8): written
+    FirmwareRuntime::step (53): written
+    FirmwareRuntime::state_runtime (1): a name for a place - written where it is called
+    FirmwareRuntime::state_runtime (1): a name for a place - written where it is called
+    FirmwareRuntime::receiver_snapshot (1): a name for a place - written where it is called
+    FirmwareRuntime::navigation_snapshot (1): a name for a place - written where it is called
+Arondight45_HardwareSensors     9 /    9 functions      150 /    150 lines
+    crc16_ccitt (10): written
+    read_be_i16 (3): written
+    orient_target (17): written
+    decode_icm42688_registers (14): written
+    decode_navigation_wire (29): written
+    encode_navigation_wire (29): written
+    encode_navigation_wire (5): written
+    NavigationWireParser::feed (17): written
+    SbusWireParser::feed (26): written
+Arondight45_StateControl       27 /   27 functions      459 /    459 lines
+    navigation_velocity_valid (3): written
+    navigation_agl_valid (3): written
+    navigation_heading_valid (3): written
+    finite (3): written
+    wrap_degrees (5): written
+    state_intent (35): written
+    StateController::reset (10): written
+    StateController::leave_mode (8): written
+    StateController::run (219): written
+    StateController::degraded_attitude_command (22): written
+    StateController::debug (1): a name for a place - written where it is called
+    StateController::hover_trim (1): written
+    StateController::kinematic_vertical_speed (8): written
+    StateController::reset_horizontal_state (8): written
+    StateController::reset_command_targets (7): written
+    StateController::update_command_targets (5): written
+    StateController::limit_vertical_accel_jerk (11): written
+    StateController::clamp_horizontal_integral (9): written
+    StateController::update_acceleration_estimator (31): written
+    StateRuntime::StateRuntime (1): written
+    StateRuntime::reset (6): written
+    StateRuntime::step (53): written
+    StateRuntime::inner (1): a name for a place - written where it is called
+    StateRuntime::inner (1): a name for a place - written where it is called
+    StateRuntime::state_controller (1): a name for a place - written where it is called
+    StateRuntime::game_active (1): written
+    StateRuntime::update_attitude (3): written
+Game/game                      10 /   11 functions       10 /     11 lines
+    Game::net (1): a name for a place - written where it is called
+    Game::city (1): a name for a place - written where it is called
+    Game::key_down_event (1): it calls Devices::key(), which waits
+    Game::mouse_move (1): written
+    Game::pointer_locked (1): written
+    Game::windows (1): a name for a place - written where it is called
+    Game::water_look (1): a name for a place - written where it is called
+    Game::body (1): written
+    Game::state_of (1): written
+    Game::player_driving (1): written
+    Game::respawn_wait (1): written
+--- Game__game_cpp: clang: /home/claude/kernengine.de/koordination/shared-tmp/kern-converted-check-tp6g9v2_/test_Game__game_cpp.cpp:4946:82: error: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld'
+--- Game__game_cpp: clang:  4946 |   physics::Body body(game::ActorId a) const { return converted::present(world_)->actor_body(a); }
+--- Game__game_cpp: clang:       |                                                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+--- Game__game_cpp: without the member body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld'
+--- Game__game_cpp: clang: /home/claude/kernengine.de/koordination/shared-tmp/kern-converted-check-jpwnzk8j/test_Game__game_cpp.cpp:4947:103: error: use of undeclared identifier 'body'
+--- Game__game_cpp: clang:  4947 |   BodyState state_of(game::ActorId a) const { return read_body(converted::present(world_)->physics(), body(a)); }
+--- Game__game_cpp: clang:       |                                                                                                       ^
+--- Game__game_cpp: clang:  4947 |   BodyState state_of(game::ActorId a) const { return read_body(converted::present(world_)->physics(), body(a)); }
+--- Game__game_cpp: clang:       |                                                                                                       ^
+--- Game__game_cpp: clang: /home/claude/kernengine.de/koordination/shared-tmp/kern-converted-check-jpwnzk8j/test_Game__game_cpp.cpp:5613:27: error: use of undeclared identifier 'body'
+--- Game__game_cpp: clang:  5613 |   const physics::Body b = body(chute_actor_);
+--- Game__game_cpp: clang:       |                           ^
+--- Game__game_cpp: without the member state_of: use of undeclared identifier 'body' - that went with body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld'
+--- Game__game_cpp: without the function step_parachute: use of undeclared identifier 'body' - that went with body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld'
+--- Game__game_cpp: clang: /home/claude/kernengine.de/koordination/shared-tmp/kern-converted-check-lohjnb_s/test_Game__game_cpp.cpp:5573:23: error: use of undeclared identifier 'state_of'
+--- Game__game_cpp: clang:  5573 |   const BodyState s = state_of(jet_actor_);
+--- Game__game_cpp: clang:       |                       ^
+--- Game__game_cpp: without the function eject: use of undeclared identifier 'state_of' - that went with body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld'
+Game/game_cpp                   2 /   34 functions       31 /   1560 lines
+    register_node (18): an object of the engine (NodeDef) copied or moved as a whole
+    Game::Game (1): CityStream() is defined in another file
+    Game::build_level (99): an object of the engine as a local that is not made by a constructor of it
+    Game::start (111): it calls register_node(), which waits
+    Game::stop (4): the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+    Game::matrix_of (5): written
+    Game::player_position (13): gaps_riding() is defined in another file
+    Game::focus_position (4): it calls Game::player_position(), which waits
+    Game::clear_spot (39): it calls CityStream::ground_height(), which waits
+    Game::spawn_guard (26): it calls Game::clear_spot(), which waits
+    Game::place_world (43): it calls Game::clear_spot(), which waits
+    Game::hide_soldier (4): an enum value of an enum without a name
+    Game::show_soldier (9): an enum value of an enum without a name
+    Game::put_down (8): it calls CityStream::ground_height(), which waits
+    Game::spawn_guard_step (34): ground_ready() is defined in another file
+    Game::standing_feet (11): it calls CityStream::ground_height(), which waits
+    Game::toggle_drone (41): gaps_riding() is defined in another file
+    Game::switch_mode (34): it calls Game::toggle_drone(), which waits
+    Game::try_enter (18): gaps_seat_press() is defined in another file
+    Game::exit_vehicle (31): it calls CityStream::ground_height(), which waits
+    Game::eject (14): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'state_of' - that went with body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld')
+    Game::fixed_step (34): it calls Game::spawn_guard_step(), which waits
+    Game::drive_traffic (86): detach() is defined in another file
+    Game::traffic_advance (26): written
+    Game::step_parachute (20): its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'body' - that went with body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld')
+    Game::manage_traffic (98): it calls Game::focus_position(), which waits
+    Game::update (87): look_begin() is defined in another file
+    Game::update_camera (149): it calls CityStream::ground_height(), which waits
+    Game::draw_vehicles (27): begin() is defined in another file
+    Game::audio_init (11): init() is defined in another file
+    Game::audio_render (13): ui_render_music() is defined in another file
+    Game::update_sound (38): ui_mix_cues() is defined in another file
+    Game::hud_json (136): vr_menu_json() is defined in another file
+    Game::command (268): ctl_command() is defined in another file
+car                            13 /   13 functions       13 /     13 lines
+    CarSpec::car (1): written
+    Car::Car (1): written
+    Car::rigged (1): written
+    Car::show (1): written
+    Car::roll (1): written
+    Car::wheel_body (1): written
+    Car::ground_offset (1): written
+    Car::spec (1): a name for a place - written where it is called
+    Car::wheel (1): a name for a place - written where it is called
+    Car::steer_angle (1): written
+    Car::forward_speed (1): written
+    Car::gear (1): written
+    Car::throttle (1): written
+city_stream                    14 /   15 functions       14 /     15 lines
+    CityStream::projector (1): a name for a place - written where it is called
+    CityStream::offline (1): written
+    CityStream::has_real_data (1): written
+    CityStream::lanes (1): a name for a place - written where it is called
+    CityStream::ground_height (1): height() is defined in another file
+    CityStream::terrain (1): a name for a place - written where it is called
+    CityStream::terrain (1): a name for a place - written where it is called
+    CityStream::stats (1): a name for a place - written where it is called
+    CityStream::furniture_serial (1): written
+    CityStream::take_ground_changes (1): written
+    CityStream::building (1): a name for a place - written where it is called
+    CityStream::area (1): a name for a place - written where it is called
+    CityStream::damaged_buildings (1): written
+    CityStream::damage_serial (1): written
+    CityStream::take_damage_log (1): written
+combat_detail                   2 /    2 functions        2 /      2 lines
+    CriticalClock::armed (1): written
+    CriticalClock::reset (1): written
+common                         18 /   18 functions       51 /     51 lines
+    clampf (1): written
+    sign0 (1): written
+    rate_limit (1): written
+    damp_alpha (1): written
+    wrap_pi (5): written
+    conj (1): written
+    to_local (1): written
+    qnormalize (4): written
+    yaw_quat (1): written
+    heading_of (1): written
+    slerp (8): written
+    read_body (4): written
+    Rng::seeded (1): written
+    Rng::next (1): written
+    Rng::unit (1): written
+    Rng::range (1): written
+    Rng::gaussian (8): written
+    cast (10): written
+controls                        3 /    8 functions        3 /      8 lines
+    RateStick::reset (1): written
+    GrenadeCook::reset (1): written
+    Devices::touch_down (1): input() is defined in another file
+    Devices::mouse_down (1): input() is defined in another file
+    Devices::mouse_move (1): input() is defined in another file
+    Devices::key (1): input() is defined in another file
+    Devices::pad_button (1): input() is defined in another file
+    Devices::set (1): written
+destruction                     4 /    4 functions        8 /      8 lines
+    Destruction::init (1): written
+    Destruction::stats (1): a name for a place - written where it is called
+    Destruction::take_points_log (1): written
+    Destruction::points_list (5): written
+drone                           5 /    5 functions        5 /      5 lines
+    Drone::telemetry (1): a name for a place - written where it is called
+    Drone::params (1): a name for a place - written where it is called
+    Drone::motor_position (1): written
+    Drone::rotor_angle (1): written
+    Drone::parked (1): written
+engine_logic_logic              0 /    5 functions        0 /      5 lines   (what the program calls of it)
+    Instance::name (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Instance::graph (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Instance::disabled (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Instance::tier (1): a function of Instance, an object of the engine (a handle in a Blueprint), that is no node of it
+    Runtime::instances (1): a function of Runtime, an object of the engine (a handle in a Blueprint), that is no node of it
+engine_math_math                5 /    5 functions       21 /     21 lines   (what the program calls of it)
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+    Mat4::translation (1): written
+    Mat4::operator* (9): written
+    Mat4::translate (1): written
+engine_physics_physics          3 /    3 functions        3 /      3 lines   (what the program calls of it)
+    Body::valid (1): written
+    Body::operator== (1): written
+    QueryFilter::QueryFilter (1): written
+--- equipment: clang: /home/claude/kernengine.de/koordination/shared-tmp/kern-converted-check-9lx0ve_k/test_equipment.cpp:52:3: error: unknown type name 'ActorRef'; did you mean 'kern::logic::ActorRef'?
+--- equipment: clang:    52 |   ActorRef target = 0;                 // only instances whose Self is target (0 = every instance)
+--- equipment: clang:       |   ^~~~~~~~
+--- equipment: without the record kern::logic::Event: unknown type name 'ActorRef'; did you mean 'kern::logic::ActorRef'?
+equipment                       5 /    5 functions        5 /      5 lines
+    FlightLog::flights (1): a name for a place - written where it is called
+    FlightLog::flying (1): written
+    FlightLog::serial (1): written
+    MusicSynth::programme (1): written
+    MusicSynth::level (1): written
+facades                         1 /    1 functions        1 /      1 lines
+    Facades::name (1): written
+game                            2 /    2 functions        2 /      2 lines
+    PadState::down (1): written
+    PadState::hit (1): written
+game_cpp                        3 /    5 functions       24 /     65 lines
+    car_color (5): written
+    vehicle_actor (37): an enum value of an enum without a name
+    json_escape (9): written
+    mode_name (10): written
+    game (4): the state of the Blueprint Game (its one object is that Blueprint, no value)
+gaps_rules                      4 /    4 functions        8 /      8 lines
+    SmokeField::of (5): written
+    SmokeField::puffs (1): a name for a place - written where it is called
+    SmokeField::effects (1): written
+    VisualPose::invalidate (1): written
+gps_live                       11 /   11 functions       11 /     11 lines
+    GpsLive::stop (1): written
+    GpsLive::active (1): written
+    GpsLive::compass (1): written
+    GpsLive::has_fix (1): written
+    GpsLive::shown (1): written
+    GpsLive::position (1): written
+    GpsLive::heading (1): written
+    GpsLive::speed (1): written
+    GpsLive::distance (1): written
+    GpsLive::accuracy (1): written
+    GpsLive::elapsed (1): written
+interiors                       3 /    3 functions        3 /      3 lines
+    Interiors::init (1): written
+    Interiors::active (1): written
+    Interiors::plan (1): a name for a place - written where it is called
+jet                             9 /   11 functions        9 /     11 lines
+    Jet::Jet (1): reset() is defined in another file
+    Jet::mode (1): written
+    Jet::toggle_mode (1): set_mode() is defined in another file
+    Jet::telemetry (1): a name for a place - written where it is called
+    Jet::landed (1): written
+    Jet::gear_down (1): written
+    Jet::gear_impact (1): written
+    Jet::nozzle (1): written
+    Jet::thrust (1): written
+    Jet::lever (1): written
+    Jet::spec (1): a name for a place - written where it is called
+jet_seats                       3 /    3 functions        3 /      3 lines
+    Table::rows (1): a name for a place - written where it is called
+    Table::revision (1): written
+    Table::clear (1): written
+lamps                           5 /    5 functions        5 /      5 lines
+    Field::clear (1): written
+    Field::all (1): a name for a place - written where it is called
+    Field::all (1): a name for a place - written where it is called
+    Field::reset_broken (1): written
+    Field::broken (1): written
+life                           28 /   29 functions       35 /     36 lines
+    LifeOut::clear (1): written
+    Life::ragdolls (1): a name for a place - written where it is called
+    Life::ragdolls (1): a name for a place - written where it is called
+    Life::cows (1): a name for a place - written where it is called
+    Life::flocks (1): a name for a place - written where it is called
+    Life::trees_down (1): written
+    Life::birds (1): a name for a place - written where it is called
+    Life::trees (1): a name for a place - written where it is called
+    Life::pets (1): a name for a place - written where it is called
+    Life::cat_attack (1): a name for a place - written where it is called
+    Life::epoch (1): written
+    Life::has_chain (1): written
+    Life::chain (1): a name for a place - written where it is called
+    Life::set_remote_joggers (1): written
+    Life::animal_of (5): written
+    Life::cow_body (1): written
+    Life::pet_body (1): written
+    Life::remote_animals (1): written
+    Life::pet_anchors (1): a name for a place - written where it is called
+    Life::anchor_of (1): written
+    Life::net_kill_pet (1): kill_pet() is defined in another file
+    Life::voices (1): a name for a place - written where it is called
+    Life::cow_hits (1): written
+    Life::bird_hits (1): written
+    Life::jogger_streak (1): written
+    Life::shouts (1): written
+    Life::honks (1): written
+    Life::hold_animal (4): written
+    Life::loose_birds (1): a name for a place - written where it is called
+life_art                        0 /    4 functions        0 /      4 lines
+    LifeArt::box (1): put() is defined in another file
+    LifeArt::ball (1): put() is defined in another file
+    LifeArt::cylinder (1): put() is defined in another file
+    LifeArt::glow (1): put() is defined in another file
+look                            3 /    3 functions        3 /      3 lines
+    impact_trauma (1): written
+    Stabilizer::reset (1): written
+    lamp_glow (1): written
+mp_art                          1 /    1 functions        1 /      1 lines
+    MpArt::ready (1): written
+mp_rules                       15 /   15 functions       15 /     15 lines
+    PoseTimeline::reset (1): written
+    PoseTimeline::empty (1): written
+    PoseTimeline::last_position (1): written
+    PoseTimeline::clock_offset_ms (1): written
+    PoseTimeline::delay_ms (1): written
+    NavTimeline::reset (1): written
+    rgb (1): written
+    Scoreboard::clear (1): written
+    Scoreboard::rows (1): a name for a place - written where it is called
+    Scoreboard::set (1): written
+    VoiceStream::speaking (1): written
+    VoiceStream::reset (1): written
+    VoiceCapture::clear (1): written
+    PingBoard::clear_all (1): written
+    PingBoard::all (1): a name for a place - written where it is called
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+net_session                    33 /   33 functions       33 /     33 lines
+    Session::active (1): written
+    Session::hosting (1): written
+    Session::self_slot (1): written
+    Session::push (1): written
+    Session::take (1): written
+    Session::seats (1): a name for a place - written where it is called
+    Session::seats (1): a name for a place - written where it is called
+    Session::take_hits (1): written
+    Session::take_confirms (1): written
+    Session::take_kills (1): written
+    Session::take_fx (1): written
+    Session::take_swarms (1): written
+    Session::take_swarm_hits (1): written
+    Session::take_world (1): written
+    Session::take_destroy (1): written
+    Session::take_town (1): written
+    Session::take_toss (1): written
+    Session::take_proj (1): written
+    Session::take_pings (1): written
+    Session::take_voice (1): written
+    Session::take_anchor (1): written
+    Session::remotes (1): a name for a place - written where it is called
+    Session::remotes (1): a name for a place - written where it is called
+    Session::scores (1): a name for a place - written where it is called
+    Session::friendly_fire (1): written
+    Session::set_friendly_fire_initial (1): written
+    Session::world_rules (1): written
+    Session::now_ms (1): written
+    Session::vote_text (1): a name for a place - written where it is called
+    Session::vote_pending (1): written
+    Session::sent_poses (1): written
+    Session::connects (1): written
+    Session::send_refused (1): written
+people                         18 /   19 functions       23 /     30 lines
+    People::set_budget (1): written
+    People::set_ranges (1): written
+    People::clear (1): written
+    People::spawns_allowed (1): written
+    People::spawns_denied (1): written
+    People::take_reports (1): written
+    People::at (1): a name for a place - written where it is called
+    People::all (1): a name for a place - written where it is called
+    People::hurt (7): kill() is defined in another file
+    People::take_deaths (1): written
+    People::take_remote_hits (1): written
+    People::take_hurts (1): written
+    People::take_falls (1): written
+    People::stand_up (1): written
+    People::set_puppets (1): written
+    People::puppets (1): written
+    People::last_head (1): written
+    People::grab_knock (1): written
+    People::knock (6): written
+perf                           12 /   12 functions       12 /     12 lines
+    Meter::begin_frame (1): written
+    Meter::ms (1): written
+    Meter::update_ms (1): written
+    Meter::render_ms (1): written
+    Meter::gpu_ms (1): written
+    Governor::tier (1): written
+    Governor::max_tier (1): written
+    Governor::automatic (1): written
+    Governor::set_auto (1): written
+    Governor::fps (1): written
+    Governor::changes (1): written
+    Governor::blocked (1): written
+ragdoll                         4 /    6 functions        4 /      6 lines
+    Ragdolls::init (1): written
+    Ragdolls::has (1): find() is defined in another file
+    Ragdolls::take_ups (1): written
+    Ragdolls::spawned (1): written
+    Ragdolls::bone_body (1): find() is defined in another file
+    Ragdolls::colors (1): a name for a place - written where it is called
+rigid_spec                      3 /    3 functions       51 /     51 lines
+    capsule_between (14): written
+    create_body (29): written
+    box_inertia (8): written
+road_graph                      2 /    2 functions        2 /      2 lines
+    RoadGraph::empty (1): written
+    RoadGraph::size (1): written
+settings                        3 /    3 functions        3 /      3 lines
+    Settings::get (1): written
+    Settings::on (1): written
+    Settings::version (1): written
+sound_fx                        1 /    1 functions        1 /      1 lines
+    SoundFx::ready (1): written
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+touch_play                     16 /   16 functions       16 /     16 lines
+    TouchPlay::right_inset (1): written
+    TouchPlay::move (1): written
+    TouchPlay::look (1): written
+    TouchPlay::move_live (1): written
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+357 of 409 functions of the program are written as Blueprints (1525 of 3119 lines), and 8 of the engine's headers that they call: 49 Blueprints - 1 of source files, 1 of states, 47 of headers and of shapes
+302 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (   268)   ctl_command() is defined in another file
+     5 (   238)   it calls CityStream::ground_height(), which waits
+     1 (   136)   vr_menu_json() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    98)   it calls Game::focus_position(), which waits
+     1 (    87)   look_begin() is defined in another file
+     1 (    86)   detach() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     2 (    54)   gaps_riding() is defined in another file
+     3 (    50)   an enum value of an enum without a name
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    27)   begin() is defined in another file
+     1 (    20)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'body' - that went with body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld')
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    14)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'state_of' - that went with body: no member named 'actor_body' in 'converted_Game__game_cpp::GameWorld')
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    11)   init() is defined in another file
+     1 (     7)   kill() is defined in another file
+     5 (     5)   input() is defined in another file
+     1 (     4)   the end of a Ragdolls runs its destructor ~Ragdolls(), which is not written yet
+     1 (     4)   it calls Game::player_position(), which waits
+     1 (     4)   the state of the Blueprint Game (its one object is that Blueprint, no value)
+     4 (     4)   put() is defined in another file
+     2 (     2)   find() is defined in another file
+     1 (     1)   it calls Devices::key(), which waits
+     1 (     1)   CityStream() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   reset() is defined in another file
+     1 (     1)   set_mode() is defined in another file
+     1 (     1)   kill_pet() is defined in another file
+     1 (     1)   elevation() is defined in another file
+rc=0

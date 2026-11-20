@@ -147,3 +147,17 @@ als Daten – s5 Endzustand). Reihenfolge der Tick-Handler (Runtime::fire, nach 
   des Klebers (lokal, mit dem Aufruf beim Namen beendet). → 45c54236 (notation.cpp native_glue): Referenz-Eingänge als Glieder des _Native-Objekts
   (wie die Variable des Aufrufs im Interpreter), busy_ für Aufruf mitten im eigenen.
 - Laufen: work-c-vergleich-091714-16925 (45c54236; city_stream, terrain), CI 44701329842 (Engine-Suite für den Kleber).
+
+## Stand 09:35 – work-c = 53c9ac69 (gepusht; enthält work-zusammen 8971e5c3)
+- **work-c-vergleich-091714-16925 (45c54236; city_stream, terrain): 11 ok von 11 in BEIDEN Durchgängen (Stellvertreter und SC_ENGINE=real), 0 FAIL/ABBRUCH/LECK/ZEIT,
+  keine Abweichung.** Belegt: b835e56d, a6127013, 4bca8f52, 42e6e45e, 45c54236 (Kleber: Referenz-Eingänge als Glieder → der Callback der Klasse aus Terrain_sampler lebt).
+- 53c9ac69 Merge 8971e5c3: converted.h in EINER Fassung – t1's probe_source behalten, c's callback_defined (doppelt gebaut) entfernt.
+- Laufen: work-c-vergleich-093342-22177 (53c9ac69; nach dem Merge), CI 44701329842 (45c54236): determinism, build, input grün; native/e2e laufen.
+
+## BEREIT ZUM MERGEN: work-c 53c9ac69 – Beleg work-c-vergleich-093342-22177
+- vergleich city_stream + terrain auf 53c9ac69 (enthält work-zusammen 8971e5c3): **11 ok von 11 in beiden Durchgängen** (Stellvertreter, SC_ENGINE=real),
+  0 FAIL/ABBRUCH/LECK/ZEIT, keine Abweichung. Vorher (Lauf 045421) rot: converted_city_stream_cpp, converted_terrain_cpp.
+- Commits seit work-zusammen: b835e56d, ce74f7d4 (converted::room), a6127013 (kept je Aufruf leeren), 4bca8f52 (m[key]=move), 45c54236 (Kleber: Referenz-
+  Eingänge als Glieder des _Native-Objekts), Merges. (42e6e45e durch t1's probe_source ersetzt.)
+- CI 44701329842 (45c54236): native, build, determinism, input grün; e2e rot nur an „cannot convert int to int64 (voice)“ (game_equipment_cpp,
+  sound_fx_cpp) und Folge „Play runs them as machine code“ = Basis (stand/e.md); native-spawncity lief noch.
