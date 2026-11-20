@@ -4788,7 +4788,24 @@ TEST(logic_fixed_widths) {
   CHECK(says("  U8 Bad = 256;\n", "256 is no U8 (it would hold 0)"));
   CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
   CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
-  CHECK(says("  Map<Int, U32> Bad = Map<Int, U32>{};\n", "Int of a fixed width"));
+  // (a map's values may be of a width - the map is the place -, its defaults hold values of it; a list of a fixed length is no value of a map)
+  {
+    logic::Graph h;
+    std::string e;
+    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  Map<Int, U32> Good = Map<Int, U32>{{1, 4294967295}};\n  Map<Int, List<U8>> Bytes = Map<Int, List<U8>>{{2, List<U8>{0, 255}}};\n};\n", h, nullptr, &e));
+    for (const logic::Issue& i : logic::check(h)) CHECK(!i.error);
+    // (a map from outside: its values as the map holds them - 2^32 + 7 as a U32 is 7, 256 in a List<U8> is 0)
+    const logic::TypeRef good = logic::declared(h.variables[0]), bytes = logic::declared(h.variables[1]);
+    logic::Value a = logic::Value::zero(logic::PinType::map), b = logic::Value::zero(logic::PinType::map);
+    a.own_entries().try_emplace(logic::key_of(logic::Value::integer(1)), logic::Value::integer(4294967303));
+    b.own_entries().try_emplace(logic::key_of(logic::Value::integer(2)), logic::Value::from_json([] { json::Value l = json::Value::array(); l.push(json::Value(256.0)); l.push(json::Value(1.0)); return l; }(), logic::PinType::integer_list));
+    const logic::Value a2 = logic::from_outside(a, good, h), b2 = logic::from_outside(b, bytes, h);
+    CHECK(a2.keyed().value_at(0).i == 7 && b2.keyed().value_at(0).item(0).i == 0 && b2.keyed().value_at(0).item(1).i == 1);
+    CHECK(a.keyed().value_at(0).i == 4294967303);  // (the map given stays as it was)
+  }
+  CHECK(says("  Map<Int, U8> Bad = Map<Int, U8>{{1, 256}};\n", "a value: 256 is no U8"));
+  CHECK(says("  Map<Int, List<I8>> Bad = Map<Int, List<I8>>{{1, List<I8>{128}}};\n", "a list's item: 128 is no I8"));
+  CHECK(says("  Map<Int, Fixed<Int, 2>> Bad = Map<Int, Fixed<Int, 2>>{};\n", "no map, set or list of a fixed length"));
   // a list of Ints of a fixed width: its default holds its values; a list of another width (or of Int) is another type; Copy Bytes
   // writes numbers of its width into it; a field of a width has its own width in a layout
   CHECK(says("  List<U8> Bad = List<U8>{1, 256};\n", "a list's item: 256 is no U8"));
@@ -5296,8 +5313,8 @@ TEST(logic_maps_and_sets) {
   // what the notation and the check refuse - with the reason
   CHECK(says("  Map<Float, Int> Wrong = Map<Float, Int>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
   CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
-  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)"));
-  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)"));
+  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
   CHECK(says("  Map<Int, Float> Twice = Map<Int, Float>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
   CHECK(says(in_event("    map_add(Scores, 2);\n    list_add(Scores, 1.0);"), "Scores"));
   CHECK(says("  void Touch(Cell& c) {\n    map_add(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    map_add(Cells, \"a\");\n    Touch(Cells[0]);"), "an entry that is held stays where it is"));

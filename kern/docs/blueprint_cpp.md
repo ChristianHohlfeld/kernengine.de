@@ -491,7 +491,12 @@ Eine Float wird erst zum Int (`kern::to<Int>(x)` – auf null zu, außerhalb das
 und JIT halten ihn genau; der JIT überlässt Set/Add einer solchen Variablen der Funktion des Knotens. Das Produkt zweier
 `U32`, wie C++ es rechnet, ist `kern::math::mul32(a, b)` (für `I32`: `wrap32s(mul32(a, b))`); Produkte bis 16 Bit sind
 als Int genau. In der Klasse ist `U32` `logic::Sized<u32>` (nodes.h): gelesen ein Int, gespeichert wie C++.
-Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`); Maps haben Schlüssel und Werte ohne Breite.
+Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`). Die Schlüssel einer Map haben keine Breite; ihre **Werte**
+können eine haben (`Map<Int, U8>`, `Map<Int, List<U32>>`, im Graphen `"of":"int>int_list:u32"`, Einstellung Value `u32_list`): die Map ist
+der Platz, ein Wert wird gespeichert wie C++ ihn in einer `std::map<…, std::vector<u32>>` speichert – Set at Key, Set Variable auf
+`M[i]`, Add/Insert/Set Length auf der Liste eines Werts (`list_add(M[0], x)`), eine ganze Map beim Setzen und von außen; ihre
+Vorgabe und ein Literal halten nur Werte der Breite (`Map<Int, U8>{{1, 256}}` ist ein Fehler). In der Klasse ist ein solcher Wert
+`logic::Sized<u32>` bzw. `List<Sized<u32>>`; Find gibt ihn als Int.
 
 **Listen fester Breite** (`List<U8>` … `List<I32>`, im Graphen `"type":"int_list","of":"u8"`, Einstellung `u8_list`) halten jeden
 Eintrag wie `std::vector<u8>`: was hineinkommt, wird gespeichert wie C++ es dort speichert – Add, Insert, der Wert von Set Length,

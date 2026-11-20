@@ -1159,6 +1159,7 @@ ParamDef key_param() {
 ParamDef value_param() {
   ParamDef p = param("value", "Value", ParamDef::Kind::type, "float");
   p.with_lists = true;
+  p.widths = p.width_values = true;  // (a map is a place: its values may be of a width, U8 and List<U8>)
   return p;
 }
 /// The keys' type a node's setting "Key" names (an Int when it names none a key can be).
@@ -1310,7 +1311,9 @@ void add_maps(Library& lib) {
     d.title = [](const NodeDef&, const Node& n) { return "Set in " + place_title(n); };
     d.run = [on_entries](Context& c) {
       const MapKey key = key_of(c.in("key"));
-      const Value value = c.in("value");
+      // (the value as the map holds it: a U8 its low bits, as C++ stores it there)
+      TypeRef t;
+      const Value value = keyed_place(c.node(), c.instance().graph(), PinType::map, t) ? fitted(c.in("value"), value_type(t), c.instance().graph()) : c.in("value");
       on_entries(c, PinType::map, [&](MapEntries& e) {
         const auto [added, at] = map::set(e, key, value);
         c.out("added", Value::boolean(added));
