@@ -11178,6 +11178,8 @@ class Held:
 
 
 class TestWriter:
+    # the logic the level's Blueprints run in, and the program's way to call them: the test's own (converted::Blueprint, RuleBlueprint)
+    OWN_LOGIC = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
     """The test of one converted file (see tests/converted.h of the game). It holds the source of the
     file's converted functions once more, compiled with the numbers and the mathematics of the
     Blueprint language - classes and constants along with them - and calls each function there and
@@ -12363,6 +12365,11 @@ class TestWriter:
         the stand-in answers. `plain`: a method of plain data (the test's own struct, MeshData::as_input) - the
         struct is its first value, and what a method that is not const makes of it, the first it takes."""
         d = f["decl"]
+        for raw in [qtype(p) for p in kids(d) if p.get("kind") == "ParmVarDecl"] + [re.sub(r"\(.*$", "", qtype(d))]:
+            if self.u.object_of(raw) in self.OWN_LOGIC:
+                # (the logic the level's Blueprints run in is the test's own, no stand-in: GameWorld::logic_runtime
+                # gives it - the stand-in of the engine has none to give, a function that asks for it is not compared)
+                raise Wait(f"it hands the logic the Blueprints run in ({self.u.object_of(raw).split('::')[-1]}) between the program and a stand-in of the engine")
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["converted::value_of(*this)"] if cls else []), []
         if plain and not qtype(d).rstrip().endswith("const"):
@@ -12524,7 +12531,7 @@ class TestWriter:
                     defs.append((("engine", f["decl"]["id"]), b))
         # (the logic the level's Blueprints run in, and the program's way to call them, are the test's own: it
         # runs the actors' Blueprints in a real one - converted::Blueprint, RuleBlueprint)
-        own_logic = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
+        own_logic = self.OWN_LOGIC
         objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
         for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
             for b in self.engine_bases(q):
@@ -13139,6 +13146,12 @@ class TestWriter:
             decl = tree.decl.get(i)
             if decl is None or decl.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
                 return
+            if function_key(tree, decl) not in self.closures:
+                # (the Blueprint whose file it stands in has not handed it on - it is none this one calls, only its test
+                # holds it: a destructor runs what it calls where a value ends. That Blueprint is one this one needs: main)
+                part = u.world.part_of_function(tree, decl)
+                if part is not None and part != u.name:
+                    u.missing.add((part, function_key(tree, decl)))
             for place in self.closures.get(function_key(tree, decl), ()):
                 if place in G.wanted:
                     continue
@@ -13209,6 +13222,22 @@ class TestWriter:
                     held = tree.owner.get(c["id"]) or "" if c is not None else ""
                     if c is not None and not (held.startswith(ENGINE + "::") and u.engine_object(held)):   # (an object of the engine: its stand-in makes it)
                         want_function(c["id"])
+                elif k == "CallExpr" and callee_name(x) in ("make_unique", "make_shared"):
+                    # (std::make_unique<T>(a...) makes the T by its constructor of these arguments in the standard library:
+                    # no call of it stands in the tree of the source - `std::make_unique<Car>(CarSpec::car())`, game_net.cpp)
+                    m = re.match(r"(?:const\s+)?std::(?:unique_ptr|shared_ptr)<(.+)>$", u.clean(qtype(x)).strip())
+                    try:
+                        q = u.find_type(m.group(1).strip()) if m else None
+                    except Wait:
+                        q = None
+                    if q in tree.records and not (q.startswith(ENGINE + "::") and u.engine_object(q)):
+                        given = len(kids(x)) - 1
+                        for c in kids(tree.records[q]):
+                            if c.get("kind") != "CXXConstructorDecl" or c.get("isImplicit"):
+                                continue
+                            ps = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
+                            if len([p for p in ps if not kids(p)]) <= given <= len(ps):
+                                want_function(c["id"])
         def scan_record(d):
             for base in d.get("bases", []) or []:
                 want_types(base.get("type", {}).get("qualType", ""))
@@ -13447,7 +13476,7 @@ class TestWriter:
         return [m for m in members if m["id"] not in inner_templates], unconverted
 
     # ---- what a test in another file holds of this file's source ----
-    def exports(self):
+    def exports(self, known=()):
         """The test of a file that calls a function of this Blueprint holds that function's source once more,
         and all it names (`gather`) - what stands in this source file is not in that file's tree. For every
         function of the Blueprint that is written and has a name the linker knows: the places of the pieces
@@ -13459,6 +13488,8 @@ class TestWriter:
         for f in self.u.order:
             if f.lifted or not f.key or "@" in f.key:
                 continue   # (a function of its file alone - static, in a namespace without a name: no other file calls it)
+            if f.key in known:
+                continue   # (`known`: what an earlier try handed on already - the first try's stands, see convert_unit)
             order = []
             for place, piece in self.items(self.gather([f.decl["id"]])):
                 pieces.setdefault(place, piece)
@@ -13539,6 +13570,9 @@ class TestWriter:
                         t = tree.decl.get(n["_unnamed"])
                         if t is None or not here(t) or not namespace_level(t) or not own(t):
                             continue
+                        ta = t.get("_at", (None, None))[0]
+                        if t.get("_file") == d["_file"] and ta is not None and d["_at"][0] <= ta < d["_at"][1]:
+                            continue   # (an enum the function declares itself - `enum { coast, drive } mode = coast;`, Car::step: its own name)
                         said, home_of = tuple(x["name"] for x in kids(t) if x.get("kind") == "EnumConstantDecl" and x.get("name")), t
                     else:
                         if n.get("kind") != "DeclRefExpr":
@@ -13680,6 +13714,27 @@ class TestWriter:
                     # it is one function, with one stand-in)
                     if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e)):
                         out[e["id"]] = e
+                # an object of the engine made - `std::make_unique<kern::net::Client>(transport_, config(), seed)`, or by its
+                # constructor: its constructor of these arguments is one the source calls (the test that takes the piece
+                # holds the stand-in's constructor too - Session::join in the tests of Game)
+                q, given = None, 0
+                if x.get("kind") == "CallExpr" and callee_name(x) == "make_unique":
+                    m = re.match(r"(?:const\s+)?std::unique_ptr<(.+)>$", u.clean(qtype(x)).strip())
+                    q, given = (u.object_of(m.group(1).strip() + "*") if m else None), len(kids(x)) - 1
+                elif x.get("kind") == "CXXConstructExpr":
+                    c = constructor_of(tree, x)
+                    held = tree.owner.get(c["id"]) or "" if c is not None else ""
+                    if c is not None and u.engine_object(held) and c["id"] not in out and not c.get("isImplicit"):
+                        out[c["id"]] = tree.decl.get(c["id"], c)
+                if q:
+                    try:
+                        makers = u.api().makers(q)
+                    except Wait:
+                        makers = []
+                    for c in makers:
+                        ps = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
+                        if len([p for p in ps if not kids(p)]) <= given <= len(ps) and c["id"] not in out:
+                            out[c["id"]] = c
         return out
 
     def guard_or_none(self, d):
@@ -14322,7 +14377,11 @@ class TestWriter:
                 said = [x for x in r.stderr.split("\n") if x.strip()]
                 firsts = [i for i, x in enumerate(said) if re.search(r"\berror: ", x)][:3]
                 for i in firsts:
-                    for x in said[max(0, i - 2):i + 3]:
+                    # (with the notes that follow it - which candidate did not fit, and why -, up to the next error)
+                    upto = next((j for j in range(i + 1, min(len(said), i + 40)) if re.search(r"\berror: ", said[j])), min(len(said), i + 40))
+                    for x in said[max(0, i - 2):upto]:
+                        if x.lstrip().startswith(("In file included", "|")) or re.match(r"\s*\d+ \|", x):
+                            continue
                         sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
@@ -14665,7 +14724,7 @@ def convert_unit(job):
             # (the source of a function is what it is, whether its test compares it yet or not: the tests of other files
             # that call it hold it - in a circle of functions over files, each test needs the others' source before any
             # test of them compares)
-            tried = writer.exports()
+            tried = writer.exports(exported[0])   # (each function once over the tries: the first try that has it gives it)
             for k, v in tried[0].items():
                 exported[0].setdefault(k, v)
             for k, v in tried[1].items():
