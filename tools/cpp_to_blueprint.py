@@ -6986,6 +6986,8 @@ class Emit:
             if not their.endswith("_list"):
                 return f"a {their}, and the call gives a {t}"
             return self.crosses(t[5:-1], their[:-5], of, target, depth + 1)
+        if t in WIDTHS:   # (an Int of a fixed width: the Int it holds - it crosses as an int, as on a wire)
+            return None if their == "int" else f"a {their}, and the call gives a {t}"
         if t in simple:   # (a value on its own is converted as on a wire - in every stage the same; a field of a struct and an item of a list are not)
             return None if simple[t] == their or depth == 0 else f"a {their}, and the call gives a {t}"
         if t in u.enum_values:
@@ -8303,7 +8305,7 @@ class Emit:
             raise Wait(f"algorithm: std::{name} of a {lt}")
         it = lt[5:-1]
         if len(a) == 2:
-            if it not in ("Int", "Float", "Bool", "Text", "Int64") and it not in self.u.enum_values:
+            if it not in ("Int", "Float", "Bool", "Text", "Int64") and it not in WIDTHS and it not in self.u.enum_values:
                 raise Wait(f"algorithm: std::{name} of {it} by its own < (a list of {it} has no order of its own: a function says it)")
             order = "nullptr"
         else:
