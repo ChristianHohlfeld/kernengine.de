@@ -13709,6 +13709,27 @@ class TestWriter:
                     # it is one function, with one stand-in)
                     if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e)):
                         out[e["id"]] = e
+                # an object of the engine made - `std::make_unique<kern::net::Client>(transport_, config(), seed)`, or by its
+                # constructor: its constructor of these arguments is one the source calls (the test that takes the piece
+                # holds the stand-in's constructor too - Session::join in the tests of Game)
+                q, given = None, 0
+                if x.get("kind") == "CallExpr" and callee_name(x) == "make_unique":
+                    m = re.match(r"(?:const\s+)?std::unique_ptr<(.+)>$", u.clean(qtype(x)).strip())
+                    q, given = (u.object_of(m.group(1).strip() + "*") if m else None), len(kids(x)) - 1
+                elif x.get("kind") == "CXXConstructExpr":
+                    c = constructor_of(tree, x)
+                    held = tree.owner.get(c["id"]) or "" if c is not None else ""
+                    if c is not None and u.engine_object(held) and c["id"] not in out and not c.get("isImplicit"):
+                        out[c["id"]] = tree.decl.get(c["id"], c)
+                if q:
+                    try:
+                        makers = u.api().makers(q)
+                    except Wait:
+                        makers = []
+                    for c in makers:
+                        ps = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
+                        if len([p for p in ps if not kids(p)]) <= given <= len(ps) and c["id"] not in out:
+                            out[c["id"]] = c
         return out
 
     def guard_or_none(self, d):
