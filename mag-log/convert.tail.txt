@@ -1,0 +1,80 @@
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+368 of 438 functions of the program are written as Blueprints (1739 of 4205 lines), and 18 of the engine's headers that they call: 59 Blueprints - 3 of source files, 1 of states, 55 of headers and of shapes
+323 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     4 (   376)   gaps_riding() is defined in another file
+     7 (   280)   it calls CityStream::ground_height(), which waits
+     1 (   268)   ctl_command() is defined in another file
+     2 (   235)   it calls Ragdolls::~Ragdolls(), which waits
+     1 (   136)   vr_menu_json() is defined in another file
+     1 (   111)   it calls register_node(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    99)   frighten() is defined in another file
+     1 (    98)   it calls Game::focus_position(), which waits
+     2 (    87)   detach() is defined in another file
+     1 (    87)   look_begin() is defined in another file
+     2 (    69)   it calls Game::clear_spot(), which waits
+     2 (    68)   life_epoch() is defined in another file
+     1 (    48)   active() is defined in another file
+     2 (    38)   begin() is defined in another file
+     1 (    38)   ui_mix_cues() is defined in another file
+     1 (    34)   ground_ready() is defined in another file
+     1 (    34)   it calls Game::toggle_drone(), which waits
+     1 (    34)   it calls Game::spawn_guard_step(), which waits
+     1 (    29)   gap_speed() is defined in another file
+     1 (    22)   lane_signature() is defined in another file
+     1 (    21)   person() is defined in another file
+     1 (    18)   an object of the engine (NodeDef) copied or moved as a whole
+     1 (    18)   gaps_seat_press() is defined in another file
+     1 (    17)   send_fx() is defined in another file
+     1 (    13)   ui_render_music() is defined in another file
+     1 (    11)   init() is defined in another file
+     1 (    11)   remote_cow_death() is defined in another file
+     1 (    11)   car() is defined in another file
+     1 (     8)   draw() is defined in another file
+     1 (     7)   kill() is defined in another file
+     1 (     6)   heard_shot() is defined in another file
+     5 (     5)   input() is defined in another file
+     1 (     4)   it calls Game::player_position(), which waits
+     1 (     4)   shot() is defined in another file
+     1 (     4)   the state of the Blueprint Game (its one object is that Blueprint, no value)
+     4 (     4)   put() is defined in another file
+     1 (     3)   it calls Ragdolls::has(), which waits
+     2 (     2)   find() is defined in another file
+     1 (     1)   it calls Devices::key(), which waits
+
+real	8m51,389s
+user	21m42,490s
+sys	1m5,473s
