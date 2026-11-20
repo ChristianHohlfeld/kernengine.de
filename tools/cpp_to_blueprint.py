@@ -7973,7 +7973,7 @@ class Emit:
             return b.get("kind") == "CXXMemberCallExpr" and callee(b).get("name") == want and kids(callee(b)) and self.same_list(kids(callee(b))[0], base)
         if not (whole(rng[0], "begin") and whole(rng[1], "end") and whole(end, "end")):
             raise Wait("list: std::unique of a part of a list")
-        if it not in ("Int", "Float", "Text") and it not in self.u.enum_values:
+        if it not in ("Int", "Float", "Text") and it not in WIDTHS and it not in self.u.enum_values:   # (entries of a width: their numbers)
             raise Wait(f"list: std::unique of {it} (its ==)")
         cpp = self.entry_cpp(base)
         kept, n = self.temp("kept", "Int"), self.temp("count", "Int")
@@ -8010,10 +8010,15 @@ class Emit:
                 inner = self.unwrap(kids(inner)[0])
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "remove" and len(kids(inner)) == 4:
                 # v.erase(std::remove(v.begin(), v.end(), x), v.end()): every entry that is x goes
-                if it not in ("Int", "Text") and it not in self.u.enum_values:
+                if it not in ("Int", "Text") and it not in WIDTHS and it not in self.u.enum_values:
                     raise Wait(f"list: every {it} that equals a value is removed")
-                x = self.temp("gone", it)
-                return [f"{x} = {self.ex(kids(inner)[3], it)};", f"while (loop(list_contains<{it}>({lv}, {x}))) {{", f"  list_remove({lv}, {x});", "}"]
+                if it in WIDTHS and self.u.clean(self.ctype(kids(inner)[3])) != self.u.clean(self.entry_cpp(base)):
+                    # (an entry of a width equals a value of its own type when their numbers are equal; a value of another
+                    # type C++ compares after its conversions - u32 == -1 holds for 4294967295)
+                    raise Wait("algorithm: std::remove of a value of another type")
+                it_wire = wire(it)
+                x = self.temp("gone", it_wire)
+                return [f"{x} = {self.ex(kids(inner)[3], it_wire)};", f"while (loop(list_contains<{it}>({lv}, {x}))) {{", f"  list_remove({lv}, {x});", "}"]
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "remove_if" and len(kids(inner)) == 4:
                 return self.removed_where(base, lv, it, kids(inner)[1:], args[1])
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "unique" and len(kids(inner)) == 3:
@@ -8208,7 +8213,7 @@ class Emit:
                 raise Wait("algorithm: std::find of a struct without an == of the program's")
             got = self.invoke(self.u.function(op), [y], obj=x)
             return got[0]
-        if it not in ("Int", "Float", "Bool") and it not in self.u.enum_values and not self.is64(x):
+        if it not in ("Int", "Float", "Bool") and it not in WIDTHS and it not in self.u.enum_values and not self.is64(x):
             raise Wait(f"algorithm: std::find of a {it}")
         return self.bx({"kind": "BinaryOperator", "opcode": "==", "type": {"qualType": "bool"}, "inner": [x, y]})
 
@@ -8329,9 +8334,9 @@ class Emit:
         cpp = self.entry_cpp(l0)
         lines = []
         if name == "find":
-            if self.u.clean(self.ctype(a[2])) != self.u.clean(cpp) or self.tp(a[2]) != it:
+            if self.u.clean(self.ctype(a[2])) != self.u.clean(cpp) or self.tp(a[2]) != wire(it):
                 raise Wait("algorithm: std::find of a value of another type")
-            x = self.held_once(a[2], it)
+            x = self.held_once(a[2], wire(it))
         else:
             g, given, lines = self.function_value(name, a[2])
         at, end, go = self.temp("at", "Int"), self.temp("end", "Int"), self.temp("go", "Bool")
@@ -10359,7 +10364,7 @@ class Emit:
             # the == of a class of the program says is that class's own matter.)
             it = t0[5:-1]
             cpp = re.match(r"std::vector<(.+)>$", self.u.clean(qtype(ops[0])))
-            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
+            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in WIDTHS or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
                 r = f"list_equal<{it}>({self.ex(ops[0], t0)}, {self.ex(ops[1], t0)})"
                 return (r if name == "operator==" else f"logic_not({r})"), "Bool"
         raise Wait(f"the operator {name[8:]} of {t0}")
