@@ -1,0 +1,80 @@
+    powm (9): written
+    reduce (5): written
+    P (1): a name for a place - written where it is called
+    N (1): a name for a place - written where it is called
+    G (1): a name for a place - written where it is called
+    fm (1): written
+    fa (1): written
+    fs (1): written
+    dbl (16): written
+    add_pt (15): written
+    mul_pt (8): written
+    affine (9): written
+    lift_x (16): written
+    tagged (7): written
+    append (1): written
+    public_key (8): written
+    sign (32): written
+    verify (18): written
+    hex_of (4): written
+    hex (5): written
+    hex (5): written
+    from_hex (11): written
+    escape (18): written
+    event_json (15): written
+qr_code                         1 /    1 functions        1 /      1 lines
+    Code::dark (1): written
+qr_code_cpp                    11 /   11 functions      176 /    176 lines
+    raw_modules (9): written
+    data_codewords (1): written
+    gf_mul (8): written
+    rs_divisor (13): written
+    rs_remainder (10): written
+    alignment_positions (9): written
+    Grid::set (1): written
+    finder (9): written
+    format_bits (15): written
+    encode (86): written
+    read_format (15): written
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+157 of 182 functions of the program are written as Blueprints (1262 of 1917 lines), and 9 of the engine's headers that they call: 17 Blueprints - 4 of source files, 0 of states, 13 of headers and of shapes
+153 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (   110)   read_features() is defined in another file
+     1 (    85)   it calls CityStream::select_cells(), which waits
+     2 (    72)   list: every U32 that equals a value is removed
+     1 (    61)   road_is_water() is defined in another file
+     3 (    60)   remove_tints() is defined in another file
+     3 (    56)   unproject() is defined in another file
+     1 (    44)   chunk_count() is defined in another file
+     2 (    33)   it calls CityStream::remove(), which waits
+     1 (    22)   buildings_input() is defined in another file
+     1 (    21)   it calls put_bytes(), which waits
+     1 (    19)   it calls CityStream::ground_height(), which waits
+     1 (    17)   sampler() is defined in another file
+     1 (    14)   ready_at() is defined in another file
+     1 (    13)   it calls CityStream::begin_roads(), which waits
+     1 (    12)   add_water_polygon() is defined in another file
+     1 (     9)   tile_input() is defined in another file
+     1 (     5)   a place in a list of another shape
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	1m27,998s
+user	4m10,252s
+sys	0m15,261s
