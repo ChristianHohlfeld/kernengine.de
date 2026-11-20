@@ -1,0 +1,80 @@
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_gaps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_wanted_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_combat_detail_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_gaps_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_net_session_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_jet_seats_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_controls_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_town_sync_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_spawn_guard_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_equipment_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_guided_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    cell (1): written
+    TrafficRules::rebuild (142): a List<Int> where a List<I32> is needed
+    TrafficRules::near (12): a List<Int> where a List<I32> is needed
+    TrafficRules::bind (1): written
+    TrafficRules::take_laws (8): written
+    TrafficRules::light (6): written
+    TrafficRules::pursuit (32): written
+    TrafficRules::gap_speed (20): written
+    TrafficRules::limit (86): it calls TrafficRules::near(), which waits
+
+1643 of 1846 functions of the program are written as Blueprints (19479 of 30980 lines), and 28 of the engine's headers that they call: 158 Blueprints - 70 of source files, 1 of states, 87 of headers and of shapes
+1598 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 7 give nothing
+
+what the others wait for: functions (lines)
+    26 (   833)   it calls Session::to_host(), which waits
+    12 (   761)   it calls Session::roster(), which waits
+    14 (   581)   a List<Int> where a List<I32> is needed
+     2 (   505)   what stays where a value was moved out of (std::move): C++ leaves it open, but for a list (its field id)
+    14 (   501)   a List<Int> where a List<U32> is needed
+     6 (   483)   the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+    10 (   409)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Car: too many errors emitted, stopping now [-ferror-limit=])
+     7 (   352)   a List<Int> where a List<U8> is needed
+     1 (   306)   a name that is BindingDecl
+     1 (   268)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'player_position') (it went round with Game/game_cpp)
+     3 (   267)   a reference to something it changes
+     1 (   230)   a function that gives a reference to something to change
+     2 (   225)   a pointer
+     1 (   225)   it calls Game::hit_remotes(), which waits
+     2 (   220)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'explosion') (it went round with Game/game_controls_cpp)
+     3 (   211)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'gaps_send_jets')
+     4 (   210)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_military_cpp)
+     4 (   196)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Car: too many errors emitted, stopping now [-ferror-limit=]) (it went round with Game/game_ui_cpp)
+     1 (   182)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_life_cpp)
+     2 (   172)   it calls CityStream::select_cells(), which waits
+     1 (   171)   algorithm: std::find of a value of another type
+     2 (   156)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'Game'; did you mean 'game'? - that went with Car: too many errors emitted, stopping now [-ferror-limit=]) (it went round with Game/game_controls_cpp)
+     1 (   155)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_gaps_cpp)
+     2 (   151)   a member of Int is set
+     2 (   147)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_weapons_cpp)
+     1 (   136)   it calls Game::ctl_strike_confirm(), which waits
+     2 (   127)   it calls Game::explosion(), which waits
+     1 (   120)   the operator == of List<U8>
+     2 (   118)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_events_cpp)
+     1 (   116)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'drone_attack')
+     1 (   115)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'player_position') (it went round with Game/game_vr_cpp)
+     1 (   111)   it calls register_node(), which waits
+     3 (   110)   it calls Game::gaps_barricade_doors(), which waits
+     1 (   110)   it calls CityStream::finish_features(), which waits
+     2 (   104)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'melee_hit' - that went with melee_hit: use of undeclared identifier 'hit_remotes')
+     1 (   103)   it calls Game::gaps_hud(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    99)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_traffic_cpp)
+     1 (    92)   it calls Session::dispatch(), which waits
+     1 (    88)   it calls Game::handle_shots(), which waits
+
+real	70m14,873s
+user	488m54,041s
+sys	17m11,150s
