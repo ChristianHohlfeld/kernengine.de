@@ -111,3 +111,39 @@ Entscheidungen beim Bau (nach den Zielen, ohne Freigabe – Chris).
 - Offen: terrain UB (leerer unique_ptr in corridors_, BEFUND t1); register_node (game.cpp: eigener Knoten der Bibliothek zur Laufzeit, Lambda
   ruft game().fixed_step) und s5-BEFUND (ShaderExtension, App configure/start/update/stop) = „die Engine ruft ein Ereignis/eine Funktion eines
   Blueprints“ – Entwurf nötig (Ereignis des Game-Blueprints statt NodeDef zur Laufzeit), nicht begonnen.
+
+## Stand 08:05 (20.11., Nachfolger) – work-c = 42e6e45e (gepusht; enthält work-zusammen bdb99729, engine_api.py neu erzeugt: unverändert)
+- Rot im vollen Lauf 045421: terrain UBSan (leerer unique_ptr in corridors_) = der Callback der Quelle (Terrain::sampler) lief erst im Vergleich
+  (Tally::take → same), außerhalb des Aussprungs g_bail → present() konnte nicht aufgeben. **42e6e45e (converted.h, c ändert die Stelle; t1 informiert):**
+  defined() eines Callbacks ruft ihn an den Stellen von same_call mit eigenem Aussprung; offen gelesen / Zahlen verlassen → nicht verglichen, neu gezogen.
+  Kleinstfall /tmp/c_gl/df richtig. city_stream: offset-16 (Stellvertreter) und heap-buffer-overflow in RoadBuilder::begin (Engine) = b835e56d/ce74f7d4
+  (converted::room), unbelegt. Der ASan heap-use-after-free danach ist converted_Game__game_cpp (Car::detach), nicht c.
+- 080407 verloren (mag-Neustart 08:06); neu abgelegt (siehe unten). work-c-vergleich-001825-8576 (a6127013) hängt seit 00:18 als „läuft“ –
+  abbrechen wurde mir verwehrt (Koordinator bitte beenden).
+
+## Aufgabe 2 – Entscheidung (c, 20.11. 08:30; nach den Zielen, ohne Freigabe – Koordinator: „entscheide selbst“)
+Alle drei Stellen (s5-BEFUND 1 und 3, register_node) sind „die Engine ruft ein Objekt des Programms, das eine Schnittstelle der Engine erfüllt“ –
+das ist NICHT der Callback (Teil 1: Funktion einer Bibliothek, Werte, ohne Welt), sondern eine eigene, allgemeine Fähigkeit:
+**E-c2 „Blueprint als Umsetzung einer Schnittstelle der Engine“.** C++: `class X : public kern::<Schnittstelle>` mit `override`s
+(kern::App, kern::ShaderExtension; jede Klasse der Engine mit virtuellen Funktionen ohne Daten). Blueprint: Einstellung `implements = <Schnittstelle>`,
+die Overrides sind Funktionen des Blueprints mit den Namen/Signaturen der virtuellen Funktionen (check: jede reine virtuelle umgesetzt, Signatur gleich,
+nichts sonst als override). Engine: je Schnittstelle ein erzeugter Adapter (engine_api.py, aus dem Header – keine Namensliste), der jede virtuelle
+Funktion auf `Instance::call` (Interpreter/JIT) bzw. die Methode der Klasse (Export: die Klasse erbt direkt, volle Leistung) abbildet; Objekte der Engine
+in der Signatur (Engine&, Frame, Program, UniformCache, Renderer) = Handles wie in der Tür. Angemeldet wird ein solcher Blueprint, wo C++ das Objekt
+übergibt (App::extensions gibt die Liste der Objekte; Endzustand s5: das Level nennt den App-Blueprint).
+**register_node** (game.cpp, NodeDef kind=event, event „logic.tick“, accepts immer, run ohne Fang ruft game().fixed_step, Knoten in build_level):
+Entwurf des Vorgängers bestätigt – ein zur Laufzeit angemeldeter Knotentyp ist im Blueprint kein Wert, sondern ein **Ereignis des Blueprints, der den
+Zustand hält** (Game): Event Tick → fixed_step(1/kStepHz). Die Anmeldung (NodeDef + library().add) und der gelegte Knoten sind zusammen dieses Ereignis;
+der Konverter liest das allgemein: ein NodeDef des Programms mit festen Feldern, `kind = event`, festem `event`, `accepts` immer wahr, `run` ohne Fang,
+der mit kStop endet → Ereignis dieses Typs im Graphen, in den das Programm den Knoten legt. Voraussetzung: der Graph ist ein Blueprint (build_level/Level
+als Daten – s5 Endzustand). Reihenfolge der Tick-Handler (Runtime::fire, nach Instanz) muss gleich bleiben – Teil des Belegs.
+**Bau:** nicht begonnen (Aufgabe 1 hatte Vorrang; Umfang: Sprache+Engine-Adapter+Konverter+Export+Tests+Editor, mehrere Stunden). Reihenfolge:
+(1) E-c2 Sprache/Adapter mit Engine-Test (Fall ShaderExtension mit name()/vertex() als Text, App mit start/update/stop), nativer Fall;
+(2) Konverter: Klasse, die von einer Schnittstelle der Engine erbt; (3) register_node, sobald build_level schreibbar ist (s5/g1).
+
+## Stand 09:18 – work-c = 45c54236 (gepusht)
+- work-c-vergleich-083848-27171 (42e6e45e): city_stream, city_stream_cpp ok in BEIDEN Durchgängen (b835e56d/a6127013/4bca8f52 damit belegt);
+  terrain_cpp: kein UBSan mehr (42e6e45e wirkt), aber ASan heap-use-after-free: Callback der KLASSE aus Terrain_sampler zeigt auf den Referenz-Eingang
+  des Klebers (lokal, mit dem Aufruf beim Namen beendet). → 45c54236 (notation.cpp native_glue): Referenz-Eingänge als Glieder des _Native-Objekts
+  (wie die Variable des Aufrufs im Interpreter), busy_ für Aufruf mitten im eigenen.
+- Laufen: work-c-vergleich-091714-16925 (45c54236; city_stream, terrain), CI 44701329842 (Engine-Suite für den Kleber).

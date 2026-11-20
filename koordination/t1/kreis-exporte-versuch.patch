@@ -1,0 +1,60 @@
+diff --git a/tools/cpp_to_blueprint.py b/tools/cpp_to_blueprint.py
+index fd7de085..30e2d1b7 100755
+--- a/tools/cpp_to_blueprint.py
++++ b/tools/cpp_to_blueprint.py
+@@ -13474,19 +13474,30 @@ class TestWriter:
+     def exports(self, known=()):
+         """The test of a file that calls a function of this Blueprint holds that function's source once more,
+         and all it names (`gather`) - what stands in this source file is not in that file's tree. For every
+-        function of the Blueprint that is written and has a name the linker knows: the places of the pieces
++        function of the Blueprint that has a name the linker knows - written or not: its source is what it is,
++        whether its Blueprint is written yet or not, and in a circle of functions over files (A calls B, B calls A)
++        the test of each needs the other's source before either Blueprint is written -: the places of the pieces
+         its test holds, in the order they must stand ({key: [place]}), and the pieces by their places
+         ({place: piece}) - main hands them on to the Blueprints that call these, after this one, and they
+-        hand on what they took along with their own."""
++        hand on what they took along with their own. (The written first, then the others, in the order they
++        were met.)"""
+         self.setup()
+         closures, pieces = {}, {}
+-        for f in self.u.order:
+-            if f.lifted or not f.key or "@" in f.key:
++        listed = {id(f) for f in self.u.order}
++        every = [*self.u.order, *(f for f in getattr(self.u, "all", ()) if id(f) not in listed)]
++        for f in every:
++            if f.lifted or not f.key or "@" in f.key or f.key in closures:
+                 continue   # (a function of its file alone - static, in a namespace without a name: no other file calls it)
+             if f.key in known:
+                 continue   # (`known`: what an earlier try handed on already - the first try's stands, see convert_unit)
++            if id(f) not in listed and f.decl.get("id") not in self.tree.body and f.decl.get("id") not in self.tree.template_of:
++                continue   # (one whose body this file does not hold: its own file hands it on)
+             order = []
+-            for place, piece in self.items(self.gather([f.decl["id"]])):
++            try:
++                held = self.items(self.gather([f.decl["id"]]))
++            except Wait:
++                continue   # (what its source names the test can not hold: no other test can take it either)
++            for place, piece in held:
+                 pieces.setdefault(place, piece)
+                 order.append(place)
+             closures[f.key] = order
+@@ -15060,10 +15071,19 @@ def main(argv):
+         w.table = {k: e for d in need for k, e in tables.get(d, {}).items()}
+         if test:   # (the pieces of their source their tests hand on: what the test of this one holds of them)
+             w.closures, w.pieces = {}, {}
++            # A piece is the one the Blueprint of its own file hands on - another that took it along has it as it was
++            # handed on a round before (in a circle of files that call each other, taking the copy would give each
++            # round what the round before the last gave: the rounds would go round). Of a file no Blueprint here is
++            # made of (a header), the first in the order of their names.
+             for d in sorted(need):
+                 closures, pieces = exports.get(d, ({}, {}))
+                 w.closures.update(closures)
++                own_files = {os.path.abspath(f) for f in unit_files.get(d, ())}
+                 for place, piece in pieces.items():
++                    if isinstance(place, tuple) and place and isinstance(place[0], str) and os.path.abspath(place[0]) in own_files:
++                        w.pieces[place] = piece
++            for d in sorted(need):
++                for place, piece in exports.get(d, ({}, {}))[1].items():
+                     w.pieces.setdefault(place, piece)
+         w.wanted = None if u in program else set(wanted[u])
+         w.bars = dict(held.get(u, {}))   # (what waits for good: see `held`)

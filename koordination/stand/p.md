@@ -1,5 +1,11 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+## 08:15 (20.11.) – Nachfolger 8: Map-Werte fester Breite gebaut (6ae29b79), Belege laufen
+- work-p = 6ae29b79 (work-zusammen bdb99729 eingemischt a2151031). Sprache: Map<K, List<U8>> … und Map<K, U8> … (Leser, check, Interpreter
+  Set at Key/fit/Vorgaben, Typwahl, Klasse/Glue Sized, nativer Test, Web-Editor, Doku), Fall fixed_width_map_values (lokal: Klasse == Interpreter
+  == echtes C++), Konverter-Regel 15201aee zurückgenommen.
+- Läuft: engine work-p-engine-081106-12834, konvert work-p-konvert-081110-12881, CI 44693119773. Danach vergleich.
+
 ## 03:00 – Map<K, List<U8>> entschieden (JA), Bauplan in uebergabe/p.md „Nachfolger 7“; work-p 39ce0076 (0f55c2f4 eingemischt). vergleich 001918 abgebrochen (Hänger, Auswertung offen). Kontext erschöpft – Nachfolger nötig.
 
 ## E20 Schritt 4 – Stand 02:45 (20.11.), ac4f6862 (work-zusammen d5f527c5 eingemischt) – NOCH NICHT BEREIT
