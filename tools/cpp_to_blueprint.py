@@ -15162,6 +15162,10 @@ def main(argv):
                     exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
+                # (and what its test left out in the last of these rounds, as the compiler said it - TEST_ERRORS: the cause to look for)
+                dropped = [x for x in (results.get(u) or {}).get("errors", "").split("\n") if x.startswith("--- ") and ": without the " in x]
+                for x in dropped[:12]:
+                    print(f"goes round: {u}: last round {x[4:][:400]}", flush=True)
             for u in sorted(new):
                 # (what it gave in the rounds that went round: of two versions one after the other, what differs - the values)
                 ring = [v for at, v in visited[u] if at >= met[state]]
