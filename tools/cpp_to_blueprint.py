@@ -2121,8 +2121,8 @@ class Unit:
         for (fname, ft, _, _), fd in zip(self.struct_fields[st], fds):
             c = self.clean(qtype(fd))
             path = at + (fname,)
-            if ft in ("Float", "Int", "Bool", "Int64", "Vector") or ft in self.enum_values:
-                keep.append(path)   # (a number's move is a copy)
+            if ft in ("Float", "Int", "Bool", "Int64", "Vector") or ft in WIDTHS or ft in self.enum_values:
+                keep.append(path)   # (a number's move is a copy - one of a width too)
             elif re.match(r"std::(vector|unique_ptr)<|kern::(Map|Set)<", c):
                 continue            # (empty)
             elif ft in self.struct_fields and self.find_type(c) in self.tree.records:
@@ -6535,7 +6535,7 @@ class Emit:
         except Wait:
             zero_bytes = False
         it = t[5:-1] if t.startswith("List<") else t
-        if not zero_bytes or (it not in ("Int", "Float", "Bool") and it != self.whole64()):
+        if not zero_bytes or (it not in ("Int", "Float", "Bool") and it not in WIDTHS and it != self.whole64()):
             raise Wait("raw memory (memset) that is not the zero of numbers")
         return self.store(dst, lambda want: self.u.zero(want))
 
