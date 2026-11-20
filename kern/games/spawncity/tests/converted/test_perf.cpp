@@ -95,7 +95,7 @@ namespace perf { struct Governor {
 }
 namespace perf { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const perf::Meter& s) { return converted::Value::structure({arg(s.start_), arg(s.last_), arg(converted::array_list(s.cur_)), arg(converted::array_list(s.avg_)), arg(s.update_), arg(s.render_), arg(s.gpu_)}); }
-[[maybe_unused]] static bool same(const perf::Meter& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.start_, (*got.rows)[0]) && same(want.last_, (*got.rows)[1]) && same(converted::array_list(want.cur_), (*got.rows)[2]) && same(converted::array_list(want.avg_), (*got.rows)[3]) && same(want.update_, (*got.rows)[4]) && same(want.render_, (*got.rows)[5]) && same(want.gpu_, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const perf::Meter& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.start_, (*got.rows)[0]), ".start_") && converted::at_place(same(want.last_, (*got.rows)[1]), ".last_") && converted::at_place(same(converted::array_list(want.cur_), (*got.rows)[2]), ".cur_") && converted::at_place(same(converted::array_list(want.avg_), (*got.rows)[3]), ".avg_") && converted::at_place(same(want.update_, (*got.rows)[4]), ".update_") && converted::at_place(same(want.render_, (*got.rows)[5]), ".render_") && converted::at_place(same(want.gpu_, (*got.rows)[6]), ".gpu_"); }
 [[maybe_unused]] static bool defined(const perf::Meter& s) { return defined(s.start_) && defined(s.last_) && defined(converted::array_list(s.cur_)) && defined(converted::array_list(s.avg_)) && defined(s.update_) && defined(s.render_) && defined(s.gpu_); }
 [[maybe_unused]] static std::string text(const perf::Meter& s) { return std::string("{") + text(s.start_) + ", " + text(s.last_) + ", " + text(converted::array_list(s.cur_)) + ", " + text(converted::array_list(s.avg_)) + ", " + text(s.update_) + ", " + text(s.render_) + ", " + text(s.gpu_) + "}"; }
 [[maybe_unused]] static void take(perf::Meter& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<double>(s.start_, (*v.rows)[0]); converted::take_as<double>(s.last_, (*v.rows)[1]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[2]); converted::array_from(s.cur_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[3]); converted::array_from(s.avg_, items); } converted::take_as<double>(s.update_, (*v.rows)[4]); converted::take_as<double>(s.render_, (*v.rows)[5]); converted::take_as<double>(s.gpu_, (*v.rows)[6]); }
@@ -117,7 +117,7 @@ namespace perf { using converted::arg; using converted::same; using converted::d
 }
 namespace perf { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const perf::Governor& s) { return converted::Value::structure({arg(s.tier_), arg(s.max_), arg(s.auto_), arg(s.avg_dt_), arg(s.clock_), arg(s.since_change_), arg(s.low_), arg(s.high_), arg(converted::array_list(s.block_until_)), arg(converted::array_list(s.block_len_)), arg(s.changes_)}); }
-[[maybe_unused]] static bool same(const perf::Governor& want, const converted::Value& got) { return got.rows && got.rows->size() == 11 && same(want.tier_, (*got.rows)[0]) && same(want.max_, (*got.rows)[1]) && same(want.auto_, (*got.rows)[2]) && same(want.avg_dt_, (*got.rows)[3]) && same(want.clock_, (*got.rows)[4]) && same(want.since_change_, (*got.rows)[5]) && same(want.low_, (*got.rows)[6]) && same(want.high_, (*got.rows)[7]) && same(converted::array_list(want.block_until_), (*got.rows)[8]) && same(converted::array_list(want.block_len_), (*got.rows)[9]) && same(want.changes_, (*got.rows)[10]); }
+[[maybe_unused]] static bool same(const perf::Governor& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.tier_, (*got.rows)[0]), ".tier_") && converted::at_place(same(want.max_, (*got.rows)[1]), ".max_") && converted::at_place(same(want.auto_, (*got.rows)[2]), ".auto_") && converted::at_place(same(want.avg_dt_, (*got.rows)[3]), ".avg_dt_") && converted::at_place(same(want.clock_, (*got.rows)[4]), ".clock_") && converted::at_place(same(want.since_change_, (*got.rows)[5]), ".since_change_") && converted::at_place(same(want.low_, (*got.rows)[6]), ".low_") && converted::at_place(same(want.high_, (*got.rows)[7]), ".high_") && converted::at_place(same(converted::array_list(want.block_until_), (*got.rows)[8]), ".block_until_") && converted::at_place(same(converted::array_list(want.block_len_), (*got.rows)[9]), ".block_len_") && converted::at_place(same(want.changes_, (*got.rows)[10]), ".changes_"); }
 [[maybe_unused]] static bool defined(const perf::Governor& s) { return defined(s.tier_) && defined(s.max_) && defined(s.auto_) && defined(s.avg_dt_) && defined(s.clock_) && defined(s.since_change_) && defined(s.low_) && defined(s.high_) && defined(converted::array_list(s.block_until_)) && defined(converted::array_list(s.block_len_)) && defined(s.changes_); }
 [[maybe_unused]] static std::string text(const perf::Governor& s) { return std::string("{") + text(s.tier_) + ", " + text(s.max_) + ", " + text(s.auto_) + ", " + text(s.avg_dt_) + ", " + text(s.clock_) + ", " + text(s.since_change_) + ", " + text(s.low_) + ", " + text(s.high_) + ", " + text(converted::array_list(s.block_until_)) + ", " + text(converted::array_list(s.block_len_)) + ", " + text(s.changes_) + "}"; }
 [[maybe_unused]] static void take(perf::Governor& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<int>(s.tier_, (*v.rows)[0]); converted::take_as<int>(s.max_, (*v.rows)[1]); converted::take_as<bool>(s.auto_, (*v.rows)[2]); converted::take_as<double>(s.avg_dt_, (*v.rows)[3]); converted::take_as<double>(s.clock_, (*v.rows)[4]); converted::take_as<double>(s.since_change_, (*v.rows)[5]); converted::take_as<double>(s.low_, (*v.rows)[6]); converted::take_as<double>(s.high_, (*v.rows)[7]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[8]); converted::array_from(s.block_until_, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[9]); converted::array_from(s.block_len_, items); } converted::take_as<unsigned int>(s.changes_, (*v.rows)[10]); }
@@ -128,7 +128,7 @@ SC_TEST(converted_perf) {
   {  // Meter::begin_frame
     converted::Tally tally("Meter_begin_frame");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Meter a0, [[maybe_unused]] double a1) { converted::counted([&] { return a0.begin_frame(std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] perf::Meter& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return a0.begin_frame(std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Meter a0 = draw_perf__Meter(draw);
       double a1 = draw.number();
@@ -138,7 +138,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -148,17 +150,19 @@ SC_TEST(converted_perf) {
   {  // Meter::ms
     converted::Tally tally("Meter_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Meter a0, [[maybe_unused]] perf::Slot a1) { return converted::counted([&] { return a0.ms(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] perf::Meter& a0, [[maybe_unused]] perf::Slot& a1) { return converted::counted([&] { return a0.ms(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Meter a0 = draw_perf__Meter(draw);
-      perf::Slot a1 = static_cast<perf::Slot>(draw.below(5));
+      perf::Slot a1 = converted::enum_value<perf::Slot>(draw.below(5));
       const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -168,7 +172,7 @@ SC_TEST(converted_perf) {
   {  // Meter::update_ms
     converted::Tally tally("Meter_update_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Meter a0) { return converted::counted([&] { return a0.update_ms(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Meter& a0) { return converted::counted([&] { return a0.update_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Meter a0 = draw_perf__Meter(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -177,7 +181,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -187,7 +193,7 @@ SC_TEST(converted_perf) {
   {  // Meter::render_ms
     converted::Tally tally("Meter_render_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Meter a0) { return converted::counted([&] { return a0.render_ms(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Meter& a0) { return converted::counted([&] { return a0.render_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Meter a0 = draw_perf__Meter(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -196,7 +202,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -206,7 +214,7 @@ SC_TEST(converted_perf) {
   {  // Meter::gpu_ms
     converted::Tally tally("Meter_gpu_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Meter a0) { return converted::counted([&] { return a0.gpu_ms(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Meter& a0) { return converted::counted([&] { return a0.gpu_ms(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Meter a0 = draw_perf__Meter(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -215,7 +223,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -225,7 +235,7 @@ SC_TEST(converted_perf) {
   {  // Governor::tier
     converted::Tally tally("Governor_tier");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Governor a0) { return converted::counted([&] { return a0.tier(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Governor& a0) { return converted::counted([&] { return a0.tier(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Governor a0 = draw_perf__Governor(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -234,7 +244,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -244,7 +256,7 @@ SC_TEST(converted_perf) {
   {  // Governor::max_tier
     converted::Tally tally("Governor_max_tier");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Governor a0) { return converted::counted([&] { return a0.max_tier(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Governor& a0) { return converted::counted([&] { return a0.max_tier(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Governor a0 = draw_perf__Governor(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -253,7 +265,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -263,7 +277,7 @@ SC_TEST(converted_perf) {
   {  // Governor::automatic
     converted::Tally tally("Governor_automatic");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Governor a0) { return converted::counted([&] { return a0.automatic(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Governor& a0) { return converted::counted([&] { return a0.automatic(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Governor a0 = draw_perf__Governor(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -272,7 +286,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -282,7 +298,7 @@ SC_TEST(converted_perf) {
   {  // Governor::set_auto
     converted::Tally tally("Governor_set_auto");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Governor a0) { converted::counted([&] { return a0.set_auto(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] perf::Governor& a0) { converted::counted([&] { return a0.set_auto(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Governor a0 = draw_perf__Governor(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -291,7 +307,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -301,7 +319,7 @@ SC_TEST(converted_perf) {
   {  // Governor::fps
     converted::Tally tally("Governor_fps");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Governor a0) { return converted::counted([&] { return a0.fps(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Governor& a0) { return converted::counted([&] { return a0.fps(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Governor a0 = draw_perf__Governor(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -310,7 +328,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -320,7 +340,7 @@ SC_TEST(converted_perf) {
   {  // Governor::changes
     converted::Tally tally("Governor_changes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Governor a0) { return converted::counted([&] { return a0.changes(); }); };
+    const auto run = [&]([[maybe_unused]] perf::Governor& a0) { return converted::counted([&] { return a0.changes(); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Governor a0 = draw_perf__Governor(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -329,7 +349,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -339,7 +361,7 @@ SC_TEST(converted_perf) {
   {  // Governor::blocked
     converted::Tally tally("Governor_blocked");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] perf::Governor a0, [[maybe_unused]] int a1) { return converted::counted([&] { return a0.blocked(std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] perf::Governor& a0, [[maybe_unused]] int& a1) { return converted::counted([&] { return a0.blocked(std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       perf::Governor a0 = draw_perf__Governor(draw);
       int a1 = static_cast<int>(draw.whole());
@@ -349,7 +371,9 @@ SC_TEST(converted_perf) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

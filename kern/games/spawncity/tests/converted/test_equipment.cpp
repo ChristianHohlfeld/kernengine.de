@@ -36,12 +36,28 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
+namespace logic { using ActorRef = u32; }
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
+struct Value;
+struct Value : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+namespace logic { enum class NodeKind : u8 { event, action, pure, flow }; }
+namespace logic { struct Event {
+  std::string type;
+  ActorRef target = 0;                 // only instances whose Self is target (0 = every instance)
+  bool level = false;                  // with a target: the level graph (Self = none) receives it too
+  std::string key;                     // event-specific match (custom event name, key code, action...)
+  std::vector<std::pair<std::string, Value>> args;
+  
+}; }
 struct Flight {
   u32 id = 0;
   f32 start = 0, duration = 0, distance = 0, max_speed = 0, max_agl = 0, max_alt = 0, volts_start = 0, volts_end = 0, volts_min = 0;
@@ -128,7 +144,7 @@ struct MusicSynth {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Flight& s) { return converted::Value::structure({arg(s.id), arg(s.start), arg(s.duration), arg(s.distance), arg(s.max_speed), arg(s.max_agl), arg(s.max_alt), arg(s.volts_start), arg(s.volts_end), arg(s.volts_min), arg(s.reason), arg(s.path)}); }
-[[maybe_unused]] static bool same(const Flight& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.id, (*got.rows)[0]) && same(want.start, (*got.rows)[1]) && same(want.duration, (*got.rows)[2]) && same(want.distance, (*got.rows)[3]) && same(want.max_speed, (*got.rows)[4]) && same(want.max_agl, (*got.rows)[5]) && same(want.max_alt, (*got.rows)[6]) && same(want.volts_start, (*got.rows)[7]) && same(want.volts_end, (*got.rows)[8]) && same(want.volts_min, (*got.rows)[9]) && same(want.reason, (*got.rows)[10]) && same(want.path, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const Flight& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.start, (*got.rows)[1]), ".start") && converted::at_place(same(want.duration, (*got.rows)[2]), ".duration") && converted::at_place(same(want.distance, (*got.rows)[3]), ".distance") && converted::at_place(same(want.max_speed, (*got.rows)[4]), ".max_speed") && converted::at_place(same(want.max_agl, (*got.rows)[5]), ".max_agl") && converted::at_place(same(want.max_alt, (*got.rows)[6]), ".max_alt") && converted::at_place(same(want.volts_start, (*got.rows)[7]), ".volts_start") && converted::at_place(same(want.volts_end, (*got.rows)[8]), ".volts_end") && converted::at_place(same(want.volts_min, (*got.rows)[9]), ".volts_min") && converted::at_place(same(want.reason, (*got.rows)[10]), ".reason") && converted::at_place(same(want.path, (*got.rows)[11]), ".path"); }
 [[maybe_unused]] static bool defined(const Flight& s) { return defined(s.id) && defined(s.start) && defined(s.duration) && defined(s.distance) && defined(s.max_speed) && defined(s.max_agl) && defined(s.max_alt) && defined(s.volts_start) && defined(s.volts_end) && defined(s.volts_min) && defined(s.reason) && defined(s.path); }
 [[maybe_unused]] static std::string text(const Flight& s) { return std::string("{") + text(s.id) + ", " + text(s.start) + ", " + text(s.duration) + ", " + text(s.distance) + ", " + text(s.max_speed) + ", " + text(s.max_agl) + ", " + text(s.max_alt) + ", " + text(s.volts_start) + ", " + text(s.volts_end) + ", " + text(s.volts_min) + ", " + text(s.reason) + ", " + text(s.path) + "}"; }
 [[maybe_unused]] static void take(Flight& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<double>(s.start, (*v.rows)[1]); converted::take_as<double>(s.duration, (*v.rows)[2]); converted::take_as<double>(s.distance, (*v.rows)[3]); converted::take_as<double>(s.max_speed, (*v.rows)[4]); converted::take_as<double>(s.max_agl, (*v.rows)[5]); converted::take_as<double>(s.max_alt, (*v.rows)[6]); converted::take_as<double>(s.volts_start, (*v.rows)[7]); converted::take_as<double>(s.volts_end, (*v.rows)[8]); converted::take_as<double>(s.volts_min, (*v.rows)[9]); converted::take_as<std::string>(s.reason, (*v.rows)[10]); converted::take_as<std::vector<Vec3>>(s.path, (*v.rows)[11]); }
@@ -139,7 +155,7 @@ struct MusicSynth {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const FlightLog::Event& s) { return converted::Value::structure({arg(s.t), arg(s.stage)}); }
-[[maybe_unused]] static bool same(const FlightLog::Event& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.t, (*got.rows)[0]) && same(want.stage, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const FlightLog::Event& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.t, (*got.rows)[0]), ".t") && converted::at_place(same(want.stage, (*got.rows)[1]), ".stage"); }
 [[maybe_unused]] static bool defined(const FlightLog::Event& s) { return defined(s.t) && defined(s.stage); }
 [[maybe_unused]] static std::string text(const FlightLog::Event& s) { return std::string("{") + text(s.t) + ", " + text(s.stage) + "}"; }
 [[maybe_unused]] static void take(FlightLog::Event& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.t, (*v.rows)[0]); converted::take_as<std::string>(s.stage, (*v.rows)[1]); }
@@ -158,7 +174,7 @@ struct MusicSynth {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const FlightLog& s) { return converted::Value::structure({arg(s.flights_), arg(s.events_), arg(s.cur_), arg(s.active_), arg(s.have_last_), arg(s.last_), arg(s.last_t_), arg(s.last_path_), arg(s.next_id_), arg(s.serial_)}); }
-[[maybe_unused]] static bool same(const FlightLog& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.flights_, (*got.rows)[0]) && same(want.events_, (*got.rows)[1]) && same(want.cur_, (*got.rows)[2]) && same(want.active_, (*got.rows)[3]) && same(want.have_last_, (*got.rows)[4]) && same(want.last_, (*got.rows)[5]) && same(want.last_t_, (*got.rows)[6]) && same(want.last_path_, (*got.rows)[7]) && same(want.next_id_, (*got.rows)[8]) && same(want.serial_, (*got.rows)[9]); }
+[[maybe_unused]] static bool same(const FlightLog& want, const converted::Value& got) { return converted::rows_of(got, 10) && converted::at_place(same(want.flights_, (*got.rows)[0]), ".flights_") && converted::at_place(same(want.events_, (*got.rows)[1]), ".events_") && converted::at_place(same(want.cur_, (*got.rows)[2]), ".cur_") && converted::at_place(same(want.active_, (*got.rows)[3]), ".active_") && converted::at_place(same(want.have_last_, (*got.rows)[4]), ".have_last_") && converted::at_place(same(want.last_, (*got.rows)[5]), ".last_") && converted::at_place(same(want.last_t_, (*got.rows)[6]), ".last_t_") && converted::at_place(same(want.last_path_, (*got.rows)[7]), ".last_path_") && converted::at_place(same(want.next_id_, (*got.rows)[8]), ".next_id_") && converted::at_place(same(want.serial_, (*got.rows)[9]), ".serial_"); }
 [[maybe_unused]] static bool defined(const FlightLog& s) { return defined(s.flights_) && defined(s.events_) && defined(s.cur_) && defined(s.active_) && defined(s.have_last_) && defined(s.last_) && defined(s.last_t_) && defined(s.last_path_) && defined(s.next_id_) && defined(s.serial_); }
 [[maybe_unused]] static std::string text(const FlightLog& s) { return std::string("{") + text(s.flights_) + ", " + text(s.events_) + ", " + text(s.cur_) + ", " + text(s.active_) + ", " + text(s.have_last_) + ", " + text(s.last_) + ", " + text(s.last_t_) + ", " + text(s.last_path_) + ", " + text(s.next_id_) + ", " + text(s.serial_) + "}"; }
 [[maybe_unused]] static void take(FlightLog& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<std::vector<Flight>>(s.flights_, (*v.rows)[0]); converted::take_as<std::vector<FlightLog::Event>>(s.events_, (*v.rows)[1]); converted::take_as<Flight>(s.cur_, (*v.rows)[2]); converted::take_as<bool>(s.active_, (*v.rows)[3]); converted::take_as<bool>(s.have_last_, (*v.rows)[4]); converted::take_as<Vec3>(s.last_, (*v.rows)[5]); converted::take_as<double>(s.last_t_, (*v.rows)[6]); converted::take_as<double>(s.last_path_, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id_, (*v.rows)[8]); converted::take_as<unsigned int>(s.serial_, (*v.rows)[9]); }
@@ -173,7 +189,7 @@ struct MusicSynth {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MusicSynth::Voice& s) { return converted::Value::structure({arg(s.phase), arg(s.freq), arg(s.env), arg(s.decay), arg(s.amp), arg(s.phase2)}); }
-[[maybe_unused]] static bool same(const MusicSynth::Voice& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.phase, (*got.rows)[0]) && same(want.freq, (*got.rows)[1]) && same(want.env, (*got.rows)[2]) && same(want.decay, (*got.rows)[3]) && same(want.amp, (*got.rows)[4]) && same(want.phase2, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const MusicSynth::Voice& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.phase, (*got.rows)[0]), ".phase") && converted::at_place(same(want.freq, (*got.rows)[1]), ".freq") && converted::at_place(same(want.env, (*got.rows)[2]), ".env") && converted::at_place(same(want.decay, (*got.rows)[3]), ".decay") && converted::at_place(same(want.amp, (*got.rows)[4]), ".amp") && converted::at_place(same(want.phase2, (*got.rows)[5]), ".phase2"); }
 [[maybe_unused]] static bool defined(const MusicSynth::Voice& s) { return defined(s.phase) && defined(s.freq) && defined(s.env) && defined(s.decay) && defined(s.amp) && defined(s.phase2); }
 [[maybe_unused]] static std::string text(const MusicSynth::Voice& s) { return std::string("{") + text(s.phase) + ", " + text(s.freq) + ", " + text(s.env) + ", " + text(s.decay) + ", " + text(s.amp) + ", " + text(s.phase2) + "}"; }
 [[maybe_unused]] static void take(MusicSynth::Voice& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.phase, (*v.rows)[0]); converted::take_as<double>(s.freq, (*v.rows)[1]); converted::take_as<double>(s.env, (*v.rows)[2]); converted::take_as<double>(s.decay, (*v.rows)[3]); converted::take_as<double>(s.amp, (*v.rows)[4]); converted::take_as<double>(s.phase2, (*v.rows)[5]); }
@@ -204,7 +220,7 @@ struct MusicSynth {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MusicSynth& s) { return converted::Value::structure({arg(s.peak), arg(s.rate_), arg(s.programme_), arg(s.want_), arg(s.gain_), arg(s.target_), arg(s.fade_), arg(converted::shaped<converted::Whole>(s.sample_)), arg(s.step_), arg(s.samples_per_step_), arg(s.until_step_), arg(s.rng_), arg(s.kick_), arg(s.snare_), arg(s.hat_), arg(s.bass_), arg(s.lead_), arg(converted::array_list(s.pad_)), arg(s.lp_), arg(s.bass_lp_), arg(converted::array_list(s.echo_)), arg(s.echo_at_)}); }
-[[maybe_unused]] static bool same(const MusicSynth& want, const converted::Value& got) { return got.rows && got.rows->size() == 22 && same(want.peak, (*got.rows)[0]) && same(want.rate_, (*got.rows)[1]) && same(want.programme_, (*got.rows)[2]) && same(want.want_, (*got.rows)[3]) && same(want.gain_, (*got.rows)[4]) && same(want.target_, (*got.rows)[5]) && same(want.fade_, (*got.rows)[6]) && same(converted::shaped<converted::Whole>(want.sample_), (*got.rows)[7]) && same(want.step_, (*got.rows)[8]) && same(want.samples_per_step_, (*got.rows)[9]) && same(want.until_step_, (*got.rows)[10]) && same(want.rng_, (*got.rows)[11]) && same(want.kick_, (*got.rows)[12]) && same(want.snare_, (*got.rows)[13]) && same(want.hat_, (*got.rows)[14]) && same(want.bass_, (*got.rows)[15]) && same(want.lead_, (*got.rows)[16]) && same(converted::array_list(want.pad_), (*got.rows)[17]) && same(want.lp_, (*got.rows)[18]) && same(want.bass_lp_, (*got.rows)[19]) && same(converted::array_list(want.echo_), (*got.rows)[20]) && same(want.echo_at_, (*got.rows)[21]); }
+[[maybe_unused]] static bool same(const MusicSynth& want, const converted::Value& got) { return converted::rows_of(got, 22) && converted::at_place(same(want.peak, (*got.rows)[0]), ".peak") && converted::at_place(same(want.rate_, (*got.rows)[1]), ".rate_") && converted::at_place(same(want.programme_, (*got.rows)[2]), ".programme_") && converted::at_place(same(want.want_, (*got.rows)[3]), ".want_") && converted::at_place(same(want.gain_, (*got.rows)[4]), ".gain_") && converted::at_place(same(want.target_, (*got.rows)[5]), ".target_") && converted::at_place(same(want.fade_, (*got.rows)[6]), ".fade_") && converted::at_place(same(converted::shaped<converted::Whole>(want.sample_), (*got.rows)[7]), ".sample_") && converted::at_place(same(want.step_, (*got.rows)[8]), ".step_") && converted::at_place(same(want.samples_per_step_, (*got.rows)[9]), ".samples_per_step_") && converted::at_place(same(want.until_step_, (*got.rows)[10]), ".until_step_") && converted::at_place(same(want.rng_, (*got.rows)[11]), ".rng_") && converted::at_place(same(want.kick_, (*got.rows)[12]), ".kick_") && converted::at_place(same(want.snare_, (*got.rows)[13]), ".snare_") && converted::at_place(same(want.hat_, (*got.rows)[14]), ".hat_") && converted::at_place(same(want.bass_, (*got.rows)[15]), ".bass_") && converted::at_place(same(want.lead_, (*got.rows)[16]), ".lead_") && converted::at_place(same(converted::array_list(want.pad_), (*got.rows)[17]), ".pad_") && converted::at_place(same(want.lp_, (*got.rows)[18]), ".lp_") && converted::at_place(same(want.bass_lp_, (*got.rows)[19]), ".bass_lp_") && converted::at_place(same(converted::array_list(want.echo_), (*got.rows)[20]), ".echo_") && converted::at_place(same(want.echo_at_, (*got.rows)[21]), ".echo_at_"); }
 [[maybe_unused]] static bool defined(const MusicSynth& s) { return defined(s.peak) && defined(s.rate_) && defined(s.programme_) && defined(s.want_) && defined(s.gain_) && defined(s.target_) && defined(s.fade_) && defined(converted::shaped<converted::Whole>(s.sample_)) && defined(s.step_) && defined(s.samples_per_step_) && defined(s.until_step_) && defined(s.rng_) && defined(s.kick_) && defined(s.snare_) && defined(s.hat_) && defined(s.bass_) && defined(s.lead_) && defined(converted::array_list(s.pad_)) && defined(s.lp_) && defined(s.bass_lp_) && defined(converted::array_list(s.echo_)) && defined(s.echo_at_); }
 [[maybe_unused]] static std::string text(const MusicSynth& s) { return std::string("{") + text(s.peak) + ", " + text(s.rate_) + ", " + text(s.programme_) + ", " + text(s.want_) + ", " + text(s.gain_) + ", " + text(s.target_) + ", " + text(s.fade_) + ", " + text(converted::shaped<converted::Whole>(s.sample_)) + ", " + text(s.step_) + ", " + text(s.samples_per_step_) + ", " + text(s.until_step_) + ", " + text(s.rng_) + ", " + text(s.kick_) + ", " + text(s.snare_) + ", " + text(s.hat_) + ", " + text(s.bass_) + ", " + text(s.lead_) + ", " + text(converted::array_list(s.pad_)) + ", " + text(s.lp_) + ", " + text(s.bass_lp_) + ", " + text(converted::array_list(s.echo_)) + ", " + text(s.echo_at_) + "}"; }
 [[maybe_unused]] static void take(MusicSynth& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 22) return; converted::take_as<double>(s.peak, (*v.rows)[0]); converted::take_as<unsigned int>(s.rate_, (*v.rows)[1]); converted::take_as<int>(s.programme_, (*v.rows)[2]); converted::take_as<int>(s.want_, (*v.rows)[3]); converted::take_as<double>(s.gain_, (*v.rows)[4]); converted::take_as<double>(s.target_, (*v.rows)[5]); converted::take_as<double>(s.fade_, (*v.rows)[6]); converted::take_as<converted::Whole>(s.sample_, (*v.rows)[7]); converted::take_as<unsigned int>(s.step_, (*v.rows)[8]); converted::take_as<unsigned int>(s.samples_per_step_, (*v.rows)[9]); converted::take_as<unsigned int>(s.until_step_, (*v.rows)[10]); converted::take_as<unsigned int>(s.rng_, (*v.rows)[11]); converted::take_as<MusicSynth::Voice>(s.kick_, (*v.rows)[12]); converted::take_as<MusicSynth::Voice>(s.snare_, (*v.rows)[13]); converted::take_as<MusicSynth::Voice>(s.hat_, (*v.rows)[14]); converted::take_as<MusicSynth::Voice>(s.bass_, (*v.rows)[15]); converted::take_as<MusicSynth::Voice>(s.lead_, (*v.rows)[16]); { std::vector<MusicSynth::Voice> items; converted::take_as<std::vector<MusicSynth::Voice>>(items, (*v.rows)[17]); converted::array_from(s.pad_, items); } converted::take_as<double>(s.lp_, (*v.rows)[18]); converted::take_as<double>(s.bass_lp_, (*v.rows)[19]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[20]); converted::array_from(s.echo_, items); } converted::take_as<unsigned int>(s.echo_at_, (*v.rows)[21]); }
@@ -214,7 +230,7 @@ SC_TEST(converted_equipment) {
   {  // FlightLog::flying
     converted::Tally tally("FlightLog_flying");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.flying(); }); };
+    const auto run = [&]([[maybe_unused]] FlightLog& a0) { return converted::counted([&] { return a0.flying(); }); };
     for (int i = 0; tally.more(i); ++i) {
       FlightLog a0 = draw_FlightLog(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -223,7 +239,9 @@ SC_TEST(converted_equipment) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -233,7 +251,7 @@ SC_TEST(converted_equipment) {
   {  // FlightLog::serial
     converted::Tally tally("FlightLog_serial");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] FlightLog a0) { return converted::counted([&] { return a0.serial(); }); };
+    const auto run = [&]([[maybe_unused]] FlightLog& a0) { return converted::counted([&] { return a0.serial(); }); };
     for (int i = 0; tally.more(i); ++i) {
       FlightLog a0 = draw_FlightLog(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -242,7 +260,9 @@ SC_TEST(converted_equipment) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -252,7 +272,7 @@ SC_TEST(converted_equipment) {
   {  // MusicSynth::programme
     converted::Tally tally("MusicSynth_programme");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MusicSynth a0) { return converted::counted([&] { return a0.programme(); }); };
+    const auto run = [&]([[maybe_unused]] MusicSynth& a0) { return converted::counted([&] { return a0.programme(); }); };
     for (int i = 0; tally.more(i); ++i) {
       MusicSynth a0 = draw_MusicSynth(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -261,7 +281,9 @@ SC_TEST(converted_equipment) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -271,7 +293,7 @@ SC_TEST(converted_equipment) {
   {  // MusicSynth::level
     converted::Tally tally("MusicSynth_level");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MusicSynth a0) { return converted::counted([&] { return a0.level(); }); };
+    const auto run = [&]([[maybe_unused]] MusicSynth& a0) { return converted::counted([&] { return a0.level(); }); };
     for (int i = 0; tally.more(i); ++i) {
       MusicSynth a0 = draw_MusicSynth(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -280,7 +302,9 @@ SC_TEST(converted_equipment) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

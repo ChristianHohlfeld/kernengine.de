@@ -36,13 +36,15 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-namespace Terrain { struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; }; }
+namespace Terrain { struct CraterRec { f32 x = 0, y = 0, r = 0, depth = 0; bool operator==(const CraterRec& o) const { return x == o.x && y == o.y && r == o.r && depth == o.depth; } }; }
 namespace CityStream { struct DamageRec { u32 seed = 0; f32 height = 0; bool leveled = false; }; }
 namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
 namespace DestroySync { using Craters = std::vector<Terrain::CraterRec>; }
 namespace DestroySync { using DamageList = std::vector<CityStream::DamageRec>; }
@@ -111,6 +113,13 @@ namespace wire { struct Reader {
     converted::plus_to(at, 4);
     return x.v;
   }
+  
+
+
+
+
+
+
   
 
 
@@ -220,6 +229,7 @@ u32 digest_of(const Craters& c, const DamageList& d) {
   }
   return h;
 }
+bool has(const Craters& v, const Terrain::CraterRec& c) { return std::find(v.begin(), v.end(), c) != v.end(); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -234,7 +244,7 @@ u32 digest_of(const Craters& c, const DamageList& d) {
 }
 namespace Terrain { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Terrain::CraterRec& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.r), arg(s.depth)}); }
-[[maybe_unused]] static bool same(const Terrain::CraterRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.r, (*got.rows)[2]) && same(want.depth, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Terrain::CraterRec& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.r, (*got.rows)[2]), ".r") && converted::at_place(same(want.depth, (*got.rows)[3]), ".depth"); }
 [[maybe_unused]] static bool defined(const Terrain::CraterRec& s) { return defined(s.x) && defined(s.y) && defined(s.r) && defined(s.depth); }
 [[maybe_unused]] static std::string text(const Terrain::CraterRec& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.r) + ", " + text(s.depth) + "}"; }
 [[maybe_unused]] static void take(Terrain::CraterRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.r, (*v.rows)[2]); converted::take_as<double>(s.depth, (*v.rows)[3]); }
@@ -247,7 +257,7 @@ namespace Terrain { using converted::arg; using converted::same; using converted
 }
 namespace wire { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const wire::Reader& s) { return converted::Value::structure({arg(s.at), arg(s.ok)}); }
-[[maybe_unused]] static bool same(const wire::Reader& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.ok, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const wire::Reader& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.at, (*got.rows)[0]), ".at") && converted::at_place(same(want.ok, (*got.rows)[1]), ".ok"); }
 [[maybe_unused]] static bool defined(const wire::Reader& s) { return defined(s.at) && defined(s.ok); }
 [[maybe_unused]] static std::string text(const wire::Reader& s) { return std::string("{") + text(s.at) + ", " + text(s.ok) + "}"; }
 [[maybe_unused]] static void take(wire::Reader& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned long>(s.at, (*v.rows)[0]); converted::take_as<bool>(s.ok, (*v.rows)[1]); }
@@ -261,21 +271,21 @@ namespace wire { using converted::arg; using converted::same; using converted::d
 }
 namespace CityStream { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const CityStream::DamageRec& s) { return converted::Value::structure({arg(s.seed), arg(s.height), arg(s.leveled)}); }
-[[maybe_unused]] static bool same(const CityStream::DamageRec& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.seed, (*got.rows)[0]) && same(want.height, (*got.rows)[1]) && same(want.leveled, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const CityStream::DamageRec& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.seed, (*got.rows)[0]), ".seed") && converted::at_place(same(want.height, (*got.rows)[1]), ".height") && converted::at_place(same(want.leveled, (*got.rows)[2]), ".leveled"); }
 [[maybe_unused]] static bool defined(const CityStream::DamageRec& s) { return defined(s.seed) && defined(s.height) && defined(s.leveled); }
 [[maybe_unused]] static std::string text(const CityStream::DamageRec& s) { return std::string("{") + text(s.seed) + ", " + text(s.height) + ", " + text(s.leveled) + "}"; }
 [[maybe_unused]] static void take(CityStream::DamageRec& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.seed, (*v.rows)[0]); converted::take_as<double>(s.height, (*v.rows)[1]); converted::take_as<bool>(s.leveled, (*v.rows)[2]); }
 }
 struct Out_get_craters { bool Result; wire::Reader in; std::vector<Terrain::CraterRec> c; };
-[[maybe_unused]] static bool same(const Out_get_craters& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.in, (*got.rows)[1]) && same(want.c, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_get_craters& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.in, (*got.rows)[1]), ".in") && converted::at_place(same(want.c, (*got.rows)[2]), ".c"); }
 [[maybe_unused]] static bool defined(const Out_get_craters& s) { return defined(s.Result) && defined(s.in) && defined(s.c); }
 [[maybe_unused]] static std::string text(const Out_get_craters& s) { return std::string("{") + text(s.Result) + ", " + text(s.in) + ", " + text(s.c) + "}"; }
 struct Out_get_damage { bool Result; wire::Reader in; std::vector<CityStream::DamageRec> d; };
-[[maybe_unused]] static bool same(const Out_get_damage& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.in, (*got.rows)[1]) && same(want.d, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_get_damage& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.in, (*got.rows)[1]), ".in") && converted::at_place(same(want.d, (*got.rows)[2]), ".d"); }
 [[maybe_unused]] static bool defined(const Out_get_damage& s) { return defined(s.Result) && defined(s.in) && defined(s.d); }
 [[maybe_unused]] static std::string text(const Out_get_damage& s) { return std::string("{") + text(s.Result) + ", " + text(s.in) + ", " + text(s.d) + "}"; }
 struct Out_get_points { bool Result; wire::Reader in; std::vector<std::pair<unsigned int, double>> p; };
-[[maybe_unused]] static bool same(const Out_get_points& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.in, (*got.rows)[1]) && same(want.p, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_get_points& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.in, (*got.rows)[1]), ".in") && converted::at_place(same(want.p, (*got.rows)[2]), ".p"); }
 [[maybe_unused]] static bool defined(const Out_get_points& s) { return defined(s.Result) && defined(s.in) && defined(s.p); }
 [[maybe_unused]] static std::string text(const Out_get_points& s) { return std::string("{") + text(s.Result) + ", " + text(s.in) + ", " + text(s.p) + "}"; }
 
@@ -284,7 +294,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // put_craters
     converted::Tally tally("put_craters");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<Terrain::CraterRec> a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::put_craters(a0, a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] std::vector<Terrain::CraterRec>& a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::put_craters(a0, a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       std::vector<Terrain::CraterRec> a1 = draw_list(draw, [&]() -> Terrain::CraterRec { return draw_Terrain__CraterRec(draw); });
@@ -294,7 +304,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -304,7 +316,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // get_craters
     converted::Tally tally("get_craters");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1, [[maybe_unused]] std::vector<Terrain::CraterRec> a2) { auto r = converted::counted([&] { return converted_game_destruction_sync_cpp::get_craters(a0, a1, a2); }); return Out_get_craters{std::move(r), std::move(a0), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1, [[maybe_unused]] std::vector<Terrain::CraterRec>& a2) { auto r = converted::counted([&] { return converted_game_destruction_sync_cpp::get_craters(a0, a1, a2); }); return Out_get_craters{std::move(r), std::move(a0), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -315,7 +327,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -325,7 +339,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // put_damage
     converted::Tally tally("put_damage");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<CityStream::DamageRec> a1, [[maybe_unused]] unsigned long a2, [[maybe_unused]] unsigned long a3) { converted::counted([&] { return converted_game_destruction_sync_cpp::put_damage(a0, a1, std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] std::vector<CityStream::DamageRec>& a1, [[maybe_unused]] unsigned long& a2, [[maybe_unused]] unsigned long& a3) { converted::counted([&] { return converted_game_destruction_sync_cpp::put_damage(a0, a1, std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       std::vector<CityStream::DamageRec> a1 = draw_list(draw, [&]() -> CityStream::DamageRec { return draw_CityStream__DamageRec(draw); });
@@ -337,7 +351,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -347,7 +363,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // get_damage
     converted::Tally tally("get_damage");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1, [[maybe_unused]] std::vector<CityStream::DamageRec> a2) { auto r = converted::counted([&] { return converted_game_destruction_sync_cpp::get_damage(a0, a1, a2); }); return Out_get_damage{std::move(r), std::move(a0), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1, [[maybe_unused]] std::vector<CityStream::DamageRec>& a2) { auto r = converted::counted([&] { return converted_game_destruction_sync_cpp::get_damage(a0, a1, a2); }); return Out_get_damage{std::move(r), std::move(a0), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -358,7 +374,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -368,7 +386,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // put_points
     converted::Tally tally("put_points");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<std::pair<unsigned int, double>> a1, [[maybe_unused]] unsigned long a2, [[maybe_unused]] unsigned long a3) { converted::counted([&] { return converted_game_destruction_sync_cpp::put_points(a0, a1, std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] std::vector<std::pair<unsigned int, double>>& a1, [[maybe_unused]] unsigned long& a2, [[maybe_unused]] unsigned long& a3) { converted::counted([&] { return converted_game_destruction_sync_cpp::put_points(a0, a1, std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       std::vector<std::pair<unsigned int, double>> a1 = draw_list(draw, [&]() -> std::pair<unsigned int, double> { return std::pair<unsigned int, double>(static_cast<unsigned int>(draw.below(40)), draw.number()); });
@@ -380,7 +398,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -390,7 +410,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // get_points
     converted::Tally tally("get_points");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1, [[maybe_unused]] std::vector<std::pair<unsigned int, double>> a2) { auto r = converted::counted([&] { return converted_game_destruction_sync_cpp::get_points(a0, a1, a2); }); return Out_get_points{std::move(r), std::move(a0), std::move(a2)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1, [[maybe_unused]] std::vector<std::pair<unsigned int, double>>& a2) { auto r = converted::counted([&] { return converted_game_destruction_sync_cpp::get_points(a0, a1, a2); }); return Out_get_points{std::move(r), std::move(a0), std::move(a2)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -401,7 +421,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -411,7 +433,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // fnv_byte
     converted::Tally tally("fnv_byte");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::fnv_byte(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::fnv_byte(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -421,7 +443,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -431,7 +455,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // fnv_word
     converted::Tally tally("fnv_word");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::fnv_word(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::fnv_word(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -441,7 +465,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -451,7 +477,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // fnv_float
     converted::Tally tally("fnv_float");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] double a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::fnv_float(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return converted_game_destruction_sync_cpp::fnv_float(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       double a1 = draw.number();
@@ -461,7 +487,9 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -471,7 +499,7 @@ SC_TEST(converted_game_destruction_sync_cpp) {
   {  // digest_of
     converted::Tally tally("digest_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<Terrain::CraterRec> a0, [[maybe_unused]] std::vector<CityStream::DamageRec> a1) { return converted::counted([&] { return converted_game_destruction_sync_cpp::digest_of(a0, a1); }); };
+    const auto run = [&]([[maybe_unused]] std::vector<Terrain::CraterRec>& a0, [[maybe_unused]] std::vector<CityStream::DamageRec>& a1) { return converted::counted([&] { return converted_game_destruction_sync_cpp::digest_of(a0, a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<Terrain::CraterRec> a0 = draw_list(draw, [&]() -> Terrain::CraterRec { return draw_Terrain__CraterRec(draw); });
       std::vector<CityStream::DamageRec> a1 = draw_list(draw, [&]() -> CityStream::DamageRec { return draw_CityStream__DamageRec(draw); });
@@ -481,7 +509,31 @@ SC_TEST(converted_game_destruction_sync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // has
+    converted::Tally tally("has");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<Terrain::CraterRec>& a0, [[maybe_unused]] Terrain::CraterRec& a1) { return converted::counted([&] { return converted_game_destruction_sync_cpp::has(a0, a1); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<Terrain::CraterRec> a0 = draw_list(draw, [&]() -> Terrain::CraterRec { return draw_Terrain__CraterRec(draw); });
+      Terrain::CraterRec a1 = draw_Terrain__CraterRec(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
