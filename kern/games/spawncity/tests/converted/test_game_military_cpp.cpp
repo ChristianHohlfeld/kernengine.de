@@ -49,6 +49,7 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
+namespace combat { } using namespace ::converted_game_military_cpp::combat;
 f32 dist2d(Vec3 a, Vec3 b) { return hypot_bp(a.x - b.x, a.y - b.y); }
 f32 approach_angle(f32 cur, f32 target, f32 max_step) { return cur + clampf(wrap_pi(target - cur), -max_step, max_step); }
 #undef private
@@ -61,7 +62,7 @@ SC_TEST(converted_game_military_cpp) {
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_game_military_cpp::dist2d(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1) { return converted::counted([&] { return converted_game_military_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       Vec3 a1 = draw.vector();
@@ -71,7 +72,9 @@ SC_TEST(converted_game_military_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -81,7 +84,7 @@ SC_TEST(converted_game_military_cpp) {
   {  // approach_angle
     converted::Tally tally("approach_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_game_military_cpp::approach_angle(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_game_military_cpp::approach_angle(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -92,7 +95,9 @@ SC_TEST(converted_game_military_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
