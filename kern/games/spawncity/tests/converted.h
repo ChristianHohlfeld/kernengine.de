@@ -1481,8 +1481,6 @@ template <FnAndUser S> bool same(const S& want, const Value& got) {
   const Value w = arg(want);
   return same_call<typename Sig::Result, typename Sig::Args>([&](std::span<const Value> in, Value& out) { return w.call && w.call->call(in, out); }, got);
 }
-template <class R, class... A> bool defined(const std::function<R(A...)>&) { return true; }
-template <FnAndUser S> bool defined(const S&) { return true; }
 template <class R, class... A> std::string text(const std::function<R(A...)>& f) { return f ? "(a callback)" : "(no callback)"; }
 template <FnAndUser S> std::string text(const S& s) { return s.fn ? "(a callback)" : "(no callback)"; }
 /// What the Blueprint gives, as the source's callback: one that calls it (the value kept as long as the test runs).
@@ -1961,6 +1959,50 @@ template <class P> P&& present(P&& p) {
   }
   return std::forward<P>(p);
 }
+
+/// Does C++ say what the source's callback answers where the test asks it (the places of same_call)? The engine
+/// calls it - in the test that is the comparison, after the source's call: what it does there is the source's as
+/// well. One that reads where C++ leaves it open (an entry outside a list, a unique_ptr or optional that holds
+/// nothing - present, open_read -) or leaves the numbers (a division by zero, a computation without a result)
+/// gives nothing to compare: the call is not compared and drawn again, as one whose own body did that (Watch).
+/// (Its body is given up where present finds nothing: g_bail, for this callback alone.)
+template <class Args> bool callback_defined(const Value& w) {
+  if (!w.call) return true;   // (unbound: C++ says - nothing is called)
+  std::jmp_buf outer;
+  std::memcpy(outer, g_bail, sizeof(std::jmp_buf));
+  const bool could = g_can_bail, was_open = g_open;
+  const long reads = g_open_reads;
+  std::fexcept_t flags;
+  std::fegetexceptflag(&flags, FE_ALL_EXCEPT);
+  bool fine = true;
+  for (int round = 0; round < 3 && fine; ++round) {
+    const std::vector<Value> in = probe_values(static_cast<Args*>(nullptr), static_cast<std::size_t>(round));
+    Value out;
+    std::feclearexcept(FE_ALL_EXCEPT);
+    g_open = false;
+    g_open_reads = 0;
+    if (setjmp(g_bail) != 0) {
+      may_bail(false);
+      fine = false;
+      break;
+    }
+    g_can_bail = true;
+    may_bail(true);
+    const bool bound = w.call->call(in, out);
+    g_can_bail = false;
+    may_bail(false);
+    if (g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0) fine = false;
+    if (!bound) break;
+  }
+  std::memcpy(g_bail, outer, sizeof(std::jmp_buf));
+  g_can_bail = could;
+  g_open = was_open;
+  g_open_reads = reads;
+  std::fesetexceptflag(&flags, FE_ALL_EXCEPT);
+  return fine;
+}
+template <class R, class... A> bool defined(const std::function<R(A...)>& f) { return callback_defined<std::tuple<std::remove_cvref_t<A>...>>(arg(f)); }
+template <FnAndUser S> bool defined(const S& s) { return callback_defined<typename CallbackSig<std::remove_cv_t<decltype(S::fn)>>::Args>(arg(s)); }
 
 /// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
 template <class C> constexpr std::size_t entries(const C& c) {
