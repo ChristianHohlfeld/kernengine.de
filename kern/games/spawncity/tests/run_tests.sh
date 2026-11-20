@@ -77,6 +77,8 @@ printf '%s\n' "${sources[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c '
 cpp_objects=()
 for f in "${sources[@]}"; do cpp_objects+=("$(object_of "$f")"); done
 "$cxx" "${link[@]}" "${cpp_objects[@]}" "${objects[@]}" -lm -o "$out/spawncity_tests"
+# SC_TEST_BUILD_ONLY=1 (the CI: one job builds, the jobs of the tests take its objects - SC_TEST_OUT - and only link): stop here.
+[ "${SC_TEST_BUILD_ONLY:-}" = 1 ] && { echo "built $out/spawncity_tests"; exit 0; }
 # SC_TEST_SHARD=k/n (the CI: n jobs): this job runs the k-th of every n tests, in both passes; the steps after the
 # tests - the game's own sources, the rules' Blueprint as C++ - the first job alone.
 whole=1

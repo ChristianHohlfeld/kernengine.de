@@ -35,11 +35,31 @@ jobs:
 
   # The game's own suite, next to the engine's (each builds the engine for itself: side by side they
   # take as long as the longer one). It holds the converted Blueprints' comparison with their source.
-  # Split so that every job stays within 45 minutes (SC_TEST_PASS, SC_TEST_SHARD - run_tests.sh): the converted
-  # Blueprints' tests cost ~48 000 CPU seconds a pass (full run 143319: 269 tests, the 32 of Game ~1 450 s each, the
-  # second pass as much) - one pass per job, the k-th of every 12 tests in it; a job runs a test of Game alone in
-  # ~25 min next to the others on 4 cores. The steps after the tests (the game's sources, the rules' C++) in 1/12 of pass 1.
+  # The game's suite, split so that every job stays within 45 minutes. One job builds (ASan/UBSan, ~27 min on 4 cores:
+  # first run of the matrix 44641939553) and hands its objects on; each job of the matrix only links and runs one pass
+  # (SC_TEST_PASS) of the k-th of every 12 tests (SC_TEST_SHARD - run_tests.sh). The converted Blueprints' tests cost
+  # ~48 000 CPU seconds a pass (full run 143319: 269 tests, the 32 of Game ~1 450 s each, the second pass as much): a
+  # job holds two or three of Game, ~25 min on 4 cores. The steps after the tests (the game's sources, the rules' C++)
+  # go with 1/12 of pass 1.
+  native-spawncity-build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the SpawnCity tests (ASan/UBSan)
+        env:
+          SC_TEST_OUT: /home/runner/sc-tests
+          SC_TEST_BUILD_ONLY: 1
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sc-tests-objects
+          path: /home/runner/sc-tests
+          retention-days: 1
+          compression-level: 1
+
   native-spawncity:
+    needs: native-spawncity-build
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -50,11 +70,16 @@ jobs:
     name: native-spawncity (pass ${{ matrix.pass }}, ${{ matrix.shard }}/12)
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: sc-tests-objects
+          path: /home/runner/sc-tests
       - name: SpawnCity native tests (ASan/UBSan)
         env:
+          SC_TEST_OUT: /home/runner/sc-tests
           SC_TEST_PASS: ${{ matrix.pass }}
           SC_TEST_SHARD: ${{ matrix.shard }}/12
-        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh   # the game compiler, clang (decision E13; ubuntu-24.04 brings clang 18)
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh
 
   # Bit-identical everywhere (docs/lehrer.md, determinism): the Lehrer built with Apple clang on
   # ARM must step the duck exactly as GCC on x86 and WebAssembly do (the golden hashes).
