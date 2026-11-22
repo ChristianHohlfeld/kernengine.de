@@ -126,7 +126,12 @@ Game& game() {
 }
 
 Game::Game() = default;
-Game::~Game() { life_.reset(); }  // the world's state goes before the world: the cars of its tow trucks have bodies in it
+// What has bodies in the world and is declared before world_ goes before it (in the order it would have gone):
+// the world's state (the cars of its tow trucks), then the cruiser the mates' cruisers are drawn with.
+Game::~Game() {
+  life_.reset();
+  swarm_cruiser_.reset();
+}
 
 // ---------------------------------------------------------------------------------------------
 // level
@@ -344,8 +349,13 @@ bool Game::start(kern::Engine& e) {
 }
 
 void Game::stop() {
+  // everything with bodies in the world goes before it, in the order ~Game would end it
   glife_.reset();  // M3 life: its bodies live in the world
+  remote_bus_.reset();
+  remote_car_.reset();
+  cars_.clear();
   life_.reset();   // the world's state: the cars of its tow trucks have bodies in the world
+  swarm_cruiser_.reset();
   world_.reset();
 }
 
