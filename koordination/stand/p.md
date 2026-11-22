@@ -1,5 +1,32 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+## 18:25 (22.11.) – Nachfolger 9: Folgeschritt Map<K, I32> (4d56692b) + E20 Schritt 5 (985ca4ab) gebaut – NOCH NICHT BEREIT (mag-Belege warten)
+- 4d56692b Konverter: Werte einer kern::Map fester Breite sind Plätze ihrer Breite (`btype`: `self.place(a[1])` statt `btype`) – Map<Int64, U8>
+  (lamps broken_), Map<Int64, I32> (road_graph cells_), Map<Int64, U32> (terrain water_meshes_), city_stream want. Lokal (lamps, road_graph): nur
+  die Typen ändern sich, die Lesestellen bleiben Int (wire).
+- 985ca4ab Schritt 5 (Entscheidung selbst, nach Entwurf 4 (b), ohne neue Einstellung): der SCHREIBER entscheidet am Graphen (`Shape::loop_local`,
+  notation.cpp) und schreibt `flow_for(...).local()` / `for (auto itN = loop_local(); itN.next(c);)`; gelesen ist es derselbe Knoten (Leser nimmt
+  beide Schreibweisen) – Interpreter/JIT unverändert, kein check() nötig. Regel (keine Namen): ein Schritt „kann zählen“, wenn er eine Schleife ist,
+  `world`/`latent`/`raises`, ein Event, kein Kernknoten (Engine/Spiel), oder eine Funktion ruft (`calls_function`, jetzt in logic.h), deren Schritte
+  zählen können – eigene Funktionen werden durchgesehen, fremde/Bibliothek/Kreis = kann zählen. Gelesen werden die Werte (pure) des Rumpfs, bei
+  While die Bedingung; Ausgaben anderer Schritte sind gemerkte Werte. Klasse: `BlueprintCore::LocalPass` (blueprint.h) hält at/end lokal, schreibt
+  im Destruktor (Ende, break, return) und vor `Runtime::pass` zurück – dieselben Durchläufe; ForLoop/ListLoop/ActorLoop über einen Guard-Parameter.
+  Verschachtelt: nur die innerste Schleife ist lokal (eine äußere hat eine Schleife im Rumpf). Fall `loops_local` (logic_cases.h), Doku.
+- Belegt: vergleich `work-p-vergleich-165213-29586` (985ca4ab; lamps road_graph nostr common): 13/13 ok, beide Durchgänge, 0 Abweichungen.
+  Lokal: Engine-Suite (kern/tests/run.sh, gcc) **55598 checks, 0 failures**; blueprint_native_test lokal nicht zu bauen (bp_Engine.h: Speicher
+  7 GB zu klein) – Teilbau p-tmp/w9/nat/m.cpp: loops_local, infinite_loop, math_loops als Klasse == Interpreter (N=19967 = 20000 − 33 Durchläufe davor:
+  jeder lokale Durchlauf genau einmal gezählt). Fixpunkt aller logic_cases (p-tmp/chk) bad=0; 25 von 32 Schleifen der Fälle lokal.
+- Zeit-Test (Schritt 5, Level/Tests 100419 = $S/p/lvl6/conv6, Klassen neu, $S/p/b7, `--check 1.10 15`, Prüfsummen gleich): **21/29 (f32), 20/29 (64)** –
+  unverändert in der Zahl; 64-Bit-Spalte vorher→nachher: wrap_pi 1,44→1,28, gf_mul 1,28→1,14, mulm 1,85→1,60, lamps_near 2,22→1,94, qr_encode 1,62→1,50,
+  wire_put_f32 1,21→1,11, sha256 4,51→4,35, settings_escape 3,49→3,39; from_hex 3,64→3,73, read_geometry 1,21→1,27 (Streuung). 199 von 385 Schleifen
+  der Bench-Klassen lokal.
+- Warten auf mag (Warteschlange voll, seit 16:22): engine `work-p-engine-163348-16467`, konvert `work-p-konvert-162233-9380` (Bezug 1756/1711).
+- Weg (b): nicht begonnen. Befund: (b) bewegt die Bench nicht (keine der 29 Fälle ruft func_call_on) – es senkt die cost-Zeilen der vergleich-Tests.
+  from_outside lässt eine passende Struktur schon unverändert (geteilte rows, keine Anforderung); es bleiben (1) to_value beim Aufrufer und (2) die
+  Glue-Ergebnisse (je make_shared + vector). Weg wie im Bauplan (Sicht in Value) ändert Value-Kopien überall – eigener Schritt mit Messung.
+- Größte Hebel danach (Beobachtung, nicht gebaut): from_hex/settings_escape nehmen `Text s` als Wert (string_view in C++ → Kopie je Aufruf) und lesen
+  Zeichen über text_code_at + Vorzeichen-Formel in double; sha256 = 64 rotr-Aufrufe je Block mit Exact-Prüfungen (2^53) je Bitoperation.
+
 ## BEREIT ZUM MERGEN: 11968cee (E20 Schritt 4 + Map-Werte fester Breite) – Belege (22.11.)
 - Commits seit 39ce0076: 6ae29b79 (Map<K, List<U8>> / Map<K, U8> in der Sprache; Konverter-Regel 15201aee zurück), c5bcd2fc + e8eb1e4f
   (Konverter: Listen fester Breite in std::unique/std::remove/std::find/==, Feld einer Breite beim std::move, memset 0), Bench-Aufrufe List<U8>,

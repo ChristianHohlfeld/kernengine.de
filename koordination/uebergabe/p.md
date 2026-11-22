@@ -216,3 +216,12 @@ Stand: work-p = 39ce0076 (work-zusammen 0f55c2f4 eingemischt, engine_api.py ohne
   Eintritt in eine lokale Variable, herunterzählen, beim Verlassen (auch break/return) zurückschreiben; bei 0 runtime->pass wie heute. Interpreter/
   JIT: dieselbe Bedeutung wie flow_for (zählen ohnehin zentral) – nur der Knoten/die Einstellung „local“ und check(), dass im Rumpf kein Aufruf steht.
   Erst messen (Projektion W: wrap_pi 1,50→0,85, gf_mul 2,9→1,8). Danach (b) Struktur-Argumente ohne Heap (Bauplan oben).
+
+## Nachfolger 9 (22.11., ab 16:15) – Map<K, I32> + Schritt 5 gebaut (985ca4ab)
+- Stand und Zahlen: stand/p.md „18:25 (22.11.)“. 4d56692b (Konverter: Map-Werte fester Breite über place()), 985ca4ab (Schritt 5: `.local()` /
+  `loop_local()`, Schreiber entscheidet – Shape::loop_local; Klasse LocalPass; Fall loops_local).
+- Offen: engine 163348 und konvert 162233 abholen (`./mag.sh holen …`); konvert ≥ 1756/1711 → BEREIT; dann Zeit-Test auf dem neuen Level
+  (Klassen aus 985ca4ab; lvl/conv aus dem Ergebnis-Zweig holen wie bei 100419).
+- Werkzeuge: p-tmp/chk/cnt.cpp (zählt lokale Schleifen, `./cnt <fall>` zeigt den Text), p-tmp/w9/nat/m.cpp (Teil des nativen Tests ohne bp_Engine:
+  Objekte aus $S/shared-tmp/kern-tests nach `tests/run.sh`). Lokal: run.sh mit gcc (clang-18 -Werror scheitert an core_nodes.cpp 1609/1641, nicht von p).
+- Weg (b) nicht begonnen (Befund in stand/p.md).
