@@ -1097,7 +1097,7 @@ und mach bei 16.26 ‚Nächster Schritt‘ weiter“.
   369 Commits vor `work`, Vorspulen möglich).
 - Agenten: keine vor dem Reset (Mi 25.11., 13:00), außer Chris meldet Guthaben.
 
-### 16.28 Stand 22:20 (22.11.) – die Suite las das Level 150-mal je Game-Test (behoben auf `work-tempo`); Belege geprüft; Kandidat rechnet parallel
+### 16.28 Stand 22:40 (22.11.) – die Suite las das Level 150-mal je Game-Test und prüfte quadratisch (behoben auf `work-tempo`); Belege geprüft; Kandidat abgelegt
 
 **Vorgaben von Chris (22:07, „Doit“):** (1) der Koordinator sucht und behebt die Ursache der langen Game-Tests selbst (Ausnahme von
 „behebt nichts selbst“, nur dafür); (2) belegte Zweige kommen auf einen eigenen Kandidaten-Zweig und rechnen parallel – `work` und
@@ -1115,6 +1115,16 @@ einmal (`rules::level_document`), gesucht wird wie zuvor; neue Zeile „time: Bl
 Lokal belegt: alle 175 Namen und ein fehlender, alter Weg gegen neuen – 176 gleich (Erfolg, Fehlermeldung, Graph als JSON), 0 verschieden;
 Syntax mit den Schaltern von run_tests.sh ok. Kein Zwischenspeicher zwischen Läufen, kein Test entfällt. **Beleg auf mag steht aus** (unten).
 
+**Zweite Schicht derselben Ursache, in der Engine (allgemein, nichts von SpawnCity): `work-tempo` = e9929af0** (kern/src/logic/logic.cpp).
+Nach dem Lesen blieb je Game-Test fest: `check()` des ganzen Graphen (70.999 Knoten) viermal (Rahmen und `Runtime::add`, Interpreter
+und Klasse) und `graph_from_json` – beide suchten quadratisch (Graph::find je Knoten/Link, alle Links je Knoten, alle Knoten je Funktion,
+jeder Link gegen alle bisherigen). Jetzt wird nachgeschlagen. Lokal gemessen (-O1, ohne Sanitizer), Blueprint Game: check 28,3 s → 0,8 s,
+add 27,6 s → 1,7 s, Lesen 8,5 s → 0,3 s; fest je Game-Test rund 160 s → rund 6 s. Lokal belegt gegen den alten Code: check() für alle
+175 Blueprints (eigener Graph und der ganze) Wort für Wort gleich (830 Meldungen); alle 175 gelesenen Graphen als Text gleich (17,8 MB);
+drei kaputte Dokumente gleich. Derselbe Code prüft im Editor – für Stufe 6 (das Projekt lädt im Editor) ohnehin nötig.
+**Engine-Suite auf mag: `work-tempo-engine-223747-2757`** (Start 22:38) – erst mit rc=0 gilt e9929af0 als belegt.
+Nächster Hebel am vollen Lauf danach: die Konvertierung (57 min 49 s, im Mittel 13 von 37 Kernen genutzt) → k („erst eindeutig, dann parallel“).
+
 **Belege der offenen Zweige (selbst geholt, 22:10)**
 | Zweig | Kopf | Beleg | Urteil |
 |---|---|---|---|
@@ -1125,8 +1135,11 @@ Syntax mit den Schaltern von run_tests.sh ok. Kein Zwischenspeicher zwischen Lä
 | work-t1-kreis | 5369a492 | 170417: Stellvertreter 150/150, Engine selbst 149/150 – converted_Game__game_cpp „manage_traffic: 1 of 20 calls differ“ | **nicht belegt** → t1 |
 | work-p | 985ca4ab | 165213: 13/13 in beiden Durchgängen | Agent meldet „nicht bereit“ → bleibt |
 
-**Kandidat: `work-kandidat` = cb25ae59** = 8a16a750 + work-d-fail 64275dd8 + work-tempo 57b050b0 (konfliktfrei; py_compile ok;
-`tools/engine_api.py` ohne Unterschied). **Läuft auf mag: `work-kandidat-voll-221713-1070`** (abgelegt 22:17).
+**Kandidat: `work-kandidat` = 7447cc16** = 8a16a750 + work-d-fail 64275dd8 + work-tempo e9929af0 (konfliktfrei; py_compile ok;
+`tools/engine_api.py` ohne Unterschied). **Abgelegt auf mag: `work-kandidat-voll-223820-2825`** (22:38). Er überlappt NICHT: die Schlange
+rechnet einen vollen Lauf mit allen 56 Kernen (`need voll` = N), cap 84 – er startet, sobald 213658 endet (~00:40), und hält bis dahin
+jeden später abgelegten Auftrag auf (der erste, der nicht passt, hält die nach ihm auf). Der erste Versuch `work-kandidat-voll-221713-1070`
+(cb25ae59) ist vor dem Start abgebrochen (eigener Auftrag), damit die Engine-Suite daneben rechnen konnte.
 Auswerten gegen `work-zusammen-voll-213658-2736` (8a16a750): (1) convert/suite/engine rc=0; (2) jeder Test, den work-d-fail nicht berührt,
 gleiches Urteil und gleiche Zahl von Prüfungen wie dort; (3) Zeit der Suite und die neuen „time: Blueprint …“-Zeilen – was dann je Game-Test
 noch fest ist (verbinden, prüfen, starten), ist der nächste Hebel. Ist er grün und hat die alte Sitzung 8a16a750 nach `work` gemischt:
