@@ -315,3 +315,16 @@ Arbeitsweise (Nachtrag 17:10 in PAKET_COMMON3.md): Stand nach $S/stand/d.md, Nac
 - **19:00:** work-d e9ed65ca (Feld-Plätze + run_buildings-Fix, unbelegt). Offen: Engine-Suite `work-d-engine-185841-1710` holen; dann
   `./mag.sh vergleich origin/work-d src/game*.cpp src/people.cpp src/city_jobs.cpp`; work-d-fail: Engine-Suite `work-d-fail-engine-170043-6435` holen →
   BEREIT (vorher work-zusammen einmischen, c änderte engine_api.py). Platz als Ganzes BEREIT erst mit konvert ohne den fremden Rückfall (t1).
+
+## Nachfolger 8 (22.11., ab 16:10) – Aufgaben aus dem Auftrag des Koordinators
+- Stand und Belege: stand/d.md oben. Werkzeug: /tmp/dtools/rueck.py <grundlage convert.log.xz> <neu convert.log.xz> – zeigt, was in 045421 geschrieben war und
+  jetzt wartet (Teil-Proben: „defined in another file“/Ketten davon sind kein Rückfall). Bei Verlust: Zeilen `    <Name> (<n>): <Grund>` beider Logs vergleichen.
+- work-d = a2dbd09f: c4cd0b69 (Merge a06e5ce4) + 3976cdfc (Feld binden ohne Aufruf; Engine-Suite 185841 war rot) + a2dbd09f (Platz der Engine nie als
+  Referenz-Eingang: vergleich 161943 hatte convert rc=1 – „put_array_f32: its input v is a reference … not n53“ in run_buildings, die Sprache las das Level nicht).
+  Belege offen: vergleich `work-d-vergleich-174829-18397` (alle src/game*.cpp + people + city_jobs + city_stream), Engine-Suite `work-d-engine-162227-8504` (3976cdfc;
+  a2dbd09f ändert nur den Konverter).
+- work-d-fail 8432b275: BEREIT (Beleg work-d-fail-vergleich-162023-5935).
+- Session_push: erledigt durch f384bdfd (Beleg 045421).
+- work-d-index 29fbf014 (= d03ccf8c + work-d a2dbd09f): Platz an einem Eintrag eines Arrays (Mixer::bus(Bus)) für Game::ui_mix_audio. Belege offen:
+  vergleich `work-d-index-vergleich-172026-30784` (d03ccf8c, game.cpp + game_ui.cpp: ui_mix_audio geschrieben? beide Durchgänge?), Engine-Suite
+  `work-d-index-engine-172028-30823` (d03ccf8c; prüft den nativen Fall mit dem neuen Platz – erst dort wird Place mit P::In instanziiert).
