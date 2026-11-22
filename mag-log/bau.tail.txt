@@ -1,0 +1,80 @@
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_town_sync_cpp.cpp:833:21: warning: unused variable 'draw' [-Wunused-variable]
+  833 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:131:21: warning: unused variable 'draw' [-Wunused-variable]
+  131 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:151:21: warning: unused variable 'draw' [-Wunused-variable]
+  151 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:171:21: warning: unused variable 'draw' [-Wunused-variable]
+  171 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:191:21: warning: unused variable 'draw' [-Wunused-variable]
+  191 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:211:21: warning: unused variable 'draw' [-Wunused-variable]
+  211 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:527:21: warning: unused variable 'draw' [-Wunused-variable]
+  527 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:547:21: warning: unused variable 'draw' [-Wunused-variable]
+  547 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_wanted_cpp.cpp:567:21: warning: unused variable 'draw' [-Wunused-variable]
+  567 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_water_look_cpp.cpp:149:21: warning: unused variable 'draw' [-Wunused-variable]
+  149 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_water_look_cpp.cpp:169:21: warning: unused variable 'draw' [-Wunused-variable]
+  169 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_water_look_cpp.cpp:189:21: warning: unused variable 'draw' [-Wunused-variable]
+  189 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_water_look_cpp.cpp:209:21: warning: unused variable 'draw' [-Wunused-variable]
+  209 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_water_look_cpp.cpp:229:21: warning: unused variable 'draw' [-Wunused-variable]
+  229 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+8 warnings generated.
+5 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_world_traffic_cpp.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_world_traffic_cpp.cpp:223:78: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  223 |               if (!dup) converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                              ^
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/converted/test_world_traffic_cpp.cpp:661:21: warning: unused variable 'draw' [-Wunused-variable]
+  661 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-t1-kreis-vergleich-170417-20160/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+3 warnings generated.
+4 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	34m20,140s
+user	429m9,677s
+sys	4m25,914s
