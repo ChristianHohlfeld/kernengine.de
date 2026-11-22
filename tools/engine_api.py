@@ -329,6 +329,8 @@ class Calls:
         d = f["decl"]
         mangled = d.get("mangledName")
         ptypes = parameters_of(self.names[mangled]) if mangled else []
+        if f.get("printf") and ptypes and ptypes[-1].strip() == "...":
+            ptypes = ptypes[:-1]   # (the values of its format: the node takes the text they make - Api.printf_format)
         declared = [x.get("type", {}).get("qualType", "") for x in d.get("inner", []) or [] if x.get("kind") == "ParmVarDecl"]
         if len(declared) == len(ptypes):
             ptypes = [fixed_width(P, t, self.tree.aliases) for P, t in zip(ptypes, declared)]
@@ -401,6 +403,8 @@ class Calls:
             tg = self.tag(bt, need)
             if P in ("char const*", "char const* const"):
                 lines += [f"std::string {a};", f"ev::take<{tg}>(o, in, {k}, {a});"]
+                if pin_in == f.get("printf"):   # (the text its format makes: written as it is)
+                    args.append('"%s"')
                 args.append(f"{a}.c_str()")
             elif re.match(r"std::basic_string_view<char\b", P):
                 lines += [f"std::string {a};", f"ev::take<{tg}>(o, in, {k}, {a});"]
@@ -535,6 +539,8 @@ class Calls:
             tg = self.dtag(bt, need)
             if P in ("char const*", "char const* const"):
                 lines.append(f"const {EV}Chars {a}({pin_in});")
+                if pin_in == f.get("printf"):   # (the text its format makes: written as it is)
+                    args.append('"%s"')
                 args.append(f"{a}.c_str()")
             elif re.match(r"std::basic_string_view<char\b", P):
                 lines.append(f"const std::string_view {a} = {pin_in}.view();")

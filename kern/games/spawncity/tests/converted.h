@@ -17,6 +17,7 @@
 #include <array>
 #include <bit>
 #include <cfenv>
+#include <cstdarg>
 #include <csetjmp>
 #include <chrono>
 #include <limits>
@@ -1381,6 +1382,18 @@ inline void class_runs(bool begins) {
 /// function of its own called `arg` (Engine::arg): found as everywhere else (and a struct of the test by its
 /// own helpers).
 template <class T> Value value_of(const T& x) { return arg(x); }
+
+/// What a printf format makes of its values - the text a function of the engine that formats one writes
+/// (`kern::fail(format, ...)`: its node takes that text; kern/docs/blueprint_cpp.md). Nothing is cut.
+__attribute__((format(printf, 1, 0))) inline std::string formatted(const char* format, std::va_list values) {
+  std::va_list again;
+  va_copy(again, values);
+  const int n = std::vsnprintf(nullptr, 0, format, values);
+  std::string out(n > 0 ? static_cast<std::size_t>(n) : 0, '\0');
+  if (n > 0) std::vsnprintf(out.data(), out.size() + 1, format, again);
+  va_end(again);
+  return out;
+}
 
 /// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
 /// entry for entry.)
