@@ -1091,6 +1091,8 @@ und mach bei 16.26 ‚Nächster Schritt‘ weiter“.
 - **Korrektur 21:58 (Chris): Den Lauf `work-zusammen-voll-213658-2736` wertet noch die Sitzung `session_012NJs7i46AnXdFpunu1X3k9` aus**
   (gegen 00:40) und mischt bei grün nach `work`, wie in ihrem Chat angekündigt; ihr Ergebnis trägt sie hier nach. Diese Sitzung mischt
   so lange NICHT. Sie kontrolliert um 01:30: steht das Ergebnis hier, macht sie danach weiter (CI ansehen, `grundlage`, rote Tests zuteilen).
-  Steht nichts hier und ist `work` noch 42831863, fragt sie Chris, bevor sie den Schritt übernimmt (`work-zusammen` 8a16a750 liegt
+  Chris, 21:59: „Du mischst wenn noch was zu mischen ist. Aber erst nach ihr.“ – also: was nach dem Schritt der alten Sitzung noch zu
+  mischen ist, mischt diese Sitzung ohne Rückfrage (belegte Zweige aus der Tabelle in 16.26 nach Prüfung der Belege). Steht um 01:30
+  nichts hier, ist `work` noch 42831863 und der Lauf grün, macht sie auch 16.26 Schritt 2 selbst (`work-zusammen` 8a16a750 liegt
   369 Commits vor `work`, Vorspulen möglich).
 - Agenten: keine vor dem Reset (Mi 25.11., 13:00), außer Chris meldet Guthaben.
