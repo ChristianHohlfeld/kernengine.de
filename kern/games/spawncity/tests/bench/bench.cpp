@@ -36,6 +36,7 @@ namespace {
 namespace bp = blueprints;
 using Int = kern::logic::Whole;
 using Float = kern::f64;
+using U8 = kern::logic::Sized<kern::u8>;  // (a byte of a List<U8>, as the classes hold bytes)
 using kern::logic::Int64;
 template <class T> using List = kern::List<T>;
 
@@ -60,9 +61,9 @@ Quat quat(const double* q) { return {q[0], q[1], q[2], q[3]}; }
 kern::Vec3 vec(const double* v) { return {static_cast<kern::f32>(v[0]), static_cast<kern::f32>(v[1]), static_cast<kern::f32>(v[2])}; }
 bench::u64 fold(bench::u64 h, const Quat& q) { return bench::fold_number(bench::fold_number(bench::fold_number(bench::fold_number(h, q.x), q.y), q.z), q.w); }
 bench::u64 fold(bench::u64 h, kern::Vec3 v) { return bench::fold_number(bench::fold_number(bench::fold_number(h, v.x), v.y), v.z); }
-List<Int> ints(const std::vector<unsigned char>& b) {
-  List<Int> r;
-  for (unsigned char x : b) r.push_back(Int(x));
+List<U8> bytes_of(const std::vector<unsigned char>& b) {
+  List<U8> r;
+  for (unsigned char x : b) r.push_back(U8(x));
   return r;
 }
 List<kern::Vec3> road(int points, bench::u64 seed) {
@@ -95,20 +96,20 @@ bench::u64 cls_qr_gf_mul() {
   return h;
 }
 bench::u64 cls_qr_rs_remainder() {
-  static const auto in = [] { bench::Gen g(2); std::vector<List<Int>> v(8); for (auto& d : v) for (int i = 0; i < 64; ++i) d.push_back(Int(g.below(256))); return v; }();
+  static const auto in = [] { bench::Gen g(2); std::vector<List<U8>> v(8); for (auto& d : v) for (int i = 0; i < 64; ++i) d.push_back(U8(g.below(256))); return v; }();
   auto& q = the<bp::qr_code_cpp>();
-  static const List<Int> div = q.rs_divisor(18).Result;
+  static const List<U8> div = q.rs_divisor(18).Result;
   bench::u64 h = 0;
   for (const auto& d : in)
-    for (const Int& b : q.rs_remainder(d, div).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
+    for (const U8 b : q.rs_remainder(d, div).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
   return h;
 }
 bench::u64 cls_nostr_sha256() {
-  static const auto in = [] { bench::Gen g(3); std::vector<List<Int>> v(4); for (auto& d : v) for (int i = 0; i < 100; ++i) d.push_back(Int(g.below(256))); return v; }();
+  static const auto in = [] { bench::Gen g(3); std::vector<List<U8>> v(4); for (auto& d : v) for (int i = 0; i < 100; ++i) d.push_back(U8(g.below(256))); return v; }();
   auto& n = the<bp::nostr_cpp>();
   bench::u64 h = 0;
   for (const auto& d : in)
-    for (const Int& b : n.sha256(d).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
+    for (const U8 b : n.sha256(d).Result) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
   return h;
 }
 bench::u64 cls_nostr_mulm() {
@@ -127,7 +128,7 @@ bench::u64 cls_nostr_from_hex() {
   auto& n = the<bp::nostr_cpp>();
   bench::u64 h = 0;
   for (int i = 0; i < 16; ++i) {
-    kern::Fixed<Int, 32> out{};
+    kern::Fixed<U8, 32> out{};
     h = bench::fold(h, n.from_hex(out, hex).Result);
     for (const Int& b : out) h = bench::fold(h, static_cast<bench::u64>(static_cast<kern::i64>(b)));
   }
@@ -169,7 +170,7 @@ bench::u64 cls_mvt_zigzag() {
   return h;
 }
 bench::u64 cls_mvt_read_geometry() {
-  static const List<Int> g = ints(bench::geometry(200));
+  static const List<U8> g = bytes_of(bench::geometry(200));
   List<bp::shapes::Vector_row> parts;
   the<bp::mvt_cpp>().read_geometry(g, parts, bp::mvt_cpp::mvt_Reader{Int(0), Int(static_cast<kern::i64>(g.size())), true}, bp::mvt_cpp::mvt_GeomType::line);
   bench::u64 h = bench::fold(0, parts.size());
@@ -183,7 +184,7 @@ bench::u64 cls_mvt_ring_area() {
 }
 bench::u64 cls_wire_put_u32() {
   static const auto in = [] { bench::Gen g(17); std::vector<kern::i64> v; for (int i = 0; i < bench::kMany; ++i) v.push_back(static_cast<kern::u32>(g.next())); return v; }();
-  static List<Int> b;
+  static List<U8> b;
   auto& w = the<bp::wire>();
   b.clear();
   for (kern::i64 v : in) w.put_u32(b, v);
@@ -193,7 +194,7 @@ bench::u64 cls_wire_put_u32() {
 }
 bench::u64 cls_wire_put_f32() {
   static const auto in = numbers(18, bench::kMany, -1000, 1000);
-  static List<Int> b;
+  static List<U8> b;
   auto& w = the<bp::wire>();
   b.clear();
   for (double v : in) w.put_f32(b, v / 3);
@@ -202,7 +203,7 @@ bench::u64 cls_wire_put_f32() {
   return h;
 }
 bench::u64 cls_wire_get_u32() {
-  static const auto in = [] { bench::Gen g(19); List<Int> v; for (int i = 0; i < 4 * bench::kMany; ++i) v.push_back(Int(g.below(256))); return v; }();
+  static const auto in = [] { bench::Gen g(19); List<U8> v; for (int i = 0; i < 4 * bench::kMany; ++i) v.push_back(U8(g.below(256))); return v; }();
   auto& w = the<bp::wire>();
   bp::wire::wire_Reader r{Int(0), true};
   bench::u64 h = 0;

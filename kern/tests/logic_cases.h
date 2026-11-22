@@ -128,7 +128,7 @@ inline const std::vector<Case>& cases() {
       {"bytes",
        R"kg({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":0},{"name":"Vx","type":"int","value":-3},)kg"
        R"kg({"name":"Flags","type":"int","value":70000},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0}]}],)kg"
-       R"kg("variables":[{"name":"B","type":"int_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}},{"name":"Shifted","type":"struct","of":"Frame","value":{}}],)kg"
+       R"kg("variables":[{"name":"B","type":"int_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}},{"name":"Shifted","type":"struct","of":"Frame","value":{}}],)kg"
        R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},)kg"
        R"kg({"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},)kg"
        R"kg({"id":5,"type":"math.formula","params":{"formula":"value * 0.1"}},{"id":6,"type":"math.round"},{"id":7,"type":"var.set","params":{"variable":"Back"}},)kg"
@@ -623,7 +623,7 @@ inline const std::vector<Case>& cases() {
           {"id":4,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":0,"code":321}}],
           "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})"},
       {"text_scan",
-       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
+       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","of":"u8","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
           {"id":2,"type":"var.set","params":{"variable":"Shown"}},
           {"id":30,"type":"list.insert_text","params":{"variable":"Bytes"},"values":{"index":1,"text":"A\u00e4"}},{"id":31,"type":"text.bytes","values":{"a":"hi"}},
           {"id":32,"type":"list.append","params":{"variable":"Bytes"}},{"id":33,"type":"var.get","params":{"variable":"Bytes"}},{"id":34,"type":"text.append"},
@@ -1206,6 +1206,25 @@ inline const std::vector<Case>& cases() {
        R"kg("list"],[16,"then",17,"exec"],[17,"then",18,"exec"],[18,"then",20,"exec"],[19,"value",18,"items"],[20,"then",24,"exec"],[21,"result",20,"item"],[22,"result",21,"a"],[23,"value",22,"bytes"],[24,"then",)kg"
        R"kg(27,"exec"],[25,"value",24,"value"],[26,"value",25,"bytes"],[27,"then",29,"exec"],[28,"value",27,"item"],[29,"then",31,"exec"],[30,"value",29,"item"],[31,"then",4,"exec"],[32,"value",4,"list"],[34,"val)kg"
        R"kg(ue",5,"list"],[36,"then",39,"exec"],[37,"item",36,"item"],[38,"value",37,"list"],[40,"length",39,"item"],[41,"value",40,"list"]],"machines":[]})kg"},
+      // Maps whose values are Ints of a fixed width (Map<Int, List<U8>>, Map<Int, U8>, Map<Int, List<I32>>, Map<Int, I16>): the map is the
+      // place - a value is stored as C++ stores it there (Set at Key, Add / Insert / Set Length on a value's list, Set Variable on a value),
+      // defaults and literals hold values of the width. The same values as the C++ of std::vector<u8> ... in a map (checked so).
+      {"fixed_width_map_values",
+       R"kg({"kind":"kern-logic","version":1,"nextId":22,"variables":[{"name":"In","type":"int_list","value":[0,1,-1,127,128,255,256,-128,-129,65535,65536,-32769,4294967295,4294967296,9007199254740992,-9007199254)kg"
+       R"kg(740994]},{"name":"B","type":"int_list","of":"u8","value":[1,2,255]},{"name":"M","type":"map","of":"int>int_list:u8","value":[[9,[1,2]]]},{"name":"N","type":"map","of":"int>int:u8","value":[[1,255]]},{)kg"
+       R"kg("name":"P","type":"map","of":"int>int_list:i32","value":[]},{"name":"Q","type":"map","of":"int>int:i16","value":[]},{"name":"Got","type":"int","value":0}],"nodes":[{"id":1,"type":"event.begin","x":0,")kg"
+       R"kg(y":0},{"id":3,"type":"flow.for_each","x":840,"y":0,"params":{"type":"int"}},{"id":4,"type":"map.add","x":280,"y":0,"params":{"variable":"M"},"values":{"key":1}},{"id":5,"type":"map.add","x":560,"y":0,)kg"
+       R"kg("params":{"variable":"P"},"values":{"key":5}},{"id":6,"type":"var.get","x":720,"y":150,"params":{"variable":"In"}},{"id":7,"type":"list.add","x":1120,"y":0,"params":{"variable":"M","path":"[]"},"value)kg"
+       R"kg(s":{"path0":1}},{"id":8,"type":"list.insert","x":1400,"y":0,"params":{"variable":"P","path":"[]"},"values":{"path0":0,"index":0}},{"id":9,"type":"map.set","x":1680,"y":0,"params":{"variable":"N"}},{"i)kg"
+       R"kg(d":10,"type":"map.set","x":1960,"y":0,"params":{"variable":"Q"}},{"id":11,"type":"list.resize","x":2240,"y":0,"params":{"variable":"P","path":"[]"},"values":{"path0":0,"length":20,"value":-1}},{"id":1)kg"
+       R"kg(2,"type":"map.set","x":2520,"y":0,"params":{"variable":"M"},"values":{"key":2}},{"id":13,"type":"var.get","x":2400,"y":150,"params":{"variable":"B"}},{"id":14,"type":"var.set","x":2800,"y":0,"params":)kg"
+       R"kg({"variable":"M","path":"[]"},"values":{"path0":0}},{"id":15,"type":"var.get","x":2680,"y":150,"params":{"variable":"B"}},{"id":16,"type":"map.set","x":3080,"y":0,"params":{"variable":"M"},"values":{"k)kg"
+       R"kg(ey":3}},{"id":17,"type":"list.make","x":2960,"y":150,"params":{"type":"u8","count":"2"},"values":{"item0":300,"item1":-1}},{"id":18,"type":"var.set","x":3360,"y":0,"params":{"variable":"Got"}},{"id":1)kg"
+       R"kg(9,"type":"map.find","x":3240,"y":150,"params":{"key":"int","value":"u8"},"values":{"key":256}},{"id":20,"type":"var.get","x":3240,"y":240,"params":{"variable":"N"}},{"id":21,"type":"var.set","x":3640,)kg"
+       R"kg("y":0,"params":{"variable":"N","path":"[]"},"values":{"path0":0,"value":300}}],"links":[[1,"then",4,"exec"],[3,"body",7,"exec"],[3,"completed",11,"exec"],[3,"index",10,"key"],[3,"item",7,"item"],[3,"i)kg"
+       R"kg(tem",8,"item"],[3,"item",9,"key"],[3,"item",9,"value"],[3,"item",10,"value"],[4,"then",5,"exec"],[5,"then",3,"exec"],[6,"value",3,"list"],[7,"then",8,"exec"],[8,"then",9,"exec"],[9,"then",10,"exec"],[)kg"
+       R"kg(11,"then",12,"exec"],[12,"then",14,"exec"],[13,"value",12,"value"],[14,"then",16,"exec"],[15,"value",14,"value"],[16,"then",18,"exec"],[17,"list",16,"value"],[18,"then",21,"exec"],[19,"value",18,"valu)kg"
+       R"kg(e"],[20,"value",19,"map"]],"machines":[]})kg"},
       // Append into the variable it reads (NodeDef::takes_first: in the class text_append(std::move(T), ...) appends where T's
       // characters are) - with the index, with T itself (T + T: T as it was), and T into U.
       {"append_in_place",

@@ -2136,7 +2136,7 @@ TEST(logic_bytes_of_struct) {
   logic::Runtime rt(host);
   const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":513},
       {"name":"Vx","type":"int","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0.1},{"name":"Key","type":"int64","value":"18364758544493064720"}]}],
-    "variables":[{"name":"B","type":"int_list","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
+    "variables":[{"name":"B","type":"int_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
     "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},
       {"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},
       {"id":5,"type":"var.set","params":{"variable":"Back"}},{"id":6,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},
@@ -3918,7 +3918,9 @@ static logic::Graph every_node_graph(bool wired) {
                       {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
                       {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::int64, ""},        {"LX", PinType::int64_list, ""},
                       // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
-                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"}};
+                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"},
+                      // (bytes - Bytes of Text, Bytes of S: a List<U8>)
+                      {"L8", PinType::integer_list, "u8"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
@@ -3971,7 +3973,8 @@ static logic::Graph every_node_graph(bool wired) {
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
       case PinType::actor: return logic::Value::actor(3);
       case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
-      case PinType::integer_list: return logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993});
+      case PinType::integer_list:  // (of a width: numbers it holds - a List<U8> holds no -7)
+        return of.empty() ? logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993}) : logic::Value::of(std::vector<i64>{7, 0, 127});
       case PinType::number_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
       case PinType::vector_list: return logic::Value::of(std::vector<Vec3>{{1, -2, 3.5f}, {0, 0, 0}});
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
@@ -4785,7 +4788,24 @@ TEST(logic_fixed_widths) {
   CHECK(says("  U8 Bad = 256;\n", "256 is no U8 (it would hold 0)"));
   CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
   CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
-  CHECK(says("  Map<Int, U32> Bad = Map<Int, U32>{};\n", "Int of a fixed width"));
+  // (a map's values may be of a width - the map is the place -, its defaults hold values of it; a list of a fixed length is no value of a map)
+  {
+    logic::Graph h;
+    std::string e;
+    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  Map<Int, U32> Good = Map<Int, U32>{{1, 4294967295}};\n  Map<Int, List<U8>> Bytes = Map<Int, List<U8>>{{2, List<U8>{0, 255}}};\n};\n", h, nullptr, &e));
+    for (const logic::Issue& i : logic::check(h)) CHECK(!i.error);
+    // (a map from outside: its values as the map holds them - 2^32 + 7 as a U32 is 7, 256 in a List<U8> is 0)
+    const logic::TypeRef good = logic::declared(h.variables[0]), bytes = logic::declared(h.variables[1]);
+    logic::Value a = logic::Value::zero(logic::PinType::map), b = logic::Value::zero(logic::PinType::map);
+    a.own_entries().try_emplace(logic::key_of(logic::Value::integer(1)), logic::Value::integer(4294967303));
+    b.own_entries().try_emplace(logic::key_of(logic::Value::integer(2)), logic::Value::from_json([] { json::Value l = json::Value::array(); l.push(json::Value(256.0)); l.push(json::Value(1.0)); return l; }(), logic::PinType::integer_list));
+    const logic::Value a2 = logic::from_outside(a, good, h), b2 = logic::from_outside(b, bytes, h);
+    CHECK(a2.keyed().value_at(0).i == 7 && b2.keyed().value_at(0).item(0).i == 0 && b2.keyed().value_at(0).item(1).i == 1);
+    CHECK(a.keyed().value_at(0).i == 4294967303);  // (the map given stays as it was)
+  }
+  CHECK(says("  Map<Int, U8> Bad = Map<Int, U8>{{1, 256}};\n", "a value: 256 is no U8"));
+  CHECK(says("  Map<Int, List<I8>> Bad = Map<Int, List<I8>>{{1, List<I8>{128}}};\n", "a list's item: 128 is no I8"));
+  CHECK(says("  Map<Int, Fixed<Int, 2>> Bad = Map<Int, Fixed<Int, 2>>{};\n", "no map, set or list of a fixed length"));
   // a list of Ints of a fixed width: its default holds its values; a list of another width (or of Int) is another type; Copy Bytes
   // writes numbers of its width into it; a field of a width has its own width in a layout
   CHECK(says("  List<U8> Bad = List<U8>{1, 256};\n", "a list's item: 256 is no U8"));
@@ -5293,8 +5313,8 @@ TEST(logic_maps_and_sets) {
   // what the notation and the check refuse - with the reason
   CHECK(says("  Map<Float, Int> Wrong = Map<Float, Int>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
   CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
-  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)"));
-  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)"));
+  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
   CHECK(says("  Map<Int, Float> Twice = Map<Int, Float>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
   CHECK(says(in_event("    map_add(Scores, 2);\n    list_add(Scores, 1.0);"), "Scores"));
   CHECK(says("  void Touch(Cell& c) {\n    map_add(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    map_add(Cells, \"a\");\n    Touch(Cells[0]);"), "an entry that is held stays where it is"));
