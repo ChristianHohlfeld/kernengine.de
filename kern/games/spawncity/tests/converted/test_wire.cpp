@@ -58,6 +58,7 @@ namespace wire { struct I8 { i8 v = 0; }; }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct I16 { i16 v = 0; }; }
 namespace wire { struct U32 { u32 v = 0; }; }
+namespace wire { struct I32 { i32 v = 0; }; }
 namespace wire { struct U64 { u64 v = 0; }; }
 namespace wire { struct I64 { i64 v = 0; }; }
 namespace wire { struct F32 { f32 v = 0; }; }
@@ -80,6 +81,10 @@ namespace wire { inline void put_i16(std::vector<u8>& b, i16 v) {
 } }
 namespace wire { inline void put_u32(std::vector<u8>& b, u32 v) {
   const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_i32(std::vector<u8>& b, i32 v) {
+  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(I32{v});
   b.insert(b.end(), x.begin(), x.end());
 } }
 namespace wire { inline void put_u64(std::vector<u8>& b, u64 v) {
@@ -144,6 +149,13 @@ namespace wire { struct Reader {
   u32 get_u32(const std::vector<u8>& b) {
     if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
     U32 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 4);
+    return x.v;
+  }
+  i32 get_i32(const std::vector<u8>& b) {
+    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
+    I32 x;
     std::memcpy(&x, b.data() + at, sizeof x);
     converted::plus_to(at, 4);
     return x.v;
@@ -214,7 +226,7 @@ namespace wire { struct Reader {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -226,57 +238,61 @@ namespace wire { struct Reader {
 }
 namespace wire { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const wire::Reader& s) { return converted::Value::structure({arg(s.at), arg(s.ok)}); }
-[[maybe_unused]] static bool same(const wire::Reader& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.ok, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const wire::Reader& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.at, (*got.rows)[0]), ".at") && converted::at_place(same(want.ok, (*got.rows)[1]), ".ok"); }
 [[maybe_unused]] static bool defined(const wire::Reader& s) { return defined(s.at) && defined(s.ok); }
 [[maybe_unused]] static std::string text(const wire::Reader& s) { return std::string("{") + text(s.at) + ", " + text(s.ok) + "}"; }
 [[maybe_unused]] static void take(wire::Reader& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned long>(s.at, (*v.rows)[0]); converted::take_as<bool>(s.ok, (*v.rows)[1]); }
 }
 struct Out_Reader_get_u8 { wire::Reader Self; unsigned char Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_u8& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_u8& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_u8& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_u8& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_i8 { wire::Reader Self; signed char Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_i8& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_i8& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_i8& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_i8& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_u16 { wire::Reader Self; unsigned short Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_u16& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_u16& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_u16& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_u16& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_i16 { wire::Reader Self; short Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_i16& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_i16& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_i16& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_i16& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_u32 { wire::Reader Self; unsigned int Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_u32& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_u32& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_u32& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_u32& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Reader_get_i32 { wire::Reader Self; int Result; };
+[[maybe_unused]] static bool same(const Out_Reader_get_i32& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_Reader_get_i32& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Reader_get_i32& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_u64 { wire::Reader Self; u64 Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_u64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(converted::shaped<converted::Whole>(want.Result), (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_u64& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(converted::shaped<converted::Whole>(want.Result), (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_u64& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_u64& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_i64 { wire::Reader Self; i64 Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_i64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(converted::shaped<converted::Whole>(want.Result), (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_i64& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(converted::shaped<converted::Whole>(want.Result), (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_i64& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_i64& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_f32 { wire::Reader Self; double Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_f32& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_f32& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_f32& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_f32& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_f64 { wire::Reader Self; double Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_f64& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_f64& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_f64& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_f64& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_vec3 { wire::Reader Self; Vec3 Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_vec3& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_vec3& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_vec3& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_vec3& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_quat { wire::Reader Self; Quat Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_quat& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_quat& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_quat& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_Reader_get_bytes { wire::Reader Self; std::vector<unsigned char> Result; };
-[[maybe_unused]] static bool same(const Out_Reader_get_bytes& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Reader_get_bytes& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Reader_get_bytes& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Reader_get_bytes& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -285,7 +301,7 @@ SC_TEST(converted_wire) {
   {  // f32_bytes
     converted::Tally tally("f32_bytes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_wire::wire::f32_bytes(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_wire::wire::f32_bytes(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -294,7 +310,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -304,7 +322,7 @@ SC_TEST(converted_wire) {
   {  // put_u8
     converted::Tally tally("put_u8");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned char a1) { converted::counted([&] { return converted_wire::wire::put_u8(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] unsigned char& a1) { converted::counted([&] { return converted_wire::wire::put_u8(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       unsigned char a1 = static_cast<unsigned char>(draw.below(40));
@@ -314,7 +332,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -324,7 +344,7 @@ SC_TEST(converted_wire) {
   {  // put_i8
     converted::Tally tally("put_i8");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] signed char a1) { converted::counted([&] { return converted_wire::wire::put_i8(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] signed char& a1) { converted::counted([&] { return converted_wire::wire::put_i8(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       signed char a1 = static_cast<signed char>(draw.whole());
@@ -334,7 +354,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -344,7 +366,7 @@ SC_TEST(converted_wire) {
   {  // put_u16
     converted::Tally tally("put_u16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned short a1) { converted::counted([&] { return converted_wire::wire::put_u16(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] unsigned short& a1) { converted::counted([&] { return converted_wire::wire::put_u16(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       unsigned short a1 = static_cast<unsigned short>(draw.below(40));
@@ -354,7 +376,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -364,7 +388,7 @@ SC_TEST(converted_wire) {
   {  // put_i16
     converted::Tally tally("put_i16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] short a1) { converted::counted([&] { return converted_wire::wire::put_i16(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] short& a1) { converted::counted([&] { return converted_wire::wire::put_i16(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       short a1 = static_cast<short>(draw.whole());
@@ -374,7 +398,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -384,7 +410,7 @@ SC_TEST(converted_wire) {
   {  // put_u32
     converted::Tally tally("put_u32");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] unsigned int a1) { converted::counted([&] { return converted_wire::wire::put_u32(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] unsigned int& a1) { converted::counted([&] { return converted_wire::wire::put_u32(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -394,7 +420,31 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // put_i32
+    converted::Tally tally("put_i32");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] int& a1) { converted::counted([&] { return converted_wire::wire::put_i32(a0, std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      int a1 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -404,7 +454,7 @@ SC_TEST(converted_wire) {
   {  // put_u64
     converted::Tally tally("put_u64");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] u64 a1) { converted::counted([&] { return converted_wire::wire::put_u64(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] u64& a1) { converted::counted([&] { return converted_wire::wire::put_u64(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       u64 a1 = static_cast<u64>(draw.bits());
@@ -414,7 +464,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -424,7 +476,7 @@ SC_TEST(converted_wire) {
   {  // put_i64
     converted::Tally tally("put_i64");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] i64 a1) { converted::counted([&] { return converted_wire::wire::put_i64(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] i64& a1) { converted::counted([&] { return converted_wire::wire::put_i64(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       i64 a1 = static_cast<i64>(draw.bits());
@@ -434,7 +486,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -444,7 +498,7 @@ SC_TEST(converted_wire) {
   {  // put_f32
     converted::Tally tally("put_f32");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] double a1) { converted::counted([&] { return converted_wire::wire::put_f32(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return converted_wire::wire::put_f32(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       double a1 = draw.number();
@@ -454,7 +508,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -464,7 +520,7 @@ SC_TEST(converted_wire) {
   {  // put_f64
     converted::Tally tally("put_f64");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] double a1) { converted::counted([&] { return converted_wire::wire::put_f64(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] double& a1) { converted::counted([&] { return converted_wire::wire::put_f64(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       double a1 = draw.number();
@@ -474,7 +530,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -484,7 +542,7 @@ SC_TEST(converted_wire) {
   {  // put_vec3
     converted::Tally tally("put_vec3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] Vec3 a1) { converted::counted([&] { return converted_wire::wire::put_vec3(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] Vec3& a1) { converted::counted([&] { return converted_wire::wire::put_vec3(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       Vec3 a1 = draw.vector();
@@ -494,7 +552,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -504,7 +564,7 @@ SC_TEST(converted_wire) {
   {  // put_quat
     converted::Tally tally("put_quat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] Quat a1) { converted::counted([&] { return converted_wire::wire::put_quat(a0, std::move(a1)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] Quat& a1) { converted::counted([&] { return converted_wire::wire::put_quat(a0, std::move(a1)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       Quat a1 = draw_kern__Quat(draw);
@@ -514,7 +574,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -524,7 +586,7 @@ SC_TEST(converted_wire) {
   {  // put_bytes
     converted::Tally tally("put_bytes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<unsigned char> a0, [[maybe_unused]] std::vector<unsigned char> a1) { converted::counted([&] { return converted_wire::wire::put_bytes(a0, a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return converted_wire::wire::put_bytes(a0, a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -534,7 +596,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -544,7 +608,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_u8
     converted::Tally tally("Reader_get_u8");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_u8(a1); }); return Out_Reader_get_u8{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_u8(a1); }); return Out_Reader_get_u8{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -554,7 +618,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -564,7 +630,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_i8
     converted::Tally tally("Reader_get_i8");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_i8(a1); }); return Out_Reader_get_i8{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_i8(a1); }); return Out_Reader_get_i8{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -574,7 +640,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -584,7 +652,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_u16
     converted::Tally tally("Reader_get_u16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_u16(a1); }); return Out_Reader_get_u16{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_u16(a1); }); return Out_Reader_get_u16{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -594,7 +662,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -604,7 +674,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_i16
     converted::Tally tally("Reader_get_i16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_i16(a1); }); return Out_Reader_get_i16{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_i16(a1); }); return Out_Reader_get_i16{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -614,7 +684,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -624,7 +696,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_u32
     converted::Tally tally("Reader_get_u32");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_u32(a1); }); return Out_Reader_get_u32{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_u32(a1); }); return Out_Reader_get_u32{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -634,7 +706,31 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Reader::get_i32
+    converted::Tally tally("Reader_get_i32");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_i32(a1); }); return Out_Reader_get_i32{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      wire::Reader a0 = draw_wire__Reader(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -644,7 +740,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_u64
     converted::Tally tally("Reader_get_u64");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_u64(a1); }); return Out_Reader_get_u64{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_u64(a1); }); return Out_Reader_get_u64{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -654,7 +750,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -664,7 +762,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_i64
     converted::Tally tally("Reader_get_i64");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_i64(a1); }); return Out_Reader_get_i64{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_i64(a1); }); return Out_Reader_get_i64{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -674,7 +772,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -684,7 +784,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_f32
     converted::Tally tally("Reader_get_f32");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_f32(a1); }); return Out_Reader_get_f32{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_f32(a1); }); return Out_Reader_get_f32{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -694,7 +794,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -704,7 +806,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_f64
     converted::Tally tally("Reader_get_f64");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_f64(a1); }); return Out_Reader_get_f64{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_f64(a1); }); return Out_Reader_get_f64{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -714,7 +816,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -724,7 +828,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_vec3
     converted::Tally tally("Reader_get_vec3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_vec3(a1); }); return Out_Reader_get_vec3{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_vec3(a1); }); return Out_Reader_get_vec3{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -734,7 +838,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -744,7 +850,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_quat
     converted::Tally tally("Reader_get_quat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_quat(a1); }); return Out_Reader_get_quat{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_quat(a1); }); return Out_Reader_get_quat{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -754,7 +860,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -764,7 +872,7 @@ SC_TEST(converted_wire) {
   {  // Reader::get_bytes
     converted::Tally tally("Reader_get_bytes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { auto r = converted::counted([&] { return a0.get_bytes(a1); }); return Out_Reader_get_bytes{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { auto r = converted::counted([&] { return a0.get_bytes(a1); }); return Out_Reader_get_bytes{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -774,7 +882,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -784,7 +894,7 @@ SC_TEST(converted_wire) {
   {  // Reader::done
     converted::Tally tally("Reader_done");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] wire::Reader a0, [[maybe_unused]] std::vector<unsigned char> a1) { return converted::counted([&] { return a0.done(a1); }); };
+    const auto run = [&]([[maybe_unused]] wire::Reader& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { return converted::counted([&] { return a0.done(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       wire::Reader a0 = draw_wire__Reader(draw);
       std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
@@ -794,7 +904,9 @@ SC_TEST(converted_wire) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
