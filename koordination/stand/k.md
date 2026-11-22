@@ -10,7 +10,16 @@
 - Beleg 162247-11853 (game, game_traffic, game_life): 47/47 ok beide, aber stop/~Game warten an Ragdolls::~Ragdolls/Car::~Car (clear()/
   detach() in ragdoll.cpp/car.cpp, nicht in der Probe) → neu 165340-2083 mit car.cpp, ragdoll.cpp.
 
-## BEREIT ZUM MERGEN: 5f6d4e3f – Beleg work-k-vergleich-165340-2083 (game, game_traffic, game_life, car, ragdoll)
+- 17:50 Koordinator: 5f6d4e3f noch nicht gemergt (real 49/50) – nach gs Fix (swarm_cruiser_, cars_, remote_car_/bus_ enden nach der Welt;
+  work-g-stop) einmischen und Game-Beleg neu, BEREIT erst bei 50/50 beide. work-k = 85267faf (Merge work-zusammen 8871ab35).
+- cd542712 (Aufgabe 2): `auto [a, b]` nach `T& r = c ? x : y` (either_place kopiert den Rest des Blocks; bind ersetzte die Namen nur im
+  Baum der Funktion) → Emit.copies/nodes(). Interiors::build (306 Zeilen, „a name that is BindingDecl“). Kleinstfall /tmp/k_sb2.
+  Beleg läuft: work-k-vergleich-174806-17509 (interiors, game_life, car, ragdoll).
+- Warteliste (Lauf 160230-5239 auf a06e5ce4, convert rc=0, 1757/1847): nicht meins – „a place in a list of another shape“ (buildings_input,
+  begin_cells: `std::vector<f64>(fp.data(), fp.data()+fp.size())` eines kern::FootprintStream – engine.footprint_stream.data gibt nur einen
+  Eintrag → d); ui_mix_audio (`m.bus(..).muted = …`, Platz der Engine → d); „a member of Int is set“ (look_draw, vr_comfort → d, s. o.).
+
+## BEREIT ZUM MERGEN (zurückgestellt, s. o.): 5f6d4e3f – Beleg work-k-vergleich-165340-2083 (game, game_traffic, game_life, car, ragdoll)
 - Game::stop (5 Zeilen) und Game::~Game, Car::~Car, Ragdolls::~Ragdolls geschrieben; Game::stop verglichen: 20/20 in beiden Durchgängen.
   Stellvertreter 50/50 ok. Kein „was written and waits now“. Game::Game wartet jetzt nur noch an CityStream() (andere Datei).
 - Durchgang gegen die Engine: 49/50 – converted_Game__game_cpp bricht NACH den Vergleichen (stop 20/20) an ASan ab: heap-use-after-free
