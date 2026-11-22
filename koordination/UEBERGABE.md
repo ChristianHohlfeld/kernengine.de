@@ -1153,10 +1153,10 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
   `…/Game.cpp: line 2185, column 5: "count" starts no statement: no variable, no function, no node` → „the Blueprints were not read:
   the level is as it was“. Die Tests liefen danach gegen das alte Level („the Blueprint nothing (interpreter) and nothing (class)“).
   Die Suite-Zahlen dieses Laufs sagen deshalb nichts über die Tests selbst.
-- **Rückfall durch das Zusammenkommen** von p 11968cee (E20 Schritt 4), k cd542712 (ended_many) und g 8b27771d (stop() mit
-  cars_.clear() usw.): jeder Zweig war einzeln mit `vergleich` belegt (175649 auf dem Stand mit k+g, aber ohne p – work-g-stop
-  enthielt 8871ab35? prüfen: der Beleg 175649 lief auf 8b27771d). Der letzte volle grüne Konverter-Lauf ist 160230 auf a06e5ce4
-  (ohne p, k, zweiten g-Fix; dort 270/0 und 150/1).
+- **Wodurch:** unbekannt. Neu gegenüber dem letzten Lauf mit convert rc=0 (160230 auf a06e5ce4: 270/0 und 150/1) sind p 11968cee
+  (E20 Schritt 4), k cd542712 (ended_many) und g 8b27771d (stop() mit cars_.clear() usw.). Der Beleg 175649 lief auf 8b27771d, das
+  alle drei enthält (8871ab35 ist Vorfahr), über game, game_traffic, game_life, car, ragdoll – grün. Der Fehler zeigt sich also erst,
+  wenn der ganze Game-Text aus allen Game-Dateien gelesen wird.
 - **Nächster Schritt:** den Text um Zeile 2185 ansehen (`mag/work-zusammen-voll-213658-2736/texts/` bzw. `convert.log.xz`), die
   schreibende Regel finden (wer schreibt eine Zeile, die mit `count` beginnt: vermutlich Ende einer Liste/Schleife mit lokalem
   Wächter in Game::stop/~Game) und dem Zuständigen geben (k, sonst p). Beleg dafür: `./mag.sh konvert origin/<zweig>` – convert rc=0
