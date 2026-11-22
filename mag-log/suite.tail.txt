@@ -1,0 +1,80 @@
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::RoadBuilder]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::Terrain::CorridorSet>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::Terrain::Job>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = fc::FirmwareRuntime]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::net::HostTransport]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::net::Server>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::net::Client>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::MpLocal>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::audio::Mixer]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::game::SoundBank>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::game::GameAudio>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::audio::Mixer *]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::LightPool]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::GameLife>]: an object held by a pointer: one the test makes, each side its own (never none)
+  Game::~Game(): 300 calls written by the old program (300 where C++ says what they give)
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::physics::World]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::Renderer]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::FootprintStream]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::RoadStream]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::BuildingBuilder]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::RoadBuilder]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = fc::FirmwareRuntime]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::net::HostTransport]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::audio::Mixer]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::LightPool]: what it holds is its own - not compared
+  Game::stop(): 300 calls written by the old program (300 where C++ says what they give)
+ok   lowered_game_cpp (1.8 s, CPU 1.8 s)
+1 tests, 4 checks, 0 failures (CPU of the tests 1.8 s, 1 at once)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::DestroySync>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::ProjSync>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::TownSync>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::Car>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::physics::World *]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::physics::World]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::WorldLife>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::Renderer *]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::Renderer]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::GapsState>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::Engine *]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::game::GameWorld>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::CityStream::Tile>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::FootprintStream]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::RoadStream]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::BuildingBuilder]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::RoadBuilder]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::Terrain::CorridorSet>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::Terrain::Job>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = fc::FirmwareRuntime]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::net::HostTransport]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::net::Server>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::net::Client>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::MpLocal>]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::audio::Mixer]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::game::SoundBank>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<kern::game::GameAudio>]: an object held by a pointer that the test cannot make: none (null) on both sides
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::audio::Mixer *]: an object held by a pointer: one the test makes, each side its own (never none)
+  note: void sc::lowered::draw(Draw &, T &) [T = kern::LightPool]: made by its constructor, not drawn (it keeps what it holds to itself)
+  note: void sc::lowered::draw(Draw &, T &) [T = std::unique_ptr<sc::GameLife>]: an object held by a pointer: one the test makes, each side its own (never none)
+  Game::~Game(): 300 calls compared, 0 not (C++ leaves them open)
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::physics::World]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::Renderer]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::FootprintStream]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::RoadStream]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::BuildingBuilder]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::RoadBuilder]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = fc::FirmwareRuntime]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::net::HostTransport]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::audio::Mixer]: what it holds is its own - not compared
+  note: void sc::lowered::put(Bytes &, const T &) [T = kern::LightPool]: what it holds is its own - not compared
+  Game::stop(), call 0: its object
+  Game::stop(), call 1: its object
+  Game::stop(), call 5: its object
+  check failed /dev/shm/spawncity-jobs-chris/work-t1-spiel-170335-15299/kern/games/spawncity/tests/lowered/builds/game/../../../source_diff.h:802: wrong == 0 | Game::stop(): 168 of 300 calls differ
+  Game::stop(): 300 calls compared, 0 not (C++ leaves them open)
+FAIL lowered_game_cpp (1.7 s, CPU 1.7 s)
+1 tests, 8 checks, 1 failures (CPU of the tests 1.7 s, 1 at once)
+
+real	36m27,975s
+user	222m31,895s
+sys	3m33,464s
