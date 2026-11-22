@@ -196,3 +196,23 @@ Stand: work-p = 39ce0076 (work-zusammen 0f55c2f4 eingemischt, engine_api.py ohne
   35 Map-Wert-Fälle) + vergleich (nostr qr_code mvt city_jobs lamps) + Zeit-Test, dann BEREIT mit „x von 29 über 1,10“.
 - vergleich 001918 (d38bc5ac) hing >2,5 h; 02:55 abgebrochen – `./mag.sh holen work-p-vergleich-001918-8866`, alle*.txt: welcher Test
   ZEIT/ABBRUCH → Befund an t1. BEFUND k (set_water_cell) ist mit k 3af75896 behoben.
+
+## Nachfolger 8 (20.–22.11.) – Map-Werte fester Breite gebaut, Schritt 4 BEREIT (11968cee)
+- Gebaut (6ae29b79): Leser (notation.cpp: Map-Werte dürfen eine Breite haben, Fixed bleibt verboten), type_from_text, has_fixed/fit für Maps
+  (auch als Struktur-Feld; fit kopiert nur, wenn ein Wert nicht passt; Tiefe zählt nur Strukturen), map.set fittet den Wert, check prüft
+  Map-Vorgaben (width_ok rekursiv), ParamDef::width_values (Value der Map-Knoten: U8 … I32 und ihre Listen), Glue/nativer Test: Map-Wert einer
+  Breite = Sized<u8>, Proben einer Map gefittet; Web: lgToNamed int:u8 / int_list:u8; Doku blueprint_cpp.md „Ganze Zahlen fester Breite“.
+  Fall fixed_width_map_values (logic_cases.h) – lokal Klasse == Interpreter == echtes C++ (p-tmp/w21/m: c.txt, cls.cpp, real.cpp; Werkzeug
+  p-tmp/w21/bo.sh baut Logik-Objekte nach w21/o, mk/run wie w20). Leser-Fälle in test_main (Map<Int, U32> gut, U8 256 / I8 128 abgelehnt, from_outside).
+- Konverter: Regel 15201aee zurück; c5bcd2fc/e8eb1e4f: Breiten in std::unique/remove(nur Wert desselben C++-Typs)/find/==, std::move-Feld, memset.
+  Entscheidung: einzelne Map-Werte (kern::Map<K, int>) schreibt der Konverter weiter als Int (btype, Wickeln beim Speichern wie vor Schritt 4) –
+  mit place() würden sie I32; offen als kleiner Folgeschritt (Folge: viele Maps ändern ihren Typ, alle Lesestellen über wire()).
+- Belege: stand/p.md „BEREIT ZUM MERGEN: 11968cee“. Zeit-Test 21/29 (f32), 20/29 (64). Bench-Level/-Tests: $S/p/lvl6, $S/p/conv6 (konvert 100419,
+  aus dem Zweig mag/ergebnis-<konvert> geholt: Commit „Level und Tests der Blueprints“). Bench-Bau $S/p/b6.
+- Nächstes: Schritt 5 (Schleife mit lokalem Wächter) NICHT begonnen. Befund zum Ansatz: kern_pass() (blueprint.h ~310) liest/schreibt
+  kern_world.counters[3] je Durchlauf über einen Zeiger; ein Aufruf im Rumpf liest denselben Zähler. Ohne Textänderung nicht exakt (ein
+  verschachteltes kern_pass sähe einen veralteten Zähler). Weg laut Entwurf 4 (b): Schreiber erkennt am Graphen Rümpfe ohne Aufruf (kein Function
+  Call/Call on/Event/Engine-Knoten, der weiterzählen kann) und schreibt `flow_for_local`/`loop_local`; Klasse: Rest = counters[1]-counters[3] beim
+  Eintritt in eine lokale Variable, herunterzählen, beim Verlassen (auch break/return) zurückschreiben; bei 0 runtime->pass wie heute. Interpreter/
+  JIT: dieselbe Bedeutung wie flow_for (zählen ohnehin zentral) – nur der Knoten/die Einstellung „local“ und check(), dass im Rumpf kein Aufruf steht.
+  Erst messen (Projektion W: wrap_pi 1,50→0,85, gf_mul 2,9→1,8). Danach (b) Struktur-Argumente ohne Heap (Bauplan oben).

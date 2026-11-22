@@ -1,5 +1,23 @@
 # Stand Paket p – Nachfolger 2 (19.11.2026, ab 07:15)
 
+## BEREIT ZUM MERGEN: 11968cee (E20 Schritt 4 + Map-Werte fester Breite) – Belege (22.11.)
+- Commits seit 39ce0076: 6ae29b79 (Map<K, List<U8>> / Map<K, U8> in der Sprache; Konverter-Regel 15201aee zurück), c5bcd2fc + e8eb1e4f
+  (Konverter: Listen fester Breite in std::unique/std::remove/std::find/==, Feld einer Breite beim std::move, memset 0), Bench-Aufrufe List<U8>,
+  Merges a2151031 (bdb99729), 454e4a39 (a2e6dd1e), 11968cee (a06e5ce4: seit 454e4a39 nur game.cpp 1 Zeile aus work-zusammen + bench.cpp).
+- engine `work-p-engine-084052-31649` (6ae29b79): rc=0, 55568 checks / 0 failures, blueprint_native_test 71 Blueprints (darin fixed_width_map_values).
+- CI 44693119773 (6ae29b79): native, build (JIT == Interpreter über alle logic_cases, darin der neue Fall), determinism, input grün; e2e blueprint
+  270/0; rot nur „compiles in the editor“ der ALTEN Level-Blueprints (List<Int> gegen Engine-Pins List<U8>, wie seit Schritt 4 – löst der volle
+  Lauf mit neuem Level) und die 3 bekannten Stellen von work-zusammen; native-spawncity ebenso (altes Level).
+- konvert `work-p-konvert-100419-30404` (454e4a39): convert rc=0, **1756 geschrieben / 1711 verglichen** (Bezug voll-045421: 1755/1710).
+- vergleich `work-p-vergleich-091250-16776` (6ae29b79; nostr qr_code common wire mvt city_stream): 14/14 ok, beide Durchgänge, 0 Abweichungen
+  (city_stream/terrain grün). vergleich `work-p-vergleich-094253-24884` (c5bcd2fc; city_stream net_session game_townsync game_destruction_sync wire):
+  47/47 ok, beide Durchgänge, 0 Abweichungen.
+- Zeit-Test (Level + Tests von konvert 100419, $S/p/lvl6, $S/p/conv6; tools/blueprint_bench.sh --check 1.10 15, alle Prüfsummen gleich):
+  **21 von 29 über 1,10 (f32-Spalte), 20 von 29 (64-Bit-Spalte)** (vorher 24/23). Darüber (min64): sha256 4,51, from_hex 3,64, settings_escape 3,49,
+  wire_get_u32 2,47, lamps_near 2,22, mulm 1,85, qr_encode 1,62, wrap_pi 1,44, rs_remainder 1,41, perf_governor 1,40, person_hit 1,30,
+  settings_num 1,28, gf_mul 1,28, qnormalize 1,27, lamps_place_road 1,22, mvt_read_geometry 1,21, wire_put_f32 1,21, mvt_ring_area 1,17,
+  to_local 1,16, audio_render 1,15 (f32-Spalte zusätzlich lamps_grid_key 1,42 – 64-Bit 1,03).
+
 ## 08:15 (20.11.) – Nachfolger 8: Map-Werte fester Breite gebaut (6ae29b79), Belege laufen
 - work-p = 6ae29b79 (work-zusammen bdb99729 eingemischt a2151031). Sprache: Map<K, List<U8>> … und Map<K, U8> … (Leser, check, Interpreter
   Set at Key/fit/Vorgaben, Typwahl, Klasse/Glue Sized, nativer Test, Web-Editor, Doku), Fall fixed_width_map_values (lokal: Klasse == Interpreter
