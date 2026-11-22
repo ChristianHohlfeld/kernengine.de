@@ -1,0 +1,80 @@
+      |                        ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/src/life.h:284:81: warning: private field 'ambient_chirp_' is not used [-Wunused-private-field]
+  284 |   f32 last_shout_ = -99, last_honk_ = -99, last_scream_ = -99, last_coo_ = -99, ambient_chirp_ = 0;
+      |                                                                                 ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/src/nostr.cpp:100:6: warning: unused function 'from_hex256' [-Wunused-function]
+  100 | U256 from_hex256(const char* s) {
+      |      ^~~~~~~~~~~
+1 warning generated.
+In file included from /dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/src/people.cpp:2:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/src/people.h:207:21: warning: private field 'serial_' is not used [-Wunused-private-field]
+  207 |   u32 budget_ = 60, serial_ = 1;
+      |                     ^
+1 warning generated.
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/src/world_traffic.cpp:52:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+   52 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/src/world_traffic.cpp:101:63: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  101 |               if (!dup) nodes[ni].arms.push_back({dir, g.width});
+      |                                                               ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_Arondight45_DroneFC_Core.cpp:1589:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1589 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_Arondight45_FirmwareRuntime.cpp:1808:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1808 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_Arondight45_StateControl.cpp:1961:21: warning: unused variable 'draw' [-Wunused-variable]
+ 1961 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_car.cpp:285:21: warning: unused variable 'draw' [-Wunused-variable]
+  285 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+2 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/src/level_blueprints.cpp:24783:10: warning: unused variable 'playing' [-Wunused-variable]
+ 24783 |     Bool playing = false;
+       |          ^~~~~~~
+2 warnings generated.
+1 warning generated.
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_facades.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_game_gaps_cpp.cpp:639:21: warning: unused variable 'draw' [-Wunused-variable]
+  639 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_game_look_cpp.cpp:634:21: warning: unused variable 'draw' [-Wunused-variable]
+  634 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-161943-5651/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+0 tests, 0 checks, 0 failures (CPU of the tests 0.0 s, 1 at once)
+
+real	16m34,633s
+user	214m13,516s
+sys	2m38,793s
