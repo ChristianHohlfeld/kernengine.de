@@ -1,5 +1,18 @@
 # Paket g – Stand (Regeln des Konverters für die Game-Dateien), Zweig work-g1
 
+## BEREIT ZUM MERGEN: work-g-stop 51364912 (Fix a5a157f2 + Merge work-zusammen a2e6dd1e) – Beleg work-g-stop-vergleich-100140-27958 (dazu 093350-22249 auf a5a157f2)
+UAF ~Game (t1, converted_Game__game_cpp) behoben: Game::stop() setzt life_ vor world_ zurück; ~Game() { life_.reset(); } (statt = default). Kein Feld verschoben;
+~Game ruft NICHT stop() (world_ endete sonst vor cars_/remote_car_/remote_bus_, deren Car beim Abbau detach() ruft). vergleich game, game_traffic, game_life, ragdoll, car:
+convert/bau/alle rc=0, 50/50 ok beide Durchgänge, 0 Abweichungen, converted_Game__game_cpp ok ohne Abbruch.
+VORBEHALTE (Entscheidung Koordinator/Chris):
+1. Rückfall: Game::stop war im vollen Lauf 045421 „written“, wartet jetzt: „the end of a WorldLife: its field trucks is a list … of what ends with it“; ebenso das neue
+   Game::~Game. Allgemeine Fähigkeit des Konverters (Ende einer Liste von Strukturen mit besessenem Car) – Paket g/k.
+2. Differenztest fehlt: source_diff.py bildet die Paare (Game::stop, Game::~Game), der erzeugte Test übersetzt nicht (Game nicht kopierbar – TowTruck; Aufzählungen
+   der Engine, const char*, Mat4) = Werkzeug „zwei Bauten“ (UEBERGABE 4.2). Nach Regel nur „vorbereitet“. Zudem lässt stop() jetzt life_ leer zurück (Objektvergleich
+   direkt nach stop() unterscheidet sich; danach folgen im Programm nur start() – ersetzt life_ – oder der Abbau).
+BEFUND (nicht geändert): dasselbe Muster bei cars_ (TrafficCar::car), remote_car_, remote_bus_ (nach stop() ist world_ weg, ihr ~Car → detach am Programmende, wenn
+angehängt) und swarm_cruiser_ (game.h:341, vor world_ erklärt → nach ihm abgebaut, falls je angehängt).
+
 ## BEREIT ZUM MERGEN: c4d4544b – Beleg work-g1-vergleich-232903-26675
 net_session.cpp auf c4d4544b, beide Durchgänge: Session_to_all/send_rules/send_scores/send_seats/send_proj/send_toss/send_world/
 town_to_all/destroy_to_all/finish_ballot/set_origin/set_world_rules weichen nicht mehr ab (vorher ~100/300: max_clients einmal statt je Runde).
