@@ -2678,8 +2678,8 @@ struct Reader {
       if (!type_here(key) || !key_type_ok(key.type) || key.count || has_width(key)) return fail(at + 2, "the keys of a map or a set are Bool, Int, Int64, Text or an enum");
       if (map) {
         if (!expect(",")) return false;
-        if (!type_here(value) || is_keyed(value.type) || value.count || has_width(value))
-          return fail(p, "the values of a map are a type a variable can be, but no map, set, list of a fixed length or Int of a fixed width (U8 ... I32)");
+        if (!type_here(value) || is_keyed(value.type) || value.count)
+          return fail(p, "the values of a map are a type a variable can be, but no map, set or list of a fixed length");
       }
       t = {map ? PinType::map : PinType::set, keyed_of(key, map ? &value : nullptr)};
       return expect(">");
@@ -5192,7 +5192,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   // (`owner`: how the class is named where the type is written - by its name in its namespace, from anywhere `rooted`)
   std::function<std::string(PinType, const std::string&, const std::string&)> type_in = [&](PinType t, const std::string& of, const std::string& owner) -> std::string {
     // (in a map or a set an Int is the class's: kern::logic::Whole, as in its lists)
-    auto inner = [&](const TypeRef& x) { return x.type == PinType::integer ? std::string("kern::logic::Whole") : type_in(x.type, x.of, owner); };
+    // (an Int of a width as the value of a map: kern::logic::Sized<kern::u8>, as in a List<U8>)
+    auto inner = [&](const TypeRef& x) {
+      if (x.type == PinType::integer) return has_width(x) ? "kern::logic::Sized<kern::" + x.of + ">" : std::string("kern::logic::Whole");
+      return type_in(x.type, x.of, owner);
+    };
     if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
     if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
     if (t == PinType::callback) {  // (kern::logic::Callback<kern::f64(kern::f64, kern::f64)>)
@@ -5244,6 +5248,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
       if (is_keyed(f.type.type) || f.type.type == PinType::callback) return type_in(f.type.type, f.type.of, rooted);
+      if (is_list(f.type.type) && has_width(f.type)) return type_in(f.type.type, f.type.of, rooted);  // (a List<U8> ...: its items of that width)
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };

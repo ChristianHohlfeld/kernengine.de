@@ -2673,7 +2673,7 @@ template <class Core> struct EngineNodesOf : Core {
     return from_value<Float>(this->kern_engine("engine.wall_ms", {}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   /// Queues a job; returns its id (> 0).
-  void engine_jobs_submit(Int kind, const List<Int>& input) {
+  template <class T1> void engine_jobs_submit(Int kind, const T1& input) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -2686,7 +2686,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.jobs.submit", {to_value(kind), to_value(input)}, {PinType::integer});
   }
-  template <class KernNode> void engine_jobs_submit(KernNode& kern_n, Int kind, const List<Int>& input) {
+  template <class KernNode, class T1> void engine_jobs_submit(KernNode& kern_n, Int kind, const T1& input) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -2701,7 +2701,7 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// True once job `id` finished; moves its result into `out` (the job is then forgotten).
-  void engine_jobs_take(Int id, const List<Int>& out) {
+  template <class T1> void engine_jobs_take(Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -2715,7 +2715,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.jobs.take", {to_value(id), to_value(out)}, {PinType::boolean, PinType::integer_list});
   }
-  template <class KernNode> void engine_jobs_take(KernNode& kern_n, Int id, const List<Int>& out) {
+  template <class KernNode, class T1> void engine_jobs_take(KernNode& kern_n, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -2810,16 +2810,18 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.jobs.reset", {}, {});
   }
   /// ---- host interface (kern/web/jobs.mjs) ---- Queued jobs not yet handed out, as one buffer: u32 count, then per job u32 id, u32 kind, u32 length, bytes. The jobs count as running until kern_job_done.
-  List<Int> engine_jobs_take_queued() const {
+  using kern_given_engine_jobs_take_queued = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(kern::jobs::take_queued())>;
+  kern_given_engine_jobs_take_queued engine_jobs_take_queued() const {
+    using kern_G = kern_given_engine_jobs_take_queued;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_r = kern::jobs::take_queued();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<List<Int>>(*kern_o, kern_r);
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return from_value<List<Int>>(this->kern_engine("engine.jobs.take_queued", {}, {PinType::integer_list})[0].converted(pin_type_of<List<Int>>()));
+    return kern_G(this->kern_engine("engine.jobs.take_queued", {}, {PinType::integer_list})[0]);
   }
   /// Runs one job here (in the worker) and returns its output.
-  void engine_jobs_run(Int kind, const List<Int>& input, const List<Int>& output) {
+  template <class T1, class T2> void engine_jobs_run(Int kind, const T1& input, const T2& output) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -2833,7 +2835,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.jobs.run", {to_value(kind), to_value(input), to_value(output)}, {PinType::integer_list});
   }
-  template <class KernNode> void engine_jobs_run(KernNode& kern_n, Int kind, const List<Int>& input, const List<Int>& output) {
+  template <class KernNode, class T1, class T2> void engine_jobs_run(KernNode& kern_n, Int kind, const T1& input, const T2& output) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -2849,7 +2851,7 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.output = from_value<std::remove_cvref_t<decltype(kern_n.output)>>(kern_out[0]);
   }
   /// The result of a handed-out job.
-  void engine_jobs_done(Int id, const List<Int>& output) {
+  template <class T1> void engine_jobs_done(Int id, const T1& output) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -3239,7 +3241,9 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.self = from_value<std::remove_cvref_t<decltype(kern_n.self)>>(kern_out[1]);
   }
   /// Children of `parent` in document order (0 = top level).
-  template <class T1> List<Int> engine_level_children(const T1& self, Int parent) const {
+  using kern_given_engine_level_children = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::game::Level&>().children(std::declval<unsigned int>()))>;
+  template <class T1> kern_given_engine_level_children engine_level_children(const T1& self, Int parent) const {
+    using kern_G = kern_given_engine_level_children;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
@@ -3247,9 +3251,9 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, parent, kern_a0);
       decltype(auto) kern_r = kern_self.children(std::move(kern_a0));
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<List<Int>>(*kern_o, kern_r);
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return from_value<List<Int>>(this->kern_engine("engine.level.children", {to_value(self), to_value(parent)}, {PinType::integer_list})[0].converted(pin_type_of<List<Int>>()));
+    return kern_G(this->kern_engine("engine.level.children", {to_value(self), to_value(parent)}, {PinType::integer_list})[0]);
   }
   /// Matrix from actor space to world space (parents applied).
   using kern_given_engine_level_world_matrix = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, decltype(std::declval<kern::game::Level&>().world_matrix(std::declval<unsigned int>()))>;
@@ -3720,7 +3724,7 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
   /// Renderer meshes of an actor (selection outline).
-  void engine_game_world_actor_meshes(Int game_world, Int id, const List<Int>& out) {
+  template <class T1> void engine_game_world_actor_meshes(Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -3735,7 +3739,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.actor_meshes", {to_value(game_world), to_value(id), to_value(out)}, {PinType::integer_list});
   }
-  template <class KernNode> void engine_game_world_actor_meshes(KernNode& kern_n, Int game_world, Int id, const List<Int>& out) {
+  template <class KernNode, class T1> void engine_game_world_actor_meshes(KernNode& kern_n, Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -3762,7 +3766,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<List<Text>>(this->kern_engine("engine.game_world.pending_textures", {to_value(game_world)}, {PinType::text_list})[0].converted(pin_type_of<List<Text>>()));
   }
-  void engine_game_world_set_texture_pixels(Int game_world, const Text& id, Int width, Int height, const List<Int>& rgba) {
+  template <class T1> void engine_game_world_set_texture_pixels(Int game_world, const Text& id, Int width, Int height, const T1& rgba) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -3779,7 +3783,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.set_texture_pixels", {to_value(game_world), to_value(id), to_value(width), to_value(height), to_value(rgba)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_game_world_set_texture_pixels(KernNode& kern_n, Int game_world, const Text& id, Int width, Int height, const List<Int>& rgba) {
+  template <class KernNode, class T1> void engine_game_world_set_texture_pixels(KernNode& kern_n, Int game_world, const Text& id, Int width, Int height, const T1& rgba) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -4209,15 +4213,17 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.set_local_pawn", {to_value(game_world), to_value(pawn)}, {});
   }
-  List<Int> engine_game_world_pawns(Int game_world) const {
+  using kern_given_engine_game_world_pawns = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::game::GameWorld&>().pawns())>;
+  kern_given_engine_game_world_pawns engine_game_world_pawns(Int game_world) const {
+    using kern_G = kern_given_engine_game_world_pawns;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.pawns"); return List<Int>{}; }
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.pawns"); return kern_G(*kern_o); }
       decltype(auto) kern_r = kern_self->pawns();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<List<Int>>(*kern_o, kern_r);
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return from_value<List<Int>>(this->kern_engine("engine.game_world.pawns", {to_value(game_world)}, {PinType::integer_list})[0].converted(pin_type_of<List<Int>>()));
+    return kern_G(this->kern_engine("engine.game_world.pawns", {to_value(game_world)}, {PinType::integer_list})[0]);
   }
   /// Collected pickups / used triggers since the last call (appended as id, alive).
   template <class T1> void engine_game_world_take_alive_changes(Int game_world, const T1& out) {
@@ -4247,15 +4253,17 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.take_alive_changes", {to_value(game_world), to_value(out)}, {PinType::structure_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
-  List<Int> engine_game_world_dead_actors(Int game_world) const {
+  using kern_given_engine_game_world_dead_actors = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::game::GameWorld&>().dead_actors())>;
+  kern_given_engine_game_world_dead_actors engine_game_world_dead_actors(Int game_world) const {
+    using kern_G = kern_given_engine_game_world_dead_actors;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.dead_actors"); return List<Int>{}; }
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.dead_actors"); return kern_G(*kern_o); }
       decltype(auto) kern_r = kern_self->dead_actors();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<List<Int>>(*kern_o, kern_r);
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return from_value<List<Int>>(this->kern_engine("engine.game_world.dead_actors", {to_value(game_world)}, {PinType::integer_list})[0].converted(pin_type_of<List<Int>>()));
+    return kern_G(this->kern_engine("engine.game_world.dead_actors", {to_value(game_world)}, {PinType::integer_list})[0]);
   }
   void engine_game_world_set_alive(Int game_world, Int id, Bool alive) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -4272,7 +4280,7 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.game_world.set_alive", {to_value(game_world), to_value(id), to_value(alive)}, {});
   }
   /// Actors whose pose changes while running (dynamic and kinematic bodies).
-  void engine_game_world_networked_actors(Int game_world, const List<Int>& out) {
+  template <class T1> void engine_game_world_networked_actors(Int game_world, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -4285,7 +4293,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.networked_actors", {to_value(game_world), to_value(out)}, {PinType::integer_list});
   }
-  template <class KernNode> void engine_game_world_networked_actors(KernNode& kern_n, Int game_world, const List<Int>& out) {
+  template <class KernNode, class T1> void engine_game_world_networked_actors(KernNode& kern_n, Int game_world, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -5301,7 +5309,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Int>(this->kern_engine("engine.game_world.find_actor", {to_value(game_world), to_value(name)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
-  void engine_game_world_actors_with_tag(Int game_world, const Text& tag, const List<Int>& out) {
+  template <class T1> void engine_game_world_actors_with_tag(Int game_world, const Text& tag, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -5315,7 +5323,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.actors_with_tag", {to_value(game_world), to_value(tag), to_value(out)}, {PinType::integer_list});
   }
-  template <class KernNode> void engine_game_world_actors_with_tag(KernNode& kern_n, Int game_world, const Text& tag, const List<Int>& out) {
+  template <class KernNode, class T1> void engine_game_world_actors_with_tag(KernNode& kern_n, Int game_world, const Text& tag, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
@@ -6392,15 +6400,17 @@ template <class Core> struct EngineNodesOf : Core {
     return from_value<Text>(this->kern_engine("engine.game_world.walker_state", {to_value(game_world), to_value(id)}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   /// Every walker actor of the running world.
-  List<Int> engine_game_world_walkers(Int game_world) const {
+  using kern_given_engine_game_world_walkers = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::game::GameWorld&>().walkers())>;
+  kern_given_engine_game_world_walkers engine_game_world_walkers(Int game_world) const {
+    using kern_G = kern_given_engine_game_world_walkers;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      if (!kern_self) { this->kern_engine_failed("engine.game_world.walkers"); return List<Int>{}; }
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.walkers"); return kern_G(*kern_o); }
       decltype(auto) kern_r = kern_self->walkers();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<List<Int>>(*kern_o, kern_r);
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return from_value<List<Int>>(this->kern_engine("engine.game_world.walkers", {to_value(game_world)}, {PinType::integer_list})[0].converted(pin_type_of<List<Int>>()));
+    return kern_G(this->kern_engine("engine.game_world.walkers", {to_value(game_world)}, {PinType::integer_list})[0]);
   }
   /// What the soldier art draws right now (tests, stats).
   using kern_given_engine_game_world_art_stats = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_ArtStats>, decltype(std::declval<kern::game::GameWorld&>().art_stats())>;
@@ -7030,7 +7040,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Float>(this->kern_engine("engine.ring_area", {to_value(xy), to_value(count)}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
-  void engine_earcut_triangulate(Int earcut, const List<Float>& xy, Int vertex_count, const List<Int>& hole_starts, Int hole_count, const List<Int>& out) {
+  template <class T1, class T2> void engine_earcut_triangulate(Int earcut, const List<Float>& xy, Int vertex_count, const T1& hole_starts, Int hole_count, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Earcut>(*kern_o, static_cast<::kern::i64>(earcut), "earcut");
@@ -7051,7 +7061,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.earcut.triangulate", {to_value(earcut), to_value(xy), to_value(vertex_count), to_value(hole_starts), to_value(hole_count), to_value(out)}, {PinType::integer_list});
   }
-  template <class KernNode> void engine_earcut_triangulate(KernNode& kern_n, Int earcut, const List<Float>& xy, Int vertex_count, const List<Int>& hole_starts, Int hole_count, const List<Int>& out) {
+  template <class KernNode, class T1, class T2> void engine_earcut_triangulate(KernNode& kern_n, Int earcut, const List<Float>& xy, Int vertex_count, const T1& hole_starts, Int hole_count, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Earcut>(*kern_o, static_cast<::kern::i64>(earcut), "earcut");
@@ -7074,7 +7084,7 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   /// Relative difference between polygon area and triangulated area (0 = exact).
-  Float engine_earcut_deviation(const List<Float>& xy, Int vertex_count, const List<Int>& hole_starts, Int hole_count, const List<Int>& triangles, Int index_count) const {
+  template <class T1, class T2> Float engine_earcut_deviation(const List<Float>& xy, Int vertex_count, const T1& hole_starts, Int hole_count, const T2& triangles, Int index_count) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
@@ -9717,7 +9727,7 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.shader_extension.frame_uniforms", {to_value(shader_extension), to_value(cache), to_value(renderer)}, {});
   }
   /// Per draw. `params` points at this extension's material parameters.
-  template <class T1> void engine_shader_extension_material_uniforms(Int shader_extension, Int cache, const T1& material, const List<Int>& params) {
+  template <class T1, class T2> void engine_shader_extension_material_uniforms(Int shader_extension, Int cache, const T1& material, const T2& params) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::ShaderExtension>(*kern_o, static_cast<::kern::i64>(shader_extension), "shader_extension");
@@ -9852,7 +9862,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.client.send_packets", {to_value(client)}, {});
   }
-  void engine_client_send(Int client, Int channel, Int type, const List<Int>& data) {
+  template <class T1> void engine_client_send(Int client, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Client>(*kern_o, static_cast<::kern::i64>(client), "client");
@@ -9869,7 +9879,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.client.send", {to_value(client), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_client_send(KernNode& kern_n, Int client, Int channel, Int type, const List<Int>& data) {
+  template <class KernNode, class T1> void engine_client_send(KernNode& kern_n, Int client, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Client>(*kern_o, static_cast<::kern::i64>(client), "client");
@@ -10081,7 +10091,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.server.send_packets", {to_value(server)}, {});
   }
-  void engine_server_send(Int server, Int client, Int channel, Int type, const List<Int>& data) {
+  template <class T1> void engine_server_send(Int server, Int client, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Server>(*kern_o, static_cast<::kern::i64>(server), "server");
@@ -10100,7 +10110,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.server.send", {to_value(server), to_value(client), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_server_send(KernNode& kern_n, Int server, Int client, Int channel, Int type, const List<Int>& data) {
+  template <class KernNode, class T1> void engine_server_send(KernNode& kern_n, Int server, Int client, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Server>(*kern_o, static_cast<::kern::i64>(server), "server");
@@ -10235,7 +10245,7 @@ template <class Core> struct EngineNodesOf : Core {
     return from_value<Bool>(this->kern_engine("engine.connection.can_send", {to_value(connection), to_value(channel)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   /// Queues a message; false (and an error) when the channel cannot take it.
-  void engine_connection_send(Int connection, Int channel, Int type, const List<Int>& data) {
+  template <class T1> void engine_connection_send(Int connection, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Connection>(*kern_o, static_cast<::kern::i64>(connection), "connection");
@@ -10252,7 +10262,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.connection.send", {to_value(connection), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_connection_send(KernNode& kern_n, Int connection, Int channel, Int type, const List<Int>& data) {
+  template <class KernNode, class T1> void engine_connection_send(KernNode& kern_n, Int connection, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Connection>(*kern_o, static_cast<::kern::i64>(connection), "connection");
@@ -10309,7 +10319,7 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.connection.send_packet", {to_value(connection)}, {});
   }
   /// Hands a datagram received from the remote side to the endpoint.
-  void engine_connection_receive_packet(Int connection, const List<Int>& data, Int bytes) {
+  template <class T1> void engine_connection_receive_packet(Int connection, const T1& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Connection>(*kern_o, static_cast<::kern::i64>(connection), "connection");
@@ -10426,7 +10436,7 @@ template <class Core> struct EngineNodesOf : Core {
     return from_value<Int>(this->kern_engine("engine.endpoint.next_sequence", {to_value(endpoint)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   /// Sends a payload (fragmented when needed). Returns its sequence.
-  void engine_endpoint_send_packet(Int endpoint, const List<Int>& payload, Int bytes) {
+  template <class T1> void engine_endpoint_send_packet(Int endpoint, const T1& payload, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
@@ -10441,7 +10451,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.endpoint.send_packet", {to_value(endpoint), to_value(payload), to_value(bytes)}, {PinType::integer});
   }
-  template <class KernNode> void engine_endpoint_send_packet(KernNode& kern_n, Int endpoint, const List<Int>& payload, Int bytes) {
+  template <class KernNode, class T1> void engine_endpoint_send_packet(KernNode& kern_n, Int endpoint, const T1& payload, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
@@ -10457,7 +10467,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.endpoint.send_packet", {to_value(endpoint), to_value(payload), to_value(bytes)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  void engine_endpoint_receive_packet(Int endpoint, const List<Int>& packet, Int bytes) {
+  template <class T1> void engine_endpoint_receive_packet(Int endpoint, const T1& packet, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
@@ -10472,15 +10482,17 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.endpoint.receive_packet", {to_value(endpoint), to_value(packet), to_value(bytes)}, {});
   }
   /// Sequences of our packets the remote side has acked since the last clear_acks().
-  List<Int> engine_endpoint_acks(Int endpoint) const {
+  using kern_given_engine_endpoint_acks = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::net::Endpoint&>().acks())>;
+  kern_given_engine_endpoint_acks engine_endpoint_acks(Int endpoint) const {
+    using kern_G = kern_given_engine_endpoint_acks;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
-      if (!kern_self) { this->kern_engine_failed("engine.endpoint.acks"); return List<Int>{}; }
+      if (!kern_self) { this->kern_engine_failed("engine.endpoint.acks"); return kern_G(*kern_o); }
       decltype(auto) kern_r = kern_self->acks();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<List<Int>>(*kern_o, kern_r);
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return from_value<List<Int>>(this->kern_engine("engine.endpoint.acks", {to_value(endpoint)}, {PinType::integer_list})[0].converted(pin_type_of<List<Int>>()));
+    return kern_G(this->kern_engine("engine.endpoint.acks", {to_value(endpoint)}, {PinType::integer_list})[0]);
   }
   void engine_endpoint_clear_acks(Int endpoint) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -10562,7 +10574,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.bit_writer.write_align", {to_value(bit_writer)}, {});
   }
-  void engine_bit_writer_write_bytes(Int bit_writer, const List<Int>& data, Int bytes) {
+  template <class T1> void engine_bit_writer_write_bytes(Int bit_writer, const T1& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::BitWriter>(*kern_o, static_cast<::kern::i64>(bit_writer), "bit_writer");
@@ -10836,7 +10848,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.write_stream.serialize_bits", {to_value(write_stream), to_value(value), to_value(bits)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  void engine_write_stream_serialize_bytes(Int write_stream, const List<Int>& data, Int bytes) {
+  template <class T1> void engine_write_stream_serialize_bytes(Int write_stream, const T1& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::WriteStream>(*kern_o, static_cast<::kern::i64>(write_stream), "write_stream");
@@ -10851,7 +10863,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.write_stream.serialize_bytes", {to_value(write_stream), to_value(data), to_value(bytes)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_write_stream_serialize_bytes(KernNode& kern_n, Int write_stream, const List<Int>& data, Int bytes) {
+  template <class KernNode, class T1> void engine_write_stream_serialize_bytes(KernNode& kern_n, Int write_stream, const T1& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::WriteStream>(*kern_o, static_cast<::kern::i64>(write_stream), "write_stream");
@@ -11230,7 +11242,7 @@ template <class Core> struct EngineNodesOf : Core {
     const std::vector<Value> kern_out = this->kern_engine("engine.measure_stream.serialize_bits", {to_value(measure_stream), to_value(value1), to_value(bits)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
-  void engine_measure_stream_serialize_bytes(Int measure_stream, const List<Int>& value1, Int bytes) {
+  template <class T1> void engine_measure_stream_serialize_bytes(Int measure_stream, const T1& value1, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::MeasureStream>(*kern_o, static_cast<::kern::i64>(measure_stream), "measure_stream");
@@ -11245,7 +11257,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.measure_stream.serialize_bytes", {to_value(measure_stream), to_value(value1), to_value(bytes)}, {PinType::boolean});
   }
-  template <class KernNode> void engine_measure_stream_serialize_bytes(KernNode& kern_n, Int measure_stream, const List<Int>& value1, Int bytes) {
+  template <class KernNode, class T1> void engine_measure_stream_serialize_bytes(KernNode& kern_n, Int measure_stream, const T1& value1, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::MeasureStream>(*kern_o, static_cast<::kern::i64>(measure_stream), "measure_stream");
@@ -11353,7 +11365,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return kern_G(this->kern_engine("engine.transport.address", {to_value(transport)}, {PinType::structure})[0]);
   }
-  template <class T1> void engine_transport_send(Int transport, const T1& to, const List<Int>& data, Int bytes) {
+  template <class T1, class T2> void engine_transport_send(Int transport, const T1& to, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
@@ -11370,7 +11382,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.transport.send", {to_value(transport), to_value(to), to_value(data), to_value(bytes)}, {PinType::boolean});
   }
-  template <class KernNode, class T1> void engine_transport_send(KernNode& kern_n, Int transport, const T1& to, const List<Int>& data, Int bytes) {
+  template <class KernNode, class T1, class T2> void engine_transport_send(KernNode& kern_n, Int transport, const T1& to, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
@@ -11443,7 +11455,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.transport.advance_time", {to_value(transport), to_value(time)}, {});
   }
-  template <class T1, class T2> void engine_simulator_send(Int simulator, const T1& from, const T2& to, const List<Int>& data, Int bytes, Float now) {
+  template <class T1, class T2, class T3> void engine_simulator_send(Int simulator, const T1& from, const T2& to, const T3& data, Int bytes, Float now) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Simulator>(*kern_o, static_cast<::kern::i64>(simulator), "simulator");
@@ -11638,7 +11650,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.host_transport.set_address", {to_value(host_transport), to_value(a)}, {});
   }
-  template <class T1> void engine_host_transport_send(Int host_transport, const T1& to, const List<Int>& data, Int bytes) {
+  template <class T1, class T2> void engine_host_transport_send(Int host_transport, const T1& to, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
@@ -11655,7 +11667,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.host_transport.send", {to_value(host_transport), to_value(to), to_value(data), to_value(bytes)}, {PinType::boolean});
   }
-  template <class KernNode, class T1> void engine_host_transport_send(KernNode& kern_n, Int host_transport, const T1& to, const List<Int>& data, Int bytes) {
+  template <class KernNode, class T1, class T2> void engine_host_transport_send(KernNode& kern_n, Int host_transport, const T1& to, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
@@ -11727,7 +11739,7 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.host_transport.advance_time", {to_value(host_transport), to_value(time)}, {});
   }
   /// Host side: a datagram arrived from `from`.
-  template <class T1> void engine_host_transport_push_incoming(Int host_transport, const T1& from, const List<Int>& data, Int bytes) {
+  template <class T1, class T2> void engine_host_transport_push_incoming(Int host_transport, const T1& from, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
@@ -11744,7 +11756,7 @@ template <class Core> struct EngineNodesOf : Core {
     this->kern_engine("engine.host_transport.push_incoming", {to_value(host_transport), to_value(from), to_value(data), to_value(bytes)}, {});
   }
   /// Host side: the next datagram to put on the wire (false when none).
-  template <class T1> void engine_host_transport_take_outgoing(Int host_transport, const T1& to, const List<Int>& data) {
+  template <class T1, class T2> void engine_host_transport_take_outgoing(Int host_transport, const T1& to, const T2& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
@@ -11761,7 +11773,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.host_transport.take_outgoing", {to_value(host_transport), to_value(to), to_value(data)}, {PinType::boolean, PinType::structure, PinType::integer_list});
   }
-  template <class KernNode, class T1> void engine_host_transport_take_outgoing(KernNode& kern_n, Int host_transport, const T1& to, const List<Int>& data) {
+  template <class KernNode, class T1, class T2> void engine_host_transport_take_outgoing(KernNode& kern_n, Int host_transport, const T1& to, const T2& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
@@ -13316,7 +13328,7 @@ template <class Core> struct EngineNodesOf : Core {
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
   /// positions: xyz per vertex; indices: triangle list (empty = non-indexed).
-  void engine_bvh_build(Int bvh, const List<Float>& positions, Int vertex_count, const List<Int>& indices, Int index_count, Int leaf_size) {
+  template <class T1> void engine_bvh_build(Int bvh, const List<Float>& positions, Int vertex_count, const T1& indices, Int index_count, Int leaf_size) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Bvh>(*kern_o, static_cast<::kern::i64>(bvh), "bvh");
