@@ -1,0 +1,80 @@
+    (test_world_traffic_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_game_gaps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_combat_detail_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_controls_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_gaps_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_town_sync_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_spawn_guard_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_mp_rules_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_equipment_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_city_stream_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_jet_seats_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_guided_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_wanted_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    cell (1): written
+    TrafficRules::rebuild (142): written
+    TrafficRules::near (12): written
+    TrafficRules::bind (1): written
+    TrafficRules::take_laws (8): written
+    TrafficRules::light (6): written
+    TrafficRules::pursuit (32): written
+    TrafficRules::gap_speed (20): written
+    TrafficRules::limit (86): written
+
+1755 of 1847 functions of the program are written as Blueprints (24103 of 30982 lines), and 28 of the engine's headers that they call: 158 Blueprints - 70 of source files, 1 of states, 87 of headers and of shapes
+1710 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 7 give nothing
+
+what the others wait for: functions (lines)
+     6 (   483)   the engine's shots() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+     1 (   472)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: expected ')')
+     4 (   397)   a pointer
+     4 (   377)   a reference to something it changes
+     2 (   311)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'player_position') (it went round with Game/game_cpp)
+     1 (   306)   a name that is BindingDecl
+     2 (   272)   it calls Game::ctl_hud_json(), which waits
+     1 (   230)   a function that gives a reference to something to change
+     2 (   220)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'explosion') (it went round with Game/game_controls_cpp)
+     4 (   210)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_military_cpp)
+     1 (   196)   it calls Game::rebase_origin(), which waits
+     4 (   196)   a pointer (it went round with Game/game_ui_cpp)
+     1 (   182)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_life_cpp)
+     2 (   156)   a pointer (it went round with Game/game_controls_cpp)
+     1 (   155)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_gaps_cpp)
+     2 (   151)   a member of Int is set
+     2 (   147)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_weapons_cpp)
+     2 (   127)   it calls Game::explosion(), which waits
+     1 (   124)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: non-const lvalue reference to type 'CarHit' cannot bind to a value of unrelated type 'town::PersonHit')
+     4 (   123)   it calls GeoProjector::init(), which waits
+     2 (   118)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_events_cpp)
+     1 (   116)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'drone_attack')
+     1 (   115)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'player_position') (it went round with Game/game_vr_cpp)
+     1 (   111)   it calls register_node(), which waits
+     1 (   104)   it calls Game::swarm_apply_hit(), which waits
+     1 (    99)   an object of the engine as a local that is not made by a constructor of it
+     1 (    99)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_traffic_cpp)
+     1 (    88)   a pointer (it went round with Game/game_town_cpp)
+     1 (    82)   a pointer (it went round with Game/game_vr_cpp)
+     1 (    81)   it calls Game::step_heli(), which waits
+     2 (    81)   it calls Game::hit_scan(), which waits
+     2 (    77)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'explosion') (it went round with Game/game_town_cpp)
+     1 (    76)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_world_cpp)
+     1 (    72)   the struct Feat (its field pts: a pointer)
+     1 (    65)   it calls Game::step_cop(), which waits
+     1 (    62)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'jet_attack')
+     1 (    60)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_details_cpp)
+     1 (    55)   it calls Interiors::activate(), which waits
+     2 (    51)   the engine's sound_cues() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)
+     1 (    49)   its test cannot compare it yet (its source does not compile with a Blueprint's numbers yet: use of undeclared identifier 'combat_blast') (it went round with Game/game_swarm_cpp)
+
+real	104m44,069s
+user	754m17,689s
+sys	21m9,431s
