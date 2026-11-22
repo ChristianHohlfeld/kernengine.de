@@ -311,7 +311,7 @@ const std::vector<EngineFunction>& engine_functions() {
        {{"result", PinType::structure, "audio_Listener", "{vvvv}"}}},
       {"engine.mixer.bus", "kern::audio::Mixer::bus", "Bus", "Engine: Mixer", "", false,
        {{"mixer", PinType::integer, "", "i"}, {"b", PinType::enumeration, "audio_Bus", "e7"}},
-       {{"result", PinType::structure, "audio_BusSettings", "{nbnn}"}}},
+       {{"result", PinType::structure, "audio_BusSettings", "{nbnn}"}}, true},
       {"engine.mixer.bus_2", "kern::audio::Mixer::bus", "Bus", "Engine: Mixer", "", true,
        {{"mixer", PinType::integer, "", "i"}, {"b", PinType::enumeration, "audio_Bus", "e7"}},
        {{"result", PinType::structure, "audio_BusSettings", "{nbnn}"}}},

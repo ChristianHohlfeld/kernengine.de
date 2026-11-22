@@ -1370,6 +1370,14 @@ struct { engine_game_world_shots_place<List<game_ShotEvent>> result = {}; } n12;
   `engine_places_class_names_the_engines_list` vergleicht die Liste der Engine mit dem, was C++ mit
   `BuildingBuilder::chunks()` tut, Bit für Bit, und zählt die Speicheranforderungen; der Fall mit jedem Knoten
   hat einen Platz (`kern/tests/test_main.cpp`).
+- **Ein Eintrag eines Arrays des Objekts.** Ist der Rumpf genau `return feld_[p];` – `feld_` ein Array fester
+  Länge N des Objekts, `p` der eine Parameter (ganze Zahl oder Aufzählung, Umwandlungen erlaubt;
+  `BusSettings& bus(Bus b) { return buses_[static_cast<u32>(b)]; }`) –, ist der Knoten ebenso ein Platz: er
+  bindet den Eintrag, den sein Eingang nennt, und hält die Eingänge, mit denen er band (`@get`/`@set` bekommen
+  sie, `@set` den Wert danach). Ein Index außerhalb 0…N−1 nennt keinen Eintrag – C++ lässt den Aufruf offen –:
+  der Aufruf scheitert in jeder Stufe gleich („the input b names no entry: there are 6“), gelesen wird die Null,
+  geschrieben ins Leere. In der Klasse hält der Platz die Eingänge in den Typen von C++ (`P::In`, ohne
+  Speicher), `P::at` prüft den Index. Geprüft: `engine_place_at_an_entry_of_an_array` und der Fall „Engine“.
 
 ### Felder eines Objekts der Engine
 

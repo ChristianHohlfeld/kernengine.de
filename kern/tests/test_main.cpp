@@ -7392,6 +7392,38 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
+// A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
+// the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
+// names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).
+TEST(engine_place_at_an_entry_of_an_array) {
+  using logic::Value;
+  const logic::EngineFunction* bus = logic::engine_function("engine.mixer.bus");
+  CHECK(bus && bus->place && bus->inputs.size() == 2);
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.mixer.make", {}, out));
+  const Value mixer = out[0];
+  const Value sfx = Value::enumeration(static_cast<i64>(audio::Bus::sfx));
+  // set at the place: the Mixer's own entry changes, no other
+  const Value put = Value::structure({Value::number(0.25), Value::boolean(true), Value::number(500), Value::number(0.5)});
+  std::vector<Value> none;
+  CHECK(logic::call_engine(objects, "engine.mixer.bus@set", {mixer, sfx, put}, none));
+  audio::Mixer* const m = logic::engine_values::object_of<audio::Mixer>(objects, mixer.as_int(), "mixer");
+  CHECK(m && m->bus(audio::Bus::sfx).volume == 0.25f && m->bus(audio::Bus::sfx).muted && m->bus(audio::Bus::sfx).lowpass_hz == 500 &&
+        m->bus(audio::Bus::sfx).reverb_send == 0.5f && m->bus(audio::Bus::master).volume == 1 && !m->bus(audio::Bus::master).muted);
+  // read at the place: what C++ reads there
+  out = {Value::zero(logic::PinType::structure)};
+  CHECK(logic::call_engine(objects, "engine.mixer.bus@get", {mixer, sfx}, out) && out[0].field(1) && out[0].field(1)->b && out[0].field(0)->n == 0.25);
+  // outside the array: refused, said, nothing set
+  const Value outside = Value::enumeration(static_cast<i64>(audio::Bus::count));
+  objects.error.clear();
+  CHECK(!logic::call_engine(objects, "engine.mixer.bus@set", {mixer, outside, put}, none));
+  CHECK(objects.error == "the input b names no entry: there are 6");
+  objects.error.clear();
+  CHECK(!logic::call_engine(objects, "engine.mixer.bus@get", {mixer, outside}, out) && objects.error == "the input b names no entry: there are 6");
+  CHECK(!logic::call_engine(objects, "engine.mixer.bus", {mixer, outside}, out));
+}
+
 TEST(audio_mixer_panning_and_limits) {
   audio::Mixer m;
   CHECK(!m.ready());

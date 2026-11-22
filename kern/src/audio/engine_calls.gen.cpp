@@ -347,8 +347,20 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::audio::Bus>>();
   ev::take<ev::Enum<E_audio_Bus>>(o, in, 1, a0);
+  if (static_cast<std::size_t>(a0) >= 6) { o.error = "the input b names no entry: there are 6"; return false; }
   decltype(auto) r = self->bus(std::move(a0));
   ev::give<ev::Struct<S_audio_BusSettings>>(o, out, 0, r);
+  return true;
+}
+
+// engine.mixer.bus@set: what stands at the place kern::audio::Mixer::bus gives
+bool c26_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
+  if (!self) return false;
+  auto a0 = ev::blank<std::remove_cvref_t<kern::audio::Bus>>();
+  ev::take<ev::Enum<E_audio_Bus>>(o, in, 1, a0);
+  if (static_cast<std::size_t>(a0) >= 6) { o.error = "the input b names no entry: there are 6"; return false; }
+  ev::take<ev::Struct<S_audio_BusSettings>>(o, in, 2, self->bus(std::move(a0)));
   return true;
 }
 
@@ -650,6 +662,8 @@ const EngineCall kCalls[] = {
     {"engine.mixer.release", &c46},
     {"engine.mixer.speed_of_sound", &c47},
     {"engine.mixer.doppler_factor", &c48},
+    {"engine.mixer.bus@get", &c26},
+    {"engine.mixer.bus@set", &c26_set},
     {"engine.mixer.speed_of_sound@get", &c47},
     {"engine.mixer.speed_of_sound@set", &c47_set},
     {"engine.mixer.doppler_factor@get", &c48},
