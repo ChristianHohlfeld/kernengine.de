@@ -687,6 +687,10 @@ class Calls:
             def function(head, direct, through, start=()):
                 lines.append(f"  {head} {{")
                 lines.extend("    " + x for x in start)
+                if direct is None:   # (the same in both ways)
+                    lines.extend("    " + x for x in through)
+                    lines.append("  }")
+                    return
                 lines.append("    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {")
                 lines.extend("      " + x for x in direct)
                 lines.append("    }")
@@ -735,7 +739,10 @@ class Calls:
                 lines.append(f"  /// The place {f['cpp']} gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.")
                 lines.append(f"  template <class B> using {name}_place = {EV}Place<engine_direct::P_{name}, B>;")
                 handle = f"static_cast<::kern::i64>({pin})"
+                # (a field: binding it is no call - the door says nothing there; the object is looked up where the place
+                # is first used, and a missing one is told there as <node>@get, as the door tells it)
                 function(f"template <class KernNode> void {name}(KernNode& kern_n, {', '.join(params)})",
+                         None if f.get("field") else
                          ["kern_o->begin_call();", f"auto* const kern_self = {EV}object_of<{q}>(*kern_o, {handle}, {c_text(pin)});",
                           f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, kern_self ? &engine_direct::P_{name}::at(*kern_self) : nullptr);",
                           f"if (!kern_self) {failed}", "return;"],

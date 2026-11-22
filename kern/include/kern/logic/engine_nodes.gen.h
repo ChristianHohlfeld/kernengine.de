@@ -15596,304 +15596,129 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::Mesh::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_id, B>;
   template <class KernNode> void engine_mesh_id(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_id::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.id");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::visible gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_visible_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_visible, B>;
   template <class KernNode> void engine_mesh_visible(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_visible::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.visible");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::layers gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_layers_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_layers, B>;
   template <class KernNode> void engine_mesh_layers(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_layers::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.layers");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// MeshInput::pick_bvh
   /// The place kern::Mesh::pick_bvh gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_pick_bvh_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_pick_bvh, B>;
   template <class KernNode> void engine_mesh_pick_bvh(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_pick_bvh::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.pick_bvh");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::linear_colors gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_linear_colors_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_linear_colors, B>;
   template <class KernNode> void engine_mesh_linear_colors(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_linear_colors::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.linear_colors");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::material gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_material_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_material, B>;
   template <class KernNode> void engine_mesh_material(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_material::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.material");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::texture gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_texture_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_texture, B>;
   template <class KernNode> void engine_mesh_texture(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_texture::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.texture");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::positions gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_positions_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_positions, B>;
   template <class KernNode> void engine_mesh_positions(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_positions::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.positions");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::normals gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_normals_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_normals, B>;
   template <class KernNode> void engine_mesh_normals(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_normals::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.normals");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::colors gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_colors_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_colors, B>;
   template <class KernNode> void engine_mesh_colors(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_colors::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.colors");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::uvs gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_uvs_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_uvs, B>;
   template <class KernNode> void engine_mesh_uvs(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_uvs::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.uvs");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::indices gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_indices_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_indices, B>;
   template <class KernNode> void engine_mesh_indices(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_indices::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.indices");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::joints gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_joints_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_joints, B>;
   template <class KernNode> void engine_mesh_joints(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_joints::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.joints");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::weights gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_weights_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_weights, B>;
   template <class KernNode> void engine_mesh_weights(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_weights::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.weights");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::bones gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_bones_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_bones, B>;
   template <class KernNode> void engine_mesh_bones(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_bones::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.bones");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::transforms gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_transforms_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_transforms, B>;
   template <class KernNode> void engine_mesh_transforms(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_transforms::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.transforms");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::tints gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_tints_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_tints, B>;
   template <class KernNode> void engine_mesh_tints(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_tints::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.tints");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::instance_normals gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_instance_normals_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_instance_normals, B>;
   template <class KernNode> void engine_mesh_instance_normals(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_instance_normals::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.instance_normals");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::instance_count gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_instance_count_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_instance_count, B>;
   template <class KernNode> void engine_mesh_instance_count(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_instance_count::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.instance_count");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// instances with negative determinant: 0 none, 1 all, 2 some
   /// The place kern::Mesh::mirror gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_mirror_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_mirror, B>;
   template <class KernNode> void engine_mesh_mirror(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_mirror::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.mirror");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::local_bounds gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_local_bounds_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_local_bounds, B>;
   template <class KernNode> void engine_mesh_local_bounds(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_local_bounds::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.local_bounds");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::world_bounds gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_world_bounds_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_world_bounds, B>;
   template <class KernNode> void engine_mesh_world_bounds(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_world_bounds::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.world_bounds");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::gpu gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_gpu_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_gpu, B>;
   template <class KernNode> void engine_mesh_gpu(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_gpu::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.gpu");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// The place kern::Mesh::sort_distance gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_sort_distance_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_sort_distance, B>;
   template <class KernNode> void engine_mesh_sort_distance(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_sort_distance::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.sort_distance");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// position in Renderer's dense live list
   /// The place kern::Mesh::live_index gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mesh_live_index_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mesh_live_index, B>;
   template <class KernNode> void engine_mesh_live_index(KernNode& kern_n, Int mesh) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Mesh>(*kern_o, static_cast<::kern::i64>(mesh), "mesh");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), kern_self ? &engine_direct::P_engine_mesh_live_index::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mesh.live_index");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mesh), nullptr);
   }
   /// Makes a Particles of the engine: its handle (the host keeps it until it is released).
@@ -16035,26 +15860,12 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::ShaderExtension::material_base gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_shader_extension_material_base_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_shader_extension_material_base, B>;
   template <class KernNode> void engine_shader_extension_material_base(KernNode& kern_n, Int shader_extension) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::ShaderExtension>(*kern_o, static_cast<::kern::i64>(shader_extension), "shader_extension");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), kern_self ? &engine_direct::P_engine_shader_extension_material_base::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.shader_extension.material_base");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), nullptr);
   }
   /// Set by the renderer: vertex location of this extension's first attribute.
   /// The place kern::ShaderExtension::attribute_base gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_shader_extension_attribute_base_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_shader_extension_attribute_base, B>;
   template <class KernNode> void engine_shader_extension_attribute_base(KernNode& kern_n, Int shader_extension) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::ShaderExtension>(*kern_o, static_cast<::kern::i64>(shader_extension), "shader_extension");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), kern_self ? &engine_direct::P_engine_shader_extension_attribute_base::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.shader_extension.attribute_base");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(shader_extension), nullptr);
   }
   /// Makes a SkyPass of the engine: its handle (the host keeps it until it is released).
@@ -16141,62 +15952,27 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::TextureDesc::width gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_desc_width_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_width, B>;
   template <class KernNode> void engine_texture_desc_width(KernNode& kern_n, Int texture_desc) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_width::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_desc.width");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
   }
   /// The place kern::TextureDesc::height gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_desc_height_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_height, B>;
   template <class KernNode> void engine_texture_desc_height(KernNode& kern_n, Int texture_desc) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_height::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_desc.height");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
   }
   /// The place kern::TextureDesc::mipmaps gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_desc_mipmaps_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_mipmaps, B>;
   template <class KernNode> void engine_texture_desc_mipmaps(KernNode& kern_n, Int texture_desc) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_mipmaps::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_desc.mipmaps");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
   }
   /// The place kern::TextureDesc::repeat gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_desc_repeat_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_repeat, B>;
   template <class KernNode> void engine_texture_desc_repeat(KernNode& kern_n, Int texture_desc) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_repeat::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_desc.repeat");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
   }
   /// nearest-neighbour filtering (pixel art), no mipmaps
   /// The place kern::TextureDesc::nearest gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_desc_nearest_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_desc_nearest, B>;
   template <class KernNode> void engine_texture_desc_nearest(KernNode& kern_n, Int texture_desc) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::TextureDesc>(*kern_o, static_cast<::kern::i64>(texture_desc), "texture_desc");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), kern_self ? &engine_direct::P_engine_texture_desc_nearest::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_desc.nearest");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_desc), nullptr);
   }
   /// Makes a UniformCache of the engine: its handle (the host keeps it until it is released).
@@ -16283,26 +16059,12 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::audio::Mixer::speed_of_sound gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mixer_speed_of_sound_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mixer_speed_of_sound, B>;
   template <class KernNode> void engine_mixer_speed_of_sound(KernNode& kern_n, Int mixer) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), kern_self ? &engine_direct::P_engine_mixer_speed_of_sound::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mixer.speed_of_sound");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), nullptr);
   }
   /// global scale of the Doppler effect
   /// The place kern::audio::Mixer::doppler_factor gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mixer_doppler_factor_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mixer_doppler_factor, B>;
   template <class KernNode> void engine_mixer_doppler_factor(KernNode& kern_n, Int mixer) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), kern_self ? &engine_direct::P_engine_mixer_doppler_factor::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.mixer.doppler_factor");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(mixer), nullptr);
   }
   /// Makes a GameAudio of the engine: its handle (the host keeps it until it is released).
@@ -16379,13 +16141,6 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::game::GameWorld::logic_native gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_game_world_logic_native_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_game_world_logic_native, B>;
   template <class KernNode> void engine_game_world_logic_native(KernNode& kern_n, Int game_world) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(game_world), kern_self ? &engine_direct::P_engine_game_world_logic_native::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.game_world.logic_native");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(game_world), nullptr);
   }
   /// Makes a PropertyChange of the engine: its handle (the host keeps it until it is released).
@@ -16419,26 +16174,12 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::game::GameWorld::PropertyChange::actor gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_property_change_actor_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_property_change_actor, B>;
   template <class KernNode> void engine_property_change_actor(KernNode& kern_n, Int property_change) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld::PropertyChange>(*kern_o, static_cast<::kern::i64>(property_change), "property_change");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), kern_self ? &engine_direct::P_engine_property_change_actor::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.property_change.actor");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), nullptr);
   }
   /// Replicated changes made by logic (the network server sends them; clients apply them).
   /// The place kern::game::GameWorld::PropertyChange::path gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_property_change_path_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_property_change_path, B>;
   template <class KernNode> void engine_property_change_path(KernNode& kern_n, Int property_change) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld::PropertyChange>(*kern_o, static_cast<::kern::i64>(property_change), "property_change");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), kern_self ? &engine_direct::P_engine_property_change_path::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.property_change.path");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(property_change), nullptr);
   }
   /// Makes a MotionAsset of the engine: its handle (the host keeps it until it is released).
@@ -16472,39 +16213,18 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::game::MotionAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_motion_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_name, B>;
   template <class KernNode> void engine_motion_asset_name(KernNode& kern_n, Int motion_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::MotionAsset>(*kern_o, static_cast<::kern::i64>(motion_asset), "motion_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), kern_self ? &engine_direct::P_engine_motion_asset_name::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.motion_asset.name");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), nullptr);
   }
   /// seconds, kMotionMinSeconds .. kMotionMaxSeconds
   /// The place kern::game::MotionAsset::duration gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_motion_asset_duration_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_duration, B>;
   template <class KernNode> void engine_motion_asset_duration(KernNode& kern_n, Int motion_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::MotionAsset>(*kern_o, static_cast<::kern::i64>(motion_asset), "motion_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), kern_self ? &engine_direct::P_engine_motion_asset_duration::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.motion_asset.duration");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), nullptr);
   }
   /// in time order (none: taught from something else, as the jump is)
   /// The place kern::game::MotionAsset::keys gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_motion_asset_keys_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_motion_asset_keys, B>;
   template <class KernNode> void engine_motion_asset_keys(KernNode& kern_n, Int motion_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::MotionAsset>(*kern_o, static_cast<::kern::i64>(motion_asset), "motion_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), kern_self ? &engine_direct::P_engine_motion_asset_keys::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.motion_asset.keys");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(motion_asset), nullptr);
   }
   /// Makes a NightWindows of the engine: its handle (the host keeps it until it is released).
@@ -16537,13 +16257,6 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::game::NightWindows::night gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_night_windows_night_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_night_windows_night, B>;
   template <class KernNode> void engine_night_windows_night(KernNode& kern_n, Int night_windows) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::NightWindows>(*kern_o, static_cast<::kern::i64>(night_windows), "night_windows");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(night_windows), kern_self ? &engine_direct::P_engine_night_windows_night::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.night_windows.night");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(night_windows), nullptr);
   }
   /// Makes a SoldierArtDelete of the engine: its handle (the host keeps it until it is released).
@@ -16603,38 +16316,17 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::game::SoundAsset::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_sound_asset_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_id, B>;
   template <class KernNode> void engine_sound_asset_id(KernNode& kern_n, Int sound_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundAsset>(*kern_o, static_cast<::kern::i64>(sound_asset), "sound_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), kern_self ? &engine_direct::P_engine_sound_asset_id::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.sound_asset.id");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), nullptr);
   }
   /// The place kern::game::SoundAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_sound_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_name, B>;
   template <class KernNode> void engine_sound_asset_name(KernNode& kern_n, Int sound_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundAsset>(*kern_o, static_cast<::kern::i64>(sound_asset), "sound_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), kern_self ? &engine_direct::P_engine_sound_asset_name::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.sound_asset.name");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), nullptr);
   }
   /// seconds (informational)
   /// The place kern::game::SoundAsset::duration gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_sound_asset_duration_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_sound_asset_duration, B>;
   template <class KernNode> void engine_sound_asset_duration(KernNode& kern_n, Int sound_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundAsset>(*kern_o, static_cast<::kern::i64>(sound_asset), "sound_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), kern_self ? &engine_direct::P_engine_sound_asset_duration::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.sound_asset.duration");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(sound_asset), nullptr);
   }
   /// Makes a SoundBank of the engine: its handle (the host keeps it until it is released).
@@ -16698,49 +16390,21 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::game::TextureAsset::id gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_asset_id_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_id, B>;
   template <class KernNode> void engine_texture_asset_id(KernNode& kern_n, Int texture_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_id::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_asset.id");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
   }
   /// The place kern::game::TextureAsset::name gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_asset_name_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_name, B>;
   template <class KernNode> void engine_texture_asset_name(KernNode& kern_n, Int texture_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_name::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_asset.name");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
   }
   /// The place kern::game::TextureAsset::width gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_asset_width_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_width, B>;
   template <class KernNode> void engine_texture_asset_width(KernNode& kern_n, Int texture_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_width::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_asset.width");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
   }
   /// The place kern::game::TextureAsset::height gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_texture_asset_height_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_texture_asset_height, B>;
   template <class KernNode> void engine_texture_asset_height(KernNode& kern_n, Int texture_asset) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::TextureAsset>(*kern_o, static_cast<::kern::i64>(texture_asset), "texture_asset");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), kern_self ? &engine_direct::P_engine_texture_asset_height::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.texture_asset.height");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(texture_asset), nullptr);
   }
   /// Makes a Client of the engine: its handle (the host keeps it until it is released).
@@ -16973,13 +16637,6 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::net::Simulator::settings gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_simulator_settings_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_simulator_settings, B>;
   template <class KernNode> void engine_simulator_settings(KernNode& kern_n, Int simulator) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Simulator>(*kern_o, static_cast<::kern::i64>(simulator), "simulator");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(simulator), kern_self ? &engine_direct::P_engine_simulator_settings::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.simulator.settings");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(simulator), nullptr);
   }
   /// Makes a CharacterMover of the engine: its handle (the host keeps it until it is released).
@@ -17012,13 +16669,6 @@ template <class Core> struct EngineNodesOf : Core {
   /// The place kern::physics::CharacterMover::settings gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_character_mover_settings_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_character_mover_settings, B>;
   template <class KernNode> void engine_character_mover_settings(KernNode& kern_n, Int character_mover) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::CharacterMover>(*kern_o, static_cast<::kern::i64>(character_mover), "character_mover");
-      kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(character_mover), kern_self ? &engine_direct::P_engine_character_mover_settings::at(*kern_self) : nullptr);
-      if (!kern_self) this->kern_engine_failed("engine.character_mover.settings");
-      return;
-    }
     kern_n.result.kern_bind(this->kern_world, static_cast<::kern::i64>(character_mover), nullptr);
   }
   /// Makes a MouseGrab of the engine: its handle (the host keeps it until it is released).
