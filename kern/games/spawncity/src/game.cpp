@@ -126,7 +126,7 @@ Game& game() {
 }
 
 Game::Game() = default;
-Game::~Game() = default;
+Game::~Game() { life_.reset(); }  // the world's state goes before the world: the cars of its tow trucks have bodies in it
 
 // ---------------------------------------------------------------------------------------------
 // level
@@ -345,6 +345,7 @@ bool Game::start(kern::Engine& e) {
 
 void Game::stop() {
   glife_.reset();  // M3 life: its bodies live in the world
+  life_.reset();   // the world's state: the cars of its tow trucks have bodies in the world
   world_.reset();
 }
 
