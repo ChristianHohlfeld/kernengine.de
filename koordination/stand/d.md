@@ -1,5 +1,33 @@
 # Stand d (18.11., Nachfolger)
 
+## BEREIT ZUM MERGEN: work-d-fail 8432b275 – Beleg work-d-fail-vergleich-162023-5935
+(Nachfolger 8, 22.11.) work-d-fail = 5500074b (engine.fail/engine.log, printf-Knoten) + origin/work-zusammen a06e5ce4 (Konflikt nur engine_case.gen.h: neu erzeugt).
+vergleich src/city_stream.cpp: convert/bau/alle rc=0, Stellvertreter 10/10 ok, Engine selbst 10/10 ok, 0 ABBRUCH/LECK. GeoProjector::init geschrieben (in 045421:
+„the engine's fail() … a variadic function“). Kein Rückfall gegenüber 045421: die 14 dort geschriebenen city_stream-Funktionen, die hier warten, warten nur auf
+„… is defined in another file“ bzw. eine Kette davon (Teil-Probe). Engine-Suite davor: work-d-fail-engine-170043-6435 (5500074b) rc=0.
+
+## Nachfolger 8 (22.11., ab 16:10)
+- **Aufgabe 3 (Befund g: Session_push, Länge eines Zeiger-Eingangs, 206/300 + ASan real): ERLEDIGT, kein neuer Commit.** Behoben durch work-d-count f384bdfd
+  (Count<Per> im Typ, in work-zusammen). Beleg: voller Lauf work-zusammen-voll-045421-10862: Session_push „285 calls drawn, 285 compared“ in beiden Durchgängen,
+  converted_net_session und converted_net_session_cpp ok (Stellvertreter und Engine selbst), kein ABBRUCH. gs Befund (232903) war vor diesem Fix.
+- **Aufgabe 1:** work-d = c4cd0b69 (work-zusammen a06e5ce4 eingemischt; Konflikte converted.h Watch + cpp_to_blueprint.py OWN_LOGIC/Felder; die Wartestelle
+  „it gives a place of the engine“ bleibt entfernt; Generator unverändert) + **3976cdfc** (Fix): die Engine-Suite work-d-engine-185841-1710 (e9ed65ca) war **rot**
+  (blueprint_native_test, Fall „Engine“ auf der Engine selbst): beim Binden eines Felds (engine.mesh.id …) sagte die Klasse „no object“ unter dem Knotennamen, die
+  Tür nichts (Binden eines Felds ist kein Aufruf). Jetzt bindet die Klasse ein Feld ohne Nachschlagen; ein fehlendes Objekt sagt sie beim ersten Zugriff als
+  <Knoten>@get wie die Tür. Belege laufen: vergleich `work-d-vergleich-161943-5651` (c4cd0b69; alle src/game*.cpp + people.cpp + city_jobs.cpp),
+  Engine-Suite `work-d-engine-162227-8504` (3976cdfc).
+- **Aufgabe 4 (übrige Wartegründe „Platz der Engine“ in 045421):** die 8 Funktionen mit „the node that binds it is not written yet“ (update_sound, update_fighters_back,
+  foot_rounds_update, gaps_lamps_update, look_lighting, step_soldier, step_cop, ui_mix_cues) und „a reference to something it changes“ an Plätzen (handle_shots
+  `auto& shots = world_->shots()`, run_buildings `auto& chunks = b.chunks()`, CityStream::work `auto& chunks = t.road_builder.chunks()`) sind auf work-d gebaut
+  (Beleg: vergleich 161943 für game*/people/city_jobs; CityStream::work dort nicht dabei). Game::ctl_view_json („a reference …“) ist KEIN Platz der Engine
+  (`ViewTrack& V = g_view`, eine Datei-Variable) – nicht d. Übrig war Game::ui_mix_audio („an assignment to CXXMemberCallExpr“: `m.bus(Bus::sfx).volume = …`).
+  **ENTSCHIEDEN (d, nach den Zielen):** ein Eintrag eines Arrays fester Länge des Objekts, `return feld_[p];` mit p dem einen Parameter, ist ein Platz der Engine
+  (am Baum geprüft, wie `return feld_;`); ein Index außerhalb ist, was C++ offen lässt: der Aufruf scheitert in jeder Stufe gleich („the input b names no entry:
+  there are 6“). Gebaut: **work-d-index d03ccf8c** (auf work-d 3976cdfc): Api.looks_up/„index“, Tür (@get/@set mit Eingängen, Index geprüft – auch im Knoten
+  selbst, wo C++ heute ins Leere läse), Klasse (Place hält P::In in C++-Typen, P::at prüft), Engine-Test engine_place_at_an_entry_of_an_array, Doku.
+  Belege laufen: vergleich `work-d-index-vergleich-172026-30784` (game.cpp, game_ui.cpp), Engine-Suite `work-d-index-engine-172028-30823`.
+- Nicht abbrechen durfte ich (Rechte verweigert): die veralteten eigenen Aufträge work-d-belege2-vergleich-055022-6799, work-d-probe-173035-30178 (warten auf mag).
+
 - **19:00 (Nachfolger 7):** work-d = **e9ed65ca** (+ work-zusammen 789f8463 Rückrufe c: 2ff9ce33, Konflikt nur Doku/engine_case.gen.h; + e9ed65ca).
   (2) **run_buildings behoben:** der Stellvertreter eines Platzes gab den Typ ohne `&` zurück (spell) – `auto& chunks = b.chunks()` band ein Temporäres. Lokal
   (Konverter über city_jobs.cpp, TEST_ERRORS): run_buildings geschrieben, übersetzt. (3) **Feld-Plätze gebaut** (Entwurf oben): Api.fields → 46 Knoten
