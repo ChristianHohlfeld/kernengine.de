@@ -248,3 +248,17 @@ Worktree /home/claude/w-k, Zweig work-k (auf origin/work-zusammen 8844531a + eig
   e1362b36 wirkte nicht und ist mit 5ce2b49c zurückgenommen. Das Problem ~Car/~Ragdolls im Test ist an t1 übergeben (stand/k.md).
   BEFUND t1: UB in der Quelle durch gezogene Eingaben (build_water_chunk ci*80).
 - 19:02 Beleg 182152-5898: 49/49 beide; gaps_draw wartet nur noch an size() (gaps.cpp). work-k = 5ce2b49c.
+
+# NACHFOLGER 7 (22.11., ab 16:10) – Ende einer Liste von Besitzern; Warteliste 045421
+- work-k = work-zusammen a06e5ce4 (vorgespult) + **5f6d4e3f** ended_many (Emit): Feld = Liste/Map/Array von Werten, die etwas beenden →
+  jeder Eintrag endet wie sein Typ (ended_entry, verschachtelt; Liste in Liste über `.items` der Zeilen-Struktur). Reihenfolge: Array von
+  hinten, std::vector von vorn (libstdc++), kern::Map von hinten; sonst Wait mit Grund. Kleinstfall /tmp/k_lt.
+- BELEGT 165340-2083: Game::stop 20/20 beide Durchgänge; Rest siehe stand/k.md (Befund g: swarm_cruiser_ endet nach world_).
+- Werkzeug: Zweig **work-k-why** (nur Probe, NICHT mergen) = work-k + `os.environ.setdefault("WHY", …)` – zeigt im convert.log zu jedem
+  Wartegrund die Zeile der Quelle und den Weg im Konverter (mag reicht keine Umgebung durch). Probe work-k-why-probe-162936-13335.
+- Warteliste 045421 (bdb99729), meine Gründe nach Häufigkeit: „a pointer“ (ctl_discrete, read_input, ui_* ×4, update_town, vr_foot,
+  place_world, command – alle im Kreis E16, wechseln mit Testgründen; look_command/look_view_models = kern::Mesh* → d); „a reference to
+  something it changes“ (ctl_view_json, CityStream::work; run_buildings/handle_shots = d); „an owned value … replaced where it is no place“
+  (CityStream fail/go_offline/request_around: `tiles_[t->key.hash()] = std::move(t)` – Kleinstfall /tmp/k_ow schreibt es, Ursache anders);
+  „a member of Int is set“ (look_draw, vr_comfort); „a place in a list of another shape“ (begin_cells, buildings_input); BindingDecl
+  (Interiors::build); ui_mix_audio (Zuweisung an CXXMemberCallExpr); life_update (läuft jetzt bis Ragdolls::~Ragdolls).

@@ -1,5 +1,27 @@
 # Paket k – Stand
 
+## Nachfolger 7 (22.11., ab 16:10; work-k = work-zusammen a06e5ce4 + eigene Commits)
+- 5f6d4e3f ended_many: das Ende eines Felds (einer Struktur oder des Zustands), das eine Liste/Map/ein Array von Werten ist, die etwas
+  beenden – jeder Eintrag wie sein Typ endet (ended_entry, verschachtelt; Liste in Liste über die Zeilen-Struktur `.items`).
+  ENTSCHEIDUNG (k, nach den Zielen): Reihenfolge wie der Destruktor des Programms – Array von hinten (Sprache), std::vector von vorn
+  (libstdc++ std::_Destroy; mit ihr baut mag Quelle und Test – libc++/WASM ginge von hinten, C++ lässt es offen), kern::Map von hinten
+  (~Map → clear(), map.h). std::map/Set/eine besessene Liste: wartet mit Grund. Betrifft Game::stop, Game::~Game (WorldLife::trucks),
+  Game::Game (cars_). Kleinstfall /tmp/k_lt.
+- Beleg 162247-11853 (game, game_traffic, game_life): 47/47 ok beide, aber stop/~Game warten an Ragdolls::~Ragdolls/Car::~Car (clear()/
+  detach() in ragdoll.cpp/car.cpp, nicht in der Probe) → neu 165340-2083 mit car.cpp, ragdoll.cpp.
+
+## BEREIT ZUM MERGEN: 5f6d4e3f – Beleg work-k-vergleich-165340-2083 (game, game_traffic, game_life, car, ragdoll)
+- Game::stop (5 Zeilen) und Game::~Game, Car::~Car, Ragdolls::~Ragdolls geschrieben; Game::stop verglichen: 20/20 in beiden Durchgängen.
+  Stellvertreter 50/50 ok. Kein „was written and waits now“. Game::Game wartet jetzt nur noch an CityStream() (andere Datei).
+- Durchgang gegen die Engine: 49/50 – converted_Game__game_cpp bricht NACH den Vergleichen (stop 20/20) an ASan ab: heap-use-after-free
+  im Abbau des Game DER QUELLE (Testkopie): ~Game → ~unique_ptr<Car> (ein Feld von Game selbst) → ~Car → detach → World::body_valid auf der
+  schon beendeten Welt. Kein Fehler des Konverters (Quelle; derselbe Befund wie 011da703, nur jetzt sichtbar, weil car.cpp in der Probe
+  ist und die Testkopie Car::detach hat). BEFUND FÜR g (game.h): `swarm_cruiser_` (game.h:341, unique_ptr<Car>) steht vor `world_`
+  (:646) und endet darum nach der Welt; ~Game/stop() setzen nur glife_/life_ zurück. Vorschlag: swarm_cruiser_ in stop()/~Game vor der
+  Welt zurücksetzen (wie life_), mit Differenztest.
+- ~Game selbst: geschrieben, aber nicht eigens verglichen – ein Destruktor „gives nothing“ (cd69e381) und wird im Test der Funktion
+  verglichen, die den Wert beendet; den Zustand beendet keine Funktion. Ihn zu vergleichen wäre Sache des Test-Schreibers (t1).
+
 ## Nachfolger 6 (19.11., ab 15:55; work-k = work-zusammen fb51251f + eigene Commits)
 - Warteliste des Laufs work-zusammen-voll-143319-13859 lief auf 0f7f5a46 – OHNE 4d14f00c…798186ff (erst 4ef56569 gemergt): darum
   warten dort noch worldsync_update (List.g), Decoder::step, end_layer, gaps_jet_audio/gaps_sirens (Tupel/&q), swarm_update, life_update
