@@ -8560,7 +8560,7 @@ class Emit:
         return (root in self.bound or any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
                 or ((self.f.state or self.f.sees_state) and self.u.is_state_variable(root)))   # (a variable of the Blueprint: C++ said whether the method may change it)
 
-    def place_arg(self, n, t, kind, after, fixed=None):
+    def place_arg(self, n, t, kind, after, fixed=None, callee=None):
         """What a call gives a reference input: the place the argument is. Where the argument is none of the
         notation's places (a value, a map's row by its key ...), a variable holds it for the call - and is
         stored back after it, when the function changes it (`after`: the lines for that). `fixed`: the input
@@ -8568,6 +8568,12 @@ class Emit:
         is given as the place it is also to a function that may run handlers: the language checks
         that call - the list stays, or the run stops there (docs/blueprint_cpp.md, E18)."""
         got = self.spot(n)
+        if got is not None and callee is not None and re.match(r"\w+", got[0]).group(0) in self.bound:
+            # (a place of the engine is no reference input of a function - check() says so: a function that only reads
+            # it and asks nothing of the engine gets what stands there, as it reads it; anything else waits)
+            if kind == "ref" or callee.asks_engine:
+                raise Wait("a place of the engine handed to a function by reference (it changes it or asks the engine)")
+            got = None
         if got is not None and got[1] == t and (kind != "ref" or self.writable(got[0])):
             return got[0]
         held = self.temp("a", t, fixed)
@@ -9059,7 +9065,7 @@ class Emit:
                     self.self_var()   # (a method that only reads its object does not call one that changes it)
                 done.append([None, None, self.self_name, True])
             else:
-                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after), place=True)
+                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after, callee=g), place=True)
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
@@ -9078,7 +9084,7 @@ class Emit:
                 continue
             (_, pt), kind = params[j], kinds[j]
             if kind:
-                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j)), place=True)
+                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j), callee=g), place=True)
             else:
                 self.operand(done, a, pt, lambda: self.ex(a, pt))
             j += 1
