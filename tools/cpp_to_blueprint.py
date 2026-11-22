@@ -1859,8 +1859,9 @@ class Unit:
                 raise Wait(f"a map or set whose keys are {key} (a key is a Bool, an Int, an Int64, a Text or an enum's value)")
             if m.group(1) == "Set":
                 return f"Set<{key}>"
-            # (a list of a fixed width is a value a map holds as it is: Map<Int, List<U32>> for kern::Map<u64, std::vector<u32>>)
-            value = self.btype(a[1])
+            # (a value is a place: a whole number of a fixed width is one of that width - Map<Int, I32> for kern::Map<u64, i32> -,
+            # a list of a fixed width a list of it: Map<Int, List<U32>> for kern::Map<u64, std::vector<u32>>)
+            value = self.place(a[1])
             if value.startswith(("Map<", "Set<")):
                 raise Wait("a map of maps or sets")
             return f"Map<{key}, {value}>"
