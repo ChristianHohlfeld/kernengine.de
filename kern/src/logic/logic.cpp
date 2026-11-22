@@ -1792,11 +1792,16 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     var.from = v["from"].as_string();
     g.variables.push_back(std::move(var));
   }
+  // (The ids of the nodes read so far and the links taken so far are kept as sets while the document is read: a
+  // graph of tens of thousands of nodes is read in the time its size takes - the answers are those of Graph::find
+  // and of looking through the links.)
+  std::set<u32> node_ids;
+  std::set<std::pair<std::pair<u32, u32>, std::pair<std::string, std::string>>> links_taken;
   for (const json::Value& v : j["nodes"].items()) {
     Node n;
     n.id = id_of(v["id"]);
     if (!n.id) return bad("a node has no valid id");
-    if (g.find(n.id)) return bad("node id " + std::to_string(n.id) + " is used twice");
+    if (!node_ids.insert(n.id).second) return bad("node id " + std::to_string(n.id) + " is used twice");
     n.type = v["type"].as_string();
     if (n.type.empty()) return bad("node " + std::to_string(n.id) + " has no type");
     n.x = static_cast<f32>(v["x"].as_number());
@@ -1820,8 +1825,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       l.to = static_cast<u32>(v["to"].as_number());
       l.in = v["in"].as_string();
     }
-    if (!g.find(l.from) || !g.find(l.to)) return bad("a link refers to a missing node");
-    if (std::find(g.links.begin(), g.links.end(), l) == g.links.end()) g.links.push_back(std::move(l));
+    if (!node_ids.count(l.from) || !node_ids.count(l.to)) return bad("a link refers to a missing node");
+    if (links_taken.insert({{l.from, l.to}, {l.out, l.in}}).second) g.links.push_back(std::move(l));
   }
   // Documents from before a Set could name a place: Set Field and Set List Item were nodes of
   // their own. Each is the Set at that place - Held.Damage = value;   Scores[index] = value;
@@ -2169,18 +2174,25 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     for (const auto* pins_of : {&f.inputs, &f.outputs, &f.locals})
       for (const FunctionPin& fp : *pins_of) length_ok("function \"" + f.name + "\": \"" + fp.name + "\"", declared(fp), fp.value);
   // A function's body starts at its one entry node.
+  // (The nodes that are a function's own - its entry, its returns, the calls of it - by the function's name, in
+  // the order of the nodes: gathered once. A graph that is a whole program - thousands of functions, tens of
+  // thousands of nodes - is checked in the time its size takes, not that of every function times every node.)
+  std::unordered_map<std::string, std::vector<const Node*>> nodes_of_function;
+  for (const Node& n : g.nodes)
+    if (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure") nodes_of_function[n.param("function")].push_back(&n);
   for (const Function& f : g.functions) {
     int entries = 0, returns = 0;
-    for (const Node& n : g.nodes) {
-      if (n.param("function") != f.name) continue;
-      entries += n.type == "func.entry" ? 1 : 0;
-      returns += n.type == "func.return" ? 1 : 0;
-    }
+    const auto own = nodes_of_function.find(f.name);
+    if (own != nodes_of_function.end())
+      for (const Node* n : own->second) {
+        entries += n->type == "func.entry" ? 1 : 0;
+        returns += n->type == "func.return" ? 1 : 0;
+      }
     if (f.external) {
       // A function of another Blueprint has no body here: it is called on an actor.
-      for (const Node& n : g.nodes)
-        if (n.param("function") == f.name && (n.type == "func.entry" || n.type == "func.return" || n.type == "func.call" || n.type == "func.pure"))
-          err(n.id, "\"" + f.name + "\" is a function of another Blueprint: it has no body here and is called with Call on Actor");
+      if (own != nodes_of_function.end())
+        for (const Node* n : own->second)
+          err(n->id, "\"" + f.name + "\" is a function of another Blueprint: it has no body here and is called with Call on Actor");
       if (f.pure) err(0, "function \"" + f.name + "\" is a function of another Blueprint: what it does is not known here, so it is called as a step (not Pure)");
       if (!f.locals.empty()) err(0, "function \"" + f.name + "\" is a function of another Blueprint: it has no local variables here");
       continue;
@@ -2360,20 +2372,31 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     if (i->type != PinType::exec && ++data_in_links[std::to_string(l.to) + ":" + l.in] > 1) err(l.to, "input \"" + i->label + "\" has more than one wire");
   }
   // Pure nodes must not depend on themselves.
+  // (A node by its id - the first of that id, as Graph::find gives it - and the wires into a node, in the order
+  // of the links: looked up, not searched for among all of them at every node.)
+  std::unordered_map<u32, const Node*> node_at;
+  node_at.reserve(g.nodes.size());
+  for (const Node& n : g.nodes) node_at.emplace(n.id, &n);
+  const auto node_of = [&](u32 id) -> const Node* {
+    const auto at = node_at.find(id);
+    return at == node_at.end() ? nullptr : at->second;
+  };
+  std::unordered_map<u32, std::vector<const Link*>> wires_into;
+  for (const Link& l : g.links) wires_into[l.to].push_back(&l);
   std::unordered_map<u32, int> mark;
   std::function<bool(u32)> cyclic = [&](u32 id) -> bool {
     int& m = mark[id];
     if (m == 1) return true;
     if (m == 2) return false;
     m = 1;
-    const Node* n = g.find(id);
+    const Node* n = node_of(id);
     const NodeDef* d = n ? lib.find(n->type) : nullptr;
     if (d && d->kind == NodeKind::pure)
-      for (const Link& l : g.links)
-        if (l.to == id) {
-          const Node* src = g.find(l.from);
+      if (const auto into = wires_into.find(id); into != wires_into.end())
+        for (const Link* l : into->second) {
+          const Node* src = node_of(l->from);
           const NodeDef* sd = src ? lib.find(src->type) : nullptr;
-          if (sd && sd->kind == NodeKind::pure && cyclic(l.from)) return true;
+          if (sd && sd->kind == NodeKind::pure && cyclic(l->from)) return true;
         }
     m = 2;
     return false;
@@ -2390,7 +2413,8 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
     for (const PinDef& p : pins[n.id].first)
       if (p.type == PinType::exec) {
         exec_in = true;
-        for (const Link& l : g.links) if (l.to == n.id && l.in == p.id) exec_linked = true;
+        if (const auto into = wires_into.find(n.id); into != wires_into.end())
+          for (const Link* l : into->second) if (l->in == p.id) exec_linked = true;
       }
     if (exec_in && !exec_linked && d->kind != NodeKind::pure) warn(n.id, lib.title(n) + " never runs (nothing is wired to its exec input)");
   }
