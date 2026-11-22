@@ -1,5 +1,12 @@
 # Paket g – Stand (Regeln des Konverters für die Game-Dateien), Zweig work-g1
 
+## WARTET AUF BELEG: work-g-stop 8b27771d – Auftrag work-g-stop-vergleich-175649-26171 (22.11. 17:56 abgelegt, um 18:45 noch „wartet“ in der Schlange)
+Auf a5a157f2/51364912 aufbauend; eingemischt: work-zusammen 8871ab35, work-k cd542712 (enthält 5f6d4e3f ended_many). stop(): glife_, remote_bus_, remote_car_,
+cars_.clear(), life_, swarm_cruiser_, dann world_ (Reihenfolge, in der ~Game sie beendet hätte); ~Game(): life_, swarm_cruiser_ (die vor world_ erklärten), dann wie bisher.
+Kein Feld verschoben. Lokal: Syntax game.cpp ok. Zu prüfen im Beleg: 50/50 beide Durchgänge, Game::stop/~Game „written“ (ended_many von k).
+Differenztest offen: „zwei Bauten“ (work-t1 33dc2e13) ist nicht in work-zusammen.
+mag: Schlange voll; mehrere „läuft“ seit 20.11. (work-c-vergleich-001825/080407/082139, work-p-engine-081106/081636, work-p-konvert-081110) – vermutlich Leichen.
+
 ## BEREIT ZUM MERGEN: work-g-stop 51364912 (Fix a5a157f2 + Merge work-zusammen a2e6dd1e) – Beleg work-g-stop-vergleich-100140-27958 (dazu 093350-22249 auf a5a157f2)
 UAF ~Game (t1, converted_Game__game_cpp) behoben: Game::stop() setzt life_ vor world_ zurück; ~Game() { life_.reset(); } (statt = default). Kein Feld verschoben;
 ~Game ruft NICHT stop() (world_ endete sonst vor cars_/remote_car_/remote_bus_, deren Car beim Abbau detach() ruft). vergleich game, game_traffic, game_life, ragdoll, car:

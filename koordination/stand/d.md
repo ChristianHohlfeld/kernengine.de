@@ -1,6 +1,7 @@
 # Stand d (18.11., Nachfolger)
 
-## BEREIT ZUM MERGEN: work-d-fail 8432b275 – Beleg work-d-fail-vergleich-162023-5935
+## work-d-fail = 64275dd8 (8432b275 + work-zusammen 8871ab35, Wunsch Koordinator 18:00) – Beleg läuft: work-d-fail-vergleich-180357-32687
+(8432b275 war belegt mit work-d-fail-vergleich-162023-5935, ließ sich aber nicht konfliktfrei in 8871ab35 mischen.) work-d = 20bf03dc (+ 8871ab35); die wartenden Aufträge 174829/162227 nehmen den Kopf beim Start.
 (Nachfolger 8, 22.11.) work-d-fail = 5500074b (engine.fail/engine.log, printf-Knoten) + origin/work-zusammen a06e5ce4 (Konflikt nur engine_case.gen.h: neu erzeugt).
 vergleich src/city_stream.cpp: convert/bau/alle rc=0, Stellvertreter 10/10 ok, Engine selbst 10/10 ok, 0 ABBRUCH/LECK. GeoProjector::init geschrieben (in 045421:
 „the engine's fail() … a variadic function“). Kein Rückfall gegenüber 045421: die 14 dort geschriebenen city_stream-Funktionen, die hier warten, warten nur auf
