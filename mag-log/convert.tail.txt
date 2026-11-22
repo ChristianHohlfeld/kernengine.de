@@ -1,0 +1,80 @@
+    RoadGraph::size (1): written
+settings                        3 /    3 functions        3 /      3 lines
+    Settings::get (1): written
+    Settings::on (1): written
+    Settings::version (1): written
+sound_fx                        1 /    1 functions        1 /      1 lines
+    SoundFx::ready (1): written
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+touch_play                     16 /   16 functions       16 /     16 lines
+    TouchPlay::right_inset (1): written
+    TouchPlay::move (1): written
+    TouchPlay::look (1): written
+    TouchPlay::move_live (1): written
+    TouchPlay::look_live (1): written
+    TouchPlay::look_edge (1): written
+    TouchPlay::fires (1): a name for a place - written where it is called
+    TouchPlay::drop_lifted (1): written
+    TouchPlay::clearance (1): written
+    TouchPlay::grenade_drag (1): written
+    TouchPlay::inject (1): written
+    TouchPlay::any (1): written
+    TouchPlay::buttons (1): a name for a place - written where it is called
+    TouchPlay::mode (1): written
+    TouchPlay::no_sticks (1): written
+    TouchPlay::add (1): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+weapons                         2 /    2 functions        5 /      5 lines
+    spec (1): a name for a place - written where it is called
+    blast_factor (4): written
+world_art                       1 /    1 functions        1 /      1 lines
+    WorldArt::renderer (1): written
+world_marks                     1 /    1 functions        1 /      1 lines
+    Marks::stats (1): a name for a place - written where it is called
+world_traffic                   1 /    1 functions        1 /      1 lines
+    (test_touch_play: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_DroneFC_Core: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_car: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_StateControl: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_Arondight45_FirmwareRuntime: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TrafficRules::junctions (1): a name for a place - written where it is called
+
+410 of 447 functions of the program are written as Blueprints (2761 of 3466 lines), and 20 of the engine's headers that they call: 51 Blueprints - 4 of source files, 0 of states, 47 of headers and of shapes
+364 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in; 3 give nothing
+
+what the others wait for: functions (lines)
+    18 (   548)   the state of its object: the struct Game has more than 96 fields
+     1 (    55)   buildings_near() is defined in another file
+     1 (    44)   features() is defined in another file
+     1 (    33)   it calls LifeArt::box(), which waits
+     1 (     7)   kill() is defined in another file
+     5 (     5)   input() is defined in another file
+     1 (     4)   exclude_building() is defined in another file
+     4 (     4)   put() is defined in another file
+     1 (     1)   height() is defined in another file
+     1 (     1)   reset() is defined in another file
+     1 (     1)   set_mode() is defined in another file
+     1 (     1)   kill_pet() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	8m39,192s
+user	25m25,572s
+sys	1m14,934s
