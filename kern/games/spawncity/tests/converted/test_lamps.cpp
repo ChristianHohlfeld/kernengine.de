@@ -40,7 +40,9 @@ namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, pol
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
 namespace lamps { struct Lamp {
@@ -67,6 +69,8 @@ namespace lamps { struct Field {
   /// Lamps (indices) within r of (x, y).
   
   /// setState: only ever worse. Returns true when it changed; remembers it for re-placement.
+  
+  /// Lamp i (one of all()) gets the state, remembered for re-placement - set_state once worse() has said yes.
   
   /// The lit head nearest along the segment a -> b within 0.38 m (onTracer), or -1.
   
@@ -107,7 +111,7 @@ namespace lamps { struct Field {
 }
 namespace lamps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const lamps::Lamp& s) { return converted::Value::structure({arg(s.foot), arg(s.yaw), arg(s.head), arg(s.state), arg(converted::shaped<converted::Whole>(s.key)), arg(s.lane)}); }
-[[maybe_unused]] static bool same(const lamps::Lamp& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.foot, (*got.rows)[0]) && same(want.yaw, (*got.rows)[1]) && same(want.head, (*got.rows)[2]) && same(want.state, (*got.rows)[3]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[4]) && same(want.lane, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const lamps::Lamp& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.foot, (*got.rows)[0]), ".foot") && converted::at_place(same(want.yaw, (*got.rows)[1]), ".yaw") && converted::at_place(same(want.head, (*got.rows)[2]), ".head") && converted::at_place(same(want.state, (*got.rows)[3]), ".state") && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[4]), ".key") && converted::at_place(same(want.lane, (*got.rows)[5]), ".lane"); }
 [[maybe_unused]] static bool defined(const lamps::Lamp& s) { return defined(s.foot) && defined(s.yaw) && defined(s.head) && defined(s.state) && defined(converted::shaped<converted::Whole>(s.key)) && defined(s.lane); }
 [[maybe_unused]] static std::string text(const lamps::Lamp& s) { return std::string("{") + text(s.foot) + ", " + text(s.yaw) + ", " + text(s.head) + ", " + text(s.state) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.lane) + "}"; }
 [[maybe_unused]] static void take(lamps::Lamp& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Vec3>(s.foot, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); converted::take_as<Vec2>(s.head, (*v.rows)[2]); converted::take_as<unsigned char>(s.state, (*v.rows)[3]); converted::take_as<converted::Whole>(s.key, (*v.rows)[4]); converted::take_as<unsigned int>(s.lane, (*v.rows)[5]); }
@@ -122,7 +126,7 @@ namespace lamps { using converted::arg; using converted::same; using converted::
 }
 namespace lamps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const lamps::Field& s) { return converted::Value::structure({arg(s.lamps_), arg(converted::shaped<converted::wide::Set<converted::Whole>>(s.seen_)), arg(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(s.broken_)), arg(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_))}); }
-[[maybe_unused]] static bool same(const lamps::Field& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.lamps_, (*got.rows)[0]) && same(converted::shaped<converted::wide::Set<converted::Whole>>(want.seen_), (*got.rows)[1]) && same(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(want.broken_), (*got.rows)[2]) && same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const lamps::Field& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.lamps_, (*got.rows)[0]), ".lamps_") && converted::at_place(same(converted::shaped<converted::wide::Set<converted::Whole>>(want.seen_), (*got.rows)[1]), ".seen_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(want.broken_), (*got.rows)[2]), ".broken_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(want.grid_), (*got.rows)[3]), ".grid_"); }
 [[maybe_unused]] static bool defined(const lamps::Field& s) { return defined(s.lamps_) && defined(converted::shaped<converted::wide::Set<converted::Whole>>(s.seen_)) && defined(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(s.broken_)) && defined(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)); }
 [[maybe_unused]] static std::string text(const lamps::Field& s) { return std::string("{") + text(s.lamps_) + ", " + text(converted::shaped<converted::wide::Set<converted::Whole>>(s.seen_)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, unsigned char>>(s.broken_)) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_)) + "}"; }
 [[maybe_unused]] static void take(lamps::Field& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<lamps::Lamp>>(s.lamps_, (*v.rows)[0]); converted::take_as<converted::wide::Set<converted::Whole>>(s.seen_, (*v.rows)[1]); converted::take_as<converted::wide::Map<converted::Whole, unsigned char>>(s.broken_, (*v.rows)[2]); converted::take_as<converted::wide::Map<converted::Whole, std::vector<int>>>(s.grid_, (*v.rows)[3]); }
@@ -133,7 +137,7 @@ SC_TEST(converted_lamps) {
   {  // Field::clear
     converted::Tally tally("Field_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] lamps::Field a0) { converted::counted([&] { return a0.clear(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] lamps::Field& a0) { converted::counted([&] { return a0.clear(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       lamps::Field a0 = draw_lamps__Field(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -142,7 +146,9 @@ SC_TEST(converted_lamps) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -152,7 +158,7 @@ SC_TEST(converted_lamps) {
   {  // Field::reset_broken
     converted::Tally tally("Field_reset_broken");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] lamps::Field a0) { converted::counted([&] { return a0.reset_broken(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] lamps::Field& a0) { converted::counted([&] { return a0.reset_broken(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       lamps::Field a0 = draw_lamps__Field(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -161,7 +167,9 @@ SC_TEST(converted_lamps) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -171,7 +179,7 @@ SC_TEST(converted_lamps) {
   {  // Field::broken
     converted::Tally tally("Field_broken");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] lamps::Field a0) { return converted::counted([&] { return a0.broken(); }); };
+    const auto run = [&]([[maybe_unused]] lamps::Field& a0) { return converted::counted([&] { return a0.broken(); }); };
     for (int i = 0; tally.more(i); ++i) {
       lamps::Field a0 = draw_lamps__Field(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -180,7 +188,9 @@ SC_TEST(converted_lamps) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

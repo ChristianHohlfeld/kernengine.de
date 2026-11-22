@@ -8,7 +8,6 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include "../../src/game.h"
 #include "../../src/game_life.h"
@@ -62,7 +61,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // dist2d
     converted::Tally tally("dist2d");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1) { return converted::counted([&] { return converted_game_worldsync_cpp::dist2d(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1) { return converted::counted([&] { return converted_game_worldsync_cpp::dist2d(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       Vec3 a1 = draw.vector();
@@ -72,7 +71,9 @@ SC_TEST(converted_game_worldsync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -82,7 +83,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // q16
     converted::Tally tally("q16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_game_worldsync_cpp::q16(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_game_worldsync_cpp::q16(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -91,7 +92,9 @@ SC_TEST(converted_game_worldsync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -101,7 +104,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // uq16
     converted::Tally tally("uq16");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] short a0) { return converted::counted([&] { return converted_game_worldsync_cpp::uq16(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] short& a0) { return converted::counted([&] { return converted_game_worldsync_cpp::uq16(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       short a0 = static_cast<short>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -110,7 +113,9 @@ SC_TEST(converted_game_worldsync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -120,7 +125,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // cms
     converted::Tally tally("cms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_game_worldsync_cpp::cms(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_game_worldsync_cpp::cms(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -129,7 +134,9 @@ SC_TEST(converted_game_worldsync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -139,7 +146,7 @@ SC_TEST(converted_game_worldsync_cpp) {
   {  // col8
     converted::Tally tally("col8");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_game_worldsync_cpp::col8(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_game_worldsync_cpp::col8(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -148,7 +155,9 @@ SC_TEST(converted_game_worldsync_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

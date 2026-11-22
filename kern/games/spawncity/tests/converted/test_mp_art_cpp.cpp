@@ -40,7 +40,7 @@ struct Vec4 {
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
@@ -74,10 +74,10 @@ struct Mat4 {
 
   Mat4 operator*(const Mat4& b) const {
     Mat4 r;
-    for (int c = 0; c < 4; ++c) {
-      const f32 b0 = converted::at(b.m, 4 * c), b1 = converted::at(b.m, 4 * c + 1), b2 = converted::at(b.m, 4 * c + 2), b3 = converted::at(b.m, 4 * c + 3);
-      for (int k = 0; k < 4; ++k)
-        converted::at(r.m, 4 * c + k) = converted::at(m, k) * b0 + converted::at(m, 4 + k) * b1 + converted::at(m, 8 + k) * b2 + converted::at(m, 12 + k) * b3;
+    for (int c = 0; c < 4; converted::pre_inc(c)) {
+      const f32 b0 = converted::at(b.m, converted::times(4, c)), b1 = converted::at(b.m, converted::plus(converted::times(4, c), 1)), b2 = converted::at(b.m, converted::plus(converted::times(4, c), 2)), b3 = converted::at(b.m, converted::plus(converted::times(4, c), 3));
+      for (int k = 0; k < 4; converted::pre_inc(k))
+        converted::at(r.m, converted::plus(converted::times(4, c), k)) = converted::at(m, k) * b0 + converted::at(m, converted::plus(4, k)) * b1 + converted::at(m, converted::plus(8, k)) * b2 + converted::at(m, converted::plus(12, k)) * b3;
     }
     return r;
   }
@@ -151,6 +151,7 @@ struct Mat4 {
 
 
 };
+struct Bvh;
 constexpr u32 kMaxExtensionAttributes = 2;
 constexpr u32 kMaxMaterialParams = 8;
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
@@ -200,6 +201,7 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 struct MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
@@ -209,9 +211,6 @@ struct MeshLook {
   bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
 };
 struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
-struct HeightSampler : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
@@ -241,6 +240,7 @@ struct BloomPass : converted::EngineObject {
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -404,14 +404,14 @@ void MpArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Vec4& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
   Material s{};
   s.color = draw_kern__Vec4(draw);
-  s.alpha = static_cast<AlphaMode>(draw.below(3));
+  s.alpha = converted::enum_value<AlphaMode>(draw.below(3));
   s.alpha_cutoff = draw.number();
   s.roughness = draw.number();
   s.metalness = draw.number();
@@ -427,7 +427,7 @@ void MpArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
-[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.color, (*got.rows)[0]) && same(want.alpha, (*got.rows)[1]) && same(want.alpha_cutoff, (*got.rows)[2]) && same(want.roughness, (*got.rows)[3]) && same(want.metalness, (*got.rows)[4]) && same(want.emissive, (*got.rows)[5]) && same(want.unlit, (*got.rows)[6]) && same(want.double_sided, (*got.rows)[7]) && same(want.cast_shadow, (*got.rows)[8]) && same(want.frustum_culled, (*got.rows)[9]) && same(want.viewmodel, (*got.rows)[10]) && same(want.linear_colors, (*got.rows)[11]) && same(want.lines, (*got.rows)[12]) && same(converted::array_list(want.params), (*got.rows)[13]); }
+[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
 [[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
 [[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
 [[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
@@ -439,7 +439,7 @@ void MpArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MpArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
-[[maybe_unused]] static bool same(const MpArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const MpArt::Part& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.transforms, (*got.rows)[1]), ".transforms") && converted::at_place(same(want.tints, (*got.rows)[2]), ".tints"); }
 [[maybe_unused]] static bool defined(const MpArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
 [[maybe_unused]] static std::string text(const MpArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
 [[maybe_unused]] static void take(MpArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
@@ -455,7 +455,7 @@ void MpArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
-[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.positions, (*got.rows)[0]), ".positions") && converted::at_place(same(want.normals, (*got.rows)[1]), ".normals") && converted::at_place(same(want.colors, (*got.rows)[2]), ".colors") && converted::at_place(same(want.uvs, (*got.rows)[3]), ".uvs") && converted::at_place(same(want.extra, (*got.rows)[4]), ".extra") && converted::at_place(same(want.extra_size, (*got.rows)[5]), ".extra_size") && converted::at_place(same(want.indices, (*got.rows)[6]), ".indices"); }
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
 [[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
@@ -473,7 +473,7 @@ void MpArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MpArt& s) { return converted::Value::structure({arg(s.r_), arg(s.post_), arg(s.gem_), arg(s.ring_), arg(s.tracer_), arg(s.flash_), arg(s.canopy_), arg(s.led_), arg(s.shield_)}); }
-[[maybe_unused]] static bool same(const MpArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.r_, (*got.rows)[0]) && same(want.post_, (*got.rows)[1]) && same(want.gem_, (*got.rows)[2]) && same(want.ring_, (*got.rows)[3]) && same(want.tracer_, (*got.rows)[4]) && same(want.flash_, (*got.rows)[5]) && same(want.canopy_, (*got.rows)[6]) && same(want.led_, (*got.rows)[7]) && same(want.shield_, (*got.rows)[8]); }
+[[maybe_unused]] static bool same(const MpArt& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.r_, (*got.rows)[0]), ".r_") && converted::at_place(same(want.post_, (*got.rows)[1]), ".post_") && converted::at_place(same(want.gem_, (*got.rows)[2]), ".gem_") && converted::at_place(same(want.ring_, (*got.rows)[3]), ".ring_") && converted::at_place(same(want.tracer_, (*got.rows)[4]), ".tracer_") && converted::at_place(same(want.flash_, (*got.rows)[5]), ".flash_") && converted::at_place(same(want.canopy_, (*got.rows)[6]), ".canopy_") && converted::at_place(same(want.led_, (*got.rows)[7]), ".led_") && converted::at_place(same(want.shield_, (*got.rows)[8]), ".shield_"); }
 [[maybe_unused]] static bool defined(const MpArt& s) { return defined(s.r_) && defined(s.post_) && defined(s.gem_) && defined(s.ring_) && defined(s.tracer_) && defined(s.flash_) && defined(s.canopy_) && defined(s.led_) && defined(s.shield_); }
 [[maybe_unused]] static std::string text(const MpArt& s) { return std::string("{") + text(s.r_) + ", " + text(s.post_) + ", " + text(s.gem_) + ", " + text(s.ring_) + ", " + text(s.tracer_) + ", " + text(s.flash_) + ", " + text(s.canopy_) + ", " + text(s.led_) + ", " + text(s.shield_) + "}"; }
 [[maybe_unused]] static void take(MpArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<MpArt::Part>(s.post_, (*v.rows)[1]); converted::take_as<MpArt::Part>(s.gem_, (*v.rows)[2]); converted::take_as<MpArt::Part>(s.ring_, (*v.rows)[3]); converted::take_as<MpArt::Part>(s.tracer_, (*v.rows)[4]); converted::take_as<MpArt::Part>(s.flash_, (*v.rows)[5]); converted::take_as<MpArt::Part>(s.canopy_, (*v.rows)[6]); converted::take_as<MpArt::Part>(s.led_, (*v.rows)[7]); converted::take_as<MpArt::Part>(s.shield_, (*v.rows)[8]); }
@@ -483,7 +483,7 @@ void MpArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::array_list(want.m), (*got.rows)[0]), ".m"); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
 [[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
@@ -498,7 +498,7 @@ void MpArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
-[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.material, (*got.rows)[0]) && same(want.extra_slot, (*got.rows)[1]) && same(want.texture, (*got.rows)[2]) && same(want.visible, (*got.rows)[3]) && same(want.layers, (*got.rows)[4]) && same(want.pick_bvh, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
 [[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
 [[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
 [[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
@@ -513,15 +513,15 @@ namespace primitives { inline MeshData sphere(const double& radius, const unsign
 namespace primitives { inline MeshData torus(const double& major, const double& minor, const unsigned int& segments, const unsigned int& tube_segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.torus", {converted::value_of(major), converted::value_of(minor), converted::value_of(segments), converted::value_of(tube_segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.box", {converted::value_of(size), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 struct Out_MpArt_make { bool Result; MpArt::Part p; };
-[[maybe_unused]] static bool same(const Out_MpArt_make& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.p, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_MpArt_make& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.p, (*got.rows)[1]), ".p"); }
 [[maybe_unused]] static bool defined(const Out_MpArt_make& s) { return defined(s.Result) && defined(s.p); }
 [[maybe_unused]] static std::string text(const Out_MpArt_make& s) { return std::string("{") + text(s.Result) + ", " + text(s.p) + "}"; }
 struct Out_MpArt_init { MpArt Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_MpArt_init& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_MpArt_init& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_MpArt_init& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_MpArt_init& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_MpArt_upload { MpArt Self; MpArt::Part p; };
-[[maybe_unused]] static bool same(const Out_MpArt_upload& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.p, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_MpArt_upload& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.p, (*got.rows)[1]), ".p"); }
 [[maybe_unused]] static bool defined(const Out_MpArt_upload& s) { return defined(s.Self) && defined(s.p); }
 [[maybe_unused]] static std::string text(const Out_MpArt_upload& s) { return std::string("{") + text(s.Self) + ", " + text(s.p) + "}"; }
 
@@ -530,7 +530,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // glow
     converted::Tally tally("glow");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_mp_art_cpp::glow(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_mp_art_cpp::glow(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       double a1 = draw.number();
@@ -540,7 +540,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -550,7 +552,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::make
     converted::Tally tally("MpArt_make");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Renderer& a0, [[maybe_unused]] MpArt::Part a1, [[maybe_unused]] MeshData a2, [[maybe_unused]] Material a3) { auto r = converted::counted([&] { return MpArt{}.make(a0, a1, a2, a3); }); return Out_MpArt_make{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] Renderer& a0, [[maybe_unused]] MpArt::Part& a1, [[maybe_unused]] MeshData& a2, [[maybe_unused]] Material& a3) { auto r = converted::counted([&] { return MpArt{}.make(a0, a1, a2, a3); }); return Out_MpArt_make{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       Renderer& a0 = *converted::engine_object<Renderer>(1 + draw.below(6));
       MpArt::Part a1 = draw_MpArt__Part(draw);
@@ -562,7 +564,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -572,7 +576,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::init
     converted::Tally tally("MpArt_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_MpArt_init{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_MpArt_init{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
@@ -582,7 +586,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1);
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -592,7 +598,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::clear
     converted::Tally tally("MpArt_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt::Part a0) { converted::counted([&] { return MpArt::clear(a0); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt::Part& a0) { converted::counted([&] { return MpArt::clear(a0); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt::Part a0 = draw_MpArt__Part(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -601,7 +607,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -611,7 +619,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::begin
     converted::Tally tally("MpArt_begin");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0) { converted::counted([&] { return a0.begin(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0) { converted::counted([&] { return a0.begin(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -620,7 +628,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -630,7 +640,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::put
     converted::Tally tally("MpArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return MpArt{}.put(a0, a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt::Part& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return MpArt{}.put(a0, a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt::Part a0 = draw_MpArt__Part(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -641,7 +651,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -651,7 +663,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::ping
     converted::Tally tally("MpArt_ping");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { converted::counted([&] { return a0.ping(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] Vec3& a3, [[maybe_unused]] double& a4, [[maybe_unused]] double& a5) { converted::counted([&] { return a0.ping(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       Vec3 a1 = draw.vector();
@@ -665,7 +677,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -675,7 +689,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::tracer
     converted::Tally tally("MpArt_tracer");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { converted::counted([&] { return a0.tracer(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3, [[maybe_unused]] Vec3& a4) { converted::counted([&] { return a0.tracer(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       Vec3 a1 = draw.vector();
@@ -688,7 +702,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -698,7 +714,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::flash
     converted::Tally tally("MpArt_flash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.flash(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.flash(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       Vec3 a1 = draw.vector();
@@ -710,7 +726,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -720,7 +738,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::drone_accent
     converted::Tally tally("MpArt_drone_accent");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.drone_accent(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return a0.drone_accent(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -731,7 +749,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -741,7 +761,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::shield
     converted::Tally tally("MpArt_shield");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.shield(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.shield(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       Vec3 a1 = draw.vector();
@@ -753,7 +773,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -763,7 +785,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::upload
     converted::Tally tally("MpArt_upload");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0, [[maybe_unused]] MpArt::Part a1) { converted::counted([&] { return a0.upload(a1); }); return Out_MpArt_upload{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0, [[maybe_unused]] MpArt::Part& a1) { converted::counted([&] { return a0.upload(a1); }); return Out_MpArt_upload{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       MpArt::Part a1 = draw_MpArt__Part(draw);
@@ -773,7 +795,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -783,7 +807,7 @@ SC_TEST(converted_mp_art_cpp) {
   {  // MpArt::end
     converted::Tally tally("MpArt_end");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] MpArt a0) { converted::counted([&] { return a0.end(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] MpArt& a0) { converted::counted([&] { return a0.end(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       MpArt a0 = draw_MpArt(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -792,7 +816,9 @@ SC_TEST(converted_mp_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

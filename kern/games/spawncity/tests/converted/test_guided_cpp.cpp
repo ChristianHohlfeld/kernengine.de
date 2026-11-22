@@ -36,7 +36,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define protected public
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace guided { bool bind(::kern::logic::Runtime& logic); }
+namespace guided { bool bind(kern::logic::Runtime& logic); }
 namespace guided { f32 speed(); }
 namespace guided { f32 turn_g(); }
 namespace guided { f32 blast_radius(); }
@@ -73,7 +73,7 @@ namespace rules { inline f64 decimal(f32 x) {
   f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
   for (f64 m = a; m < 1; m *= 10) scale *= 10;
   for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
     const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
     if (static_cast<f32>(c) == x) return c;
   }
@@ -109,7 +109,7 @@ namespace guided { void take(const MissileRun& f, Missile& m) {
   m.dodge_last = {f.dodge_last.x, f.dodge_last.y};
   m.tracking = f.tracking;
 } }
-namespace guided { bool bind(::kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
+namespace guided { bool bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); } }
 namespace guided { f32 speed() { return static_cast<f32>(g_rules.get<f64>("Speed")); } }
 namespace guided { f32 turn_g() { return static_cast<f32>(g_rules.get<f64>("TurnG")); } }
 namespace guided { f32 blast_radius() { return static_cast<f32>(g_rules.get<f64>("BlastRadius")); } }
@@ -158,7 +158,7 @@ namespace guided { Result step(Missile& m, f32 now, f32 dt, f32 ground) {
 }
 namespace guided { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const guided::Dodge& s) { return converted::Value::structure({arg(s.seconds), arg(s.lost)}); }
-[[maybe_unused]] static bool same(const guided::Dodge& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.seconds, (*got.rows)[0]) && same(want.lost, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const guided::Dodge& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.seconds, (*got.rows)[0]), ".seconds") && converted::at_place(same(want.lost, (*got.rows)[1]), ".lost"); }
 [[maybe_unused]] static bool defined(const guided::Dodge& s) { return defined(s.seconds) && defined(s.lost); }
 [[maybe_unused]] static std::string text(const guided::Dodge& s) { return std::string("{") + text(s.seconds) + ", " + text(s.lost) + "}"; }
 [[maybe_unused]] static void take(guided::Dodge& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.seconds, (*v.rows)[0]); converted::take_as<bool>(s.lost, (*v.rows)[1]); }
@@ -179,7 +179,7 @@ namespace guided { using converted::arg; using converted::same; using converted:
 }
 namespace guided { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const guided::Missile& s) { return converted::Value::structure({arg(s.p), arg(s.v), arg(s.goal), arg(s.born), arg(s.cruise_z), arg(s.motor), arg(s.pedestrian), arg(s.dodge), arg(s.dodge_last), arg(s.tracking)}); }
-[[maybe_unused]] static bool same(const guided::Missile& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.p, (*got.rows)[0]) && same(want.v, (*got.rows)[1]) && same(want.goal, (*got.rows)[2]) && same(want.born, (*got.rows)[3]) && same(want.cruise_z, (*got.rows)[4]) && same(want.motor, (*got.rows)[5]) && same(want.pedestrian, (*got.rows)[6]) && same(want.dodge, (*got.rows)[7]) && same(want.dodge_last, (*got.rows)[8]) && same(want.tracking, (*got.rows)[9]); }
+[[maybe_unused]] static bool same(const guided::Missile& want, const converted::Value& got) { return converted::rows_of(got, 10) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.v, (*got.rows)[1]), ".v") && converted::at_place(same(want.goal, (*got.rows)[2]), ".goal") && converted::at_place(same(want.born, (*got.rows)[3]), ".born") && converted::at_place(same(want.cruise_z, (*got.rows)[4]), ".cruise_z") && converted::at_place(same(want.motor, (*got.rows)[5]), ".motor") && converted::at_place(same(want.pedestrian, (*got.rows)[6]), ".pedestrian") && converted::at_place(same(want.dodge, (*got.rows)[7]), ".dodge") && converted::at_place(same(want.dodge_last, (*got.rows)[8]), ".dodge_last") && converted::at_place(same(want.tracking, (*got.rows)[9]), ".tracking"); }
 [[maybe_unused]] static bool defined(const guided::Missile& s) { return defined(s.p) && defined(s.v) && defined(s.goal) && defined(s.born) && defined(s.cruise_z) && defined(s.motor) && defined(s.pedestrian) && defined(s.dodge) && defined(s.dodge_last) && defined(s.tracking); }
 [[maybe_unused]] static std::string text(const guided::Missile& s) { return std::string("{") + text(s.p) + ", " + text(s.v) + ", " + text(s.goal) + ", " + text(s.born) + ", " + text(s.cruise_z) + ", " + text(s.motor) + ", " + text(s.pedestrian) + ", " + text(s.dodge) + ", " + text(s.dodge_last) + ", " + text(s.tracking) + "}"; }
 [[maybe_unused]] static void take(guided::Missile& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<Vec3>(s.v, (*v.rows)[1]); converted::take_as<Vec3>(s.goal, (*v.rows)[2]); converted::take_as<double>(s.born, (*v.rows)[3]); converted::take_as<double>(s.cruise_z, (*v.rows)[4]); converted::take_as<bool>(s.motor, (*v.rows)[5]); converted::take_as<bool>(s.pedestrian, (*v.rows)[6]); converted::take_as<guided::Dodge>(s.dodge, (*v.rows)[7]); converted::take_as<Vec2>(s.dodge_last, (*v.rows)[8]); converted::take_as<bool>(s.tracking, (*v.rows)[9]); }
@@ -201,13 +201,13 @@ namespace guided { using converted::arg; using converted::same; using converted:
 }
 namespace guided { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const guided::MissileRun& s) { return converted::Value::structure({arg(s.p), arg(s.v), arg(s.goal), arg(s.born), arg(s.cruise_z), arg(s.motor), arg(s.pedestrian), arg(s.dodge_seconds), arg(s.dodge_lost), arg(s.dodge_last), arg(s.tracking)}); }
-[[maybe_unused]] static bool same(const guided::MissileRun& want, const converted::Value& got) { return got.rows && got.rows->size() == 11 && same(want.p, (*got.rows)[0]) && same(want.v, (*got.rows)[1]) && same(want.goal, (*got.rows)[2]) && same(want.born, (*got.rows)[3]) && same(want.cruise_z, (*got.rows)[4]) && same(want.motor, (*got.rows)[5]) && same(want.pedestrian, (*got.rows)[6]) && same(want.dodge_seconds, (*got.rows)[7]) && same(want.dodge_lost, (*got.rows)[8]) && same(want.dodge_last, (*got.rows)[9]) && same(want.tracking, (*got.rows)[10]); }
+[[maybe_unused]] static bool same(const guided::MissileRun& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.v, (*got.rows)[1]), ".v") && converted::at_place(same(want.goal, (*got.rows)[2]), ".goal") && converted::at_place(same(want.born, (*got.rows)[3]), ".born") && converted::at_place(same(want.cruise_z, (*got.rows)[4]), ".cruise_z") && converted::at_place(same(want.motor, (*got.rows)[5]), ".motor") && converted::at_place(same(want.pedestrian, (*got.rows)[6]), ".pedestrian") && converted::at_place(same(want.dodge_seconds, (*got.rows)[7]), ".dodge_seconds") && converted::at_place(same(want.dodge_lost, (*got.rows)[8]), ".dodge_lost") && converted::at_place(same(want.dodge_last, (*got.rows)[9]), ".dodge_last") && converted::at_place(same(want.tracking, (*got.rows)[10]), ".tracking"); }
 [[maybe_unused]] static bool defined(const guided::MissileRun& s) { return defined(s.p) && defined(s.v) && defined(s.goal) && defined(s.born) && defined(s.cruise_z) && defined(s.motor) && defined(s.pedestrian) && defined(s.dodge_seconds) && defined(s.dodge_lost) && defined(s.dodge_last) && defined(s.tracking); }
 [[maybe_unused]] static std::string text(const guided::MissileRun& s) { return std::string("{") + text(s.p) + ", " + text(s.v) + ", " + text(s.goal) + ", " + text(s.born) + ", " + text(s.cruise_z) + ", " + text(s.motor) + ", " + text(s.pedestrian) + ", " + text(s.dodge_seconds) + ", " + text(s.dodge_lost) + ", " + text(s.dodge_last) + ", " + text(s.tracking) + "}"; }
 [[maybe_unused]] static void take(guided::MissileRun& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<Vec3>(s.v, (*v.rows)[1]); converted::take_as<Vec3>(s.goal, (*v.rows)[2]); converted::take_as<double>(s.born, (*v.rows)[3]); converted::take_as<double>(s.cruise_z, (*v.rows)[4]); converted::take_as<bool>(s.motor, (*v.rows)[5]); converted::take_as<bool>(s.pedestrian, (*v.rows)[6]); converted::take_as<double>(s.dodge_seconds, (*v.rows)[7]); converted::take_as<bool>(s.dodge_lost, (*v.rows)[8]); converted::take_as<Vec3>(s.dodge_last, (*v.rows)[9]); converted::take_as<bool>(s.tracking, (*v.rows)[10]); }
 }
 struct Out_step { guided::Result Result; guided::Missile m; };
-[[maybe_unused]] static bool same(const Out_step& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.m, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.m, (*got.rows)[1]), ".m"); }
 [[maybe_unused]] static bool defined(const Out_step& s) { return defined(s.Result) && defined(s.m); }
 [[maybe_unused]] static std::string text(const Out_step& s) { return std::string("{") + text(s.Result) + ", " + text(s.m) + "}"; }
 
@@ -217,7 +217,7 @@ SC_TEST(converted_guided_cpp) {
   {  // flight_of
     converted::Tally tally("flight_of");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] guided::Missile a0) { return converted::counted([&] { return converted_guided_cpp::guided::flight_of(a0); }); };
+    const auto run = [&]([[maybe_unused]] guided::Missile& a0) { return converted::counted([&] { return converted_guided_cpp::guided::flight_of(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       guided::Missile a0 = draw_guided__Missile(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -226,7 +226,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -236,7 +238,7 @@ SC_TEST(converted_guided_cpp) {
   {  // take
     converted::Tally tally("take");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] guided::MissileRun a0, [[maybe_unused]] guided::Missile a1) { converted::counted([&] { return converted_guided_cpp::guided::take(a0, a1); }); return a1; };
+    const auto run = [&]([[maybe_unused]] guided::MissileRun& a0, [[maybe_unused]] guided::Missile& a1) { converted::counted([&] { return converted_guided_cpp::guided::take(a0, a1); }); return std::move(a1); };
     for (int i = 0; tally.more(i); ++i) {
       guided::MissileRun a0 = draw_guided__MissileRun(draw);
       guided::Missile a1 = draw_guided__Missile(draw);
@@ -246,7 +248,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -264,7 +268,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -282,7 +288,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -300,7 +308,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -318,7 +328,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -336,7 +348,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -354,7 +368,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -372,7 +388,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -390,7 +408,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -408,7 +428,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -418,7 +440,7 @@ SC_TEST(converted_guided_cpp) {
   {  // update_dodge
     converted::Tally tally("update_dodge");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] guided::Dodge a0, [[maybe_unused]] Vec2 a1, [[maybe_unused]] Vec2 a2, [[maybe_unused]] double a3, [[maybe_unused]] bool a4) { return converted::counted([&] { return converted_guided_cpp::guided::update_dodge(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
+    const auto run = [&]([[maybe_unused]] guided::Dodge& a0, [[maybe_unused]] Vec2& a1, [[maybe_unused]] Vec2& a2, [[maybe_unused]] double& a3, [[maybe_unused]] bool& a4) { return converted::counted([&] { return converted_guided_cpp::guided::update_dodge(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
     for (int i = 0; tally.more(i); ++i) {
       guided::Dodge a0 = draw_guided__Dodge(draw);
       Vec2 a1 = draw.vector2();
@@ -431,7 +453,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -441,7 +465,7 @@ SC_TEST(converted_guided_cpp) {
   {  // pick_score
     converted::Tally tally("pick_score");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { return converted::counted([&] { return converted_guided_cpp::guided::pick_score(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] Vec3& a4) { return converted::counted([&] { return converted_guided_cpp::guided::pick_score(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       Vec3 a1 = draw.vector();
@@ -454,7 +478,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -464,7 +490,7 @@ SC_TEST(converted_guided_cpp) {
   {  // launch
     converted::Tally tally("launch");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { return converted::counted([&] { return converted_guided_cpp::guided::launch(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] bool& a3) { return converted::counted([&] { return converted_guided_cpp::guided::launch(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       Vec3 a1 = draw.vector();
@@ -476,7 +502,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -486,7 +514,7 @@ SC_TEST(converted_guided_cpp) {
   {  // track
     converted::Tally tally("track");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] guided::Missile a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { converted::counted([&] { return converted_guided_cpp::guided::track(a0, std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] guided::Missile& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return converted_guided_cpp::guided::track(a0, std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       guided::Missile a0 = draw_guided__Missile(draw);
       Vec3 a1 = draw.vector();
@@ -497,7 +525,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -507,7 +537,7 @@ SC_TEST(converted_guided_cpp) {
   {  // step
     converted::Tally tally("step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] guided::Missile a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { auto r = converted::counted([&] { return converted_guided_cpp::guided::step(a0, std::move(a1), std::move(a2), std::move(a3)); }); return Out_step{std::move(r), std::move(a0)}; };
+    const auto run = [&]([[maybe_unused]] guided::Missile& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { auto r = converted::counted([&] { return converted_guided_cpp::guided::step(a0, std::move(a1), std::move(a2), std::move(a3)); }); return Out_step{std::move(r), std::move(a0)}; };
     for (int i = 0; tally.more(i); ++i) {
       guided::Missile a0 = draw_guided__Missile(draw);
       double a1 = draw.number();
@@ -519,7 +549,9 @@ SC_TEST(converted_guided_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
