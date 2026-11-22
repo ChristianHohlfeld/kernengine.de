@@ -1604,6 +1604,16 @@ struct Blueprint {
   const char* name;
   std::vector<std::string> others;
   explicit Blueprint(const char* actor, std::vector<std::string> actors = {}) : name(actor), others(actors) {
+    // (What it takes before the first call - reading the Blueprint and those it uses from the level, linking,
+    // checking and starting it, in the interpreter and as the class - is said like a function's time: ~Began.)
+    const struct Began {
+      const char* actor;
+      std::chrono::steady_clock::time_point at = std::chrono::steady_clock::now();
+      ~Began() {
+        const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count();
+        if (took >= 1.0) std::printf("  time: Blueprint %s: %.1f s before its first call (read from the level, linked, checked and started - the interpreter and the class)\n", actor, took);
+      }
+    } began{actor};
     interpreted = std::make_unique<RuleBlueprint>(actor, nullptr, false, actors);
     compiled = std::make_unique<RuleBlueprint>(actor, nullptr, true, actors);
     // (The loop guard is the host's: a program whose functions loop long - a sound computed sample by

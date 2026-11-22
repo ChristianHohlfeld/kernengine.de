@@ -83,16 +83,31 @@ inline bool test_engine(kern::logic::EngineStandIn& kept, kern::logic::EngineObj
 }  // namespace sc
 
 namespace sc::rules {
+/// The level file's text as a document, read once by a test program (null: the text is none - `why` says
+/// so). Every Blueprint a test asks for stands in this one document. The level holds 175 Blueprints, and
+/// "Game" is one graph with 150 of them: read anew for each, the text (37 MB) was most of the time of every
+/// test of "Game" - the same answer, 150 times. (Nothing is kept from one run of the program to the next.)
+inline const kern::json::Value* level_document(std::string* why = nullptr) {
+  static const struct Read {
+    kern::json::Value doc;
+    std::string why;
+    bool ok;
+    Read() : ok(kern::json::parse(level_text(), doc, &why)) {}
+  } read;
+  if (!read.ok && why) *why = read.why;
+  return read.ok ? &read.doc : nullptr;
+}
 /// The Blueprint of the level's actor `actor`, read from the level file's text (false: no such actor, or it
 /// has none - `error` says why). The game itself reads the level as a whole (Game::build_level); only the
 /// tests ask for one actor's Blueprint.
 inline bool actor_graph(std::string_view actor, kern::logic::Graph& out, std::string& error) {
-  kern::json::Value doc;
   std::string why;
-  if (!kern::json::parse(level_text(), doc, &why)) {
+  const kern::json::Value* document = level_document(&why);
+  if (!document) {
     error = "the level file: " + why;
     return false;
   }
+  const kern::json::Value& doc = *document;
   for (const kern::json::Value& a : doc["actors"].items()) {
     if (a["name"].as_string() != actor) continue;
     const kern::json::Value& graph = a["components"]["logic"];  // (an actor's Blueprint is one of its components)
