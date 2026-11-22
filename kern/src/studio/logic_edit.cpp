@@ -556,9 +556,14 @@ json::Value Studio::logic_json() const {
         pj.set("id", p.id);
         pj.set("label", p.label);
         pj.set("type", logic::pin_type_name(p.type));
-        if (!p.of.empty()) pj.set("of", p.of);
+        if (!p.of.empty() && p.of != logic::kAnyWidth) pj.set("of", p.of);
         // (a pin that takes the type of the first wire: the types it can be)
         for (const auto& [id, types] : generic) if (id == p.id) pj.set("generic", types);
+        if (p.of == logic::kAnyWidth) {  // (it reads a list of Ints of each width: List<Int>, List<U8> ...)
+          std::string types = "int_list";
+          for (std::string_view w : logic::kWidthNames) types += " " + std::string(w) + "_list";
+          pj.set("generic", types);
+        }
         bool linked = false;
         for (const logic::Link& l : g->links)
           if ((output && l.from == n.id && l.out == p.id) || (!output && l.to == n.id && l.in == p.id)) linked = true;
@@ -892,7 +897,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
   for (const auto& d : lib.all()) {
     if (variable_step(*d) || enum_node(*d) || struct_node(*d)) continue;                 // per variable, per enum, per struct below
     if (d->type == "flow.reroute" || d->type == "value.reroute") continue;               // from a wire, below
-    if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure" || d->type == "func.call_on") continue;  // per function below
+    if (d->type == "func.return" || d->type == "func.call" || d->type == "func.pure" || d->type == "func.call_on" || d->type == "func.callback") continue;  // per function below
     Entry e{d->label, d->category, d->help, d->type, {}};
     if (from_pin && from_type.type != logic::PinType::exec) {
       // a generic node comes in the type that fits the wire (Length of a Text List, Select of a Vector)
@@ -1027,6 +1032,8 @@ json::Value Studio::logic_palette(const json::Value& c) const {
       if (f.external || !f.from.empty()) continue;
       const std::string full = logic::library_function(used, f.name);
       consider({full, "Library " + used, f.help.empty() ? "Calls the function " + f.name + " of the library " + used : f.help, f.pure ? "func.pure" : "func.call", {{"function", full}}});
+      if (f.outputs.size() <= 1)  // (a function of a library as a value the engine calls: Make Callback)
+        consider({"Callback " + full, "Library " + used, "A Callback of " + f.name + ": a value the engine calls (its first input, a const reference, bound to a place)", "func.callback", {{"function", full}}});
     }
   }
   for (const logic::Function& f : g->functions) {
@@ -1036,6 +1043,8 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     if (f.external) continue;  // (a function of another Blueprint has no body here)
     consider({f.name, "Functions", f.help.empty() ? "Calls the function " + f.name : f.help, f.pure ? "func.pure" : "func.call", {{"function", f.name}}});
     consider({"Return (" + f.name + ")", "Functions", "Ends " + f.name + " and gives its outputs to the caller", "func.return", {{"function", f.name}}});
+    if (g->library && f.outputs.size() <= 1)
+      consider({"Callback " + f.name, "Functions", "A Callback of " + f.name + ": a value the engine calls (its first input, a const reference, bound to a place)", "func.callback", {{"function", f.name}}});
   }
   for (const std::string& ev : event_names(level_)) {
     consider({"Call " + ev, "Events", "Raises the custom event " + ev, "flow.call", {{"name", ev}}});
@@ -2570,8 +2579,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       if (!name_problem(g, base).empty()) base += "Value";
       std::string vname = base;
       for (int i = 2; g.variable(vname) || g.function(vname) || g.enumeration(vname) || g.structure(vname); ++i) vname = base + std::to_string(i);
-      const logic::TypeRef held{p.type, p.of};
-      logic::Variable v{vname, p.type, logic::zero_of(held, g).to_json(g, held), {}, p.of};
+      const logic::TypeRef held = logic::place_type(p);
+      logic::Variable v{vname, p.type, logic::zero_of(held, g).to_json(g, held), {}, held.of};
       if (!output)
         if (const json::Value* lit = n->value(p.id)) v.value = logic::Value::from_json(*lit, held, g).to_json(g, held);
       g.variables.push_back(v);

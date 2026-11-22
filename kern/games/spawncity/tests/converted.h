@@ -26,6 +26,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <functional>
 #include <initializer_list>
 #include <list>
 #include <map>
@@ -588,6 +589,19 @@ template <class T, std::size_t N> inline constexpr bool is_list<std::array<T, N>
 template <class T> inline constexpr bool is_box = false;
 template <class T> inline constexpr bool is_box<std::unique_ptr<T>> = !std::is_base_of_v<EngineObject, T>;
 template <class T> inline constexpr bool is_box<std::optional<T>> = true;
+// (a callback of the source - std::function, or a struct of the engine that is one: fn + user, as kern::HeightSampler -: declared
+// before the templates that use them, as the lists are below - their types stand in std and kern, not here)
+template <class S> concept FnAndUser = requires(const S& s) { s.fn; s.user; } && std::is_pointer_v<decltype(S::fn)>;
+template <class R, class... A> Value arg(const std::function<R(A...)>& f);
+template <FnAndUser S> Value arg(const S& s);
+template <class R, class... A> bool same(const std::function<R(A...)>& want, const Value& got);
+template <FnAndUser S> bool same(const S& want, const Value& got);
+template <FnAndUser S> bool defined(const S&);
+template <FnAndUser S> std::string text(const S& s);
+template <class R, class... A> void take(std::function<R(A...)>& to, const Value& v);
+template <class R, class... A> bool defined(const std::function<R(A...)>&);
+template <class R, class... A> std::string text(const std::function<R(A...)>& f);
+template <FnAndUser S> void take(S& to, const Value& v);
 template <class T> Value arg(const std::vector<T>& v);
 template <class T> bool same(const std::vector<T>& want, const Value& got);
 template <class T> bool defined(const std::vector<T>& v);
@@ -1141,6 +1155,30 @@ template <class T> void take(kern::Span<T>& to, const Value& v) {
   to = kern::Span<T>(kept.back().data(), kept.back().size());
 }
 /// By the type as the program spells it (S, with Whole where it says u64 or i64 - see shaped).
+/// Numbers the engine gives at a place of its own (`const f64* RoadStream::data()`): the test keeps those its stand-in
+/// answers, and the source reads them where the pointer points - as long as the test runs.
+/// How many numbers there are where a pointer the test took (take of a const T*) points - none for any other pointer.
+inline std::map<const void*, std::size_t>& rooms() {
+  static std::map<const void*, std::size_t> r;
+  return r;
+}
+template <class T>
+  requires std::is_arithmetic_v<T>
+void take(const T*& to, const Value& v) {
+  static std::deque<std::vector<T>> kept;
+  kept.emplace_back();
+  take(kept.back(), v);
+  to = kept.back().data();
+  rooms()[to] = kept.back().size();
+}
+/// How many entries the source hands the engine from a pointer, a count beside it: as many as the count says - but where
+/// the pointer is one the test took from the stand-in (data() of an object of the engine), the numbers it holds, all
+/// of them: the Blueprint hands the engine the list that node gave it, and the stand-in answers size() on its own
+/// (the count is handed beside them, and compared as well).
+template <class T> std::size_t room(const T* p, std::size_t count) {
+  const auto it = rooms().find(static_cast<const void*>(p));
+  return it == rooms().end() ? count : it->second;
+}
 template <class S> struct Take {
   template <class T> static void to(T& target, const Value& v) { take(target, v); }
 };
@@ -1384,6 +1422,161 @@ inline bool same_value(const Value& a, const Value& b) {
   return a == b;
 }
 
+// ---- callbacks: a function the engine calls back (std::function<R(A...)>, or a struct of the engine that is one -
+// `struct HeightSampler { f64 (*fn)(void* user, f64 x, f64 y); void* user; }`). In the Blueprint a Callback
+// (PinType::callback): a function of a library and the place it is bound to; only the engine calls it. ----
+template <class T> struct CallbackSig;
+template <class R, class... A> struct CallbackSig<std::function<R(A...)>> { using Result = R; using Args = std::tuple<A...>; };
+template <class R, class... A> struct CallbackSig<R (*)(void*, A...)> { using Result = R; using Args = std::tuple<A...>; };
+/// A callback of the source as the Blueprint is handed it: a Callable that calls it, its arguments and result as
+/// the test's values (take, arg).
+template <class R, class Args, class F> struct SourceCallable;
+template <class R, class... A, class F> struct SourceCallable<R, std::tuple<A...>, F> : kern::logic::Callable {
+  F f;
+  explicit SourceCallable(F g) : f(std::move(g)) {}
+  bool call(std::span<const Value> args, Value& result) const override {
+    if (args.size() != sizeof...(A)) return false;
+    std::tuple<std::remove_cvref_t<A>...> in;
+    std::size_t k = 0;
+    std::apply([&](auto&... x) { ((take(x, args[k++])), ...); }, in);
+    if constexpr (std::is_void_v<R>) {
+      std::apply(f, in);
+      result = Value{};
+    } else {
+      result = arg(std::apply(f, in));
+    }
+    return true;
+  }
+};
+template <class R, class... A> Value arg(const std::function<R(A...)>& f) {
+  if (!f) return Value::callback(nullptr);
+  return Value::callback(std::make_shared<SourceCallable<R, std::tuple<A...>, std::function<R(A...)>>>(f));
+}
+template <FnAndUser S> Value arg(const S& s) {
+  using Sig = CallbackSig<std::remove_cv_t<decltype(S::fn)>>;
+  if (!s.fn) return Value::callback(nullptr);
+  const auto call = [fn = s.fn, user = s.user](auto... a) { return fn(user, a...); };
+  return Value::callback(std::make_shared<SourceCallable<typename Sig::Result, typename Sig::Args, decltype(call)>>(call));
+}
+/// The values a callback is called with to compare it (a number, a whole number, a flag, a vector of each input).
+template <class X> Value probe_value(f64 v) {
+  if constexpr (std::is_same_v<X, bool>) return Value::boolean(v > 0);
+  else if constexpr (std::is_integral_v<X>) return Value::integer(static_cast<kern::i64>(v * 4));
+  else if constexpr (std::is_floating_point_v<X>) return Value::number(v);
+  else return Value::vector({static_cast<f32>(v), static_cast<f32>(-v), static_cast<f32>(v * 0.5)});
+}
+template <class... A> std::vector<Value> probe_values(std::tuple<A...>*, std::size_t from) {
+  static constexpr f64 at[] = {1.5, -2.25, 4, 0, -0.5, 7.25};
+  std::size_t k = from;
+  return {probe_value<std::remove_cvref_t<A>>(at[k++ % std::size(at)])...};
+}
+/// The source's callback called at a place to compare it (same_call) is a call of the source as the one the test made:
+/// it runs as that one does - where it goes through a place C++ leaves open (g_open), or is given up (g_bail), its
+/// answer is nothing C++ says, and the test's call is counted with those it has nothing to compare for (g_probe_open,
+/// Tally::take) - as when the call itself had gone there. (Defined below, with the places C++ leaves open.)
+inline bool g_probe_open = false;
+inline bool probe_source(const std::function<bool(std::span<const Value>, Value&)>& f, std::span<const Value> in, Value& out);
+/// Is what the Blueprint gives this callback? The same, bound or not, and where bound, the same answer at a few places
+/// (1.5, -2.25, 4, …), bit for bit - what the engine would get from either.
+template <class R, class Args> bool same_call(const std::function<bool(std::span<const Value>, Value&)>& want, const Value& got) {
+  if (got.type != kern::logic::PinType::callback) return differ_at([] { return std::string("a callback"); }, [&] { return std::string("no callback"); });
+  for (int round = 0; round < 3; ++round) {
+    const std::vector<Value> in = probe_values(static_cast<Args*>(nullptr), static_cast<std::size_t>(round));
+    Value a, b;
+    const bool wa = probe_source(want, in, a);
+    if (g_probe_open) return true;   // (not compared: see Tally::take)
+    const bool gb = got.call && got.call->call(in, b);
+    if (wa != gb) return differ_at([&] { return std::string(wa ? "bound" : "unbound"); }, [&] { return std::string(gb ? "bound" : "unbound"); });
+    if (!wa) return true;
+    if (!same_value(a, b)) return differ_at([&] { return "at call " + std::to_string(round + 1) + ": " + shown(a); }, [&] { return shown(b); });
+  }
+  return true;
+}
+template <class R, class... A> bool same(const std::function<R(A...)>& want, const Value& got) {
+  const Value w = arg(want);
+  return same_call<R, std::tuple<std::remove_cvref_t<A>...>>([&](std::span<const Value> in, Value& out) { return w.call && w.call->call(in, out); }, got);
+}
+template <FnAndUser S> bool same(const S& want, const Value& got) {
+  using Sig = CallbackSig<std::remove_cv_t<decltype(S::fn)>>;
+  const Value w = arg(want);
+  return same_call<typename Sig::Result, typename Sig::Args>([&](std::span<const Value> in, Value& out) { return w.call && w.call->call(in, out); }, got);
+}
+template <class R, class... A> std::string text(const std::function<R(A...)>& f) { return f ? "(a callback)" : "(no callback)"; }
+template <FnAndUser S> std::string text(const S& s) { return s.fn ? "(a callback)" : "(no callback)"; }
+/// What the Blueprint gives, as the source's callback: one that calls it (the value kept as long as the test runs).
+template <class R, class... A> void take(std::function<R(A...)>& to, const Value& v) {
+  if (!v.call) { to = nullptr; return; }
+  to = [held = v](A... a) -> R {
+    Value r;
+    std::vector<Value> in{arg(a)...};
+    held.call->call(in, r);
+    if constexpr (!std::is_void_v<R>) {
+      R out{};
+      take(out, r);
+      return out;
+    }
+  };
+}
+template <class R, class... A> R value_callback_thunk(void* user, A... a) {
+  const Value& held = *static_cast<const Value*>(user);
+  Value r;
+  std::vector<Value> in{arg(a)...};
+  if (held.call) held.call->call(in, r);
+  if constexpr (!std::is_void_v<R>) {
+    R out{};
+    take(out, r);
+    return out;
+  }
+}
+template <class R, class... A> auto value_thunk_of(R (*)(void*, A...)) { return &value_callback_thunk<R, A...>; }
+template <FnAndUser S> void take(S& to, const Value& v) {
+  if (!v.call) { to.fn = nullptr; to.user = nullptr; return; }
+  static std::deque<Value> kept;
+  kept.push_back(v);
+  to.fn = value_thunk_of(decltype(S::fn){});
+  to.user = &kept.back();
+}
+template <class X> f64 callback_number(const X& x) {
+  if constexpr (std::is_arithmetic_v<X>) return static_cast<f64>(x);
+  else return static_cast<f64>(x.x) + 2.0 * static_cast<f64>(x.y);
+}
+/// A drawn callback: none (unbound), or one of three plain functions of its arguments (each the same in every run).
+template <class R, class... A> struct DrawnCallback {
+  static R pick(int which, A... a) {
+    if constexpr (std::is_void_v<R>) {
+      return;
+    } else {
+      f64 sum = 0, k = 1;
+      ((sum += k * static_cast<f64>(callback_number(a)), k += 0.5), ...);
+      const f64 r = which == 0 ? sum : which == 1 ? sum * 0.25 - 1.5 : -sum + 3;
+      if constexpr (std::is_same_v<R, bool>) return r > 0;
+      else if constexpr (std::is_arithmetic_v<R>) return static_cast<R>(r);
+      else return R{static_cast<f32>(r), static_cast<f32>(-r), 0};
+    }
+  }
+  template <int W> static R plain(void*, A... a) { return pick(W, a...); }
+};
+template <class T> T draw_callback(Draw& draw) {
+  const u32 which = draw.below(4);
+  T out{};
+  if constexpr (FnAndUser<T>) {
+    if (which == 3) return out;
+    using Sig = CallbackSig<std::remove_cv_t<decltype(T::fn)>>;
+    [&]<class... A>(std::tuple<A...>*) {
+      using D = DrawnCallback<typename Sig::Result, A...>;
+      out.fn = which == 0 ? &D::template plain<0> : which == 1 ? &D::template plain<1> : &D::template plain<2>;
+    }(static_cast<typename Sig::Args*>(nullptr));
+  } else {
+    if (which == 3) return out;
+    using Sig = CallbackSig<T>;
+    [&]<class... A>(std::tuple<A...>*) {
+      using D = DrawnCallback<typename Sig::Result, A...>;
+      out = [which](A... a) { return D::pick(static_cast<int>(which), a...); };
+    }(static_cast<typename Sig::Args*>(nullptr));
+  }
+  return out;
+}
+
 /// The Blueprints of the level's actors a converted Blueprint calls on them (Call on Actor, Get Variable on
 /// Actor - kern::logic::ActorBlueprint in the source), running beside it in its runtime, each by its name
 /// (RuleBlueprint: the host's find_actor finds them) - and for the source in a runtime of their own, bound
@@ -1475,6 +1668,7 @@ struct Blueprint {
   const std::vector<std::string>& calls(bool in_class) { return (in_class ? compiled : interpreted)->host.stand_in.calls; }
   void before_call(bool in_class) {
     (in_class ? compiled : interpreted)->host.stand_in.calls.clear();
+    (in_class ? compiled : interpreted)->host.stand_in.kept.clear();   // (what objects of the engine were handed before: not of this call - see the source's)
     if (real_engine()) fresh_engine((in_class ? compiled : interpreted)->host.objects);
     (in_class ? compiled_actors : interpreted_actors).restore();
   }
@@ -1674,6 +1868,14 @@ struct Tally {
       ++class_only;
       most_passes_alone = std::max(most_passes_alone, looped);
     }
+    // (a callback the source gives, called to compare it, that went where C++ says nothing: not compared - probe_source)
+    g_probe_open = false;
+    const bool equal = ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0]);
+    if (g_probe_open) {
+      g_probe_open = false;
+      ++outside;
+      return;
+    }
     ++compared;
     if (class_asks > source_asks) {
       if (++costlier == 1 && cost::tracing) {
@@ -1684,7 +1886,7 @@ struct Tally {
       }
       if (class_asks - source_asks > most_class - with_source) most_class = class_asks, with_source = source_asks;
     }
-    if (ia && ib && a.size() == 1 && b.size() == 1 && a[0] == b[0] && same(want, a[0]) && same(want, b[0])) return;
+    if (equal) return;
     if (++wrong <= 3) {
       std::printf("  %s(%s): the source gives %s, the Blueprint %s (interpreter) and %s (class)\n", function, describe().c_str(), text(want).c_str(),
                   !both ? "(not run)" : ia && a.size() == 1 ? shown(a[0]).c_str() : "nothing", ib && b.size() == 1 ? shown(b[0]).c_str() : "nothing");
@@ -1785,6 +1987,42 @@ template <class P> P&& present(P&& p) {
   }
   return std::forward<P>(p);
 }
+
+/// (declared above same_call) The source's callback, called as the source is in a test's call: watched (g_open, the
+/// floating-point flags) and given up where it reads on for ever or holds nothing (g_bail); what the call itself
+/// left stays as it was.
+inline bool probe_source(const std::function<bool(std::span<const Value>, Value&)>& f, std::span<const Value> in, Value& out) {
+  const bool was_open = g_open, could = g_can_bail;
+  const long was_reads = g_open_reads;
+  std::fexcept_t flags;
+  std::fegetexceptflag(&flags, FE_ALL_EXCEPT);
+  std::feclearexcept(FE_ALL_EXCEPT);
+  std::jmp_buf outer;
+  std::memcpy(&outer, &g_bail, sizeof(std::jmp_buf));
+  g_open = false;
+  g_open_reads = 0;
+  volatile bool bound = false, open = false;
+  if (setjmp(g_bail) == 0) {
+    g_can_bail = true;
+    may_bail(true);
+    bound = f(in, out);
+    g_can_bail = false;
+  } else {
+    open = true;
+  }
+  may_bail(false);
+  if (g_open || std::fetestexcept(FE_DIVBYZERO | FE_INVALID) != 0) open = true;
+  std::memcpy(&g_bail, &outer, sizeof(std::jmp_buf));
+  g_can_bail = could;
+  if (could) may_bail(true);
+  g_open = was_open;
+  g_open_reads = was_reads;
+  std::fesetexceptflag(&flags, FE_ALL_EXCEPT);
+  if (open) g_probe_open = true;
+  return bound;
+}
+template <class R, class... A> bool defined(const std::function<R(A...)>&) { return true; }
+template <FnAndUser S> bool defined(const S&) { return true; }
 
 /// How many entries a list has: a container, an array - or a view (kern::Span says its length as a field).
 template <class C> constexpr std::size_t entries(const C& c) {
@@ -1927,18 +2165,40 @@ template <class R, class A, class B> constexpr bool both_held(A a, B b) {
     return false;
   }
 }
+// A whole number with a sign narrower than 64 bits (i32, and what is promoted to int): C++ leaves open what a
+// sum, a difference, a product or a negation gives outside its range (UBSan: "signed integer overflow"). The
+// test computes it exactly, marks the call there (open_read - it is given up and drawn again, never compared)
+// and goes on with the bits the number keeps, so the source itself never does what C++ leaves open.
+template <class R> constexpr bool narrow_signed() { return std::is_integral_v<R> && std::is_signed_v<R> && sizeof(R) < 8; }
+template <class R> constexpr R kept_narrow(long long exact) {
+  if (exact < static_cast<long long>(std::numeric_limits<R>::min()) || exact > static_cast<long long>(std::numeric_limits<R>::max())) open_read();
+  return static_cast<R>(static_cast<std::make_unsigned_t<R>>(static_cast<unsigned long long>(exact)));
+}
+template <class A> constexpr auto neg(A a) -> decltype(-a) {
+  using R = decltype(-a);
+  if constexpr (std::is_integral_v<R> && std::is_signed_v<R>) {
+    if (static_cast<R>(a) == std::numeric_limits<R>::min()) {
+      open_read();
+      return static_cast<R>(a);
+    }
+  }
+  return -a;
+}
 template <class A, class B> constexpr auto plus(A a, B b) -> decltype(a + b) {
   using R = decltype(a + b);
+  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) + static_cast<long long>(b));
   if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) + static_cast<long long>(static_cast<R>(b)));
   return a + b;
 }
 template <class A, class B> constexpr auto minus(A a, B b) -> decltype(a - b) {
   using R = decltype(a - b);
+  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) - static_cast<long long>(b));
   if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) - static_cast<long long>(static_cast<R>(b)));
   return a - b;
 }
 template <class A, class B> constexpr auto times(A a, B b) -> decltype(a * b) {
   using R = decltype(a * b);
+  if constexpr (narrow_signed<R>()) return kept_narrow<R>(static_cast<long long>(a) * static_cast<long long>(b));
   if (both_held<R>(a, b)) return kept<R>(static_cast<__int128>(static_cast<long long>(static_cast<R>(a))) * static_cast<long long>(static_cast<R>(b)));
   return a * b;
 }
@@ -2080,6 +2340,7 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
+    g_source_engine.kept.clear();   // (the Callbacks objects of the engine kept from an earlier call: each call begins with an engine that holds none - both sides alike)
     g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - rule_blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);
   }

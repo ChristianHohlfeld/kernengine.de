@@ -3568,6 +3568,11 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("DeepCount").as_int() == 63 && r.find("events nest more than") != std::string::npos && !inst->disabled());
       CHECK(inst->get("Tail").as_int() == 630);  // every handler's ten open steps ran when the levels below were over
     }
+    if (std::string(c.name) == "recursion_direct") CHECK(inst->get("R").as_int() == 55 + 144 + 377 + 610 + 610 + 89 && inst->get("Count").as_int() == 2 + 14 + 62 + 126 + 126 + 6 && !inst->disabled());
+    if (std::string(c.name) == "recursion_through") CHECK(inst->get("Trail").as_number() == 614664 && inst->get("Hops").as_int() == 17 && !inst->disabled());
+    if (std::string(c.name) == "recursion_deep") CHECK(inst->get("Depth").as_int() == 5000 && !inst->disabled());
+    if (std::string(c.name) == "recursion_endless")
+      CHECK(inst->get("Steps").as_int() == logic::Runtime::kCallsDeep && inst->disabled() && r.find("function calls nest") != std::string::npos);
     if (std::string(c.name) == "whole_numbers") {
       const i64 top = std::numeric_limits<i64>::max();
       CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
@@ -4050,6 +4055,7 @@ static logic::Graph every_node_graph(bool wired) {
   for (const std::string& type : types) {
     const logic::NodeDef* def = lib.find(type);
     if (type == "func.entry" || type == "func.return") continue;
+    if (type == "func.callback") continue;  // (it names a function of a library: a Blueprint of its own uses one - logic_callbacks)
     // (the engine's functions name the engine's structs: a Blueprint of their own declares those and calls
     // every one of them - the case Engine of blueprint_native.h, read from its text and written again)
     if (logic::engine_function(type)) continue;
@@ -4057,7 +4063,7 @@ static logic::Graph every_node_graph(bool wired) {
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
       // (Copy Bytes on a list of whole numbers: its default numbers are bytes, u8; Insert Text Bytes takes only such a list)
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" || type == "list.insert_text" ? "LI" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" || type == "list.insert_text" ? "LI" : type == "text.set_code" ? "VT" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
                                     pd.kind == K::field ? "In" : pd.kind == K::function ? (pd.optional ? pd.def : def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
@@ -4150,6 +4156,103 @@ TEST(logic_notation_every_node_type) {
   for (const char* ok : {"Heat", "max_stars", "a1", "Go", "n", "on", "it", "x_y"}) CHECK(logic::cpp_name_ok(ok));
   for (const char* no : {"", "1a", "my var", "class", "float", "Float", "Text", "loop", "entry", "n12", "go3", "on7", "it1", "machine2", "n007", "a__b", "_Big", "kern", "kern_x", "ä"})
     CHECK(!logic::cpp_name_ok(no));
+}
+
+TEST(logic_notation_values_of_a_call) {
+  // What a step of a function gives, and what its loop keeps while it runs, is the call's own: a
+  // local of the method, where only the function's own path after it reads it. Read before the
+  // step (a loop's earlier pass) or in an event: a member, as before. The reader also takes such a
+  // value as a member (texts of before); declared in the wrong body, it is refused.
+  const std::string text =
+      "struct Calls : kern::Blueprint {\n"
+      "  // ---- variables ----\n"
+      "  Float Total = 0.0;\n"
+      "  Float Last = 0.0;\n"
+      "\n"
+      "  // ---- functions ----\n"
+      "  struct HalfResult { Float h = 0.0; };\n"
+      "  HalfResult Half(Float x = 0.0) {\n"
+      "    return {math_div(x, 2.0)};\n"
+      "  }\n"
+      "\n"
+      "  struct SumResult { Float s = 0.0; };\n"
+      "  SumResult Sum(Int n = 0) {\n"
+      "    Float Acc = 0.0;\n"
+      "    struct : kern::Node<11> { Int index = 0; } n11;\n"
+      "    HalfResult n12;\n"
+      "    for (auto it11 = flow_for(n11, 1, n); it11.next();) {\n"
+      "      Last = n13.h;\n"
+      "      n12 = Half(kern::to<Float>(n11.index));\n"
+      "      Acc = math_add(Acc, n12.h);\n"
+      "      n13 = Half(Acc);\n"
+      "    }\n"
+      "    return {Acc};\n"
+      "  }\n"
+      "\n"
+      "  // ---- events ----\n"
+      "  KERN_EVENT(on1, event_custom<\"Go\">)\n"
+      "  void on1(Actor actor, Float value, Text text) {\n"
+      "    n2 = Sum(kern::to<Int>(value));\n"
+      "    Total = n2.s;\n"
+      "  }\n"
+      "\n"
+      "  // ---- what nodes give and keep ----\n"
+      "  SumResult n2;\n"
+      "  HalfResult n13;\n"
+      "};\n";
+  auto strip = [](const std::string& s) {  // (the struct alone: without the head and the layout)
+    const std::size_t from = s.find("struct Calls"), at = s.find("\nKERN_LAYOUT(");
+    return from == std::string::npos || at == std::string::npos ? s : s.substr(from, at - from);
+  };
+  logic::Graph g;
+  std::string name, error, again;
+  const bool read = logic::from_cpp(text, g, &name, &error);
+  if (!read) std::printf("%s\n", error.c_str());
+  CHECK(read && logic::to_cpp(g, name, again, &error));
+  if (strip(again) != text) std::printf("%s\n", again.c_str());
+  CHECK(strip(again) == text);
+  // the same Blueprint with n12 and n11 as members (as texts had them before)
+  std::string before = text;
+  auto cut = [&](const std::string& what) { const std::size_t at = before.find(what); CHECK(at != std::string::npos); if (at != std::string::npos) before.erase(at, what.size()); };
+  cut("    HalfResult n12;\n");
+  cut("    struct : kern::Node<11> { Int index = 0; } n11;\n");
+  before.insert(before.rfind("};"), "  HalfResult n12;\n  struct : kern::Node<11> { Int index = 0; } n11;\n");
+  logic::Graph old;
+  CHECK(logic::from_cpp(before, old, &name, &error) && logic::same_blueprint(old, g));
+  // a value an earlier pass of the loop reads (n13), or one an event reads (n2), is no local of Sum
+  for (const char* member : {"  HalfResult n13;\n", "  SumResult n2;\n"}) {
+    std::string wrong = text;
+    const std::size_t at = wrong.find(member);
+    wrong.erase(at, std::strlen(member));
+    wrong.insert(wrong.find("    for (auto it11"), std::string("  ") + member);
+    logic::Graph bad;
+    CHECK(!logic::from_cpp(wrong, bad, &name, &error) && error.find("it is a member of the class") != std::string::npos);
+  }
+}
+
+TEST(logic_recursion_rules) {
+  // A function may call itself, directly or through others, as a step. Read as a value it would
+  // read itself (a value has no circles); and in a circle what its steps give stays on its path.
+  auto refused = [](const char* text, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool read = logic::from_cpp(text, g, nullptr, &error);
+    if (read || error.find(why) == std::string::npos) std::printf("%s\n", error.c_str());
+    return !read && error.find(why) != std::string::npos;
+  };
+  CHECK(refused("struct P : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  KERN_PURE HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      return {Half(math_div(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
+                "calls itself and is read as a value"));
+  CHECK(refused("struct Q : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
+                "  // ---- what nodes give and keep ----\n  HalfResult n5;\n};\n",
+                "calls itself, so every call has its own values"));
+  logic::Graph ok;
+  std::string error;
+  CHECK(logic::from_cpp("struct R : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n    HalfResult n5;\n"
+                        "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
+                        ok, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
 }
 
 TEST(logic_notation_reads_what_a_person_writes) {
@@ -4683,7 +4786,15 @@ TEST(logic_fixed_widths) {
   CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
   CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
   CHECK(says("  Map<Int, U32> Bad = Map<Int, U32>{};\n", "Int of a fixed width"));
-  CHECK(says("  List<U8> Bytes = List<U8>{};\n", "a list of Ints of a fixed width is no type of the language yet"));
+  // a list of Ints of a fixed width: its default holds its values; a list of another width (or of Int) is another type; Copy Bytes
+  // writes numbers of its width into it; a field of a width has its own width in a layout
+  CHECK(says("  List<U8> Bad = List<U8>{1, 256};\n", "a list's item: 256 is no U8"));
+  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_append(W, B);\n  }\n",
+             "this is List<U8>, the input is List<Int>: the two do not convert"));
+  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_copy_bytes<\"u32\", \"u8\">(B, 0, W, 0, 4);\n  }\n",
+             "its numbers are u8, not u32"));
+  CHECK(says("  KERN_STRUCT(H) {\n    U8 a = 0;\n  };\n  List<U16> B = List<U16>{};\n  H Hh = H{0};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    Hh = struct_of_bytes<H, \"2: u16@0\">(B, 0);\n  }\n",
+             "its own width"));
   {
     // ... and a graph that says it wrong
     logic::Graph h;
@@ -4692,6 +4803,21 @@ TEST(logic_fixed_widths) {
     std::string all;
     for (const logic::Issue& i : logic::check(h)) all += i.text + "\n";
     CHECK(all.find("variable \"W\" is U16, its default 70000 is none of its values (0 .. 65535)") != std::string::npos && all.find("variable \"X\"") != std::string::npos);
+  }
+  {
+    // Lists of a width hold and give what std::vector<u8>, <int8_t>, <uint32_t> hold and give - the same steps in C++ give these numbers
+    // (and the case fixed_width_lists runs as a class and in the JIT against this interpreter)
+    for (const logic_cases::Case& c : logic_cases::cases()) {
+      if (std::string(c.name) != "fixed_width_lists") continue;
+      logic_cases::Host lh;
+      logic::Runtime lr(lh);
+      lr.native = false;
+      logic::Instance* li = lr.add(logic_cases::parse(c), 0, "l");
+      lr.begin();
+      CHECK(li->get("W").as_text() ==
+            "[3, 0, -1, 6, 7, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 128, 127, 0, 0, 0, 254, -2, -61, -65, 122, 0, 0, -1, "
+            "-1, 0, -1, 127, -128, 0, -1, -128, 127, -1, 1, 0, 127, 20]");
+    }
   }
 }
 
@@ -5614,6 +5740,92 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   CHECK(logic::from_cpp("struct A : kern::Blueprint {\n};\n", g, nullptr, &error) && g.empty());
 }
 
+TEST(logic_callbacks) {
+  // A Callback: a function of a library as a value only the engine calls (Make Callback) - its first input bound to a
+  // place, read where it stands when the engine calls; unbound once the Blueprint that made it has ended.
+  const char* ground =
+      "struct Ground : virtual kern::Library {\n  // ---- types ----\n  KERN_STRUCT(Field) {\n    Float Base = 1.0;\n    Float Slope = 0.5;\n  };\n\n  // ---- functions ----\n"
+      "  struct heightResult { Float h = 0.0; };\n"
+      "  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {\n    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x + y; }, f.Base, f.Slope, x, y)};\n  }\n\n"
+      "  struct loudResult { Float h = 0.0; };\n"
+      "  loudResult loud(const Field& f, Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {f.Base};\n  }\n};\n";
+  const char* site =
+      "struct Site : virtual kern::Blueprint, virtual Ground {\n  // ---- variables ----\n"
+      "  Field Here = Field{2.0, 0.5};\n  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};\n\n  // ---- functions ----\n"
+      "  void Make() {\n    Kept = callback<&Ground::height>(Here);\n  }\n\n"
+      "  struct MadeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; };\n"
+      "  KERN_PURE MadeResult Made() {\n    return {callback<&Ground::height>(Here)};\n  }\n};\n";
+  std::map<std::string, logic::Graph> project;
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    auto it = project.find(std::string(name));
+    return it == project.end() ? nullptr : &it->second;
+  };
+  auto read = [&](const char* name, const std::string& text) {
+    std::string error;
+    logic::Graph g;
+    if (!logic::from_cpp(text, g, nullptr, &error, logic::library(), all)) return error;
+    for (const logic::Issue& i : logic::check(g)) if (i.error) error += i.text + "\n";
+    if (!error.empty()) return error;
+    project[name] = std::move(g);
+    return std::string();
+  };
+  const std::string g1 = read("Ground", ground), g2 = read("Site", site);
+  CHECK(g1.empty() && g2.empty());
+  if (!g1.empty() || !g2.empty()) std::printf("%s%s", g1.c_str(), g2.c_str());
+  const logic::TypeRef type{logic::PinType::callback, "float(float,float)"};
+  // the text, the graph and the document: one thing
+  for (const char* name : {"Ground", "Site"}) {
+    std::string text, error;
+    logic::Graph back, stored;
+    CHECK(logic::to_cpp(project[name], name, text, &error, logic::library(), false));
+    CHECK(logic::from_cpp(text, back, nullptr, &error, logic::library(), all) && back == project[name]);
+    if (!(back == project[name])) std::printf("%s is written as:\n%s\n%s\n", name, text.c_str(), error.c_str());
+    CHECK(logic::graph_from_json(logic::graph_to_json(project[name]), stored) && stored == project[name]);
+    CHECK(logic::cpp_problem(project[name]).empty());
+  }
+  CHECK(logic::type_label(type) == "Callback of Float(Float, Float)" && logic::type_text(type) == "callback<float(float,float)>");
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    rt.blueprints = all;
+    logic::Instance* inst = rt.add(project["Site"], 0, "Site");
+    rt.begin();
+    std::vector<logic::Value> out;
+    logic::Value r;
+    CHECK(!logic::call_back(inst->get("Kept"), type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.type == logic::PinType::number && r.n == 0);
+    CHECK(inst->call("Make", {}, out) && host.errors.empty());
+    const logic::Value kept = inst->get("Kept");
+    // 2 + 0.5 * 1 + 3: the place as it is when the engine calls
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 5.5);
+    CHECK(inst->set("Here", logic::Value::structure({logic::Value::number(10), logic::Value::number(2)})));
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 15);
+    CHECK(inst->call("Made", {}, out) && out.size() == 1 && out[0].type == logic::PinType::callback && logic::call_back(out[0], type, std::vector<logic::Value>{logic::Value::number(0), logic::Value::number(0)}, r) && r.n == 10);
+    rt.remove(0);
+    rt.clear();
+    CHECK(!logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 0);  // (its Blueprint has ended: unbound)
+  }
+  // what is no Callback
+  auto says = [&](const std::string& got, const char* why) {
+    if (got.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, got.empty() ? "(nothing wrong)" : got.c_str());
+    return got.find(why) != std::string::npos;
+  };
+  // a loop keeps where it is only while it runs (set anew whenever it starts): a Callback's function may have one
+  {
+    const std::string loops = read("Loops", "struct Loops : virtual kern::Library {\n  struct stepsResult { Float h = 0.0; };\n  stepsResult steps(Float x = 0.0) {\n"
+                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\">(kern::to<Float>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
+                                            "    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n"
+                                            "    return {callback<&Loops::steps>()};\n  }\n\n  struct : kern::Node<1> { Int index = 0; } n1;\n};\n");
+    CHECK(loops.empty());
+    if (!loops.empty()) std::printf("Loops: %s", loops.c_str());
+  }
+  CHECK(says(read("Bad1", "struct Bad1 : virtual kern::Blueprint, virtual Ground {\n  Callback<Float(Float)> K = Callback<Float(Float)>{};\n\n  void Make() {\n    K = callback<&Ground::loud>(Here);\n  }\n};\n"), "Here"));
+  CHECK(says(read("Bad2", "struct Bad2 : virtual kern::Library {\n  struct loudResult { Float h = 0.0; };\n  loudResult loud(Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad2::loud>()};\n  }\n};\n"), "needs the world"));
+  CHECK(says(read("Bad4", "struct Bad4 : virtual kern::Blueprint, virtual Ground {\n  List<Field> Fields = List<Field>{Field{1.0, 0.5}};\n  Callback<Float(Float, Float)> K = Callback<Float(Float, Float)>{};\n\n  void Make() {\n    K = callback<&Ground::height>(Fields[0]);\n  }\n};\n"), "an entry of a list"));
+  CHECK(says(read("Bad3", "struct Bad3 : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct fResult { Float r = 0.0; };\n  KERN_PURE fResult f(Float x = 0.0) {\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad3::f>()};\n  }\n};\n"), "a Callback names a function of a library"));
+}
+
 TEST(logic_libraries) {
   // A library is a Blueprint that keeps nothing: types and functions. A Blueprint that uses it
   // has its types and calls its functions directly - Wheels::skid(Spare[at], by); -, also with
@@ -5632,9 +5844,8 @@ TEST(logic_libraries) {
       "struct Garage : virtual kern::Blueprint, virtual Wheels {\n  // ---- variables ----\n"
       "  List<Wheel> Spare = List<Wheel>{Wheel{0.5, Side::Front, List<Float>{}}};\n  Float Seen = 0.0;\n\n  // ---- functions ----\n"
       "  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; };\n"
-      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
-      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n\n"
-      "  // ---- what nodes give and keep ----\n  Wheels::twiceResult n5;\n};\n";
+      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::twiceResult n5;\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
+      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n};\n";
   std::map<std::string, logic::Graph> project;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
     auto it = project.find(std::string(name));
@@ -5952,11 +6163,11 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
       CHECK(!i.error);
     }
   };
-  // a function does not run again while it runs: not by calling itself, not through another one
-  problem(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
+  // a function calls itself as a step - its own values in every call (that this one never ends is
+  // the scenario's, not the graph's: logic_cases recursion_endless) - but not as a value
+  fine(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
             "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}}],
-            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})",
-          "function \"Fact\" calls itself:", 21);
+            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})");
   problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"G","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.pure","params":{"function":"G"}},{"id":3,"type":"func.return","params":{"function":"F"}},
               {"id":4,"type":"func.entry","params":{"function":"G"}},{"id":5,"type":"func.call","params":{"function":"F"}},{"id":6,"type":"func.return","params":{"function":"G"}}],

@@ -22,6 +22,7 @@ struct S_MeshData { [[maybe_unused]] static Value to(EngineObjects& o, const ker
 struct S_MeshInput { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshInput& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshInput& x); };
 struct S_MeshLook { [[maybe_unused]] static Value to(EngineObjects& o, const kern::MeshLook& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::MeshLook& x); };
 struct S_Rgb { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Rgb& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Rgb& x); };
+struct S_RoadOptions { [[maybe_unused]] static Value to(EngineObjects& o, const kern::RoadOptions& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::RoadOptions& x); };
 struct S_Vec4 { [[maybe_unused]] static Value to(EngineObjects& o, const kern::Vec4& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::Vec4& x); };
 struct S_WeldStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::WeldStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::WeldStats& x); };
 Value S_BuildingOptions::to(EngineObjects& o, const kern::BuildingOptions& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.chunk_size), ev::Conv<ev::Int>::to(o, x.max_buildings), ev::Conv<ev::Bool>::to(o, x.cornice), ev::Conv<ev::Bool>::to(o, x.wall_records), ev::Conv<ev::Struct<S_BuildingStyle>>::to(o, x.style)}); }
@@ -42,6 +43,8 @@ Value S_MeshLook::to(EngineObjects& o, const kern::MeshLook& x) { return Value::
 void S_MeshLook::from(EngineObjects& o, const Value& v, kern::MeshLook& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_Material>>::from(o, *f, x.material); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.extra_slot); if (const Value* f = v.field(2)) ev::Conv<ev::Int>::from(o, *f, x.texture); if (const Value* f = v.field(3)) ev::Conv<ev::Bool>::from(o, *f, x.visible); if (const Value* f = v.field(4)) ev::Conv<ev::Int>::from(o, *f, x.layers); if (const Value* f = v.field(5)) ev::Conv<ev::Bool>::from(o, *f, x.pick_bvh); }
 Value S_Rgb::to(EngineObjects& o, const kern::Rgb& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.r), ev::Conv<ev::Float>::to(o, x.g), ev::Conv<ev::Float>::to(o, x.b)}); }
 void S_Rgb::from(EngineObjects& o, const Value& v, kern::Rgb& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.r); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.g); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.b); }
+Value S_RoadOptions::to(EngineObjects& o, const kern::RoadOptions& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.center_x), ev::Conv<ev::Float>::to(o, x.center_y), ev::Conv<ev::Float>::to(o, x.radius), ev::Conv<ev::Float>::to(o, x.chunk_size), ev::Conv<ev::Float>::to(o, x.segment_length), ev::Conv<ev::Float>::to(o, x.curb_extra), ev::Conv<ev::Float>::to(o, x.curb_z), ev::Conv<ev::Float>::to(o, x.surface_z), ev::Conv<ev::Float>::to(o, x.marking_z), ev::Conv<ev::Float>::to(o, x.marking_width), ev::Conv<ev::Float>::to(o, x.dash_start), ev::Conv<ev::Float>::to(o, x.dash_length), ev::Conv<ev::Float>::to(o, x.dash_period), ev::Conv<ev::Float>::to(o, x.uv_scale), ev::Conv<ev::Struct<S_Rgb>>::to(o, x.curb_color), ev::Conv<ev::List<ev::Struct<S_Rgb>>>::to(o, x.palette), ev::Conv<ev::Callback<ev::Bool(ev::Float, ev::Float, ev::Float)>>::to(o, x.deformed), ev::Conv<ev::Float>::to(o, x.fine_step)}); }
+void S_RoadOptions::from(EngineObjects& o, const Value& v, kern::RoadOptions& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.center_x); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.center_y); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.radius); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.chunk_size); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.segment_length); if (const Value* f = v.field(5)) ev::Conv<ev::Float>::from(o, *f, x.curb_extra); if (const Value* f = v.field(6)) ev::Conv<ev::Float>::from(o, *f, x.curb_z); if (const Value* f = v.field(7)) ev::Conv<ev::Float>::from(o, *f, x.surface_z); if (const Value* f = v.field(8)) ev::Conv<ev::Float>::from(o, *f, x.marking_z); if (const Value* f = v.field(9)) ev::Conv<ev::Float>::from(o, *f, x.marking_width); if (const Value* f = v.field(10)) ev::Conv<ev::Float>::from(o, *f, x.dash_start); if (const Value* f = v.field(11)) ev::Conv<ev::Float>::from(o, *f, x.dash_length); if (const Value* f = v.field(12)) ev::Conv<ev::Float>::from(o, *f, x.dash_period); if (const Value* f = v.field(13)) ev::Conv<ev::Float>::from(o, *f, x.uv_scale); if (const Value* f = v.field(14)) ev::Conv<ev::Struct<S_Rgb>>::from(o, *f, x.curb_color); if (const Value* f = v.field(15)) ev::Conv<ev::List<ev::Struct<S_Rgb>>>::from(o, *f, x.palette); if (const Value* f = v.field(16)) ev::Conv<ev::Callback<ev::Bool(ev::Float, ev::Float, ev::Float)>>::from(o, *f, x.deformed); if (const Value* f = v.field(17)) ev::Conv<ev::Float>::from(o, *f, x.fine_step); }
 Value S_Vec4::to(EngineObjects& o, const kern::Vec4& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.x), ev::Conv<ev::Float>::to(o, x.y), ev::Conv<ev::Float>::to(o, x.z), ev::Conv<ev::Float>::to(o, x.w)}); }
 void S_Vec4::from(EngineObjects& o, const Value& v, kern::Vec4& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.x); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.y); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.z); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.w); }
 Value S_WeldStats::to(EngineObjects& o, const kern::WeldStats& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.source_vertices), ev::Conv<ev::Int>::to(o, x.unique_vertices), ev::Conv<ev::Int>::to(o, x.bytes_before), ev::Conv<ev::Int>::to(o, x.bytes_after), ev::Conv<ev::Bool>::to(o, x.indexed)}); }
@@ -460,12 +463,12 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::List<ev::Float>>(o, in, 1, a0);
   auto a1 = ev::blank<std::remove_cvref_t<kern::Count<1u>>>();
   ev::take<ev::Int>(o, in, 2, a1);
-  kern::RoadOptions* a2 = ev::object<kern::RoadOptions>(o, in, 3, "options");
-  if (!a2) return false;
-  kern::HeightSampler* a3 = ev::object<kern::HeightSampler>(o, in, 4, "heights");
-  if (!a3) return false;
+  auto a2 = ev::blank<std::remove_cvref_t<kern::RoadOptions const&>>();
+  ev::take<ev::Struct<S_RoadOptions>>(o, in, 3, a2);
+  auto a3 = ev::blank<std::remove_cvref_t<kern::HeightSampler>>();
+  ev::take<ev::Callback<ev::Float(ev::Float, ev::Float)>>(o, in, 4, a3);
   if (ev::numbers(a1) > a0.size()) { o.error = "the list stream has fewer entries than length says"; return false; }
-  decltype(auto) r = self->begin(a0.empty() ? nullptr : a0.data(), std::move(a1), *a2, *a3);
+  decltype(auto) r = self->begin(a0.empty() ? nullptr : a0.data(), std::move(a1), a2, std::move(a3));
   ev::give<ev::Bool>(o, out, 0, r);
   return true;
 }
@@ -585,13 +588,13 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   ev::take<ev::Int>(o, in, 3, a3);
   auto a4 = ev::blank<std::remove_cvref_t<kern::Rgb>>();
   ev::take<ev::Struct<S_Rgb>>(o, in, 4, a4);
-  kern::HeightSampler* a5 = ev::object<kern::HeightSampler>(o, in, 5, "heights");
-  if (!a5) return false;
+  auto a5 = ev::blank<std::remove_cvref_t<kern::HeightSampler>>();
+  ev::take<ev::Callback<ev::Float(ev::Float, ev::Float)>>(o, in, 5, a5);
   auto a6 = ev::blank<std::remove_cvref_t<kern::MeshData&>>();
   ev::take<ev::Struct<S_MeshData>>(o, in, 6, a6);
   auto a7 = ev::blank<double>();
   auto a8 = ev::blank<double>();
-  decltype(auto) r = kern::build_terrain_tile(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), *a5, a6, &a7, &a8);
+  decltype(auto) r = kern::build_terrain_tile(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6, &a7, &a8);
   ev::give<ev::Bool>(o, out, 0, r);
   ev::give<ev::Struct<S_MeshData>>(o, out, 1, a6);
   ev::give<ev::Float>(o, out, 2, a7);
@@ -644,29 +647,14 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.height_sampler.make: kern::HeightSampler::HeightSampler
-bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::HeightSampler>(std::unique_ptr<kern::HeightSampler>(new kern::HeightSampler())));
-  return true;
-}
-
-// engine.height_sampler.release: kern::HeightSampler::~HeightSampler
-bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::HeightSampler>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no HeightSampler that was made";
-    return false;
-  }
-  return true;
-}
-
 // engine.road_builder.make: kern::RoadBuilder::RoadBuilder
-bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::RoadBuilder>(std::unique_ptr<kern::RoadBuilder>(new kern::RoadBuilder())));
   return true;
 }
 
 // engine.road_builder.release: kern::RoadBuilder::~RoadBuilder
-bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::RoadBuilder>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no RoadBuilder that was made";
     return false;
@@ -674,29 +662,14 @@ bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.road_options.make: kern::RoadOptions::RoadOptions
-bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  out[0] = Value::integer(o.own<kern::RoadOptions>(std::unique_ptr<kern::RoadOptions>(new kern::RoadOptions())));
-  return true;
-}
-
-// engine.road_options.release: kern::RoadOptions::~RoadOptions
-bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
-  if (!o.release<kern::RoadOptions>(in.empty() ? 0 : in[0].as_int())) {
-    o.error = "the handle names no RoadOptions that was made";
-    return false;
-  }
-  return true;
-}
-
 // engine.road_stream.make: kern::RoadStream::RoadStream
-bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::RoadStream>(std::unique_ptr<kern::RoadStream>(new kern::RoadStream())));
   return true;
 }
 
 // engine.road_stream.release: kern::RoadStream::~RoadStream
-bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::RoadStream>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no RoadStream that was made";
     return false;
@@ -753,14 +726,10 @@ const EngineCall kCalls[] = {
     {"engine.earcut.release", &c45},
     {"engine.footprint_stream.make", &c46},
     {"engine.footprint_stream.release", &c47},
-    {"engine.height_sampler.make", &c48},
-    {"engine.height_sampler.release", &c49},
-    {"engine.road_builder.make", &c50},
-    {"engine.road_builder.release", &c51},
-    {"engine.road_options.make", &c52},
-    {"engine.road_options.release", &c53},
-    {"engine.road_stream.make", &c54},
-    {"engine.road_stream.release", &c55},
+    {"engine.road_builder.make", &c48},
+    {"engine.road_builder.release", &c49},
+    {"engine.road_stream.make", &c50},
+    {"engine.road_stream.release", &c51},
     {"engine.building_builder.chunks@get", &c3},
     {"engine.building_builder.chunks@set", &c3_set},
     {"engine.road_builder.chunks@get", &c35},
@@ -772,9 +741,7 @@ const EngineMaker kMakers[] = {
     {EngineObjects::kind<kern::BuildingBuilder>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::BuildingBuilder>(handle, std::unique_ptr<kern::BuildingBuilder>(new kern::BuildingBuilder())); }},
     {EngineObjects::kind<kern::Earcut>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::Earcut>(handle, std::unique_ptr<kern::Earcut>(new kern::Earcut())); }},
     {EngineObjects::kind<kern::FootprintStream>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::FootprintStream>(handle, std::unique_ptr<kern::FootprintStream>(new kern::FootprintStream())); }},
-    {EngineObjects::kind<kern::HeightSampler>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::HeightSampler>(handle, std::unique_ptr<kern::HeightSampler>(new kern::HeightSampler())); }},
     {EngineObjects::kind<kern::RoadBuilder>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::RoadBuilder>(handle, std::unique_ptr<kern::RoadBuilder>(new kern::RoadBuilder())); }},
-    {EngineObjects::kind<kern::RoadOptions>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::RoadOptions>(handle, std::unique_ptr<kern::RoadOptions>(new kern::RoadOptions())); }},
     {EngineObjects::kind<kern::RoadStream>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::RoadStream>(handle, std::unique_ptr<kern::RoadStream>(new kern::RoadStream())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));

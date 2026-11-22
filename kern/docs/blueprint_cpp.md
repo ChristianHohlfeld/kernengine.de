@@ -190,6 +190,7 @@ KERN_LAYOUT(Demo) {
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
+| Make Callback (eine Funktion einer Bibliothek, die die Engine ruft) | `callback<&Lib::fn>(platz)`, Typ `Callback<Float(Float, Float)>` |
 | Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
 | Bibliothek (ein Blueprint, der nichts behält) und wer sie benutzt | `struct Workshop : virtual kern::Library { … };` · `struct Garage : virtual kern::Blueprint, virtual Workshop { … };` – Aufruf `Workshop::skid(Spare[i], 1.0);` (siehe „Bibliotheken“) |
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
@@ -237,6 +238,7 @@ KERN_LAYOUT(Demo) {
 | Schritt, der einfach weitergeht | `debug_print(text, true);` |
 | was ein Knoten gibt und anderswo gelesen wird | Member `struct { Float value = 0.0; } n12;`, gelesen als `n12.value` |
 | was ein Knoten sich merkt (Schleifenindex, Do Once, Wartezeit, Zufallsfolge) | Member `kern::Node<12> n12;` bzw. `struct : kern::Node<12> { Int index = 0; } n12;` |
+| was ein Schritt einer Funktion gibt oder eine ihrer Schleifen sich merkt, wo es nur der Weg dieser Funktion nach ihm liest | lokal in der Methode, als erste Zeilen ihres Rumpfs nach den lokalen Variablen: `FnResult n14;`, `struct { Float value = 0.0; } n12;`, `struct : kern::Node<9> { Int index = 0; } n9;` – jeder Aufruf hat seine eigenen (siehe „Werte eines Aufrufs“) |
 | Wert, den mehrere Eingänge lesen | ein Name: `const auto n7 = [&] { return math_add(a, b); };`, gelesen als `n7()` |
 | Schritt, zu dem mehrere Drähte führen (oder keiner) | eine eigene Methode `void go9() { ... }`, jeder Draht ist ein Aufruf `go9();` |
 | Wert, den niemand liest | `(void)math_add(1.0, 2.0);` in `void detached() { ... }` |
@@ -490,7 +492,19 @@ und JIT halten ihn genau; der JIT überlässt Set/Add einer solchen Variablen de
 `U32`, wie C++ es rechnet, ist `kern::math::mul32(a, b)` (für `I32`: `wrap32s(mul32(a, b))`); Produkte bis 16 Bit sind
 als Int genau. In der Klasse ist `U32` `logic::Sized<u32>` (nodes.h): gelesen ein Int, gespeichert wie C++.
 Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`); Maps haben Schlüssel und Werte ohne Breite.
-Listen fester Breite (`List<U8>`) sind noch kein Typ der Sprache.
+
+**Listen fester Breite** (`List<U8>` … `List<I32>`, im Graphen `"type":"int_list","of":"u8"`, Einstellung `u8_list`) halten jeden
+Eintrag wie `std::vector<u8>`: was hineinkommt, wird gespeichert wie C++ es dort speichert – Add, Insert, der Wert von Set Length,
+`List<U8>{…}` (Make List mit Typ `u8`), Insert Text Bytes (eine `List<I8>` hält die Bytes 128 … 255 als −128 … −1), eine ganze Liste
+beim Setzen; Copy Bytes schreibt in eine Liste einer Breite nur Zahlen dieser Breite (`list_copy_bytes<"u8", …>(B, …)` bei
+`List<U8> B`). Find, Contains und Remove Item vergleichen die Zahl, wie C++ ein `std::uint8_t` mit einem `int` vergleicht
+(`std::find` von 256 in einem `std::vector<u8>` findet nichts): in der Klasse `logic::Sought<T>` (ein Int bei `Sized<T>`).
+Eine Liste einer Breite ist ein eigener Typ: sie geht nicht in einen Eingang `List<Int>` und umgekehrt (C++: kein
+`std::vector<int>` aus einem `std::vector<u8>`). Die Knoten, die die Zahlen einer Liste lesen, wie sie sind – Text of Bytes,
+Struct of Bytes, Items von Copy Bytes – nehmen eine Liste von Ints **jeder** Breite (`List<Int>`, `List<U8>` …; Eingang
+`kAnyWidth`); in der Klasse eine Funktion über die Einträge (`logic::items_of`, `Items<T>`). Ein Feld einer Breite hat in
+einer Anordnung (Bytes of Struct, Struct of Bytes) seine eigene Breite (`U16 a` ↔ `u16@0`). Die Listenknoten mit Typ
+(`list_length<U8>(B)`, `flow_for_each<U8>(n4, B)`) nennen die Breite als Typ der Einträge; ein Ausgang `item` ist dort ein `U8`.
 
 ### Int64
 
@@ -1308,6 +1322,54 @@ selbst“).
   oder mehrere, wird das Objekt nicht gemacht (`tools/engine_api.py --list` nennt, welche Klassen und
   warum). Erzeugt in `kMakers` jeder `engine_calls.gen.cpp`; keine Liste von Klassen.
 
+### Rückrufe der Engine (Callback)
+
+Wo die Engine eine Funktion des Programms ruft – eine Höhe je Punkt (`kern::HeightSampler`, ein Zeiger auf eine
+Funktion mit ihrem `void*`), ob eine Stelle verformt ist (`std::function<bool(f64, f64, f64)>` in `RoadOptions`) –,
+gibt ihr ein Blueprint einen **Callback**: eine Funktion einer Bibliothek als Wert, den nur die Engine ruft.
+
+```cpp
+struct Ground : virtual kern::Library {
+  KERN_STRUCT(Field) { Float Base = 1.0; Float Slope = 0.5; };
+  struct heightResult { Float h = 0.0; };
+  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) { ... }
+};
+struct Site : virtual kern::Blueprint, virtual Ground {
+  Field Here = Field{2.0, 0.5};
+  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
+  void Make() { Kept = callback<&Ground::height>(Here); }
+};
+```
+
+- **Typ** `Callback<R(A…)>` (Pin-Typ `callback`, `TypeRef::of` die Signatur `float(float,float)`; ohne Ergebnis
+  `Callback<void(Int)>`): R und A sind Bool, Int, Float, Vector, Int64 – was C++ als Wert übergibt. Ein Callback steht in
+  einer Variablen, einem Feld, einem Ein- oder Ausgang, einer lokalen Variablen; nicht in einer Liste, Map oder einem Set.
+  Unbound ist `Callback<…>{}`: ruft die Engine ihn, bekommt sie die Null von R.
+- **Make Callback** (`func.callback`, Wert-Knoten, `callback<&Lib::fn>(platz)`, ohne Platz `callback<&Lib::fn>()`): nennt
+  eine **Funktion einer Bibliothek** mit höchstens einem Ausgang. Ist ihr erster Eingang eine const-Referenz, bindet der
+  Knoten ihn an den Platz, den er nennt (Einstellungen wie die Referenz-Eingänge von Call); die übrigen Eingänge gibt die
+  Engine. Gelesen wird der Platz, wie er steht, wenn die Engine ruft.
+- **Regeln (check):** die Funktion braucht nichts von der Welt – auf ihrem Weg und dem der Funktionen, die sie ruft, kein
+  Knoten der Engine oder des Spiels, kein Print, keine Game Time, kein Random, kein Call Event/Call on Actor, nichts, was
+  wartet oder sich etwas merkt (`NodeDef::world`). Darum darf die Engine sie rufen, wann und wie oft sie will: sie ändert
+  nichts, und jede Stufe gibt dasselbe. Ein Blueprint ruft, vergleicht und wandelt einen Callback nicht.
+- **Interpreter und JIT:** der Wert hält die Nummer der Instanz, die Funktion und den Platz (`Instance::Spot`); die Engine
+  ruft ihn synchron auf dem Frame-Thread (`Callable::call` → `Instance::call_inside`). Ist die Instanz zu Ende, ist er
+  unbound.
+- **Klasse:** `kern::logic::Callback<R(A…)>` sind zwei Wörter, `{R (*fn)(void*, A…); void* place;}` – der Thunk ruft die
+  Funktion der Bibliothek auf `the_library<L>` (eine Bibliothek hält nichts) mit dem Platz. Zur Engine gehen sie Feld für
+  Feld (`HeightSampler{fn, user}`: dieselben Kosten wie der Zeiger mit `void*` in C++) oder als `std::function`, die die
+  beiden Wörter hält (keine Anforderung).
+- **Tür:** `Conv<Callback<…>>` macht den Funktionszeiger mit `void*` (ein Trampolin auf den `Callable`) bzw. die
+  `std::function`. Was ein Aufruf der Engine an Callbacks bekommt, bleibt für den Aufruf; einer Methode eines Objekts der
+  Engine gegeben (sein Handle zuerst), bleibt es mit dem Objekt, bis es endet (`EngineObjects::kept_by`).
+- **Tabelle:** `tools/engine_api.py` erkennt die C++-Form am Typ – ein Struct der Engine aus genau einem Zeiger auf eine
+  Funktion mit `void*` vorn und einem `void*`, oder `std::function<R(A…)>`; Form `c<gibt>(<nimmt>)`, z. B. `cn(nn)`.
+- **Stellvertreter:** `EngineStandIn` ruft jeden Callback, den ein Aufruf bekommt, dreimal mit aus dem Aufruf gewürfelten
+  Eingängen; was er gibt, steht in der Aufzeichnung und geht in die Antwort ein. Einem Objekt gegeben, ruft er ihn bei
+  jedem späteren Aufruf auf diesem Objekt wieder, bis es freigegeben wird – so wird auch der behaltene Weg verglichen.
+- Geprüft: `logic_callbacks` (kern/tests/test_main.cpp).
+
 ### Formeln
 
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas
@@ -1502,8 +1564,12 @@ Typs.
 
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
-Event. Funktionsaufrufe zählen nicht mit: Sie können sich nicht selbst erreichen, und in C++ sind
-sie gewöhnliche Aufrufe. Werte lesen einander so tief, wie der Graph es vorgibt (ein Ausdruck in
+Event. Funktionsaufrufe zählen nicht mit. Sie schachteln höchstens 65.536 tief
+(`Runtime::kCallsDeep`) – im Interpreter und mit dem JIT ein Rahmen je Aufruf, nicht ein Aufruf von
+C++, also unabhängig vom Stapel der Maschine; der Aufruf darüber stoppt die Kette und den Blueprint
+(„function calls nest more than 65536 deep“), in beiden Stufen beim selben Aufruf. Die Klasse ruft
+ihre Methoden wie C++, ohne Zähler: Wie tief C++ kommt, lässt C++ offen (sein Stapel) – ein Aufruf,
+der so tief führt, wird im Vergleichstest nicht verglichen. Werte lesen einander so tief, wie der Graph es vorgibt (ein Ausdruck in
 C++ hat auch keine Grenze).
 
 **Wege, die sich wieder treffen.** Führen alle Wege eines Branch (oder Switch) in denselben Knoten,
@@ -1533,6 +1599,21 @@ in denen C++ weiterliefe, wo der Graph aufhört.
 
 **Funktionen mit Ausgängen.** Endet ein Weg ohne Return-Knoten, behalten die Ausgänge ihre
 Vorgaben: Der Rumpf endet dann mit `return {};` (kein Knoten).
+
+**Werte eines Aufrufs.** Was ein Schritt einer Funktion gibt (`n14 = Fn(args);`, `n5.value = (Heat += x);`)
+und was eine Schleife der Funktion sich merkt, während sie läuft (Index, Eintrag), gehört dem Aufruf, wie ein
+Wert in C++: Es steht lokal in der Methode – als erste Zeilen ihres Rumpfs, nach den lokalen Variablen, nach
+Ids –, wenn jeder Schritt, der es liest (auch über Werte), auf dem Weg dieser Funktion steht und erst nach ihm
+kommt: Kein Weg vom Function Entry zu einem Leser geht an dem Schritt vorbei (eine Schleife, deren Rumpf vor ihm
+liest, ein anderer Ausgang einer Sequence oder eines Branch tun das). Eine Schleife gibt ihre Werte in ihrem Rumpf:
+was nach Completed ihren Index liest, liest nach einer Schleife ohne Durchlauf, was sie in einem früheren Aufruf gab –
+ihr Zustand bleibt dann ein Member. Sonst bleibt es ein Member der Klasse:
+gelesen in einem anderen Rumpf (`go<id>`, ein Event, ein Wert mehrerer Rümpfe), nach einem Warten, oder wo der
+Schritt in diesem Aufruf noch nicht gelaufen sein kann (dann liest man, was er im letzten Aufruf gab – in jeder
+Stufe). Was ein Knoten über Aufrufe hinweg behält (Do Once, Gate, Flip Flop, Wartezeit, Zufallsfolge), bleibt
+immer ein Member. Der Leser nimmt einen solchen Wert auch als Member an (die Form früherer Texte – derselbe
+Blueprint); geschrieben wird er lokal. Eine Deklaration im Rumpf einer Funktion für einen Knoten, der nicht so
+dieser Funktion gehört, weist er ab.
 
 ## Regeln: was kein Blueprint sein darf
 
@@ -1581,9 +1662,12 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
 - **Eine Funktion eines anderen Blueprints** (`KERN_EXTERN`) hat hier keinen Rumpf: kein Function
   Entry, kein Return, kein Call und kein Function Value mit ihrem Namen, keine lokalen Variablen,
   nicht pure. Aufgerufen wird sie mit Call on Actor – ein Schritt.
-- **Eine Funktion läuft nicht noch einmal, während sie läuft:** Sie ruft sich nicht selbst auf,
-  auch nicht über andere Funktionen. (Nach einem Warten ist sie zu Ende; sich dann aufzurufen,
-  geht.)
+- **Eine Funktion darf sich selbst aufrufen**, auch über andere Funktionen – als Schritt (Call
+  Function), jeder Aufruf mit seinen eigenen Werten (Parameter, lokale Variablen, was seine Schritte
+  geben und seine Schleifen sich merken), wie in C++. Nicht als Wert: Eine Funktion, die als Wert
+  gelesen wird (pure), in einem solchen Kreis läse sich selbst – ein Wert hat keine Kreise. Und
+  was ein Schritt einer Funktion im Kreis gibt, liest nur ihr eigener Weg nach ihm (siehe „Werte
+  eines Aufrufs“: sonst wäre es ein Member für alle Aufrufe).
 - **Eine Funktion, die als Wert gelesen wird (pure), rechnet nur:** kein Set oder Add (außer auf ihre eigenen lokalen Variablen), kein
   Warten, kein Do Once, Gate oder Flip Flop, keine Aktion – und was sie als Schritt aufruft,
   rechnet ebenfalls nur. Verzweigen, Schleifen und andere Werte lesen darf sie. So ist es gleich,
@@ -1838,7 +1922,10 @@ Liste vom Typ einer Struktur mit einer Aufzählung, einer Struktur und Listen al
 Break und Set Field, Vergleich Feld für Feld, ein Eintrag jenseits der Liste), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
-tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
+tiefer als 64 ineinander liegen (`function_reentry`), Funktionen, die sich selbst rufen
+(`recursion_direct`: Fib(15) = 610, eine Schleife über den inneren Aufruf; `recursion_through`: über eine
+andere; `recursion_deep`: 5.000 tief; `recursion_endless`: der 65.537. Aufruf stoppt, in Interpreter und JIT
+gleich – die Klasse rechnet ihn nicht, `Case::cpp_leaves_open`), ganze Zahlen an ihren Enden
 (`whole_numbers`), das Vorzeichen von −0 (`signed_zero`: Copy Sign und `copysign` der Formel), die Bytes einer Struktur (`bytes`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit

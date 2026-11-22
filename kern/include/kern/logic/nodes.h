@@ -174,6 +174,7 @@ template <class T> struct Sized {
   constexpr Sized(math::Exact x) : Sized(Whole(x)) {}                                // NOLINT
   template <char Op, class A, class B> Sized(const Sum<Op, A, B>& x) : Sized(Whole(x)) {}  // NOLINT
   constexpr operator Whole() const { Whole r; r.v = static_cast<i64>(v); return r; }  // NOLINT (implicit: it is that Int)
+  constexpr explicit operator i64() const { return static_cast<i64>(v); }  // (its number: static_cast<i64>, as of a std::uint8_t)
   Sized& operator+=(Whole amount) {
     v = static_cast<T>(static_cast<u64>(static_cast<i64>(v)) + static_cast<u64>(amount.v));
     return *this;
@@ -348,6 +349,13 @@ class Text {
   std::string str() && { return holds_ ? std::move(made_) : std::string(written_); }
   friend bool operator==(const Text& a, const Text& b) { return a.view() == b.view(); }
   friend auto operator<=>(const Text& a, const Text& b) { return a.view() <=> b.view(); }
+  /// Set Code: the character at `index` becomes `c`, where it stands (a text of the program is first made the
+  /// text's own). An index outside the text changes nothing.
+  void set_at(i64 index, char c) {
+    if (index < 0 || static_cast<u64>(index) >= size()) return;
+    if (!holds_) hold(std::string(written_));
+    made_[static_cast<std::size_t>(index)] = c;
+  }
 
  private:
   /// (appended where its characters are - one character as std::string's += of a char adds it)
@@ -385,7 +393,15 @@ struct Truth {
 namespace detail {
 template <class T> struct Entry { using type = T; };
 template <> struct Entry<bool> { using type = Truth; };
+template <class T> struct Sought { using type = T; };
+template <class T> struct Sought<Sized<T>> { using type = Whole; };
 }  // namespace detail
+/// What an item of a list of T is compared with (Find, Contains, Remove Item): a T - for a list of Ints
+/// of a fixed width an Int, as C++ compares a std::uint8_t with an int: the number, not what a U8 would
+/// hold of it (std::find of 256 in a std::vector<u8> finds nothing).
+template <class T> using Sought = typename detail::Sought<T>::type;
+template <class A, class B> constexpr bool equal_item(const A& a, const B& b) { return a == b; }
+template <class T> constexpr bool equal_item(const Sized<T>& a, const Whole& b) { return static_cast<i64>(a.v) == b.v; }
 
 /// Beside the lists. A place that is named beside a list (Cars[9] of two cars) is an entry of
 /// its own, with the zero of the items' type - a struct with its defaults: read, it is that
@@ -501,6 +517,11 @@ template <class T> struct Items {
     return zero;
   }
 };
+/// The entries of a list, whatever its items are (a node over the items of a list of Ints of each width -
+/// Text of Bytes, Copy Bytes: in C++ a function over the list's items).
+template <class T> Items<T> items_of(const List<T>& list) { return list; }
+template <class T, std::size_t N> Items<T> items_of(const Fixed<T, N>& list) { return list; }
+template <class T> Items<T> items_of(Items<T> list) { return list; }
 
 /// A value of the interpreter as the C++ type of its pin, and back. A list is the vector of its
 /// items; a list of whole numbers is a vector of i64 in the interpreter and of Whole (`Int`) in a
@@ -565,6 +586,13 @@ template <> struct Held<std::vector<Whole>> {
   static std::vector<Whole> from(const Value& v) {
     const std::vector<i64>& items = v.items<i64>();
     return std::vector<Whole>(items.begin(), items.end());
+  }
+};
+template <class T> struct Held<std::vector<Sized<T>>> {
+  static constexpr PinType type = PinType::integer_list;
+  static std::vector<Sized<T>> from(const Value& v) {
+    const std::vector<i64>& items = v.items<i64>();
+    return std::vector<Sized<T>>(items.begin(), items.end());
   }
 };
 template <> struct Held<std::vector<Text>> {
@@ -686,6 +714,7 @@ Value to_value(std::vector<E> v) {
 }
 inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Truth>& v) { return Value::of(std::vector<bool>(v.begin(), v.end())); }
+template <class T> Value to_value(const std::vector<Sized<T>>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Text>& v) {
   std::vector<std::string> items;
   items.reserve(v.size());
@@ -740,12 +769,12 @@ template <class T> void remove_at(std::vector<T>& items, i64 index) {
   if (index >= 0 && static_cast<u64>(index) < items.size()) items.erase(items.begin() + static_cast<std::ptrdiff_t>(index));
 }
 /// Takes every item that equals `item` out; was there one?
-template <class T> bool remove(std::vector<T>& items, const std::type_identity_t<T>& item) {
+template <class T> bool remove(std::vector<T>& items, const Sought<T>& item) {
   std::size_t kept = 0;
   for (std::size_t k = 0; k < items.size(); ++k) {
     {
       const T& at = items[k];
-      if (at == item) continue;
+      if (equal_item(at, item)) continue;
     }
     if (kept != k) items[kept] = std::move(items[k]);
     ++kept;
@@ -886,6 +915,57 @@ template <class K> Value to_value(const Set<K>& s) {
   e.reserve(s.size());
   for (const K& k : s) e.try_emplace(key_of(to_value(k)));
   return r;
+}
+
+/// A Callback in a Blueprint's C++ (Callback<Float(Float, Float)>, Make Callback: callback<&Lib::fn>(place)): a
+/// function the engine calls and the place it is bound to - two words, as a function pointer with its void* is
+/// (kern::HeightSampler). fn is a thunk that calls the library's function on that place; none: unbound (a call
+/// gives the zero of R).
+template <class S> struct Callback;
+template <class R, class... A> struct Callback<R(A...)> {
+  R (*fn)(void*, A...) = nullptr;
+  void* place = nullptr;
+  /// (bound or not - as the interpreter's value says: what it calls, a call says. A Blueprint does not compare one;
+  /// a struct that holds one is equal field by field)
+  friend bool operator==(const Callback& x, const Callback& y) { return !x.fn == !y.fn; }
+  R operator()(A... a) const {
+    if constexpr (std::is_void_v<R>) {
+      if (fn) fn(place, a...);
+    } else {
+      return fn ? fn(place, a...) : R{};
+    }
+  }
+};
+namespace detail {
+template <class S> inline constexpr bool is_callback = false;
+template <class S> inline constexpr bool is_callback<Callback<S>> = true;
+/// A Callback of a Blueprint's class as a value (the door to the engine, a stand-in in a test): calls the thunk
+/// with the values made into its C++ types.
+template <class R, class... A> struct NativeCallable final : Callable {
+  Callback<R(A...)> held;
+  explicit NativeCallable(Callback<R(A...)> c) : held(c) {}
+  static constexpr char kind = 0;
+  const void* native_kind() const override { return &kind; }
+  bool call(std::span<const Value> args, Value& result) const override { return call(args, result, std::index_sequence_for<A...>{}); }
+  template <std::size_t... I> bool call(std::span<const Value> args, Value& result, std::index_sequence<I...>) const {
+    if (!held.fn) return false;
+    if constexpr (std::is_void_v<R>) held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...);
+    else result = to_value(held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...));
+    return true;
+  }
+};
+template <class R, class... A> struct Held<Callback<R(A...)>> {
+  static constexpr PinType type = PinType::callback;
+  /// (one the class made, back as it was; one the interpreter made calls the Blueprint there - in a class it is
+  /// unbound: a Callback goes from a Blueprint to the engine, not from one tier into another)
+  static Callback<R(A...)> from(const Value& v) {
+    if (v.call && v.call->native_kind() == &NativeCallable<R, A...>::kind) return static_cast<const NativeCallable<R, A...>&>(*v.call).held;
+    return {};
+  }
+};
+}  // namespace detail
+template <class R, class... A> Value to_value(const Callback<R(A...)>& c) {
+  return Value::callback(c.fn ? std::make_shared<detail::NativeCallable<R, A...>>(c) : nullptr);
 }
 
 /// What the nodes of a map do - on a Map of a Blueprint's class and on the interpreter's entries
@@ -2315,6 +2395,7 @@ template <detail::NativeStruct S> void native_set(S& variable, const Value& v) {
 inline void native_set(Int64& variable, const Value& v) { variable = from_value<Int64>(v.converted(PinType::int64)); }
 template <class K, class V> void native_set(Map<K, V>& variable, const Value& v) { variable = from_value<Map<K, V>>(v.converted(pin_type_of<Map<K, V>>())); }
 template <class K> void native_set(Set<K>& variable, const Value& v) { variable = from_value<Set<K>>(v.converted(pin_type_of<Set<K>>())); }
+template <class R, class... A> void native_set(Callback<R(A...)>& variable, const Value& v) { variable = from_value<Callback<R(A...)>>(v); }
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a

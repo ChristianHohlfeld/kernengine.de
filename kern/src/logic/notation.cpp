@@ -37,7 +37,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "Callback", "callback", "loop", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -92,6 +92,13 @@ std::string width_of_cpp(std::string_view name) {
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
+  if (t.type == PinType::callback) {  // (Callback<Float(Float, Float)>, Callback<void(Int)>)
+    const TypeRef r = callback_result(t);
+    std::string s = "Callback<" + (r.type == PinType::exec ? std::string("void") : cpp_type(r)) + "(";
+    const std::vector<TypeRef> in = callback_inputs(t);
+    for (std::size_t k = 0; k < in.size(); ++k) s += (k ? ", " : "") + cpp_type(in[k]);
+    return s + ")>";
+  }
   // (a map, a set: Map<Int, List<Weapon>>, Set<Text>)
   if (t.type == PinType::map) return "Map<" + cpp_type(key_type(t)) + ", " + cpp_type(value_type(t)) + ">";
   if (t.type == PinType::set) return "Set<" + cpp_type(key_type(t)) + ">";
@@ -205,6 +212,7 @@ std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std
   return r + "}";
 }
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
+  if (v.type == PinType::callback) return cpp_type(TypeRef{PinType::callback, of}) + "{}";  // (unbound: what a place of one holds until it is set)
   if (is_keyed(v.type)) {
     // a map: Map<Int, Float>{{1, 2.5}, {3, 4.0}} - its entries in their order; a set: Set<Int>{1, 3}
     const TypeRef t{v.type, of}, key = key_type(t), value = v.type == PinType::map ? value_type(t) : TypeRef{};
@@ -225,6 +233,11 @@ std::string literal(const Value& v, const std::string& of, const Graph& g, std::
     if (v.type == PinType::structure) return one(v);
     std::string r = "List<" + of + ">{";
     for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + one(v.item(k));
+    return r + "}";
+  }
+  if (v.type == PinType::integer_list && width_bits(of) != 0) {  // (a list of Ints of a fixed width: List<U8>{1, 255})
+    std::string r = cpp_type(TypeRef{v.type, of}) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + literal(v.item(k));
     return r + "}";
   }
   if (element_of(v.type) != PinType::enumeration) return literal(v);
@@ -325,6 +338,8 @@ struct Info {
   bool guard = false;        // a Branch whose True path always returns: its False path is written after it
   int place = kNowhere;      // the body (context) its text stands in
   bool member = false;       // it has a member n<id>: outputs read elsewhere, or memory
+  int local_in = -1;         // a step of a function whose n<id> is a local of the function's method: the entry
+  bool kept() const { return member || local_in >= 0; }  // it has its n<id> (a member or a local)
 };
 
 /// An exec output a list of statements leaves through: wired to `target`, or to nothing (-1). kOn:
@@ -566,7 +581,61 @@ struct Shape {
       for (const auto& r : x.readers)
         if (at(r.first).place != x.place) x.member = true;
     }
+    locals();
     return rules();
+  }
+
+  /// What a step of a function gives - and what a loop of it keeps while it runs - is the call's
+  /// own: a local of the function's method, as a value in C++ is, where every step that reads it
+  /// stands on the function's own path after it (in the same call, nothing reads it before the
+  /// step gave it). Else it stays a member: a value read in another body, after a wait, or where
+  /// the step may not have run in this call (what the step gave in an earlier call).
+  void locals() {
+    for (int i : by_id) {
+      Info& x = at(i);
+      if (x.pure || x.event || x.place < 0 || ctx[static_cast<std::size_t>(x.place)].first != kCallable) continue;
+      if (!(x.member && (!x.def->memory || x.def->loop))) continue;
+      const int e = ctx[static_cast<std::size_t>(x.place)].second;
+      if (e < 0 || at(e).def->type != "func.entry") continue;
+      // the steps that read it, through the values that pass it on
+      std::vector<int> users, todo;
+      std::vector<u8> seen(n.size(), 0);
+      bool here = true;
+      for (const auto& r : x.readers) todo.push_back(r.first);
+      while (here && !todo.empty()) {
+        const int y = todo.back();
+        todo.pop_back();
+        if (seen[static_cast<std::size_t>(y)]) continue;
+        seen[static_cast<std::size_t>(y)] = 1;
+        if (at(y).place != x.place || y == i) here = false;
+        else if (at(y).pure) for (const auto& r : at(y).readers) todo.push_back(r.first);
+        else users.push_back(y);
+      }
+      if (!here) continue;
+      // from the function's entry on, the paths that do not pass the step reach none of them (a loop gives
+      // its values in its body: what follows Completed may read what it gave in an earlier call - a loop
+      // that made no pass in this one)
+      const bool loop = x.def->loop;
+      std::vector<u8> reach(n.size(), 0);
+      std::vector<int> walk{e};
+      reach[static_cast<std::size_t>(e)] = 1;
+      while (!walk.empty()) {
+        const int y = walk.back();
+        walk.pop_back();
+        for (std::size_t k = 0; k < at(y).dst.size(); ++k) {
+          const int t = at(y).dst[k].first;
+          if (y == i && k == 0) continue;  // (its body: only through the loop)
+          if (t < 0 || (t == i && !loop) || reach[static_cast<std::size_t>(t)] || at(t).place != x.place) continue;
+          reach[static_cast<std::size_t>(t)] = 1;
+          walk.push_back(t);
+        }
+      }
+      bool after = true;
+      for (int u : users) after = after && !reach[static_cast<std::size_t>(u)];
+      if (!after) continue;
+      x.member = false;
+      x.local_in = e;
+    }
   }
 
   /// Values: no circles; a value with memory (Random) is read by one input, and so is everything
@@ -655,7 +724,8 @@ struct Shape {
     return true;
   }
 
-  /// Functions: none runs again while it runs (it has one set of values, not one per call), and
+  /// Functions: one may call itself, directly or through others, as a step (each call has its own
+  /// values - not one read as a value: a value has no circles), and
   /// one that is read as a value only computes - how often and in which order values are read
   /// then makes no difference.
   bool functions_ok() {
@@ -696,31 +766,52 @@ struct Shape {
         for (const auto& next : next_steps(x)) todo.push_back(next);
       }
     }
-    // a function that calls itself, directly or through others
-    std::vector<u8> mark(count, 0);
-    for (std::size_t start = 0; start < count; ++start) {
-      if (mark[start]) continue;
-      std::vector<std::pair<int, std::size_t>> stack{{static_cast<int>(start), 0}};
-      mark[start] = 1;
-      while (!stack.empty()) {
-        const std::size_t f = static_cast<std::size_t>(stack.back().first);
-        if (stack.back().second < calls[f].size()) {
-          const auto [callee, node] = calls[f][stack.back().second++];
-          if (mark[static_cast<std::size_t>(callee)] == 1) {
-            const std::string& a = g.functions[f].name;
-            const std::string& b = g.functions[static_cast<std::size_t>(callee)].name;
-            return fail("function \"" + b + "\" calls itself" + (a == b ? std::string() : " (through \"" + a + "\")") +
-                            ": a function does not run again while it runs - repeat steps with a loop",
-                        node);
+    // Functions that call themselves, directly or through others: a call like any other, each
+    // with its own values (in the class a method's parameters and locals; in the interpreter and
+    // the JIT a frame of its own, at most Runtime::kCallsDeep calls one in another). The circles
+    // (strongly connected parts of the calls; Tarjan's way, without recursion):
+    std::vector<int> circle(count, -1), index(count, -1), low(count, 0);
+    {
+      std::vector<int> held;
+      std::vector<u8> on(count, 0);
+      int next = 0, circles = 0;
+      for (std::size_t start = 0; start < count; ++start) {
+        if (index[start] >= 0) continue;
+        std::vector<std::pair<std::size_t, std::size_t>> walk{{start, 0}};
+        index[start] = low[start] = next++;
+        held.push_back(static_cast<int>(start));
+        on[start] = 1;
+        while (!walk.empty()) {
+          const std::size_t f = walk.back().first;
+          if (walk.back().second < calls[f].size()) {
+            const std::size_t c = static_cast<std::size_t>(calls[f][walk.back().second++].first);
+            if (index[c] < 0) {
+              index[c] = low[c] = next++;
+              held.push_back(static_cast<int>(c));
+              on[c] = 1;
+              walk.push_back({c, 0});
+            } else if (on[c]) {
+              low[f] = std::min(low[f], index[c]);
+            }
+            continue;
           }
-          if (mark[static_cast<std::size_t>(callee)] == 0) {
-            mark[static_cast<std::size_t>(callee)] = 1;
-            stack.push_back({callee, 0});
+          walk.pop_back();
+          if (!walk.empty()) low[walk.back().first] = std::min(low[walk.back().first], low[f]);
+          if (low[f] != index[f]) continue;
+          std::vector<int> part;
+          for (int x = -1; x != static_cast<int>(f);) {
+            x = held.back();
+            held.pop_back();
+            on[static_cast<std::size_t>(x)] = 0;
+            part.push_back(x);
           }
-          continue;
+          bool self = false;
+          for (const auto& c : calls[f]) self = self || c.first == static_cast<int>(f);
+          if (part.size() > 1 || self) {
+            for (int x : part) circle[static_cast<std::size_t>(x)] = circles;
+            ++circles;
+          }
         }
-        mark[f] = 2;
-        stack.pop_back();
       }
     }
     // the inputs by reference come first: an input by value is written with its default, and in
@@ -757,6 +848,28 @@ struct Shape {
           return fail(because[f] + ": " + title(x) + (d.latent ? " waits" : " changes something") + ". Call the function as a step instead (My Blueprint: untick Pure)", x);
       }
     }
+    // In a circle: a function read as a value would read itself - a value has no circles (call it
+    // as a step); and what its steps give stays on its own path (a member of the class would be
+    // one for all its calls: Shape::locals).
+    for (std::size_t f = 0; f < count; ++f) {
+      if (circle[f] < 0) continue;
+      const std::string through = [&] {
+        for (const auto& [c, node] : calls[f])
+          if (circle[static_cast<std::size_t>(c)] == circle[f] && c != static_cast<int>(f)) return " (through \"" + g.functions[static_cast<std::size_t>(c)].name + "\")";
+        return std::string();
+      }();
+      if (value[f]) {
+        int node = -1;
+        for (int i : by_id)
+          if (at(i).def->type == "func.pure" && at(i).node->param("function") == g.functions[f].name) node = i;
+        return fail("function \"" + g.functions[f].name + "\" calls itself" + through + " and is read as a value: a value does not read itself - call it as a step (My Blueprint: untick Pure)", node);
+      }
+      for (int x : steps[f])
+        if (at(x).member && (!at(x).def->memory || at(x).def->loop))
+          return fail("function \"" + g.functions[f].name + "\" calls itself" + through + ", so every call has its own values: what " + title(x) +
+                          " gives is read where it may not have run in this call, or outside the function's path after it",
+                      x);
+    }
     return places_ok(steps, calls);
   }
 
@@ -779,7 +892,7 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" ||
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" || t == "text.set_code" ||
              // (a map's or a set's steps put entries in or take them out - and move the others: a map's values are its entries)
              t == "map.set" || t == "map.add" || t == "map.remove" || t == "map.remove_at" || t == "map.clear" || t == "map.reserve" ||
              t == "set.add" || t == "set.remove" || t == "set.remove_at" || t == "set.clear" || t == "set.reserve";
@@ -808,7 +921,7 @@ struct Shape {
       }
       return seen;
     };
-    // (callees first: no function calls itself, functions_ok has seen to that)
+    // (callees first - where functions call each other in a circle, the rounds below see to the rest)
     std::vector<u8> done(count, 0);
     std::vector<std::size_t> order;
     for (std::size_t start = 0; start < count; ++start) {
@@ -829,6 +942,10 @@ struct Shape {
         stack.pop_back();
       }
     }
+    // what each function does itself, then with what its calls do - again and again where
+    // functions call each other in a circle, until nothing new comes (a path through a value's
+    // fields and entries is as long as its type is deep: it ends)
+    std::vector<std::vector<Write>> own(count);
     for (std::size_t f : order) {
       for (int x : steps[f]) {
         const std::string& t = at(x).def->type;
@@ -840,13 +957,33 @@ struct Shape {
         w.root = at(x).node->param("variable");
         if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
         // (a Take puts the zero where something stood, like a Set; Sort puts other items there, Copy Bytes other bytes)
-        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes";
+        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes" && t != "text.set_code";
         w.node = x;
-        writes[f].push_back(std::move(w));
+        own[f].push_back(std::move(w));
       }
-      for (const auto& [callee, call] : calls[f]) {
-        for (Write& w : through(static_cast<std::size_t>(callee), call)) writes[f].push_back(std::move(w));
-        if (raises[static_cast<std::size_t>(callee)] >= 0 && raises[f] < 0) raises[f] = call;
+    }
+    auto key = [](const Write& w) {
+      std::string k = std::to_string(static_cast<int>(w.kind)) + (w.resizes ? "+" : "=") + w.root;
+      for (const std::string& s : w.path) k += "\x1f" + s;
+      return k;
+    };
+    for (bool changed = true; changed;) {
+      changed = false;
+      for (std::size_t f : order) {
+        std::vector<Write> now = own[f];
+        for (const auto& [callee, call] : calls[f]) {
+          for (Write& w : through(static_cast<std::size_t>(callee), call)) now.push_back(std::move(w));
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && raises[f] < 0) {
+            raises[f] = call;
+            changed = true;
+          }
+        }
+        std::set<std::string> seen;
+        std::vector<Write> once;
+        for (Write& w : now)
+          if (seen.insert(key(w)).second) once.push_back(std::move(w));
+        if (once.size() != writes[f].size()) changed = true;
+        writes[f] = std::move(once);
       }
     }
     // every call - in a function, in an event -: the places it holds against what its function does
@@ -1060,7 +1197,7 @@ struct Shape {
     for (int i : by_id) {
       const Info& x = at(i);
       const std::string& t = x.def->type;
-      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure" || t == "func.call_on")
+      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure" || t == "func.call_on" || t == "func.callback")
         if (!function_of(i)) return fail(title(i) + " names a function that is not there", i);
       bool names_variable = false;
       for (const ParamDef& pd : x.def->params) names_variable = names_variable || pd.kind == ParamDef::Kind::variable;
@@ -1081,7 +1218,7 @@ struct Shape {
                             "runs - not after a wait (Delay), not in an event or another function, and paths that meet before it must all come from one Branch or Switch",
                         i);
         }
-      } else if (const std::string scope = x.node->param("scope"); !scope.empty() && (t == "func.call" || t == "func.pure")) {
+      } else if (const std::string scope = x.node->param("scope"); !scope.empty() && (t == "func.call" || t == "func.pure" || t == "func.callback")) {
         // A call that names places of a function - its local variables, its inputs - stands on a
         // path of that function, like a node of one of its local variables.
         const int where = place_of(i);
@@ -1524,6 +1661,13 @@ struct Writer {
       const std::string args = call_args(x, c);
       return at(x).node->param("function") + "(" + args + ")";
     }
+    if (t == "func.callback") {
+      // callback<&Terrain_lib::height_at>(self): the function, by its class, and the place its first input binds
+      const std::string fn = at(x).node->param("function");
+      const Function* f = s.g.function(fn);
+      const std::string place = f && !f->inputs.empty() && f->inputs[0].ref ? place_text(x, c, ref_key(f->inputs[0].name, "")) : std::string();
+      return "callback<&" + (fn.find("::") != std::string::npos ? fn : cls_ + "::" + fn) + ">(" + place + ")";
+    }
     if (t == "math.formula") {
       const std::string text = at(x).node->param("formula", "a + b");
       const Formula& f = Formula::cached(text);
@@ -1610,7 +1754,7 @@ struct Writer {
   /// the variable it changes, then what its inputs are given.
   std::string call(int x, int entry, int c, bool definition) {
     std::vector<std::string> head;
-    if (at(x).member) head.push_back("n" + id(x));
+    if (at(x).kept()) head.push_back("n" + id(x));
     if (at(x).exec_in.size() >= 2) head.push_back(definition ? std::string("entry") : text_literal(at(x).in[static_cast<std::size_t>(entry)].id));
     if (runs_function(*at(x).def, *at(x).node)) head.push_back("*this");
     if (names_place(*at(x).def)) head.push_back(place_text(x, c));
@@ -1747,7 +1891,7 @@ struct Writer {
       // or, when what the node gives is read: n5.value = (Heat = value);
       const std::string where = place_text(x, c);
       const std::string set = where + (t == "var.set" ? " = " + given(x, X.data_in.front(), c) : " += " + value(x, X.data_in.front(), c));
-      line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
+      line(ind, X.kept() ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
       return 0;
     }
     if (t == "func.call") {
@@ -1756,14 +1900,14 @@ struct Writer {
       const std::string lists = held_lists(x, c);
       if (!lists.empty()) line(ind, "const kern::logic::Held held_" + id(x) + "(" + lists + ");");
       const std::string args = call_args(x, c);
-      line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
+      line(ind, (X.kept() ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
       if (!lists.empty()) line(ind, "held_after(held_" + id(x) + ");");
       return 0;
     }
     if (t == "func.call_on") {
       // func_call_on<"Fn">(target, kern::out(n7.a, n7.b), values...);   (kern::out(): nothing reads what it gave)
       std::string args = value(x, X.data_in.front(), c) + ", kern::out(";
-      if (X.member)
+      if (X.kept())
         for (std::size_t k = 0; k < X.data_out.size(); ++k) args += (k ? ", n" : "n") + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out[k])].id;
       args += ")";
       for (std::size_t k = 1; k < X.data_in.size(); ++k) args += ", " + value(x, X.data_in[k], c);
@@ -1812,6 +1956,9 @@ struct Writer {
       for (int k : at(e).data_out) names += (names.empty() ? "" : ", ") + at(e).out[static_cast<std::size_t>(k)].id;
       line(ind, "n" + id(e) + " = {" + names + "};");
     }
+    // (what its steps give and its loops keep, where only its own path reads it: the call's own)
+    for (int i : s.by_id)
+      if (at(i).local_in == e) line(ind, member_text(at(i), s.g));
     named_values(at(e).place, ind);
     return at(e).exec_out.empty() ? false : follow(e, 0, at(e).place, ind);
   }
@@ -2027,6 +2174,7 @@ struct Reader {
   struct MemberDecl {
     bool memory = false, result = false;
     std::string result_of;
+    std::string local;  // declared in this function's body (a local of its method), not in the class
     std::vector<std::pair<std::string, TypeRef>> fields;
     std::size_t tok = 0;
   };
@@ -2311,6 +2459,14 @@ struct Reader {
   bool literal_here(Value& v, std::string* of = nullptr, u32* count = nullptr) {
     const Tok& t = peek();
     if (of) of->clear();
+    if (t.kind == Tok::id && t.s == "Callback" && is("<", 1)) {
+      // Callback<Float(Float, Float)>{}: unbound - the one Callback a text writes out
+      TypeRef c;
+      if (!type_here(c) || !expect("{", "(an unbound Callback is " + cpp_type(c) + "{})") || !expect("}")) return true;
+      v = Value::zero(PinType::callback);
+      if (of) *of = c.of;
+      return true;
+    }
     if (t.kind == Tok::id && is("{", 1) && g.structure(t.s)) {
       // Weapon{"Knife", Kind::Melee, 25.0}: a value for every field, in their order
       const StructType s = *g.structure(t.s);
@@ -2492,6 +2648,25 @@ struct Reader {
       t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
       t.of = toks[p++].s;
       return true;
+    }
+    if (is("Callback") && is("<", 1)) {
+      // Callback<Float(Float, Float)>: a function of a library the engine calls (Make Callback), its signature -
+      // what it gives (void: nothing) and what it is handed: Bools, Ints, Floats, Vectors, Int64s
+      const std::size_t at = p;
+      p += 2;
+      TypeRef r{PinType::exec, {}};
+      if (!accept("void") && (!type_here(r) || !callback_type_ok(r.type) || r.count)) return fail(at + 2, "a Callback gives a Bool, an Int, a Float, a Vector, an Int64 or nothing: Callback<Float(Float, Float)>, Callback<void(Int)>");
+      if (!expect("(")) return false;
+      std::vector<TypeRef> in;
+      while (!is(")")) {
+        if (!in.empty() && !expect(",")) return false;
+        TypeRef a;
+        if (!type_here(a) || !callback_type_ok(a.type) || a.count) return fail(p, "the engine hands a Callback Bools, Ints, Floats, Vectors and Int64s");
+        in.push_back(a);
+      }
+      ++p;
+      t = {PinType::callback, callback_of(r, in)};
+      return expect(">");
     }
     if ((is("Map") || is("Set")) && is("<", 1)) {
       // Map<Int, Float>: values under keys; Set<Int>: keys - in the order the keys came. A key is a
@@ -2942,7 +3117,7 @@ struct Reader {
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
-        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set")) && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set") || is("Callback")) && is("<", 1)) || (peek(1).kind == Tok::id && !numbered(peek(1).s, "n") && (is("=", 2) || is(";", 2)))) && type_here(type);) {
           FunctionPin l;
           l.type = type.type;
           l.of = type.of;
@@ -2959,6 +3134,30 @@ struct Reader {
           f.locals.push_back(std::move(l));
         }
         if (failed()) return false;
+        // FnResult n12;   struct { Float value = 0.0; } n13;   struct : kern::Node<14> { Int index = 0; } n14;
+        // what its steps give and its loops keep, the call's own (Writer::body)
+        for (;;) {
+          MemberDecl d;
+          d.local = f.name;
+          u32 base = 0;
+          if (peek().kind == Tok::id && peek(1).kind == Tok::id && numbered(peek(1).s, "n") && is(";", 2)) {
+            const std::size_t at_type = p;
+            const std::string ret = toks[p++].s;
+            if (ret.size() <= 6 || ret.substr(ret.size() - 6) != "Result") return fail(at_type, "\"" + ret + "\" is no type here: what a called function gave is <Function>Result n<id>;");
+            d.result = true;
+            d.result_of = ret.substr(0, ret.size() - 6);
+            if (!member_name(std::move(d), 0)) return false;
+            continue;
+          }
+          if (is("kern") && is("::", 1) && is("Node", 2)) {
+            if (!node_base(d.memory, base) || !member_name(std::move(d), base)) return false;
+            continue;
+          }
+          if (!(is("struct") && (is("{", 1) || is(":", 1)))) break;
+          ++p;
+          if (accept(":") && !node_base(d.memory, base)) return false;
+          if (!expect("{") || !fields(d.fields, nullptr, "what a node gives") || !member_name(std::move(d), base)) return false;
+        }
       }
       it.open = p;
       items.push_back(std::move(it));
@@ -3205,7 +3404,7 @@ struct Reader {
     std::vector<int> r;
     const Made& m = made[static_cast<std::size_t>(node)];
     const bool place = names_place(*m.def);  // (the indices of its path stand in the place, not among its values)
-    const bool call = m.def->type == "func.call" || m.def->type == "func.pure";  // (so do those of the places a call names: "<input>.path0")
+    const bool call = m.def->type == "func.call" || m.def->type == "func.pure" || m.def->type == "func.callback";  // (so do those of the places a call names: "<input>.path0")
     for (std::size_t k = 0; k < m.in.size(); ++k)
       if (m.in[k].type != PinType::exec && !(place && is_path_pin(m.in[k].id)) && !(call && m.in[k].id.find('.') != std::string::npos)) r.push_back(static_cast<int>(k));
     return r;
@@ -3241,10 +3440,12 @@ struct Reader {
                                cpp_type(TypeRef{v.type, src.of, src.count}));
     // (what flows into a pin is an Int: one of a fixed width is the place's - the place holds its low bits)
     const bool any_int = v.type == PinType::integer && pin.type == PinType::integer && src.of.empty() && has_width(pin.type, pin.of);
-    if (v.type != pin.type || (src.of != pin.of && !any_int))
+    // (an input of a list of Ints of any width: a list written out is a List<Int>{...} - kAnyWidth)
+    const bool any_list = v.type == PinType::integer_list && pin.of == kAnyWidth && src.of.empty();
+    if (v.type != pin.type || (src.of != pin.of && !any_int && !any_list))
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
-    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, pin.of}));
+    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, any_list ? std::string() : pin.of}));
     return true;
   }
   /// Wires the exec outputs `from` to the exec input `in` of `node` ("": its first), or of the step go<id>.
@@ -3395,6 +3596,41 @@ struct Reader {
           s.pin = pd.id;
           return s;
         }
+    }
+    if (t.s == "callback" && is("<")) {
+      // callback<&Lib::fn>(place): Make Callback - a function of a library the engine calls; the place binds its
+      // first input where that is a const reference
+      p += 1;
+      std::string owner, fn, more;
+      if (!expect("&", "(callback<&Library::function>(place))") || !word(owner, "a library")) return s;
+      if (const std::size_t at = owner.find("::"); at != std::string::npos) {  // (a name with its library, read as one: Ground::height)
+        fn = owner.substr(at + 2);
+        owner = owner.substr(0, at);
+      } else if (!expect("::") || !word(fn, "a function of " + owner)) {
+        return s;
+      }
+      while (accept("::")) {
+        if (!word(more, "a function")) return s;
+        fn += "::" + more;
+      }
+      const std::string fname = owner == name ? fn : owner + "::" + fn;
+      const Function* f = g.function(fname);
+      if (!f) { fail(s.tok, "callback<&" + owner + "::" + fn + ">: no such function"); return s; }
+      if (!expect(">") || !is("(")) { expect("("); return s; }
+      std::vector<std::pair<std::string, std::string>> params{{"function", fname}};
+      const bool bound = !f->inputs.empty() && f->inputs[0].ref;
+      if (bound && !ref_places(*f, 1, params)) return s;
+      ++p;
+      const int node = make("func.callback", s.tok, std::move(params));
+      if (node < 0) return s;
+      if (bound) {
+        ++p;  // (the variable's name)
+        if (!place_rest(node, ref_key(f->inputs[0].name, ""))) return s;
+      }
+      if (!expect(")", "(a Callback binds one place: callback<&" + owner + "::" + fn + ">(" + (bound ? f->inputs[0].name : std::string()) + "))")) return s;
+      s.node = node;
+      s.root = true;
+      return s;
     }
     if (const Function* f = g.function(t.s)) {
       const std::string fname = f->name;
@@ -4509,7 +4745,9 @@ struct Reader {
       const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
       const std::string need = cpp_type(TypeRef{to_type.type, to_type.type == PinType::integer ? std::string() : to_type.of}), have = cpp_type(from_type);
       // (an Int is an Int, whatever width the place it comes from or goes to has: the place holds its low bits)
-      const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer);
+      // (an input that reads a list of Ints of any width takes each as it is: kAnyWidth)
+      const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer) ||
+                        (to_type.of == kAnyWidth && fits(from_type, to_type));
       if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::integer)
         return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
       if (int_inputs.count({w.to, w.in})) {
@@ -4597,10 +4835,15 @@ struct Reader {
         for (int k : x.data_out) names += (names.empty() ? "" : ", ") + x.out[static_cast<std::size_t>(k)].id;
         return fail(m.tok, "its values are read outside its own method: the method begins with " + nid + " = {" + names + "};");
       }
-      if (!x.member && decl == members.end()) continue;
+      if (!x.kept() && decl == members.end()) continue;
       const std::string want = Writer::member_text(x, g);
-      if (decl == members.end()) return fail(m.tok, nid + " is not declared: " + want);
+      const std::string fn = x.local_in >= 0 ? shape.at(x.local_in).node->param("function") : std::string();
+      if (decl == members.end()) return fail(m.tok, nid + " is not declared: " + want + (fn.empty() ? "" : " (at the top of the body of " + fn + ")"));
       const MemberDecl& d = decl->second;
+      // (one that is the call's own may also be a member of the class, as texts had it before: the same Blueprint)
+      if (!d.local.empty() && d.local != fn)
+        return fail(d.tok, nid + (fn.empty() ? " is read outside the path of " + d.local + " after it, or where it may not have run in this call: it is a member of the class - " + want
+                                              : " belongs to the function " + fn + ": " + want + " at the top of its body"));
       bool same = d.memory == (x.def->memory && !x.event) && d.result == (x.def->type == "func.call");
       if (d.result) same = same && d.result_of == x.node->param("function");
       else {
@@ -4952,6 +5195,14 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     auto inner = [&](const TypeRef& x) { return x.type == PinType::integer ? std::string("kern::logic::Whole") : type_in(x.type, x.of, owner); };
     if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
     if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
+    if (t == PinType::callback) {  // (kern::logic::Callback<kern::f64(kern::f64, kern::f64)>)
+      const TypeRef r = callback_result({t, of});
+      std::string c = "kern::logic::Callback<" + (r.type == PinType::exec ? std::string("void") : inner(r)) + "(";
+      const std::vector<TypeRef> in = callback_inputs({t, of});
+      for (std::size_t k = 0; k < in.size(); ++k) c += (k ? ", " : "") + inner(in[k]);
+      return c + ")>";
+    }
+    if (t == PinType::integer_list && width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
     return is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
   };
@@ -4992,7 +5243,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
-      if (is_keyed(f.type.type)) return type_in(f.type.type, f.type.of, rooted);
+      if (is_keyed(f.type.type) || f.type.type == PinType::callback) return type_in(f.type.type, f.type.of, rooted);
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };
@@ -5088,6 +5339,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "  }\n"
                   "  bool call(std::string_view function, std::span<const kern::logic::Value> args, kern::logic::Results& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
+  std::string kept;   // (the reference inputs of the calls by name: members - see below)
   for (const Function& f : g.functions) {
     if (f.external || !f.from.empty()) continue;  // (a function of another Blueprint, or of a library: nothing of it is here to call by name)
     // (a reference input: called by name it is a variable of the call that starts as the argument;
@@ -5096,12 +5348,21 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     // so that a host can measure the function's own work (logic::native_probe) -, then what it gave
     // is handed back. An input by value is moved in: the function gets it without a copy.
     std::string call = "self." + f.name + "(", places, changed;
+    bool busy = false;
     for (std::size_t k = 0; k < f.inputs.size(); ++k) {
       const std::string at = std::to_string(k);
       if (f.inputs[k].ref) {
         // (a variable of exactly the type the function takes: its reference binds to it)
+        // (it stays after the call, as the interpreter's variable of the call does, until the function is called by
+        // name again: what the call bound to it - a Callback it gave back - reads it there, not a place that ended)
         const std::string held = "kern::logic::NativeParam<&" + name + "::" + f.name + ", " + at + ">";
-        places += "      " + held + " place" + at + " = native_arg<" + held + ">(args, " + at + ", " + held + "{});\n";
+        const std::string member = "place_" + f.name + "_" + at;
+        // (a call by name inside such a call of the same function - the engine calls it again from within -: its own,
+        // as the interpreter keeps the outer call's variables)
+        kept += "  " + held + " " + member + "{};\n";
+        places += "      " + held + " inner" + at + "{};\n      auto& place" + at + " = busy_" + f.name + " ? inner" + at + " : " + member + ";\n      place" + at +
+                  " = native_arg<" + held + ">(args, " + at + ", " + held + "{});\n";
+        busy = true;
         if (!f.inputs[k].constant) changed += "      results.push_back(to_value(place" + at + "));\n";
       } else {
         const std::string held = type(f.inputs[k].type, f.inputs[k].of);
@@ -5110,6 +5371,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       call += std::string(k ? ", " : "") + (f.inputs[k].ref ? "place" + at : "std::move(in" + at + ")");
     }
     call += ")";
+    if (busy) {
+      kept += "  bool busy_" + f.name + " = false;\n";
+      places += "      const bool was_busy = busy_" + f.name + ";\n      busy_" + f.name + " = true;\n";
+      changed += "      busy_" + f.name + " = was_busy;\n";
+    }
     s += "    if (function == \"" + f.name + "\") {\n" + places + "      kern::logic::native_call(true);\n";
     if (f.outputs.empty()) {
       s += "      " + call + ";\n      kern::logic::native_call(false);\n";
@@ -5120,7 +5386,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     }
     s += changed + "      return true;\n    }\n";
   }
-  s += "    return false;\n  }\n"
+  s += "    return false;\n  }\n" + kept +
        "  bool get(std::string_view variable, kern::logic::Value& out) const override {\n    (void)out;\n";
   for (const Variable& v : g.variables) s += "    if (variable == \"" + v.name + "\") { out = kern::logic::to_value(self." + v.name + "); return true; }\n";
   s += "    return false;\n  }\n"

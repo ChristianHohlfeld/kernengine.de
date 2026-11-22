@@ -232,6 +232,53 @@ struct Workshop : virtual kern::Library, virtual Parts {
   struct : kern::Node<20> { Int index = 0; } n20;
 };
 )kn";
+// Callbacks: a function of a library as a value only the engine calls (Make Callback) - bound to a variable, to a field in
+// one, or to nothing; the place is read where it stands when the value is called (native_show calls it, as the engine would).
+inline const char* kGround = R"kn(
+struct Ground : virtual kern::Library {
+  KERN_STRUCT(Field) {
+    Float Base = 1.0;
+    Float Slope = 0.5;
+  };
+
+  struct heightResult { Float h = 0.0; };
+  /// The height of the field at (x, y): what the engine asks.
+  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {
+    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x - y; }, f.Base, f.Slope, x, y)};
+  }
+  struct highResult { Bool up = false; };
+  KERN_PURE highResult high(Float x = 0.0) {
+    return {math_compare<">">(x, 1.0)};
+  }
+};
+)kn";
+inline const char* kSite = R"kn(
+struct Site : virtual kern::Blueprint, virtual Ground {
+  KERN_STRUCT(Twin) {
+    Field First = Field{1.0, 1.0};
+    Field Second = Field{3.0, -1.0};
+  };
+
+  Field Here = Field{2.0, 0.5};
+  Twin Pair = Twin{Field{1.0, 1.0}, Field{3.0, -1.0}};
+  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
+  Callback<Float(Float, Float)> Other = Callback<Float(Float, Float)>{};
+
+  struct MakeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; Callback<Bool(Float)> up = Callback<Bool(Float)>{}; };
+  /// Callbacks bound to a variable and to a field in one; one without a place.
+  MakeResult Make(Float base = 0.0) {
+    Here.Base = base;
+    Kept = callback<&Ground::height>(Here);
+    Other = callback<&Ground::height>(Pair.Second);
+    return {callback<&Ground::height>(Here), callback<&Ground::high>()};
+  }
+  /// The places change: what the engine reads when it calls.
+  void Again() {
+    Here.Slope = 3.0;
+    Pair.Second.Base = 7.0;
+  }
+};
+)kn";
 inline const char* kGarage = R"kn(
 struct Garage : virtual kern::Blueprint, virtual Workshop, virtual Parts {
   KERN_STRUCT(Car) {
@@ -1148,7 +1195,12 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
   }
   if (logic::element_of(t.type) != PinType::structure) {
     const logic::EnumType* e = g.enumeration(t.of);
-    return samples(t.type, e ? e->values.size() : 0);
+    std::vector<Value> r = samples(t.type, e ? e->values.size() : 0);
+    // (a list of Ints of a width holds its values only - a C++ caller hands over a List<U8>, which holds no -1; one Int of a
+    // width is handed over as an Int, the input holds its low bits)
+    if (t.type == PinType::integer_list && logic::has_width(t))
+      for (Value& v : r) v = logic::fitted(v, t, g);
+    return r;
   }
   std::vector<Value> items;
   if (const logic::StructType* s = g.structure(t.of)) {
@@ -1202,13 +1254,15 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   for (const logic::PinDef& p : in) {
     if (p.type == PinType::exec) continue;
     const std::string name = "i" + std::to_string(f.inputs.size());
-    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of({p.type, p.of}, g).to_json(g, p.of) : p.def, p.of});
+    const logic::TypeRef held = logic::place_type(p);  // (an input of a list of any width: a List<Int> is given)
+    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of(held, g).to_json(g, held.of) : p.def, held.of});
     g.links.push_back({entry.id, name, node.id, p.id});
   }
   for (const logic::PinDef& p : out) {
     if (p.type == PinType::exec) continue;
     const std::string name = "o" + std::to_string(f.outputs.size());
-    f.outputs.push_back({name, p.type, logic::zero_of({p.type, p.of}, g).to_json(g, p.of), p.of});
+    const logic::TypeRef held = logic::place_type(p);
+    f.outputs.push_back({name, p.type, logic::zero_of(held, g).to_json(g, held.of), held.of});
     g.links.push_back({node.id, p.id, give.id, name});
   }
   g.functions.push_back(f);
@@ -1497,6 +1551,11 @@ inline std::vector<Case> cases() {
     r.calls.push_back({"next", {samples({PinType::structure, "Rng"}, r.graph).front(), I(5)}});
     Case& d = read("dice", kDice);
     for (i64 step : {i64{1}, i64{4}, i64{-2}}) d.calls.push_back({"roll", {I(step)}});
+    Case& ground = read("Ground", kGround);
+    for (const Value& field : samples({PinType::structure, "Field"}, ground.graph)) ground.calls.push_back({"height", {field, N(1.5), N(-2.0)}});
+    ground.calls.push_back({"high", {N(2.0)}});
+    Case& site = read("Site", kSite);
+    site.calls = {{"Make", {N(0.5)}}, {"Again", {}}, {"Make", {N(-3.0)}}};
     Case& c = read("Garage", kGarage);
     const i64 most = std::numeric_limits<i64>::max();
     for (i64 car : {i64{0}, i64{1}, i64{-1}, most})
@@ -1559,7 +1618,7 @@ inline std::vector<Case> cases() {
     c.name = std::string("Tier_") + t.name;
     c.graph = logic_cases::parse(t);
     c.scenario = true;
-    if (logic::native_ready(c.graph)) all.push_back(std::move(c));
+    if (logic::native_ready(c.graph) && !t.cpp_leaves_open) all.push_back(std::move(c));  // (what C++ leaves open is no case for the class)
   }
   return all;
 }
@@ -1655,6 +1714,7 @@ inline std::string cpp_type(PinType t, const std::string& of = {}, const std::st
     auto part = [&](const logic::TypeRef& p) { return p.type == PinType::integer ? std::string("kern::logic::Whole") : cpp_type(p.type, p.of, owner); };
     return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
   }
+  if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }

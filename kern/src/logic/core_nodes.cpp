@@ -18,6 +18,22 @@ namespace {
 PinDef exec_in(std::string id = "exec", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
 PinDef exec_out(std::string id = "then", std::string label = "") { return {std::move(id), std::move(label), PinType::exec, {}}; }
 PinDef data(std::string id, std::string label, PinType t, json::Value def = {}) { return {std::move(id), std::move(label), t, std::move(def)}; }
+/// An input that reads a list of Ints of any width as it is (kAnyWidth: List<Int>, List<U8> ...).
+PinDef any_ints(std::string id, std::string label) {
+  PinDef p = data(std::move(id), std::move(label), PinType::integer_list, json::Value::array());
+  p.of = std::string(kAnyWidth);
+  return p;
+}
+/// The width of the Ints a list place of the node holds ("u8" ... - empty: none), as C++ stores an item there.
+std::string width_of_place(Context& c) {
+  Variable named;
+  return c.instance().graph().place_of(c.node(), named) && has_width(named.type, named.of) ? named.of : std::string();
+}
+/// An item as a list of the width `of` holds it (an Int of no width: as it is).
+Value stored_as(Value item, const std::string& of) {
+  if (!of.empty() && item.type == PinType::integer) item.i = wrapped(item.i, of);
+  return item;
+}
 
 NodeDef make(std::string type, std::string label, std::string category, NodeKind kind, std::string help, std::string keywords = {}) {
   NodeDef d;
@@ -68,6 +84,11 @@ ParamDef param(std::string key, std::string label, ParamDef::Kind kind, std::str
 }
 /// The setting of a node that names a variable: the function whose local variable it is (empty:
 /// a variable of the Blueprint).
+/// A node that reads or changes the world it runs in (NodeDef::world).
+NodeDef worldly(NodeDef d) {
+  d.world = true;
+  return d;
+}
 ParamDef local_of() { return param("scope", "Local of", ParamDef::Kind::scope); }
 /// The setting "path" of a node that names a place: from its variable through fields and list
 /// entries (ParamDef::Kind::path).
@@ -79,6 +100,7 @@ std::string place_title(const Node& n) { return n.param("variable", "?") + n.par
 ParamDef type_param(bool with_lists) {
   ParamDef p = param("type", "Type", ParamDef::Kind::type, "float");
   p.with_lists = with_lists;
+  p.widths = true;
   return p;
 }
 /// The setting "Enum" of an enum node: which enum of the Blueprint.
@@ -423,6 +445,7 @@ void add_flow(Library& lib) {
   {
     NodeDef d = make("flow.call", "Call Event", "Flow", NodeKind::action,
                      "Raises a Custom Event: on Target's graph, or on every graph when Target is empty. Also switches state machine transitions with that name.");
+    d.world = true;
     d.inputs = {exec_in(), data("target", "Target", PinType::actor, 0), data("actor", "Actor", PinType::actor, 0), data("value", "Value", PinType::number, 0),
                 data("text", "Text", PinType::text, "")};
     d.params = {param("name", "Event", ParamDef::Kind::event, "MyEvent")};
@@ -633,10 +656,12 @@ void add_lists(Library& lib) {
     };
     d.run = [](Context& c) {
       const std::size_t count = c.input_count();
+      const TypeRef e = item_type(c.node(), c.instance().graph());
+      const std::string of = has_width(e) ? e.of : std::string();  // (List<U8>{a, b}: each stored as a U8)
       with_items(element_of(c.output(0).type), [&](auto type) {
         using T = typename decltype(type)::type;
         std::vector<T> items;
-        for (std::size_t k = 0; k < count; ++k) items.push_back(from_value<T>(c.in(k)));
+        for (std::size_t k = 0; k < count; ++k) items.push_back(from_value<T>(stored_as(c.in(k), of)));
         c.out(std::size_t{0}, Value::of(std::move(items)));
       });
       return kStop;
@@ -772,7 +797,7 @@ void add_lists(Library& lib) {
                      {data("index", "Index", PinType::integer)});
     d.title = [](const NodeDef&, const Node& n) { return "Add to " + place_title(n); };
     d.run = [on_list](Context& c) {
-      const Value item = c.in("item");
+      const Value item = stored_as(c.in("item"), width_of_place(c));
       on_list(c, [&](Value& v) {
         with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
@@ -789,7 +814,7 @@ void add_lists(Library& lib) {
     d.title = [](const NodeDef&, const Node& n) { return "Insert into " + place_title(n); };
     d.run = [on_list](Context& c) {
       const i64 index = c.in_int("index");
-      const Value item = c.in("item");
+      const Value item = stored_as(c.in("item"), width_of_place(c));
       on_list(c, [&](Value& v) {
         with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
@@ -838,7 +863,7 @@ void add_lists(Library& lib) {
     d.title = [](const NodeDef&, const Node& n) { return "Set Length of " + place_title(n); };
     d.run = [on_list](Context& c) {
       const i64 length = c.in_int("length");
-      const Value value = c.in("value");
+      const Value value = stored_as(c.in("value"), width_of_place(c));
       on_list(c, [&](Value& v) {
         with_items(element_of(v.type), [&](auto type) {
           using T = typename decltype(type)::type;
@@ -975,8 +1000,13 @@ void add_lists(Library& lib) {
     d.run = [on_list](Context& c) {
       const i64 index = c.in_int("index");
       const std::string text = c.in_text("text");
+      const std::string of = width_of_place(c);  // (a list of a width holds each byte as C++ stores it there: an I8 128 .. 255 as -128 .. -1)
       on_list(c, [&](Value& v) {
-        if (v.type == PinType::integer_list) texts::insert_bytes(v.template edit<i64>(), index, text);
+        if (v.type != PinType::integer_list) return;
+        std::vector<i64>& items = v.template edit<i64>();
+        texts::insert_bytes(items, index, text);
+        if (!of.empty())
+          for (i64& x : items) x = wrapped(x, of);
       });
       return 0;
     };
@@ -1011,14 +1041,14 @@ void add_lists(Library& lib) {
                      "its length); an item some of whose bytes are written keeps the others. Items are read as they were (a list into itself, as memmove).",
                      "memcpy memmove bytes binary serialize wire buffer float array copy");
     d.params = {param("variable", "List", ParamDef::Kind::variable), local_of(), path_of(), code_param("code", "Number"), code_param("from_code", "Number of Items")};
-    d.inputs = {exec_in(), data("at", "At", PinType::integer, 0), data("items", "Items", PinType::integer_list), data("from", "From", PinType::integer, 0),
+    d.inputs = {exec_in(), data("at", "At", PinType::integer, 0), any_ints("items", "Items"), data("from", "From", PinType::integer, 0),
                 data("count", "Count", PinType::integer, 0)};
     d.outputs = {exec_out()};
     d.title = [](const NodeDef&, const Node& n) { return "Copy Bytes into " + place_title(n); };
     d.shape = [list_of_code](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) {
       const bytes::Code of = bytes::code_of(n.param("from_code", "u8"));
       for (PinDef& p : in)
-        if (p.id == "items" && of != bytes::Code::none && of != bytes::Code::boolean) retype(p, TypeRef{list_of_code(of), ""}, g);
+        if (p.id == "items" && of != bytes::Code::none && of != bytes::Code::boolean) retype(p, TypeRef{list_of_code(of), bytes::whole(of) ? std::string(kAnyWidth) : ""}, g);
     };
     d.problem = [](const Node& n, const Graph& g) -> std::string {
       const bytes::Code into = bytes::code_of(n.param("code", "u8")), of = bytes::code_of(n.param("from_code", "u8"));
@@ -1030,6 +1060,9 @@ void add_lists(Library& lib) {
       if (v && !bytes::suits_list(into, element_of(v->type)))
         return "\"" + v->name + "\" is a list of " + std::string(pin_type_name(element_of(v->type))) + ": its numbers are not " + n.param("code", "u8") +
                " (an Int is u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+      // (a list of Ints of a width holds numbers of that width: the bytes written are of them)
+      if (v && has_width(v->type, v->of) && n.param("code", "u8") != v->of)
+        return "\"" + v->name + "\" is a list of " + type_label({PinType::integer, v->of}) + ": its numbers are " + v->of + ", not " + n.param("code", "u8");
       return {};
     };
     d.run = [](Context& c) {
@@ -1548,9 +1581,10 @@ void add_structs(Library& lib) {
     if (st->fields.size() != l.count)
       return "the layout has " + std::to_string(l.count) + " field(s), " + st->name + " has " + std::to_string(st->fields.size());
     for (std::size_t k = 0; k < l.count; ++k)
-      if (st->fields[k].type.count || !bytes::suits(l.fields[k].code, st->fields[k].type.type))
+      if (st->fields[k].type.count || !bytes::suits(l.fields[k].code, st->fields[k].type.type) ||
+          (has_width(st->fields[k].type) && bytes::code_of(st->fields[k].type.of) != l.fields[k].code))
         return "the layout's field " + std::to_string(k + 1) + " does not suit " + st->name + "." + st->fields[k].name +
-               " (a Bool is bool; an Int u8 .. i32; an Int64 u64, i64; a Float f32, f64)";
+               " (a Bool is bool; an Int u8 .. i32; an Int64 u64, i64; a Float f32, f64; a U8 ... I32 its own width)";
     return {};
   };
   auto layout_param = [] { return param("layout", "Layout", ParamDef::Kind::text, "4: i32@0"); };
@@ -1592,7 +1626,7 @@ void add_structs(Library& lib) {
                      "where the list has none, it is 0.",
                      "bit cast memcpy binary bytes deserialize parse wire packet");
     d.params = {struct_param(), layout_param()};
-    d.inputs = {data("bytes", "Bytes", PinType::integer_list), data("at", "At", PinType::integer, 0)};
+    d.inputs = {any_ints("bytes", "Bytes"), data("at", "At", PinType::integer, 0)};
     d.outputs = {data("value", "Value", PinType::structure)};
     d.title = [](const NodeDef&, const Node& n) { return n.param("struct", "?") + " of Bytes"; };
     d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>&, std::vector<PinDef>& out) { retype(out[0], {PinType::structure, n.param("struct")}, g); };
@@ -1755,18 +1789,18 @@ void add_math(Library& lib) {
   lib.add(pure("math.round", "Round", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_round)));
   lib.add(pure("math.floor", "Floor", "Math", {data("a", "A", K::number, 0.0)}, integer, of(&P::math_floor)));
   // Random: every node has a sequence of its own (logic::random), from the Blueprint's seed.
-  lib.add(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number), [](Context& c) {
+  lib.add(worldly(fresh(pure("math.random", "Random Float in Range", "Math", {data("min", "Min", K::number, 0.0), data("max", "Max", K::number, 1.0)}, data("result", "", K::number), [](Context& c) {
     const f64 lo = c.in_number("min"), hi = c.in_number("max");
     return Value::number(random::number(&c.slot(0), c.instance().seed(), c.node().id, lo, hi));
-  }, "Deterministic per world", "rand")));
-  lib.add(fresh(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
+  }, "Deterministic per world", "rand"))));
+  lib.add(worldly(fresh(pure("math.random_int", "Random Integer in Range", "Math", {data("min", "Min", K::integer, 0), data("max", "Max", K::integer, 10)}, data("result", "", K::integer), [](Context& c) {
     const i64 lo = c.in_int("min"), hi = c.in_int("max");
     return Value::integer(random::whole_number(&c.slot(0), c.instance().seed(), c.node().id, lo, hi));
-  }, "Min to Max inclusive", "rand")));
-  lib.add(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean), [](Context& c) {
+  }, "Min to Max inclusive", "rand"))));
+  lib.add(worldly(fresh(pure("math.random_bool", "Random Bool", "Math", {data("chance", "Chance", K::number, 0.5)}, data("result", "", K::boolean), [](Context& c) {
     const f64 chance = c.in_number("chance");
     return Value::boolean(random::chance(&c.slot(0), c.instance().seed(), c.node().id, chance));
-  }, "True with the given chance (0..1)", "rand coin")));
+  }, "True with the given chance (0..1)", "rand coin"))));
   {
     NodeDef d = pure("math.compare", "Compare", "Logic", {data("a", "A", K::number, 0.0), data("b", "B", K::number, 0.0)}, boolean, [](Context& c) {
       const f64 a = c.in_number("a"), b = c.in_number("b");
@@ -1844,6 +1878,32 @@ void add_math(Library& lib) {
                "The byte at Index as a number 0 to 255 (beyond the text: 0)", "char character byte ascii index"));
   lib.add(pure("text.of_code", "Text of Code", "Text", {data("code", "Code", K::integer, 65)}, data("result", "", K::text), of(&P::text_of_code),
                "A text of one byte: Code cut to 8 bits", "char character byte ascii"));
+  {
+    // Set Code: one byte of a text variable set where it stands - what `s[i] = c` does to a std::string (Text::set_at)
+    NodeDef d = make("text.set_code", "Set Code", "Text", NodeKind::action,
+                     "Sets the byte at Index of a text variable - or of a text at a place in one - to Code (cut to 8 bits), where it stands: the text keeps its "
+                     "length, the other bytes stay. An index outside the text changes nothing.",
+                     "char character byte ascii index replace write string");
+    d.params = {param("variable", "Text", ParamDef::Kind::variable), local_of(), path_of()};
+    d.inputs = {exec_in(), data("index", "Index", PinType::integer, 0), data("code", "Code", PinType::integer, 32)};
+    d.outputs = {exec_out()};
+    d.title = [](const NodeDef&, const Node& n) { return "Set Code in " + place_title(n); };
+    d.problem = [](const Node& n, const Graph& g) -> std::string {
+      Variable named;
+      const Variable* v = g.place_of(n, named) ? &named : nullptr;
+      if (v && v->type != PinType::text) return "needs a text variable: \"" + v->name + "\" is " + std::string(pin_type_name(v->type));
+      return {};
+    };
+    d.run = [](Context& c) {
+      const i64 index = c.in_int("index"), code = c.in_int("code");
+      const std::vector<i64> at = c.path();  // (its indices, read after its inputs - as every step on a place)
+      c.instance().change(c.node(), at, [&](Value& v) {
+        if (v.type == PinType::text && index >= 0 && static_cast<u64>(index) < v.s.size()) v.s[static_cast<std::size_t>(index)] = static_cast<char>(static_cast<u8>(code));
+      });
+      return 0;
+    };
+    lib.add(std::move(d));
+  }
   {
     // Format Text: a format as printf has it, and a value for each of its conversions (nodes.h, format)
     NodeDef d = make("text.format", "Format Text", "Text", NodeKind::pure,
@@ -1929,7 +1989,7 @@ void add_math(Library& lib) {
     lib.add(pure("text.reserve", "Reserve Text", "Text", {data("a", "Text", K::text, ""), data("count", "Count", K::integer, 0)}, text, of(&P::text_reserve),
                  "The text as it is - in a Blueprint's class with room for Count characters, so that what is appended to it fits (std::string::reserve)",
                  "reserve capacity room string"));
-    lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {data("bytes", "Bytes", K::integer_list), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
+    lib.add(pure("text.of_bytes", "Text of Bytes", "Text", {any_ints("bytes", "Bytes"), data("at", "At", K::integer, 0), data("count", "Count", K::integer, 0)}, text,
                  of(&P::text_of_bytes), "Count bytes of the list from At on as a text, each cut to 8 bits (beyond the list: up to its end)",
                  "bytes chars string decode utf8 buffer"));
     // Numbers read from a text at a place, as C reads them (scan, nodes.h): Value, and End - the place just
@@ -2020,9 +2080,10 @@ void add_math(Library& lib) {
     lib.add(std::move(d));
   }
   // Time.
-  lib.add(pure("time.now", "Game Time", "Utilities", {}, data("result", "Seconds", K::number), [](Context& c) { return Value::number(c.host().time()); }, "Seconds since play started", "clock elapsed"));
+  lib.add(worldly(pure("time.now", "Game Time", "Utilities", {}, data("result", "Seconds", K::number), [](Context& c) { return Value::number(c.host().time()); }, "Seconds since play started", "clock elapsed")));
   {
     NodeDef d = make("debug.print", "Print", "Utilities", NodeKind::action, "Writes text to the log (and on screen).");
+    d.world = true;
     d.inputs = {exec_in(), data("text", "Text", K::text, "Hello"), data("screen", "On Screen", K::boolean, true)};
     d.outputs = {exec_out()};
     d.keywords = "log debug message string";
@@ -2161,6 +2222,7 @@ void add_functions(Library& lib) {
                      "Runs a function of another actor's Blueprint to its end, then continues: Target's, or the Level's when Target is empty. This Blueprint says what the "
                      "function looks like (My Blueprint: a function \"of another Blueprint\", or one of its own with the same name and pins). Where the target has no such "
                      "function, the outputs are their defaults.");
+    d.world = true;
     d.params = {param("function", "Function", ParamDef::Kind::function)};
     d.inputs = {exec_in(), data("this", "Target", PinType::actor, 0)};  // ("this": a word of C++ - no pin of a function has that name)
     d.outputs = {exec_out()};
@@ -2187,6 +2249,7 @@ void add_functions(Library& lib) {
     NodeDef d = make("func.get_on", "Get Variable on Actor", "Functions", NodeKind::pure,
                      "What the variable of the name holds in the Blueprint of Target (the Level's when Target is empty), as a value of the type the setting says. Where Target has no such "
                      "variable of that type: the zero of the type.");
+    d.world = true;
     d.params = {param("variable", "Variable", ParamDef::Kind::text, ""), type_param(true)};
     d.inputs = {data("this", "Target", PinType::actor, 0)};
     d.outputs = {data("value", "Value", PinType::number)};
@@ -2205,6 +2268,7 @@ void add_functions(Library& lib) {
     NodeDef d = make("func.has_blueprint", "Has Blueprint", "Functions", NodeKind::pure,
                      "True when Target (the Level when Target is empty) has a Blueprint that runs: one without errors that has not been stopped. Call on Actor and Get "
                      "Variable on Actor reach it; where it has none, they give their defaults.");
+    d.world = true;
     d.inputs = {data("target", "Target", PinType::actor, 0)};
     d.outputs = {data("result", "Has Blueprint", PinType::boolean)};
     d.keywords = "has blueprint logic running valid other actor remote bound";
@@ -2223,6 +2287,37 @@ void add_functions(Library& lib) {
     d.keywords = "call pure function value compute";
     d.run = [call](Context& c) {
       call(c);
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
+    // Make Callback: a function of a library as a value that only the engine calls (a height lookup, a test a
+    // builder asks) - with the place its first input names, where that is a const reference
+    NodeDef d = make("func.callback", "Make Callback", "Functions", NodeKind::pure,
+                     "A function of a library as a value the engine calls - while one of its nodes runs, or later, while the object of the engine it was "
+                     "given to lives. Its first input, where that is a const reference, is bound to the place this node names (read when the engine calls). "
+                     "The function needs nothing of the world: it only computes. A Blueprint does not call a Callback itself.");
+    d.params = {param("function", "Function", ParamDef::Kind::function), local_of()};
+    d.shape = [](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>& out) {
+      const Function* f = g.function(n.param("function"));
+      out.push_back({"callback", "Callback", PinType::callback, {}, false, f ? callback_of(*f) : std::string("()")});
+      if (!f || f->inputs.empty() || !f->inputs[0].ref) return;
+      const FunctionPin& p = f->inputs[0];
+      const std::size_t entries = path_indices(n.param(ref_key(p.name, "path")));
+      for (std::size_t k = 0; k < entries; ++k)
+        in.push_back({ref_key(p.name, path_pin(k)), p.name + (entries > 1 ? " index " + std::to_string(k + 1) : std::string(" index")), PinType::integer, json::Value(0), false, {}});
+    };
+    d.title = [](const NodeDef&, const Node& n) { return "Callback " + n.param("function", "?"); };
+    d.color = 0x6d3fc4;
+    d.keywords = "callback function value engine calls sampler handler";
+    d.run = [](Context& c) {
+      const Function* f = c.instance().graph().function(c.param("function"));
+      if (!f) return kStop;
+      Instance::Spot place;
+      const bool bound = !f->inputs.empty() && f->inputs[0].ref;
+      if (bound) place = c.spot(ref_key(f->inputs[0].name, ""));  // (the place, as the node names it now)
+      c.out(std::size_t{0}, Value::callback(c.instance().callable(f->name, bound, std::move(place))));
       return kStop;
     };
     lib.add(std::move(d));
