@@ -96,6 +96,62 @@ rc=0
 # class) call the real functions of the engine's nodes, each side with objects of its own, set up alike
 # for every call - the description of every node they call has to fit the real function (rule_blueprint.h).
 if [ $# -eq 0 ] && [ "$pass" != 1 ]; then SC_ENGINE=real "$out/spawncity_tests" converted_ || rc=1; fi
+# The differential tests in the form "two builds" (tools/source_diff.py; tests/lowered/builds/<file>/): each side is the
+# whole program in its state - the old tree (the game's sources as they stood at the test's base: these sources with
+# old/ put over them and the files named in gone taken away) and the sources as they stand -, the engine and the level
+# as they stand. The same test is compiled into each; the old program writes what each compared function gave, the
+# new compares. Run with the tests (no filter, or one its name - lowered_<file>_cpp - holds), in the first pass.
+builds_rc=0
+for drv in "$here"/lowered/builds/*/builds_*.cpp; do
+  [ -f "$drv" ] || continue
+  bdir="$(dirname "$drv")" stem="$(basename "$bdir")" name="lowered_$(basename "$bdir" | sed 's/[^A-Za-z0-9_]/_/g')_cpp"
+  want=0; [ $# -eq 0 ] && want=1
+  for a in "$@"; do case "$name" in *"$a"*) want=1 ;; esac; done
+  [ "$want" = 1 ] && [ "$pass" != 2 ] && [ "$whole" = 1 ] || continue
+  bout="$out/builds/$stem"; tree="$bout/tree/src"
+  rm -rf "$bout/tree" && mkdir -p "$bout/tree"
+  # (beside it what stands beside src; the tests as folders of links - a header of the tests that names ../src/ is then
+  # the old tree's: the test of the old program is compiled from there)
+  for e in "$game"/*; do case "$(basename "$e")" in src) ;; tests) cp -rs "$e" "$bout/tree/tests" ;; *) ln -s "$e" "$bout/tree/$(basename "$e")" ;; esac; done
+  cp -r "$game/src" "$tree"
+  (cd "$bdir/old" && find . -type f) | while IFS= read -r f; do mkdir -p "$(dirname "$tree/$f")"; cp "$bdir/old/$f" "$tree/$f"; done
+  while IFS= read -r f; do [ -n "$f" ] && rm -f "$tree/$f"; done < "$bdir/gone"
+  # (the objects: the engine's as the tests have them; the game's - every source but main.cpp, game.h's too - of each tree.
+  # An old source that is the new one, with no header of the trees other, is the new one's object)
+  same_headers=1
+  if [ -n "$(cd "$bdir/old" && find . -name '*.h' -o -name '*.hpp')" ] || [ -s "$bdir/gone" ]; then same_headers=0; fi
+  okey="$({ printf '%s ' "$key"; find "$tree" -name '*.h' -o -name '*.hpp' | sort | xargs cat; } | sha256sum | cut -c1-12)"
+  side_objects() {  # tree flag... -> the object of every source of the tree (compiled where it is not there)
+    local t="$1"; shift
+    for f in "$t"/*.cpp; do
+      [ "$(basename "$f")" = main.cpp ] && continue
+      if [ "$t" = "$game/src" ] || { [ "$same_headers" = 1 ] && cmp -s "$f" "$game/src/$(basename "$f")"; }; then
+        object_of "$game/src/$(basename "$f")"
+      else
+        echo "$out/obj/builds-$stem-$(basename "$f")-$okey-$(sha256sum "$f" | cut -c1-12).o"
+      fi
+    done
+  }
+  oflags=(); for f in "${flags[@]}"; do [ "$f" = "-I$game/src" ] && oflags+=("-I$tree") || oflags+=("$f"); done
+  engine=(); for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_*|*_kern_tests_gl_stub*|*_tests_test_main.cpp-*) engine+=("$f") ;; esac; done
+  for side in new old; do
+    if [ "$side" = new ]; then t="$game/src" d="$drv" sf=("${flags[@]}"); else t="$tree" d="$bout/tree/tests/${drv#"$here"/}" sf=("${oflags[@]}"); fi
+    mapfile -t objs < <(side_objects "$t")
+    k=0; jobs_src=()
+    for f in "$t"/*.cpp; do [ "$(basename "$f")" = main.cpp ] && continue; [ -f "${objs[$k]}" ] || jobs_src+=("$f|${objs[$k]}"); k=$((k + 1)); done
+    if [ "${#jobs_src[@]}" -gt 0 ]; then
+      printf '%s\n' "${jobs_src[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c 'src="${1%%|*}" o="${1#*|}"; shift; "$cxx" "$@" -c "$src" -o "$o"' _ {} "${sf[@]}"
+    fi
+    dobj="$bout/driver-$side.o"
+    "$cxx" "${sf[@]}" -c "$d" -o "$dobj"
+    "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "$dobj" "${objects[@]}" -lm -o "$bout/$side"
+  done
+  rm -f "$bout/record"
+  echo "two builds: $name (base $(sed -n 's#^// base: ##p' "$drv"))"
+  SC_LOWERED_BUILDS="write:$bout/record" "$bout/old" --name "$name" || builds_rc=1
+  SC_LOWERED_BUILDS="check:$bout/record" "$bout/new" --name "$name" || builds_rc=1
+done
+[ "$builds_rc" = 0 ] || rc=1
 # The game's own sources - what includes game.h and is not linked into the tests - compile: a
 # rule's header that changed is caught here, not first by the game's build.
 if [ $# -eq 0 ] && [ "$whole" = 1 ]; then
