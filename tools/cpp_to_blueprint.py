@@ -168,6 +168,18 @@ ALIAS = {"f32": "float", "f64": "double", "i8": "signed char", "i16": "short", "
          "uint32_t": "unsigned int", "int8_t": "signed char", "int16_t": "short", "int32_t": "int", "usize": "unsigned long", "size_t": "unsigned long", "Vec2": "kern::Vec2", "Vec3": "kern::Vec3", "Vec4": "kern::Vec4", "Quat": "kern::Quat",
          "Mat4": "kern::Mat4"}
 ZERO = {"Int64": "Int64{0x0}", "Float": "0.0", "Int": "0", "Bool": "false", "Vector": "Vector{0.0, 0.0, 0.0}", "Text": '""'}
+# A place (a variable, a field, an input, what a function gives, an entry of a list) of a whole number of a fixed width
+# is, in the Blueprint, a place of that width: U8 ... I32 (kern/docs/blueprint_cpp.md "Whole numbers of a fixed width") -
+# storing there keeps the low bits, as C++ stores them. What flows through a pin, what an expression is, is an Int:
+# `wire`. (char: its sign is the platform's - an Int, read as char_of reads it.)
+WIDTH = {"unsigned char": "U8", "signed char": "I8", "unsigned short": "U16", "short": "I16", "unsigned int": "U32", "int": "I32"}
+WIDTHS = {"U8": 8, "I8": 8, "U16": 16, "I16": 16, "U32": 32, "I32": 32}
+ZERO.update({w: "0" for w in WIDTHS})
+
+
+def wire(t):
+    """The type of what a place of the Blueprint type `t` gives a pin: an Int for a whole number of a fixed width."""
+    return "Int" if t in WIDTHS else t
 # (functions of numbers a formula has, by the names C++ calls them)
 MATH = {"sqrt": "sqrt", "sqrtf": "sqrt", "fabs": "abs", "fabsf": "abs", "abs": "abs", "fmin": "min", "fminf": "min", "min": "min", "min_of": "min", "fmax": "max", "fmaxf": "max", "max": "max",
         "max_of": "max", "floor": "floor", "floorf": "floor", "ceil": "ceil", "ceilf": "ceil", "round": "round", "roundf": "round", "lround": "round", "lroundf": "round", "trunc": "trunc",
@@ -536,7 +548,7 @@ BYTE_CODES = {"bool": "bool", "uint8_t": "u8", "std::uint8_t": "u8", "u8": "u8",
               "unsigned int": "u32", "long long": "i64", "unsigned long long": "u64"}
 BYTE_WIDTH = {"bool": 1, "u8": 1, "i8": 1, "u16": 2, "i16": 2, "u32": 4, "i32": 4, "u64": 8, "i64": 8, "f32": 4, "f64": 8}
 # (the Blueprint type of a field of each such number)
-BYTE_FIELD = {"bool": "Bool", "u8": "Int", "i8": "Int", "u16": "Int", "i16": "Int", "u32": "Int", "i32": "Int", "u64": "Int64", "i64": "Int64", "f32": "Float", "f64": "Float"}
+BYTE_FIELD = {"bool": "Bool", "u8": "U8", "i8": "I8", "u16": "U16", "i16": "I16", "u32": "U32", "i32": "I32", "u64": "Int64", "i64": "Int64", "f32": "Float", "f64": "Float"}
 # A pointer to bytes: what C++ reads any object's bytes through (and a void*, which is read as one of these)
 BYTE_POINTER = re.compile(r"const\s+(?:void|unsigned\s+char|uint8_t|std::uint8_t|u8|std::byte)\s*\*$")
 
@@ -1603,8 +1615,17 @@ class Unit:
         return name
 
     def entry(self, raw):
-        """The type of the entries of a list whose C++ entries are `raw` (see `element`)."""
-        return self.element(self.btype(raw), self.entries(raw))
+        """The type of the entries of a list whose C++ entries are `raw` (see `element`): an entry is a place - a
+        whole number of a fixed width one of that width (List<U8> for std::vector<u8>)."""
+        return self.element(self.place(raw), self.entries(raw))
+
+    def place(self, raw):
+        """What a place of the C++ type `raw` holds (a variable, a field, an input, what a function gives, an
+        entry): a whole number of a fixed width its width (WIDTH) - else its type (`btype`)."""
+        t = self.clean(raw).strip()
+        if t in WIDTH and "*" not in raw and not self.object_of(raw):
+            return WIDTH[t]
+        return self.btype(raw)
 
     @staticmethod
     def fixed_type(t, n):
@@ -1641,7 +1662,7 @@ class Unit:
         A whole number of 64 bits is an Int64 where the program spells it u64 or i64; where the compiler works
         a type out (a part of a std::pair<u64, u32>, what a template gives, a cast to const) it names it
         unsigned long, as size_t - the place the value comes from or goes to says which it is."""
-        return a is not None and b is not None and self.shape64(a) == self.shape64(b)
+        return a is not None and b is not None and self.shape64(wire(a)) == self.shape64(wire(b))
 
     def shape64(self, t):
         """A Blueprint type with Int for every Int64 - of the pairs and rows the converter makes, by their parts."""
@@ -1838,6 +1859,7 @@ class Unit:
                 raise Wait(f"a map or set whose keys are {key} (a key is a Bool, an Int, an Int64, a Text or an enum's value)")
             if m.group(1) == "Set":
                 return f"Set<{key}>"
+            # (a list of a fixed width is a value a map holds as it is: Map<Int, List<U32>> for kern::Map<u64, std::vector<u32>>)
             value = self.btype(a[1])
             if value.startswith(("Map<", "Set<")):
                 raise Wait("a map of maps or sets")
@@ -1917,16 +1939,16 @@ class Unit:
             return None
         inner = m.group(1).strip()
         if inner == "void":
-            return "Int"   # (a pointer to raw memory: what C++ can read through it are bytes - BYTE_POINTER)
+            return "U8"   # (a pointer to raw memory: what C++ can read through it are bytes - BYTE_POINTER: a List<U8>)
         if "*" in inner or "&" in inner:
             return None
-        t = self.btype(inner)
+        t = self.place(inner)
         return t if t is not None and not t.startswith("List<") else None
 
     def param_types(self, p):
         """The Blueprint inputs a parameter of the program is: its type - a pointer into a list two (Unit.pointed)."""
         t = self.pointed(qtype(p))
-        return [f"List<{t}>", "Int"] if t is not None else [self.btype(qtype(p))]
+        return [f"List<{t}>", "Int"] if t is not None else [self.place(qtype(p))]
 
     def enum(self, q):
         if q in self.enums:
@@ -2031,7 +2053,7 @@ class Unit:
                     self.state_pointers.add(c["id"])
                     continue
                 try:
-                    ft = self.btype(qtype(c))
+                    ft = self.place(qtype(c))
                 except Wait as w:
                     raise Wait(f"the struct {q.split('::')[-1]} (its field {c.get('name')}: {w})")
                 # (a field has its own name; no field is called what a type of the program is - in whatever
@@ -2099,8 +2121,8 @@ class Unit:
         for (fname, ft, _, _), fd in zip(self.struct_fields[st], fds):
             c = self.clean(qtype(fd))
             path = at + (fname,)
-            if ft in ("Float", "Int", "Bool", "Int64", "Vector") or ft in self.enum_values:
-                keep.append(path)   # (a number's move is a copy)
+            if ft in ("Float", "Int", "Bool", "Int64", "Vector") or ft in WIDTHS or ft in self.enum_values:
+                keep.append(path)   # (a number's move is a copy - one of a width too)
             elif re.match(r"std::(vector|unique_ptr)<|kern::(Map|Set)<", c):
                 continue            # (empty)
             elif ft in self.struct_fields and self.find_type(c) in self.tree.records:
@@ -2280,7 +2302,7 @@ class Unit:
         if not (d.get("constexpr") or re.search(r"\bconst\b", raw)):
             # (a library keeps nothing: what every caller of the file's functions shares has no place in the language)
             raise Wait("state outside a function (a variable of the file: a library keeps nothing)")
-        t = self.btype(raw)
+        t = self.place(raw)
         init = kids(d)[-1] if kids(d) and d.get("init") else None
         if init is None:
             raise Wait(f"the constant {d.get('name')} is defined elsewhere")
@@ -2399,7 +2421,7 @@ class Unit:
         if field in self.state_types:
             return name, self.state_types[field]
         try:
-            t = self.btype(qtype(c))
+            t = self.place(qtype(c))
             init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
             default = Const(self).literal(init, t) if init is not None and not self.made_by_cpp(qtype(c), init) else self.zero(t)
         except Wait as w:
@@ -2427,7 +2449,7 @@ class Unit:
         name = sane_name(want)
         if name in self.names:
             raise Wait(f"the variable {d.get('name')} kept by {owner}: the Blueprint {self.name} has something called {name}")
-        t = self.btype(qtype(d))
+        t = self.place(qtype(d))
         init = kids(d)[-1] if kids(d) and d.get("init") else None
         if shared and init is None and self.world.globals.get(q) is False:
             raise Wait(f"the variable {q} starts with what its definition in another file says")
@@ -2655,7 +2677,7 @@ class Unit:
                         seen += [mine] if not f.ctor else []
                     seen += [t for x in kids(d) if x.get("kind") == "ParmVarDecl" for t in self.param_types(x)]
                     if f.value is not None:
-                        seen.append(self.btype(qtype(d).split("(")[0].strip()))
+                        seen.append(self.place(qtype(d).split("(")[0].strip()))
                 finally:
                     self.lookup_scope = looked
                 told = [t for _, t in f.params] + ([f.value] if f.value is not None else [])
@@ -3066,6 +3088,7 @@ class Const:
     def literal(self, n, t):
         """The value of a constant expression, written as a literal of the Blueprint type t."""
         u = self.unit
+        t = wire(t)   # (a place of a fixed width: the whole number C++ gives it - the casts in `n` say which)
         n = bare(n)
         k = n.get("kind")
         while k in ("ImplicitCastExpr", "CXXFunctionalCastExpr", "CXXStaticCastExpr") and t not in ("Float", "Int", "Bool") and kids(n):
@@ -3244,7 +3267,7 @@ class Emit:
         declared with, a field the struct's -, else what its C++ type says."""
         t = self.held_type(n)
         if t is not None:
-            return self.u.rows.get(t, t)   # (a list inside a list is held as a struct of that list: here, the list)
+            return wire(self.u.rows.get(t, t))   # (a list inside a list is held as a struct of that list: here, the list)
         if self.u.object_of(qtype(n)):
             return "Int"   # (an object of the engine: its handle)
         return self.u.btype(qtype(n))
@@ -3318,7 +3341,7 @@ class Emit:
         return self.ctype(n) in ("kern::Vec3", "kern::Vec2")
 
     def local(self, decl, want_type=None):
-        t = want_type or self.u.btype(qtype(decl))
+        t = want_type or self.u.place(qtype(decl))
         name = self.u.fresh(decl.get("name") or "v", self.taken)
         self.taken.add(name)
         self.names[decl["id"]] = name
@@ -3361,7 +3384,7 @@ class Emit:
             given = next(returns(d), None)
             if given is not None and qtype(kids(given)[0]) and not UNSPELLED.search(qtype(kids(given)[0])):
                 ret = qtype(kids(given)[0]).strip()
-        f.value = u.btype(ret) if d.get("kind") != "CXXConstructorDecl" else None
+        f.value = u.place(ret) if d.get("kind") != "CXXConstructorDecl" else None
         if u.state is not None and (self.tree.owner.get(d["id"]) == u.state or function_key(self.tree, d) in u.world.state_functions):
             # a method of the state the Blueprint is: its fields are the Blueprint's variables - no object is
             # handed in. It changes them unless it says it does not (const) and writes no mutable field.
@@ -3456,7 +3479,7 @@ class Emit:
                 f.kinds += ["const", ""]
                 self.pointers[p["id"]] = (lname, aname, entries)
                 continue
-            t = u.btype(raw)
+            t = u.place(raw)
             # A reference of C++ is a reference input: the place the call names. T& - the function changes it
             # there; const T& - it reads it there (a struct, a list, a text: a number, a vector, an enum's value
             # or a handle is read by value either way). Nothing is copied in or out.
@@ -4969,7 +4992,7 @@ class Emit:
                         vals = said[0] + [self.u.zero(self.types[v['id']][5:-1])] * (said[1] - len(said[0]))
                         out += self.take_pre() + [f"{name}[{i}] = {x};" for i, x in enumerate(vals)]
                     else:
-                        text = self.made_list(said[0], self.types[v['id']]) if said else self.ex(init, self.types[v['id']])
+                        text = self.made_list(said[0], self.types[v['id']]) if said else self.put(init, self.types[v['id']])
                         out += self.take_pre() + [f"{name} = {text};"]
                     c = self.ctype(v)
                     if ITERATOR.match(c) or REVERSE_ITERATOR.match(c):
@@ -4992,13 +5015,13 @@ class Emit:
             if not made:
                 if not c:
                     return [self.ret_line(None)], True
-                return [self.ret_line(self.ex(c[0], self.f.value))], True
+                return [self.ret_line(self.put(c[0], self.f.value))], True
             # the objects of the engine the function made are released on its way out - after what it
             # returns is computed (C++: the value first, then the destructors)
             mine = {i for scope in self.scopes for i, q in scope if not isinstance(q, tuple)}   # (a value that holds some: none given back - lifetimes)
             if c and any(x.get("kind") == "DeclRefExpr" and self.names.get(x.get("referencedDecl", {}).get("id")) in mine for x in walk(c[0])):
                 raise Wait("a return of an object of the engine the function made")
-            text = self.ex(c[0], self.f.value) if c else None
+            text = self.put(c[0], self.f.value) if c else None
             if text is None or self.f.ctor or self.f.value is None:
                 return self.take_pre() + self.releases(made) + [self.ret_line(None)], True
             kept = self.temp("returned", self.f.value)
@@ -5331,11 +5354,12 @@ class Emit:
             lst, at = self.place(inner)
         except Wait:
             return None
-        if self.tp(lst) != "List<Int>":
+        lt = self.tp(lst)
+        if lt not in ("List<Int>", "List<U8>", "List<I8>"):
             return None
         for op, k in reversed(steps):
             at = self.whole_math(op, at, self.ex(k, "Int"))
-        return f"text_of_bytes({self.place_arg(lst, 'List<Int>', 'const', [])}, {at}, {self.ex(count, 'Int')})"
+        return f"text_of_bytes({self.place_arg(lst, lt, 'const', [])}, {at}, {self.ex(count, 'Int')})"
 
     def text_range(self, first, last):
         """`text.begin(), text.end()` of one text (std::string, std::string_view): the text - None: no such range."""
@@ -5950,7 +5974,10 @@ class Emit:
             if not keyed:
                 self.loop_entries[v["id"]] = (place, index)   # (the entry of a pass: its list and its place - entry_pointer_set)
         else:
-            first = [f"{self.local(v, it)} = {entry};"]
+            # (an entry copied into a variable of its own: a variable of the type C++ declares it with - `for (int b : bytes)`
+            # an I32 -, a whole number of the entry's width where it says `auto`)
+            mine = self.u.place(raw) if wire(it) == "Int" and NUMBER.get(self.u.clean(raw).strip()) == "Int" else it
+            first = [f"{self.local(v, mine)} = {entry};"]
         if not keyed and v.get("kind") == "DecompositionDecl":
             self.bind(v, it)   # (for (const auto& [a, b] : list): a and b are the parts of the entry)
         length = count_text if keyed else f"list_length<{it}>({place})"
@@ -6117,8 +6144,8 @@ class Emit:
             a, b = kids(n)
             inner = self.unwrap(b)
             if inner.get("kind") == "BinaryOperator" and inner.get("opcode") == "=":   # a = b = v: first b, then a is what b is now
-                return self.effect(inner) + self.store(a, lambda t: self.ex(kids(inner)[0], t))
-            return self.store(a, lambda t: self.ex(b, t))
+                return self.effect(inner) + self.store(a, lambda t: self.put(kids(inner)[0], t))
+            return self.store(a, lambda t: self.put(b, t))
         if k == "BinaryOperator" and n.get("opcode") == ",":
             a, b = kids(n)
             return self.effect(a) + self.effect(b)
@@ -6133,23 +6160,24 @@ class Emit:
             op = n["opcode"][:-1]
             ta = self.tp(a)
             computed = n.get("type", {}) if "computeResultType" not in n else n["computeResultType"]
-            if op == "+" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT and self.u.clean(qtype({"type": computed})) == self.ctype(a)):
+            if op == "+" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT and self.u.clean(qtype({"type": computed})) == self.ctype(a)
+                                                       or self.wraps_sum(a, self.u.clean(qtype({"type": computed})), b)):
                 return [f"{self.lvalue(a)} += {self.ex(b, ta)};"]
             synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": op, "type": computed, "inner": [a, b]})
-            lines = self.store(a, lambda t: self.ex(synth, t))
+            lines = self.store(a, lambda t: self.put(synth, t))
             if synth.get("_w64"):
                 n["_w64"] = True
             return lines
         if k == "UnaryOperator" and n.get("opcode") in ("++", "--"):
             a = kids(n)[0]
             ta = self.tp(a)
-            if n["opcode"] == "++" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT):
+            if n["opcode"] == "++" and self.plain_variable(a) and (ta == "Float" or ta == "Int" and self.ctype(a) in self.UNCUT or self.wraps_sum(a, "int", None)):
                 return [f"{self.lvalue(a)} += {'1' if ta == 'Int' else '1.0'};"]
             one = {"kind": "IntegerLiteral", "value": "1", "type": {"qualType": "int"}}
             # (x++ is x += 1: a type smaller than int counts as an int, the sum goes back into x's type - a u16 at 65535 + 1 is 0)
             computed = {"qualType": "int"} if self.ctype(a) in self.PROMOTED else a.get("type", {})
             synth = self.held_as(a, {"kind": "BinaryOperator", "opcode": "+" if n["opcode"] == "++" else "-", "type": computed, "inner": [a, one]})
-            lines = self.store(a, lambda t: self.ex(synth, t))
+            lines = self.store(a, lambda t: self.put(synth, t))
             if synth.get("_w64"):
                 n["_w64"] = True
             return lines
@@ -6169,7 +6197,7 @@ class Emit:
                 target = self.unwrap(ops[0])
                 if target.get("kind") == "DeclRefExpr":
                     self.note_home(target.get("referencedDecl", {}).get("id"), ops[1])
-                return self.store(ops[0], lambda t: self.ex(ops[1], t))
+                return self.store(ops[0], lambda t: self.put(ops[1], t))
             if self.is_slot(n):
                 self.slot(n)   # (m[key]; - the key's row is made)
                 return []
@@ -6178,7 +6206,7 @@ class Emit:
                 inner = self.unwrap(kids(inner)[0])
             if inner.get("kind") == "CXXOperatorCallExpr" and not inner.get("_op") and callee_name(inner) == "operator=" and len(kids(inner)) == 3:
                 # a = b = v of a class (a vector, a struct): first b, then a is what b is now
-                return self.effect(inner) + self.store(ops[0], lambda t: self.ex(kids(inner)[1], t))
+                return self.effect(inner) + self.store(ops[0], lambda t: self.put(kids(inner)[1], t))
             if name == "operator=" and self.made_anew(n) is not None:
                 # an object of the engine held as a value gets one its constructor makes for it: the new one first,
                 # then the old one ends (move assignment: what the place held is replaced)
@@ -6223,10 +6251,10 @@ class Emit:
                 if self.is_box(ops[0]) and not self.is_box(ops[1]):   # (an optional gets a value: the list of that one)
                     it = self.tp(ops[0])[5:-1]
                     return self.store(ops[0], lambda t: f'list_make<{it}, "1">({self.ex(ops[1], it)})')
-                return self.store(ops[0], lambda t: self.ex(ops[1], t))
+                return self.store(ops[0], lambda t: self.put(ops[1], t))
             if name in ("operator+=", "operator-=", "operator*=", "operator/=") and self.is_vec(ops[0]):
                 synth = {"kind": "CXXOperatorCallExpr", "type": ops[0].get("type", {}), "_op": "operator" + name[8], "inner": [kids(n)[0], ops[0], ops[1]]}
-                return self.store(ops[0], lambda t: self.ex(synth, t))
+                return self.store(ops[0], lambda t: self.put(synth, t))
             if name == "operator+=" and self.tp(ops[0]) == "Text":
                 return self.store(ops[0], lambda t: f'text_append({self.ex(ops[0], "Text")}, {self.text_piece(ops[1])}, "")')
         if k == "CallExpr":
@@ -6359,7 +6387,7 @@ class Emit:
                     return []
                 before, lv, after = self.variable_of(base, self.tp(base))
                 if name in ("push_back", "emplace_back") and len(args) == 1 and (name == "push_back" or it not in self.u.struct_fields or self.tp(args[0]) == it):
-                    return before + [f"list_add({lv}, {self.ex(args[0], it)});"] + after
+                    return before + [f"list_add({lv}, {self.put(args[0], it)});"] + after
                 if name == "emplace_back" and it in self.u.struct_fields:
                     # (the entry made of the arguments where it is added, as T(args...) makes it)
                     return before + [f"list_add({lv}, {self.make(it, args)});"] + after
@@ -6397,7 +6425,7 @@ class Emit:
             c = self.ctype(lst)
             span = re.match(r"(?:kern::)?Span<\s*(?:const\s+)?(.+?)\s*>$", c)   # (a view of a list of bytes: that list)
             entry = template_args(c)[0] if c.startswith(("std::array<", "std::vector<")) else span.group(1) if span else re.sub(r"\s*\[\d*\]$", "", c) if c.endswith("]") else None
-            if entry is None or self.u.clean(entry) not in ("unsigned char", "signed char", "char") or self.tp(lst) != "List<Int>":
+            if entry is None or self.u.clean(entry) not in ("unsigned char", "signed char", "char") or self.tp(lst) not in ("List<U8>", "List<I8>", "List<Int>"):
                 return None
             out.append((lst, at))
         return out
@@ -6422,7 +6450,7 @@ class Emit:
             # (the bytes of a struct of numbers - Bytes of Struct, a list of a fixed length where the call is - as bytes)
             v, q = held
             st, text, size = self.u.byte_layout(q)
-            src, frm, of = self.temp("bytes", "List<Int>", size), "0", "u8"
+            src, frm, of = self.temp("bytes", "List<U8>", size), "0", "u8"
             self.hoist([f"{src} = struct_bytes<{st}, {text_literal(text)}>({self.ex(v, st)});"])
         else:
             of = pointer_code(self.u, a[1])
@@ -6453,7 +6481,7 @@ class Emit:
             raise Wait("raw memory (memcpy) into a part of a value")
         st, text, _ = self.u.byte_layout(q)
         (lst, at), = places
-        sv = self.place_arg(lst, "List<Int>", "const", [])
+        sv = self.place_arg(lst, self.tp(lst), "const", [])
         return self.store(dst, lambda want: f"struct_of_bytes<{st}, {text_literal(text)}>({sv}, {at})")
 
     def moved_bytes(self, name, a):
@@ -6461,18 +6489,19 @@ class Emit:
         says - from the first on, or from the last on where the bytes move up in the same list (memmove: what
         is read is read before it is written over). Nothing is asked for; C++ copies the same bytes."""
         (dst, at), (src, frm) = self.byte_places(a[:2])
-        before, lv, after = self.variable_of(dst, "List<Int>")
-        sv = self.place_arg(src, "List<Int>", "const", [])
+        dt, st = self.tp(dst), self.tp(src)   # (lists of bytes: of u8, i8 or char - a byte copied keeps its bits, as a place of its width keeps them)
+        before, lv, after = self.variable_of(dst, dt)
+        sv = self.place_arg(src, st, "const", [])
         count, to, fro = self.temp("count", "Int"), self.temp("to", "Int"), self.temp("from", "Int")
         lines = [f"{count} = {self.ex(a[2], 'Int')};", f"{to} = {at};", f"{fro} = {frm};"]
         last = self.temp("last", "Int")
         lines.append(f"{last} = {self.whole_math('-', count, '1')};")
-        up = self.count_loop("0", last, lambda i: [f"{lv}[{self.whole_math('+', to, i)}] = list_get<Int>({sv}, {self.whole_math('+', fro, i)});"])
+        up = self.count_loop("0", last, lambda i: [f"{lv}[{self.whole_math('+', to, i)}] = list_get<{st[5:-1]}>({sv}, {self.whole_math('+', fro, i)});"])
         if name == "memcpy" or not self.same_list(dst, src):
             return before + lines + up + after
         k = self.temp("k", "Int")
         down = [f"{k} = {last};", f'while (loop(math_compare<">=">({self.cast("Float", k)}, 0.0))) {{',
-                f"  {lv}[{self.whole_math('+', to, k)}] = list_get<Int>({sv}, {self.whole_math('+', fro, k)});", f"  {k} = {self.whole_math('-', k, '1')};", "}"]
+                f"  {lv}[{self.whole_math('+', to, k)}] = list_get<{st[5:-1]}>({sv}, {self.whole_math('+', fro, k)});", f"  {k} = {self.whole_math('-', k, '1')};", "}"]
         return before + lines + [f'if (math_compare<"<=">({self.cast("Float", to)}, {self.cast("Float", fro)})) {{', *["  " + x for x in up], "} else {", *["  " + x for x in down], "}"] + after
 
     def addressed(self, n):
@@ -6503,13 +6532,13 @@ class Emit:
             src = self.addressed(a[1])
             if self.u.clean(qtype(src)) != self.u.clean(qtype(dst)):
                 raise Wait("raw memory (memcpy): the bytes of one type read as another")
-            return self.store(dst, lambda want: self.ex(src, want))
+            return self.store(dst, lambda want: self.put(src, want))
         try:
             zero_bytes = Const(self.u).number(a[1]) == 0
         except Wait:
             zero_bytes = False
         it = t[5:-1] if t.startswith("List<") else t
-        if not zero_bytes or (it not in ("Int", "Float", "Bool") and it != self.whole64()):
+        if not zero_bytes or (it not in ("Int", "Float", "Bool") and it not in WIDTHS and it != self.whole64()):
             raise Wait("raw memory (memset) that is not the zero of numbers")
         return self.store(dst, lambda want: self.u.zero(want))
 
@@ -6958,6 +6987,8 @@ class Emit:
             if not their.endswith("_list"):
                 return f"a {their}, and the call gives a {t}"
             return self.crosses(t[5:-1], their[:-5], of, target, depth + 1)
+        if t in WIDTHS:   # (an Int of a fixed width: the Int it holds - it crosses as an int, as on a wire)
+            return None if their == "int" else f"a {their}, and the call gives a {t}"
         if t in simple:   # (a value on its own is converted as on a wire - in every stage the same; a field of a struct and an item of a list are not)
             return None if simple[t] == their or depth == 0 else f"a {their}, and the call gives a {t}"
         if t in u.enum_values:
@@ -7685,10 +7716,12 @@ class Emit:
         else:
             bits = f"int64_of_int({self.ex(x, 'Int')})"
         held = self.temp("bits", "Int64")
-        lt = "List<Int>"
+        pointee = self.u.clean(re.sub(r"\*\s*(?:const)?\s*$", "", raw)).strip()
+        e = WIDTH[pointee] if pointee in ("unsigned char", "signed char") else "Int"   # (the bytes as what C++ reads them through: u8, i8 - a char, void, std::byte: an Int)
+        lt = f"List<{e}>"
         made = self.temp("bytes", lt, size)
         at = self.temp((v.get("name") or "p") + "_at", "Int")
-        self.pointers[v["id"]] = (made, at, "Int")
+        self.pointers[v["id"]] = (made, at, e)
         return [f"{held} = {bits};"] + [f"{made}[{i}] = int64_low(int64_and(int64_shift_right_unsigned({held}, {8 * i}), int64_of_int(255)));" for i in range(size)] + [f"{at} = 0;"]
 
     def entry_pointer(self, v):
@@ -7856,7 +7889,7 @@ class Emit:
         lt = f"List<{entries}>"
         if self.nothing(a):   # (null: no place - in a list of nothing)
             return [self.temp("none", lt, fixed), "-1"]
-        held = addressed_record(self.tree, a) if entries == "Int" else None
+        held = addressed_record(self.tree, a) if entries in ("U8", "Int") else None
         if held is not None:
             # the address of a value handed to a pointer to bytes (`crc(&frame, n)`): the value's bytes - as many
             # as it has, a list of that fixed length, made where the call is (Bytes of Struct)
@@ -7943,7 +7976,7 @@ class Emit:
             return b.get("kind") == "CXXMemberCallExpr" and callee(b).get("name") == want and kids(callee(b)) and self.same_list(kids(callee(b))[0], base)
         if not (whole(rng[0], "begin") and whole(rng[1], "end") and whole(end, "end")):
             raise Wait("list: std::unique of a part of a list")
-        if it not in ("Int", "Float", "Text") and it not in self.u.enum_values:
+        if it not in ("Int", "Float", "Text") and it not in WIDTHS and it not in self.u.enum_values:   # (entries of a width: their numbers)
             raise Wait(f"list: std::unique of {it} (its ==)")
         cpp = self.entry_cpp(base)
         kept, n = self.temp("kept", "Int"), self.temp("count", "Int")
@@ -7980,10 +8013,15 @@ class Emit:
                 inner = self.unwrap(kids(inner)[0])
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "remove" and len(kids(inner)) == 4:
                 # v.erase(std::remove(v.begin(), v.end(), x), v.end()): every entry that is x goes
-                if it not in ("Int", "Text") and it not in self.u.enum_values:
+                if it not in ("Int", "Text") and it not in WIDTHS and it not in self.u.enum_values:
                     raise Wait(f"list: every {it} that equals a value is removed")
-                x = self.temp("gone", it)
-                return [f"{x} = {self.ex(kids(inner)[3], it)};", f"while (loop(list_contains<{it}>({lv}, {x}))) {{", f"  list_remove({lv}, {x});", "}"]
+                if it in WIDTHS and self.u.clean(self.ctype(kids(inner)[3])) != self.u.clean(self.entry_cpp(base)):
+                    # (an entry of a width equals a value of its own type when their numbers are equal; a value of another
+                    # type C++ compares after its conversions - u32 == -1 holds for 4294967295)
+                    raise Wait("algorithm: std::remove of a value of another type")
+                it_wire = wire(it)
+                x = self.temp("gone", it_wire)
+                return [f"{x} = {self.ex(kids(inner)[3], it_wire)};", f"while (loop(list_contains<{it}>({lv}, {x}))) {{", f"  list_remove({lv}, {x});", "}"]
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "remove_if" and len(kids(inner)) == 4:
                 return self.removed_where(base, lv, it, kids(inner)[1:], args[1])
             if inner.get("kind") == "CallExpr" and callee_name(inner) == "unique" and len(kids(inner)) == 3:
@@ -8055,7 +8093,7 @@ class Emit:
         if name in ("resize", "assign") and len(args) in (1, 2) and not (name == "assign" and len(args) == 1):
             # the list that long, in one go (Set Length): cut at its end or filled up
             if name == "resize":
-                return [f"list_resize({lv}, {self.ex(args[0], 'Int')}, {self.ex(args[1], it) if len(args) == 2 else self.u.zero(it)});"]
+                return [f"list_resize({lv}, {self.ex(args[0], 'Int')}, {self.put(args[1], it) if len(args) == 2 else self.u.zero(it)});"]
             # (assign: what it is given is worked out before the list is emptied)
             n, fill = self.temp("count", "Int"), self.temp("fill", it)
             return [f"{n} = {self.ex(args[0], 'Int')};", f"{fill} = {self.ex(args[1], it)};", f"list_clear({lv});", f"list_resize({lv}, {n}, {fill});"]
@@ -8178,7 +8216,7 @@ class Emit:
                 raise Wait("algorithm: std::find of a struct without an == of the program's")
             got = self.invoke(self.u.function(op), [y], obj=x)
             return got[0]
-        if it not in ("Int", "Float", "Bool") and it not in self.u.enum_values and not self.is64(x):
+        if it not in ("Int", "Float", "Bool") and it not in WIDTHS and it not in self.u.enum_values and not self.is64(x):
             raise Wait(f"algorithm: std::find of a {it}")
         return self.bx({"kind": "BinaryOperator", "opcode": "==", "type": {"qualType": "bool"}, "inner": [x, y]})
 
@@ -8273,7 +8311,7 @@ class Emit:
             raise Wait(f"algorithm: std::{name} of a {lt}")
         it = lt[5:-1]
         if len(a) == 2:
-            if it not in ("Int", "Float", "Bool", "Text", "Int64") and it not in self.u.enum_values:
+            if it not in ("Int", "Float", "Bool", "Text", "Int64") and it not in WIDTHS and it not in self.u.enum_values:
                 raise Wait(f"algorithm: std::{name} of {it} by its own < (a list of {it} has no order of its own: a function says it)")
             order = "nullptr"
         else:
@@ -8299,9 +8337,9 @@ class Emit:
         cpp = self.entry_cpp(l0)
         lines = []
         if name == "find":
-            if self.u.clean(self.ctype(a[2])) != self.u.clean(cpp) or self.tp(a[2]) != it:
+            if self.u.clean(self.ctype(a[2])) != self.u.clean(cpp) or self.tp(a[2]) != wire(it):
                 raise Wait("algorithm: std::find of a value of another type")
-            x = self.held_once(a[2], it)
+            x = self.held_once(a[2], wire(it))
         else:
             g, given, lines = self.function_value(name, a[2])
         at, end, go = self.temp("at", "Int"), self.temp("end", "Int"), self.temp("go", "Bool")
@@ -8498,6 +8536,14 @@ class Emit:
         except Wait:
             pass   # (a conversion the formula does not know: the cast says so where it is written)
         return {"kind": "ImplicitCastExpr", "castKind": "IntegralCast", "type": a.get("type", {}), "inner": [synth]}
+
+    def wraps_sum(self, a, computed, b):
+        """`a += b` (`++a`: b None) where a is a variable of a fixed width (U8 ... I32) and C++ computes the sum in a
+        whole number of as many bits or more: the sum, stored in a (Add to Variable), keeps the bits C++ keeps."""
+        i = bare(a).get("referencedDecl", {}).get("id")
+        w = self.types.get(i)
+        return (w in WIDTHS and self.CUT_BITS.get(computed, 0) >= WIDTHS[w] and computed not in ("char",)
+                and (b is None or self.tp(b) == "Int" and not self.is64(b)))
 
     def plain_variable(self, n):
         n = bare(n)
@@ -9022,6 +9068,7 @@ class Emit:
 
     # ---- expressions ----
     def conv(self, text, have, want):
+        have, want = wire(have), wire(want)   # (a place of a fixed width takes an Int: it keeps its low bits)
         if want is None or have == want:
             return text
         if want == "Int64" and have in ("Int", "Float", "Bool"):
@@ -9084,6 +9131,37 @@ class Emit:
     def bx(self, n):
         return self.ex(n, "Bool")
 
+    def put(self, n, t):
+        """An expression as the value stored in a place of the type `t`. A place of a fixed width keeps the low bits
+        of what it is given, as C++ stores them: what the expression would cut to that width or more at its root
+        (a conversion to a whole number of as many bits or more, an unsigned 32-bit + or -) is not cut there -
+        the place does it (`stored`, read by `value`)."""
+        if t not in WIDTHS:
+            return self.ex(n, t)
+        self.storing = (bare(n), WIDTHS[t])
+        try:
+            return self.ex(n, t)
+        finally:
+            self.storing = None
+
+    CUT_BITS = {"unsigned char": 8, "signed char": 8, "char": 8, "unsigned short": 16, "short": 16, "unsigned int": 32, "int": 32,
+                "long": 64, "long long": 64, "unsigned long": 64, "unsigned long long": 64}
+
+    def stored(self, b, bits):
+        """The expression a place of `bits` bits is given in place of `b` (see `put`): `b` without the conversions
+        at its root that keep `bits` bits or more of a whole number - and an unsigned 32-bit + or - there is marked
+        to be written without its wrap (self.unwrapped)."""
+        while (b.get("kind") in CAST and b.get("castKind") == "IntegralCast" and kids(b) and self.CUT_BITS.get(self.ctype(b), 0) >= bits
+               and self.tp(b) == "Int" and self.tp(kids(b)[-1]) == "Int" and not self.is64(kids(b)[-1])):
+            inner = bare(kids(b)[-1])
+            if inner.get("kind") == "BinaryOperator" and inner.get("opcode") in ("*", "<<"):
+                break   # (a product or a shift of whole numbers is cut where it is made: in a formula it may be no whole number below 2^53)
+            b = inner
+        if (b.get("kind") == "BinaryOperator" and b.get("opcode") in ("+", "-") or b.get("kind") == "UnaryOperator" and b.get("opcode") == "-") \
+                and self.ctype(b) in UNSIGNED and self.ctype(b) not in WIDE_UNSIGNED and self.CUT_BITS[self.ctype(b)] >= bits:
+            self.unwrapped = b
+        return b
+
     def arithmetic(self, n):
         """Is this a computation with numbers a formula writes (not just a value read somewhere)?"""
         b = bare(n)
@@ -9126,7 +9204,18 @@ class Emit:
         return name in MORE_MATH and count == 1
 
     def value(self, n):
-        """(text, Blueprint type) of an expression."""
+        """(text, Blueprint type) of an expression - a whole number of a fixed width read from its place is an Int (`wire`)."""
+        storing, self.storing = getattr(self, "storing", None), None
+        if storing is not None and storing[0] is bare(n):
+            try:
+                text, t = self.value_of(self.stored(bare(n), storing[1]))
+            finally:
+                self.unwrapped = None
+            return text, wire(t)
+        text, t = self.value_of(n)
+        return text, wire(t)
+
+    def value_of(self, n):
         u = self.u
         b = bare(n)
         k = b.get("kind")
@@ -9451,7 +9540,7 @@ class Emit:
         st, text, size = self.u.byte_layout(q)
         if self.u.fixed(qtype(b)) != size:
             raise Wait("std::bit_cast to bytes of another size")   # (C++ does not take that either)
-        lt = "List<Int>"
+        lt = "List<U8>"   # (std::array<u8, N>: Bytes of Struct gives bytes)
         tmp = self.temp("bytes", lt, size)
         self.hoist([f"{tmp} = struct_bytes<{st}, {text_literal(text)}>({self.ex(x, st)});"])
         return tmp, lt
@@ -9568,7 +9657,7 @@ class Emit:
             x = self.fx(kids(b)[0], leaves)
             if b["opcode"] == "-" and self.ctype(b) in WIDE_UNSIGNED:
                 return f"(-{x})"   # (64 bit: the number read with its sign, see WIDE_UNSIGNED)
-            if b["opcode"] == "-" and self.ctype(b) in UNSIGNED:
+            if b["opcode"] == "-" and self.ctype(b) in UNSIGNED and b is not getattr(self, "unwrapped", None):
                 return f"kern::math::wrap32(-{x})"
             return x if b["opcode"] == "+" else f"({'-' if b['opcode'] == '-' else '!'}{x})"
         if k == "UnaryOperator" and b.get("opcode") == "~":
@@ -9589,9 +9678,12 @@ class Emit:
                 if self.ctype(b) in WIDE_UNSIGNED:
                     return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
                 if self.ctype(b) in UNSIGNED:
-                    # unsigned arithmetic wraps around at 32 bit: the formula's wrap32 and mul32
+                    # unsigned arithmetic wraps around at 32 bit: the formula's wrap32 and mul32 (not where the place it
+                    # is stored in wraps it: `stored`)
                     if op == "*":
                         return f"kern::math::mul32({self.fx(x, leaves)}, {self.fx(y, leaves)})"
+                    if b is getattr(self, "unwrapped", None):
+                        return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
                     return f"kern::math::wrap32({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
                 return f"({self.fx(x, leaves)} {op} {self.fx(y, leaves)})"
             if op in ("/", "%") and self.tp(b) == "Int" and not (bare(y).get("kind") == "IntegerLiteral" or (bare(y).get("kind") in CAST and kids(bare(y)) and bare(kids(bare(y))[-1]).get("kind") == "IntegerLiteral")):
@@ -10275,7 +10367,7 @@ class Emit:
             # the == of a class of the program says is that class's own matter.)
             it = t0[5:-1]
             cpp = re.match(r"std::vector<(.+)>$", self.u.clean(qtype(ops[0])))
-            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
+            if it in ("Int", "Float", "Bool", "Text", "Int64") or it in WIDTHS or it in self.u.enum_values or (it in self.u.struct_fields and cpp and self.memberwise(template_args(cpp.group(0))[0])):
                 r = f"list_equal<{it}>({self.ex(ops[0], t0)}, {self.ex(ops[1], t0)})"
                 return (r if name == "operator==" else f"logic_not({r})"), "Bool"
         raise Wait(f"the operator {name[8:]} of {t0}")
@@ -10460,7 +10552,7 @@ class Emit:
                 made = self.temp("made", t)
                 self.hoist([f"{made} = {t}{{}};", f"list_resize({made}, {self.ex(a[0], 'Int')}, {self.ex(a[1], it) if len(a) == 2 else u.zero(it)});"])
                 return made, t
-            if len(a) == 2 and t == "List<Int>" and self.text_range(a[0], a[1]) is not None:
+            if len(a) == 2 and t == "List<U8>" and self.text_range(a[0], a[1]) is not None:
                 # std::vector<u8>(text.begin(), text.end()): the bytes of the text (Bytes of Text)
                 return f"text_bytes({self.text_range(a[0], a[1])})", t
             if len(a) == 2:
@@ -10697,8 +10789,8 @@ class Api:
         r = re.sub(r"^const\s+", "", r)
         c = self.u.clean(r)
         m = re.match(r"(?:kern::)?Span<\s*(.+)>$", c)
-        if m:   # a view of a list: the list
-            return f"List<{self.u.element(self.u.btype(m.group(1)))}>", False, None
+        if m:   # a view of a list: the list (of entries of a fixed width: a list of that width - Span<const u8> a List<U8>)
+            return f"List<{self.u.entry(m.group(1))}>", False, None
         q = None
         try:
             q = self.u.find_type(c)
@@ -10711,7 +10803,7 @@ class Api:
             # the first of several (samples, with their count beside them) - the list of them, none for null
             if writes:
                 raise Wait("a pointer it writes through")
-            inner = self.u.btype(r)
+            inner = self.u.place(r)
             if inner is None:
                 raise Wait("a pointer to anything (void*)")
             return f"List<{self.u.element(inner)}>", False, None
@@ -10721,6 +10813,8 @@ class Api:
         """(pin type, the struct or enum it names) of a Blueprint type."""
         if bt in ENGINE_PIN:
             return ENGINE_PIN[bt], ""
+        if bt in WIDTHS:   # (an entry of a list of a fixed width: List<U8> is an int list of "u8")
+            return "integer", bt.lower()
         if callback_parts(bt):
             return "callback", callback_of(bt)
         if bt in self.u.enum_values:
@@ -10739,8 +10833,8 @@ class Api:
         result, its "shapes"), e<values>, {fields}, [items] - [N items] for a list of a fixed
         length N (`f32 m[16]`: `[16n]`, as many entries as C++ holds; `raw`, the C++ type, says it), [?item] for what
         may be there or not (std::optional, std::unique_ptr of a value: no entry or one)."""
-        if bt in ENGINE_PIN:
-            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[bt]
+        if bt in ENGINE_PIN or bt in WIDTHS:
+            return {"Bool": "b", "Int": "i", "Float": "n", "Vector": "v", "Text": "t", "Int64": "l"}[wire(bt)]
         if callback_parts(bt):   # (c, what it gives - none: nothing -, and in brackets what it is handed: cn(nn))
             r, a = callback_parts(bt)
             return "c" + (self.shape(r) if r else "") + "(" + "".join(self.shape(x) for x in a) + ")"
