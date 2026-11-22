@@ -4422,7 +4422,7 @@ class Emit:
             elif kind == "box":
                 out += self.ended_box(what, p)
             else:
-                raise Wait(f"the end of a {short}: its field {c['name']} is a list, a map or an array of what ends with it")
+                out += self.ended_many(what, self.u.field(sname, c["name"])[1], p)
         return out
 
     def state_ended(self):
@@ -4440,7 +4440,7 @@ class Emit:
             elif kind == "box":
                 out += self.ended_box(what, name)
             else:
-                raise Wait(f"the end of the state: its field {c['name']} is a list, a map or an array of what ends with it")
+                out += self.ended_many(what, self.u.state_variable(c["name"])[1], name)
         return out
 
     def own_end(self, q, place):
@@ -4688,8 +4688,9 @@ class Emit:
             a = self.unwrap(kids(a)[0])
         return a.get("kind") == "CallExpr" and callee_name(a) == "move" and len(kids(a)) == 2
 
-    def ended_entry(self, h, place):
-        """The steps that end an entry of a list or map at `place` as C++ ends it (h: what ends with it)."""
+    def ended_entry(self, h, place, t=None):
+        """The steps that end an entry of a list or map at `place` as C++ ends it (h: what ends with it; t: the
+        entry's type in the Blueprint, where it is itself a list, a map or an array - ended_many)."""
         kind, what = h
         if kind in ("object", "owned"):
             return self.release(what, place)
@@ -4697,7 +4698,51 @@ class Emit:
             return self.ended_parts(what, place)
         if kind == "box":
             return self.ended_box(what, place)
+        if t is not None:
+            return self.ended_many(what, t, place)
         raise Wait("the end of an entry that is itself a list, a map or an array of what ends")
+
+    def ended_many(self, raw, t, place):
+        """The end of a list, a map or an array at `place` (its C++ type `raw`, its type `t` in the Blueprint) whose
+        entries end something (Unit.held_life), as C++ ends it - each entry as its type ends (ended_entry), in the
+        order the destructor has: an array (T[N], std::array) from the last entry to the first (the language ends
+        the elements of an array so); a std::vector from the first to the last (std::_Destroy of libstdc++, the
+        library the program is built with - the order is the library's); a kern::Map from the last to the first
+        (~Map: clear(), kern/core/map.h). Anything else (a std::map, a set whose keys end something, an owned list)
+        waits."""
+        c = self.u.clean(raw)
+        arr = re.match(r"(.+?)\s*\[(\d+)\]$", c)
+        if arr:
+            entry, n, kind = arr.group(1), int(arr.group(2)), "array"
+        elif re.match(r"std::array<", c) and len(template_args(c)) == 2 and re.fullmatch(r"\s*\d+\w*\s*", template_args(c)[1]):
+            entry, n, kind = template_args(c)[0], int(re.match(r"\s*(\d+)", template_args(c)[1]).group(1)), "array"
+        elif re.match(r"std::vector<", c):
+            entry, n, kind = template_args(c)[0], None, "list"
+        elif KEYED_KERN.match(c) and re.match(r"(?:kern::)?Map<", c) and len(template_args(c)) == 2:
+            entry, n, kind = template_args(c)[1], None, "map"
+        else:
+            raise Wait(f"the end of a {c}: what ends with its entries, in which order")
+        h = self.u.held_life(entry)
+        if h is None:
+            return []
+        if t in self.u.rows:   # (a list inside a list: the struct that holds it - Unit.element)
+            t, place = self.u.rows[t], f"{place}.items"
+        targs = template_args(t)
+        if kind == "array" and not (t.startswith("Fixed<") and len(targs) == 2 and targs[1].strip() == str(n) or t.startswith("List<")):
+            raise Wait(f"the end of an array of {n} that is not one in the Blueprint ({t})")
+        if kind == "list" and not t.startswith("List<") or kind == "map" and not t.startswith("Map<"):
+            raise Wait(f"the end of a {c} that is a {t} in the Blueprint")
+        et = targs[1] if kind == "map" else targs[0]
+        if kind == "array":
+            last = str(n - 1)
+        else:
+            count = self.temp("count", "Int")
+            last = self.whole_math("-", count, "1")
+        at = self.temp("at", "Int")
+        forward = kind == "list"
+        steps = [] if kind == "array" else [f"{count} = {kind}_length<{', '.join(targs)}>({place});"]   # (Length gives an Int)
+        return steps + self.count_loop("0", last, lambda i: [f"{at} = {i if forward else self.whole_math('-', last, i)};",
+                                                              *self.ended_entry(h, f"{place}[{at}]", et)])
 
     def entries_ended(self, h, kind, row, lv):
         """The steps that end every entry of a list or map at `lv`, from the last to the first."""
