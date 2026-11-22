@@ -1096,3 +1096,38 @@ und mach bei 16.26 ‚Nächster Schritt‘ weiter“.
   nichts hier, ist `work` noch 42831863 und der Lauf grün, macht sie auch 16.26 Schritt 2 selbst (`work-zusammen` 8a16a750 liegt
   369 Commits vor `work`, Vorspulen möglich).
 - Agenten: keine vor dem Reset (Mi 25.11., 13:00), außer Chris meldet Guthaben.
+
+### 16.28 Stand 22:20 (22.11.) – die Suite las das Level 150-mal je Game-Test (behoben auf `work-tempo`); Belege geprüft; Kandidat rechnet parallel
+
+**Vorgaben von Chris (22:07, „Doit“):** (1) der Koordinator sucht und behebt die Ursache der langen Game-Tests selbst (Ausnahme von
+„behebt nichts selbst“, nur dafür); (2) belegte Zweige kommen auf einen eigenen Kandidaten-Zweig und rechnen parallel – `work` und
+`work-zusammen` bleiben dabei unberührt, gemischt wird dorthin erst nach dem Schritt der alten Sitzung.
+
+**Befund (gemessen an `work-zusammen-voll-160230-5239`):** voller Lauf 3 h 10 (convert 58 min, Suite 2 h 11, engine 34 min daneben).
+Von 2462 Rechenminuten der Suite liegen 2220 in den 66 Tests `converted_Game__*` (je 1727–2519 s, fast gleich lang, egal wie groß der Teil);
+die verglichenen Funktionen selbst brauchen je Test unter 2 Minuten (Summe der „time:“-Zeilen von game_net: 55 s). Ursache:
+`rules::actor_graph` (tests/rule_blueprint.h) las für **jeden** Blueprint, nach dem ein Test fragt, den ganzen Text des Levels (37 MB) neu;
+„Game“ ist ein Graph mit 150 der 175 Blueprints. Die Testzeit folgt der Zahl der benutzten Blueprints (water_look 1 → 7 s,
+town_sync_cpp 5 → 41 s, Game 150 → 1727 s).
+
+**Behebung: `work-tempo` = 57b050b0** (auf 8a16a750; nur tests/rule_blueprint.h, tests/converted.h): das Dokument steht je Testprogramm
+einmal (`rules::level_document`), gesucht wird wie zuvor; neue Zeile „time: Blueprint <name>: … s before its first call“ ab 1 s.
+Lokal belegt: alle 175 Namen und ein fehlender, alter Weg gegen neuen – 176 gleich (Erfolg, Fehlermeldung, Graph als JSON), 0 verschieden;
+Syntax mit den Schaltern von run_tests.sh ok. Kein Zwischenspeicher zwischen Läufen, kein Test entfällt. **Beleg auf mag steht aus** (unten).
+
+**Belege der offenen Zweige (selbst geholt, 22:10)**
+| Zweig | Kopf | Beleg | Urteil |
+|---|---|---|---|
+| work-k | 85267faf | 174806: 46/46 in beiden Durchgängen | **nichts zu mischen** – der Kopf ist nur der Merge von work-zusammen; Probe-Merge = Baum von 8a16a750 |
+| work-d-fail | 64275dd8 | 180357 auf dem Kopf: 10/10 in beiden Durchgängen, Abweichungen leer | **belegt** → im Kandidaten |
+| work-d-index | 29fbf014 | 172026 lief auf d03ccf8c (47/47), nicht auf dem Kopf (a2dbd09f fehlt); baut auf work-d | **nicht belegt** |
+| work-d | 20bf03dc | 174829: bau rc=123 (engine_nodes.gen.h:389 „cannot decompose class type Field<Ref<Struct<S_GeoChunk>>>“); 161943 (c4cd0b69): 30 FAIL | **rot** → d |
+| work-t1-kreis | 5369a492 | 170417: Stellvertreter 150/150, Engine selbst 149/150 – converted_Game__game_cpp „manage_traffic: 1 of 20 calls differ“ | **nicht belegt** → t1 |
+| work-p | 985ca4ab | 165213: 13/13 in beiden Durchgängen | Agent meldet „nicht bereit“ → bleibt |
+
+**Kandidat: `work-kandidat` = cb25ae59** = 8a16a750 + work-d-fail 64275dd8 + work-tempo 57b050b0 (konfliktfrei; py_compile ok;
+`tools/engine_api.py` ohne Unterschied). **Läuft auf mag: `work-kandidat-voll-221713-1070`** (abgelegt 22:17).
+Auswerten gegen `work-zusammen-voll-213658-2736` (8a16a750): (1) convert/suite/engine rc=0; (2) jeder Test, den work-d-fail nicht berührt,
+gleiches Urteil und gleiche Zahl von Prüfungen wie dort; (3) Zeit der Suite und die neuen „time: Blueprint …“-Zeilen – was dann je Game-Test
+noch fest ist (verbinden, prüfen, starten), ist der nächste Hebel. Ist er grün und hat die alte Sitzung 8a16a750 nach `work` gemischt:
+work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen aus diesem Lauf.
