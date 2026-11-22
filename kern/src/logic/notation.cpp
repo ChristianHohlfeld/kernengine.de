@@ -5452,6 +5452,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "  }\n"
                   "  bool call(std::string_view function, std::span<const kern::logic::Value> args, kern::logic::Results& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
+  std::string kept;   // (the reference inputs of the calls by name: members - see below)
   for (const Function& f : g.functions) {
     if (f.external || !f.from.empty()) continue;  // (a function of another Blueprint, or of a library: nothing of it is here to call by name)
     // (a reference input: called by name it is a variable of the call that starts as the argument;
@@ -5460,12 +5461,21 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     // so that a host can measure the function's own work (logic::native_probe) -, then what it gave
     // is handed back. An input by value is moved in: the function gets it without a copy.
     std::string call = "self." + f.name + "(", places, changed;
+    bool busy = false;
     for (std::size_t k = 0; k < f.inputs.size(); ++k) {
       const std::string at = std::to_string(k);
       if (f.inputs[k].ref) {
         // (a variable of exactly the type the function takes: its reference binds to it)
+        // (it stays after the call, as the interpreter's variable of the call does, until the function is called by
+        // name again: what the call bound to it - a Callback it gave back - reads it there, not a place that ended)
         const std::string held = "kern::logic::NativeParam<&" + name + "::" + f.name + ", " + at + ">";
-        places += "      " + held + " place" + at + " = native_arg<" + held + ">(args, " + at + ", " + held + "{});\n";
+        const std::string member = "place_" + f.name + "_" + at;
+        // (a call by name inside such a call of the same function - the engine calls it again from within -: its own,
+        // as the interpreter keeps the outer call's variables)
+        kept += "  " + held + " " + member + "{};\n";
+        places += "      " + held + " inner" + at + "{};\n      auto& place" + at + " = busy_" + f.name + " ? inner" + at + " : " + member + ";\n      place" + at +
+                  " = native_arg<" + held + ">(args, " + at + ", " + held + "{});\n";
+        busy = true;
         if (!f.inputs[k].constant) changed += "      results.push_back(to_value(place" + at + "));\n";
       } else {
         const std::string held = type(f.inputs[k].type, f.inputs[k].of);
@@ -5474,6 +5484,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       call += std::string(k ? ", " : "") + (f.inputs[k].ref ? "place" + at : "std::move(in" + at + ")");
     }
     call += ")";
+    if (busy) {
+      kept += "  bool busy_" + f.name + " = false;\n";
+      places += "      const bool was_busy = busy_" + f.name + ";\n      busy_" + f.name + " = true;\n";
+      changed += "      busy_" + f.name + " = was_busy;\n";
+    }
     s += "    if (function == \"" + f.name + "\") {\n" + places + "      kern::logic::native_call(true);\n";
     if (f.outputs.empty()) {
       s += "      " + call + ";\n      kern::logic::native_call(false);\n";
@@ -5484,7 +5499,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     }
     s += changed + "      return true;\n    }\n";
   }
-  s += "    return false;\n  }\n"
+  s += "    return false;\n  }\n" + kept +
        "  bool get(std::string_view variable, kern::logic::Value& out) const override {\n    (void)out;\n";
   for (const Variable& v : g.variables) s += "    if (variable == \"" + v.name + "\") { out = kern::logic::to_value(self." + v.name + "); return true; }\n";
   s += "    return false;\n  }\n"

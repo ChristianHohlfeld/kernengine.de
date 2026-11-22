@@ -5,6 +5,7 @@
 //   kern/games/spawncity/tests/run_tests.sh
 //   spawncity_tests [part]          the tests whose name has `part` in it (all of them without it)
 //   spawncity_tests --name <n>...   exactly the tests named so, each once (a whole name; one that is no test's: FAIL)
+//   SC_TEST_SHARD=<k>/<n>           the k-th of every n of the tests (n jobs: each test once)
 //   SC_TEST_JOBS=<n>                up to n tests at once (else KERN_JOBS, else the cores; the output as one by one, in the order of the tests)
 #include <cerrno>
 #include <chrono>
@@ -226,6 +227,19 @@ int main(int argc, char** argv) {
       if (!named) continue;
     }
     todo.push_back(&c);
+  }
+  // SC_TEST_SHARD=k/n: of these, the k-th of every n (k = 1 ... n), in their order - n jobs together run every test once
+  // (the CI splits the suite so; in turn, so that the long ones of a file - the parts of Game stand side by side - spread).
+  if (const char* shard = std::getenv("SC_TEST_SHARD")) {
+    int k = 0, n = 0;
+    if (std::sscanf(shard, "%d/%d", &k, &n) != 2 || n < 1 || k < 1 || k > n) {
+      std::printf("FAIL SC_TEST_SHARD=%s (k/n with 1 <= k <= n)\n", shard);
+      return 1;
+    }
+    std::vector<const sct::Case*> mine;
+    for (std::size_t i = 0; i < todo.size(); ++i)
+      if (static_cast<int>(i % static_cast<std::size_t>(n)) == k - 1) mine.push_back(todo[i]);
+    todo = std::move(mine);
   }
   int ran = 0;
   count_memory();

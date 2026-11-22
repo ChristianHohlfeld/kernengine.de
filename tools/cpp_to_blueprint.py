@@ -4063,12 +4063,18 @@ class Emit:
             if k == "DeclRefExpr":
                 return (x.get("referencedDecl") or {}).get("kind") in ("VarDecl", "ParmVarDecl")   # (a variable stays where it is; a reference is not bound again)
             if k == "MemberExpr" and kids(x):
-                return bare(kids(x)[0]).get("kind") == "CXXThisExpr" if x.get("isArrow") else fixed(kids(x)[0])
+                if x.get("isArrow") and bare(kids(x)[0]).get("kind") != "CXXThisExpr":
+                    return fixed(kids(x)[0]) and not self.reads(kids(x)[0]) & changed   # (through a pointer nothing after changes)
+                return True if x.get("isArrow") else fixed(kids(x)[0])
+            if (k == "CXXOperatorCallExpr" and callee_name(x) in ("operator*", "operator->") and len(kids(x)) == 2) or (k == "UnaryOperator" and x.get("opcode") == "*" and kids(x)):
+                held = kids(x)[-1]   # (what an owned value or a pointer holds - `*gaps_`: as long as nothing after sets it)
+                return fixed(held) and not self.reads(held) & changed
             return k == "CXXThisExpr"
         cond, a, b = kids(init)
+        rest = stmts[i + 1:]
+        changed = self.assigned({"kind": "CompoundStmt", "inner": rest})
         if not (fixed(a) and fixed(b)):
             return None
-        rest = stmts[i + 1:]
         for x in (y for r in rest for y in walk(r)):
             if x.get("kind") == "LabelStmt":
                 return None   # (a goto into what follows: the copies would have the label twice)
@@ -6205,6 +6211,9 @@ class Emit:
                 # value first, then the old one ends (unique_ptr::operator=: the pointer stored, then the old deleted)
                 self.moved_into(ops[1], qtype(callee(n)))
                 got = self.spot(ops[0])
+                if got is None and self.is_slot(ops[0]):
+                    # (m[key] = std::move(v): the key's entry - made where the key is new, as operator[] does -, then replaced)
+                    got = self.spot(self.held_by(ops[0]))
                 if got is None or not self.writable(got[0]):
                     raise Wait("an owned value that holds objects of the engine, replaced where it is no place")
                 lt = got[1]
@@ -11307,6 +11316,8 @@ class Held:
 
 
 class TestWriter:
+    # the logic the level's Blueprints run in, and the program's way to call them: the test's own (converted::Blueprint, RuleBlueprint)
+    OWN_LOGIC = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
     """The test of one converted file (see tests/converted.h of the game). It holds the source of the
     file's converted functions once more, compiled with the numbers and the mathematics of the
     Blueprint language - classes and constants along with them - and calls each function there and
@@ -11426,6 +11437,11 @@ class TestWriter:
             return NUMBER.get(c) == "Int" or self.u.find_type(c) in self.tree.enums
         def wide(n):
             return self.u.clean(qtype(n)) in ("long", "unsigned long", "long long", "unsigned long long")
+        def narrow(n):
+            """A sum, difference or product computed as an int (i32, and what is promoted to it): C++ leaves open what it
+            gives outside the range (signed overflow) - the test computes it exactly and marks the call there."""
+            computed = n.get("computeResultType") if n.get("kind") == "CompoundAssignOperator" and n.get("computeResultType") else n.get("type", {})
+            return self.u.clean(qtype({"type": computed})) == "int"
         def fixed(n):
             n = bare(n)
             while n.get("kind") in ("ImplicitCastExpr", "CStyleCastExpr", "CXXStaticCastExpr", "CXXFunctionalCastExpr") and kids(n):
@@ -11764,14 +11780,21 @@ class TestWriter:
                 else:
                     swap(a, xa, n["opcode"], f"converted::{name}(")
                     edits.append((b, 0, -depth, b, ")"))
-            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and wide(n) and whole(ks[0]) and whole(ks[1]):
-                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign)
+            elif k in ("BinaryOperator", "CompoundAssignOperator") and n.get("opcode") in ("+", "-", "*", "+=", "-=", "*=") and len(ks) == 2 and (wide(n) or narrow(n)) and whole(ks[0]) and whole(ks[1]):
+                # a 64-bit whole number: a Blueprint holds it while it is within 2^53 of zero (read with its sign);
+                # an int: C++ leaves open what it gives outside its range (converted.h kept_narrow)
                 op = n["opcode"]
                 (a, b), (xa, xb), (ya, yb) = span(n), span(ks[0]), span(ks[1])
                 edits.append((a, 2, depth, a, "converted::" + {"+": "plus", "-": "minus", "*": "times"}[op.rstrip("=")] + ("_to(" if op.endswith("=") else "(")))
                 swap(xb, ya, op, ", ")
                 edits.append((b, 0, -depth, b, ")"))
-            elif k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1 and wide(ks[0]):
+            elif (k == "UnaryOperator" and n.get("opcode") == "-" and len(ks) == 1 and not n.get("_w64") and whole(n) and whole(ks[0])
+                  and self.u.clean(qtype(n)) in ("int", "long", "long long") and not fixed(ks[0])):
+                # the negation of the least number of a signed type: C++ leaves open what it gives (converted.h neg)
+                (a, b), (xa, xb) = span(n), span(ks[0])
+                swap(a, xa, "-", "converted::neg(")
+                edits.append((b, 0, -depth, b, ")"))
+            elif k == "UnaryOperator" and n.get("opcode") in ("++", "--") and len(ks) == 1 and (wide(ks[0]) or self.u.clean(qtype(ks[0])) == "int"):
                 (a, b), (xa, xb) = span(n), span(ks[0])
                 name = ("post_" if n.get("isPostfix") else "pre_") + ("inc" if n["opcode"] == "++" else "dec")
                 if n.get("isPostfix"):
@@ -12480,6 +12503,11 @@ class TestWriter:
         the stand-in answers. `plain`: a method of plain data (the test's own struct, MeshData::as_input) - the
         struct is its first value, and what a method that is not const makes of it, the first it takes."""
         d = f["decl"]
+        for raw in [qtype(p) for p in kids(d) if p.get("kind") == "ParmVarDecl"] + [re.sub(r"\(.*$", "", qtype(d))]:
+            if self.u.object_of(raw) in self.OWN_LOGIC:
+                # (the logic the level's Blueprints run in is the test's own, no stand-in: GameWorld::logic_runtime
+                # gives it - the stand-in of the engine has none to give, a function that asks for it is not compared)
+                raise Wait(f"it hands the logic the Blueprints run in ({self.u.object_of(raw).split('::')[-1]}) between the program and a stand-in of the engine")
         shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
         params, values, takes = [], (["converted::value_of(*this)"] if cls else []), []
         if plain and not qtype(d).rstrip().endswith("const"):
@@ -12516,7 +12544,9 @@ class TestWriter:
                 per = count_per(self.u.clean(qtype(after))) if after is not None else None   # (Count<Per>: Per numbers each)
                 counted = per is not None   # (only the type says it - no name is read)
                 fixed = declared_length(self.tree, p)   # (an array of a fixed length: so many)
-                data = (f"std::vector<{inner}>({name}, {name} + {per} * static_cast<std::size_t>({after['name']}))" if counted else
+                # (counted: as many as the count says - of numbers the test took from the stand-in itself, all it holds, as the
+                # Blueprint hands the list its node gave: the stand-in answers data() and size() each on its own; converted::room)
+                data = (f"std::vector<{inner}>({name}, {name} + converted::room({name}, {per} * static_cast<std::size_t>({after['name']})))" if counted else
                         f"({name} ? std::vector<{inner}>({name}, {name} + {fixed}) : std::vector<{inner}>{{}})" if fixed else
                         f"({name} ? std::vector<{inner}>{{*{name}}} : std::vector<{inner}>{{}})")
                 params.append((f"const {inner}* {name}", default))
@@ -12648,7 +12678,7 @@ class TestWriter:
                     defs.append((("engine", f["decl"]["id"]), b))
         # (the logic the level's Blueprints run in, and the program's way to call them, are the test's own: it
         # runs the actors' Blueprints in a real one - converted::Blueprint, RuleBlueprint)
-        own_logic = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
+        own_logic = self.OWN_LOGIC
         objects = {q for q in u.objects_seen | set(by_class) | set(fields) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
         for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
             for b in self.engine_bases(q):
@@ -13274,6 +13304,12 @@ class TestWriter:
             decl = tree.decl.get(i)
             if decl is None or decl.get("kind") not in ("FunctionDecl", "CXXMethodDecl", "CXXConstructorDecl", "CXXConversionDecl"):
                 return
+            if function_key(tree, decl) not in self.closures:
+                # (the Blueprint whose file it stands in has not handed it on - it is none this one calls, only its test
+                # holds it: a destructor runs what it calls where a value ends. That Blueprint is one this one needs: main)
+                part = u.world.part_of_function(tree, decl)
+                if part is not None and part != u.name:
+                    u.missing.add((part, function_key(tree, decl)))
             for place in self.closures.get(function_key(tree, decl), ()):
                 if place in G.wanted:
                     continue
@@ -13344,6 +13380,22 @@ class TestWriter:
                     held = tree.owner.get(c["id"]) or "" if c is not None else ""
                     if c is not None and not (held.startswith(ENGINE + "::") and u.engine_object(held)):   # (an object of the engine: its stand-in makes it)
                         want_function(c["id"])
+                elif k == "CallExpr" and callee_name(x) in ("make_unique", "make_shared"):
+                    # (std::make_unique<T>(a...) makes the T by its constructor of these arguments in the standard library:
+                    # no call of it stands in the tree of the source - `std::make_unique<Car>(CarSpec::car())`, game_net.cpp)
+                    m = re.match(r"(?:const\s+)?std::(?:unique_ptr|shared_ptr)<(.+)>$", u.clean(qtype(x)).strip())
+                    try:
+                        q = u.find_type(m.group(1).strip()) if m else None
+                    except Wait:
+                        q = None
+                    if q in tree.records and not (q.startswith(ENGINE + "::") and u.engine_object(q)):
+                        given = len(kids(x)) - 1
+                        for c in kids(tree.records[q]):
+                            if c.get("kind") != "CXXConstructorDecl" or c.get("isImplicit"):
+                                continue
+                            ps = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
+                            if len([p for p in ps if not kids(p)]) <= given <= len(ps):
+                                want_function(c["id"])
         def scan_record(d):
             for base in d.get("bases", []) or []:
                 want_types(base.get("type", {}).get("qualType", ""))
@@ -13582,7 +13634,7 @@ class TestWriter:
         return [m for m in members if m["id"] not in inner_templates], unconverted
 
     # ---- what a test in another file holds of this file's source ----
-    def exports(self):
+    def exports(self, known=()):
         """The test of a file that calls a function of this Blueprint holds that function's source once more,
         and all it names (`gather`) - what stands in this source file is not in that file's tree. For every
         function of the Blueprint that is written and has a name the linker knows: the places of the pieces
@@ -13594,6 +13646,8 @@ class TestWriter:
         for f in self.u.order:
             if f.lifted or not f.key or "@" in f.key:
                 continue   # (a function of its file alone - static, in a namespace without a name: no other file calls it)
+            if f.key in known:
+                continue   # (`known`: what an earlier try handed on already - the first try's stands, see convert_unit)
             order = []
             for place, piece in self.items(self.gather([f.decl["id"]])):
                 pieces.setdefault(place, piece)
@@ -13674,6 +13728,9 @@ class TestWriter:
                         t = tree.decl.get(n["_unnamed"])
                         if t is None or not here(t) or not namespace_level(t) or not own(t):
                             continue
+                        ta = t.get("_at", (None, None))[0]
+                        if t.get("_file") == d["_file"] and ta is not None and d["_at"][0] <= ta < d["_at"][1]:
+                            continue   # (an enum the function declares itself - `enum { coast, drive } mode = coast;`, Car::step: its own name)
                         said, home_of = tuple(x["name"] for x in kids(t) if x.get("kind") == "EnumConstantDecl" and x.get("name")), t
                     else:
                         if n.get("kind") != "DeclRefExpr":
@@ -13815,6 +13872,27 @@ class TestWriter:
                     # it is one function, with one stand-in)
                     if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e) or u.api().field_node(e) is not None):
                         out[e["id"]] = e
+                # an object of the engine made - `std::make_unique<kern::net::Client>(transport_, config(), seed)`, or by its
+                # constructor: its constructor of these arguments is one the source calls (the test that takes the piece
+                # holds the stand-in's constructor too - Session::join in the tests of Game)
+                q, given = None, 0
+                if x.get("kind") == "CallExpr" and callee_name(x) == "make_unique":
+                    m = re.match(r"(?:const\s+)?std::unique_ptr<(.+)>$", u.clean(qtype(x)).strip())
+                    q, given = (u.object_of(m.group(1).strip() + "*") if m else None), len(kids(x)) - 1
+                elif x.get("kind") == "CXXConstructExpr":
+                    c = constructor_of(tree, x)
+                    held = tree.owner.get(c["id"]) or "" if c is not None else ""
+                    if c is not None and u.engine_object(held) and c["id"] not in out and not c.get("isImplicit"):
+                        out[c["id"]] = tree.decl.get(c["id"], c)
+                if q:
+                    try:
+                        makers = u.api().makers(q)
+                    except Wait:
+                        makers = []
+                    for c in makers:
+                        ps = [p for p in kids(c) if p.get("kind") == "ParmVarDecl"]
+                        if len([p for p in ps if not kids(p)]) <= given <= len(ps) and c["id"] not in out:
+                            out[c["id"]] = c
         return out
 
     def guard_or_none(self, d):
@@ -14459,7 +14537,11 @@ class TestWriter:
                 said = [x for x in r.stderr.split("\n") if x.strip()]
                 firsts = [i for i, x in enumerate(said) if re.search(r"\berror: ", x)][:3]
                 for i in firsts:
-                    for x in said[max(0, i - 2):i + 3]:
+                    # (with the notes that follow it - which candidate did not fit, and why -, up to the next error)
+                    upto = next((j for j in range(i + 1, min(len(said), i + 40)) if re.search(r"\berror: ", said[j])), min(len(said), i + 40))
+                    for x in said[max(0, i - 2):upto]:
+                        if x.lstrip().startswith(("In file included", "|")) or re.match(r"\s*\d+ \|", x):
+                            continue
                         sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
@@ -14802,7 +14884,7 @@ def convert_unit(job):
             # (the source of a function is what it is, whether its test compares it yet or not: the tests of other files
             # that call it hold it - in a circle of functions over files, each test needs the others' source before any
             # test of them compares)
-            tried = writer.exports()
+            tried = writer.exports(exported[0])   # (each function once over the tries: the first try that has it gives it)
             for k, v in tried[0].items():
                 exported[0].setdefault(k, v)
             for k, v in tried[1].items():
@@ -15240,6 +15322,10 @@ def main(argv):
                     exported = [k for da, db in zip(ea, eb) if isinstance(da, dict) and isinstance(db, dict)
                                 for k in sorted(set(da) | set(db), key=str) if da.get(k) != db.get(k)]
                     print(f"goes round: {u}: " + "; ".join(moved[:6]) + (f"; exports differ: {', '.join(map(str, exported[:6]))}" if exported else ("" if moved else "; exports differ")), flush=True)
+                # (and what its test left out in the last of these rounds, as the compiler said it - TEST_ERRORS: the cause to look for)
+                dropped = [x for x in (results.get(u) or {}).get("errors", "").split("\n") if x.startswith("--- ") and ": without the " in x]
+                for x in dropped[:12]:
+                    print(f"goes round: {u}: last round {x[4:][:400]}", flush=True)
             for u in sorted(new):
                 # (what it gave in the rounds that went round: of two versions one after the other, what differs - the values)
                 ring = [v for at, v in visited[u] if at >= met[state]]
