@@ -842,6 +842,9 @@ struct ParamDef {
   /// list holds is stored there, a wire of an item is an Int); `with_lists`: a list of them (u8_list), which a
   /// value of the type is as it is (not a single Int of a width: on a pin it would be another number)
   bool widths = false;
+  /// Kind::type with `widths` and `with_lists`: a single Int of a width too - the values of a map (Map<Int, U8>: the
+  /// map is the place, a value it gives is what it holds)
+  bool width_values = false;
 };
 /// The types a Kind::type setting can name in the Blueprint `g` - its enums and structs among
 /// them -, in the order they are offered.

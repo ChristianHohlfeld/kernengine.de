@@ -71,7 +71,7 @@ template <> struct Direct<Bool> {
 /// value holds as a value: the one of the handle, copied there.)
 template <> struct Direct<Int> {
   template <class B, class C> static void from(EngineObjects& o, const B& b, C& c) {
-    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64>, "an Int pin the class holds as something else than an Int");
+    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");
     const i64 v = normal(static_cast<i64>(b));
     if constexpr (std::is_pointer_v<C>) {
       c = o.get<std::remove_pointer_t<C>>(v);
@@ -85,7 +85,7 @@ template <> struct Direct<Int> {
     }
   }
   template <class B, class C> static B make(EngineObjects& o, const C& c) {
-    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64>, "an Int pin the class holds as something else than an Int");
+    static_assert(std::is_same_v<B, Whole> || std::is_same_v<B, i64> || logic::is_sized<B>, "an Int pin the class holds as something else than an Int (or an Int of a fixed width: an entry of a List<U8> ...)");
     if constexpr (std::is_pointer_v<C>) {
       return B(normal(c ? o.adopt(*c) : 0));
     } else if constexpr (std::is_class_v<C> && !is_count<C>) {

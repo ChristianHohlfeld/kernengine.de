@@ -307,8 +307,8 @@ class Calls:
     def tag(self, bt, need, ev="ev::", types=""):
         """`ev`, `types`: how the file the tag stands in names engine_values and the tool's own types (E_, S_)."""
         u = self.u
-        if bt in SCALAR_TAG:
-            return ev + SCALAR_TAG[bt]
+        if c2b.wire(bt) in SCALAR_TAG:   # (an entry of a fixed width - of a List<U8> - is an Int)
+            return ev + SCALAR_TAG[c2b.wire(bt)]
         if c2b.callback_parts(bt):
             r, a = c2b.callback_parts(bt)
             return f"{ev}Callback<{self.tag(r, need, ev, types) if r else 'void'}({', '.join(self.tag(x, need, ev, types) for x in a)})>"

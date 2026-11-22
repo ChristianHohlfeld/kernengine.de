@@ -24,6 +24,12 @@ PinDef any_ints(std::string id, std::string label) {
   p.of = std::string(kAnyWidth);
   return p;
 }
+/// A list of bytes a node gives: a List<U8> (what C++ holds bytes in - std::vector<u8>, std::array<u8, N>).
+PinDef bytes_out(std::string id, std::string label) {
+  PinDef p = data(std::move(id), std::move(label), PinType::integer_list);
+  p.of = "u8";
+  return p;
+}
 /// The width of the Ints a list place of the node holds ("u8" ... - empty: none), as C++ stores an item there.
 std::string width_of_place(Context& c) {
   Variable named;
@@ -1154,6 +1160,7 @@ ParamDef key_param() {
 ParamDef value_param() {
   ParamDef p = param("value", "Value", ParamDef::Kind::type, "float");
   p.with_lists = true;
+  p.widths = p.width_values = true;  // (a map is a place: its values may be of a width, U8 and List<U8>)
   return p;
 }
 /// The keys' type a node's setting "Key" names (an Int when it names none a key can be).
@@ -1305,7 +1312,9 @@ void add_maps(Library& lib) {
     d.title = [](const NodeDef&, const Node& n) { return "Set in " + place_title(n); };
     d.run = [on_entries](Context& c) {
       const MapKey key = key_of(c.in("key"));
-      const Value value = c.in("value");
+      // (the value as the map holds it: a U8 its low bits, as C++ stores it there)
+      TypeRef t;
+      const Value value = keyed_place(c.node(), c.instance().graph(), PinType::map, t) ? fitted(c.in("value"), value_type(t), c.instance().graph()) : c.in("value");
       on_entries(c, PinType::map, [&](MapEntries& e) {
         const auto [added, at] = map::set(e, key, value);
         c.out("added", Value::boolean(added));
@@ -1596,7 +1605,7 @@ void add_structs(Library& lib) {
                      "bit cast memcpy binary bytes serialize wire packet");
     d.params = {struct_param(), layout_param()};
     d.inputs = {data("value", "Value", PinType::structure)};
-    d.outputs = {data("bytes", "Bytes", PinType::integer_list)};
+    d.outputs = {bytes_out("bytes", "Bytes")};
     d.title = [](const NodeDef&, const Node& n) { return "Bytes of " + n.param("struct", "?"); };
     d.shape = [of](const NodeDef&, const Node& n, const Graph& g, std::vector<PinDef>& in, std::vector<PinDef>&) { retype(in[0], {PinType::structure, n.param("struct")}, g); };
     d.problem = layout_problem;
@@ -1985,7 +1994,7 @@ void add_math(Library& lib) {
                  "Text with Count characters from At on replaced by With (std::string::replace); At beyond the end: Text as it is", "replace string"));
     lib.add(pure("text.repeat", "Repeat Text", "Text", {data("a", "Text", K::text, "*"), data("count", "Count", K::integer, 3)}, text, of(&P::text_repeat),
                  "Text so many times, one after the other (std::string(count, c) of a character); Count 0 or less: no text", "repeat times fill padding string"));
-    lib.add(pure("text.bytes", "Bytes of Text", "Text", {data("a", "Text", K::text, "")}, data("result", "", K::integer_list), of(&P::text_bytes),
+    lib.add(pure("text.bytes", "Bytes of Text", "Text", {data("a", "Text", K::text, "")}, bytes_out("result", ""), of(&P::text_bytes),
                  "The bytes of the text, each a whole number 0 to 255 (a std::vector<u8> of its range)", "bytes chars utf8 encode array"));
     lib.add(pure("text.reserve", "Reserve Text", "Text", {data("a", "Text", K::text, ""), data("count", "Count", K::integer, 0)}, text, of(&P::text_reserve),
                  "The text as it is - in a Blueprint's class with room for Count characters, so that what is appended to it fits (std::string::reserve)",

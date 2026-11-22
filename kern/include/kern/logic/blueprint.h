@@ -96,12 +96,13 @@ struct Machine {
 };
 
 /// kern::formula(lambda, values...): a Formula node. The lambda is the formula.
-template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(values...)); }
+/// (a place of a fixed width - U8 ... I32 - gives the formula its Int: logic::pinned)
+template <class F, class... A> constexpr f64 formula(F&& f, A... values) { return static_cast<f64>(f(logic::pinned(values)...)); }
 /// (a formula of whole numbers - [](Int a) -> Int: its value is the double of the Int it gives, held as
 /// that whole number, kern::math::Exact: an Int takes it as it is, everything else as that double)
 template <class F, class... A>
-  requires std::same_as<std::invoke_result_t<F, A...>, logic::Whole>
-constexpr math::Exact formula(F&& f, A... values) { return {static_cast<i64>(f(values...))}; }
+  requires std::same_as<std::invoke_result_t<F, decltype(logic::pinned(std::declval<A>()))...>, logic::Whole>
+constexpr math::Exact formula(F&& f, A... values) { return {static_cast<i64>(f(logic::pinned(values)...))}; }
 
 /// kern::out(n7.stars, n7.found): where a call on another Blueprint puts what it gave, in the
 /// order of the function's outputs (func_call_on).
@@ -597,9 +598,9 @@ struct BlueprintCore : logic::PureNodes {
   /// (of a list of Ints of any width - Int, U8 ... I32: each number's last 8 bits; of a place of the engine: read where it stands)
   template <class L> static Text text_of_bytes(const L& bytes, Int at, Int count) { return logic::texts::of_bytes(logic::items_of(read_of(bytes)), at, count); }
   static Text text_repeat(const Text& a, Int count) { return logic::texts::repeat(a.view(), count); }
-  /// Bytes of Text: its bytes, 0 .. 255 (one request for memory, as std::vector of the text's range makes it).
-  static List<Int> text_bytes(const Text& a) {
-    List<Int> r;
+  /// Bytes of Text: its bytes, a List<U8> (one request for memory, as std::vector<u8> of the text's range makes it).
+  static List<logic::Sized<u8>> text_bytes(const Text& a) {
+    List<logic::Sized<u8>> r;
     logic::texts::insert_bytes(r, 0, a.view());
     return r;
   }
@@ -705,6 +706,7 @@ struct BlueprintCore : logic::PureNodes {
     return logic::format::text_of(Format.view(), args, sizeof...(V), most);
   }
   static logic::format::Arg format_arg(Int v) { return logic::format::arg(static_cast<i64>(v)); }
+  template <class T> static logic::format::Arg format_arg(logic::Sized<T> v) { return logic::format::arg(static_cast<i64>(v)); }  // (an Int of a fixed width: its Int)
   static logic::format::Arg format_arg(Float v) { return logic::format::arg(v); }
   static logic::format::Arg format_arg(const Text& v) { return logic::format::arg(v.view()); }
   /// (a text that is no Text - what int64_text, int64_text_signed ... give: a view of that value itself, which
@@ -784,7 +786,7 @@ struct BlueprintCore : logic::PureNodes {
     static constexpr logic::bytes::Layout kLayout = logic::bytes::layout(Layout.view());
     static_assert(kLayout.error == nullptr, "the layout of Bytes of Struct cannot be read");
     static_assert(kLayout.count == logic::structs::field_count<S>(), "the layout has a field for each field of the struct");
-    Fixed<Int, kLayout.size> out;
+    Fixed<logic::Sized<u8>, kLayout.size> out;   // (the bytes: std::array<u8, N>)
     std::size_t k = 0;
     logic::structs::fields(value, [&](const auto&... field) { (put_bytes(out.items.data(), kLayout.fields[k++], field), ...); });
     return out;
@@ -802,10 +804,11 @@ struct BlueprintCore : logic::PureNodes {
     logic::structs::fields(out, [&](auto&... field) { (take_bytes(field, kLayout.fields[k++], byte), ...); });
     return out;
   }
-  static void put_bytes(Int* out, const logic::bytes::Field& f, Bool v) { logic::bytes::put(out, f, v ? 1 : 0); }
-  static void put_bytes(Int* out, const logic::bytes::Field& f, Int v) { logic::bytes::put(out, f, static_cast<u64>(static_cast<i64>(v))); }
-  static void put_bytes(Int* out, const logic::bytes::Field& f, logic::Int64 v) { logic::bytes::put(out, f, v.bits); }
-  static void put_bytes(Int* out, const logic::bytes::Field& f, Float v) { logic::bytes::put(out, f, logic::bytes::bits(f.code, v)); }
+  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, Bool v) { logic::bytes::put(out, f, v ? 1 : 0); }
+  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, Int v) { logic::bytes::put(out, f, static_cast<u64>(static_cast<i64>(v))); }
+  template <class B, class T> static void put_bytes(B* out, const logic::bytes::Field& f, logic::Sized<T> v) { logic::bytes::put(out, f, static_cast<u64>(static_cast<i64>(v))); }
+  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, logic::Int64 v) { logic::bytes::put(out, f, v.bits); }
+  template <class B> static void put_bytes(B* out, const logic::bytes::Field& f, Float v) { logic::bytes::put(out, f, logic::bytes::bits(f.code, v)); }
   template <class B> static void take_bytes(Bool& to, const logic::bytes::Field& f, B&& byte) { to = logic::bytes::take(f, byte) != 0; }
   template <class B> static void take_bytes(Int& to, const logic::bytes::Field& f, B&& byte) { to = static_cast<i64>(logic::bytes::take(f, byte)); }
   // (a field of a width: the layout gives it its own width - the number fits)

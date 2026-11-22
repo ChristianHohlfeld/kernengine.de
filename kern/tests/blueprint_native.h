@@ -1186,7 +1186,7 @@ inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g
         if (keys.empty()) break;
         v.own_entries().try_emplace(logic::key_of(keys[k % keys.size()]), t.type == PinType::map ? values[n++ % values.size()] : Value{});
       }
-      return v;
+      return logic::fitted(std::move(v), t, g);  // (a map of U8 values holds U8s only - what a C++ caller hands over)
     };
     std::vector<std::size_t> all, back;
     for (std::size_t k = 0; k < keys.size(); ++k) all.push_back(k);
@@ -1847,7 +1847,11 @@ inline std::string cpp_type(PinType t, const std::string& of = {}, const std::st
   if (logic::is_keyed(t)) {
     // a map or a set as the class holds it: Map<Int, Float> - its keys and values of the class's types (an Int: Whole)
     const logic::TypeRef k = logic::key_type({t, of});
-    auto part = [&](const logic::TypeRef& p) { return p.type == PinType::integer ? std::string("kern::logic::Whole") : cpp_type(p.type, p.of, owner); };
+    // (a value of a width: Sized<u8>, as in a List<U8>)
+    auto part = [&](const logic::TypeRef& p) {
+      if (p.type == PinType::integer) return logic::has_width(p) ? "kern::logic::Sized<kern::" + p.of + ">" : std::string("kern::logic::Whole");
+      return cpp_type(p.type, p.of, owner);
+    };
     return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
   }
   if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)

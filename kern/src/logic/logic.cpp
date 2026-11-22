@@ -44,11 +44,11 @@ std::vector<TypeRef> type_choices(const ParamDef& pd, const Graph& g) {
     for (const EnumType& e : g.enums) r.push_back({PinType::enumeration, e.name});
   if (!pd.enums_only)
     for (const StructType& s : g.structs) r.push_back({PinType::structure, s.name});
-  if (pd.widths && !pd.with_lists)
+  if (pd.widths && (!pd.with_lists || pd.width_values))
     for (std::string_view w : kWidthNames) r.push_back({PinType::integer, std::string(w)});
   if (pd.with_lists)
     for (std::size_t k = 0, n = r.size(); k < n; ++k) r.push_back({list_of(r[k].type), r[k].of});
-  if (pd.widths && pd.with_lists)
+  if (pd.widths && pd.with_lists && !pd.width_values)  // (with width_values: the lists of them came above)
     for (std::string_view w : kWidthNames) r.push_back({PinType::integer_list, std::string(w)});
   return r;
 }
@@ -77,12 +77,12 @@ bool type_from_text(std::string_view text, const Graph& g, TypeRef& out) {
     if (text.size() > head.size() + 2 && text.substr(0, head.size()) == head && text[head.size()] == '<' && text.back() == '>') {
       TypeRef t{keyed, std::string(text.substr(head.size() + 1, text.size() - head.size() - 2))};
       const TypeRef key = key_type(t);
-      // (a map's keys and values are of no fixed width - an Int of a width is a place's, see kWidthNames)
+      // (a map's keys are of no fixed width; its values may be - a map is a place: Map<Int, List<U8>>, Map<Int, U8>)
       if (!key_type_ok(key.type) || has_width(key) || (key.type == PinType::enumeration && !g.enumeration(key.of))) return false;
       if (keyed == PinType::map) {
         const TypeRef value = value_type(t);
         TypeRef named;
-        if (value.type == PinType::exec || is_keyed(value.type) || value.type == PinType::callback || !type_from_text(type_text(value), g, named) || has_width(named)) return false;
+        if (value.type == PinType::exec || is_keyed(value.type) || value.type == PinType::callback || !type_from_text(type_text(value), g, named) || named.count) return false;
       } else if (t.of.find('>') != std::string::npos) {
         return false;
       }
@@ -689,6 +689,7 @@ Value zero_of(const TypeRef& t, const Graph& g) {
 Value Value::from_json(const json::Value& j, const TypeRef& declared, const Graph& g) { return read_value(j, declared, g, struct_depth(g)); }
 bool has_fixed(const TypeRef& t, const Graph& g) {
   if (t.count || has_width(t)) return true;
+  if (t.type == PinType::map) return has_fixed(value_type(t), g);  // (a map of List<U8>: its values are fitted)
   if (element_of(t.type) != PinType::structure) return false;
   // (a struct holds structs declared above it: no deeper than there are structs)
   std::vector<const StructType*> todo;
@@ -696,8 +697,10 @@ bool has_fixed(const TypeRef& t, const Graph& g) {
   for (std::size_t seen = 0; seen < todo.size() && seen <= g.structs.size(); ++seen)
     for (const StructField& f : todo[seen]->fields) {
       if (f.type.count || has_width(f.type)) return true;
-      if (element_of(f.type.type) != PinType::structure) continue;
-      const StructType* inner = g.structure(f.type.of);
+      const TypeRef held = f.type.type == PinType::map ? value_type(f.type) : f.type;  // (a field of a map: its values)
+      if (held.count || has_width(held)) return true;
+      if (element_of(held.type) != PinType::structure) continue;
+      const StructType* inner = g.structure(held.of);
       if (inner && std::find(todo.begin(), todo.end(), inner) == todo.end()) todo.push_back(inner);
     }
   return false;
@@ -705,6 +708,25 @@ bool has_fixed(const TypeRef& t, const Graph& g) {
 namespace {
 void fit(Value& v, const TypeRef& t, const Graph& g, int depth) {
   if (v.type != t.type) return;
+  if (t.type == PinType::map) {  // (each value as the map holds it: a List<U8>'s items, a U8, a struct's fields)
+    const TypeRef value = value_type(t);
+    if (!has_fixed(value, g)) return;  // (a map's value is no map: no deeper than its value's type; `depth` counts structs)
+    if (has_width(value)) {  // (Ints of a width that are what the map holds already: nothing to change, nothing copied)
+      bool all = true;
+      const MapEntries& held = v.keyed();
+      for (std::size_t k = 0; all && k < held.size(); ++k) {
+        const Value& x = held.value_at(k);
+        if (x.type != value.type) continue;
+        if (value.type == PinType::integer) all = wrapped(x.i, value.of) == x.i;
+        else
+          for (i64 i : x.items<i64>()) all = all && wrapped(i, value.of) == i;
+      }
+      if (all) return;
+    }
+    MapEntries& e = v.own_entries();
+    for (std::size_t k = 0; k < e.size(); ++k) fit(e.value_at(k), value, g, depth);
+    return;
+  }
   at_length(v, t, g);
   if (has_width(t)) {  // (what a place of a fixed width holds: the low bits, as C++ stores them)
     if (t.type == PinType::integer) v.i = wrapped(v.i, t.of);
@@ -2131,7 +2153,14 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
       err(0, what + " is a list of " + std::to_string(t.count) + " entries, its default has " + std::to_string(value.size()));
   };
   // An Int of a fixed width: its default is one of its values (C++ would store another there).
-  auto width_ok = [&](const std::string& what, const TypeRef& t, const json::Value& value) {
+  std::function<void(const std::string&, const TypeRef&, const json::Value&)> width_ok = [&](const std::string& what, const TypeRef& t, const json::Value& value) {
+    if (t.type == PinType::map) {  // (a map of Ints of a width: each value its default holds, [key, value])
+      const TypeRef held = value_type(t);
+      if (has_width(held) && value.is_array())
+        for (std::size_t k = 0; k < value.size(); ++k)
+          if (value[k].is_array() && value[k].size() == 2) width_ok(what + "'s value under the key " + json::stringify(value[k][0]), held, value[k][1]);
+      return;
+    }
     if (!has_width(t)) return;
     if (t.type == PinType::integer_list) {
       if (value.is_array())

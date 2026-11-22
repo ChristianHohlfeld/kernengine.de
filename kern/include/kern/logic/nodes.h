@@ -174,14 +174,27 @@ template <class T> struct Sized {
   constexpr Sized(math::Exact x) : Sized(Whole(x)) {}                                // NOLINT
   template <char Op, class A, class B> Sized(const Sum<Op, A, B>& x) : Sized(Whole(x)) {}  // NOLINT
   constexpr operator Whole() const { Whole r; r.v = static_cast<i64>(v); return r; }  // NOLINT (implicit: it is that Int)
-  constexpr explicit operator i64() const { return static_cast<i64>(v); }  // (its number: static_cast<i64>, as of a std::uint8_t)
+  // (its number, as a std::uint8_t converts to one: handed to every function of whole numbers that takes an i64)
+  constexpr operator i64() const { return static_cast<i64>(v); }  // NOLINT
   Sized& operator+=(Whole amount) {
     v = static_cast<T>(static_cast<u64>(static_cast<i64>(v)) + static_cast<u64>(amount.v));
     return *this;
   }
   u64 hash() const { return KeyHash<i64>{}(static_cast<i64>(v)); }
   friend constexpr bool operator==(Sized a, Sized b) { return a.v == b.v; }
+  // (compared with a whole number: as their numbers - one way, not two)
+  friend constexpr bool operator==(Sized a, Whole b) { return static_cast<i64>(a.v) == b.v; }
+  template <class U> friend constexpr bool operator==(Sized a, Sized<U> b) { return static_cast<i64>(a.v) == static_cast<i64>(b.v); }
+  template <class I>
+    requires std::is_integral_v<I>
+  friend constexpr bool operator==(Sized a, I b) { return static_cast<i64>(a.v) == static_cast<i64>(b); }
 };
+/// What a pin reads from a value it is handed (a Formula's input): an Int of a fixed width is the Int it holds,
+/// anything else is itself.
+template <class X> constexpr decltype(auto) pinned(X&& x) {
+  if constexpr (is_sized<std::remove_cvref_t<X>>) return Whole(x);
+  else return std::forward<X>(x);
+}
 }  // namespace logic
 namespace math {
 template <class T> inline i64 bits_of(logic::Sized<T> a) { return static_cast<i64>(a.v); }
@@ -431,14 +444,14 @@ template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
   List(const Items& items) : Items(items) {}                 // NOLINT (implicit: the vector of its items is the list)
   List(Items&& items) noexcept : Items(std::move(items)) {}  // NOLINT
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
@@ -474,14 +487,14 @@ template <class T, std::size_t N> struct Fixed {
   operator List<T>() const& { return List<T>(typename List<T>::Items(items.begin(), items.end())); }           // NOLINT (implicit: its entries as a list)
   operator List<T>() && { return List<T>(typename List<T>::Items(std::make_move_iterator(items.begin()), std::make_move_iterator(items.end()))); }  // NOLINT
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
@@ -841,14 +854,14 @@ template <class K, class V> struct Map : kern::Map<K, typename detail::Entry<V>:
   using Entries::Entries;
   Map() = default;
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));

@@ -72,6 +72,9 @@ const lgKeyed = t => {
   return {kind: t.slice(0, 3), key: lgFromNamed(at < 0 ? inner : inner.slice(0, at)), value: at < 0 ? null : lgFromNamed(inner.slice(at + 1))};
 };
 const lgToNamed = (t, enums) => {
+  // (an Int of a fixed width as a map's value: "int:u8", "int_list:u8" - as the engine names it)
+  const width = lgIsList(t) ? lgItemType(t) : t;
+  if (LG_WIDTHS.includes(width)) return (lgIsList(t) ? "int_list:" : "int:") + width;
   if (lgBuiltin(t)) return t;
   const list = lgIsList(t), name = list ? lgItemType(t) : t;
   const kind = lgStructNames.has(name) ? "struct" : (enums || []).some(e => e.name === name) ? "enum" : null;
