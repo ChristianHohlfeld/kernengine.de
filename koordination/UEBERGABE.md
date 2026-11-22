@@ -1163,3 +1163,16 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
   ist die Bedingung; `vergleich` über einzelne Dateien hat diesen Fehler nicht gezeigt, weil er erst beim Lesen des ganzen Game-Textes
   auftritt. Danach neuer voller Lauf als Kandidat. Lehre: vor einem vollen Lauf nach dem Einmischen mehrerer Zweige erst `konvert`.
 - Braucht einen Agenten → frühestens mit Guthaben oder nach dem Reset (Mi 25.11., 13:00).
+
+### 16.30 Stand 00:50 (23.11.) – Kontrolle der neuen Sitzung: Engine-Suite für `work-tempo` grün; Kandidat hat denselben Konverter-Fehler
+
+- `work-tempo-engine-223747-2757` auf e9929af0: **engine rc=0** (23:09) → die Engine-Änderung (check/graph_from_json) ist damit belegt.
+- `work-kandidat-voll-223820-2825` (7447cc16, Start 23:25): **convert rc=1** (00:14) – gleiche Basis 8a16a750, also derselbe Fehler wie 16.29.
+  Suite läuft noch; ihre Urteile sagen nichts (altes Level), ihre **Zeit** aber schon: mit 213658 vergleichen (dort Suite 57 min 43 s,
+  weil das alte, kleinere Level geprüft wurde – der Vergleich mit 160230 (2 h 11) gilt deshalb nur eingeschränkt).
+- Zur Ursache aus 16.29 (nur angesehen, nichts behoben): `mag-zwischen/texts/Game.cpp` Zeile 2185 ist `count = list_length<TrafficCar>(cars_);`
+  gefolgt von `at = n….index;` – die Funktion (Aufräumen in Game::stop/~Game: remote_bus_, remote_car_, net_, dann Schleife über cars_)
+  benutzt die Lokalen `count` und `at`, ohne dass sie in diesem Text vereinbart sind. Die Schleife über `cars_` kam mit g 8b27771d
+  (stop() mit cars_.clear()) und k cd542712 (ended_many). → Auftrag an k (mit g): die Regel, die das Ende vieler Stücke als Schleife
+  schreibt, muss ihre Lokalen vereinbaren; Beleg `./mag.sh konvert`, convert rc=0.
+- `work` unverändert 42831863; nichts zu mischen, solange convert rot ist.
