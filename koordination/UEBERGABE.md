@@ -1005,3 +1005,81 @@ mag rechnet unabhängig weiter (der volle Lauf `work-voll-162644-5528` seit 17:3
   (Abschnitt 10; engine_api.py neu erzeugen und mit dem Level committen), CI mit der Matrix; (3) p Map-Werte + Schritt 4 einmischen, messen; d Platz;
   k Warteliste des Laufs 045421; s5 Endzustand ($S/luecken.txt neu erzeugen). Entscheidungen E15–E20 gelten; Chris: Entwurfsfragen entscheidet der Koordinator
   nach den Zielen, Agenten Opus (mittel, einfache Sachen niedrig), Token sparen, Meldungen nur bei Meilensteinen.
+
+### 16.26 Stand 21:50 (22.11.) – ÜBERGABE AN EINEN NEUEN KOORDINATOR (Wunsch Chris); Agenten stehen am Limit, mag rechnet
+
+**Zuerst lesen:** Abschnitte 1–4, 10, 12, 13 (Ziel, Regeln, Reihenfolge, Abschluss), dann diesen Abschnitt, dann `stand/KOORDINATOR.md`
+(oberste fünf Einträge) und die `uebergabe/<paket>.md` der Pakete, die du startest. 16.2–16.25 sind Verlauf, nur bei Bedarf.
+
+**Quote.** Wochenlimit erreicht (Reset Mi 25.11., 13:00 Berlin), Guthaben leer: alle Agenten sind am 22.11. zwischen 19 und 20 Uhr
+mit 429 abgebrochen. Vorher nichts starten, außer Chris meldet Guthaben/höhere Obergrenze. mag kostet keine Quote.
+
+**Stand der Zweige (22.11., 21:40)**
+- `work` = 42831863 – unverändert seit 18.11., war nie grün. Niemand außer dem Koordinator pusht dorthin.
+- `work-zusammen` = **8a16a750** – enthält alles Belegte: t1 bis 5fead28f, c 53c9ac69, g (a5a157f2, 8b27771d), k bis cd542712
+  (ended_many), p 11968cee (E20 Schritt 4, Map-Werte fester Breite).
+- **Läuft auf mag:** `work-zusammen-voll-213658-2736` auf 8a16a750 (Start 21:37, etwa 3 Stunden) = **Kandidat für `work`**.
+- Letzter fertiger voller Lauf `work-zusammen-voll-160230-5239` auf a06e5ce4 (ohne p, k, zweiten g-Fix): convert rc=0, engine rc=0,
+  Suite Stellvertreter **270 Tests / 0 Fehler**, echte Engine **150 Tests / 1 Fehler** (converted_Game__game_cpp: ~Car auf beendeter
+  Welt; behoben durch 8b27771d, im Vergleich 175649 50/50). Zahlen geschrieben/verglichen stehen in `mag/…160230…/convert.tail.txt`.
+- `grundlage` (mag/auftrag) = noch `work-zusammen-voll-045421-10862` (1755 von 1846 geschrieben, 1710 verglichen).
+
+**Nächster Schritt (ohne Agenten machbar)**
+1. `./mag.sh holen work-zusammen-voll-213658-2736`; in `when` müssen convert, suite, engine rc=0 stehen (nie vor `engine rc` abbrechen).
+2. Alles rc=0 → Abschnitt 10: 8a16a750 nach `work` mischen, `python3 tools/engine_api.py` neu erzeugen und mit den Level-Blueprints
+   des Laufs committen (Zweig `mag/ergebnis-<name>`), `gh workflow run ci.yml --ref work`, `grundlage` auf diesen Lauf setzen, Chris melden.
+3. Nicht grün → rote Tests den Paketen zuteilen (unten), nach deren Belegen neuer voller Lauf.
+
+**Nicht eingemischt (gepusht, Arbeitsbäume sauber, nichts lokal offen)**
+| Zweig | Kopf | Inhalt | Stand |
+|---|---|---|---|
+| work-t1 | 33dc2e13 | Differenztest in der Form „zwei Bauten“ (4.2) | gebaut, **kein Beleg** |
+| work-t1-kreis | 5369a492 | Tests der Kreis-Funktionen (Exporte als Verweis) | Beleg `work-t1-kreis-vergleich-170417-20160` ungeprüft; Arbeit mittendrin abgebrochen |
+| work-k | 85267faf | 1 Commit nach cd542712 | Beleg `work-k-vergleich-174806-17509` ungeprüft („Belegt“ laut letzter Zeile des Agenten, stand/k.md nicht mehr fortgeschrieben) |
+| work-d-fail | 64275dd8 | engine.fail/engine.log + Merge 8871ab35 | 8432b275 war belegt (162023, 10/10); Beleg des Merges `work-d-fail-vergleich-180357-32687` prüfen, dann einmischen |
+| work-d | 20bf03dc | Platz der Engine, Feld-Plätze, run_buildings | Belege `work-d-vergleich-161943/174829`, `work-d-engine-162227` ungeprüft |
+| work-d-index | 29fbf014 | Länge eines Zeiger-Eingangs (Session_push) | Beleg `work-d-index-vergleich-172026-30784` ungeprüft |
+| work-p | 985ca4ab | Map<K, I32> als Plätze (4d56692b), E20 Schritt 5 (Schleife mit lokalem Wächter) | **nicht bereit**, mag-Belege standen aus |
+| work-c | 53c9ac69 | eingemischt; Aufgabe 2 (implements/E-c2) entschieden, nicht gebaut | Entwurf in stand/c.md |
+| work-s5 | f39a76a1 | Bau-Weg `--only-blueprints`, blueprint_gaps.py, Exporte | alt (19.11.); Tabellen und Level zusammen neu erzeugen |
+Vor jedem Einmischen: Beleg selbst holen und ansehen (`when`: alle rc=0, beide Durchgänge, `alle*-abweichungen.txt` leer), kein Rückfall
+bei „written“, danach `python3 -m py_compile tools/*.py`, `python3 tools/engine_api.py` ohne Unterschied. Konflikte löst der Agent, nicht der Koordinator.
+
+**Offen bis „Fertig heißt“ (Abschnitt 1), mit Zuständigen**
+1. **Quelländerungen an game.cpp** (Chris: „beheben dann weiter“; a5a157f2, 8b27771d: stop() und ~Game beenden glife_, remote_bus_,
+   remote_car_, cars_, life_, swarm_cruiser_ vor world_) haben **keinen grünen Differenztest** → t1 (33dc2e13 belegen, dann anwenden).
+   Bis dahin gilt die Änderung nach 4.2 nur als vorbereitet.
+2. **Game::stop wartet** an `cars_.clear()` („clear() of a list of what ends … C++ leaves open in which order a std::vector's entries
+   end“) → g/k: in stop() die Einträge in festgelegter Reihenfolge beenden statt clear(), oder allgemeine Fähigkeit nach k's
+   Entscheidung in stand/k.md (Reihenfolge wie der Destruktor des Programms). ~Game wird geschrieben, aber nicht eigens verglichen.
+3. **Nicht geschriebene Funktionen** (zuletzt ~90): Plätze der Engine (d), register_node/App-Ereignisse/ShaderExtension (c, E-c2),
+   minimap_json (braucht eine Absenkung – Entscheidung offen), Warteliste (k).
+4. **Nicht verglichene Funktionen** (zuletzt ~45): Kreis-Funktionen der Rekursion (t1, work-t1-kreis), übrige „cannot compare“.
+5. **Geschwindigkeit** (p): 20 von 29 Fällen über 1,10 (64-Bit-Spalte), Liste in stand/p.md; Schritt 5 gebaut/unbelegt, dann Weg (b).
+6. **Umschalten** (s5): Spiel nur aus Blueprints, `src/` leer – 176 Lücken (luecken.txt, alter Lauf), Einstieg ohne main.cpp,
+   21 Spieltests, 5 Exporte passen nicht ins wire. Größter Brocken, nie als Ganzes gelaufen – **zuerst angehen**.
+7. **CI**: `work` nie grün; e2e rot an alten Level-Blueprints („cannot convert int to int64 (voice)“, List<Int> gegen List<U8>) –
+   löst sich mit Schritt 2 oben (Level neu committen); CI-Matrix (12 Teile je Durchgang) unbelegt.
+8. Abschluss nach Abschnitt 12 (Squash nach main, Deploy nur mit grüner CI, Changelog in web/view/changelog_menu.mjs).
+Nur gemeldet, nicht entschieden: gaps_barricade_doors-UB in der Quelle.
+
+**Agenten** (Opus 5.5, mittlere Stufe; einfache Sachen niedrig). IDs dieser Sitzung in `/home/claude/agenten.txt` gelten in einer neuen
+Sitzung nicht – dort Nachfolger mit `uebergabe/<paket>.md` + `stand/<paket>.md` starten (Muster der Prompts: schlank, Regeln per
+Verweis, Aufgaben nummeriert, Beleg-Pflicht, Attributionszeilen). Empfehlung: höchstens zwei bis drei gleichzeitig, Reihenfolge
+s5 → t1/k/d (Rest der Funktionen, Differenztest) → p. Agenten enden nach 260–550k Tokens; nach Server-Neustart per Nachricht wecken.
+
+**mag** (Chris' Server, keine systemweiten Installationen, MAG-Stack nicht anfassen). Schleife starten (macht Chris):
+`pgrep -f lauf2.sh || nohup bash ~/spawncity-auftrag/lauf2.sh > ~/spawncity-auftrag2.log 2>&1 &`. `cap` = 84, nicht anheben
+(Überbuchung am 19.11.). `stand` zeigt nach den Neustarts vom 20.11. tote Aufträge als „läuft“/„wartet“ (work-c-vergleich-001825,
+-080407, -082139, work-p-engine-081106, -081636, work-p-konvert-081110 u. a.) – ignorieren; Agenten wurde das Abbrechen verwehrt,
+der Koordinator bricht sie nicht an ihrer Stelle ab (Chris kann es mit `./mag.sh abbrechen <name>`). mag hatte am 20.11. zwei
+Neustarts mit Hardware-Meldungen (mce, CMCI storm) – nach einem Neustart sind laufende Aufträge verloren und neu abzulegen.
+vergleich/probe brauchen Pfade `src/<datei>.cpp`.
+
+**Vorgaben von Chris aus dieser Sitzung** (zusätzlich zu Abschnitt 2–4): Koordinator koordiniert nur (Belege prüfen, einmischen,
+Läufe starten, entscheiden) und behebt nichts selbst; Entwurfsfragen entscheiden Koordinator/Agent nach den Zielen ohne Rückfrage;
+Tokens sparen, Meldungen nur bei Meilensteinen, kurz, auf Deutsch; keine Schätzungen in Entwickler-Tagen; ehrlich bleiben, keine
+Zusage „wird fertig“. Wache nur durch Nutzer-Nachricht oder geplante Kontrolle auf – Kontrollen etwa alle 45 Minuten planen.
+
+**Was Chris in den neuen Chat schreibt:** wie Abschnitt 14, mit „lies koordination/UEBERGABE.md, Abschnitte 1–4, 10, 12, 13 und 16.26,
+und mach bei 16.26 ‚Nächster Schritt‘ weiter“.
