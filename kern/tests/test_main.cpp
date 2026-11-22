@@ -4183,7 +4183,7 @@ TEST(logic_notation_values_of_a_call) {
       "    Float Acc = 0.0;\n"
       "    struct : kern::Node<11> { Int index = 0; } n11;\n"
       "    HalfResult n12;\n"
-      "    for (auto it11 = flow_for(n11, 1, n); it11.next();) {\n"
+      "    for (auto it11 = flow_for(n11, 1, n).local(); it11.next();) {\n"
       "      Last = n13.h;\n"
       "      n12 = Half(kern::to<Float>(n11.index));\n"
       "      Acc = math_add(Acc, n12.h);\n"

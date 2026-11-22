@@ -684,6 +684,8 @@ std::size_t path_indices(std::string_view path);
 std::string path_pin(std::size_t k);
 /// Is `id` such an input's?
 bool is_path_pin(std::string_view id);
+/// Does the node run a function of the Blueprint (its setting "function")? A call, a pure call, a Callback, Sort List with its order.
+bool calls_function(const Node& n);
 /// How a call names the place it gives a reference input (FunctionPin::ref) of the function it
 /// calls: its settings "<input>.variable" and "<input>.path" - a variable or a local variable of
 /// the function the call stands in (the call's setting "scope"), or one of that function's

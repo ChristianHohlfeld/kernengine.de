@@ -231,6 +231,7 @@ KERN_LAYOUT(Demo) {
 | Sequence | `{ ... } { ... }` – ein Block je Ausgang |
 | For Loop (jeder Schleifen-Knoten) | `for (auto it12 = flow_for(n12, 0, 9); it12.next();) { ... }` – danach folgt „Completed“ |
 | While Loop | `while (loop(wert)) { ... }` – danach folgt „Completed“ |
+| Schleife, deren Rumpf selbst nicht zählt (siehe „Endlosschleifen“) | `for (auto it12 = flow_for(n12, 0, 9).local(); it12.next();) { ... }`, While Loop `for (auto it12 = loop_local(); it12.next(wert);) { ... }` – derselbe Knoten; ob `.local()` dasteht, entscheidet der Schreiber am Graphen |
 | Knoten, der entscheidet, ob es weitergeht (Do Once, Gate, Do N) | `if (flow_do_once(n7, "exec", false)) { ... }` |
 | Knoten mit mehreren Wegen (Switch, Flip Flop) | `switch (flow_flip_flop(n13)) { case 0: { ... } break; case 1: { ... } break; }` |
 | Switch on Enum | `switch (flow_switch_enum<Mode>(State)) { case Mode::Closed: { ... } break; ... }` – die Fälle sind die Werte der Aufzählung, bei ihren Namen; der Text hat einen für jeden Wert |
@@ -1871,6 +1872,18 @@ Schleifendurchläufe eines Schritts für alle Stufen an einer Stelle (`Runtime::
 überschritten, enden die Schleifen der Kette sofort, der Rest der Kette läuft zu Ende, dann ist
 der Blueprint gestoppt und es wird gemeldet. Das ist für Graph und Text dasselbe – der Text kann
 eine Kette nicht mittendrin abbrechen, also tut es auch der Interpreter nicht mehr.
+
+Zählt im Rumpf einer Schleife nichts selbst Durchläufe – keine Schleife, kein Aufruf einer Funktion,
+deren Schritte zählen können (die eigenen Funktionen des Blueprints werden durchgesehen; Funktionen
+eines anderen Blueprints oder einer Bibliothek, Events, Warten, Schritte, die Handler auslösen, Knoten
+der Welt, der Engine oder des Spiels zählen als „kann zählen“; ein Kreis von Aufrufen ebenso) –, auch
+nicht in den Werten, die er liest (bei While: die Bedingung), dann schreibt der Text die Schleife mit
+`.local()` bzw. `loop_local()`: In der Klasse steht der Zähler dann während der Schleife in einer
+lokalen Variable der Methode (`BlueprintCore::LocalPass`, ein Register) statt im Speicher der Laufzeit;
+beim Verlassen der Schleife (Ende, `return`, auch aus einem tieferen Block) und vor der Frage an
+`Runtime::pass` an der Grenze wird er zurückgeschrieben. Es werden dieselben Durchläufe in derselben
+Reihenfolge gezählt – die Bedeutung ist die von `kern_pass`; Interpreter und JIT bleiben unverändert,
+gelesen ist es derselbe Knoten (Fall `loops_local`).
 
 ## Der Beweis (Tests)
 

@@ -316,52 +316,97 @@ struct BlueprintCore : logic::PureNodes {
     }
     return kern_world.runtime->pass(*kern_world.instance);
   }
+  /// The guard of a loop none of whose steps counts passes of its own (no loop, no call of a function that may,
+  /// nothing of the world, no event, no wait - the writer decides it at the graph: `.local()`, `loop_local()`):
+  /// while the loop runs, where the count stands is a local of the method (a register), not the runtime's
+  /// counter - written back when the loop is left in any way (its end, break, return), and before the runtime is
+  /// asked at the limit. The same passes are counted, in the same order: the same meaning as kern_pass.
+  struct LocalPass {
+    BlueprintCore& self;
+    i32* count;
+    i32 at, end;
+    explicit LocalPass(BlueprintCore& s) : self(s), count(s.kern_world.counters), at(count ? count[3] : 0), end(count ? count[1] : 0x7fffffff) {}
+    LocalPass(const LocalPass&) = delete;
+    LocalPass& operator=(const LocalPass&) = delete;
+    ~LocalPass() {
+      if (count) count[3] = at;
+    }
+    bool pass() {
+      if (at < end) {
+        ++at;
+        return true;
+      }
+      if (!count) {  // (no world: no limit)
+        at = 0;
+        return true;
+      }
+      count[3] = at;
+      const bool on = self.kern_world.runtime->pass(*self.kern_world.instance);
+      at = count[3];
+      end = count[1];
+      return on;
+    }
+  };
+  /// The guard of every other loop: the runtime's counter (kern_pass).
+  struct SharedPass {
+    BlueprintCore& self;
+    bool pass() { return self.kern_pass(); }
+  };
   /// After a call that held an entry of a list (logic::Held): did the lists stay? Else the run stops here with an error.
   template <class... L> void held_after(const logic::Held<L...>& held) {
     if (!held.same() && kern_world.runtime && kern_world.instance) kern_world.runtime->held_lost(*kern_world.instance);
   }
   /// while (loop(condition)): a While Loop.
   bool loop(Bool condition) { return condition && kern_pass(); }
+  /// for (auto it<id> = loop_local(); it<id>.next(condition);): a While Loop whose body counts no passes of its own (LocalPass).
+  struct WhileLoop {
+    LocalPass guard;
+    bool next(Bool condition) { return condition && guard.pass(); }
+  };
+  WhileLoop loop_local() { return WhileLoop{LocalPass(*this)}; }
   /// for (auto it = flow_for(n, first, last); it.next();): a For Loop; n.index is the index.
-  template <class N> struct ForLoop {
-    BlueprintCore& self;
+  /// flow_for(...).local(): the same loop with a LocalPass.
+  template <class N, class Guard = SharedPass> struct ForLoop {
     N& n;
+    Guard guard;
     bool first = true;
     bool next() {
       if (!first) logic::flow::for_step(n.memory);
       first = false;
-      if (!logic::flow::for_runs(n.memory) || !self.kern_pass()) return false;
+      if (!logic::flow::for_runs(n.memory) || !guard.pass()) return false;
       n.index = logic::flow::for_index(n.memory);
       return true;
     }
+    ForLoop<N, LocalPass> local() { return {n, LocalPass(guard.self)}; }
   };
   template <class N> ForLoop<N> flow_for(N& n, Int first, Int last) {
     logic::flow::for_start(n.memory, first, last);
-    return {*this, n};
+    return {n, SharedPass{*this}};
   }
 
   /// for (auto it = flow_for_each<Float>(n, list); it.next();): every item of the list as it
   /// is when the loop starts; n.item and n.index are the pass's. Where the loop is, is the node's
   /// (n.kept, n.memory[0]) - like the index of a For Loop.
-  template <class N, class T> struct ListLoop {
-    BlueprintCore& self;
+  template <class N, class T, class Guard = SharedPass> struct ListLoop {
     N& n;
+    Guard guard;
     bool first = true;
     bool next() {
       if (!first) n.memory[0] += 1;
       first = false;
       const List<T>* list = static_cast<const List<T>*>(n.kept.get());
       const std::size_t at = static_cast<std::size_t>(n.memory[0]);
-      if (!list || at >= list->size() || !self.kern_pass()) return false;
+      if (!list || at >= list->size() || !guard.pass()) return false;
       n.item = T((*list)[at]);
       n.index = static_cast<i64>(at);
       return true;
     }
+    ListLoop<N, T, LocalPass> local() { return {n, LocalPass(guard.self)}; }
   };
   template <class T, class N> ListLoop<N, T> flow_for_each(N& n, std::type_identity_t<List<T>> list) {
     n.kept = std::make_shared<const List<T>>(std::move(list));
     n.memory[0] = 0;
-    return {*this, n};
+    return {n, SharedPass{*this}};
   }
 
   // ---- lists ----

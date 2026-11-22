@@ -37,7 +37,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "Callback", "callback", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "Callback", "callback", "loop", "loop_local", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -480,6 +480,71 @@ struct Shape {
       else if (where != p) where = kMember;
     }
     return X.place = where;
+  }
+
+  /// Does a step count passes of a loop of its own (Runtime::budget) while it runs? A loop does; so may every
+  /// step that runs what is not of this Blueprint's core steps (an event, a wait, a step that raises, one of the
+  /// world - time, print, other Blueprints -, a node of the engine or the game, a function of another Blueprint
+  /// or of a library); a call of a function of this Blueprint does what the steps of that function do.
+  std::map<std::string, int> counting_;  // function -> 1: being looked at (a call of itself, directly or through others: counts - so says no one before it is known), 2: counts, 3: counts none
+  bool counts(int y) {
+    const Info& Y = at(y);
+    if (!Y.def || (Y.event && Y.def->type != "func.entry")) return true;
+    const NodeDef& d = *Y.def;
+    if (d.loop || Y.form == Form::loop_while || d.world || d.latent || d.raises || !Library::core().find(d.type)) return true;
+    if (!calls_function(*Y.node)) return false;
+    const std::string name = Y.node->param("function");
+    const Function* f = g.function(name);
+    if (!f || f->external || !f->from.empty()) return true;
+    int& state = counting_[name];
+    if (state) return state != 3;
+    state = 1;
+    int entry = -1;
+    for (std::size_t i = 0; i < n.size(); ++i)
+      if (n[i].node->type == "func.entry" && n[i].node->param("function") == name) entry = static_cast<int>(i);
+    const bool c = entry < 0 || steps_count({entry});
+    counting_[name] = c ? 2 : 3;
+    return c;
+  }
+  /// Does one of the steps from `todo` on (along the exec wires), or a value they read, count passes (counts)? (A
+  /// value of a step - not a pure one - is what that step gave when it ran: reading it runs nothing.)
+  bool steps_count(std::vector<int> todo, int loop = -1) {
+    std::vector<char> seen(n.size(), 0);
+    if (loop >= 0) seen[static_cast<std::size_t>(loop)] = 1;  // (the loop itself: what it gives its body)
+    std::vector<int> values;
+    auto read = [&](int y) {
+      for (const auto& from : at(y).src)
+        if (from.first >= 0 && at(from.first).pure) values.push_back(from.first);
+    };
+    for (std::size_t k = 0; k < todo.size(); ++k) {
+      const int y = todo[k];
+      if (y < 0 || seen[static_cast<std::size_t>(y)]) continue;
+      seen[static_cast<std::size_t>(y)] = 1;
+      if (counts(y)) return true;
+      read(y);
+      for (const auto& d : at(y).dst)
+        if (d.first >= 0) todo.push_back(d.first);
+    }
+    for (std::size_t k = 0; k < values.size(); ++k) {
+      const int y = values[k];
+      if (seen[static_cast<std::size_t>(y)]) continue;
+      seen[static_cast<std::size_t>(y)] = 1;
+      if (counts(y)) return true;
+      read(y);
+    }
+    return false;
+  }
+  /// A loop whose body - and what it reads, its condition too - counts no passes of its own keeps where its count
+  /// stands in a local of the method while it runs (BlueprintCore::LocalPass): the same passes, counted the same.
+  bool loop_local(int x) {
+    std::vector<int> todo;
+    const Info& X = at(x);
+    for (std::size_t k = 0; k < X.dst.size(); ++k)
+      if (k != 1) todo.push_back(X.dst[k].first);  // (its body - output 1 is what follows it)
+    if (X.form == Form::loop_while)  // (its condition is asked before every pass)
+      for (const auto& from : X.src)
+        if (from.first >= 0 && at(from.first).pure) todo.push_back(from.first);
+    return !steps_count(std::move(todo), x);
   }
 
   Form form_of(const Info& x) const {
@@ -1818,13 +1883,14 @@ struct Writer {
         }
         return -1;
       case Form::loop_while:
-        line(ind, "while (loop(" + value(x, X.data_in.front(), c) + ")) {");
+        if (s.loop_local(x)) line(ind, "for (auto it" + id(x) + " = loop_local(); it" + id(x) + ".next(" + value(x, X.data_in.front(), c) + ");) {");
+        else line(ind, "while (loop(" + value(x, X.data_in.front(), c) + ")) {");
         follow(x, 0, c, ind + 1);
         line(ind, "}");
         return outs > 1 ? 1 : -1;
       case Form::loop: {
         const std::string it = "it" + id(x);
-        line(ind, "for (auto " + it + " = " + call(x, entry, c, definition) + "; " + it + ".next();) {");
+        line(ind, "for (auto " + it + " = " + call(x, entry, c, definition) + (s.loop_local(x) ? ".local()" : "") + "; " + it + ".next();) {");
         follow(x, 0, c, ind + 1);
         line(ind, "}");
         return outs > 1 ? 1 : -1;
@@ -4064,6 +4130,22 @@ struct Reader {
       if (!id) { fail(at + 3, "a loop's iterator is called it<id> (it12), not \"" + it + "\""); return {}; }
       if (!expect("=")) return {};
       const std::size_t name = p;
+      if (peek().kind == Tok::id && peek().s == "loop_local") {
+        // for (auto it<id> = loop_local(); it<id>.next(condition);) { }   a While Loop whose body counts no passes of its own
+        // (the writer says it - Shape::loop_local -; read, it is a While Loop)
+        ++p;
+        const int node = step(make("flow.while", name), name);
+        if (node < 0 || !declare(id, node, at + 3) || !expect("(") || !expect(")") || !expect(";")) return {};
+        std::string again;
+        const std::size_t cond = p;
+        if (!word(again, "it<id>.next(condition)") || !expect(".") || !expect("next") || !expect("(")) return {};
+        if (again != it) { fail(cond, "the loop goes on while " + it + ".next(condition)"); return {}; }
+        enter(in, node, "", name);
+        const Src s = value();
+        if (failed() || !bind(node, data_inputs(node).front(), s) || !expect(")") || !expect(";") || !expect(")") || !expect("{")) return {};
+        block({out(node, 0)});
+        return {out(node, 1)};
+      }
       auto fn = peek().kind == Tok::id ? node_fns.find(peek().s) : node_fns.end();
       if (fn == node_fns.end() || !fn->second->loop) { fail(p, "a loop expected (flow_for ...), not " + shown(peek())); return {}; }
       ++p;
@@ -4072,7 +4154,10 @@ struct Reader {
       if (node < 0 || !expect("(")) return {};
       Args a{*this};
       std::string entry;
-      if (!head(node, a, entry) || !declare(id, node, at + 3) || !args_of(node, a, fname) || !expect(")", "(" + takes(node, fname) + ")") || !expect(";")) return {};
+      if (!head(node, a, entry) || !declare(id, node, at + 3) || !args_of(node, a, fname) || !expect(")", "(" + takes(node, fname) + ")")) return {};
+      // (.local(): its body counts no passes of its own - the writer says it, Shape::loop_local; read, it is the same loop)
+      if (accept(".") && (!expect("local") || !expect("(") || !expect(")"))) return {};
+      if (!expect(";")) return {};
       std::string again;
       const std::size_t cond = p;
       if (!word(again, "it<id>.next()") || !expect(".") || !expect("next") || !expect("(") || !expect(")") || !expect(";") || !expect(")") || !expect("{")) return {};

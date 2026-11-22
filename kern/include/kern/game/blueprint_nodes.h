@@ -238,25 +238,26 @@ template <class Core> struct BlueprintNodesOf : Core {
   /// for (auto it = flow_for_each_tag(n, tag); it.next();): every living actor with the tag, as the
   /// loop starts; n.actor and n.index are the pass's. Where the loop is, is the node's (n.list,
   /// n.memory[0]) - like the index of a For Loop.
-  template <class N> struct ActorLoop {
-    BlueprintNodesOf& self;
+  template <class N, class Guard = typename Core::SharedPass> struct ActorLoop {
     N& n;
+    Guard guard;
     bool first = true;
     bool next() {
       if (!first) n.memory[0] += 1;
       first = false;
       const std::size_t at = static_cast<std::size_t>(n.memory[0]);
-      if (at >= n.list.size() || !self.kern_pass()) return false;
+      if (at >= n.list.size() || !guard.pass()) return false;
       n.actor = {n.list[at]};
       n.index = static_cast<i64>(at);
       return true;
     }
+    ActorLoop<N, typename Core::LocalPass> local() { return {n, typename Core::LocalPass(guard.self)}; }
   };
   template <class N> ActorLoop<N> flow_for_each_tag(N& n, const Text& tag) {
     GameWorld* g = kern_game();
     n.list = g ? nodes::actors_with_tag(*g, tag) : std::vector<logic::ActorRef>();
     n.memory[0] = 0;
-    return {*this, n};
+    return {n, typename Core::SharedPass{*this}};
   }
 };
 

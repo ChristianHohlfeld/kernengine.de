@@ -1055,6 +1055,9 @@ std::string input_order_problem(const Function& f, const FunctionPin& early) {
 void order_inputs(Function& f) {
   std::stable_partition(f.inputs.begin(), f.inputs.end(), [](const FunctionPin& in) { return in.ref; });
 }
+// (a node that runs a function of the Blueprint: a call - and Sort List with its order, which it asks
+// again and again: a library's function it names comes along like one it calls)
+bool calls_function(const Node& n) { return n.type == "func.call" || n.type == "func.pure" || n.type == "func.callback" || (n.type == "list.sort" && !n.param("function").empty()); }
 bool is_path_pin(std::string_view id) {
   if (id.size() < 5 || id.substr(0, 4) != "path") return false;
   for (char c : id.substr(4))
@@ -1210,9 +1213,6 @@ bool split_library_function(std::string_view name, std::string& library, std::st
   function = std::string(name.substr(at + 2));
   return true;
 }
-// (a node that runs a function of the Blueprint: a call - and Sort List with its order, which it asks
-// again and again: a library's function it names comes along like one it calls)
-bool calls_function(const Node& n) { return n.type == "func.call" || n.type == "func.pure" || n.type == "func.callback" || (n.type == "list.sort" && !n.param("function").empty()); }
 bool same_pins(const std::vector<FunctionPin>& a, const std::vector<FunctionPin>& b) {
   if (a.size() != b.size()) return false;
   for (std::size_t k = 0; k < a.size(); ++k)
