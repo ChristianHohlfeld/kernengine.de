@@ -1083,3 +1083,12 @@ Zusage „wird fertig“. Wache nur durch Nutzer-Nachricht oder geplante Kontrol
 
 **Was Chris in den neuen Chat schreibt:** wie Abschnitt 14, mit „lies koordination/UEBERGABE.md, Abschnitte 1–4, 10, 12, 13 und 16.26,
 und mach bei 16.26 ‚Nächster Schritt‘ weiter“.
+
+### 16.27 Stand 21:55 (22.11.) – NEUER KOORDINATOR: Sitzung `session_012NJs7fdiQpt3PGbqqUhXXV` hat übernommen
+
+- Aufgesetzt wie 16.1: Klon `/home/claude/kernengine.de` auf `koordination` (flach seit 17.11., reicht für `work`…`work-zusammen`),
+  `/home/claude/kw` auf `work`, `$S/magjob` auf `mag/auftrag`. Schreibzugriff von Chris im Chat bestätigt.
+- **Den Lauf `work-zusammen-voll-213658-2736` wertet DIESE Sitzung aus** (Kontrolle geplant 00:45, dann alle 45 Minuten, bis `engine rc` steht)
+  und macht 16.26 „Nächster Schritt“ 2 bzw. 3. Die Sitzung `session_012NJs7i46AnXdFpunu1X3k9` mischt nicht mehr nach `work`.
+  Vor dem Mischen prüft diese Sitzung, dass `work` noch 42831863 ist (`work-zusammen` 8a16a750 liegt 369 Commits davor, Vorspulen möglich).
+- Agenten: keine vor dem Reset (Mi 25.11., 13:00), außer Chris meldet Guthaben.
