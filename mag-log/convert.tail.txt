@@ -1,0 +1,80 @@
+    push (9): written
+    finish (9): written
+    sha256 (5): written
+    sha256 (5): written
+    from_be (5): written
+    to_be (5): written
+    half (5): written
+    from_hex256 (5): written
+    cmp (4): written
+    is_zero (1): written
+    add (5): written
+    sub (5): written
+    addm (6): written
+    subm (5): written
+    mulm (8): written
+    powm (9): written
+    reduce (5): written
+    P (1): a name for a place - written where it is called
+    N (1): a name for a place - written where it is called
+    G (1): a name for a place - written where it is called
+    fm (1): written
+    fa (1): written
+    fs (1): written
+    dbl (16): written
+    add_pt (15): written
+    mul_pt (8): written
+    affine (9): written
+    lift_x (16): written
+    tagged (7): written
+    append (1): written
+    public_key (8): written
+    sign (32): written
+    verify (18): written
+    hex_of (4): written
+    hex (5): written
+    hex (5): written
+    from_hex (11): written
+    escape (18): written
+    event_json (15): written
+road_graph                      2 /    2 functions        2 /      2 lines
+    RoadGraph::empty (1): written
+    RoadGraph::size (1): written
+road_graph_cpp                 11 /   11 functions      135 /    135 lines
+    cell_key (1): written
+    dist (1): written
+    before (1): written
+    heap_push (10): written
+    heap_pop (15): written
+    lane_signature (8): written
+    RoadGraph::node_at (12): written
+    RoadGraph::rebuild (22): written
+    RoadGraph::nearest (9): written
+    RoadGraph::path (34): written
+    RoadGraph::pursuit_point (22): written
+terrain                         8 /    9 functions       11 /     12 lines
+    Terrain::settled (1): written
+    Terrain::has_dem (1): written
+    Terrain::water_level (1): elevation() is defined in another file
+    Terrain::deformed (4): written
+    Terrain::crater_count (1): written
+    CraterRec::operator== (1): written
+    Terrain::take_changes (1): written
+    Terrain::stats (1): a name for a place - written where it is called
+    terrarium_height (1): written
+tiles                           2 /    2 functions        2 /      2 lines
+    (test_lamps_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    TileKey::operator== (1): written
+    TileKey::hash (1): written
+
+121 of 124 functions of the program are written as Blueprints (676 of 682 lines), and 3 of the engine's headers that they call: 15 Blueprints - 3 of source files, 0 of states, 12 of headers and of shapes
+109 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+     1 (     4)   it calls CityStream::ground_height(), which waits
+     1 (     1)   height() is defined in another file
+     1 (     1)   elevation() is defined in another file
+
+real	2m13,660s
+user	5m25,211s
+sys	0m18,679s
