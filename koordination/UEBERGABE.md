@@ -1088,7 +1088,9 @@ und mach bei 16.26 ‚Nächster Schritt‘ weiter“.
 
 - Aufgesetzt wie 16.1: Klon `/home/claude/kernengine.de` auf `koordination` (flach seit 17.11., reicht für `work`…`work-zusammen`),
   `/home/claude/kw` auf `work`, `$S/magjob` auf `mag/auftrag`. Schreibzugriff von Chris im Chat bestätigt.
-- **Den Lauf `work-zusammen-voll-213658-2736` wertet DIESE Sitzung aus** (Kontrolle geplant 00:45, dann alle 45 Minuten, bis `engine rc` steht)
-  und macht 16.26 „Nächster Schritt“ 2 bzw. 3. Die Sitzung `session_012NJs7i46AnXdFpunu1X3k9` mischt nicht mehr nach `work`.
-  Vor dem Mischen prüft diese Sitzung, dass `work` noch 42831863 ist (`work-zusammen` 8a16a750 liegt 369 Commits davor, Vorspulen möglich).
+- **Korrektur 21:58 (Chris): Den Lauf `work-zusammen-voll-213658-2736` wertet noch die Sitzung `session_012NJs7i46AnXdFpunu1X3k9` aus**
+  (gegen 00:40) und mischt bei grün nach `work`, wie in ihrem Chat angekündigt; ihr Ergebnis trägt sie hier nach. Diese Sitzung mischt
+  so lange NICHT. Sie kontrolliert um 01:30: steht das Ergebnis hier, macht sie danach weiter (CI ansehen, `grundlage`, rote Tests zuteilen).
+  Steht nichts hier und ist `work` noch 42831863, fragt sie Chris, bevor sie den Schritt übernimmt (`work-zusammen` 8a16a750 liegt
+  369 Commits vor `work`, Vorspulen möglich).
 - Agenten: keine vor dem Reset (Mi 25.11., 13:00), außer Chris meldet Guthaben.
