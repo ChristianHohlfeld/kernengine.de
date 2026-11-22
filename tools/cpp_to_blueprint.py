@@ -108,6 +108,7 @@ import io
 import itertools
 import json
 import os
+os.environ.setdefault("WHY", r"ui_reset|ui_command|ctl_discrete|read_input|update_town|vr_foot|place_world|Game::command$|ctl_view_json|CityStream::work|go_offline|CityStream::fail|request_around|Interiors::build|life_update|ui_mix_audio|look_draw|vr_comfort|begin_cells|buildings_input|handle_shots|run_buildings")   # (nur Probe work-k-why)
 import re
 import shutil
 import struct
