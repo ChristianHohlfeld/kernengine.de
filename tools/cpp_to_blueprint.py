@@ -3233,6 +3233,7 @@ class Emit:
         self.loop_entries = {}   # decl id of the entry of a pass of a loop over a list (a reference) -> (the list, its place)
         self.text_ptrs = {}   # decl id of a local pointer into a text (char* end of strtod) -> {"text": the text, "at": the Int of its place}
         self.assigned_ids = set()   # (the variables the body changes - see assigned)
+        self.copies = []      # the statements either_place copied (the rest of a block, once for each place): outside the function's tree (nodes)
         self.keyed_vars = {}  # decl id of a name for an entry of a map or a set (a loop's variable, `auto& [k, v]`) -> (the map or set, its place)
         self.serial = 0       # the number of the statement being written (see `slot`)
         self.writing = object()   # (this writing of the function: the tree is shared - another writing of it, a later conversion of its file, has nodes of its own)
@@ -4097,6 +4098,7 @@ class Emit:
                     put = copy.deepcopy(arm)
                     x.clear()
                     x.update(put)
+            self.copies.append(body)
             return body
         choice = {"kind": "IfStmt", "hasElse": True, **{k: s[k] for k in ("_at", "_file", "range", "loc") if k in s},
                   "inner": [copy.deepcopy(cond), branch(0, a), branch(1, b)]}
@@ -7585,6 +7587,13 @@ class Emit:
             raise Wait(f"{name}() of a map or set")
         return None
 
+    def nodes(self):
+        """Every node of the function's code: its tree and what either_place copied out of it (a name declared
+        there is used there)."""
+        yield from walk(self.f.decl)
+        for b in self.copies:
+            yield from walk(b)
+
     def bind(self, d, bt):
         """`auto [a, b] = ...;` - a and b are names for the parts of the value: where they are used, the part
         is written out (the first field of the value, the second ...)."""
@@ -7595,7 +7604,7 @@ class Emit:
             if len(binds) != 2:
                 raise Wait("names for the parts of an entry of a map")
             names = {binds[0]["id"]: "first", binds[1]["id"]: "second"}
-            for n in walk(self.f.decl):
+            for n in list(self.nodes()):
                 if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in names:
                     whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {})}
                     was = n.get("type", {})
@@ -7608,7 +7617,7 @@ class Emit:
         if lt.startswith("List<") and self.u.fixed(re.sub(r"&", "", qtype(d))) == len(binds):
             # `auto& [x, y, w] = an_array;` - the names are its entries: x is the entry 0, where it stands
             ids = {c["id"]: i for i, c in enumerate(binds)}
-            for n in walk(self.f.decl):
+            for n in list(self.nodes()):
                 if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in ids:
                     whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
                     at = {"kind": "IntegerLiteral", "value": str(ids[n["referencedDecl"]["id"]]), "type": {"qualType": "int"}}
@@ -7620,7 +7629,7 @@ class Emit:
         if fields is None or len(fields) != len(binds) or any(f[3] is None for f in fields):
             raise Wait("names for the parts of something that is not a struct")
         ids = {c["id"]: i for i, c in enumerate(binds)}
-        for n in walk(self.f.decl):
+        for n in list(self.nodes()):
             if n.get("kind") == "DeclRefExpr" and n.get("referencedDecl", {}).get("id") in ids:
                 f, ft = fields[ids[n["referencedDecl"]["id"]]][3], fields[ids[n["referencedDecl"]["id"]]][1]
                 whole = {"kind": "DeclRefExpr", "referencedDecl": {"id": d["id"], "kind": "VarDecl", "name": d.get("name", "")}, "type": d.get("type", {}), "_bt": bt}
