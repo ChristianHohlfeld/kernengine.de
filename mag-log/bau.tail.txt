@@ -1,0 +1,80 @@
+  547 | concept NativeStruct = !std::is_same_v<S, Value> && requires { requires Held<S>::type == PinType::structure; };
+      |                                                                         ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:711:41: note: candidate template ignored: could not match 'vector' against 'Field'
+  711 | template <detail::NativeStruct S> Value to_value(std::vector<S> v) {
+      |                                         ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:718:7: note: candidate template ignored: constraints not satisfied [with E = kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_GeoChunk>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk>, kern::logic::engine_values::Struct<kern::logic::engine_direct::S_MeshData>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk, kern::MeshData, kern_blueprint_11b4e90fe6c0e7c8::engine_geo_mesh_data::MeshData, &kern::GeoChunk::mesh, &kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk::mesh>]
+  718 | Value to_value(E v) {
+      |       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:717:12: note: because 'std::is_enum_v<kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_GeoChunk>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk>, kern::logic::engine_values::Struct<kern::logic::engine_direct::S_MeshData>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk, kern::MeshData, kern_blueprint_11b4e90fe6c0e7c8::engine_geo_mesh_data::MeshData, &kern::GeoChunk::mesh, &kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk::mesh> >' evaluated to false
+  717 |   requires std::is_enum_v<E>
+      |            ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:723:7: note: candidate template ignored: could not match 'vector' against 'Field'
+  723 | Value to_value(std::vector<E> v) {
+      |       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:730:26: note: candidate template ignored: could not match 'vector' against 'Field'
+  730 | template <class T> Value to_value(const std::vector<Sized<T>>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
+      |                          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:737:41: note: candidate template ignored: could not match 'Fixed' against 'Field'
+  737 | template <class T, std::size_t N> Value to_value(const Fixed<T, N>& v) { return to_value(List<T>(v)); }  // (a list of a fixed length: its entries as a list)
+      |                                         ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:916:35: note: candidate template ignored: could not match 'Map' against 'Field'
+  916 | template <class K, class V> Value to_value(const Map<K, V>& m) {
+      |                                   ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:924:26: note: candidate template ignored: could not match 'Set' against 'Field'
+  924 | template <class K> Value to_value(const Set<K>& s) {
+      |                          ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/nodes.h:980:38: note: candidate template ignored: could not match 'Callback' against 'Field'
+  980 | template <class R, class... A> Value to_value(const Callback<R(A...)>& c) {
+      |                                      ^
+In file included from /dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/src/level_blueprints.cpp:4:
+In file included from /dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/blueprint.h:27:
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/engine_nodes.gen.h:389:102: error: cannot decompose class type 'Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_GeoChunk>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk>, kern::logic::engine_values::Struct<kern::logic::engine_direct::S_MeshData>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk, kern::MeshData, kern_blueprint_11b4e90fe6c0e7c8::engine_geo_mesh_data::MeshData, &kern::GeoChunk::mesh, &kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk::mesh>': both it and its base class 'S_MeshData::Fields<Field<Ref<Struct<S_GeoChunk>, GeoChunk, GeoChunk>, Struct<S_MeshData>, GeoChunk, GeoChunk, MeshData, MeshData, &kern::GeoChunk::mesh, &kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk::mesh>, MeshData, MeshData>' have non-static data members
+  389 |   template <class B> static void from(EngineObjects& o, const B& b, kern::MeshData& x) { const auto& [f0, f1, f2, f3, f4, f5, f6] = b; ev::Direct<ev::List<ev::Float>>::from(o, f0, x.positions); ev::Direct<ev::List<ev::Float>>::from(o, f1, x.normals); ev::Direct<ev::List<ev::Float>>::from(o, f2, x.colors); ev::Direct<ev::List<ev::Float>>::from(o, f3, x.uvs); ev::Direct<ev::List<ev::Float>>::from(o, f4, x.extra); ev::Direct<ev::Int>::from(o, f5, x.extra_size); ev::Direct<ev::List<ev::Int>>::from(o, f6, x.indices); }
+      |                                                                                                      ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/engine_direct.h:185:89: note: in instantiation of function template specialization 'kern::logic::engine_direct::S_MeshData::from<kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_GeoChunk>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk>, kern::logic::engine_values::Struct<kern::logic::engine_direct::S_MeshData>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk, kern::MeshData, kern_blueprint_11b4e90fe6c0e7c8::engine_geo_mesh_data::MeshData, &kern::GeoChunk::mesh, &kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk::mesh>>' requested here
+  185 |   template <class B, class C> static void from(EngineObjects& o, const B& b, C& c) { S::from(o, b, c); }
+      |                                                                                         ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/include/kern/logic/engine_nodes.gen.h:9048:125: note: in instantiation of function template specialization 'kern::logic::engine_values::Direct<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_MeshData>>::from<kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_GeoChunk>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk>, kern::logic::engine_values::Struct<kern::logic::engine_direct::S_MeshData>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk, kern::MeshData, kern_blueprint_11b4e90fe6c0e7c8::engine_geo_mesh_data::MeshData, &kern::GeoChunk::mesh, &kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk::mesh>, kern::MeshData>' requested here
+ 9048 |       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, mesh, kern_a0);
+      |                                                                                                                             ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/src/level_blueprints.cpp:39891:7: note: in instantiation of function template specialization 'kern::logic::EngineNodesOf<kern::BlueprintCore>::engine_weld<(unnamed struct at /dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/src/level_blueprints.cpp:39835:5), kern::logic::engine_values::Field<kern::logic::engine_values::Ref<kern::logic::engine_values::Struct<kern::logic::engine_direct::S_GeoChunk>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk>, kern::logic::engine_values::Struct<kern::logic::engine_direct::S_MeshData>, kern::GeoChunk, kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk, kern::MeshData, kern_blueprint_11b4e90fe6c0e7c8::engine_geo_mesh_data::MeshData, &kern::GeoChunk::mesh, &kern_blueprint_6cf7ffd64a9addfa::engine_geo_buildings::GeoChunk::mesh>>' requested here
+ 39891 |       engine_weld(n55, n53.result[n54.index].mesh, 0);
+       |       ^
+63 warnings and 2 errors generated.
+1 warning generated.
+1 warning generated.
+3 warnings generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/converted/test_game_gaps_cpp.cpp:639:21: warning: unused variable 'draw' [-Wunused-variable]
+  639 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/converted/test_game_look_cpp.cpp:634:21: warning: unused variable 'draw' [-Wunused-variable]
+  634 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/converted/test_touch_play.cpp:309:21: warning: unused variable 'draw' [-Wunused-variable]
+  309 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/converted/test_water_look.cpp:47:21: warning: unused variable 'draw' [-Wunused-variable]
+   47 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+1 warning generated.
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/work-d-vergleich-174829-18397/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+
+real	23m42,725s
+user	296m52,068s
+sys	2m57,135s
