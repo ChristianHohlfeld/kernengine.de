@@ -1144,3 +1144,22 @@ Auswerten gegen `work-zusammen-voll-213658-2736` (8a16a750): (1) convert/suite/e
 gleiches Urteil und gleiche Zahl von Prüfungen wie dort; (3) Zeit der Suite und die neuen „time: Blueprint …“-Zeilen – was dann je Game-Test
 noch fest ist (verbinden, prüfen, starten), ist der nächste Hebel. Ist er grün und hat die alte Sitzung 8a16a750 nach `work` gemischt:
 work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen aus diesem Lauf.
+
+### 16.29 Stand 00:45 (23.11.) – Ergebnis der alten Sitzung (`session_012NJs7i46AnXdFpunu1X3k9`): Lauf `work-zusammen-voll-213658-2736` ist ROT, NICHT nach `work` gemischt
+
+- Lauf auf 8a16a750: **convert rc=1** (22:26), engine rc=0, **suite rc=1**: Stellvertreter 270 Tests / 764 Fehler, echte Engine 150 / 737,
+  73 verschiedene Tests rot. `work` bleibt 42831863, `grundlage` unverändert (045421). Die alte Sitzung mischt nichts mehr.
+- **Eine Ursache für alles:** der Konverter schrieb 1723 Funktionen, aber der Text des Blueprints Game wurde nicht gelesen –
+  `…/Game.cpp: line 2185, column 5: "count" starts no statement: no variable, no function, no node` → „the Blueprints were not read:
+  the level is as it was“. Die Tests liefen danach gegen das alte Level („the Blueprint nothing (interpreter) and nothing (class)“).
+  Die Suite-Zahlen dieses Laufs sagen deshalb nichts über die Tests selbst.
+- **Rückfall durch das Zusammenkommen** von p 11968cee (E20 Schritt 4), k cd542712 (ended_many) und g 8b27771d (stop() mit
+  cars_.clear() usw.): jeder Zweig war einzeln mit `vergleich` belegt (175649 auf dem Stand mit k+g, aber ohne p – work-g-stop
+  enthielt 8871ab35? prüfen: der Beleg 175649 lief auf 8b27771d). Der letzte volle grüne Konverter-Lauf ist 160230 auf a06e5ce4
+  (ohne p, k, zweiten g-Fix; dort 270/0 und 150/1).
+- **Nächster Schritt:** den Text um Zeile 2185 ansehen (`mag/work-zusammen-voll-213658-2736/texts/` bzw. `convert.log.xz`), die
+  schreibende Regel finden (wer schreibt eine Zeile, die mit `count` beginnt: vermutlich Ende einer Liste/Schleife mit lokalem
+  Wächter in Game::stop/~Game) und dem Zuständigen geben (k, sonst p). Beleg dafür: `./mag.sh konvert origin/<zweig>` – convert rc=0
+  ist die Bedingung; `vergleich` über einzelne Dateien hat diesen Fehler nicht gezeigt, weil er erst beim Lesen des ganzen Game-Textes
+  auftritt. Danach neuer voller Lauf als Kandidat. Lehre: vor einem vollen Lauf nach dem Einmischen mehrerer Zweige erst `konvert`.
+- Braucht einen Agenten → frühestens mit Guthaben oder nach dem Reset (Mi 25.11., 13:00).
