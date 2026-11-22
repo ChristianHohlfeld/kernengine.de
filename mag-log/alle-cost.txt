@@ -1,0 +1,6 @@
+  cost: Car_new: in 61 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  cost: eject: in 1 of 20 calls the class asks for memory more often than the source (up to 64 times instead of 63)
+  cost: hide_soldier: in 1 of 20 calls the class asks for memory more often than the source (up to 8 times instead of 7)
+  cost: layered: in 62 of 300 calls the class asks for memory more often than the source (up to 256 times instead of 253)
+  cost: Session_take: in 163 of 285 calls the class asks for memory more often than the source (up to 16 times instead of 15)
+  cost: vehicle_actor: in 84 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
