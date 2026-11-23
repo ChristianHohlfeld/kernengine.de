@@ -59,10 +59,12 @@ namespace json { enum class Type : u8 { null, boolean, number, string, array, ob
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
-namespace gaps { bool bind_sirens(::kern::logic::Runtime& logic); }
+namespace gaps { bool bind_sirens(kern::logic::Runtime& logic); }
 namespace gaps { f32 horn_low(); }
 namespace gaps { f32 horn_high(); }
 namespace gaps { f32 car_gain(); }
@@ -156,7 +158,7 @@ namespace rules { inline f64 decimal(f32 x) {
   f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
   for (f64 m = a; m < 1; m *= 10) scale *= 10;
   for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
     const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
     if (static_cast<f32>(c) == x) return c;
   }
@@ -166,7 +168,7 @@ namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
   using ActorBlueprint::ActorBlueprint;
 }; }
 namespace gaps { rules::Blueprint g_sirens{"Sirens"}; }
-namespace gaps { bool bind_sirens(::kern::logic::Runtime& logic) { return g_sirens.bind(logic); } }
+namespace gaps { bool bind_sirens(kern::logic::Runtime& logic) { return g_sirens.bind(logic); } }
 namespace gaps { f32 horn_low() { return static_cast<f32>(g_sirens.get<f64>("HornLow")); } }
 namespace gaps { f32 horn_high() { return static_cast<f32>(g_sirens.get<f64>("HornHigh")); } }
 namespace gaps { f32 car_gain() { return static_cast<f32>(g_sirens.get<f64>("CarGain")); } }
@@ -383,7 +385,7 @@ namespace gaps { void VisualPose::update(Vec3 position, Quat rotation, Vec3 anch
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::SirenVoice& s) { return converted::Value::structure({arg(s.have_d), arg(s.last_d), arg(s.doppler), arg(s.gain)}); }
-[[maybe_unused]] static bool same(const gaps::SirenVoice& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.have_d, (*got.rows)[0]) && same(want.last_d, (*got.rows)[1]) && same(want.doppler, (*got.rows)[2]) && same(want.gain, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const gaps::SirenVoice& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.have_d, (*got.rows)[0]), ".have_d") && converted::at_place(same(want.last_d, (*got.rows)[1]), ".last_d") && converted::at_place(same(want.doppler, (*got.rows)[2]), ".doppler") && converted::at_place(same(want.gain, (*got.rows)[3]), ".gain"); }
 [[maybe_unused]] static bool defined(const gaps::SirenVoice& s) { return defined(s.have_d) && defined(s.last_d) && defined(s.doppler) && defined(s.gain); }
 [[maybe_unused]] static std::string text(const gaps::SirenVoice& s) { return std::string("{") + text(s.have_d) + ", " + text(s.last_d) + ", " + text(s.doppler) + ", " + text(s.gain) + "}"; }
 [[maybe_unused]] static void take(gaps::SirenVoice& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.have_d, (*v.rows)[0]); converted::take_as<double>(s.last_d, (*v.rows)[1]); converted::take_as<double>(s.doppler, (*v.rows)[2]); converted::take_as<double>(s.gain, (*v.rows)[3]); }
@@ -402,7 +404,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::SmokeEffect& s) { return converted::Value::structure({arg(s.id), arg(s.at), arg(s.scale), arg(s.started), arg(s.expires), arg(s.last_emit), arg(s.serial), arg(s.seed)}); }
-[[maybe_unused]] static bool same(const gaps::SmokeEffect& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.id, (*got.rows)[0]) && same(want.at, (*got.rows)[1]) && same(want.scale, (*got.rows)[2]) && same(want.started, (*got.rows)[3]) && same(want.expires, (*got.rows)[4]) && same(want.last_emit, (*got.rows)[5]) && same(want.serial, (*got.rows)[6]) && same(want.seed, (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const gaps::SmokeEffect& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.at, (*got.rows)[1]), ".at") && converted::at_place(same(want.scale, (*got.rows)[2]), ".scale") && converted::at_place(same(want.started, (*got.rows)[3]), ".started") && converted::at_place(same(want.expires, (*got.rows)[4]), ".expires") && converted::at_place(same(want.last_emit, (*got.rows)[5]), ".last_emit") && converted::at_place(same(want.serial, (*got.rows)[6]), ".serial") && converted::at_place(same(want.seed, (*got.rows)[7]), ".seed"); }
 [[maybe_unused]] static bool defined(const gaps::SmokeEffect& s) { return defined(s.id) && defined(s.at) && defined(s.scale) && defined(s.started) && defined(s.expires) && defined(s.last_emit) && defined(s.serial) && defined(s.seed); }
 [[maybe_unused]] static std::string text(const gaps::SmokeEffect& s) { return std::string("{") + text(s.id) + ", " + text(s.at) + ", " + text(s.scale) + ", " + text(s.started) + ", " + text(s.expires) + ", " + text(s.last_emit) + ", " + text(s.serial) + ", " + text(s.seed) + "}"; }
 [[maybe_unused]] static void take(gaps::SmokeEffect& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<std::string>(s.id, (*v.rows)[0]); converted::take_as<Vec3>(s.at, (*v.rows)[1]); converted::take_as<double>(s.scale, (*v.rows)[2]); converted::take_as<double>(s.started, (*v.rows)[3]); converted::take_as<double>(s.expires, (*v.rows)[4]); converted::take_as<double>(s.last_emit, (*v.rows)[5]); converted::take_as<unsigned int>(s.serial, (*v.rows)[6]); converted::take_as<unsigned int>(s.seed, (*v.rows)[7]); }
@@ -425,7 +427,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::Puff& s) { return converted::Value::structure({arg(s.alive), arg(s.ember), arg(s.pos), arg(s.vel), arg(s.born), arg(s.expires), arg(s.s0), arg(s.s1), arg(s.opacity), arg(s.rotation), arg(s.serial), arg(s.color)}); }
-[[maybe_unused]] static bool same(const gaps::Puff& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.alive, (*got.rows)[0]) && same(want.ember, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.vel, (*got.rows)[3]) && same(want.born, (*got.rows)[4]) && same(want.expires, (*got.rows)[5]) && same(want.s0, (*got.rows)[6]) && same(want.s1, (*got.rows)[7]) && same(want.opacity, (*got.rows)[8]) && same(want.rotation, (*got.rows)[9]) && same(want.serial, (*got.rows)[10]) && same(want.color, (*got.rows)[11]); }
+[[maybe_unused]] static bool same(const gaps::Puff& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.alive, (*got.rows)[0]), ".alive") && converted::at_place(same(want.ember, (*got.rows)[1]), ".ember") && converted::at_place(same(want.pos, (*got.rows)[2]), ".pos") && converted::at_place(same(want.vel, (*got.rows)[3]), ".vel") && converted::at_place(same(want.born, (*got.rows)[4]), ".born") && converted::at_place(same(want.expires, (*got.rows)[5]), ".expires") && converted::at_place(same(want.s0, (*got.rows)[6]), ".s0") && converted::at_place(same(want.s1, (*got.rows)[7]), ".s1") && converted::at_place(same(want.opacity, (*got.rows)[8]), ".opacity") && converted::at_place(same(want.rotation, (*got.rows)[9]), ".rotation") && converted::at_place(same(want.serial, (*got.rows)[10]), ".serial") && converted::at_place(same(want.color, (*got.rows)[11]), ".color"); }
 [[maybe_unused]] static bool defined(const gaps::Puff& s) { return defined(s.alive) && defined(s.ember) && defined(s.pos) && defined(s.vel) && defined(s.born) && defined(s.expires) && defined(s.s0) && defined(s.s1) && defined(s.opacity) && defined(s.rotation) && defined(s.serial) && defined(s.color); }
 [[maybe_unused]] static std::string text(const gaps::Puff& s) { return std::string("{") + text(s.alive) + ", " + text(s.ember) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.born) + ", " + text(s.expires) + ", " + text(s.s0) + ", " + text(s.s1) + ", " + text(s.opacity) + ", " + text(s.rotation) + ", " + text(s.serial) + ", " + text(s.color) + "}"; }
 [[maybe_unused]] static void take(gaps::Puff& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<bool>(s.alive, (*v.rows)[0]); converted::take_as<bool>(s.ember, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<Vec3>(s.vel, (*v.rows)[3]); converted::take_as<double>(s.born, (*v.rows)[4]); converted::take_as<double>(s.expires, (*v.rows)[5]); converted::take_as<double>(s.s0, (*v.rows)[6]); converted::take_as<double>(s.s1, (*v.rows)[7]); converted::take_as<double>(s.opacity, (*v.rows)[8]); converted::take_as<double>(s.rotation, (*v.rows)[9]); converted::take_as<unsigned int>(s.serial, (*v.rows)[10]); converted::take_as<Vec3>(s.color, (*v.rows)[11]); }
@@ -438,7 +440,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::SmokeField& s) { return converted::Value::structure({arg(s.effects_), arg(s.puffs_)}); }
-[[maybe_unused]] static bool same(const gaps::SmokeField& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.effects_, (*got.rows)[0]) && same(want.puffs_, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const gaps::SmokeField& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.effects_, (*got.rows)[0]), ".effects_") && converted::at_place(same(want.puffs_, (*got.rows)[1]), ".puffs_"); }
 [[maybe_unused]] static bool defined(const gaps::SmokeField& s) { return defined(s.effects_) && defined(s.puffs_); }
 [[maybe_unused]] static std::string text(const gaps::SmokeField& s) { return std::string("{") + text(s.effects_) + ", " + text(s.puffs_) + "}"; }
 [[maybe_unused]] static void take(gaps::SmokeField& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<gaps::SmokeEffect>>(s.effects_, (*v.rows)[0]); converted::take_as<std::vector<gaps::Puff>>(s.puffs_, (*v.rows)[1]); }
@@ -452,7 +454,7 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -466,29 +468,29 @@ namespace gaps { using converted::arg; using converted::same; using converted::d
 }
 namespace gaps { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const gaps::VisualPose& s) { return converted::Value::structure({arg(s.init_), arg(s.mode_), arg(s.offset_), arg(s.q_)}); }
-[[maybe_unused]] static bool same(const gaps::VisualPose& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.init_, (*got.rows)[0]) && same(want.mode_, (*got.rows)[1]) && same(want.offset_, (*got.rows)[2]) && same(want.q_, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const gaps::VisualPose& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.init_, (*got.rows)[0]), ".init_") && converted::at_place(same(want.mode_, (*got.rows)[1]), ".mode_") && converted::at_place(same(want.offset_, (*got.rows)[2]), ".offset_") && converted::at_place(same(want.q_, (*got.rows)[3]), ".q_"); }
 [[maybe_unused]] static bool defined(const gaps::VisualPose& s) { return defined(s.init_) && defined(s.mode_) && defined(s.offset_) && defined(s.q_); }
 [[maybe_unused]] static std::string text(const gaps::VisualPose& s) { return std::string("{") + text(s.init_) + ", " + text(s.mode_) + ", " + text(s.offset_) + ", " + text(s.q_) + "}"; }
 [[maybe_unused]] static void take(gaps::VisualPose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<bool>(s.init_, (*v.rows)[0]); converted::take_as<int>(s.mode_, (*v.rows)[1]); converted::take_as<Vec3>(s.offset_, (*v.rows)[2]); converted::take_as<Quat>(s.q_, (*v.rows)[3]); }
 }
 struct Out_SirenVoice_update { gaps::SirenVoice Self; double Result; };
-[[maybe_unused]] static bool same(const Out_SirenVoice_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_SirenVoice_update& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_SirenVoice_update& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_SirenVoice_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_SmokeField_emit { gaps::SmokeField Self; gaps::SmokeEffect e; };
-[[maybe_unused]] static bool same(const Out_SmokeField_emit& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.e, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_SmokeField_emit& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.e, (*got.rows)[1]), ".e"); }
 [[maybe_unused]] static bool defined(const Out_SmokeField_emit& s) { return defined(s.Self) && defined(s.e); }
 [[maybe_unused]] static std::string text(const Out_SmokeField_emit& s) { return std::string("{") + text(s.Self) + ", " + text(s.e) + "}"; }
 struct Out_SmokeField_start { gaps::SmokeField Self; double Result; };
-[[maybe_unused]] static bool same(const Out_SmokeField_start& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_SmokeField_start& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_SmokeField_start& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_SmokeField_start& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_SmokeField_accelerate { gaps::SmokeField Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_SmokeField_accelerate& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_SmokeField_accelerate& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_SmokeField_accelerate& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_SmokeField_accelerate& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_VisualPose_update { gaps::VisualPose Self; Vec3 out_p; Quat out_q; };
-[[maybe_unused]] static bool same(const Out_VisualPose_update& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Self, (*got.rows)[0]) && same(want.out_p, (*got.rows)[1]) && same(want.out_q, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_VisualPose_update& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.out_p, (*got.rows)[1]), ".out_p") && converted::at_place(same(want.out_q, (*got.rows)[2]), ".out_q"); }
 [[maybe_unused]] static bool defined(const Out_VisualPose_update& s) { return defined(s.Self) && defined(s.out_p) && defined(s.out_q); }
 [[maybe_unused]] static std::string text(const Out_VisualPose_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.out_p) + ", " + text(s.out_q) + "}"; }
 
@@ -506,7 +508,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -524,7 +528,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -542,7 +548,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -560,7 +568,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -578,7 +588,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -596,7 +608,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -614,7 +628,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -632,7 +648,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run();
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -642,7 +660,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // horn_hz
     converted::Tally tally("horn_hz");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::horn_hz(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::horn_hz(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -651,7 +669,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -661,7 +681,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // whoop_hz
     converted::Tally tally("whoop_hz");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::whoop_hz(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::whoop_hz(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -670,7 +690,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -680,7 +702,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // siren_gain
     converted::Tally tally("siren_gain");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::siren_gain(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::siren_gain(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -691,7 +713,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -701,7 +725,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // siren_cutoff
     converted::Tally tally("siren_cutoff");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::siren_cutoff(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::siren_cutoff(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -710,7 +734,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -720,7 +746,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SirenVoice::update
     converted::Tally tally("SirenVoice_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SirenVoice a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_SirenVoice_update{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] gaps::SirenVoice& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return Out_SirenVoice_update{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SirenVoice a0 = draw_gaps__SirenVoice(draw);
       double a1 = draw.number();
@@ -733,7 +759,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -743,7 +771,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // post_arrival_grace_ms
     converted::Tally tally("post_arrival_grace_ms");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::post_arrival_grace_ms(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::post_arrival_grace_ms(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -752,7 +780,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -762,16 +792,18 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // organic_rate
     converted::Tally tally("organic_rate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::Organic a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::organic_rate(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] gaps::Organic& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::organic_rate(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      gaps::Organic a0 = static_cast<gaps::Organic>(draw.below(3));
+      gaps::Organic a0 = converted::enum_value<gaps::Organic>(draw.below(3));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -781,7 +813,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // hash_text
     converted::Tally tally("hash_text");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::string a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::hash_text(a0); }); };
+    const auto run = [&]([[maybe_unused]] std::string& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::hash_text(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       std::string a0 = draw.word();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -790,7 +822,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -800,7 +834,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // unit_hash
     converted::Tally tally("unit_hash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::unit_hash(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::unit_hash(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -809,7 +843,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -819,7 +855,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // rgb
     converted::Tally tally("rgb");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::rgb(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::rgb(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -828,7 +864,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -838,7 +876,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::emit
     converted::Tally tally("SmokeField_emit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0, [[maybe_unused]] gaps::SmokeEffect a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.emit(a1, std::move(a2)); }); return Out_SmokeField_emit{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0, [[maybe_unused]] gaps::SmokeEffect& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.emit(a1, std::move(a2)); }); return Out_SmokeField_emit{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       gaps::SmokeEffect a1 = draw_gaps__SmokeEffect(draw);
@@ -849,7 +887,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -859,7 +899,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::start
     converted::Tally tally("SmokeField_start");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { auto r = converted::counted([&] { return a0.start(a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return Out_SmokeField_start{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0, [[maybe_unused]] std::string& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] double& a5) { auto r = converted::counted([&] { return a0.start(a1, std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return Out_SmokeField_start{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       std::string a1 = draw.word();
@@ -873,7 +913,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -883,7 +925,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::accelerate
     converted::Tally tally("SmokeField_accelerate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { auto r = converted::counted([&] { return a0.accelerate(a1, std::move(a2), std::move(a3)); }); return Out_SmokeField_accelerate{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0, [[maybe_unused]] std::string& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { auto r = converted::counted([&] { return a0.accelerate(a1, std::move(a2), std::move(a3)); }); return Out_SmokeField_accelerate{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       std::string a1 = draw.word();
@@ -895,7 +937,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -905,7 +949,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::stop
     converted::Tally tally("SmokeField_stop");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0, [[maybe_unused]] std::string a1) { converted::counted([&] { return a0.stop(a1); }); return a0; };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0, [[maybe_unused]] std::string& a1) { converted::counted([&] { return a0.stop(a1); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       std::string a1 = draw.word();
@@ -915,7 +959,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -925,7 +971,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::move
     converted::Tally tally("SmokeField_move");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0, [[maybe_unused]] std::string a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return a0.move(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0, [[maybe_unused]] std::string& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return a0.move(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       std::string a1 = draw.word();
@@ -936,7 +982,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -946,7 +994,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::active
     converted::Tally tally("SmokeField_active");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0, [[maybe_unused]] std::string a1) { return converted::counted([&] { return a0.active(a1); }); };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0, [[maybe_unused]] std::string& a1) { return converted::counted([&] { return a0.active(a1); }); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       std::string a1 = draw.word();
@@ -956,7 +1004,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -966,7 +1016,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::opacity
     converted::Tally tally("SmokeField_opacity");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::Puff a0, [[maybe_unused]] double a1) { return converted::counted([&] { return gaps::SmokeField::opacity(a0, std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] gaps::Puff& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return gaps::SmokeField::opacity(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::Puff a0 = draw_gaps__Puff(draw);
       double a1 = draw.number();
@@ -976,7 +1026,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -986,7 +1038,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::update
     converted::Tally tally("SmokeField_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       double a1 = draw.number();
@@ -997,7 +1049,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1007,7 +1061,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::live_puffs
     converted::Tally tally("SmokeField_live_puffs");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::SmokeField a0) { return converted::counted([&] { return a0.live_puffs(); }); };
+    const auto run = [&]([[maybe_unused]] gaps::SmokeField& a0) { return converted::counted([&] { return a0.live_puffs(); }); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::SmokeField a0 = draw_gaps__SmokeField(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1016,7 +1070,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1026,7 +1082,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // SmokeField::size
     converted::Tally tally("SmokeField_size");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::Puff a0, [[maybe_unused]] double a1) { return converted::counted([&] { return gaps::SmokeField::size(a0, std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] gaps::Puff& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return gaps::SmokeField::size(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       gaps::Puff a0 = draw_gaps__Puff(draw);
       double a1 = draw.number();
@@ -1036,7 +1092,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1046,7 +1104,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // damping
     converted::Tally tally("damping");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::damping(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::damping(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1056,7 +1114,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1066,7 +1126,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // normalized
     converted::Tally tally("normalized");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::normalized(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::normalized(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1075,7 +1135,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1085,7 +1147,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // slerp
     converted::Tally tally("slerp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::slerp(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0, [[maybe_unused]] Quat& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::slerp(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       Quat a1 = draw_kern__Quat(draw);
@@ -1096,7 +1158,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1106,7 +1170,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // quat_angle
     converted::Tally tally("quat_angle");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Quat a0, [[maybe_unused]] Quat a1) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::quat_angle(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Quat& a0, [[maybe_unused]] Quat& a1) { return converted::counted([&] { return converted_gaps_rules_cpp::gaps::quat_angle(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Quat a0 = draw_kern__Quat(draw);
       Quat a1 = draw_kern__Quat(draw);
@@ -1116,7 +1180,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1126,7 +1192,7 @@ SC_TEST(converted_gaps_rules_cpp) {
   {  // VisualPose::update
     converted::Tally tally("VisualPose_update");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] gaps::VisualPose a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Quat a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] int a4, [[maybe_unused]] double a5, [[maybe_unused]] Vec3 a6, [[maybe_unused]] Quat a7) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6, a7); }); return Out_VisualPose_update{std::move(a0), std::move(a6), std::move(a7)}; };
+    const auto run = [&]([[maybe_unused]] gaps::VisualPose& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Quat& a2, [[maybe_unused]] Vec3& a3, [[maybe_unused]] int& a4, [[maybe_unused]] double& a5, [[maybe_unused]] Vec3& a6, [[maybe_unused]] Quat& a7) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), a6, a7); }); return Out_VisualPose_update{std::move(a0), std::move(a6), std::move(a7)}; };
     for (int i = 0; tally.more(i); ++i) {
       gaps::VisualPose a0 = draw_gaps__VisualPose(draw);
       Vec3 a1 = draw.vector();
@@ -1142,7 +1208,9 @@ SC_TEST(converted_gaps_rules_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6, a7))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6, a7); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

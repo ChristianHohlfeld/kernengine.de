@@ -118,11 +118,11 @@ namespace combat_audio { std::vector<f32> pistol(u32 rate, u32 v) {
   // reflections + street tail
   const double taps[5][2] = {{0.0142, 0.42}, {0.0235, 0.30}, {0.0371, 0.24}, {0.0516, 0.17}, {0.0784, 0.11}};
   std::size_t d[5];
-  for (int i = 0; i < 5; ++i) converted::at(d, i) = static_cast<std::size_t>(converted::fits<unsigned long>((converted::at(taps, i)[0] + v * 0.0007) * rate));
+  for (int i = 0; i < 5; converted::pre_inc(i)) converted::at(d, i) = static_cast<std::size_t>(converted::fits<unsigned long>((converted::at(taps, i)[0] + v * 0.0007) * rate));
   for (std::size_t n = 0; n < data.size(); converted::pre_inc(n)) {
     const double t = static_cast<double>(n) / rate;
     double val = converted::at(dry, n);
-    for (int i = 0; i < 5; ++i)
+    for (int i = 0; i < 5; converted::pre_inc(i))
       if (n >= converted::at(d, i)) val += converted::at(taps, i)[1] * converted::at(dry, converted::minus(n, converted::at(d, i))) * 0.8;
     ring2 += 0.08 * ((random() * 2 - 1) - ring2);
     tail += 0.15 * (ring2 - tail);
@@ -198,7 +198,7 @@ namespace combat_audio { std::vector<f32> scream(u32 rate, u32 v) {
     const double f0 = base * (0.82 + 0.34 * rise - 0.35 * fall) * (1 + 0.018 * kern::math::sin(TAU * (5.1 + v * 0.35) * t));
     phase += TAU * f0 / rate;
     double voice = 0;
-    for (int h = 1; h <= 12; ++h) {
+    for (int h = 1; h <= 12; converted::pre_inc(h)) {
       const double hz = f0 * h, shape = 0.18 + 1.35 * gaussian(hz, converted::at(formants, which)[0], 260) + 1.02 * gaussian(hz, converted::at(formants, which)[1], 390) + 0.55 * gaussian(hz, converted::at(formants, which)[2], 620);
       voice += kern::math::sin(phase * h + h * 0.31 * v) * shape / kern::math::pow(static_cast<double>(h), 0.82);
     }
@@ -258,7 +258,7 @@ namespace combat_audio { std::vector<f32> bounce(u32 rate, u32 v) {
   return finish(data, 0.82);
 } }
 namespace combat_audio { constexpr double kSixteenth = 60.0 / 176 / 4; }
-namespace combat_audio { double note_hz(int n) { return 440 * kern::math::pow(2.0, (n - 69) / 12.0); } }
+namespace combat_audio { double note_hz(int n) { return 440 * kern::math::pow(2.0, (converted::minus(n, 69)) / 12.0); } }
 namespace combat_audio { std::vector<f32> cue(u32 rate, std::vector<int> notes, std::vector<double> lengths, double cutoff, double echo, double level) {
   double total = 0;
   for (double l : lengths) total += l;
@@ -340,17 +340,17 @@ namespace combat_audio { std::vector<f32> render(Kind k, u32 v, u32 rate) {
 }
 namespace combat_audio { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const combat_audio::Random& s) { return converted::Value::structure({arg(s.s)}); }
-[[maybe_unused]] static bool same(const combat_audio::Random& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(want.s, (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const combat_audio::Random& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.s, (*got.rows)[0]), ".s"); }
 [[maybe_unused]] static bool defined(const combat_audio::Random& s) { return defined(s.s); }
 [[maybe_unused]] static std::string text(const combat_audio::Random& s) { return std::string("{") + text(s.s) + "}"; }
 [[maybe_unused]] static void take(combat_audio::Random& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); }
 }
 struct Out_Random_call { combat_audio::Random Self; double Result; };
-[[maybe_unused]] static bool same(const Out_Random_call& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_Random_call& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_Random_call& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_Random_call& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_finish { std::vector<double> Result; std::vector<double> d; };
-[[maybe_unused]] static bool same(const Out_finish& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.d, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_finish& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.d, (*got.rows)[1]), ".d"); }
 [[maybe_unused]] static bool defined(const Out_finish& s) { return defined(s.Result) && defined(s.d); }
 [[maybe_unused]] static std::string text(const Out_finish& s) { return std::string("{") + text(s.Result) + ", " + text(s.d) + "}"; }
 
@@ -359,7 +359,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // Random::Random
     converted::Tally tally("Random_new");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return combat_audio::Random(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return combat_audio::Random(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -368,7 +368,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -378,7 +380,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // Random::operator()
     converted::Tally tally("Random_call");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat_audio::Random a0) { auto r = converted::counted([&] { return a0.operator()(); }); return Out_Random_call{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] combat_audio::Random& a0) { auto r = converted::counted([&] { return a0.operator()(); }); return Out_Random_call{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       combat_audio::Random a0 = draw_combat_audio__Random(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -387,7 +389,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -397,7 +401,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // envelope
     converted::Tally tally("envelope");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::envelope(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::envelope(std::move(a0), std::move(a1), std::move(a2), std::move(a3)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -409,7 +413,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -419,7 +425,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // finish
     converted::Tally tally("finish");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] std::vector<double> a0, [[maybe_unused]] double a1) { auto r = converted::counted([&] { return converted_combat_audio_cpp::combat_audio::finish(a0, std::move(a1)); }); return Out_finish{std::move(r), std::move(a0)}; };
+    const auto run = [&]([[maybe_unused]] std::vector<double>& a0, [[maybe_unused]] double& a1) { auto r = converted::counted([&] { return converted_combat_audio_cpp::combat_audio::finish(a0, std::move(a1)); }); return Out_finish{std::move(r), std::move(a0)}; };
     for (int i = 0; tally.more(i); ++i) {
       std::vector<double> a0 = draw_list(draw, [&]() -> double { return draw.number(); });
       double a1 = draw.number();
@@ -429,7 +435,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -439,7 +447,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // samples
     converted::Tally tally("samples");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::samples(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::samples(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -449,7 +457,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -459,7 +469,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // nwave_at
     converted::Tally tally("nwave_at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::nwave_at(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::nwave_at(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -470,7 +480,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -480,7 +492,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // shot
     converted::Tally tally("shot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::shot(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::shot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -490,7 +502,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -500,7 +514,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // pistol
     converted::Tally tally("pistol");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::pistol(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::pistol(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -510,7 +524,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -520,7 +536,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // hit
     converted::Tally tally("hit");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::hit(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::hit(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -530,7 +546,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -540,7 +558,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // crack
     converted::Tally tally("crack");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::crack(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::crack(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -550,7 +568,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -560,7 +580,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // damage
     converted::Tally tally("damage");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::damage(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::damage(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -570,7 +590,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -580,7 +602,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // gaussian
     converted::Tally tally("gaussian");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::gaussian(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::gaussian(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -591,7 +613,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -601,7 +625,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // scream
     converted::Tally tally("scream");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::scream(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::scream(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -611,7 +635,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -621,7 +647,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // explosion
     converted::Tally tally("explosion");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::explosion(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::explosion(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -631,7 +657,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -641,7 +669,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // step
     converted::Tally tally("step");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::step(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::step(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -651,7 +679,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -661,7 +691,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // bounce
     converted::Tally tally("bounce");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] unsigned int a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::bounce(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] unsigned int& a1) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::bounce(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
@@ -671,7 +701,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -681,7 +713,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // note_hz
     converted::Tally tally("note_hz");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] int a0) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::note_hz(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] int& a0) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::note_hz(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       int a0 = static_cast<int>(draw.whole());
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -690,7 +722,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -700,7 +734,7 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // cue
     converted::Tally tally("cue");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0, [[maybe_unused]] std::vector<int> a1, [[maybe_unused]] std::vector<double> a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] double a5) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::cue(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0, [[maybe_unused]] std::vector<int>& a1, [[maybe_unused]] std::vector<double>& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] double& a5) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::cue(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); };
     for (int i = 0; tally.more(i); ++i) {
       unsigned int a0 = static_cast<unsigned int>(draw.below(40));
       std::vector<int> a1 = draw_list(draw, [&]() -> int { return static_cast<int>(draw.whole()); });
@@ -714,7 +748,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -724,16 +760,18 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // kind_name
     converted::Tally tally("kind_name");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat_audio::Kind a0) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::kind_name(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] combat_audio::Kind& a0) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::kind_name(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      combat_audio::Kind a0 = static_cast<combat_audio::Kind>(draw.below(12));
+      combat_audio::Kind a0 = converted::enum_value<combat_audio::Kind>(draw.below(12));
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -743,9 +781,9 @@ SC_TEST(converted_combat_audio_cpp) {
   {  // render
     converted::Tally tally("render");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] combat_audio::Kind a0, [[maybe_unused]] unsigned int a1, [[maybe_unused]] unsigned int a2) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::render(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] combat_audio::Kind& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] unsigned int& a2) { return converted::counted([&] { return converted_combat_audio_cpp::combat_audio::render(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      combat_audio::Kind a0 = static_cast<combat_audio::Kind>(draw.below(12));
+      combat_audio::Kind a0 = converted::enum_value<combat_audio::Kind>(draw.below(12));
       unsigned int a1 = static_cast<unsigned int>(draw.below(40));
       unsigned int a2 = static_cast<unsigned int>(draw.below(40));
       const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
@@ -754,7 +792,9 @@ SC_TEST(converted_combat_audio_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
