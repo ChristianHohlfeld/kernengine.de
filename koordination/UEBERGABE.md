@@ -1201,3 +1201,16 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
 - **FAIL 2: `lowered_city_jobs_cpp`** (source_diff.h:555): `run_tile`: in 1 von 300 Aufrufen fragt das Neue öfter nach Speicher (3 statt 2).
   In 213658 und 223820 ok. Ursache offen (work-d-fail berührt city_stream/jobs?) → d.
 - `work` 42831863 und `work-zusammen` 8a16a750 unverändert. Gemischt wird erst mit suite rc=0.
+
+### 16.33 Stand 11:00 (23.11.) – FAIL 1 behoben auf `work-geliehen` (Chris: „doit“), FAIL 2 ist nicht reproduzierbar; neuer Kandidat rechnet
+
+- **FAIL 1 (Game__game_cpp, echte Engine):** kein Fehler des Spiels – `engine.game_world.physics` gibt die Welt der GameWorld als adoptiertes
+  Handle heraus; endet die GameWorld (~Game eines früher gezogenen Zustands), blieb das Handle stehen und zeigte auf freien Speicher. Ein später
+  gezogener Car mit `rig_world_` = dieses Handle → `~Car`/`detach` → `World::valid()` auf Freigegebenem. **`work-geliehen` = 0c15cfa2**
+  (kern/src/logic/engine_host.cpp, engine_host.h; allgemein): EngineObjects merkt sich, was ein Aufruf auf einem eigenen Objekt adoptiert,
+  und vergisst diese Handles, wenn das Objekt endet. Lokal nur Syntax – Beleg: Engine-Suite und Game__game_cpp im vollen Lauf.
+- **FAIL 2 (lowered_city_jobs_cpp, run_tile 3 statt 2 Anfragen in 1/300):** die Testdatei ist in 223820 (ok) und 084935 (FAIL) dieselbe,
+  der Zufall hat einen festen Startwert (Draw: 0x5eed1234) → das Ergebnis schwankt von Lauf zu Lauf. Ursache nicht gefunden (Verdacht:
+  Zählung der Speicheranfragen, cost.h, zählt nicht nur den gemessenen Aufruf). Nichts geändert; der nächste Lauf zeigt, ob es wiederkommt. → t1.
+- **`work-kandidat` = 01a64b4d** = 8a16a750 + work-d-fail + work-tempo e9929af0 + work-ende 3ecf4708 + work-geliehen 0c15cfa2.
+  **Läuft: `work-kandidat-voll-105632-525`** (10:56). Nächster Hebel Zeit: „time: Blueprint Game“ 84–149 s je Game-Test.
