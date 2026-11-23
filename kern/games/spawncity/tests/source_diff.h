@@ -504,6 +504,9 @@ struct World {
 /// One side's call: run with the guards armed. False: C++ leaves open what it gives (a guard marked it, or
 /// it read outside a list so long that it was given up - converted::open_read). `asks`: how often it asked
 /// for memory.
+/// From where the last two calls asked for memory - the old side's, then the new side's (cost.h): shown where
+/// the new asks more often (Tally::take), so that a count that differs says at once from where.
+inline cost::Trace g_trace_before, g_trace_last;
 template <class F> bool run(F&& f, long& asks) {
   converted::g_open = false;
   converted::g_open_reads = 0;
@@ -515,9 +518,13 @@ template <class F> bool run(F&& f, long& asks) {
   }
   converted::g_can_bail = true;
   converted::may_bail(true);
+  cost::tracing = true;
   cost::begin();
   f();
   asks = cost::end();
+  cost::tracing = false;
+  g_trace_before = g_trace_last;
+  g_trace_last = cost::now;
   converted::g_can_bail = false;
   converted::may_bail(false);
   return !converted::g_open;
@@ -545,6 +552,11 @@ struct Tally {
     ++compared;
     if (!differs.empty() && ++wrong <= 3) std::printf("  %s, call %d: %s\n", function.c_str(), call, differs.c_str());
     if (new_asks > old_asks) {
+      if (costlier == 0) {   // (the first such call: from where each side asked)
+        std::printf("  %s, call %d: the new asks for memory %ld time(s), the old %ld\n", function.c_str(), call, new_asks, old_asks);
+        cost::print("the old", g_trace_before, old_asks);
+        cost::print("the new", g_trace_last, new_asks);
+      }
       ++costlier;
       if (new_asks - old_asks > most_new - with_old) most_new = new_asks, with_old = old_asks;
     }
