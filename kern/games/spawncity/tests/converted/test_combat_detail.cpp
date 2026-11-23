@@ -52,7 +52,7 @@ namespace detail { struct CriticalClock {
 }
 namespace detail { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const detail::CriticalClock& s) { return converted::Value::structure({arg(s.at), arg(s.last_hp)}); }
-[[maybe_unused]] static bool same(const detail::CriticalClock& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.at, (*got.rows)[0]) && same(want.last_hp, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const detail::CriticalClock& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.at, (*got.rows)[0]), ".at") && converted::at_place(same(want.last_hp, (*got.rows)[1]), ".last_hp"); }
 [[maybe_unused]] static bool defined(const detail::CriticalClock& s) { return defined(s.at) && defined(s.last_hp); }
 [[maybe_unused]] static std::string text(const detail::CriticalClock& s) { return std::string("{") + text(s.at) + ", " + text(s.last_hp) + "}"; }
 [[maybe_unused]] static void take(detail::CriticalClock& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.at, (*v.rows)[0]); converted::take_as<double>(s.last_hp, (*v.rows)[1]); }
@@ -63,7 +63,7 @@ SC_TEST(converted_combat_detail) {
   {  // CriticalClock::armed
     converted::Tally tally("CriticalClock_armed");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] detail::CriticalClock a0) { return converted::counted([&] { return a0.armed(); }); };
+    const auto run = [&]([[maybe_unused]] detail::CriticalClock& a0) { return converted::counted([&] { return a0.armed(); }); };
     for (int i = 0; tally.more(i); ++i) {
       detail::CriticalClock a0 = draw_detail__CriticalClock(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -72,7 +72,9 @@ SC_TEST(converted_combat_detail) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -82,7 +84,7 @@ SC_TEST(converted_combat_detail) {
   {  // CriticalClock::reset
     converted::Tally tally("CriticalClock_reset");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] detail::CriticalClock a0) { converted::counted([&] { return a0.reset(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] detail::CriticalClock& a0) { converted::counted([&] { return a0.reset(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       detail::CriticalClock a0 = draw_detail__CriticalClock(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -91,7 +93,9 @@ SC_TEST(converted_combat_detail) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
