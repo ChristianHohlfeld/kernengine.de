@@ -1226,3 +1226,17 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
 - **`work-kost` = 452b4ddc** (tests/source_diff.h): beim ersten Aufruf, in dem das Neue öfter fragt, druckt der Test die Spuren beider Seiten.
   Noch NICHT im Kandidaten (01a64b4d rechnet) – mit der nächsten Runde einmischen; der nächste rote Lauf nennt dann die Stelle. → t1.
 - Läuft: `work-kandidat-voll-105632-525`; Kontrolle geplant ~12:42 (mischt bei grün nach work-zusammen/work, siehe 16.33).
+
+### 16.35 Stand 12:45 (23.11.) – Kandidat `work-kandidat-voll-105632-525` (01a64b4d): wieder 420 ok / 2 FAIL – NICHT gemischt; Guthaben knapp, Sitzung hält an
+
+- convert rc=0 (11:46), engine rc=0, suite rc=1: dieselben zwei Tests wie in 084935.
+- **`converted_Game__game_cpp` (echte Engine): `work-geliehen` 0c15cfa2 hat es NICHT behoben** – derselbe heap-use-after-free
+  (World::valid aus Car::detach in draw_maybe<unique_ptr<Car>>, draw_WorldLife__TowTruck). Das veraltete Welt-Handle kommt also nicht
+  (nur) über ein von der GameWorld adoptiertes Handle. Die Engine-Suite ist mit 0c15cfa2 grün; ob die Änderung bleibt, entscheidet g/der
+  nächste Koordinator (sie ist allgemein und unschädlich belegt, aber ohne belegten Nutzen). Nächster Schritt: im ASan-Bericht „freed by“
+  und „previously allocated by“ lesen (suite.log.xz des Laufs), dann klären, wessen Welt das gezogene Handle 1..6 nennt. → g/t1.
+- **`lowered_city_jobs_cpp`: zweimal hintereinander rot** (084935, 105632), in 213658/223820 grün – also nicht zufällig je Lauf, sondern
+  seit convert rc=0 / work-ende. Testdatei gleich; lokal (g++) nicht nachstellbar. `work-kost` 452b4ddc einmischen, dann nennt der Lauf die Stelle. → t1.
+- `work` 42831863, `work-zusammen` 8a16a750 unverändert. Belegt und mischbar, sobald die zwei Tests grün sind: work-d-fail, work-tempo
+  e9929af0 (Suite 51 min statt 2 h 11), work-ende 3ecf4708 (convert wieder grün).
+- Keine weitere geplante Kontrolle; kein Auftrag auf mag offen. Chris: Rest-Guthaben ~12 USD (11:13) – weiter erst auf sein Wort oder ab Mi 25.11., 13:00.
