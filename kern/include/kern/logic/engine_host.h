@@ -157,6 +157,7 @@ class EngineObjects {
   void begin_call() {
     error.clear();
     calling_.clear();
+    calling_on_ = 0;
     let_go();
   }
 
@@ -172,6 +173,7 @@ class EngineObjects {
   };
   i64 put(Kinds kinds, void (*end)(void*));
   void place(i64 handle, Kinds kinds, void (*end)(void*), void* owner = nullptr);
+  void forget_lent(i64 lender);
   void* find(i64 handle, Kind k) const;
   bool end(i64 handle, Kind k);
 
@@ -181,6 +183,13 @@ class EngineObjects {
   std::unordered_map<i64, std::vector<Entry>> entries_;
   std::vector<std::pair<i64, void*>> order_;  // (the objects in the order they came: handle and where)
   std::unordered_map<const void*, std::vector<std::pair<Kind, i64>>> by_object_;
+  // What an object lent: a call on an object this owns that hands out one of the host's own - a reference or a
+  // pointer the object gave: its world, its level - names something that is there while that object is. When
+  // the object ends, the handles of what it lent are forgotten with it (end): a handle of what is gone names
+  // nothing - and not the place where it was. (By the handle of the object that lent: handle and where.
+  // `calling_on_`: the first object the call being made asked for - the one it is a call on.)
+  std::unordered_map<i64, std::vector<std::pair<i64, void*>>> lent_;
+  mutable i64 calling_on_ = 0;
   i64 next_ = 1;
   Missing missing_ = nullptr;
   std::unordered_set<std::string> texts_;
