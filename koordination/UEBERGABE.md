@@ -1240,3 +1240,13 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
 - `work` 42831863, `work-zusammen` 8a16a750 unverändert. Belegt und mischbar, sobald die zwei Tests grün sind: work-d-fail, work-tempo
   e9929af0 (Suite 51 min statt 2 h 11), work-ende 3ecf4708 (convert wieder grün).
 - Keine weitere geplante Kontrolle; kein Auftrag auf mag offen. Chris: Rest-Guthaben ~12 USD (11:13) – weiter erst auf sein Wort oder ab Mi 25.11., 13:00.
+
+### 16.36 Stand 12:47 (23.11.) – Chris: „do“. Ursache des use-after-free gefunden (GameWorld wird erst für den Aufruf gemacht); Kandidat a93ccd2e rechnet
+
+- ASan in 105632: freigegeben durch `release<GameWorld>` aus `~GameWorld` des Tests, angelegt durch `engine_make_default`
+  (MadeWith<GameWorld>, missing). 0c15cfa2 merkte sich das Objekt eines Aufrufs nur, wenn es *gefunden* wurde – hier wird es für den Aufruf
+  erst gemacht. **`work-geliehen` = 1c0fee70**: auch das gemachte Objekt zählt (EngineObjects::get). Lokal geprüft (eigenes Objekt, Teil
+  adoptiert, Objekt beendet → Handle des Teils nennt nichts mehr).
+- **`work-kandidat` = a93ccd2e** = 01a64b4d + work-geliehen 1c0fee70 + work-kost 452b4ddc (Spuren, wenn das Neue öfter Speicher fragt).
+  **Läuft: `work-kandidat-voll-124529-474`** (12:45). Auswerten: Game__game_cpp (echte Engine) grün? lowered_city_jobs_cpp: die zwei
+  Spuren („the old“/„the new“) im Protokoll nennen die Stelle. Alles rc=0 → nach work-zusammen und work mischen wie in 16.33.
