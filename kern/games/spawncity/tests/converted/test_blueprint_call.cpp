@@ -42,7 +42,7 @@ namespace rules { inline f64 decimal(f32 x) {
   f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
   for (f64 m = a; m < 1; m *= 10) scale *= 10;
   for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; ++digits, scale *= 10) {
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
     const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
     if (static_cast<f32>(c) == x) return c;
   }
@@ -58,7 +58,7 @@ SC_TEST(converted_blueprint_call) {
   {  // decimal
     converted::Tally tally("decimal");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_blueprint_call::rules::decimal(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_blueprint_call::rules::decimal(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -67,7 +67,9 @@ SC_TEST(converted_blueprint_call) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
