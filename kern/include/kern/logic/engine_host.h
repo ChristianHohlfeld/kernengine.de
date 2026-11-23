@@ -81,7 +81,10 @@ class EngineObjects {
   template <class T> T* get(i64 handle) {
     if (void* p = find(handle, kind<std::remove_const_t<T>>())) return static_cast<T*>(p);
     if (handle != 0 && missing_)
-      if (void* p = missing_(*this, handle, kind<std::remove_const_t<T>>())) return static_cast<T*>(p);
+      if (void* p = missing_(*this, handle, kind<std::remove_const_t<T>>())) {
+        if (!calling_on_) calling_on_ = handle;   // (made for this call: the object the call is on, as one found)
+        return static_cast<T*>(p);
+      }
     return nullptr;
   }
   /// Ends an object of a handle this owns (its destructor): true if it did. A handle the host keeps
