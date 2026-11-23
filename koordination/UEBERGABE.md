@@ -1176,3 +1176,15 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
   (stop() mit cars_.clear()) und k cd542712 (ended_many). → Auftrag an k (mit g): die Regel, die das Ende vieler Stücke als Schleife
   schreibt, muss ihre Lokalen vereinbaren; Beleg `./mag.sh konvert`, convert rc=0.
 - `work` unverändert 42831863; nichts zu mischen, solange convert rot ist.
+
+### 16.31 Stand 08:50 (23.11.) – Konverter-Fehler aus 16.29 behoben auf `work-ende` (Chris: „doit“), neuer Kandidat rechnet
+
+- Kandidat `work-kandidat-voll-223820-2825` (7447cc16): convert rc=1 (derselbe Fehler), engine rc=0, suite rc=1 (altes Level, Urteile
+  zählen nicht). Zeit: „time: Blueprint Game: ~6 s before its first call“; Rechenzeit der Suite 85 min statt 315 min in 213658
+  (beide auf dem alten, kleinen Level), Laufzeit 54 statt 58 min. `converted_engine_geo_roads` dort ok, hier FAIL („the Blueprint nothing“,
+  GeoProjector_init 300/300) – vermutlich Test neu erzeugt (work-d-fail ändert den Konverter), Level alt; erst mit convert rc=0 zu klären.
+- **Ursache 16.29:** `state_ended()` schreibt in das Ereignis event_end; `ended_many` braucht dort Lokale (count, at) – ein Ereignis hat keine.
+  **`work-ende` = 3ecf4708** (tools/cpp_to_blueprint.py): brauchen die Schritte Lokale, stehen sie in einer Funktion `<Zustand>_ended()`
+  mit ihren Lokalen, das Ereignis ruft sie; sonst unverändert. Lokal nur py_compile – Beleg ist der volle Lauf.
+- **`work-kandidat` = d9af9855** = 8a16a750 + work-d-fail + work-tempo e9929af0 + work-ende 3ecf4708.
+  **Läuft: `work-kandidat-voll-084935-415`** (abgelegt 08:49). Auswerten: convert rc=0? dann Urteile gegen 160230 (270/0, 150/1) und Zeit der Suite.
