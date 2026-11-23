@@ -14,7 +14,12 @@ i64 EngineObjects::put(Kinds kinds, void (*end)(void*)) {
         if (kind == kinds.front().first) return handle;
   }
   const i64 handle = next_++;
+  void* const at = kinds.front().second;
   place(handle, std::move(kinds), end);
+  if (!end && calling_on_ && calling_on_ != handle) {   // (the host's own, handed out by a call on an object this owns: lent)
+    const auto on = entries_.find(calling_on_);
+    if (on != entries_.end() && std::any_of(on->second.begin(), on->second.end(), [](const Entry& e) { return e.end != nullptr; })) lent_[calling_on_].push_back({handle, at});
+  }
   return handle;
 }
 
@@ -35,7 +40,10 @@ void* EngineObjects::find(i64 handle, Kind k) const {
   if (it == entries_.end()) return nullptr;
   for (const Entry& e : it->second)
     for (const auto& [kind, where] : e.kinds)
-      if (kind == k) return where;
+      if (kind == k) {
+        if (!calling_on_) calling_on_ = handle;
+        return where;
+      }
   return nullptr;
 }
 
@@ -71,9 +79,35 @@ bool EngineObjects::end(i64 handle, Kind k) {
     v.erase(std::remove_if(v.begin(), v.end(), [&](const auto& y) { return y.second == handle; }), v.end());
     if (v.empty()) by_object_.erase(o);
   }
+  forget_lent(handle);   // (what it lent is no longer there)
   e.end(e.owner ? e.owner : e.at);
   if (!entries_.count(handle)) kept_.erase(handle);  // (the Callbacks it was given go with it)
   return true;
+}
+
+void EngineObjects::forget_lent(i64 lender) {
+  const auto it = lent_.find(lender);
+  if (it == lent_.end()) return;
+  const std::vector<std::pair<i64, void*>> lent = std::move(it->second);
+  lent_.erase(it);
+  for (const auto& [handle, at] : lent) {
+    const auto held = entries_.find(handle);
+    if (held == entries_.end()) continue;
+    if (std::none_of(held->second.begin(), held->second.end(), [&, at = at](const Entry& e) { return e.at == at && !e.end; })) continue;  // (gone already)
+    Entry e;
+    take(entries_, handle, at, e);
+    const auto o = std::find(order_.begin(), order_.end(), std::pair<i64, void*>{handle, e.at});
+    if (o != order_.end()) order_.erase(o);
+    for (const auto& [kind, where] : e.kinds) {
+      auto b = by_object_.find(where);
+      if (b == by_object_.end()) continue;
+      auto& v = b->second;
+      v.erase(std::remove_if(v.begin(), v.end(), [&, handle = handle](const auto& y) { return y.second == handle; }), v.end());
+      if (v.empty()) by_object_.erase(b);
+    }
+    forget_lent(handle);   // (what was reached through it)
+    if (!entries_.count(handle)) kept_.erase(handle);
+  }
 }
 
 void EngineObjects::clear() {
@@ -87,8 +121,10 @@ void EngineObjects::clear() {
   }
   entries_.clear();
   by_object_.clear();
+  lent_.clear();
   kept_.clear();
   calling_.clear();
+  calling_on_ = 0;
   next_ = 1;
 }
 
