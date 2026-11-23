@@ -3569,7 +3569,17 @@ class Emit:
             out += ["", f"  KERN_EVENT(on{node}, event_begin)", f"  void on{node}() {{", f"    {f.name}();", "  }"]
             # ... and ends when the program ends (its destructor - the compiler's: what its fields hold of the engine is
             # released, in the reverse order of the fields): when the Blueprint's play ends, End Play
+            held = len(self.locals)
             ended = self.state_ended()
+            if ended and len(self.locals) > held:
+                # An event has no local variables - a function has. Where what ends needs some (a list, a map or an
+                # array whose entries end something is gone through: ended_many), the steps are a function of the
+                # Blueprint's own with those local variables, and the event calls it.
+                name = u.fresh(u.state.split("::")[-1] + "_ended")
+                u.names.add(name)
+                own = [f"    {self.declared(n, t)} {n} = {u.zero(self.declared(n, t))};" for n, t in self.locals[held:]]
+                out += ["", f"  void {name}() {{", *own, *["    " + x for x in ended], "  }"]
+                ended = [f"{name}();"]
             if ended:
                 node = u.next_node
                 u.next_node += 1
