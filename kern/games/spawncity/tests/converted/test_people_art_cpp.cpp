@@ -41,7 +41,7 @@ struct Vec4 {
   constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
   
   
-  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
 };
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
@@ -75,10 +75,10 @@ struct Mat4 {
 
   Mat4 operator*(const Mat4& b) const {
     Mat4 r;
-    for (int c = 0; c < 4; ++c) {
-      const f32 b0 = converted::at(b.m, 4 * c), b1 = converted::at(b.m, 4 * c + 1), b2 = converted::at(b.m, 4 * c + 2), b3 = converted::at(b.m, 4 * c + 3);
-      for (int k = 0; k < 4; ++k)
-        converted::at(r.m, 4 * c + k) = converted::at(m, k) * b0 + converted::at(m, 4 + k) * b1 + converted::at(m, 8 + k) * b2 + converted::at(m, 12 + k) * b3;
+    for (int c = 0; c < 4; converted::pre_inc(c)) {
+      const f32 b0 = converted::at(b.m, converted::times(4, c)), b1 = converted::at(b.m, converted::plus(converted::times(4, c), 1)), b2 = converted::at(b.m, converted::plus(converted::times(4, c), 2)), b3 = converted::at(b.m, converted::plus(converted::times(4, c), 3));
+      for (int k = 0; k < 4; converted::pre_inc(k))
+        converted::at(r.m, converted::plus(converted::times(4, c), k)) = converted::at(m, k) * b0 + converted::at(m, converted::plus(4, k)) * b1 + converted::at(m, converted::plus(8, k)) * b2 + converted::at(m, converted::plus(12, k)) * b3;
     }
     return r;
   }
@@ -152,6 +152,7 @@ struct Mat4 {
 
 
 };
+struct Bvh;
 constexpr u32 kMaxExtensionAttributes = 2;
 constexpr u32 kMaxMaterialParams = 8;
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
@@ -194,6 +195,7 @@ enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct AmbientOcclusionPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 struct ShaderExtension : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -234,6 +236,7 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
+struct Renderer;
 struct MeshLook {
   Material material;
   u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
@@ -243,9 +246,6 @@ struct MeshLook {
   bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
 };
 struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
-struct HeightSampler : converted::EngineObject {
-  using converted::EngineObject::EngineObject;
-};
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -261,14 +261,18 @@ struct RoadStream : converted::EngineObject {
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
-namespace physics { struct Body { u64 id = 0; }; }
-namespace physics { struct Joint { u64 id = 0; }; }
+namespace physics { struct Body { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Body& o) const { return id == o.id; } }; }
+namespace physics { struct Joint { u64 id = 0; bool valid() const { return id != 0; } bool operator==(const Joint& o) const { return id == o.id; } }; }
 namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
 }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  bool joint_valid(const physics::Joint& joint) const;
+  void destroy_joint(const physics::Joint& joint, const bool& wake_bodies = true) const;
+  bool body_valid(const physics::Body& body) const;
+  void destroy_body(const physics::Body& body) const;
 };
 struct MouseGrab : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -288,8 +292,14 @@ struct Value : converted::EngineObject {
 namespace logic { enum class PinType : u8 {
   exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
   boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
-  map, set, count
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
 }; }
+struct EngineValue;
+struct Callable : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -306,10 +316,14 @@ struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+struct Context;
 struct Library : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Host : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Results : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -366,7 +380,7 @@ struct Ragdolls {
   /// A person who stood up again (reverse ragdoll): where and facing which way.
   struct Up { u64 key; Vec3 feet; f32 yaw; };
 
-  
+  ~Ragdolls() { clear(); }
   // MAX_RAGDOLLS
   /// Throws a person standing at `feet` (facing `yaw`) with `velocity` (m/s). `recover`: the person
   /// gets up again when the body has settled. Reuses the oldest body when the pool is full.
@@ -375,7 +389,7 @@ struct Ragdolls {
   /// A blast pushes every body in range (world_person_ragdoll: the bodies are in the same world).
   
   
-  
+  void clear();
   
   /// The pelvis of a body (where it lies), false when there is none.
   
@@ -411,7 +425,7 @@ struct Ragdolls {
     i32 group = 0;
   };
   
-  
+  void release(Doll& d);
   
   World* world_ = nullptr;
   std::vector<Doll> dolls_;
@@ -465,6 +479,22 @@ namespace primitives { MeshData sphere(const double& radius, const unsigned int&
 namespace primitives { MeshData capsule(const double& radius, const double& length, const unsigned int& segments = 16, const unsigned int& rings = 8, const Vec3& color = {1, 1, 1}); }
 namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
 namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
+void Ragdolls::release(Doll& d) {
+  if (!world_) return;
+  for (u32 b = 0; b < kBones; ++b) {
+    if (converted::at(d.joints, b).valid() && world_->joint_valid(converted::at(d.joints, b))) world_->destroy_joint(converted::at(d.joints, b), false);
+    converted::at(d.joints, b) = {};
+  }
+  for (u32 b = 0; b < kBones; ++b) {
+    if (converted::at(d.bodies, b).valid() && world_->body_valid(converted::at(d.bodies, b))) world_->destroy_body(converted::at(d.bodies, b));
+    converted::at(d.bodies, b) = {};
+  }
+}
+void Ragdolls::clear() {
+  for (Doll& d : dolls_) { release(d); d.active = false; }
+  dolls_.clear();
+  ups_.clear();
+}
 Mat4 rot(Vec3 axis, f32 a) { return Mat4::trs({}, Quat::axis_angle(axis, a), {1, 1, 1}); }
 Mat4 at(Vec3 p) { return Mat4::translate(p); }
 Material mat(f32 roughness, f32 metalness = 0, Vec3 emissive = {}) {
@@ -633,7 +663,7 @@ bool PeopleArt::init(Renderer& r) {
   primitives::append(pd, primitives::box({0.36, 0.22, 0.05}, {0.06, 0.065, 0.075}), at({0, 0, -0.06}));  // belly
   primitives::append(pd, primitives::box({0.38, 0.235, 0.035}, {0.12, 0.3, 0.85}), at({0, 0, 0.02}));   // blue band
   for (f32 a : {kPi / 4, -kPi / 4}) primitives::append(pd, primitives::box({0.9, 0.045, 0.035}, {0.07, 0.07, 0.08}), rot({0, 0, 1}, a));
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 4; converted::pre_inc(i)) {
     const f32 a = kPi / 4 + static_cast<f32>(i) * kPi / 2;
     primitives::append(pd, primitives::cylinder(0.045, 0.06, 10, {0.08, 0.08, 0.09}), at({kern::math::cos(a) * 0.32, kern::math::sin(a) * 0.32, -0.02}));
   }
@@ -835,7 +865,7 @@ void PeopleArt::light_bar(const Mat4& chassis, bool on, f32 now) {
   put(lamp_, m * at({0, -0.25, 0.05}), red ? Vec3{3.0, 0.1, 0.16} : Vec3{0.2, 0.024, 0.03});
 }
 void PeopleArt::fire(Vec3 p, f32 size, f32 now) {
-  for (int i = 0; i < 3; ++i) {
+  for (int i = 0; i < 3; converted::pre_inc(i)) {
     const f32 t = now * (3.1 + static_cast<f32>(i)) + static_cast<f32>(i) * 2.1;
     const f32 s = size * (0.55 + 0.25 * kern::math::sin(t));
     put(flame_, at(p + Vec3{0.3 * kern::math::sin(t * 1.3), 0.3 * kern::math::cos(t * 0.9), s * 0.6 + static_cast<f32>(i) * size * 0.35}) * Mat4::scale({s, s, s * 1.4}),
@@ -845,7 +875,7 @@ void PeopleArt::fire(Vec3 p, f32 size, f32 now) {
 void PeopleArt::police_drone(Vec3 p, f32 yaw, f32 tilt_x, f32 tilt_y, bool lights, f32 now, u32 index) {
   const Mat4 m = at(p) * rot({0, 0, 1}, yaw) * rot({0, 1, 0}, tilt_y) * rot({1, 0, 0}, tilt_x);
   put(pd_body_, m);
-  for (int i = 0; i < 4; ++i) {
+  for (int i = 0; i < 4; converted::pre_inc(i)) {
     const f32 a = kPi / 4 + static_cast<f32>(i) * kPi / 2;
     put(pd_rotor_, m * at({kern::math::cos(a) * 0.32, kern::math::sin(a) * 0.32, 0.04}));
   }
@@ -913,7 +943,7 @@ void PeopleArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::array_list(want.m), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::array_list(want.m), (*got.rows)[0]), ".m"); }
 [[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
 [[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
 [[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
@@ -927,14 +957,14 @@ void PeopleArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Vec4& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
 [[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
   Material s{};
   s.color = draw_kern__Vec4(draw);
-  s.alpha = static_cast<AlphaMode>(draw.below(3));
+  s.alpha = converted::enum_value<AlphaMode>(draw.below(3));
   s.alpha_cutoff = draw.number();
   s.roughness = draw.number();
   s.metalness = draw.number();
@@ -950,7 +980,7 @@ void PeopleArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
-[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.color, (*got.rows)[0]) && same(want.alpha, (*got.rows)[1]) && same(want.alpha_cutoff, (*got.rows)[2]) && same(want.roughness, (*got.rows)[3]) && same(want.metalness, (*got.rows)[4]) && same(want.emissive, (*got.rows)[5]) && same(want.unlit, (*got.rows)[6]) && same(want.double_sided, (*got.rows)[7]) && same(want.cast_shadow, (*got.rows)[8]) && same(want.frustum_culled, (*got.rows)[9]) && same(want.viewmodel, (*got.rows)[10]) && same(want.linear_colors, (*got.rows)[11]) && same(want.lines, (*got.rows)[12]) && same(converted::array_list(want.params), (*got.rows)[13]); }
+[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
 [[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
 [[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
 [[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
@@ -963,7 +993,7 @@ void PeopleArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const PeopleArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints), arg(s.tinted)}); }
-[[maybe_unused]] static bool same(const PeopleArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]) && same(want.tinted, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const PeopleArt::Part& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.transforms, (*got.rows)[1]), ".transforms") && converted::at_place(same(want.tints, (*got.rows)[2]), ".tints") && converted::at_place(same(want.tinted, (*got.rows)[3]), ".tinted"); }
 [[maybe_unused]] static bool defined(const PeopleArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints) && defined(s.tinted); }
 [[maybe_unused]] static std::string text(const PeopleArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + ", " + text(s.tinted) + "}"; }
 [[maybe_unused]] static void take(PeopleArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); converted::take_as<bool>(s.tinted, (*v.rows)[3]); }
@@ -979,7 +1009,7 @@ void PeopleArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
-[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.positions, (*got.rows)[0]), ".positions") && converted::at_place(same(want.normals, (*got.rows)[1]), ".normals") && converted::at_place(same(want.colors, (*got.rows)[2]), ".colors") && converted::at_place(same(want.uvs, (*got.rows)[3]), ".uvs") && converted::at_place(same(want.extra, (*got.rows)[4]), ".extra") && converted::at_place(same(want.extra_size, (*got.rows)[5]), ".extra_size") && converted::at_place(same(want.indices, (*got.rows)[6]), ".indices"); }
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
 [[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
@@ -1019,14 +1049,14 @@ void PeopleArt::end() {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const PeopleArt& s) { return converted::Value::structure({arg(s.r_), arg(s.leg_), arg(s.torso_), arg(s.arm_), arg(s.head_), arg(s.hand_), arg(s.hair_), arg(s.vest_), arg(s.door_), arg(s.cap_), arg(s.bar_), arg(s.lamp_), arg(s.flame_), arg(s.pd_body_), arg(s.pd_rotor_), arg(s.shell_), arg(s.pole_), arg(s.lamp_head_), arg(s.rd_pelvis_), arg(s.rd_chest_), arg(s.rd_upper_), arg(s.rd_fore_), arg(s.rd_thigh_), arg(s.rd_shin_), arg(s.beacon_), arg(s.gun_pistol_), arg(s.gun_smg_), arg(s.gun_sniper_), arg(s.gun_tube_), arg(s.gun_rocket_), arg(s.gun_knife_)}); }
-[[maybe_unused]] static bool same(const PeopleArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 31 && same(want.r_, (*got.rows)[0]) && same(want.leg_, (*got.rows)[1]) && same(want.torso_, (*got.rows)[2]) && same(want.arm_, (*got.rows)[3]) && same(want.head_, (*got.rows)[4]) && same(want.hand_, (*got.rows)[5]) && same(want.hair_, (*got.rows)[6]) && same(want.vest_, (*got.rows)[7]) && same(want.door_, (*got.rows)[8]) && same(want.cap_, (*got.rows)[9]) && same(want.bar_, (*got.rows)[10]) && same(want.lamp_, (*got.rows)[11]) && same(want.flame_, (*got.rows)[12]) && same(want.pd_body_, (*got.rows)[13]) && same(want.pd_rotor_, (*got.rows)[14]) && same(want.shell_, (*got.rows)[15]) && same(want.pole_, (*got.rows)[16]) && same(want.lamp_head_, (*got.rows)[17]) && same(want.rd_pelvis_, (*got.rows)[18]) && same(want.rd_chest_, (*got.rows)[19]) && same(want.rd_upper_, (*got.rows)[20]) && same(want.rd_fore_, (*got.rows)[21]) && same(want.rd_thigh_, (*got.rows)[22]) && same(want.rd_shin_, (*got.rows)[23]) && same(want.beacon_, (*got.rows)[24]) && same(want.gun_pistol_, (*got.rows)[25]) && same(want.gun_smg_, (*got.rows)[26]) && same(want.gun_sniper_, (*got.rows)[27]) && same(want.gun_tube_, (*got.rows)[28]) && same(want.gun_rocket_, (*got.rows)[29]) && same(want.gun_knife_, (*got.rows)[30]); }
+[[maybe_unused]] static bool same(const PeopleArt& want, const converted::Value& got) { return converted::rows_of(got, 31) && converted::at_place(same(want.r_, (*got.rows)[0]), ".r_") && converted::at_place(same(want.leg_, (*got.rows)[1]), ".leg_") && converted::at_place(same(want.torso_, (*got.rows)[2]), ".torso_") && converted::at_place(same(want.arm_, (*got.rows)[3]), ".arm_") && converted::at_place(same(want.head_, (*got.rows)[4]), ".head_") && converted::at_place(same(want.hand_, (*got.rows)[5]), ".hand_") && converted::at_place(same(want.hair_, (*got.rows)[6]), ".hair_") && converted::at_place(same(want.vest_, (*got.rows)[7]), ".vest_") && converted::at_place(same(want.door_, (*got.rows)[8]), ".door_") && converted::at_place(same(want.cap_, (*got.rows)[9]), ".cap_") && converted::at_place(same(want.bar_, (*got.rows)[10]), ".bar_") && converted::at_place(same(want.lamp_, (*got.rows)[11]), ".lamp_") && converted::at_place(same(want.flame_, (*got.rows)[12]), ".flame_") && converted::at_place(same(want.pd_body_, (*got.rows)[13]), ".pd_body_") && converted::at_place(same(want.pd_rotor_, (*got.rows)[14]), ".pd_rotor_") && converted::at_place(same(want.shell_, (*got.rows)[15]), ".shell_") && converted::at_place(same(want.pole_, (*got.rows)[16]), ".pole_") && converted::at_place(same(want.lamp_head_, (*got.rows)[17]), ".lamp_head_") && converted::at_place(same(want.rd_pelvis_, (*got.rows)[18]), ".rd_pelvis_") && converted::at_place(same(want.rd_chest_, (*got.rows)[19]), ".rd_chest_") && converted::at_place(same(want.rd_upper_, (*got.rows)[20]), ".rd_upper_") && converted::at_place(same(want.rd_fore_, (*got.rows)[21]), ".rd_fore_") && converted::at_place(same(want.rd_thigh_, (*got.rows)[22]), ".rd_thigh_") && converted::at_place(same(want.rd_shin_, (*got.rows)[23]), ".rd_shin_") && converted::at_place(same(want.beacon_, (*got.rows)[24]), ".beacon_") && converted::at_place(same(want.gun_pistol_, (*got.rows)[25]), ".gun_pistol_") && converted::at_place(same(want.gun_smg_, (*got.rows)[26]), ".gun_smg_") && converted::at_place(same(want.gun_sniper_, (*got.rows)[27]), ".gun_sniper_") && converted::at_place(same(want.gun_tube_, (*got.rows)[28]), ".gun_tube_") && converted::at_place(same(want.gun_rocket_, (*got.rows)[29]), ".gun_rocket_") && converted::at_place(same(want.gun_knife_, (*got.rows)[30]), ".gun_knife_"); }
 [[maybe_unused]] static bool defined(const PeopleArt& s) { return defined(s.r_) && defined(s.leg_) && defined(s.torso_) && defined(s.arm_) && defined(s.head_) && defined(s.hand_) && defined(s.hair_) && defined(s.vest_) && defined(s.door_) && defined(s.cap_) && defined(s.bar_) && defined(s.lamp_) && defined(s.flame_) && defined(s.pd_body_) && defined(s.pd_rotor_) && defined(s.shell_) && defined(s.pole_) && defined(s.lamp_head_) && defined(s.rd_pelvis_) && defined(s.rd_chest_) && defined(s.rd_upper_) && defined(s.rd_fore_) && defined(s.rd_thigh_) && defined(s.rd_shin_) && defined(s.beacon_) && defined(s.gun_pistol_) && defined(s.gun_smg_) && defined(s.gun_sniper_) && defined(s.gun_tube_) && defined(s.gun_rocket_) && defined(s.gun_knife_); }
 [[maybe_unused]] static std::string text(const PeopleArt& s) { return std::string("{") + text(s.r_) + ", " + text(s.leg_) + ", " + text(s.torso_) + ", " + text(s.arm_) + ", " + text(s.head_) + ", " + text(s.hand_) + ", " + text(s.hair_) + ", " + text(s.vest_) + ", " + text(s.door_) + ", " + text(s.cap_) + ", " + text(s.bar_) + ", " + text(s.lamp_) + ", " + text(s.flame_) + ", " + text(s.pd_body_) + ", " + text(s.pd_rotor_) + ", " + text(s.shell_) + ", " + text(s.pole_) + ", " + text(s.lamp_head_) + ", " + text(s.rd_pelvis_) + ", " + text(s.rd_chest_) + ", " + text(s.rd_upper_) + ", " + text(s.rd_fore_) + ", " + text(s.rd_thigh_) + ", " + text(s.rd_shin_) + ", " + text(s.beacon_) + ", " + text(s.gun_pistol_) + ", " + text(s.gun_smg_) + ", " + text(s.gun_sniper_) + ", " + text(s.gun_tube_) + ", " + text(s.gun_rocket_) + ", " + text(s.gun_knife_) + "}"; }
 [[maybe_unused]] static void take(PeopleArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 31) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); converted::take_as<PeopleArt::Part>(s.leg_, (*v.rows)[1]); converted::take_as<PeopleArt::Part>(s.torso_, (*v.rows)[2]); converted::take_as<PeopleArt::Part>(s.arm_, (*v.rows)[3]); converted::take_as<PeopleArt::Part>(s.head_, (*v.rows)[4]); converted::take_as<PeopleArt::Part>(s.hand_, (*v.rows)[5]); converted::take_as<PeopleArt::Part>(s.hair_, (*v.rows)[6]); converted::take_as<PeopleArt::Part>(s.vest_, (*v.rows)[7]); converted::take_as<PeopleArt::Part>(s.door_, (*v.rows)[8]); converted::take_as<PeopleArt::Part>(s.cap_, (*v.rows)[9]); converted::take_as<PeopleArt::Part>(s.bar_, (*v.rows)[10]); converted::take_as<PeopleArt::Part>(s.lamp_, (*v.rows)[11]); converted::take_as<PeopleArt::Part>(s.flame_, (*v.rows)[12]); converted::take_as<PeopleArt::Part>(s.pd_body_, (*v.rows)[13]); converted::take_as<PeopleArt::Part>(s.pd_rotor_, (*v.rows)[14]); converted::take_as<PeopleArt::Part>(s.shell_, (*v.rows)[15]); converted::take_as<PeopleArt::Part>(s.pole_, (*v.rows)[16]); converted::take_as<PeopleArt::Part>(s.lamp_head_, (*v.rows)[17]); converted::take_as<PeopleArt::Part>(s.rd_pelvis_, (*v.rows)[18]); converted::take_as<PeopleArt::Part>(s.rd_chest_, (*v.rows)[19]); converted::take_as<PeopleArt::Part>(s.rd_upper_, (*v.rows)[20]); converted::take_as<PeopleArt::Part>(s.rd_fore_, (*v.rows)[21]); converted::take_as<PeopleArt::Part>(s.rd_thigh_, (*v.rows)[22]); converted::take_as<PeopleArt::Part>(s.rd_shin_, (*v.rows)[23]); converted::take_as<PeopleArt::Part>(s.beacon_, (*v.rows)[24]); converted::take_as<PeopleArt::Part>(s.gun_pistol_, (*v.rows)[25]); converted::take_as<PeopleArt::Part>(s.gun_smg_, (*v.rows)[26]); converted::take_as<PeopleArt::Part>(s.gun_sniper_, (*v.rows)[27]); converted::take_as<PeopleArt::Part>(s.gun_tube_, (*v.rows)[28]); converted::take_as<PeopleArt::Part>(s.gun_rocket_, (*v.rows)[29]); converted::take_as<PeopleArt::Part>(s.gun_knife_, (*v.rows)[30]); }
 [[maybe_unused]] static People::Person draw_People__Person(converted::Draw& draw) {
   People::Person s{};
-  s.kind = static_cast<People::Kind>(draw.below(5));
-  s.state = static_cast<People::State>(draw.below(7));
+  s.kind = converted::enum_value<People::Kind>(draw.below(5));
+  s.state = converted::enum_value<People::State>(draw.below(7));
   s.pos = draw.vector();
   s.yaw = draw.number();
   s.speed = draw.number();
@@ -1076,7 +1106,7 @@ void PeopleArt::end() {
 }
 namespace People { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const People::Person& s) { return converted::Value::structure({arg(s.kind), arg(s.state), arg(s.pos), arg(s.yaw), arg(s.speed), arg(s.v), arg(s.hp), arg(s.phase), arg(s.shirt), arg(s.pants), arg(s.skin), arg(s.lane), arg(s.seg), arg(s.dir), arg(s.along), arg(s.side), arg(s.off), arg(s.flee_until), arg(s.burst_until), arg(s.flee_speed), arg(s.hands_up_until), arg(s.shaken_until), arg(s.wait_until), arg(s.flee_dir), arg(s.fitness), arg(s.down_at), arg(s.fall_dir), arg(s.unit), arg(s.aiming), arg(s.aim_pitch), arg(s.held), arg(s.hands), arg(s.hand_l), arg(s.hand_r), arg(s.punch), arg(s.seed), arg(s.provoked_at), arg(s.fight_until), arg(s.last_attack), arg(s.provoked_hit), arg(s.role), arg(s.knocked_until), arg(s.hurt_at), arg(s.remote), arg(s.net), arg(s.net_to), arg(s.net_at)}); }
-[[maybe_unused]] static bool same(const People::Person& want, const converted::Value& got) { return got.rows && got.rows->size() == 47 && same(want.kind, (*got.rows)[0]) && same(want.state, (*got.rows)[1]) && same(want.pos, (*got.rows)[2]) && same(want.yaw, (*got.rows)[3]) && same(want.speed, (*got.rows)[4]) && same(want.v, (*got.rows)[5]) && same(want.hp, (*got.rows)[6]) && same(want.phase, (*got.rows)[7]) && same(want.shirt, (*got.rows)[8]) && same(want.pants, (*got.rows)[9]) && same(want.skin, (*got.rows)[10]) && same(want.lane, (*got.rows)[11]) && same(want.seg, (*got.rows)[12]) && same(want.dir, (*got.rows)[13]) && same(want.along, (*got.rows)[14]) && same(want.side, (*got.rows)[15]) && same(want.off, (*got.rows)[16]) && same(want.flee_until, (*got.rows)[17]) && same(want.burst_until, (*got.rows)[18]) && same(want.flee_speed, (*got.rows)[19]) && same(want.hands_up_until, (*got.rows)[20]) && same(want.shaken_until, (*got.rows)[21]) && same(want.wait_until, (*got.rows)[22]) && same(want.flee_dir, (*got.rows)[23]) && same(want.fitness, (*got.rows)[24]) && same(want.down_at, (*got.rows)[25]) && same(want.fall_dir, (*got.rows)[26]) && same(want.unit, (*got.rows)[27]) && same(want.aiming, (*got.rows)[28]) && same(want.aim_pitch, (*got.rows)[29]) && same(want.held, (*got.rows)[30]) && same(want.hands, (*got.rows)[31]) && same(want.hand_l, (*got.rows)[32]) && same(want.hand_r, (*got.rows)[33]) && same(want.punch, (*got.rows)[34]) && same(want.seed, (*got.rows)[35]) && same(want.provoked_at, (*got.rows)[36]) && same(want.fight_until, (*got.rows)[37]) && same(want.last_attack, (*got.rows)[38]) && same(want.provoked_hit, (*got.rows)[39]) && same(want.role, (*got.rows)[40]) && same(want.knocked_until, (*got.rows)[41]) && same(want.hurt_at, (*got.rows)[42]) && same(want.remote, (*got.rows)[43]) && same(want.net, (*got.rows)[44]) && same(want.net_to, (*got.rows)[45]) && same(want.net_at, (*got.rows)[46]); }
+[[maybe_unused]] static bool same(const People::Person& want, const converted::Value& got) { return converted::rows_of(got, 47) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.state, (*got.rows)[1]), ".state") && converted::at_place(same(want.pos, (*got.rows)[2]), ".pos") && converted::at_place(same(want.yaw, (*got.rows)[3]), ".yaw") && converted::at_place(same(want.speed, (*got.rows)[4]), ".speed") && converted::at_place(same(want.v, (*got.rows)[5]), ".v") && converted::at_place(same(want.hp, (*got.rows)[6]), ".hp") && converted::at_place(same(want.phase, (*got.rows)[7]), ".phase") && converted::at_place(same(want.shirt, (*got.rows)[8]), ".shirt") && converted::at_place(same(want.pants, (*got.rows)[9]), ".pants") && converted::at_place(same(want.skin, (*got.rows)[10]), ".skin") && converted::at_place(same(want.lane, (*got.rows)[11]), ".lane") && converted::at_place(same(want.seg, (*got.rows)[12]), ".seg") && converted::at_place(same(want.dir, (*got.rows)[13]), ".dir") && converted::at_place(same(want.along, (*got.rows)[14]), ".along") && converted::at_place(same(want.side, (*got.rows)[15]), ".side") && converted::at_place(same(want.off, (*got.rows)[16]), ".off") && converted::at_place(same(want.flee_until, (*got.rows)[17]), ".flee_until") && converted::at_place(same(want.burst_until, (*got.rows)[18]), ".burst_until") && converted::at_place(same(want.flee_speed, (*got.rows)[19]), ".flee_speed") && converted::at_place(same(want.hands_up_until, (*got.rows)[20]), ".hands_up_until") && converted::at_place(same(want.shaken_until, (*got.rows)[21]), ".shaken_until") && converted::at_place(same(want.wait_until, (*got.rows)[22]), ".wait_until") && converted::at_place(same(want.flee_dir, (*got.rows)[23]), ".flee_dir") && converted::at_place(same(want.fitness, (*got.rows)[24]), ".fitness") && converted::at_place(same(want.down_at, (*got.rows)[25]), ".down_at") && converted::at_place(same(want.fall_dir, (*got.rows)[26]), ".fall_dir") && converted::at_place(same(want.unit, (*got.rows)[27]), ".unit") && converted::at_place(same(want.aiming, (*got.rows)[28]), ".aiming") && converted::at_place(same(want.aim_pitch, (*got.rows)[29]), ".aim_pitch") && converted::at_place(same(want.held, (*got.rows)[30]), ".held") && converted::at_place(same(want.hands, (*got.rows)[31]), ".hands") && converted::at_place(same(want.hand_l, (*got.rows)[32]), ".hand_l") && converted::at_place(same(want.hand_r, (*got.rows)[33]), ".hand_r") && converted::at_place(same(want.punch, (*got.rows)[34]), ".punch") && converted::at_place(same(want.seed, (*got.rows)[35]), ".seed") && converted::at_place(same(want.provoked_at, (*got.rows)[36]), ".provoked_at") && converted::at_place(same(want.fight_until, (*got.rows)[37]), ".fight_until") && converted::at_place(same(want.last_attack, (*got.rows)[38]), ".last_attack") && converted::at_place(same(want.provoked_hit, (*got.rows)[39]), ".provoked_hit") && converted::at_place(same(want.role, (*got.rows)[40]), ".role") && converted::at_place(same(want.knocked_until, (*got.rows)[41]), ".knocked_until") && converted::at_place(same(want.hurt_at, (*got.rows)[42]), ".hurt_at") && converted::at_place(same(want.remote, (*got.rows)[43]), ".remote") && converted::at_place(same(want.net, (*got.rows)[44]), ".net") && converted::at_place(same(want.net_to, (*got.rows)[45]), ".net_to") && converted::at_place(same(want.net_at, (*got.rows)[46]), ".net_at"); }
 [[maybe_unused]] static bool defined(const People::Person& s) { return defined(s.kind) && defined(s.state) && defined(s.pos) && defined(s.yaw) && defined(s.speed) && defined(s.v) && defined(s.hp) && defined(s.phase) && defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.lane) && defined(s.seg) && defined(s.dir) && defined(s.along) && defined(s.side) && defined(s.off) && defined(s.flee_until) && defined(s.burst_until) && defined(s.flee_speed) && defined(s.hands_up_until) && defined(s.shaken_until) && defined(s.wait_until) && defined(s.flee_dir) && defined(s.fitness) && defined(s.down_at) && defined(s.fall_dir) && defined(s.unit) && defined(s.aiming) && defined(s.aim_pitch) && defined(s.held) && defined(s.hands) && defined(s.hand_l) && defined(s.hand_r) && defined(s.punch) && defined(s.seed) && defined(s.provoked_at) && defined(s.fight_until) && defined(s.last_attack) && defined(s.provoked_hit) && defined(s.role) && defined(s.knocked_until) && defined(s.hurt_at) && defined(s.remote) && defined(s.net) && defined(s.net_to) && defined(s.net_at); }
 [[maybe_unused]] static std::string text(const People::Person& s) { return std::string("{") + text(s.kind) + ", " + text(s.state) + ", " + text(s.pos) + ", " + text(s.yaw) + ", " + text(s.speed) + ", " + text(s.v) + ", " + text(s.hp) + ", " + text(s.phase) + ", " + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.lane) + ", " + text(s.seg) + ", " + text(s.dir) + ", " + text(s.along) + ", " + text(s.side) + ", " + text(s.off) + ", " + text(s.flee_until) + ", " + text(s.burst_until) + ", " + text(s.flee_speed) + ", " + text(s.hands_up_until) + ", " + text(s.shaken_until) + ", " + text(s.wait_until) + ", " + text(s.flee_dir) + ", " + text(s.fitness) + ", " + text(s.down_at) + ", " + text(s.fall_dir) + ", " + text(s.unit) + ", " + text(s.aiming) + ", " + text(s.aim_pitch) + ", " + text(s.held) + ", " + text(s.hands) + ", " + text(s.hand_l) + ", " + text(s.hand_r) + ", " + text(s.punch) + ", " + text(s.seed) + ", " + text(s.provoked_at) + ", " + text(s.fight_until) + ", " + text(s.last_attack) + ", " + text(s.provoked_hit) + ", " + text(s.role) + ", " + text(s.knocked_until) + ", " + text(s.hurt_at) + ", " + text(s.remote) + ", " + text(s.net) + ", " + text(s.net_to) + ", " + text(s.net_at) + "}"; }
 [[maybe_unused]] static void take(People::Person& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 47) return; converted::take_as<People::Kind>(s.kind, (*v.rows)[0]); converted::take_as<People::State>(s.state, (*v.rows)[1]); converted::take_as<Vec3>(s.pos, (*v.rows)[2]); converted::take_as<double>(s.yaw, (*v.rows)[3]); converted::take_as<double>(s.speed, (*v.rows)[4]); converted::take_as<double>(s.v, (*v.rows)[5]); converted::take_as<double>(s.hp, (*v.rows)[6]); converted::take_as<double>(s.phase, (*v.rows)[7]); converted::take_as<Vec3>(s.shirt, (*v.rows)[8]); converted::take_as<Vec3>(s.pants, (*v.rows)[9]); converted::take_as<Vec3>(s.skin, (*v.rows)[10]); converted::take_as<int>(s.lane, (*v.rows)[11]); converted::take_as<int>(s.seg, (*v.rows)[12]); converted::take_as<int>(s.dir, (*v.rows)[13]); converted::take_as<double>(s.along, (*v.rows)[14]); converted::take_as<double>(s.side, (*v.rows)[15]); converted::take_as<double>(s.off, (*v.rows)[16]); converted::take_as<double>(s.flee_until, (*v.rows)[17]); converted::take_as<double>(s.burst_until, (*v.rows)[18]); converted::take_as<double>(s.flee_speed, (*v.rows)[19]); converted::take_as<double>(s.hands_up_until, (*v.rows)[20]); converted::take_as<double>(s.shaken_until, (*v.rows)[21]); converted::take_as<double>(s.wait_until, (*v.rows)[22]); converted::take_as<Vec2>(s.flee_dir, (*v.rows)[23]); converted::take_as<double>(s.fitness, (*v.rows)[24]); converted::take_as<double>(s.down_at, (*v.rows)[25]); converted::take_as<Vec3>(s.fall_dir, (*v.rows)[26]); converted::take_as<int>(s.unit, (*v.rows)[27]); converted::take_as<bool>(s.aiming, (*v.rows)[28]); converted::take_as<double>(s.aim_pitch, (*v.rows)[29]); converted::take_as<int>(s.held, (*v.rows)[30]); converted::take_as<bool>(s.hands, (*v.rows)[31]); converted::take_as<Vec3>(s.hand_l, (*v.rows)[32]); converted::take_as<Vec3>(s.hand_r, (*v.rows)[33]); converted::take_as<unsigned char>(s.punch, (*v.rows)[34]); converted::take_as<unsigned int>(s.seed, (*v.rows)[35]); converted::take_as<double>(s.provoked_at, (*v.rows)[36]); converted::take_as<double>(s.fight_until, (*v.rows)[37]); converted::take_as<double>(s.last_attack, (*v.rows)[38]); converted::take_as<bool>(s.provoked_hit, (*v.rows)[39]); converted::take_as<unsigned char>(s.role, (*v.rows)[40]); converted::take_as<double>(s.knocked_until, (*v.rows)[41]); converted::take_as<double>(s.hurt_at, (*v.rows)[42]); converted::take_as<bool>(s.remote, (*v.rows)[43]); converted::take_as<int>(s.net, (*v.rows)[44]); converted::take_as<Vec3>(s.net_to, (*v.rows)[45]); converted::take_as<double>(s.net_at, (*v.rows)[46]); }
@@ -1092,7 +1122,7 @@ namespace People { using converted::arg; using converted::same; using converted:
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Draw& s) { return converted::Value::structure({arg(s.m), arg(s.tint), arg(s.sphere), arg(s.bone), arg(s.doll), arg(s.pose)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Draw& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.m, (*got.rows)[0]) && same(want.tint, (*got.rows)[1]) && same(want.sphere, (*got.rows)[2]) && same(want.bone, (*got.rows)[3]) && same(want.doll, (*got.rows)[4]) && same(want.pose, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls::Draw& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.m, (*got.rows)[0]), ".m") && converted::at_place(same(want.tint, (*got.rows)[1]), ".tint") && converted::at_place(same(want.sphere, (*got.rows)[2]), ".sphere") && converted::at_place(same(want.bone, (*got.rows)[3]), ".bone") && converted::at_place(same(want.doll, (*got.rows)[4]), ".doll") && converted::at_place(same(want.pose, (*got.rows)[5]), ".pose"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Draw& s) { return defined(s.m) && defined(s.tint) && defined(s.sphere) && defined(s.bone) && defined(s.doll) && defined(s.pose); }
 [[maybe_unused]] static std::string text(const Ragdolls::Draw& s) { return std::string("{") + text(s.m) + ", " + text(s.tint) + ", " + text(s.sphere) + ", " + text(s.bone) + ", " + text(s.doll) + ", " + text(s.pose) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Draw& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Mat4>(s.m, (*v.rows)[0]); converted::take_as<Vec3>(s.tint, (*v.rows)[1]); converted::take_as<bool>(s.sphere, (*v.rows)[2]); converted::take_as<unsigned char>(s.bone, (*v.rows)[3]); converted::take_as<unsigned int>(s.doll, (*v.rows)[4]); converted::take_as<Mat4>(s.pose, (*v.rows)[5]); }
@@ -1103,7 +1133,7 @@ namespace People { using converted::arg; using converted::same; using converted:
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Body& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Body& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Body& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Body& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Body& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -1115,7 +1145,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Joint& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
-[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]); }
+[[maybe_unused]] static bool same(const physics::Joint& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
 [[maybe_unused]] static bool defined(const physics::Joint& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
 [[maybe_unused]] static std::string text(const physics::Joint& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
 [[maybe_unused]] static void take(physics::Joint& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
@@ -1129,7 +1159,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
-[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.x, (*got.rows)[0]) && same(want.y, (*got.rows)[1]) && same(want.z, (*got.rows)[2]) && same(want.w, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
 [[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
 [[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
 [[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
@@ -1141,7 +1171,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 }
 namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const physics::Pose& s) { return converted::Value::structure({arg(s.position), arg(s.rotation)}); }
-[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.position, (*got.rows)[0]) && same(want.rotation, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const physics::Pose& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[1]), ".rotation"); }
 [[maybe_unused]] static bool defined(const physics::Pose& s) { return defined(s.position) && defined(s.rotation); }
 [[maybe_unused]] static std::string text(const physics::Pose& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + "}"; }
 [[maybe_unused]] static void take(physics::Pose& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Quat>(s.rotation, (*v.rows)[1]); }
@@ -1157,7 +1187,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Colors& s) { return converted::Value::structure({arg(s.shirt), arg(s.pants), arg(s.skin), arg(s.hair), arg(s.cap), arg(s.vest)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Colors& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.shirt, (*got.rows)[0]) && same(want.pants, (*got.rows)[1]) && same(want.skin, (*got.rows)[2]) && same(want.hair, (*got.rows)[3]) && same(want.cap, (*got.rows)[4]) && same(want.vest, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls::Colors& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.shirt, (*got.rows)[0]), ".shirt") && converted::at_place(same(want.pants, (*got.rows)[1]), ".pants") && converted::at_place(same(want.skin, (*got.rows)[2]), ".skin") && converted::at_place(same(want.hair, (*got.rows)[3]), ".hair") && converted::at_place(same(want.cap, (*got.rows)[4]), ".cap") && converted::at_place(same(want.vest, (*got.rows)[5]), ".vest"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Colors& s) { return defined(s.shirt) && defined(s.pants) && defined(s.skin) && defined(s.hair) && defined(s.cap) && defined(s.vest); }
 [[maybe_unused]] static std::string text(const Ragdolls::Colors& s) { return std::string("{") + text(s.shirt) + ", " + text(s.pants) + ", " + text(s.skin) + ", " + text(s.hair) + ", " + text(s.cap) + ", " + text(s.vest) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Colors& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Vec3>(s.shirt, (*v.rows)[0]); converted::take_as<Vec3>(s.pants, (*v.rows)[1]); converted::take_as<Vec3>(s.skin, (*v.rows)[2]); converted::take_as<Vec3>(s.hair, (*v.rows)[3]); converted::take_as<bool>(s.cap, (*v.rows)[4]); converted::take_as<bool>(s.vest, (*v.rows)[5]); }
@@ -1182,7 +1212,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Doll& s) { return converted::Value::structure({arg(s.active), arg(s.recover), arg(s.getting_up), arg(converted::shaped<converted::Whole>(s.key)), arg(converted::array_list(s.bodies)), arg(converted::array_list(s.joints)), arg(converted::array_list(s.pose)), arg(converted::array_list(s.from)), arg(converted::array_list(s.stand)), arg(s.colors), arg(s.born), arg(s.settled), arg(s.getup_at), arg(s.stand_yaw), arg(s.stand_feet), arg(s.group)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return got.rows && got.rows->size() == 16 && same(want.active, (*got.rows)[0]) && same(want.recover, (*got.rows)[1]) && same(want.getting_up, (*got.rows)[2]) && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]) && same(converted::array_list(want.bodies), (*got.rows)[4]) && same(converted::array_list(want.joints), (*got.rows)[5]) && same(converted::array_list(want.pose), (*got.rows)[6]) && same(converted::array_list(want.from), (*got.rows)[7]) && same(converted::array_list(want.stand), (*got.rows)[8]) && same(want.colors, (*got.rows)[9]) && same(want.born, (*got.rows)[10]) && same(want.settled, (*got.rows)[11]) && same(want.getup_at, (*got.rows)[12]) && same(want.stand_yaw, (*got.rows)[13]) && same(want.stand_feet, (*got.rows)[14]) && same(want.group, (*got.rows)[15]); }
+[[maybe_unused]] static bool same(const Ragdolls::Doll& want, const converted::Value& got) { return converted::rows_of(got, 16) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.recover, (*got.rows)[1]), ".recover") && converted::at_place(same(want.getting_up, (*got.rows)[2]), ".getting_up") && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[3]), ".key") && converted::at_place(same(converted::array_list(want.bodies), (*got.rows)[4]), ".bodies") && converted::at_place(same(converted::array_list(want.joints), (*got.rows)[5]), ".joints") && converted::at_place(same(converted::array_list(want.pose), (*got.rows)[6]), ".pose") && converted::at_place(same(converted::array_list(want.from), (*got.rows)[7]), ".from") && converted::at_place(same(converted::array_list(want.stand), (*got.rows)[8]), ".stand") && converted::at_place(same(want.colors, (*got.rows)[9]), ".colors") && converted::at_place(same(want.born, (*got.rows)[10]), ".born") && converted::at_place(same(want.settled, (*got.rows)[11]), ".settled") && converted::at_place(same(want.getup_at, (*got.rows)[12]), ".getup_at") && converted::at_place(same(want.stand_yaw, (*got.rows)[13]), ".stand_yaw") && converted::at_place(same(want.stand_feet, (*got.rows)[14]), ".stand_feet") && converted::at_place(same(want.group, (*got.rows)[15]), ".group"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Doll& s) { return defined(s.active) && defined(s.recover) && defined(s.getting_up) && defined(converted::shaped<converted::Whole>(s.key)) && defined(converted::array_list(s.bodies)) && defined(converted::array_list(s.joints)) && defined(converted::array_list(s.pose)) && defined(converted::array_list(s.from)) && defined(converted::array_list(s.stand)) && defined(s.colors) && defined(s.born) && defined(s.settled) && defined(s.getup_at) && defined(s.stand_yaw) && defined(s.stand_feet) && defined(s.group); }
 [[maybe_unused]] static std::string text(const Ragdolls::Doll& s) { return std::string("{") + text(s.active) + ", " + text(s.recover) + ", " + text(s.getting_up) + ", " + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(converted::array_list(s.bodies)) + ", " + text(converted::array_list(s.joints)) + ", " + text(converted::array_list(s.pose)) + ", " + text(converted::array_list(s.from)) + ", " + text(converted::array_list(s.stand)) + ", " + text(s.colors) + ", " + text(s.born) + ", " + text(s.settled) + ", " + text(s.getup_at) + ", " + text(s.stand_yaw) + ", " + text(s.stand_feet) + ", " + text(s.group) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Doll& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<bool>(s.recover, (*v.rows)[1]); converted::take_as<bool>(s.getting_up, (*v.rows)[2]); converted::take_as<converted::Whole>(s.key, (*v.rows)[3]); { std::vector<physics::Body> items; converted::take_as<std::vector<physics::Body>>(items, (*v.rows)[4]); converted::array_from(s.bodies, items); } { std::vector<physics::Joint> items; converted::take_as<std::vector<physics::Joint>>(items, (*v.rows)[5]); converted::array_from(s.joints, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[6]); converted::array_from(s.pose, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[7]); converted::array_from(s.from, items); } { std::vector<physics::Pose> items; converted::take_as<std::vector<physics::Pose>>(items, (*v.rows)[8]); converted::array_from(s.stand, items); } converted::take_as<Ragdolls::Colors>(s.colors, (*v.rows)[9]); converted::take_as<double>(s.born, (*v.rows)[10]); converted::take_as<double>(s.settled, (*v.rows)[11]); converted::take_as<double>(s.getup_at, (*v.rows)[12]); converted::take_as<double>(s.stand_yaw, (*v.rows)[13]); converted::take_as<Vec3>(s.stand_feet, (*v.rows)[14]); converted::take_as<int>(s.group, (*v.rows)[15]); }
@@ -1194,7 +1224,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls::Up& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.key)), arg(s.feet), arg(s.yaw)}); }
-[[maybe_unused]] static bool same(const Ragdolls::Up& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]) && same(want.feet, (*got.rows)[1]) && same(want.yaw, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Ragdolls::Up& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(converted::shaped<converted::Whole>(want.key), (*got.rows)[0]), ".key") && converted::at_place(same(want.feet, (*got.rows)[1]), ".feet") && converted::at_place(same(want.yaw, (*got.rows)[2]), ".yaw"); }
 [[maybe_unused]] static bool defined(const Ragdolls::Up& s) { return defined(converted::shaped<converted::Whole>(s.key)) && defined(s.feet) && defined(s.yaw); }
 [[maybe_unused]] static std::string text(const Ragdolls::Up& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.key)) + ", " + text(s.feet) + ", " + text(s.yaw) + "}"; }
 [[maybe_unused]] static void take(Ragdolls::Up& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.key, (*v.rows)[0]); converted::take_as<Vec3>(s.feet, (*v.rows)[1]); converted::take_as<double>(s.yaw, (*v.rows)[2]); }
@@ -1209,7 +1239,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Ragdolls& s) { return converted::Value::structure({arg(s.world_), arg(s.dolls_), arg(s.ups_), arg(s.max_), arg(s.spawned_), arg(s.group_)}); }
-[[maybe_unused]] static bool same(const Ragdolls& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.world_, (*got.rows)[0]) && same(want.dolls_, (*got.rows)[1]) && same(want.ups_, (*got.rows)[2]) && same(want.max_, (*got.rows)[3]) && same(want.spawned_, (*got.rows)[4]) && same(want.group_, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const Ragdolls& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.world_, (*got.rows)[0]), ".world_") && converted::at_place(same(want.dolls_, (*got.rows)[1]), ".dolls_") && converted::at_place(same(want.ups_, (*got.rows)[2]), ".ups_") && converted::at_place(same(want.max_, (*got.rows)[3]), ".max_") && converted::at_place(same(want.spawned_, (*got.rows)[4]), ".spawned_") && converted::at_place(same(want.group_, (*got.rows)[5]), ".group_"); }
 [[maybe_unused]] static bool defined(const Ragdolls& s) { return defined(s.world_) && defined(s.dolls_) && defined(s.ups_) && defined(s.max_) && defined(s.spawned_) && defined(s.group_); }
 [[maybe_unused]] static std::string text(const Ragdolls& s) { return std::string("{") + text(s.world_) + ", " + text(s.dolls_) + ", " + text(s.ups_) + ", " + text(s.max_) + ", " + text(s.spawned_) + ", " + text(s.group_) + "}"; }
 [[maybe_unused]] static void take(Ragdolls& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<World*>(s.world_, (*v.rows)[0]); converted::take_as<std::vector<Ragdolls::Doll>>(s.dolls_, (*v.rows)[1]); converted::take_as<std::vector<Ragdolls::Up>>(s.ups_, (*v.rows)[2]); converted::take_as<unsigned int>(s.max_, (*v.rows)[3]); converted::take_as<unsigned int>(s.spawned_, (*v.rows)[4]); converted::take_as<int>(s.group_, (*v.rows)[5]); }
@@ -1224,7 +1254,7 @@ namespace physics { using converted::arg; using converted::same; using converted
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
-[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.material, (*got.rows)[0]) && same(want.extra_slot, (*got.rows)[1]) && same(want.texture, (*got.rows)[2]) && same(want.visible, (*got.rows)[3]) && same(want.layers, (*got.rows)[4]) && same(want.pick_bvh, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
 [[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
 [[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
 [[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
@@ -1232,6 +1262,10 @@ inline unsigned int Renderer::allocate_id() const { const std::vector<converted:
 inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
 inline bool Renderer::set_visible(const unsigned int& id, const bool& visible) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_visible", {converted::value_of(*this), converted::value_of(id), converted::value_of(visible)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool Renderer::update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.update_instances", {converted::value_of(*this), converted::value_of(id), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); if (changed) converted::take_as<bool>(*changed, kern_out[1]); return kern_result; }
+inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void World::destroy_joint(const physics::Joint& joint, const bool& wake_bodies) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_joint", {converted::value_of(*this), converted::value_of(joint), converted::value_of(wake_bodies)}); }
+inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
 inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 namespace primitives { inline void append(MeshData& dst, const MeshData& src, const Mat4& m) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.append", {converted::value_of(dst), converted::value_of(src), converted::value_of(m)}); converted::take_as<MeshData>(dst, kern_out[0]); } }
 namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.box", {converted::value_of(size), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
@@ -1239,15 +1273,15 @@ namespace primitives { inline MeshData capsule(const double& radius, const doubl
 namespace primitives { inline MeshData sphere(const double& radius, const unsigned int& segments, const unsigned int& rings, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.sphere", {converted::value_of(radius), converted::value_of(segments), converted::value_of(rings), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cylinder", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 struct Out_PeopleArt_make { bool Result; PeopleArt::Part p; };
-[[maybe_unused]] static bool same(const Out_PeopleArt_make& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.p, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_PeopleArt_make& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.p, (*got.rows)[1]), ".p"); }
 [[maybe_unused]] static bool defined(const Out_PeopleArt_make& s) { return defined(s.Result) && defined(s.p); }
 [[maybe_unused]] static std::string text(const Out_PeopleArt_make& s) { return std::string("{") + text(s.Result) + ", " + text(s.p) + "}"; }
 struct Out_PeopleArt_init { PeopleArt Self; bool Result; };
-[[maybe_unused]] static bool same(const Out_PeopleArt_init& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_PeopleArt_init& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_PeopleArt_init& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_PeopleArt_init& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_PeopleArt_upload { PeopleArt Self; PeopleArt::Part p; };
-[[maybe_unused]] static bool same(const Out_PeopleArt_upload& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.p, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_PeopleArt_upload& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.p, (*got.rows)[1]), ".p"); }
 [[maybe_unused]] static bool defined(const Out_PeopleArt_upload& s) { return defined(s.Self) && defined(s.p); }
 [[maybe_unused]] static std::string text(const Out_PeopleArt_upload& s) { return std::string("{") + text(s.Self) + ", " + text(s.p) + "}"; }
 
@@ -1256,7 +1290,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_people_art_cpp::rot(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_people_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       double a1 = draw.number();
@@ -1266,7 +1300,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1276,7 +1312,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // at
     converted::Tally tally("at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_people_art_cpp::at(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0) { return converted::counted([&] { return converted_people_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
       Vec3 a0 = draw.vector();
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1285,7 +1321,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1295,7 +1333,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // mat
     converted::Tally tally("mat");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] Vec3 a2) { return converted::counted([&] { return converted_people_art_cpp::mat(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] Vec3& a2) { return converted::counted([&] { return converted_people_art_cpp::mat(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
       double a0 = draw.number();
       double a1 = draw.number();
@@ -1306,7 +1344,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1316,7 +1356,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::make
     converted::Tally tally("PeopleArt_make");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Renderer& a0, [[maybe_unused]] PeopleArt::Part a1, [[maybe_unused]] MeshData a2, [[maybe_unused]] Material a3, [[maybe_unused]] bool a4) { auto r = converted::counted([&] { return PeopleArt{}.make(a0, a1, a2, a3, std::move(a4)); }); return Out_PeopleArt_make{std::move(r), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] Renderer& a0, [[maybe_unused]] PeopleArt::Part& a1, [[maybe_unused]] MeshData& a2, [[maybe_unused]] Material& a3, [[maybe_unused]] bool& a4) { auto r = converted::counted([&] { return PeopleArt{}.make(a0, a1, a2, a3, std::move(a4)); }); return Out_PeopleArt_make{std::move(r), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       Renderer& a0 = *converted::engine_object<Renderer>(1 + draw.below(6));
       PeopleArt::Part a1 = draw_PeopleArt__Part(draw);
@@ -1329,7 +1369,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(a0, std::move(a1), std::move(a2), std::move(a3), std::move(a4));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1339,7 +1381,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::init
     converted::Tally tally("PeopleArt_init");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_PeopleArt_init{std::move(a0), std::move(r)}; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_PeopleArt_init{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
@@ -1349,7 +1391,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), a1);
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1359,7 +1403,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::put
     converted::Tally tally("PeopleArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt::Part a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] Vec3 a2) { converted::counted([&] { return PeopleArt{}.put(a0, a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt::Part& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] Vec3& a2) { converted::counted([&] { return PeopleArt{}.put(a0, a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt::Part a0 = draw_PeopleArt__Part(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -1370,7 +1414,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1380,7 +1426,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::street_lamp
     converted::Tally tally("PeopleArt_street_lamp");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.street_lamp(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.street_lamp(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       Vec3 a1 = draw.vector();
@@ -1392,7 +1438,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1402,7 +1450,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::clear
     converted::Tally tally("PeopleArt_clear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt::Part a0) { converted::counted([&] { return PeopleArt::clear(a0); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt::Part& a0) { converted::counted([&] { return PeopleArt::clear(a0); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt::Part a0 = draw_PeopleArt__Part(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1411,7 +1459,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1421,7 +1471,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::begin
     converted::Tally tally("PeopleArt_begin");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0) { converted::counted([&] { return a0.begin(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0) { converted::counted([&] { return a0.begin(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1430,7 +1480,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1440,7 +1492,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::hair_color
     converted::Tally tally("PeopleArt_hair_color");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] People::Person a0) { return converted::counted([&] { return PeopleArt::hair_color(a0); }); };
+    const auto run = [&]([[maybe_unused]] People::Person& a0) { return converted::counted([&] { return PeopleArt::hair_color(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
       People::Person a0 = draw_People__Person(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1449,7 +1501,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1459,7 +1513,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::person
     converted::Tally tally("PeopleArt_person");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] People::Person a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.person(a1, std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] People::Person& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.person(a1, std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       People::Person a1 = draw_People__Person(draw);
@@ -1470,7 +1524,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1480,7 +1536,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::ragdolls
     converted::Tally tally("PeopleArt_ragdolls");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] std::vector<Ragdolls::Draw> a1, [[maybe_unused]] Ragdolls a2) { converted::counted([&] { return a0.ragdolls(a1, a2); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] std::vector<Ragdolls::Draw>& a1, [[maybe_unused]] Ragdolls& a2) { converted::counted([&] { return a0.ragdolls(a1, a2); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       std::vector<Ragdolls::Draw> a1 = draw_list(draw, [&]() -> Ragdolls::Draw { return draw_Ragdolls__Draw(draw); });
@@ -1491,7 +1547,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1501,7 +1559,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::beacon
     converted::Tally tally("PeopleArt_beacon");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.beacon(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.beacon(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       Vec3 a1 = draw.vector();
@@ -1513,7 +1571,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1523,7 +1583,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::light_bar
     converted::Tally tally("PeopleArt_light_bar");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] bool a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.light_bar(a1, std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.light_bar(a1, std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       Mat4 a1 = draw_kern__Mat4(draw);
@@ -1535,7 +1595,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1545,7 +1607,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::fire
     converted::Tally tally("PeopleArt_fire");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3) { converted::counted([&] { return a0.fire(std::move(a1), std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { converted::counted([&] { return a0.fire(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       Vec3 a1 = draw.vector();
@@ -1557,7 +1619,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1567,7 +1631,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::police_drone
     converted::Tally tally("PeopleArt_police_drone");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5, [[maybe_unused]] double a6, [[maybe_unused]] unsigned int a7) { converted::counted([&] { return a0.police_drone(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] bool& a5, [[maybe_unused]] double& a6, [[maybe_unused]] unsigned int& a7) { converted::counted([&] { return a0.police_drone(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       Vec3 a1 = draw.vector();
@@ -1583,7 +1647,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6), std::move(a7));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6, a7))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6, a7); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1593,7 +1659,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::projectile
     converted::Tally tally("PeopleArt_projectile");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5) { converted::counted([&] { return a0.projectile(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] bool& a5) { converted::counted([&] { return a0.projectile(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       Vec3 a1 = draw.vector();
@@ -1607,7 +1673,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1617,7 +1685,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::upload
     converted::Tally tally("PeopleArt_upload");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0, [[maybe_unused]] PeopleArt::Part a1) { converted::counted([&] { return a0.upload(a1); }); return Out_PeopleArt_upload{std::move(a0), std::move(a1)}; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0, [[maybe_unused]] PeopleArt::Part& a1) { converted::counted([&] { return a0.upload(a1); }); return Out_PeopleArt_upload{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       PeopleArt::Part a1 = draw_PeopleArt__Part(draw);
@@ -1627,7 +1695,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0), std::move(a1));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -1637,7 +1707,7 @@ SC_TEST(converted_people_art_cpp) {
   {  // PeopleArt::end
     converted::Tally tally("PeopleArt_end");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PeopleArt a0) { converted::counted([&] { return a0.end(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] PeopleArt& a0) { converted::counted([&] { return a0.end(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
       PeopleArt a0 = draw_PeopleArt(draw);
       const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
@@ -1646,7 +1716,9 @@ SC_TEST(converted_people_art_cpp) {
       converted::g_can_bail = true;
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      const auto made = run(std::move(a0));
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
