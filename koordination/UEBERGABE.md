@@ -1188,3 +1188,16 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
   mit ihren Lokalen, das Ereignis ruft sie; sonst unverändert. Lokal nur py_compile – Beleg ist der volle Lauf.
 - **`work-kandidat` = d9af9855** = 8a16a750 + work-d-fail + work-tempo e9929af0 + work-ende 3ecf4708.
   **Läuft: `work-kandidat-voll-084935-415`** (abgelegt 08:49). Auswerten: convert rc=0? dann Urteile gegen 160230 (270/0, 150/1) und Zeit der Suite.
+
+### 16.32 Stand 10:50 (23.11.) – Kandidat `work-kandidat-voll-084935-415` (d9af9855): convert grün, Suite 420 ok / 2 FAIL – NICHT gemischt
+
+- **convert rc=0** (09:40, 50 min 38 s) → `work-ende` 3ecf4708 belegt: der Text von Game wird wieder gelesen. **engine rc=0.**
+- **suite rc=1** (10:31; Suite 50 min 38 s statt 2 h 11 in 160230, beide auf dem ganzen Level): 420 ok, 2 FAIL.
+  Game-Tests je 94–186 s (vorher 1727–2519 s); „time: Blueprint Game“ 84–149 s vor dem ersten Aufruf – das ist jetzt der größte Teil
+  eines Game-Tests (unter Sanitizern, ganzes Level): nächster Hebel, noch nicht untersucht. `converted_engine_geo_roads` wieder ok.
+- **FAIL 1: `converted_Game__game_cpp` gegen die echte Engine** – ASan heap-use-after-free, physics.cpp:182 `World::valid()` aus
+  `Car::detach()` → `World::body_valid` (test_Game__game_cpp.cpp:6775): ~Car auf beendeter Welt, derselbe Test wie in 160230 (150/1).
+  g 8b27771d hat ihn also nicht behoben. → g.
+- **FAIL 2: `lowered_city_jobs_cpp`** (source_diff.h:555): `run_tile`: in 1 von 300 Aufrufen fragt das Neue öfter nach Speicher (3 statt 2).
+  In 213658 und 223820 ok. Ursache offen (work-d-fail berührt city_stream/jobs?) → d.
+- `work` 42831863 und `work-zusammen` 8a16a750 unverändert. Gemischt wird erst mit suite rc=0.
