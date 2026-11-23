@@ -1214,3 +1214,15 @@ work-d-fail und work-tempo nach `work-zusammen` und `work`, Level und Tabellen a
   Zählung der Speicheranfragen, cost.h, zählt nicht nur den gemessenen Aufruf). Nichts geändert; der nächste Lauf zeigt, ob es wiederkommt. → t1.
 - **`work-kandidat` = 01a64b4d** = 8a16a750 + work-d-fail + work-tempo e9929af0 + work-ende 3ecf4708 + work-geliehen 0c15cfa2.
   **Läuft: `work-kandidat-voll-105632-525`** (10:56). Nächster Hebel Zeit: „time: Blueprint Game“ 84–149 s je Game-Test.
+
+### 16.34 Stand 11:20 (23.11.) – lowered_city_jobs_cpp: Ursache NICHT gefunden, Spur-Ausgabe auf `work-kost` 452b4ddc; Chris: noch ~12 USD Guthaben
+
+- Chris (11:13): Rest-Guthaben rund 12 USD – sparsam; alles gepusht halten, mag läuft ohne Quote weiter.
+- **Ausgeschlossen (lokal, g++ 13, ASan, nur dieser Test):** 85 Läufe 0 FAIL; Stapel vor jedem Aufruf mit 0x00/0xFF/0xAA/0x55/wechselnd
+  gefüllt – gleich; alle Lokalen mit -ftrivial-auto-var-init=zero gegen =pattern – 6900 Zählungen Aufruf für Aufruf gleich. Also kein
+  Lesen nicht gesetzter Lokale (unter g++). Der Test startet keine Job-Threads. Der Zufall ist fest (Draw 0x5eed1234).
+- **Offen:** mag baut mit clang 18 (ASan mit falschem Stapel; malloc-Haken zählt jede Anfrage des Prozesses). Auffällig: lowered-Tests rufen
+  `converted::zero_stack()` nicht (die converted-Tests schon, cpp_to_blueprint.py:14247) – als Ursache nicht belegt.
+- **`work-kost` = 452b4ddc** (tests/source_diff.h): beim ersten Aufruf, in dem das Neue öfter fragt, druckt der Test die Spuren beider Seiten.
+  Noch NICHT im Kandidaten (01a64b4d rechnet) – mit der nächsten Runde einmischen; der nächste rote Lauf nennt dann die Stelle. → t1.
+- Läuft: `work-kandidat-voll-105632-525`; Kontrolle geplant ~12:42 (mischt bei grün nach work-zusammen/work, siehe 16.33).
