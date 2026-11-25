@@ -2,6 +2,7 @@
 #pragma once
 
 #include "kern/app/app.h"
+#include "kern/app/run.h"
 #include "kern/core/base.h"
 #include "kern/geo/buildings.h"
 #include "kern/geo/earcut.h"

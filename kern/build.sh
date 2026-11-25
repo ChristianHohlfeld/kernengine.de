@@ -147,9 +147,13 @@ if [ "${#todo[@]}" -gt 0 ]; then
 fi
 
 mkdir -p "$(dirname "$out")"
+# (an app's one entry, kern_main - the program defines it, kern/app/app.h - is exported for kern/web/app.mjs, which
+# calls it before kern_app_start; a module without it - the Studio - cannot start an app, and the page says so)
+entry=()
+[ "$with_app" = 1 ] && entry=(-Wl,--export-if-defined=kern_main)
 "$CXX" "${target[@]}" "${opt[@]}" "${features[@]}" "${lto[@]}" \
   "${cpp_objects[@]}" "${objects[@]}" \
-  -mexec-model=reactor \
+  -mexec-model=reactor "${entry[@]}" \
   -Wl,--gc-sections -Wl,--strip-debug -Wl,-z,stack-size=1048576 -Wl,--export-table -Wl,--growable-table \
   -Wl,--initial-memory="${KERN_INITIAL_MEMORY:-33554432}" -Wl,--max-memory=2147483648 \
   ${lto[@]:+-Wl,--thinlto-jobs=$jobs -Wl,--thinlto-cache-dir=$cache_root/thinlto} \

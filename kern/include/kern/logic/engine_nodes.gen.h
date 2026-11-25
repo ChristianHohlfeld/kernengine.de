@@ -1940,23 +1940,11 @@ struct P_engine_character_mover_settings {
 template <class B> class ClassImplements_App final : public kern::App {
  public:
   explicit ClassImplements_App(B& b) : b_(b) {}
-  template <class X> static constexpr bool kern_has_configure = requires { requires std::is_same_v<typename MemberOf<decltype(&X::configure)>::type, X>; };
   template <class X> static constexpr bool kern_has_extensions = requires { requires std::is_same_v<typename MemberOf<decltype(&X::extensions)>::type, X>; };
   template <class X> static constexpr bool kern_has_start = requires { requires std::is_same_v<typename MemberOf<decltype(&X::start)>::type, X>; };
   template <class X> static constexpr bool kern_has_update = requires { requires std::is_same_v<typename MemberOf<decltype(&X::update)>::type, X>; };
   template <class X> static constexpr bool kern_has_resized = requires { requires std::is_same_v<typename MemberOf<decltype(&X::resized)>::type, X>; };
   template <class X> static constexpr bool kern_has_stop = requires { requires std::is_same_v<typename MemberOf<decltype(&X::stop)>::type, X>; };
-  decltype(std::declval<kern::App&>().configure()) configure() override {
-    if constexpr (!kern_has_configure<B>) {
-      return kern::App::configure();
-    } else {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.configure();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::App&>().configure())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
   decltype(std::declval<kern::App&>().extensions()) extensions() override {
     if constexpr (!kern_has_extensions<B>) {
       return kern::App::extensions();
@@ -2010,6 +1998,28 @@ template <class B> class ClassImplements_App final : public kern::App {
 };
 template <> struct InterfaceOf<"App"> {
   template <class B> using adapter = ClassImplements_App<B>;
+};
+
+// kern::game::FixedStep that a Blueprint's class is (kern::Implements<"game_FixedStep">: kern::logic::implementation)
+template <class B> class ClassImplements_game_FixedStep final : public kern::game::FixedStep {
+ public:
+  explicit ClassImplements_game_FixedStep(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_fixed_step = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fixed_step)>::type, X>; };
+  decltype(std::declval<kern::game::FixedStep&>().fixed_step(std::declval<double>())) fixed_step(double kern_p0) override {
+    static_assert(kern_has_fixed_step<B>, "a Blueprint that implements game_FixedStep has its function fixed_step");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.fixed_step(::kern::logic::engine_values::Given<::kern::logic::engine_values::Float, double const&>(kern_o, kern_p0));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+};
+template <> struct InterfaceOf<"game_FixedStep"> {
+  template <class B> using adapter = ClassImplements_game_FixedStep<B>;
 };
 
 // kern::ShaderExtension that a Blueprint's class is (kern::Implements<"ShaderExtension">: kern::logic::implementation)
@@ -3035,30 +3045,6 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.engine.set_stereo_cross", {to_value(engine), to_value(on)}, {});
-  }
-  /// Renderer configuration, asked once before start().
-  void engine_app_configure(Int app) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::App>(*kern_o, static_cast<::kern::i64>(app), "app");
-      if (!kern_self) { this->kern_engine_failed("engine.app.configure"); return; }
-      decltype(auto) kern_r = kern_self->configure();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::pass(*kern_o, kern_r);
-      return;
-    }
-    this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure});
-  }
-  template <class KernNode> void engine_app_configure(KernNode& kern_n, Int app) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::App>(*kern_o, static_cast<::kern::i64>(app), "app");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.app.configure"); return; }
-      decltype(auto) kern_r = kern_self->configure();
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Shader extensions the game uses (must outlive the app).
   void engine_app_extensions(Int app) {
@@ -4541,6 +4527,19 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Text>(this->kern_engine("engine.game.game_status_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
+  /// One fixed step of `dt` seconds. The world calls it after the physics step and the step's events (contacts, triggers, health), right before the Blueprints' Event Tick of the same step - so what it changes, every Blueprint of the world sees in that tick, and forces it applies act in the next physics step.
+  void engine_fixed_step_fixed_step(Int fixed_step, Float dt) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::FixedStep>(*kern_o, static_cast<::kern::i64>(fixed_step), "fixed_step");
+      if (!kern_self) { this->kern_engine_failed("engine.fixed_step.fixed_step"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a0);
+      kern_self->fixed_step(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.fixed_step.fixed_step", {to_value(fixed_step), to_value(dt)}, {});
+  }
   /// Renderer layer bits for the scene meshes (default 1).
   void engine_game_world_set_layers(Int game_world, Int layers) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -4778,6 +4777,29 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.game_world.present", {to_value(game_world), to_value(now_ms), to_value(eye)}, {});
+  }
+  /// The program's fixed step (FixedStep: where in a step it runs); one, null: none. It must outlive the world's runs or be taken back (set_fixed_step(nullptr)) before it ends.
+  void engine_game_world_set_fixed_step(Int game_world, Int step) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.set_fixed_step"); return; }
+      kern::game::FixedStep* const kern_a0 = ::kern::logic::engine_values::maybe_of<kern::game::FixedStep>(*kern_o, static_cast<::kern::i64>(step), "step");
+      if (!kern_o->error.empty()) { this->kern_engine_failed("engine.game_world.set_fixed_step"); return; }
+      kern_self->set_fixed_step(kern_a0);
+      return;
+    }
+    this->kern_engine("engine.game_world.set_fixed_step", {to_value(game_world), to_value(step)}, {});
+  }
+  Int engine_game_world_fixed_step_handler(Int game_world) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.fixed_step_handler"); return Int{}; }
+      decltype(auto) kern_r = kern_self->fixed_step_handler();
+      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::FixedStep>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
+    }
+    return from_value<Int>(this->kern_engine("engine.game_world.fixed_step_handler", {to_value(game_world)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   void engine_game_world_stop(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

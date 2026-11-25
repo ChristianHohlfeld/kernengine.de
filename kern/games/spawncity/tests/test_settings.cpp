@@ -1,34 +1,43 @@
-// The settings table: SpawnCity's defaults and ranges, the "set" parser.
+// The settings table: SpawnCity's defaults and ranges, the "set" parser. The table is the level's Blueprint
+// Settings; the settings themselves are the Blueprint settings_cpp, called as its class - as the program
+// calls it (level_blueprints.h).
 #include <string>
 
-#include "../src/settings.h"
+#include "../src/blueprint_call.h"
+#include "level_blueprints.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
 
 SC_TEST(settings_defaults_and_ranges) {
-  RuleBlueprint bp("Settings", nullptr);
+  RuleBlueprint bp("Settings", nullptr, true, {"settings_cpp"});
   SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Settings Blueprint compiles and runs: %s", bp.problems.c_str());
   SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
-  SettingsTable table;
-  SC_CHECK(bind_settings(bp.rt, table), "its table has one row per setting");
-  Settings s(table);
-  SC_CHECK(s.get(Opt::mouse_sensitivity) == 100 && !s.on(Opt::mouse_invert_y), "mouse 100 %%, not inverted");
-  SC_CHECK(s.get(Opt::drone_max_speed_kmh) == 90 && std::fabs(s.get(Opt::drone_hover_agl) - 1.2f) < 1e-6f, "drone 90 km/h, hover 1.2 m");
-  SC_CHECK(s.get(Opt::car_max_kmh) == 115 && s.get(Opt::car_reverse_kmh) == 32, "car 115 / 32 km/h");
-  SC_CHECK(s.get(Opt::cam_fpv_tilt) == -15 && s.get(Opt::cam_fov) == 105, "camera -15 deg, 105 deg");
-  SC_CHECK(s.get(Opt::audio_drone) == 50 && s.get(Opt::audio_vehicle) == 58 && s.get(Opt::music_volume) == 32, "audio mix v5");
-  SC_CHECK(s.on(Opt::world_jetpack) && s.on(Opt::world_friendly_fire) && !s.on(Opt::world_terrain) && !s.on(Opt::world_flak) && s.on(Opt::world_guided), "world options: jetpack, friendly fire, guided on; terrain, flak off");
-  const u32 v = s.version();
-  SC_CHECK(s.set(table, "mouse.sensitivity", "999") && s.get(Opt::mouse_sensitivity) == 300, "clamped to 300");
-  SC_CHECK(s.set(table, "mouse.sensitivity", "47") && s.get(Opt::mouse_sensitivity) == 45, "snapped to the 5 %% step (%g)", s.get(Opt::mouse_sensitivity));
-  SC_CHECK(s.version() > v, "version counts changes");
-  SC_CHECK(s.set(table, "world.people", "false") && !s.on(Opt::world_people), "toggle off");
-  SC_CHECK(!s.set(table, "no.such", "1") && !s.set(table, "car.maxKmh", "fast"), "unknown key / no number");
-  s.reset_section(table, "maus");
-  SC_CHECK(s.get(Opt::mouse_sensitivity) == 100 && !s.on(Opt::world_people), "section reset keeps the others");
-  const std::string schema = s.schema_json(table);
+  bp.rt.budget = rules::kLoopBudget;
+  using S = blueprints::settings_cpp;
+  using Opt = S::Opt;
+  SC_CHECK(kern::logic::bind_blueprint<S>(bp.rt), "settings_cpp runs as its class");
+  S& set = kern::logic::blueprint<S>();
+  S::SettingsTable table;
+  SC_CHECK(set.bind_settings(table).Result, "its table has one row per setting");
+  S::Settings s = set.Settings_new(table).Result;
+  auto get = [&](Opt o) { return set.Settings_get(s, o).Result; };
+  auto on = [&](Opt o) { return static_cast<bool>(set.Settings_on(s, o).Result); };
+  SC_CHECK(get(Opt::mouse_sensitivity) == 100 && !on(Opt::mouse_invert_y), "mouse 100 %%, not inverted");
+  SC_CHECK(get(Opt::drone_max_speed_kmh) == 90 && std::fabs(get(Opt::drone_hover_agl) - 1.2f) < 1e-6f, "drone 90 km/h, hover 1.2 m");
+  SC_CHECK(get(Opt::car_max_kmh) == 115 && get(Opt::car_reverse_kmh) == 32, "car 115 / 32 km/h");
+  SC_CHECK(get(Opt::cam_fpv_tilt) == -15 && get(Opt::cam_fov) == 105, "camera -15 deg, 105 deg");
+  SC_CHECK(get(Opt::audio_drone) == 50 && get(Opt::audio_vehicle) == 58 && get(Opt::music_volume) == 32, "audio mix v5");
+  SC_CHECK(on(Opt::world_jetpack) && on(Opt::world_friendly_fire) && !on(Opt::world_terrain) && !on(Opt::world_flak) && on(Opt::world_guided), "world options: jetpack, friendly fire, guided on; terrain, flak off");
+  const auto v = set.Settings_version(s).Result;
+  SC_CHECK(set.Settings_set_2(s, table, "mouse.sensitivity", "999").Result && get(Opt::mouse_sensitivity) == 300, "clamped to 300");
+  SC_CHECK(set.Settings_set_2(s, table, "mouse.sensitivity", "47").Result && get(Opt::mouse_sensitivity) == 45, "snapped to the 5 %% step (%g)", static_cast<double>(get(Opt::mouse_sensitivity)));
+  SC_CHECK(set.Settings_version(s).Result > v, "version counts changes");
+  SC_CHECK(set.Settings_set_2(s, table, "world.people", "false").Result && !on(Opt::world_people), "toggle off");
+  SC_CHECK(!set.Settings_set_2(s, table, "no.such", "1").Result && !set.Settings_set_2(s, table, "car.maxKmh", "fast").Result, "unknown key / no number");
+  set.Settings_reset_section(s, table, "maus");
+  SC_CHECK(get(Opt::mouse_sensitivity) == 100 && !on(Opt::world_people), "section reset keeps the others");
+  const std::string schema(set.Settings_schema_json(s, table).Result.view());
   SC_CHECK(schema.find("\"key\":\"world.jetpack\"") != std::string::npos && schema.front() == '[' && schema.back() == ']', "schema lists every row");
-  bind_settings(no_logic(), table);   // (the test's logic is gone with it: the rules are bound where none has a Blueprint)
 }

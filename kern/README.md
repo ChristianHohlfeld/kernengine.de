@@ -100,7 +100,7 @@ class MyGame final : public App {
   f32 yaw_ = 0;
 };
 
-App* kern_create_app() { static MyGame game; return &game; }
+int kern_main() { static MyGame game; return kern::run(game); }
 ```
 
 Im Browser:

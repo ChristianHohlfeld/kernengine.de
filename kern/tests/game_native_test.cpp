@@ -13,8 +13,6 @@
 #include "game_cases.h"
 #include "kern/app/app.h"
 
-kern::App* kern_create_app() { return nullptr; }  // (the app runtime is linked in; it needs a factory)
-
 int main(int argc, char** argv) {
   using namespace kern;
   if (argc < 2) {

@@ -9,11 +9,6 @@
 
 using namespace kern;
 
-extern "C" __attribute__((weak)) u32 kern_game_extensions(ShaderExtension*** out) {
-  *out = nullptr;
-  return 0;
-}
-
 namespace kern {
 Renderer& c_api_renderer() {
   static Renderer renderer;
@@ -103,9 +98,7 @@ KERN_EXPORT(kern_renderer_init) i32 kern_renderer_init(const u32* d) {
   o.bloom.forced = d[KERN_ID_BLOOM_FORCED] != 0;
   o.grade = d[KERN_ID_GRADE] != 0;
   o.bloom.grade = o.grade;
-  ShaderExtension** list = nullptr;
-  const u32 n = kern_game_extensions(&list);
-  return R().init(o, Span<ShaderExtension* const>(list, n)) ? 1 : 0;
+  return R().init(o, {}) ? 1 : 0;   // (shader extensions are an App's: App::extensions, kern/app/app.h)
 }
 KERN_EXPORT(kern_renderer_shutdown) void kern_renderer_shutdown() { R().shutdown(); }
 KERN_EXPORT(kern_renderer_resize) i32 kern_renderer_resize(i32 w, i32 h) { return R().resize(w, h) ? 1 : 0; }

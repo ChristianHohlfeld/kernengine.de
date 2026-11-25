@@ -2263,8 +2263,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
     }
     runs += body + "}\n\n";
   }
-  main += "\n// (the engine is linked in with its app runtime, which needs a factory)\nkern::App* kern_create_app() { return nullptr; }\n"
-          "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
+  main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
           "// A call by name that reached its function: the class's glue says when the function begins and when it has\n"
           "// returned (logic::native_probe) - once each, the begin first. (A function that calls one of another\n"
           "// Blueprint by name: that call begins and returns inside it.)\n"

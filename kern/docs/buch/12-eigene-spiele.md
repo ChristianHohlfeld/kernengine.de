@@ -164,7 +164,6 @@ Die API steht in `kern/include/kern/app/app.h` und wird mit `#include "kern/kern
 
 | Methode | Wann | Zweck |
 |---|---|---|
-| `RendererOptions configure()` | einmal, vor `start` | Schatten, Bloom und weitere Renderer-Optionen (Breite und Höhe setzt die Engine) |
 | `Span<ShaderExtension* const> extensions()` | einmal, vor `start` | eigene Shader-Erweiterungen; sie müssen die App überleben |
 | `bool start(Engine&)` | einmal | Meshes anlegen, Zustand vorbereiten; `false` bricht ab |
 | `void update(Engine&, const Frame&)` | jeden Bildschirm-Frame | Eingabe lesen, Spiel fortschreiben, Szene aktualisieren |
@@ -209,7 +208,8 @@ und `space`, `enter`, `escape`, `tab`, `backspace`, `shift_left`/`_right`, `cont
 Seite (app.mjs)                       Modul (src/app/app.cpp)
 ---------------------------------------------------------------------------
 kern_app_set_args("?time=0.6")   ->   Engine::set_args
-kern_app_start(w, h)             ->   kern_create_app(), configure(), Renderer::init, start()
+kern_main()                      ->   kern::run(app, settings)  (Einstieg des Programms)
+kern_app_start(w, h)             ->   settings (profile=<name>), Renderer::init, start()
 Tastatur / Maus / Touch          ->   kern_app_key / _pointer / _wheel / _touch / _focus
 requestAnimationFrame:
   kern_app_frame(now, hidden)    ->   update(engine, frame); input.end_frame(); render()
@@ -242,17 +242,12 @@ using namespace kern;
 ```cpp
 class Hello final : public App {
  public:
-  RendererOptions configure() override {
-    RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 1024;
-    o.shadow.extent = 40;
-    return o;
-  }
 ```
 
-`configure` legt den Renderer fest, bevor es ihn gibt: Sonnenschatten mit einer 1024er-Karte, die 40 m
-abdeckt. Breite und Höhe trägt die Engine selbst ein.
+Den Renderer legen, bevor es ihn gibt, die Einstellungen fest, die `kern_main` mit der App übergibt (`kern::run(app,
+settings)`, unten): Sonnenschatten mit einer 1024er-Karte, die 40 m abdeckt. Breite und Höhe trägt die Engine selbst
+ein. Einen zweiten Weg gibt es nicht (die App hat kein `configure`): ein Spiel mit Projekt-Datei nimmt sie aus seinem
+Projekt (12.2.7).
 
 ```cpp
   bool start(Engine& engine) override {
@@ -366,13 +361,20 @@ den Instanzpuffer kopiert.
 auf z = 0, ihre Vertexfarbe ist orange). Weiße Tints lassen diese Farbe unverändert.
 
 ```cpp
-App* kern_create_app() {
+int kern_main() {
   static Hello app;
-  return &app;
+  ProjectSettings settings;
+  settings.renderer.shadows = true;
+  settings.renderer.shadow.resolution = 1024;
+  settings.renderer.shadow.extent = 40;
+  return kern::run(app, settings);
 }
 ```
 
-Diese eine freie Funktion muss jedes Spiel definieren. Die Laufzeit ruft sie beim Start genau einmal auf.
+Diesen einen Einstieg muss jedes Spiel definieren (`include/kern/app/run.h`): die Plattformschicht ruft ihn vor dem
+Start der App genau einmal auf, und er gibt der Engine seine App mit `kern::run` (ein zweites `run` wird abgewiesen).
+Einen anderen Weg, der Engine eine App zu geben, gibt es nicht – keine Fabrik, nach der die Engine fragt, kein Symbol,
+das der Linker wählt.
 Das statische Objekt lebt so lange wie das Modul.
 
 Die Seite dazu (`kern/examples/hello/index.html`) ist kurz:
@@ -599,7 +601,7 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
 ### 12.2.6 Ein eigenes Spiel anlegen
 
 1. Einen Ordner anlegen, etwa `meinspiel/`, mit `meinspiel.cpp` (eine Klasse, die von `App` erbt, und
-   `kern_create_app()`) und `index.html` (wie bei hello, mit dem Pfad zu `app.mjs`).
+   `kern_main()`) und `index.html` (wie bei hello, mit dem Pfad zu `app.mjs`).
 2. Bauen: `kern/build.sh --app meinspiel/meinspiel.wasm meinspiel/meinspiel.cpp`. Wer Box3D direkt nutzen
    will, nimmt `--physics` dazu ([Kapitel 6](06-physik.md)); wer Levels und die Spiel-Laufzeit braucht,
    `--game` ([Kapitel 8](08-spiel-laufzeit.md)).
@@ -607,6 +609,28 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
    (Abschnitt 12.5).
 
 ---
+
+### 12.2.7 Projekt-Einstellungen
+
+Die Projekt-Datei (`<name>.kproject`, `kern::game::Project`, `include/kern/game/project.h`; siehe `kern/docs/project.md`)
+trägt die Einstellungen, die die Engine beim Start des Programms anwendet: ihr Feld `"settings"`
+(`kern::ProjectSettings`, `include/kern/app/project.h`) – die Renderer-Optionen (`renderer`), dieselben
+als Geräteprofile (`profiles`: je ein Name und die Renderer-Optionen auf dieser Art Gerät – der `renderer` des
+Projekts mit den Schlüsseln, die das Profil nennt, darüber –, gewählt beim Start mit dem Startparameter
+`profile=<name>`) und `heapReserveMb`, den Heap, der vor
+dem Start einmal genommen und zurückgegeben wird (der Allokator behält ihn; das Spiel stockt nicht, weil der Speicher
+beim Spielen Stück für Stück wächst). Ein Level enthält nur seine Welt: eine Level-Datei mit dem alten Feld
+`"project"` wird mit Stelle und Grund abgelehnt.
+Der Bau bettet Projekt und Levels ein (`kern/tools/embed_project.py <name.kproject> <out.cpp>`): die Quelle definiert
+`kern::game::embedded_project_text()` und `kern::game::embedded_level(pfad)` – Daten, kein Einstieg;
+`kern::game::embedded_project()` (`include/kern/game/embedded.h`) ist das daraus gelesene Projekt. Der Einstieg des
+Programms gibt der Engine die Einstellungen des Projekts mit seiner App: `kern::run(kern::game::embedded_project())` für
+ein Projekt, dessen App ein Programm-Blueprint ist, `kern::run(app, kern::game::embedded_project().settings)` für eine
+App aus C++. `kern_app_start` wendet sie vor allem anderen der App an: der Renderer startet mit dem Profil, das `profile=<name>`
+nennt, sonst mit `renderer` (ein Name, zu dem das Projekt kein Profil hat, ist ein Fehler im Log, mit den Namen, die es
+hat); danach der Heap-Vorgriff – dann `App::start()`. `kern::run(app)` ohne Einstellungen: die Vorgaben der Engine. Das
+feste Telefon-Feld von früher (`"mobile"`), ein Profil ohne Namen oder mit einem Namen zweimal werden mit Stelle
+abgelehnt.
 
 ## 12.3 Die Plattformschicht `web/app.mjs`
 

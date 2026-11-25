@@ -1,7 +1,8 @@
 // Application runtime: Input bookkeeping and the C ABI the platform layer
-// (kern/web/app.mjs) drives. Only linked into modules that define
-// kern_create_app() (the C ABI below references it).
+// (kern/web/app.mjs) drives. The App and the project's settings are what the program's kern_main() handed over with
+// kern::run (kern/docs/project.md 4.).
 #include "kern/app/app.h"
+#include "kern/app/run.h"
 
 #include <cmath>
 #include <cstdio>
@@ -9,6 +10,7 @@
 #include <cstring>
 
 #include "kern/api/c_api.h"
+#include "kern/app/project.h"
 
 namespace kern {
 
@@ -153,6 +155,41 @@ u64 g_frame = 0;
 bool g_running = false;
 }  // namespace
 
+namespace kern {
+/// The renderer the project's settings start: the device profile the launch argument profile=<name> names, else the
+/// project's. A name the project has no profile of: an error in the log with the names it has, and the project's.
+RendererOptions start_renderer(const ProjectSettings& p, const Engine& e) {
+  const std::string want = e.arg("profile", "");
+  if (want.empty()) return p.renderer;
+  if (const DeviceProfile* d = p.profile(want)) return d->renderer;
+  std::string names;
+  for (const DeviceProfile& d : p.profiles) names += (names.empty() ? "" : ", ") + d.name;
+  log(LogLevel::error, "the launch argument profile=%s names no device profile of the project (it has: %s) - the renderer starts with the project's",
+      want.c_str(), names.empty() ? "none" : names.c_str());
+  return p.renderer;
+}
+/// Between the renderer's init and App::start: the heap grown once - one block taken and given back stays in the
+/// allocator's free space (wasm memory never shrinks), so the game does not stall growing it piece by piece.
+void reserve_heap(const ProjectSettings& p) {
+  if (p.heap_reserve_mb > 0)
+    if (void* reserve = std::malloc(static_cast<std::size_t>(p.heap_reserve_mb) << 20)) std::free(reserve);
+}
+namespace {
+/// The project's settings the program's kern_main() handed over with its App (kern::run).
+ProjectSettings g_settings;
+}  // namespace
+
+int run(App& app, const ProjectSettings& settings) {
+  if (g_app) {
+    log(LogLevel::error, "kern::run: the program has given its App already - kern_main hands over one App, once");
+    return 1;
+  }
+  g_app = &app;
+  g_settings = settings;
+  return 0;
+}
+}  // namespace kern
+
 Engine& engine_instance() {
   static Engine engine(c_api_renderer());
   return engine;
@@ -163,14 +200,15 @@ KERN_EXPORT(kern_app_set_args) void kern_app_set_args(const char* text, u32 leng
 
 KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
   if (g_running) return 1;
-  g_app = kern_create_app();
-  if (!g_app) { fail("no application"); return 0; }
+  if (!g_app) { fail("no App: the program's kern_main() hands the engine its App with kern::run (kern/docs/project.md 4.)"); return 0; }
   Engine& engine = engine_instance();
   g_engine = &engine;
-  RendererOptions options = g_app->configure();
+  const ProjectSettings& project = g_settings;
+  RendererOptions options = start_renderer(project, engine);
   options.width = width;
   options.height = height;
   if (!engine.renderer().init(options, g_app->extensions())) return 0;
+  reserve_heap(project);
   if (!g_app->start(engine)) return 0;
   g_running = true;
   g_start_ms = g_last_ms = -1;

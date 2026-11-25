@@ -17,6 +17,8 @@
 #include "kern/audio/synth.h"
 #include "kern/game/walker_policy.h"
 #include "kern/game/runtime.h"
+#include "kern/game/program.h"
+#include "kern/game/project.h"
 #include "kern/game/walker.h"
 #include "kern/lehrer/env.h"
 #include "kern/lehrer/nn.h"
@@ -1263,6 +1265,111 @@ TEST(game_euler_and_transforms) {
   CHECK(!game::parse_hex_color("ff8000", c) && !game::parse_hex_color("#ggg000", c));
 }
 
+// The project file (kern/game/project.h): settings, levels, start level and the program's Blueprints round-trip as
+// written (a 32-bit number as its decimal); a device profile starts from the project's renderer; a level holds only
+// its world - one with the old member "project" is refused with the place and the reason.
+TEST(game_project_round_trip) {
+  game::Project pr;
+  pr.name = "Probe";
+  pr.settings.renderer.shadows = true;
+  pr.settings.renderer.shadow.resolution = 2048;
+  pr.settings.renderer.shadow.extent = 110;
+  pr.settings.renderer.shadow.bias = 0.0014f;
+  pr.settings.renderer.ao.quality = AoQuality::medium;
+  pr.settings.renderer.ao.half_resolution = false;
+  DeviceProfile phone{"mobile", pr.settings.renderer};
+  phone.renderer.shadow.resolution = 1024;
+  phone.renderer.shadow.bias = 0.0016f;
+  phone.renderer.shadow.filter = 4;
+  phone.renderer.ao.quality = AoQuality::low;
+  pr.settings.profiles = {phone, {"laptop", {}}};
+  pr.settings.heap_reserve_mb = 320;
+  pr.levels = {"levels/start.klevel", "levels/wald.klevel"};
+  pr.start_level = "levels/wald.klevel";
+  game::ProgramBlueprint math;
+  math.name = "Mathe";
+  math.logic.library = true;
+  game::ProgramBlueprint spiel;
+  spiel.name = "Spiel";
+  spiel.logic.uses = {"Mathe"};
+  pr.blueprints = {spiel, math};
+  const std::string text = game::to_text(pr);
+  CHECK(text.find("\"format\": \"kern-project\"") != std::string::npos && text.find("0.0014,") != std::string::npos);
+  game::Project back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));
+  CHECK(error.empty() && game::to_text(back) == text);
+  const ProjectSettings& p = back.settings;
+  CHECK(p.renderer.shadows && p.renderer.shadow.resolution == 2048 && p.renderer.shadow.extent == 110 && p.renderer.shadow.bias == 0.0014f);
+  CHECK(p.renderer.ao.quality == AoQuality::medium && !p.renderer.ao.half_resolution && p.renderer.bloom.enabled && p.renderer.grade);
+  const DeviceProfile* m = p.profile("mobile");
+  CHECK(p.profiles.size() == 2 && m == &p.profiles[0] && p.profile("laptop") == &p.profiles[1] && p.profile("tablet") == nullptr);
+  CHECK(m && m->renderer.shadow.resolution == 1024 && m->renderer.shadow.bias == 0.0016f && m->renderer.shadow.filter == 4 && m->renderer.ao.quality == AoQuality::low && m->renderer.shadows);
+  CHECK(p.heap_reserve_mb == 320);
+  CHECK(back.name == "Probe" && back.levels.size() == 2 && back.start_level == "levels/wald.klevel" && back.first_level() == "levels/wald.klevel");
+  CHECK(back.blueprints.size() == 2 && back.blueprints[0].name == "Spiel" && back.blueprints[1].logic.library && back.blueprint("Mathe") == &back.blueprints[1]);
+  back.start_level.clear();
+  CHECK(back.first_level() == "levels/start.klevel");
+  // The settings as the project file holds them (the one way to set up the renderer - kern::run hands them over): a
+  // profile takes the project's renderer where it names nothing; missing settings are the engine's defaults; the fixed
+  // phone part of before ("mobile"), a profile without a name or with one twice, a heap out of range: an error with
+  // the place.
+  ProjectSettings q;
+  auto settings = [&](const char* text) {
+    json::Value v;
+    error.clear();
+    CHECK(json::parse(text, v));
+    return project_from_json(v, q, &error);
+  };
+  CHECK(settings("{\"renderer\":{\"shadow\":{\"extent\":90}},\"profiles\":[{\"name\":\"mobile\",\"renderer\":{\"ao\":{\"quality\":\"low\"}}}],\"heapReserveMb\":64}"));
+  CHECK(q.renderer.shadow.extent == 90 && q.profile("mobile") && q.profile("mobile")->renderer.shadow.extent == 90 && q.profile("mobile")->renderer.ao.quality == AoQuality::low && q.heap_reserve_mb == 64);
+  CHECK(settings("{}") && q.profiles.empty() && q.heap_reserve_mb == 0 && q.renderer.shadow.extent == RendererOptions{}.shadow.extent);
+  CHECK(!settings("{\"mobile\":{}}") && error.find("settings: mobile: a device profile is one of \"profiles\"") == 0);
+  CHECK(!settings("{\"profiles\":[{\"renderer\":{}}]}") && error == "settings: profiles[0]: a profile has a name");
+  CHECK(!settings("{\"profiles\":[{\"name\":\"a\"},{\"name\":\"a\"}]}") && error == "settings: profiles[1]: the profile a stands twice");
+  CHECK(!settings("{\"heapReserveMb\":-5}") && error == "settings: heapReserveMb: from 0 to 4095");
+  CHECK(!settings("[]") && error == "settings: must be an object");
+  CHECK(!game::from_text("{\"format\":\"kern-project\",\"settings\":{\"mobile\":{}}}", back, &error) && error.find("settings: mobile") == 0);
+  // a level is a world: its old member "project" is an error with the place
+  game::Level l = game::basic_level();
+  const std::string level = game::to_text(l);
+  CHECK(level.find("\"project\"") == std::string::npos);
+  std::string old = level;
+  old.insert(old.find("\"world\""), "\"project\": {\"heapReserveMb\": 1},\n  ");
+  game::Level was;
+  CHECK(!game::from_text(old, was, &error) && error.find("project:") == 0 && error.find(".kproject") != std::string::npos);
+}
+
+// A project that does not read says where and why.
+TEST(game_project_errors) {
+  const auto why = [](const std::string& text) {
+    game::Project p;
+    std::string error;
+    p.name = "kept";
+    const bool ok = game::from_text(text, p, &error);
+    CHECK(!ok && p.name == "kept");   // (nothing read on failure)
+    return error;
+  };
+  const std::string head = "{\"format\":\"kern-project\",";
+  CHECK(why("{broken") == "the project is not JSON");
+  CHECK(why("[1]") == "a project must be a JSON object");
+  CHECK(why("{\"format\":\"kern-level\"}").find("format:") == 0);
+  CHECK(why(head + "\"version\":2}").find("version:") == 0);
+  CHECK(why(head + "\"settings\":3}") == "settings: must be an object");
+  CHECK(why(head + "\"levels\":\"a.klevel\"}") == "levels: must be a list of paths");
+  CHECK(why(head + "\"levels\":[\"a.klevel\",\"\"]}") == "levels[1]: must be the path of a level");
+  CHECK(why(head + "\"levels\":[\"a.klevel\",\"a.klevel\"]}") == "levels[1] \"a.klevel\": named twice (also levels[0])");
+  CHECK(why(head + "\"levels\":[\"a.klevel\"],\"startLevel\":\"b.klevel\"}") == "startLevel \"b.klevel\": is none of the project's levels");
+  CHECK(why(head + "\"blueprints\":{}}") == "blueprints: must be a list");
+  CHECK(why(head + "\"blueprints\":[{\"logic\":{}}]}") == "blueprints[0]: has no name");
+  CHECK(why(head + "\"blueprints\":[{\"name\":\"A\"}]}") == "blueprints[0] \"A\": has no logic (its Blueprint)");
+  CHECK(why(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{}},{\"name\":\"A\",\"logic\":{}}]}") ==
+        "blueprints[1] \"A\": the name stands twice (also blueprints[0])");
+  CHECK(why(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{\"uses\":[\"X\",\"X\"]}}]}") == "blueprints[0] \"A\": logic graph: the library \"X\" is used twice");
+  game::Project ok;
+  CHECK(game::from_text(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{}}]}", ok) && ok.blueprints.size() == 1 && ok.levels.empty());
+}
+
 TEST(game_level_round_trip_and_validation) {
   game::Level l = game::physics_lab_level();
   const std::string text = game::to_text(l);
@@ -2406,6 +2513,14 @@ struct Host : kern::Blueprint {
   }
   KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<Int>& data, Int data_at = 0, Int length = 0) {
   }
+  struct game_takeResult { List<Int> Result = List<Int>{}; };
+  KERN_EXPORT_AS("game_take", "-> bytes") game_takeResult game_take() {
+    return {List<Int>{}};
+  }
+  struct game_audioResult { List<Float> Result = List<Float>{}; };
+  KERN_EXPORT_AS("game_audio", "floats at len u32 -> floats") game_audioResult game_audio(const List<Float>& samples, Int samples_at = 0, Int count = 0, Int rate = 0) {
+    return {samples};
+  }
 };
 )kn";
   logic::Graph g;
@@ -2422,12 +2537,24 @@ struct Host : kern::Blueprint {
   logic::Graph read;
   CHECK(logic::from_cpp(written, read, nullptr, &error) && read == g);
   std::string glue;
-  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5) {") != std::string::npos &&
+  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5, kern::u32* out_len) {") != std::string::npos &&
         glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
   // a pointer of C is a list and the place in it (at): no C parameter - from the host the place is 0
   CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
         glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
         glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
+  // floats: a pointer to f32 (in: a List of Float, its at and len; out: the entries as f32, kept until the next - none
+  // when the list is empty); bytes go out the same way, as u8
+  CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
+        glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3, kern::u32* out_len) {") != std::string::npos &&
+        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out<&game_audio>(object->") != std::string::npos);
+  CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take(kern::u32* out_len) {") != std::string::npos && glue.find("return kern::logic::export_bytes_out<&game_take>(object->") != std::string::npos);
+  // (a text, bytes, floats go out as a piece: the pointer returned, the length written to out_len - the export's own)
+  CHECK(glue.find("return kern::logic::export_text_out<&game_hud>(object->") != std::string::npos && glue.find(", out_len);") != std::string::npos);
+  // (the exports call the object the program bound - never the instance that started last)
+  CHECK(glue.find("blueprint_object<Host> = &self") == std::string::npos);
+  // (called while nothing is bound: an error with the export's name and reason - kern::fail -, then an empty piece)
+  CHECK(glue.find("if (!object) { kern::logic::export_unbound(\"game_hud\"); { if (out_len) *out_len = 0; return \"\"; } }") != std::string::npos);
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};
   CHECK(logic::export_ok(f));
@@ -2437,7 +2564,11 @@ struct Host : kern::Blueprint {
   CHECK(!logic::export_ok(f));
   f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
   CHECK(!logic::export_ok(f));
-  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes do not go out)
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes go out of a List of Int, not of a Text)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len floats len i32 f32 -> text";   // (floats are a List of Float, not of Int)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len floats i32 i32 f32 -> text";   // (floats without their len)
   CHECK(!logic::export_ok(f));
   f.wire = "text len bytes at i32 i32 f32 -> text";   // (an at where the bytes' len is)
   CHECK(!logic::export_ok(f));
@@ -4729,6 +4860,21 @@ TEST(logic_native_blueprints) {
   CHECK(logic::bind_blueprint<Fake>(rt) && &logic::blueprint<Fake>() == inst->native_object<Fake>());
   logic::blueprint<Fake>().heat = 6;
   CHECK(inst->get("Heat").as_number() == 6 && inst->set("Heat", logic::Value::number(3)) && logic::blueprint<Fake>().heat == 3);
+  // two instances of the class: the program says which one it calls (and an export calls) - the one bound, not the
+  // one that started last
+  logic::Instance* second = rt.add(g, 0, "Second");
+  rt.begin();
+  CHECK(second && second->native_object<Fake>() && &logic::blueprint<Fake>() == inst->native_object<Fake>());
+  // (binding again while one is bound is refused, with an error that says so - the program rebinds on purpose)
+  CHECK(!logic::bind_blueprint<Fake>(*second, "Fake") && std::string(kern::last_error()).find("Fake is bound already") != std::string::npos &&
+        &logic::blueprint<Fake>() == inst->native_object<Fake>());
+  CHECK(logic::rebind_blueprint<Fake>(*second) && &logic::blueprint<Fake>() == second->native_object<Fake>());
+  logic::blueprint<Fake>().heat = 8;
+  CHECK(second->get("Heat").as_number() == 8 && inst->get("Heat").as_number() == 3);
+  logic::unbind_blueprint<Fake>();
+  CHECK(!logic::blueprint_object<Fake> && logic::bind_blueprint<Fake>(*inst) && logic::blueprint<Fake>().heat == 3);
+  // (an export called while nothing of its class is bound: an error with its name, never a quiet value)
+  CHECK(!logic::export_unbound("game_hud") && std::string(kern::last_error()).find("the export game_hud: no instance of its Blueprint is bound") != std::string::npos);
   // a moved node is the same Blueprint (the hash leaves places out); a changed one is another:
   // the class never runs a graph it was not written from
   logic::Graph moved = g, changed = g;
@@ -4743,7 +4889,7 @@ TEST(logic_native_blueprints) {
   logic::Instance* interpreted = plain.add(g, 0, "Plain");
   CHECK(std::string(interpreted->tier()) != "native C++" && interpreted->call_number("Twice", {4}) == 8 && interpreted->get("Heat").as_number() == 5);
   // (no instance there runs as the class: nothing is bound)
-  CHECK(!interpreted->native_object<Fake>() && !logic::bind_blueprint<Fake>(plain) && !logic::blueprint_object<Fake>);
+  CHECK(!interpreted->native_object<Fake>() && !logic::rebind_blueprint<Fake>(plain) && !logic::blueprint_object<Fake>);
   // the glue for it: every function and variable by name, registered under the graph's hash
   std::string glue, why;
   CHECK(logic::native_glue(g, "Hosted", glue, &why));
@@ -7368,6 +7514,51 @@ template <class Work> long memory_asked_by(Work&& work) {
   return engine_probe::asks;
 }
 
+// What an export gives by a pointer is a piece {pointer, length} of the export's own place (kern::logic::export_text,
+// export_bytes, export_floats and the glue's *_out, kern/logic/blueprint_class.h): two exports called by turns keep
+// what each gave, a second call of one export replaces only its own, and once the place holds as many, giving again
+// asks for no memory (an audio callback gives its samples every few milliseconds). The exports call the object the
+// program bound (bind_blueprint), not the instance that started last: two instances of one class, two bindings.
+namespace export_keys {
+const char* text_a() { return nullptr; }
+const char* text_b() { return nullptr; }
+const f32* audio() { return nullptr; }
+const u8* datagram() { return nullptr; }
+}  // namespace export_keys
+TEST(logic_export_gives_its_own_piece) {
+  u32 len_a = 99, len_b = 99, len_audio = 99, len_bytes = 99;
+  const char* a = logic::export_text<&export_keys::text_a>(std::string("first"), &len_a);
+  const char* b = logic::export_text_out<&export_keys::text_b>(logic::Text("second, longer"), &len_b);
+  CHECK(std::string(a, len_a) == "first" && std::string(b, len_b) == "second, longer" && a != b);
+  std::vector<f32> samples(2048, 0.25f);
+  logic::List<f64> wide;
+  for (std::size_t i = 0; i < 2048; ++i) wide.push_back(0.5);
+  logic::List<logic::Whole> bytes;
+  for (int i = 0; i < 64; ++i) bytes.push_back(logic::Whole(static_cast<i64>(i)));
+  const f32* audio = logic::export_floats<&export_keys::audio>(samples, &len_audio);
+  const u8* datagram = logic::export_bytes_out<&export_keys::datagram>(bytes, &len_bytes);
+  // (by turns: each still holds what it gave)
+  a = logic::export_text<&export_keys::text_a>(std::string("third"), &len_a);
+  CHECK(std::string(a, len_a) == "third" && std::string(b, len_b) == "second, longer");
+  CHECK(audio && len_audio == 2048 && audio[2047] == 0.25f && datagram && len_bytes == 64 && datagram[63] == 63);
+  // (none: null, length 0)
+  u32 none = 7;
+  CHECK(!logic::export_bytes<&export_keys::datagram>(std::vector<u8>{}, &none) && none == 0);
+  logic::export_bytes_out<&export_keys::datagram>(bytes, &len_bytes);
+  logic::export_floats_out<&export_keys::audio>(wide, &len_audio);   // (the glue's place grows once too)
+  const long asked = memory_asked_by([&] {
+    for (int k = 0; k < 8; ++k) {
+      audio = logic::export_floats<&export_keys::audio>(samples, &len_audio);
+      audio = logic::export_floats_out<&export_keys::audio>(wide, &len_audio);
+      logic::export_bytes_out<&export_keys::datagram>(bytes, &len_bytes);
+      logic::export_text<&export_keys::text_a>(std::string_view("third"), &len_a);
+    }
+  });
+  CHECK(asked == 0);
+  if (asked != 0) std::printf("  giving again asked for memory %ld times\n", asked);
+  CHECK(audio && audio[0] == 0.5f && len_audio == 2048);
+}
+
 // The class calls the engine itself and does what the door does: the same class once with a host that
 // gives it the engine's objects and once with one that has only its door - every value the calls gave is
 // the same, bit for bit, and so is what the host is told of the call that fails; and what the mixer wrote
@@ -7753,7 +7944,7 @@ TEST(engine_interface_a_class_implements) {
   a.update(engine, f);
   CHECK(static_cast<i64>(r.Updates) == 2 && r.Last == 2.0 && !r.Stopped);
   a.resized(engine);
-  CHECK(a.extensions().empty() && !a.configure().shadows);  // (App's own)
+  CHECK(a.extensions().empty());  // (App's own)
   a.stop(engine);
   CHECK(r.Stopped);
   // without the engine's objects (a class a test holds): the handles it is handed are the adapter's own
@@ -7872,7 +8063,7 @@ TEST(engine_interface_a_blueprint_implements) {
   app->update(engine, f);
   CHECK(a->get("Updates").i == 2 && a->get("Last").n == 2.0 && !a->get("Stopped").b);
   app->resized(engine);
-  CHECK(app->extensions().empty() && !app->configure().shadows);  // (App's own)
+  CHECK(app->extensions().empty());  // (App's own)
   app->stop(engine);
   CHECK(a->get("Stopped").b);
   // a function the engine hands a pointer without its count (material_uniforms) has no way to a Blueprint: the
@@ -7892,6 +8083,465 @@ TEST(engine_interface_a_blueprint_implements) {
   rt.remove(11);
   CHECK(std::string(ext->name()).empty() && std::string(ext->vertex()).empty());
   objects.clear();
+}
+
+// Engine Object of Blueprint (func.engine_object, Runtime::engine_object): the object of the engine another Blueprint is -
+// what an App gives the engine as its extensions (`&facades()` of the program: the Blueprint Facades) - its handle in the
+// host's objects, made once: the same handle every time; 0 where there is no Blueprint that runs, one that implements
+// nothing, or a host without objects of the engine.
+TEST(engine_object_of_a_blueprint) {
+  struct Host : FakeLogicHost {
+    logic::EngineObjects objects;
+    bool has = true;
+    logic::EngineObjects* engine_objects() override { return has ? &objects : nullptr; }
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Water" ? 11 : name == "Asks" ? 12 : 0; }
+  } host;
+  logic::Runtime rt(host);
+  logic::Graph water, asks;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && water.implements == "ShaderExtension");
+  CHECK(logic::from_cpp("struct Asks : kern::Blueprint {\n"
+                        "  // ---- functions ----\n"
+                        "  struct waterResult { Int result = 0; };\n"
+                        "  waterResult water() {\n"
+                        "    return {func_engine_object(actor_find(\"Water\"))};\n"
+                        "  }\n"
+                        "\n"
+                        "  struct selfResult { Int result = 0; };\n"
+                        "  selfResult self() {\n"
+                        "    return {func_engine_object(actor_find(\"Asks\"))};\n"
+                        "  }\n"
+                        "};\n", asks, nullptr, &error));
+  CHECK(no_errors(logic::check(asks)));
+  logic::Instance* const w = rt.add(water, 11, "Water");
+  logic::Instance* const a = rt.add(asks, 12, "Asks");
+  rt.begin();
+  CHECK(w && a);
+  if (!w || !a) return;
+  std::vector<logic::Value> got;
+  CHECK(a->call("water", {}, got) && got.size() == 1);
+  const i64 h = got.empty() ? 0 : got[0].as_int();
+  ShaderExtension* const ext = host.objects.get<ShaderExtension>(h);
+  CHECK(h != 0 && ext && std::string(ext->name()) == "water");
+  CHECK(rt.engine_object(11) == h && rt.engine_object(11) == h);   // (made once)
+  CHECK(a->call("self", {}, got) && got.size() == 1 && got[0].as_int() == 0);   // (it implements nothing)
+  CHECK(rt.engine_object(99) == 0);   // (no Blueprint there)
+  host.has = false;
+  logic::Runtime other(host);
+  other.add(water, 11, "Water");
+  CHECK(other.engine_object(11) == 0);   // (a host without objects of the engine)
+  host.objects.clear();
+}
+
+// The program's fixed step (kern/game/runtime.h FixedStep, kern/docs/project.md 6.): a world calls it once in every fixed
+// step, after the physics step and its events and right before the Blueprints' Event Tick of that step - an explicit
+// place, not where a node happens to stand. The object may be the program's C++ or the object of the engine of a
+// program Blueprint that implements game_FixedStep (it runs in the program's runtime); null takes it back.
+TEST(game_world_fixed_step) {
+  GameFixture f;
+  game::Level l = game::basic_level();
+  game::Actor counter;
+  counter.name = "Counter";
+  counter.logic = logic::Graph{};
+  std::string error;
+  CHECK(logic::from_cpp("struct Counter : kern::Blueprint {\n"
+                        "  Int Ticks = 0;\n"
+                        "\n"
+                        "  KERN_EVENT(on1, event_tick)\n"
+                        "  void on1(Float delta) {\n"
+                        "    Ticks += 1;\n"
+                        "  }\n"
+                        "};\n", *counter.logic, nullptr, &error));
+  if (!error.empty()) std::printf("  game_world_fixed_step: %s\n", error.c_str());
+  const game::ActorId id = l.add(counter).id;
+  struct Seen final : game::FixedStep {
+    game::GameWorld* world = nullptr;
+    game::ActorId id = 0;
+    std::vector<f64> ticks;   // the Counter's ticks when the fixed step runs
+    f64 dt = 0;
+    void fixed_step(f64 step) override {
+      dt = step;
+      const logic::Instance* inst = world->logic_runtime() ? world->logic_runtime()->find(static_cast<logic::ActorRef>(id)) : nullptr;
+      ticks.push_back(inst ? inst->get("Ticks").as_number() : -1);
+    }
+  } seen;
+  seen.world = f.world.get();
+  seen.id = id;
+  f.world->set_fixed_step(&seen);
+  CHECK(f.world->fixed_step_handler() == &seen);
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  const f32 step = 1.0f / clamp(l.world.step_hz, 15.0f, 480.0f);
+  for (int i = 0; i < 3; ++i) f.world->step(step, game::PlayInput{});
+  const std::vector<f64> want{0, 1, 2};   // (each before that step's tick: the Counter has ticked one time less)
+  CHECK(seen.ticks == want);
+  CHECK(std::abs(seen.dt - step) < 1e-6);
+  f.world->set_fixed_step(nullptr);
+  f.world->step(step, game::PlayInput{});
+  CHECK(seen.ticks.size() == 3);
+  f.world->stop();
+  // the object of a program Blueprint that implements game_FixedStep: its fixed_step runs in the program's runtime
+  struct Host : FakeLogicHost {
+    logic::EngineObjects objects;
+    logic::EngineObjects* engine_objects() override { return &objects; }
+  } program_host;
+  logic::Runtime program(program_host);
+  logic::Graph stepper;
+  error.clear();
+  CHECK(logic::from_cpp("struct Stepper : kern::Blueprint, kern::Implements<\"game_FixedStep\"> {\n"
+                        "  // ---- functions ----\n"
+                        "  void fixed_step(Float dt) {\n"
+                        "    debug_print(\"step\", false);\n"
+                        "  }\n"
+                        "};\n", stepper, nullptr, &error));
+  if (!error.empty()) std::printf("  game_world_fixed_step: %s\n", error.c_str());
+  CHECK(error.empty() && stepper.implements == "game_FixedStep");
+  CHECK(program.add(stepper, 7, "Stepper") != nullptr);
+  program.begin();
+  game::FixedStep* const object = program_host.objects.get<game::FixedStep>(program.engine_object(7));
+  CHECK(object != nullptr);
+  if (!object) return;
+  f.world->set_fixed_step(object);
+  CHECK(f.world->start(l, game::SimMode::simulate));
+  for (int i = 0; i < 2; ++i) f.world->step(step, game::PlayInput{});
+  CHECK(program_host.printed.size() == 2 && program_host.printed[0] == "step");
+  CHECK(program_host.errors.empty());
+  f.world->set_fixed_step(nullptr);
+  f.world->stop();
+  program.end();
+}
+
+// Where a Blueprint finds its libraries (kern/docs/project.md, 5.): a program Blueprint in the project alone; a
+// world's in its level, then in the project; a name in both is an error with both places, and the world does not start.
+TEST(game_project_library_search) {
+  game::Project pr;
+  game::ProgramBlueprint math;
+  math.name = "Mathe";
+  math.logic.library = true;
+  pr.blueprints.push_back(math);
+  game::Level l = game::basic_level();
+  game::Actor lib;
+  lib.name = "Wald";
+  lib.logic = logic::Graph{};
+  lib.logic->library = true;
+  l.add(lib);
+  const logic::Blueprints program = game::program_blueprints(pr);
+  CHECK(program("Mathe") == &pr.blueprints[0].logic && program("Wald") == nullptr);
+  const logic::Blueprints world = game::world_blueprints(l, &pr);
+  CHECK(world("Mathe") == &pr.blueprints[0].logic && world("Wald") == &*l.actors.back().logic && world("Keiner") == nullptr);
+  CHECK(game::world_blueprints(l, nullptr)("Mathe") == nullptr);
+  CHECK(game::library_conflicts(l, pr).empty());
+  // the same name in the level and in the project
+  game::Actor twin;
+  twin.name = "Mathe";
+  twin.logic = logic::Graph{};
+  const game::ActorId id = l.add(twin).id;
+  const std::vector<std::string> c = game::library_conflicts(l, pr);
+  CHECK(c.size() == 1 && c[0] == "the Blueprint Mathe stands in the level (actor " + std::to_string(id) + ") and in the project (blueprints[0]) - rename one");
+  // a world of that level with the project does not start, and says so; without the project it does
+  GameFixture f;
+  f.world->set_project(&pr);
+  CHECK(!f.world->start(l, game::SimMode::play));
+  CHECK(std::string(last_error()).find("the Blueprint Mathe stands in the level") != std::string::npos);
+  f.world->set_project(nullptr);
+  CHECK(f.world->start(l, game::SimMode::play));
+  f.world->stop();
+}
+
+// The program's runtime from the project (kern/game/program.h, kern/docs/project.md 3./4.): of its project, as the
+// program carries it (text), the program Blueprints run in one logic runtime of their own, in their order - before the
+// renderer starts, as kern_app_start asks for the App first; no world, so no tick -, and the App is the engine's
+// object of the one Blueprint there that implements App. The engine calls it as any App: extensions before the
+// renderer, then start, update, stop - in this order. A library of the project is found (only there) and not run.
+TEST(program_from_the_project) {
+  auto graph = [](const char* cpp) {
+    logic::Graph g;
+    std::string error;
+    CHECK(logic::from_cpp(cpp, g, nullptr, &error));
+    CHECK(error.empty());
+    return g;
+  };
+  auto ticks = [&](const char* name) {
+    return graph((std::string("struct ") + name + " : kern::Blueprint {\n"
+                  "  KERN_EVENT(on1, event_begin)\n"
+                  "  void on1() {\n"
+                  "    debug_print(\"begin " + name + "\", false);\n"
+                  "  }\n"
+                  "\n"
+                  "  KERN_EVENT(on2, event_tick)\n"
+                  "  void on2(Float delta) {\n"
+                  "    debug_print(\"tick " + name + "\", false);\n"
+                  "  }\n"
+                  "};\n").c_str());
+  };
+  // the program: Main (implements App), Second, and the library Helper that Second uses
+  game::Project pr;
+  pr.name = "Probe";
+  game::ProgramBlueprint main;
+  main.name = "Main";
+  main.logic = graph("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                     "  // ---- types ----\n"
+                     "  KERN_STRUCT(Frame) {\n"
+                     "    Float time = 0.0;\n"
+                     "    Float dt = 0.0;\n"
+                     "    Int64 index = Int64{0x0};\n"
+                     "  };\n"
+                     "\n"
+                     "  // ---- functions ----\n"
+                     "  struct startResult { Bool result = false; };\n"
+                     "  startResult start(Int engine = 0) {\n"
+                     "    debug_print(\"start\", false);\n"
+                     "    return {true};\n"
+                     "  }\n"
+                     "\n"
+                     "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                     "    debug_print(\"update\", false);\n"
+                     "  }\n"
+                     "\n"
+                     "  void stop(Int engine = 0) {\n"
+                     "    debug_print(\"stop\", false);\n"
+                     "  }\n"
+                     "\n"
+                     "  KERN_EVENT(on1, event_begin)\n"
+                     "  void on1() {\n"
+                     "    debug_print(\"begin Main\", false);\n"
+                     "  }\n"
+                     "};\n");
+  CHECK(main.logic.implements == "App");
+  game::ProgramBlueprint helper;   // (a library: found in the project - program_blueprints -, never an instance)
+  helper.name = "Helper";
+  helper.logic.library = true;
+  game::ProgramBlueprint second;
+  second.name = "Second";
+  second.logic = ticks("Second");
+  second.logic.uses = {"Helper"};
+  pr.blueprints = {main, helper, second};
+  const std::string text = game::to_text(pr);
+
+  game::Program program;
+  std::string error;
+  CHECK(!program.running() && program.app() == nullptr && program.runtime() == nullptr && program.project() == nullptr);
+  CHECK(program.start(text, &error) && error.empty());
+  App* const app = program.app();
+  logic::Runtime* const rt = program.runtime();
+  CHECK(app != nullptr && rt != nullptr);
+  if (!app || !rt) return;
+  // a second start while it runs is refused with the reason - it does not keep the first and drop the second silently
+  CHECK(!program.start(text, &error) && error == "the program of the project Probe runs already - end it first");
+  CHECK(program.app() == app && game::program_app(*rt) == app);
+  CHECK(program.project() && program.project()->name == "Probe");
+  // the program Blueprints in the order of the project - the library is none
+  CHECK(rt->instances().size() == 2 && rt->instances()[0]->name() == "Main" && rt->instances()[1]->name() == "Second");
+  Renderer renderer;
+  RendererOptions o;
+  CHECK(renderer.init(o, app->extensions()));
+  CHECK(app->extensions().empty());   // (App's own)
+  Engine engine(renderer);
+  CHECK(app->start(engine));
+  Frame f;
+  f.time = 0.5, f.dt = 0.25f, f.index = 1;
+  app->update(engine, f);
+  app->stop(engine);
+  // Begin Play of the program (Main, Second), then start, update, stop - no tick: the program has no world
+  const std::vector<std::string> said = program.said();
+  const std::vector<std::string> want{"begin Main", "begin Second", "start", "update", "stop"};
+  CHECK(said == want);
+  if (said != want)
+    for (const std::string& s : said) std::printf("  program_from_the_project: %s\n", s.c_str());
+  program.end();
+  CHECK(!program.running() && program.runtime() == nullptr && program.project() == nullptr);
+  // no Blueprint that implements App, two of them, no program Blueprints, a text that is no project: no App, nothing
+  // is kept, and the reason names them
+  game::Project none = pr;
+  none.blueprints[0].logic.implements.clear();
+  CHECK(!program.start(none, &error) && !program.running());
+  CHECK(error == "no Blueprint of the project Probe implements App");
+  game::Project two = pr;
+  two.blueprints[2].logic = two.blueprints[0].logic;
+  CHECK(!program.start(two, &error) && !program.running());
+  CHECK(error == "more than one Blueprint of the project Probe implements App: Main, Second");
+  game::Project empty;
+  CHECK(!program.start(empty, &error) && error == "the project Untitled has no program Blueprints (\"blueprints\")");
+  CHECK(!program.start("{ broken", &error) && error == "the program's project: the project is not JSON");
+  // it starts again after an end
+  CHECK(program.start(pr, &error) && program.app() != nullptr);
+  program.end();
+  renderer.shutdown();
+}
+
+// A world the program makes is a world of its project (kern/docs/project.md 3., 5.): the GameWorld a node makes in
+// the program's host (engine.game_world.make) is given the program's project as it is made - its Blueprints then find
+// libraries in its level, then in the project; a world made in any other host gets none.
+TEST(program_world_has_the_project) {
+  logic::Graph main;
+  std::string error;
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  startResult start(Int engine = 0) {\n"
+                        "    return {true};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  }\n"
+                        "};\n", main, nullptr, &error));
+  game::Project pr;
+  pr.name = "Welten";
+  pr.blueprints.push_back({"Main", main});
+  game::Program program;
+  CHECK(program.start(pr, &error));
+  logic::EngineObjects* objects = program.runtime() ? program.runtime()->host().engine_objects() : nullptr;
+  CHECK(objects != nullptr);
+  if (!objects) return;
+  Renderer renderer;
+  std::vector<logic::Value> out(1);
+  CHECK(logic::call_engine(*objects, "engine.game_world.make", {logic::Value::integer(objects->adopt<Renderer>(renderer)), logic::Value::integer(0)}, out));
+  game::GameWorld* world = objects->get<game::GameWorld>(out[0].as_int());
+  CHECK(world && world->project() == program.project() && world->project()->name == "Welten");
+  // (made elsewhere: no project)
+  logic::EngineObjects other;
+  CHECK(logic::call_engine(other, "engine.game_world.make", {logic::Value::integer(other.adopt<Renderer>(renderer)), logic::Value::integer(0)}, out));
+  game::GameWorld* alone = other.get<game::GameWorld>(out[0].as_int());
+  CHECK(alone && alone->project() == nullptr);
+  program.end();
+}
+
+// The exports belong to the program (kern/docs/project.md 4.): the program's runtime binds each of its Blueprints that
+// runs as a class with exports when it starts (NativeBlueprint::bind_exports) and unbinds them at its end - two objects
+// of one such class in the program: the start is refused and names the Blueprint. An export in a Blueprint of a world
+// is refused where the level is read (with the place), by validate (Play does not start) and in the editor (studio).
+TEST(program_binds_the_exports) {
+  struct Exported final : logic::NativeBlueprint {
+    void attach(const logic::BlueprintWorld&) override {}
+    void run(int, int) override {}
+    bool call(std::string_view, std::span<const logic::Value>, logic::Results& results) override { results.clear(); return false; }
+    bool get(std::string_view, logic::Value&) const override { return false; }
+    bool set(std::string_view, const logic::Value&) override { return false; }
+    void* object(const void* type) override { return type == &logic::class_key<Exported> ? this : nullptr; }
+    bool bind_exports() override { return logic::bind_blueprint_object<Exported>(*this, "Exported"); }
+    void unbind_exports() override { if (logic::blueprint_object<Exported> == this) logic::unbind_blueprint<Exported>(); }
+  };
+  std::string error;
+  logic::Graph app, hud;
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  startResult start(Int engine = 0) {\n"
+                        "    return {true};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  }\n"
+                        "};\n", app, nullptr, &error));
+  CHECK(logic::from_cpp("struct Hud : kern::Blueprint {\n"
+                        "  struct game_shownResult { Int Result = 0; };\n"
+                        "  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n"
+                        "    return {7};\n"
+                        "  }\n"
+                        "};\n", hud, nullptr, &error));
+  if (!error.empty()) std::printf("program_binds_the_exports: %s\n", error.c_str());
+  CHECK(error.empty() && hud.functions.size() == 1 && hud.functions[0].exported == "game_shown");
+  logic::register_native_blueprint(logic::graph_hash(hud), [] { return std::unique_ptr<logic::NativeBlueprint>(new Exported()); });
+  game::Project pr;
+  pr.name = "Exporte";
+  pr.blueprints = {{"Main", app}, {"Hud", hud}};
+  game::Program program;
+  CHECK(!logic::blueprint_object<Exported>);
+  CHECK(program.start(pr, &error));
+  CHECK(logic::blueprint_object<Exported> && program.runtime() && program.runtime()->instances()[1]->native_object<Exported>() == logic::blueprint_object<Exported>);
+  program.end();
+  CHECK(!logic::blueprint_object<Exported>);   // (the end unbinds them: an export after it says so)
+  // two objects of the class: which one the exports call is not said - refused, with the Blueprint's name
+  game::Project two = pr;
+  two.blueprints.push_back({"Hud2", hud});
+  CHECK(!program.start(two, &error) && !program.running() && !logic::blueprint_object<Exported>);
+  CHECK(error.find("the exports of its Blueprint Hud2") != std::string::npos && error.find("Exported is bound already") != std::string::npos);
+  // in a world: the level is refused where it is read, validate says it, and Play does not start
+  game::Level l = game::basic_level();
+  game::Actor holder;
+  holder.name = "Holder";
+  holder.logic = hud;
+  l.add(holder);
+  std::vector<game::Issue> issues = game::validate(l);
+  CHECK(std::any_of(issues.begin(), issues.end(), [](const game::Issue& i) { return i.error && i.text.find("\"Holder\": the function game_shown is an export (game_shown) - exports belong to the program") == 0; }));
+  game::Level back;
+  CHECK(!game::from_text(game::to_text(l), back, &error) && error.find("actor \"Holder\": the function game_shown is an export (game_shown)") == 0);
+  game::Level graph_has_it = game::basic_level();
+  graph_has_it.logic = hud;
+  CHECK(!game::from_text(game::to_text(graph_has_it), back, &error) && error.find("logic: the function game_shown is an export") == 0);
+}
+
+// The one entry (kern/docs/project.md 4., kern/app/app.h): the program's kern_main hands the engine its App once -
+// kern::run(project) starts the project's program and gives the app runtime its App; the platform then starts it
+// (kern_app_start), drives its frames and stops it - the program ends with the app and starts again with it. A
+// second kern::run (of a project or of a C++ App) is refused: the first App stays. (One app runtime per process:
+// this is the only test that hands it an App.)
+extern "C" i32 kern_app_start(i32 width, i32 height);
+extern "C" i32 kern_app_frame(f64 now_ms, i32 page_hidden);
+extern "C" void kern_app_stop();
+TEST(run_the_program_of_a_project) {
+  logic::Graph main;
+  std::string error;
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  startResult start(Int engine = 0) {\n"
+                        "    return {true};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  }\n"
+                        "};\n", main, nullptr, &error));
+  CHECK(error.empty() && main.implements == "App");
+  game::Project pr;
+  pr.name = "Run";
+  pr.blueprints.push_back({"Main", main});
+  // no App before kern_main: the start is refused and says what is missing
+  CHECK(!kern_app_start(64, 48) && std::string(last_error()).find("kern_main") != std::string::npos);
+  // a project whose program does not start: no App is given (the reason is the program's)
+  game::Project none = pr;
+  none.blueprints[0].logic.implements.clear();
+  CHECK(run(none) == 1);
+  CHECK(run(pr) == 0);
+  CHECK(run(pr) == 1);   // (its program runs already)
+  struct Other final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } other;
+  CHECK(run(other) == 1);   // (an App was given already: the first stays)
+  // the renderer the settings start: the profile the launch argument names, else the project's (an unknown name: the
+  // project's, and the log says which it has)
+  ProjectSettings ps;
+  ps.renderer.shadow.resolution = 2048;
+  ps.profiles.push_back({"mobile", ps.renderer});
+  ps.profiles[0].renderer.shadow.resolution = 512;
+  Renderer r0;
+  Engine e0(r0);
+  CHECK(start_renderer(ps, e0).shadow.resolution == 2048);
+  e0.set_args("profile=mobile", 14);
+  CHECK(start_renderer(ps, e0).shadow.resolution == 512);
+  e0.set_args("profile=tablet", 14);
+  CHECK(start_renderer(ps, e0).shadow.resolution == 2048);
+  CHECK(kern_app_start(64, 48) == 1);
+  CHECK(kern_app_frame(0, 0) == 1 && kern_app_frame(16, 0) == 1);
+  kern_app_stop();
+  // started again: its program again, from the project
+  CHECK(kern_app_start(64, 48) == 1);
+  kern_app_stop();
 }
 
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
@@ -12619,6 +13269,119 @@ TEST(studio_logic_implements) {
   CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string().empty());
+  // an export in a Blueprint of a world: the editor says it where the Blueprint is open (exports belong to the program,
+  // kern/docs/project.md 4.) - the level then does not play
+  std::string text = f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string();
+  const std::size_t end = text.rfind("};");
+  CHECK(end != std::string::npos);
+  text.insert(end, "\n  struct game_shownResult { Int Result = 0; };\n  KERN_EXPORT_AS(\"game_shown\", \"-> i32\") game_shownResult game_shown() {\n    return {7};\n  }\n");
+  json::Value apply = json::Value::object();
+  apply.set("cmd", "logicCppApply");
+  apply.set("text", text);
+  CHECK(f.s->command(apply)["ok"].as_bool());
+  bool said = false;
+  const json::Value checked = f.cmd(R"({"cmd":"logicCompile"})");
+  for (const json::Value& i : checked["issues"].items()) said = said || i["text"].as_string().find("exports belong to the program") != std::string::npos;
+  CHECK(said);
+}
+
+// The project in the editor (kern/docs/project.md): a new one, its levels and start level, its settings, its program
+// Blueprints edited in the logic editor like a level's (one undo history for both), libraries found in the project by
+// a world's Blueprint, a name in one place only, saved and opened again - errors with where and why.
+TEST(studio_project) {
+  StudioFixture f;
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  json::Value st = f.s->state();
+  CHECK(st["project"]["name"].as_string() == "Untitled" && st["project"]["levels"].size() == 0 && st["project"]["blueprints"].size() == 0);
+  // a new project: one empty level, the start level
+  CHECK(cmd({{"cmd", "projectNew"}, {"name", "Spiel"}})["ok"].as_bool());
+  st = f.s->state();
+  CHECK(st["project"]["name"].as_string() == "Spiel" && st["project"]["levels"].size() == 1 && st["project"]["startLevel"].as_string() == "levels/start.klevel");
+  CHECK(f.s->level().name == "start" && st["project"]["dirty"].as_bool());
+  // program Blueprints: a name once, in one place
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Spiel"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Mathe"}, {"library", true}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Spiel"}})["error"].as_string() == "the project has a Blueprint \"Spiel\" already");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", ""}})["error"].as_string() == "a program Blueprint needs a name");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "move"}, {"name", "Spiel"}})["error"].as_string().find("op must be add, remove or rename") != std::string::npos);
+  CHECK(f.s->project().blueprints.size() == 2 && f.s->project().blueprints[1].logic.library);
+  // a program Blueprint in the logic editor: its edits change the project, not the level, and are undone like any
+  CHECK(!cmd({{"cmd", "logicOpen"}, {"program", "Nope"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"program", "Mathe"}})["ok"].as_bool());
+  const json::Value applied = cmd({{"cmd", "logicCppApply"}, {"text", "struct Mathe : virtual kern::Library {\n  struct clampedResult { Float value = 0.0; };\n"
+                                                                    "  KERN_PURE clampedResult clamped(Float value = 0.0) {\n    return {math_max(value, 0.0)};\n  }\n};\n"}});
+  CHECK(applied["ok"].as_bool());
+  if (!applied["ok"].as_bool()) std::printf("    %s\n", applied["error"].as_string().c_str());
+  CHECK(f.s->project().blueprints[1].logic.functions.size() == 1 && f.s->project().blueprints[1].logic.library);
+  CHECK(cmd({{"cmd", "logicOpen"}, {"program", "Spiel"}})["ok"].as_bool());
+  st = f.s->state();
+  CHECK(st["logic"]["program"].as_bool() && st["logic"]["ownerName"].as_string() == "Spiel" && st["project"]["blueprints"][0]["open"].as_bool());
+  CHECK(st["logic"]["owners"].size() == 2);  // the program's Blueprints, no level graph
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Score"}, {"type", "int"}})["ok"].as_bool());
+  CHECK(f.s->project().blueprints[0].logic.variables.size() == 1 && f.s->level().logic.variables.empty());
+  CHECK(st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Mathe");
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(f.s->project().blueprints[0].logic.variables.empty());
+  CHECK(f.cmd(R"({"cmd":"redo"})")["ok"].as_bool());
+  CHECK(f.s->project().blueprints[0].logic.variables.size() == 1);
+  CHECK(!cmd({{"cmd", "logicRemoveGraph"}})["ok"].as_bool());
+  // a world's Blueprint finds the project's library; then it may be neither renamed nor removed
+  f.cmd(R"({"cmd":"spawn","item":"cube"})");
+  const game::ActorId cube = f.s->level().actors.back().id;
+  CHECK(cmd({{"cmd", "rename"}, {"id", static_cast<f64>(cube)}, {"name", "Kiste"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicOpen"}, {"owner", static_cast<f64>(cube)}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "logicVariable"}, {"op", "add"}, {"name", "Hits"}, {"type", "int"}})["ok"].as_bool());
+  st = f.s->state();
+  CHECK(!st["logic"]["program"].as_bool() && st["logic"]["libraries"].size() == 1 && st["logic"]["libraries"][0].as_string() == "Mathe");
+  CHECK(cmd({{"cmd", "logicLibrary"}, {"op", "use"}, {"name", "Mathe"}})["ok"].as_bool());
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "rename"}, {"name", "Mathe"}, {"to", "Rechnen"}})["error"].as_string() ==
+        "the Blueprint Mathe is a library of Kiste (in the level): they name it - change them first");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "remove"}, {"name", "Mathe"}})["error"].as_string().find("is a library of Kiste (in the level)") != std::string::npos);
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "add"}, {"name", "Kiste"}})["error"].as_string() ==
+        "the Blueprint Kiste stands in the level (actor " + std::to_string(cube) + ") - a name stands in one place only");
+  CHECK(cmd({{"cmd", "projectBlueprint"}, {"op", "rename"}, {"name", "Spiel"}, {"to", "MeinSpiel"}})["ok"].as_bool());
+  CHECK(f.s->project().blueprint("MeinSpiel") && !f.s->project().blueprint("Spiel"));
+  // levels, start level and settings: checked as the file is read
+  CHECK(cmd({{"cmd", "projectSet"}, {"startLevel", "levels/wald.klevel"}})["error"].as_string() == "startLevel \"levels/wald.klevel\": is none of the project's levels");
+  json::Value levels = json::Value::array();
+  levels.push("levels/start.klevel");
+  levels.push("levels/wald.klevel");
+  CHECK(cmd({{"cmd", "projectSet"}, {"levels", levels}, {"startLevel", "levels/wald.klevel"}})["ok"].as_bool());
+  json::Value twice = json::Value::array();
+  twice.push("levels/a.klevel");
+  twice.push("levels/a.klevel");
+  CHECK(cmd({{"cmd", "projectSet"}, {"levels", twice}})["error"].as_string() == "levels[1] \"levels/a.klevel\": named twice (also levels[0])");
+  json::Value settings;
+  json::parse(R"({"renderer":{"shadows":false},"heapReserveMb":64})", settings);
+  CHECK(cmd({{"cmd", "projectSet"}, {"settings", settings}})["ok"].as_bool());
+  CHECK(f.s->project().settings.heap_reserve_mb == 64 && !f.s->project().settings.renderer.shadows && f.s->project().start_level == "levels/wald.klevel");
+  json::Value phone;
+  json::parse(R"({"mobile":{}})", phone);   // (the fixed phone part of before: refused, with the place - a profile is one of "profiles")
+  CHECK(cmd({{"cmd", "projectSet"}, {"settings", phone}})["error"].as_string().find("settings: mobile") == 0);
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(f.s->project().settings.heap_reserve_mb == 0 && f.s->project().settings.renderer.shadows == RendererOptions{}.shadows);
+  CHECK(f.cmd(R"({"cmd":"redo"})")["ok"].as_bool());
+  // saved and opened again: the same project
+  const json::Value saved = f.cmd(R"({"cmd":"projectSave"})");
+  CHECK(saved["file"].as_string() == "Spiel.kproject");
+  game::Project back;
+  std::string why;
+  CHECK(game::from_text(saved["text"].as_string(), back, &why) && game::to_text(back) == f.s->project_text());
+  CHECK(f.s->state()["project"]["dirty"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"projectSaved"})")["ok"].as_bool());
+  CHECK(!f.s->state()["project"]["dirty"].as_bool());
+  CHECK(cmd({{"cmd", "projectOpen"}, {"text", "{\"format\":\"kern-level\"}"}})["error"].as_string() == "format: not a Kern project (format must be \"kern-project\")");
+  CHECK(f.s->project().name == "Spiel");  // (nothing changed)
+  // a project whose Blueprint has the name of one in the open level: refused, with both places
+  CHECK(cmd({{"cmd", "projectOpen"}, {"text", "{\"format\":\"kern-project\",\"blueprints\":[{\"name\":\"Kiste\",\"logic\":{}}]}"}})["error"].as_string() ==
+        "the Blueprint Kiste stands in the level (actor " + std::to_string(cube) + ") and in the project (blueprints[0]) - rename one");
+  CHECK(cmd({{"cmd", "projectOpen"}, {"text", saved["text"]}})["ok"].as_bool());
+  CHECK(game::to_text(f.s->project()) == saved["text"].as_string() && !f.s->state()["project"]["dirty"].as_bool());
+  CHECK(!f.s->can_undo());  // opening starts a new history
 }
 
 TEST(studio_logic_libraries) {
@@ -14899,9 +15662,6 @@ TEST(level_with_a_copy_of_the_engine_is_refused) {
 }
 
 }  // namespace
-
-// The app runtime is linked into the test binary; it needs an app factory.
-App* kern_create_app() { return nullptr; }
 
 int main(int argc, char** argv) {
   // kern_tests --emit-native <dir>: Blueprints as their C++ text, calls to them and the

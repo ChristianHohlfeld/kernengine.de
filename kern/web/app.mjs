@@ -34,6 +34,8 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
   const kern = await loadKern({bytes, base64, url, module});
   const e = kern.exports;
   if (!e.kern_app_start) throw Error("module was not built with --app");
+  // the program's one entry (kern/docs/project.md 4.): it hands the engine its App (kern::run) - once, first
+  if (!e.kern_main) throw Error("module has no kern_main: the program's entry, which hands the engine its App (kern::run)");
   const gl = canvas.getContext("webgl2", {alpha: false, antialias: false, depth: true, powerPreference: "high-performance", ...contextAttributes});
   if (!gl) throw Error("WebGL2 required");
   kern.attachContext(canvas, gl);
@@ -54,6 +56,7 @@ export async function runKernApp({canvas, bytes = null, base64 = null, url = nul
     e.kern_app_set_args(ptr, text.length);
     e.kern_free(ptr);
   }
+  if (e.kern_main() !== 0) throw kern.fail("kern_main (kern::run)");
   if (!e.kern_app_start(width, height)) throw kern.fail("app start");
 
   const listeners = [];

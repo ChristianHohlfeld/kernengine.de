@@ -390,7 +390,7 @@ Also pro Farbkanal den Anteil indirekten Lichts am Gesamtlicht, bereits um den N
 
 ## 4.6 Shader-Erweiterungen
 
-Eine `ShaderExtension` (`gfx/shader.h`) liefert GLSL-Schnipsel für feste Einfügestellen und optional eigene Vertex-Ströme, Uniforms und Materialparameter. Die Engine bleibt unverändert; das Spiel reicht seine Erweiterungen bei `Renderer::init()` herein (in einer `App` über `App::extensions()`, in der C-ABI über `kern_game_extensions`).
+Eine `ShaderExtension` (`gfx/shader.h`) liefert GLSL-Schnipsel für feste Einfügestellen und optional eigene Vertex-Ströme, Uniforms und Materialparameter. Die Engine bleibt unverändert; das Spiel reicht seine Erweiterungen bei `Renderer::init()` herein (in einer `App` über `App::extensions()`; `kern_renderer_init` der C-ABI startet den Renderer ohne Erweiterungen).
 
 ### Die Einfügestellen
 

@@ -404,22 +404,18 @@ std::string compact_symbol(const logic::Node& n) {
 
 
 namespace {
-/// The Blueprints of a level by the name of the actor that has them: where the libraries a
-/// Blueprint uses are found.
-logic::Blueprints blueprints_of(const game::Level& level) {
-  return logic::with_engine([&level](std::string_view name) -> const logic::Graph* {
-    for (const game::Actor& a : level.actors)
-      if (a.logic && a.name == name) return &*a.logic;
-    return nullptr;
-  });  // (and the engine's own libraries: kern/logic/engine_libraries.h)
+/// Where the libraries a Blueprint of `level` uses are found (kern/docs/project.md 5.): in the level, by the name
+/// of the actor that has them, then in the project (null: the level alone - the program's Blueprints, seen as a level).
+logic::Blueprints blueprints_of(const game::Level& level, const game::Project* project) {
+  return logic::with_engine(game::world_blueprints(level, project));  // (and the engine's own libraries: kern/logic/engine_libraries.h)
 }
 /// Does a Blueprint use the library `name` - itself, or through the libraries it uses?
-bool uses_library(const game::Level& level, const logic::Graph& g, const std::string& name, int depth = 0) {
+bool uses_library(const game::Level& level, const game::Project* project, const logic::Graph& g, const std::string& name, int depth = 0) {
   if (depth > 32) return false;
-  const logic::Blueprints all = blueprints_of(level);
+  const logic::Blueprints all = blueprints_of(level, project);
   for (const std::string& used : g.uses) {
     if (used == name) return true;
-    if (const logic::Graph* l = all(used); l && l != &g && uses_library(level, *l, name, depth + 1)) return true;
+    if (const logic::Graph* l = all(used); l && l != &g && uses_library(level, project, *l, name, depth + 1)) return true;
   }
   return false;
 }
@@ -427,8 +423,8 @@ bool uses_library(const game::Level& level, const logic::Graph& g, const std::st
 /// uses of them now (their types, how the functions look that it calls) - and the Blueprints of
 /// the level that use it follow. False: one of them cannot (`error` says which, and why) - the
 /// edit does not happen.
-bool libraries_follow(game::Level& level, u32 owner, logic::Graph& g, std::string& error) {
-  const logic::Blueprints all = blueprints_of(level);
+bool libraries_follow(game::Level& level, const game::Project* project, u32 owner, logic::Graph& g, std::string& error) {
+  const logic::Blueprints all = blueprints_of(level, project);
   bool holds = !g.uses.empty();
   for (const logic::Function& f : g.functions) holds = holds || !f.from.empty();
   for (const logic::EnumType& e : g.enums) holds = holds || !e.from.empty();
@@ -437,7 +433,7 @@ bool libraries_follow(game::Level& level, u32 owner, logic::Graph& g, std::strin
   const game::Actor* self = owner ? level.find(owner) : nullptr;
   if (!self) return true;
   for (game::Actor& a : level.actors) {
-    if (a.id == owner || !a.logic || !uses_library(level, *a.logic, self->name)) continue;
+    if (a.id == owner || !a.logic || !uses_library(level, project, *a.logic, self->name)) continue;
     std::string why;
     if (!logic::take_libraries(*a.logic, all, &why)) {
       error = "the Blueprint of " + a.name + " uses this one: " + why;
@@ -450,11 +446,11 @@ bool libraries_follow(game::Level& level, u32 owner, logic::Graph& g, std::strin
 constexpr std::size_t kCanvasNodes = 2000;
 /// What is wrong with a Blueprint. One that uses libraries is judged as the one graph it is
 /// with them (logic::link): the rules that follow calls see what a library's function does.
-std::vector<logic::Issue> whole_issues(const game::Level& level, const logic::Graph& g) {
+std::vector<logic::Issue> linked_issues(const game::Level& level, const game::Project* project, const logic::Graph& g) {
   if (g.uses.empty()) return logic::check(g);
   logic::Graph whole;
   std::string why;
-  if (!logic::link(g, blueprints_of(level), whole, &why)) {
+  if (!logic::link(g, blueprints_of(level, project), whole, &why)) {
     std::vector<logic::Issue> issues = logic::check(g);
     issues.push_back({0, true, why});
     return issues;
@@ -464,12 +460,20 @@ std::vector<logic::Issue> whole_issues(const game::Level& level, const logic::Gr
   std::erase_if(issues, [&](const logic::Issue& i) { return i.node != 0 && !g.find(i.node); });
   return issues;
 }
+std::vector<logic::Issue> whole_issues(const game::Level& level, const game::Project* project, const logic::Graph& g) {
+  std::vector<logic::Issue> issues = linked_issues(level, project, g);
+  // (a Blueprint of a world - one with a project to find libraries in; the program's has none: an export is the
+  // program's - the level is refused with one, Play too; here it is said where the Blueprint is open)
+  if (project)
+    if (const std::string e = game::world_export(g); !e.empty()) issues.push_back({0, true, e});
+  return issues;
+}
 /// The Blueprint as an edit sees it: with every type of its libraries - those it does not use
 /// yet among them (a Blueprint holds of its libraries what it uses; an edit may pick the rest).
-logic::Graph with_library_types(const game::Level& level, const logic::Graph& g) {
+logic::Graph with_library_types(const game::Level& level, const game::Project* project, const logic::Graph& g) {
   if (g.uses.empty()) return g;
   logic::Graph whole = g;
-  if (!logic::take_libraries(whole, blueprints_of(level), nullptr, true)) return g;
+  if (!logic::take_libraries(whole, blueprints_of(level, project), nullptr, true)) return g;
   whole.functions = g.functions;
   return whole;
 }
@@ -478,22 +482,23 @@ json::Value Studio::logic_json() const {
   json::Value o = json::Value::object();
   o.set("open", logic_open_);
   o.set("owner", logic_owner_);
-  const game::Actor* owner = logic_owner_ ? level_.find(logic_owner_) : nullptr;
+  o.set("program", logic_program_);  // a program Blueprint (of the project), not one of the level
+  const game::Actor* owner = logic_owner_ ? logic_level().find(logic_owner_) : nullptr;
   o.set("ownerName", logic_owner_ ? (owner ? owner->name : std::string("?")) : std::string("Level"));
   o.set("view", logic_view_);
   o.set("paused", paused_);
   o.set("playing", play_ != PlayState::editing);
   o.set("breakpoints", static_cast<u32>(logic_breakpoints_.size()));
-  // Owners to switch between: the level and every actor with a graph.
+  // Owners to switch between: the level and every actor with a graph - or the program's Blueprints.
   json::Value owners = json::Value::array();
-  {
+  if (!logic_program_) {
     json::Value lv = json::Value::object();
     lv.set("id", 0);
     lv.set("name", "Level");
-    lv.set("nodes", static_cast<u32>(level_.logic.nodes.size()));
+    lv.set("nodes", static_cast<u32>(logic_level().logic.nodes.size()));
     owners.push(std::move(lv));
   }
-  for (const game::Actor& a : level_.actors)
+  for (const game::Actor& a : logic_level().actors)
     if (a.logic) {
       json::Value x = json::Value::object();
       x.set("id", a.id);
@@ -502,18 +507,18 @@ json::Value Studio::logic_json() const {
       owners.push(std::move(x));
     }
   o.set("owners", std::move(owners));
-  const logic::Graph* g = graph_of(level_, logic_owner_);
+  const logic::Graph* g = graph_of(logic_level(), logic_owner_);
   o.set("exists", g != nullptr);
   json::Value events = json::Value::array();
-  for (const std::string& e : event_names(level_)) events.push(e);
+  for (const std::string& e : event_names(logic_level())) events.push(e);
   o.set("events", std::move(events));
   if (!g) return o;
   const logic::Library& lib = logic::library();
   std::unordered_map<u32, std::vector<const logic::Issue*>> by_node;
-  std::vector<logic::Issue> issues = whole_issues(level_, *g);
+  std::vector<logic::Issue> issues = whole_issues(logic_level(), logic_project(), *g);
   {
     // A function of another Blueprint: one of this level should have it as it is declared here.
-    const auto others = other_blueprints(level_, logic_owner_);
+    const auto others = other_blueprints(logic_level(), logic_owner_);
     for (const logic::Function& f : g->functions) {
       if (!f.external) continue;
       bool found = false, named = false;
@@ -677,7 +682,7 @@ json::Value Studio::logic_json() const {
             for (const logic::State& s : m->states) choice(s.name, s.name);
         }
         if (pd.kind == K::event)
-          for (const std::string& e : event_names(level_)) choice(e, e);
+          for (const std::string& e : event_names(logic_level())) choice(e, e);
         if (pd.kind == K::sound) {
           for (const audio::BuiltinSound& b : audio::builtin_sounds()) choice(std::string("builtin:") + b.name, b.label);
           for (const game::SoundAsset& sa : level_.sounds) choice(sa.id, sa.name);
@@ -791,7 +796,7 @@ json::Value Studio::logic_json() const {
   o.set("variables", std::move(vars));
   json::Value graph = logic::graph_to_json(*g);
   // (the types: with all its libraries have - any of them can be picked)
-  const json::Value types = g->uses.empty() ? graph : logic::graph_to_json(with_library_types(level_, *g));
+  const json::Value types = g->uses.empty() ? graph : logic::graph_to_json(with_library_types(logic_level(), logic_project(), *g));
   o.set("enums", types["enums"].is_array() ? types["enums"] : json::Value::array());
   o.set("structs", types["structs"].is_array() ? types["structs"] : json::Value::array());
   o.set("functions", graph["functions"].is_array() ? graph["functions"] : json::Value::array());
@@ -801,12 +806,16 @@ json::Value Studio::logic_json() const {
     o.set("library", g->library);
     json::Value uses = json::Value::array(), libraries = json::Value::array();
     for (const std::string& used : g->uses) uses.push(used);
-    const game::Actor* self = logic_owner_ ? level_.find(logic_owner_) : nullptr;
-    for (const auto& [id, name, other] : other_blueprints(level_, logic_owner_)) {
+    const game::Actor* self = logic_owner_ ? logic_level().find(logic_owner_) : nullptr;
+    for (const auto& [id, name, other] : other_blueprints(logic_level(), logic_owner_)) {
       if (!other->library || g->uses_library(name) || !id) continue;
-      if (self && uses_library(level_, *other, self->name)) continue;  // (a library does not use what uses it)
+      if (self && uses_library(logic_level(), logic_project(), *other, self->name)) continue;  // (a library does not use what uses it)
       libraries.push(name);
     }
+    // a world's Blueprint finds libraries in the project too (kern/docs/project.md 5.)
+    if (const game::Project* project = logic_project())
+      for (const game::ProgramBlueprint& b : project->blueprints)
+        if (b.logic.library && !g->uses_library(b.name)) libraries.push(b.name);
     // The engine's libraries (kern/logic/engine_libraries.h): every Blueprint can use them; none of them is an actor
     // of the level, so none can be changed here - the editor shows them as the engine's ("engine": read-only).
     json::Value engine = json::Value::array();  // (each of them: "libraries" are the level's)
@@ -832,7 +841,7 @@ json::Value Studio::logic_json() const {
   {
     // (the functions of the level's other Blueprints this one does not have or declare yet)
     json::Value offered = json::Value::array();
-    for (const auto& [id, name, other] : other_blueprints(level_, logic_owner_))
+    for (const auto& [id, name, other] : other_blueprints(logic_level(), logic_owner_))
       for (const logic::Function& f : other->functions) {
         if (f.external || g->function(f.name) || offered.size() >= 200) continue;
         json::Value x = json::Value::object();
@@ -858,7 +867,7 @@ json::Value Studio::logic_json() const {
       if (!help.empty()) x.set("help", help);
       types.push(std::move(x));
     };
-    for (const auto& [id, name, other] : other_blueprints(level_, logic_owner_)) {
+    for (const auto& [id, name, other] : other_blueprints(logic_level(), logic_owner_)) {
       for (const logic::EnumType& e : other->enums) offer(id, name, e.name, "enum", e.project, e.help);
       for (const logic::StructType& t : other->structs) offer(id, name, t.name, "struct", t.project, t.help);
     }
@@ -883,7 +892,7 @@ json::Value Studio::logic_json() const {
     o.set("comments", std::move(boxes));
   }
   json::Value iss = json::Value::array();
-  if (const std::string conflict = project_type_conflict(level_, logic_owner_, *g); !conflict.empty()) {
+  if (const std::string conflict = project_type_conflict(logic_level(), logic_owner_, *g); !conflict.empty()) {
     json::Value x = json::Value::object();
     x.set("node", 0);
     x.set("error", true);
@@ -904,7 +913,7 @@ json::Value Studio::logic_json() const {
 json::Value Studio::logic_trace_json() const {
   json::Value o = json::Value::object();
   logic::Runtime* rt = world_->logic_runtime();
-  if (!rt) return o;
+  if (!rt || logic_program_) return o;  // (a program Blueprint runs in no world)
   rt->tracing = true;
   const logic::Instance* inst = rt->find(static_cast<logic::ActorRef>(logic_owner_));
   json::Value ran = json::Value::array();
@@ -942,6 +951,7 @@ void Studio::check_logic_breakpoints() {
       toggle_pause();
       logic_break_hit_ = {owner, node};
       logic_owner_ = owner;
+      logic_program_ = false;
       logic_open_ = true;
       logic_view_ = "graph";
       logic_sheet_.clear();
@@ -963,11 +973,11 @@ void Studio::check_logic_breakpoints() {
 
 json::Value Studio::logic_palette(const json::Value& c) const {
   const logic::Library& lib = logic::library();
-  const logic::Graph* g = graph_of(level_, logic_owner_);
+  const logic::Graph* g = graph_of(logic_level(), logic_owner_);
   logic::Graph empty;
   if (!g) g = &empty;
   // (the nodes of its libraries' types are offered whether it uses the type yet or not)
-  const logic::Graph seen = with_library_types(level_, *g);
+  const logic::Graph seen = with_library_types(logic_level(), logic_project(), *g);
   g = &seen;
   const std::string query = lower(c["query"].is_string() ? c["query"].as_string() : std::string());
   std::vector<std::string> words;
@@ -1171,7 +1181,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     }
   // (the functions of the libraries it uses: called directly, by the library's name)
   for (const std::string& used : g->uses) {
-    const logic::Graph* l = blueprints_of(level_)(used);
+    const logic::Graph* l = blueprints_of(logic_level(), logic_project())(used);
     for (const logic::Function& f : l ? l->functions : std::vector<logic::Function>()) {
       if (f.external || !f.from.empty()) continue;
       const std::string full = logic::library_function(used, f.name);
@@ -1190,7 +1200,7 @@ json::Value Studio::logic_palette(const json::Value& c) const {
     if (g->library && f.outputs.size() <= 1)
       consider({"Callback " + f.name, "Functions", "A Callback of " + f.name + ": a value the engine calls (its first input, a const reference, bound to a place)", "func.callback", {{"function", f.name}}});
   }
-  for (const std::string& ev : event_names(level_)) {
+  for (const std::string& ev : event_names(logic_level())) {
     consider({"Call " + ev, "Events", "Raises the custom event " + ev, "flow.call", {{"name", ev}}});
     consider({"Event " + ev, "Events", "Runs when " + ev + " is called", "event.custom", {{"name", ev}}});
   }
@@ -1398,8 +1408,24 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     return true;
   };
   if (name == "logicOpen") {
+    // {program: "<name>"}: a program Blueprint of the project; else {owner}: the level's graph (0) or an actor's.
+    if (c["program"].is_string()) {
+      const std::string which = str("program");
+      std::size_t at = project_.blueprints.size();
+      for (std::size_t i = 0; i < project_.blueprints.size(); ++i)
+        if (project_.blueprints[i].name == which) at = i;
+      if (at == project_.blueprints.size()) return fail_result("the project has no Blueprint \"" + which + "\"");
+      logic_program_ = true;
+      logic_owner_ = static_cast<u32>(at + 1);
+      logic_open_ = true;
+      logic_view_ = "graph";
+      logic_sheet_.clear();
+      touch();
+      return ok_result();
+    }
     const u32 owner = static_cast<u32>(num("owner", c["owner"].is_null() && !selection_.empty() ? primary() : 0));
     if (owner && !level_.find(owner)) return fail_result("no such actor");
+    logic_program_ = false;
     logic_owner_ = owner;
     logic_open_ = true;
     logic_view_ = "graph";
@@ -1426,7 +1452,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
   }
   if (name == "logicReveal") {
     // Shows the sheet a node stands on (a result of Find, a compiler message): the page then moves to the node.
-    const logic::Graph* g = graph_of(level_, logic_owner_);
+    const logic::Graph* g = graph_of(logic_level(), logic_owner_);
     const u32 node = static_cast<u32>(num("node"));
     if (!g || !g->find(node)) return fail_result("no such node");
     const auto bodies = g->bodies(logic::library());
@@ -1439,7 +1465,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
   if (name == "logicFind") {
     // Find in the whole Blueprint, also on the sheets that are not shown: nodes by title, comment, category and
     // parameter values. At most 200 hits - "more" says there are others.
-    const logic::Graph* g = graph_of(level_, logic_owner_);
+    const logic::Graph* g = graph_of(logic_level(), logic_owner_);
     json::Value r = ok_result();
     json::Value hits = json::Value::array();
     std::string q = str("query");
@@ -1493,7 +1519,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     return r;
   }
   if (name == "logicCopy") {
-    const logic::Graph* g = graph_of(level_, logic_owner_);
+    const logic::Graph* g = graph_of(logic_level(), logic_owner_);
     if (!g) return fail_result("no graph");
     logic::Graph part;
     std::vector<u32> ids;
@@ -1542,8 +1568,8 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
   if (name == "logicCpp") {
     // The Blueprint in its second notation (docs/blueprint_cpp.md): the code alone - where the
     // nodes are stays with the graph.
-    const logic::Graph* g = graph_of(level_, logic_owner_);
-    const game::Actor* a = logic_owner_ ? level_.find(logic_owner_) : nullptr;
+    const logic::Graph* g = graph_of(logic_level(), logic_owner_);
+    const game::Actor* a = logic_owner_ ? logic_level().find(logic_owner_) : nullptr;
     const logic::Graph none;
     const std::string owner_name = logic::cpp_class_name(a ? a->name : std::string("Level"), g ? *g : none);
     std::string text, why;
@@ -1560,13 +1586,13 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     // The Blueprint as the source a game's build compiles: its own class - the Blueprint's text
     // as it is - and the glue the engine reaches it through (what tools/blueprint_cpp.sh writes
     // for a whole level). A game that links it runs the Blueprint as that compiled code.
-    const logic::Graph* g = graph_of(level_, logic_owner_);
+    const logic::Graph* g = graph_of(logic_level(), logic_owner_);
     if (!g) return fail_result("this actor has no logic yet");
     std::string text, glue, why;
     if (!logic::native_ready(*g, &why)) return fail_result(why);  // (it does not compile: Compile says where)
-    const game::Actor* owner = logic_owner_ ? level_.find(logic_owner_) : nullptr;
+    const game::Actor* owner = logic_owner_ ? logic_level().find(logic_owner_) : nullptr;
     const std::string cls = logic::cpp_class_name(owner ? owner->name : std::string("Level"), *g);
-    if (!logic::to_cpp(*g, cls, text, &why) || !logic::native_glue(*g, cls, glue, &why, logic::library(), {}, blueprints_of(level_))) return fail_result(why);
+    if (!logic::to_cpp(*g, cls, text, &why) || !logic::native_glue(*g, cls, glue, &why, logic::library(), {}, blueprints_of(logic_level(), logic_project()))) return fail_result(why);
     json::Value r = ok_result();
     r.set("text", text + "\n" + glue);
     std::string file;
@@ -1577,10 +1603,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
   }
   if (name == "logicCompile") {
     json::Value r = ok_result();
-    const logic::Graph* g = graph_of(level_, logic_owner_);
+    const logic::Graph* g = graph_of(logic_level(), logic_owner_);
     json::Value iss = json::Value::array();
     if (g)
-      for (const logic::Issue& i : whole_issues(level_, *g)) {
+      for (const logic::Issue& i : whole_issues(logic_level(), logic_project(), *g)) {
         json::Value x = json::Value::object();
         x.set("node", i.node);
         x.set("error", i.error);
@@ -1601,15 +1627,36 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     coalesce_ = "logic-tx:" + std::to_string(owner);
     transaction_ = str("transaction");
   }
+  // A program Blueprint that the level's Blueprints use as a library: they follow it too (they find it in the project).
+  auto program_library_follows = [&](u32 id, const logic::Graph& g, std::string& why) {
+    const game::Actor* self = program_view_.find(id);
+    if (!self || !g.library) return true;
+    const logic::Blueprints all = [&](std::string_view n) -> const logic::Graph* {
+      for (const game::Actor& a : level_.actors)
+        if (a.logic && a.name == n) return &*a.logic;
+      for (const game::Actor& a : program_view_.actors)
+        if (a.logic && a.name == n) return &*a.logic;
+      return nullptr;
+    };
+    for (game::Actor& a : level_.actors) {
+      if (!a.logic || !uses_library(level_, &project_, *a.logic, self->name)) continue;
+      if (!logic::take_libraries(*a.logic, all, &why)) {
+        why = "the Blueprint of " + a.name + " (in the level) uses this one: " + why;
+        return false;
+      }
+    }
+    return true;
+  };
   auto graph_edit = [&](const char* label, auto&& fn) {
-    const bool done = edit(label, [&](game::Level& l) {
+    const bool done = edit_logic(label, [&](game::Level& l) {
       logic::Graph* g = graph_of(l, owner, true);
       if (!g) { error = "the graph's actor is gone"; return false; }
       // An edit may pick whatever the Blueprint's libraries have - any type, any function: while
       // it is made, the Blueprint holds all of it. After it, it holds what it uses - and the
       // Blueprints that use it follow.
-      if (!g->uses.empty()) logic::take_libraries(*g, blueprints_of(l), nullptr, true);
-      return fn(*g, l) && libraries_follow(l, owner, *g, error);
+      if (!g->uses.empty()) logic::take_libraries(*g, blueprints_of(l, logic_project()), nullptr, true);
+      if (!fn(*g, l) || !libraries_follow(l, logic_project(), owner, *g, error)) return false;
+      return !logic_program_ || program_library_follows(owner, *g, error);
     });
     if (!done && !error.empty()) return fail_result(error);
     result.set("ok", done || error.empty());
@@ -1670,10 +1717,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
   if (name == "logicCppApply") {
     // The Blueprint becomes what the C++ says: one undo step. The nodes the text still has keep
     // their ids and places; what cannot be read is refused with its line and the reason.
-    const logic::Graph* g = graph_of(level_, owner);
+    const logic::Graph* g = graph_of(logic_level(), owner);
     logic::Graph now;
-    if (!logic::apply_cpp(str("text"), g ? *g : logic::Graph(), now, &error, logic::library(), blueprints_of(level_))) return fail_result(error);
-    if (const std::string conflict = project_type_conflict(level_, owner, now); !conflict.empty()) return fail_result(conflict + " (change it in one of them: the others follow)");
+    if (!logic::apply_cpp(str("text"), g ? *g : logic::Graph(), now, &error, logic::library(), blueprints_of(logic_level(), logic_project()))) return fail_result(error);
+    if (const std::string conflict = project_type_conflict(logic_level(), owner, now); !conflict.empty()) return fail_result(conflict + " (change it in one of them: the others follow)");
     bool applied = false;
     graph_edit("Edit C++", [&](logic::Graph& graph, game::Level&) {
       graph = std::move(now);
@@ -1986,7 +2033,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         if (!g.uses_library(which)) return false;
         std::erase(g.uses, which);
         // (what the Blueprint still has of it would be of nothing: the edit is refused then)
-        if (!logic::take_libraries(g, blueprints_of(level), &error)) return false;
+        if (!logic::take_libraries(g, blueprints_of(level, logic_project()), &error)) return false;
         logic::Graph probe;
         std::string why;
         if (!logic::graph_from_json(logic::graph_to_json(g), probe, &why)) { error = "the Blueprint still uses a type of the library " + which + ": " + why; return false; }
@@ -2841,6 +2888,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     });
   }
   if (name == "logicRemoveGraph") {
+    if (logic_program_) return fail_result("a program Blueprint is removed from the project (projectBlueprint remove)");
     if (!owner) return graph_edit("Clear Level Logic", [&](logic::Graph& g, game::Level&) { g = logic::Graph{}; return true; });
     const bool done = edit("Remove Logic", [&](game::Level& l) {
       game::Actor* a = l.find(owner);

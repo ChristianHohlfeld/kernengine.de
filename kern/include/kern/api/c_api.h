@@ -26,9 +26,6 @@ struct MeshInput;
 void read_material(const u32* descriptor, MeshInput& input);
 }  // namespace kern
 
-/// Games linked into the module may provide their shader extensions by
-/// defining this function (weak default: none).
-extern "C" kern::u32 kern_game_extensions(kern::ShaderExtension*** out);
 
 // ---- mesh descriptor (u32 words; f32 where noted) ----
 enum KernMeshDesc : kern::u32 {

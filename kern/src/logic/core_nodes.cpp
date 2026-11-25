@@ -2289,6 +2289,23 @@ void add_functions(Library& lib) {
     lib.add(std::move(d));
   }
   {
+    // Engine Object of Blueprint: the object of the engine another Blueprint is (Graph::implements) - its handle
+    NodeDef d = make("func.engine_object", "Engine Object of Blueprint", "Functions", NodeKind::pure,
+                     "The object of the engine the Blueprint on Target (the Level when Target is empty) is - of the interface of the engine it "
+                     "implements (App, Shader Extension ...) - as a handle of the engine: what a function of the engine takes where it is handed "
+                     "such an object (an App's Extensions). The same handle every time; 0 when Target has no Blueprint that runs, it "
+                     "implements none, or this build has no such interface.");
+    d.world = true;
+    d.inputs = {data("target", "Target", PinType::actor, 0)};
+    d.outputs = {data("result", "Engine Object", PinType::integer)};
+    d.keywords = "engine object interface implements implementation handle extension app other actor";
+    d.run = [](Context& c) {
+      c.out(std::size_t{0}, Value::integer(c.runtime().engine_object(c.in_actor("target"))));
+      return kStop;
+    };
+    lib.add(std::move(d));
+  }
+  {
     NodeDef d = make("func.pure", "Function Value", "Functions", NodeKind::pure,
                      "A function as a value: it runs whenever one of its outputs is read. For functions that only compute (no effects on the world).");
     d.params = {param("function", "Function", ParamDef::Kind::function)};

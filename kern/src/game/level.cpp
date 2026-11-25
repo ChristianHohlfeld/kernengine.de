@@ -1,4 +1,5 @@
 #include "kern/game/level.h"
+#include "kern/game/project.h"
 #include "kern/core/dmath.h"
 
 #include "kern/audio/synth.h"
@@ -1188,6 +1189,8 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
   Level l;
   Reader r{doc, error};
   r.string("name", l.name);
+  // (a level is a world: the project's settings stand in the project file, kern/game/project.h)
+  if (doc.has("project")) { if (error) *error = "project: a level holds only its world - the settings belong in the project file (.kproject, kern/game/project.h)"; return false; }
   if (!world_from_json(doc["world"], l.world, error)) return false;
   if (const json::Value* c = doc.find("camera")) {
     Reader cr{*c, error};
@@ -1200,6 +1203,7 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
   if (!r.ok) return false;
   if (const json::Value* g = doc.find("logic"); g && !g->is_null()) {
     if (!logic::graph_from_level_json(*g, l.logic, error)) return false;
+    if (const std::string e = world_export(l.logic); !e.empty()) { if (error) *error = "logic: " + e; return false; }
     logic::cpp_names(l.logic);  // (levels from before a Blueprint's names had to be C++ names)
   }
   const json::Value& actors = doc["actors"];
@@ -1212,6 +1216,11 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
       if (error) *error = "actor \"" + v["name"].as_string() + "\": " + *error;
       return false;
     }
+    if (a.logic)
+      if (const std::string e = world_export(*a.logic); !e.empty()) {
+        if (error) *error = "actor \"" + a.name + "\": " + e;
+        return false;
+      }
     if (!a.id || ids.count(a.id)) a.id = 0;  // re-assigned by add()
     if (a.id) ids.insert(a.id);
     l.add(std::move(a));
@@ -1288,8 +1297,16 @@ bool sound_reference_ok(const Level& level, std::string_view ref) {
   return level.sound(ref) != nullptr;
 }
 
+std::string world_export(const logic::Graph& g) {
+  for (const logic::Function& f : g.functions)
+    if (!f.exported.empty() && !f.external && f.from.empty())
+      return "the function " + f.name + " is an export (" + f.exported + ") - exports belong to the program: a Blueprint with an export stands in the project, not in a world (kern/docs/project.md 4.)";
+  return {};
+}
+
 std::vector<Issue> validate(const Level& level) {
   std::vector<Issue> out;
+  if (const std::string e = world_export(level.logic); !e.empty()) out.push_back({true, 0, "the level's graph: " + e});
   std::unordered_set<ActorId> ids;
   u32 players = 0;
   for (const Actor& a : level.actors) {
@@ -1297,6 +1314,8 @@ std::vector<Issue> validate(const Level& level) {
     auto error = [&](const std::string& t) { out.push_back({true, a.id, who + ": " + t}); };
     auto warn = [&](const std::string& t) { out.push_back({false, a.id, who + ": " + t}); };
     if (!a.id || ids.count(a.id)) error("duplicate or missing id");
+    if (a.logic)
+      if (const std::string e = world_export(*a.logic); !e.empty()) error(e);
     ids.insert(a.id);
     if (a.parent && !level.find(a.parent)) error("parent does not exist");
     if (!finite(a.transform.position) || !finite(a.transform.rotation) || !finite(a.transform.scale)) error("transform is not finite");

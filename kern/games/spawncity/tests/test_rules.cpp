@@ -1,16 +1,20 @@
 // Game rules with SpawnCity's numbers: wanted level, police response, escape. The rules are the
-// Blueprint of the level's actor "Wanted" (level/spawncity.klevel): the tests run that Blueprint
-// in Kern Logic and call it the way the game does (wanted.h).
-#include "../src/rules.h"
-#include "../src/wanted.h"
+// Blueprint of the level's actor "Wanted" (level/spawncity.klevel); the program calls it through the
+// Blueprint wanted_cpp, and the tests run both in Kern Logic and call wanted_cpp as its class - as the
+// program does (level_blueprints.h).
+#include "../src/blueprint_call.h"
+#include "level_blueprints.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
 
 namespace {
-/// The level's actor "Wanted" running in a logic runtime of its own, bound to wanted.h.
+using Wanted = blueprints::wanted_cpp;
+using Crime = Wanted::wanted_Crime;
+/// The level's actor "Wanted" running in a logic runtime of its own, wanted_cpp beside it as its class.
 struct WantedBlueprint {
+  /// (a logic of its own, for the Blueprint read back from its text)
   struct Host : kern::logic::Host {
     f64 now = 0;
     std::string errors;
@@ -18,23 +22,21 @@ struct WantedBlueprint {
     void print(const std::string&, bool) override {}
     void error(const std::string& text) override { errors += text + "\n"; }
     kern::u32 random() override { return 4; }
-    // (the actor of its name, as the game's world finds it: the rules bound to this logic reach it so)
     kern::logic::ActorRef find_actor(std::string_view name) override { return name == "Wanted" ? 1 : 0; }
-  } host;
-  kern::logic::Runtime rt{host};
+  };
+  RuleBlueprint rules;
+  RuleBlueprint::Host& host = rules.host;
   kern::logic::Instance* inst = nullptr;
   std::string problems;
-  WantedBlueprint() {
-    kern::logic::Graph g;
-    std::string error;
-    if (!rules::actor_graph("Wanted", g, error)) { problems = error; return; }
-    for (const kern::logic::Issue& i : kern::logic::check(g)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
-    inst = rt.add(g, 1, "Wanted");
-    rt.begin();
-    wanted::bind(rt);
+  bool bound = false;
+  explicit WantedBlueprint(const char* actor = "Wanted") : rules(actor, nullptr, true, {"wanted_cpp"}) {
+    inst = rules.inst;
+    problems = rules.problems;
+    rules.rt.budget = rules::kLoopBudget;
+    bound = kern::logic::bind_blueprint<Wanted>(rules.rt);
   }
-  ~WantedBlueprint() { wanted::bind(sc::no_logic()); }
 };
+Wanted& W() { return kern::logic::blueprint<Wanted>(); }
 }  // namespace
 
 SC_TEST(rules_wanted_blueprint) {
@@ -50,46 +52,48 @@ SC_TEST(rules_wanted_blueprint) {
   for (const char* f : {"Severity", "StarsForHeat", "PoliceCount", "DetectionRadius", "EscapeMs", "PoliceDamage", "SpawnRadius", "ArrivalDelayMs", "EngageDelayMs",
                         "WaveBreakMs", "FireRange", "FireIntervalMs", "HitChance", "EmpImpulse", "Report", "Update", "Clear", "Stars"})
     SC_CHECK(bp.inst->has_function(f), "function %s", f);
-  SC_CHECK(wanted::max_stars() == 5 && wanted::emp_range() == 30 && wanted::emp_cooldown_ms() == 18000 && wanted::max_fire_range() == 35, "the constants are its variables");
+  SC_CHECK(W().max_stars().Result == 5 && W().emp_range().Result == 30 && W().emp_cooldown_ms().Result == 18000 && W().max_fire_range().Result == 35, "the constants are its variables");
   // the whole table of the original (wanted_system_logic.mjs), star by star
   const int severity[10] = {2, 1, 2, 1, 2, 3, 3, 3, 1, 0};
-  for (int c = 0; c < 10; ++c) SC_CHECK(wanted::severity(static_cast<wanted::Crime>(c)) == severity[c], "severity of crime %d", c);
+  for (int c = 0; c < 10; ++c) SC_CHECK(W().severity(static_cast<Crime>(c)).Result == severity[c], "severity of crime %d", c);
   const float heats[] = {-3, 0, 3.99f, 4, 8.9f, 9, 14, 15, 21.5f, 22, 29, 30, 500};
   const int stars[] = {0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5};
-  for (int i = 0; i < 13; ++i) SC_CHECK(wanted::stars_for_heat(heats[i]) == stars[i], "stars for heat %.2f", heats[i]);
+  for (int i = 0; i < 13; ++i) SC_CHECK(W().stars_for_heat(heats[i]).Result == stars[i], "stars for heat %.2f", heats[i]);
   const int count[] = {0, 1, 2, 3, 3, 3, 3};
   const float detect[] = {0, 59, 66, 73, 80, 87, 87}, escape[] = {0, 5100, 6000, 6900, 7800, 8700, 8700}, damage[] = {2, 2, 2, 3, 3, 4, 4};
   const float arrival[] = {14700, 14700, 13400, 12100, 10800, 9500, 9500}, engage[] = {6350, 6350, 5900, 5450, 5000, 4550, 4550};
   const float wave[] = {9050, 9050, 8600, 8150, 7700, 7250, 7250}, interval[] = {4870, 4870, 4640, 4410, 4180, 3950, 3950};
   for (int s = 0; s <= 6; ++s) {
-    SC_CHECK(wanted::police_count(s) == count[s], "units at %d stars", s);
-    SC_CHECK(wanted::detection_radius(s) == detect[s] && wanted::escape_ms(s) == escape[s], "detection and escape at %d stars", s);
-    SC_CHECK(wanted::police_damage(s) == damage[s], "damage at %d stars", s);
-    SC_CHECK(wanted::arrival_delay_ms(s) == arrival[s] && wanted::engage_delay_ms(s) == engage[s] && wanted::wave_break_ms(s) == wave[s], "delays at %d stars", s);
-    SC_CHECK(wanted::fire_interval_ms(s) == interval[s], "fire interval at %d stars", s);
+    SC_CHECK(W().police_count(s).Result == count[s], "units at %d stars", s);
+    SC_CHECK(W().detection_radius(s).Result == detect[s] && W().escape_ms(s).Result == escape[s], "detection and escape at %d stars", s);
+    SC_CHECK(W().police_damage(s).Result == damage[s], "damage at %d stars", s);
+    SC_CHECK(W().arrival_delay_ms(s).Result == arrival[s] && W().engage_delay_ms(s).Result == engage[s] && W().wave_break_ms(s).Result == wave[s], "delays at %d stars", s);
+    SC_CHECK(W().fire_interval_ms(s).Result == interval[s], "fire interval at %d stars", s);
     const int level = s < 1 ? 1 : s > 5 ? 5 : s;
-    SC_CHECK(std::fabs(wanted::fire_range(s) - std::fmin(35.0f, 28 + static_cast<float>(level) * 1.4f)) < 1e-5f, "fire range at %d stars", s);
+    SC_CHECK(std::fabs(W().fire_range(s).Result - std::fmin(35.0f, 28 + static_cast<float>(level) * 1.4f)) < 1e-5f, "fire range at %d stars", s);
   }
-  SC_CHECK(wanted::spawn_radius(0) == 58 && wanted::spawn_radius(1) == 66 && wanted::spawn_radius(2) == 74 && wanted::spawn_radius(3) == 58 && wanted::spawn_radius(-4) == 58, "spawn rings 58 66 74");
+  SC_CHECK(W().spawn_radius(0).Result == 58 && W().spawn_radius(1).Result == 66 && W().spawn_radius(2).Result == 74 && W().spawn_radius(3).Result == 58 && W().spawn_radius(-4).Result == 58, "spawn rings 58 66 74");
   // the hit chance against the original's formula on a grid
   for (int s = 1; s <= 5; ++s)
     for (float d : {0.0f, 6.0f, 20.0f, 38.0f, 90.0f})
       for (float v : {-2.0f, 0.0f, 3.6f, 7.2f, 15.0f}) {
         const float dp = clampf((d - 6) / 32, 0, 1) * 0.26f, mp = std::fmin(1.0f, std::fmax(0.0f, v) / 7.2f) * 0.24f;
         const float want = clampf(0.28f + static_cast<float>(s) * 0.02f - dp - mp, 0.1f, 0.38f);
-        SC_CHECK(std::fabs(wanted::hit_chance(s, d, v) - want) < 1e-6f, "hit chance %d stars, %.0f m, %.1f m/s: %f vs %f", s, d, v, wanted::hit_chance(s, d, v), want);
+        SC_CHECK(std::fabs(W().hit_chance(s, d, v).Result - want) < 1e-6f, "hit chance %d stars, %.0f m, %.1f m/s: %f vs %f", s, d, v, W().hit_chance(s, d, v).Result, want);
       }
   // the EMP's push: 126 at the player, 54 at the edge, nothing beyond or behind
-  SC_CHECK(wanted::emp_impulse(0) == 126 && std::fabs(wanted::emp_impulse(30) - 54) < 1e-4f && std::fabs(wanted::emp_impulse(15) - 90) < 1e-4f, "EMP 126 .. 90 .. 54");
-  SC_CHECK(wanted::emp_impulse(30.01f) == 0 && wanted::emp_impulse(-1) == 0 && wanted::emp_impulse(std::nanf("")) == 0, "EMP: nothing out of range");
+  SC_CHECK(W().emp_impulse(0).Result == 126 && std::fabs(W().emp_impulse(30).Result - 54) < 1e-4f && std::fabs(W().emp_impulse(15).Result - 90) < 1e-4f, "EMP 126 .. 90 .. 54");
+  SC_CHECK(W().emp_impulse(30.01f).Result == 0 && W().emp_impulse(-1).Result == 0 && W().emp_impulse(std::nanf("")).Result == 0, "EMP: nothing out of range");
   SC_CHECK(bp.host.errors.empty(), "no errors while it ran (%s)", bp.host.errors.c_str());
 }
 
 SC_TEST(rules_wanted_unbound) {
   // without the Blueprint there are no rules (the game refuses to start without it)
-  SC_CHECK(!wanted::bind(sc::no_logic()) && wanted::police_count(5) == 0 && wanted::arrival_delay_ms(1) == 0, "unbound: nothing");
-  wanted::report(wanted::Crime::police_car, true);
-  SC_CHECK(wanted::stars() == 0 && wanted::heat() == 0, "unbound: no heat");
+  WantedBlueprint none(nullptr);
+  SC_CHECK(none.bound, "wanted_cpp runs as its class");
+  SC_CHECK(!W().bind().Result && W().police_count(5).Result == 0 && W().arrival_delay_ms(1).Result == 0, "unbound: nothing");
+  W().report(Crime::police_car, true);
+  SC_CHECK(W().stars().Result == 0 && W().heat().Result == 0, "unbound: no heat");
 }
 
 SC_TEST(rules_wanted_blueprint_is_its_cpp) {
@@ -132,41 +136,41 @@ SC_TEST(rules_wanted_blueprint_is_its_cpp) {
 
 SC_TEST(rules_wanted_levels) {
   WantedBlueprint bp;
-  SC_CHECK(wanted::stars_for_heat(3.9f) == 0 && wanted::stars_for_heat(4) == 1 && wanted::stars_for_heat(30) == 5, "thresholds 4 9 15 22 30");
-  SC_CHECK(wanted::police_count(1) == 1 && wanted::police_count(3) == 3 && wanted::police_count(5) == 3, "units min(3, ceil(.7 stars))");
-  SC_CHECK(wanted::detection_radius(2) == 66, "detection 52 + 7 stars");
-  SC_CHECK(wanted::police_damage(1) == 2 && wanted::police_damage(3) == 3 && wanted::police_damage(5) == 4, "damage 2 2 3 3 4");
-  SC_CHECK(wanted::arrival_delay_ms(5) == 9500, "arrival max(9000, 16000 - 1300 stars)");
-  SC_CHECK(std::fabs(wanted::hit_chance(1, 0, 0) - 0.3f) < 1e-6f && wanted::hit_chance(5, 100, 20) == 0.1f, "hit chance clamp");
-  SC_CHECK(wanted::emp_impulse(0) == 126 && wanted::emp_impulse(31) == 0, "EMP impulse");
+  SC_CHECK(W().stars_for_heat(3.9f).Result == 0 && W().stars_for_heat(4).Result == 1 && W().stars_for_heat(30).Result == 5, "thresholds 4 9 15 22 30");
+  SC_CHECK(W().police_count(1).Result == 1 && W().police_count(3).Result == 3 && W().police_count(5).Result == 3, "units min(3, ceil(.7 stars))");
+  SC_CHECK(W().detection_radius(2).Result == 66, "detection 52 + 7 stars");
+  SC_CHECK(W().police_damage(1).Result == 2 && W().police_damage(3).Result == 3 && W().police_damage(5).Result == 4, "damage 2 2 3 3 4");
+  SC_CHECK(W().arrival_delay_ms(5).Result == 9500, "arrival max(9000, 16000 - 1300 stars)");
+  SC_CHECK(std::fabs(W().hit_chance(1, 0, 0).Result - 0.3f) < 1e-6f && W().hit_chance(5, 100, 20).Result == 0.1f, "hit chance clamp");
+  SC_CHECK(W().emp_impulse(0).Result == 126 && W().emp_impulse(31).Result == 0, "EMP impulse");
 }
 
 SC_TEST(rules_wanted_escape) {
   WantedBlueprint bp;
-  wanted::report(wanted::Crime::carjacking, false);
-  SC_CHECK(wanted::stars() == 0, "nobody saw it");
-  for (int i = 0; i < 4; ++i) wanted::report(wanted::Crime::carjacking, true);
-  SC_CHECK(wanted::stars() == 1, "four carjackings seen = one star (%d)", wanted::stars());
-  wanted::update(4.0f, false);
-  SC_CHECK(wanted::stars() == 1, "still searched after 4 s");
-  wanted::update(1.2f, false);
-  SC_CHECK(wanted::stars() == 0, "escaped after 5.1 s out of sight");
-  SC_CHECK(wanted::heat() == 0 && wanted::hidden_ms() == 0, "the escape clears the heat and the clock");
+  W().report(Crime::carjacking, false);
+  SC_CHECK(W().stars().Result == 0, "nobody saw it");
+  for (int i = 0; i < 4; ++i) W().report(Crime::carjacking, true);
+  SC_CHECK(W().stars().Result == 1, "four carjackings seen = one star (%d)", W().stars().Result);
+  W().update(4.0, false);
+  SC_CHECK(W().stars().Result == 1, "still searched after 4 s");
+  W().update(1.2, false);
+  SC_CHECK(W().stars().Result == 0, "escaped after 5.1 s out of sight");
+  SC_CHECK(W().heat().Result == 0 && W().hidden_ms().Result == 0, "the escape clears the heat and the clock");
   // being seen restarts the clock; a new crime does too
-  for (int i = 0; i < 9; ++i) wanted::report(wanted::Crime::person_hit, true);
-  SC_CHECK(wanted::stars() == 2 && wanted::heat() == 9, "nine hits seen = two stars");
-  wanted::update(5.0f, false);
-  SC_CHECK(std::fabs(wanted::hidden_ms() - 5000) < 1e-3f && wanted::stars() == 2, "5 s of the 6 s out of sight");
-  wanted::update(0.1f, true);
-  SC_CHECK(wanted::hidden_ms() == 0 && wanted::stars() == 2, "seen again: the clock restarts");
-  wanted::update(5.9f, false);
-  wanted::report(wanted::Crime::bird, true);
-  SC_CHECK(wanted::hidden_ms() == 0 && wanted::heat() == 9, "a crime seen restarts the clock (a bird costs nothing)");
-  wanted::update(5.9f, false);
-  SC_CHECK(wanted::stars() == 2, "not yet");
-  wanted::update(0.2f, false);
-  SC_CHECK(wanted::stars() == 0, "gone after 6 s");
-  wanted::update(1.0f, false);
-  SC_CHECK(wanted::hidden_ms() == 0, "no stars: no clock");
+  for (int i = 0; i < 9; ++i) W().report(Crime::person_hit, true);
+  SC_CHECK(W().stars().Result == 2 && W().heat().Result == 9, "nine hits seen = two stars");
+  W().update(5.0, false);
+  SC_CHECK(std::fabs(W().hidden_ms().Result - 5000) < 1e-3f && W().stars().Result == 2, "5 s of the 6 s out of sight");
+  W().update(0.1, true);
+  SC_CHECK(W().hidden_ms().Result == 0 && W().stars().Result == 2, "seen again: the clock restarts");
+  W().update(5.9, false);
+  W().report(Crime::bird, true);
+  SC_CHECK(W().hidden_ms().Result == 0 && W().heat().Result == 9, "a crime seen restarts the clock (a bird costs nothing)");
+  W().update(5.9, false);
+  SC_CHECK(W().stars().Result == 2, "not yet");
+  W().update(0.2, false);
+  SC_CHECK(W().stars().Result == 0, "gone after 6 s");
+  W().update(1.0, false);
+  SC_CHECK(W().hidden_ms().Result == 0, "no stars: no clock");
   SC_CHECK(bp.host.errors.empty(), "no errors while it ran (%s)", bp.host.errors.c_str());
 }

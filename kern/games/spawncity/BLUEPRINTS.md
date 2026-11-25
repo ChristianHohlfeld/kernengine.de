@@ -959,6 +959,13 @@ Umgeschaltet:
   (`tools/embed_level.py --without Source`), aber mit den Bibliotheken, die die bleibenden Blueprints
   benutzen (`uses`, auch mittelbar: `qr_code_cpp` ruft `shapes`); Header und Klassen entstehen aus
   diesem Level.
+- **Ein Objekt der Engine, das ein anderer Blueprint ist** (seit 25.11.2026): `&sc::facades()` – der Getter des
+  einen Objekts eines Zustands, der eine Schnittstelle der Engine implementiert – ist, wo die Engine ein solches
+  Objekt nimmt, dessen Handle: `func_engine_object(actor_find("Facades"))` (Knoten Engine Object of Blueprint). Ein
+  Array von Zeigern auf Objekte der Engine ist eine Liste ihrer Handles. Eine statische lokale Variable einer Methode
+  des Zustands, deren Anfang berechnet wird (`static ShaderExtension* ext[2] = {&a(), &b()};`), ist eine Variable des
+  Blueprints mit einem Bool `<name>_met` daneben: beim ersten Durchlauf der Deklaration bekommt sie ihren Anfang –
+  wie C++ ihn dann berechnet (SpawnCityApp::extensions).
 - **Der Konverter liest eine Klasse aus dem Level** (seit 25.11.2026): Eine Funktion des übrigen C++,
   die eine umgeschaltete Datei ruft, wird wie jede andere geschrieben. Ein Typ der Klasse
   (`blueprints::qr_code::qr_Code`) ist der Typ dieser Bibliothek mit den Feldern und Defaults, die

@@ -284,8 +284,18 @@ bool c21(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
-// engine.game_world.set_layers: kern::game::GameWorld::set_layers
+// engine.fixed_step.fixed_step: kern::game::FixedStep::fixed_step
 bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::FixedStep>(o, in, 0, "fixed_step");
+  if (!self) return false;
+  auto a0 = ev::blank<std::remove_cvref_t<double>>();
+  ev::take<ev::Float>(o, in, 1, a0);
+  self->fixed_step(std::move(a0));
+  return true;
+}
+
+// engine.game_world.set_layers: kern::game::GameWorld::set_layers
+bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -295,7 +305,7 @@ bool c22(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.clear: kern::game::GameWorld::clear
-bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   self->clear();
@@ -303,7 +313,7 @@ bool c23(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.actor_for_mesh: kern::game::GameWorld::actor_for_mesh
-bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -314,7 +324,7 @@ bool c24(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.actor_matrix: kern::game::GameWorld::actor_matrix
-bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -328,7 +338,7 @@ bool c25(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.actor_bounds: kern::game::GameWorld::actor_bounds
-bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -342,7 +352,7 @@ bool c26(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.actor_meshes: kern::game::GameWorld::actor_meshes
-bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -355,7 +365,7 @@ bool c27(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.pending_textures: kern::game::GameWorld::pending_textures
-bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->pending_textures();
@@ -364,7 +374,7 @@ bool c28(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_texture_pixels: kern::game::GameWorld::set_texture_pixels
-bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
@@ -381,7 +391,7 @@ bool c29(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.apply_lighting: kern::game::GameWorld::apply_lighting
-bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -392,7 +402,7 @@ bool c30(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.time_of_day: kern::game::GameWorld::time_of_day
-bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->time_of_day();
@@ -401,7 +411,7 @@ bool c31(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.present: kern::game::GameWorld::present
-bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -412,8 +422,27 @@ bool c32(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
   return true;
 }
 
+// engine.game_world.set_fixed_step: kern::game::GameWorld::set_fixed_step
+bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  kern::game::FixedStep* a0 = ev::maybe<kern::game::FixedStep>(o, in, 1, "step");
+  if (!o.error.empty()) return false;
+  self->set_fixed_step(a0);
+  return true;
+}
+
+// engine.game_world.fixed_step_handler: kern::game::GameWorld::fixed_step_handler
+bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
+  if (!self) return false;
+  decltype(auto) r = self->fixed_step_handler();
+  out[0] = Value::integer(ev::handle_of<kern::game::FixedStep>(o, std::forward<decltype(r)>(r)));
+  return true;
+}
+
 // engine.game_world.stop: kern::game::GameWorld::stop
-bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   self->stop();
@@ -421,7 +450,7 @@ bool c33(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.running: kern::game::GameWorld::running
-bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->running();
@@ -430,7 +459,7 @@ bool c34(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.session: kern::game::GameWorld::session
-bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->session();
@@ -439,7 +468,7 @@ bool c35(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.mode: kern::game::GameWorld::mode
-bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->mode();
@@ -448,7 +477,7 @@ bool c36(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_paused: kern::game::GameWorld::set_paused
-bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -458,7 +487,7 @@ bool c37(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.paused: kern::game::GameWorld::paused
-bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->paused();
@@ -467,7 +496,7 @@ bool c38(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_mode: kern::game::GameWorld::set_mode
-bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::game::SimMode>>();
@@ -478,7 +507,7 @@ bool c39(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.step: kern::game::GameWorld::step
-bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -490,7 +519,7 @@ bool c40(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.step_once: kern::game::GameWorld::step_once
-bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::game::PlayInput const&>>();
@@ -500,7 +529,7 @@ bool c41(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.restart: kern::game::GameWorld::restart
-bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->restart();
@@ -509,7 +538,7 @@ bool c42(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.update_camera: kern::game::GameWorld::update_camera
-bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Camera&>>();
@@ -525,7 +554,7 @@ bool c43(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.player: kern::game::GameWorld::player
-bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->player();
@@ -534,7 +563,7 @@ bool c44(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.camera_yaw: kern::game::GameWorld::camera_yaw
-bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->camera_yaw();
@@ -543,7 +572,7 @@ bool c45(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.interior_view: kern::game::GameWorld::interior_view
-bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->interior_view();
@@ -552,7 +581,7 @@ bool c46(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.camera_pitch: kern::game::GameWorld::camera_pitch
-bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->camera_pitch();
@@ -561,7 +590,7 @@ bool c47(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.sim_time: kern::game::GameWorld::sim_time
-bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->sim_time();
@@ -570,7 +599,7 @@ bool c48(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.add_pawn: kern::game::GameWorld::add_pawn
-bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -583,7 +612,7 @@ bool c49(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.remove_pawn: kern::game::GameWorld::remove_pawn
-bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -594,7 +623,7 @@ bool c50(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.pawn_source: kern::game::GameWorld::pawn_source
-bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -605,7 +634,7 @@ bool c51(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_pawn_input: kern::game::GameWorld::set_pawn_input
-bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -617,7 +646,7 @@ bool c52(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_local_pawn: kern::game::GameWorld::set_local_pawn
-bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -627,7 +656,7 @@ bool c53(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.pawns: kern::game::GameWorld::pawns
-bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->pawns();
@@ -636,7 +665,7 @@ bool c54(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.take_alive_changes: kern::game::GameWorld::take_alive_changes
-bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<std::pair<unsigned int, bool>, std::allocator<std::pair<unsigned int, bool> > >&>>();
@@ -647,7 +676,7 @@ bool c55(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.dead_actors: kern::game::GameWorld::dead_actors
-bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->dead_actors();
@@ -656,7 +685,7 @@ bool c56(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_alive: kern::game::GameWorld::set_alive
-bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -668,7 +697,7 @@ bool c57(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.networked_actors: kern::game::GameWorld::networked_actors
-bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
@@ -679,7 +708,7 @@ bool c58(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.hud_mut: kern::game::GameWorld::hud_mut
-bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->hud_mut();
@@ -688,7 +717,7 @@ bool c59(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.hud_mut@set: what stands at the place kern::game::GameWorld::hud_mut gives
-bool c59_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c62_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::take<ev::Struct<S_game_Hud>>(o, in, 1, self->hud_mut());
@@ -696,7 +725,7 @@ bool c59_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.game_world.set_replica_pose: kern::game::GameWorld::set_replica_pose
-bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -710,7 +739,7 @@ bool c60(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.step_replica: kern::game::GameWorld::step_replica
-bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -724,7 +753,7 @@ bool c61(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.hud: kern::game::GameWorld::hud
-bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->hud();
@@ -733,7 +762,7 @@ bool c62(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.aim_blend: kern::game::GameWorld::aim_blend
-bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->aim_blend();
@@ -742,7 +771,7 @@ bool c63(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.stats: kern::game::GameWorld::stats
-bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->stats();
@@ -751,7 +780,7 @@ bool c64(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.physics: kern::game::GameWorld::physics
-bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->physics();
@@ -760,7 +789,7 @@ bool c65(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.actor_body: kern::game::GameWorld::actor_body
-bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -771,7 +800,7 @@ bool c66(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.begin_grab: kern::game::GameWorld::begin_grab
-bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -784,7 +813,7 @@ bool c67(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.move_grab: kern::game::GameWorld::move_grab
-bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -794,7 +823,7 @@ bool c68(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.end_grab: kern::game::GameWorld::end_grab
-bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   self->end_grab();
@@ -802,7 +831,7 @@ bool c69(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.grabbing: kern::game::GameWorld::grabbing
-bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->grabbing();
@@ -811,7 +840,7 @@ bool c70(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.debug_lines: kern::game::GameWorld::debug_lines
-bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -831,7 +860,7 @@ bool c71(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.events: kern::game::GameWorld::events
-bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->events();
@@ -840,7 +869,7 @@ bool c72(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.events@set: what stands at the place kern::game::GameWorld::events gives
-bool c72_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c75_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::take<ev::List<ev::Text>>(o, in, 1, self->events());
@@ -848,7 +877,7 @@ bool c72_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.game_world.sound_cues: kern::game::GameWorld::sound_cues
-bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->sound_cues();
@@ -857,7 +886,7 @@ bool c73(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.sound_cues@set: what stands at the place kern::game::GameWorld::sound_cues gives
-bool c73_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c76_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::take<ev::List<ev::Struct<S_game_SoundCue>>>(o, in, 1, self->sound_cues());
@@ -865,7 +894,7 @@ bool c73_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.game_world.shots: kern::game::GameWorld::shots
-bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->shots();
@@ -874,7 +903,7 @@ bool c74(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.shots@set: what stands at the place kern::game::GameWorld::shots gives
-bool c74_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c77_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::take<ev::List<ev::Struct<S_game_ShotEvent>>>(o, in, 1, self->shots());
@@ -882,7 +911,7 @@ bool c74_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&
 }
 
 // engine.game_world.damage: kern::game::GameWorld::damage
-bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -900,7 +929,7 @@ bool c75(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.health_of: kern::game::GameWorld::health_of
-bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -911,7 +940,7 @@ bool c76(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_health: kern::game::GameWorld::set_health
-bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -927,7 +956,7 @@ bool c77(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.soldier_state: kern::game::GameWorld::soldier_state
-bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -941,7 +970,7 @@ bool c78(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.respawn_now: kern::game::GameWorld::respawn_now
-bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -952,7 +981,7 @@ bool c79(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.apply_soldier_state: kern::game::GameWorld::apply_soldier_state
-bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::game::SoldierState const&>>();
@@ -962,7 +991,7 @@ bool c80(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_view: kern::game::GameWorld::set_view
-bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Camera const&>>();
@@ -972,7 +1001,7 @@ bool c81(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_view_hand: kern::game::GameWorld::set_view_hand
-bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   std::vector<kern::Mat4> a0;
@@ -982,7 +1011,7 @@ bool c82(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.actor_alive: kern::game::GameWorld::actor_alive
-bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -993,7 +1022,7 @@ bool c83(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.last_input: kern::game::GameWorld::last_input
-bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->last_input();
@@ -1002,7 +1031,7 @@ bool c84(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.logic_runtime: kern::game::GameWorld::logic_runtime
-bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->logic_runtime();
@@ -1011,7 +1040,7 @@ bool c85(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.key_event: kern::game::GameWorld::key_event
-bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
@@ -1023,7 +1052,7 @@ bool c86(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.take_replicated_changes: kern::game::GameWorld::take_replicated_changes
-bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
@@ -1037,7 +1066,7 @@ bool c87(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.replicated_state: kern::game::GameWorld::replicated_state
-bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
@@ -1051,7 +1080,7 @@ bool c88(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_property: kern::game::GameWorld::set_property
-bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1066,7 +1095,7 @@ bool c89(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_property_number: kern::game::GameWorld::set_property_number
-bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1081,7 +1110,7 @@ bool c90(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_property_flag: kern::game::GameWorld::set_property_flag
-bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1096,7 +1125,7 @@ bool c91(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_property_text: kern::game::GameWorld::set_property_text
-bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1111,7 +1140,7 @@ bool c92(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.spawn_copy: kern::game::GameWorld::spawn_copy
-bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1128,7 +1157,7 @@ bool c93(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.teleport: kern::game::GameWorld::teleport
-bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1143,7 +1172,7 @@ bool c94(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.actor_velocity: kern::game::GameWorld::actor_velocity
-bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1154,7 +1183,7 @@ bool c95(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_actor_velocity: kern::game::GameWorld::set_actor_velocity
-bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1167,7 +1196,7 @@ bool c96(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.push_actor: kern::game::GameWorld::push_actor
-bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1182,7 +1211,7 @@ bool c97(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_simulate_physics: kern::game::GameWorld::set_simulate_physics
-bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1195,7 +1224,7 @@ bool c98(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.set_joint_motor: kern::game::GameWorld::set_joint_motor
-bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1214,7 +1243,7 @@ bool c99(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out
 }
 
 // engine.game_world.find_actor: kern::game::GameWorld::find_actor
-bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   std::string a0;
@@ -1225,7 +1254,7 @@ bool c100(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.actors_with_tag: kern::game::GameWorld::actors_with_tag
-bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   std::string a0;
@@ -1238,7 +1267,7 @@ bool c101(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.has_tag: kern::game::GameWorld::has_tag
-bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1251,7 +1280,7 @@ bool c102(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.line_trace: kern::game::GameWorld::line_trace
-bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -1277,7 +1306,7 @@ bool c103(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.add_score: kern::game::GameWorld::add_score
-bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -1287,7 +1316,7 @@ bool c104(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.end_game: kern::game::GameWorld::end_game
-bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -1299,7 +1328,7 @@ bool c105(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.show_message: kern::game::GameWorld::show_message
-bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
@@ -1309,7 +1338,7 @@ bool c106(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.play_sound: kern::game::GameWorld::play_sound
-bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
@@ -1329,7 +1358,7 @@ bool c107(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.particle_burst: kern::game::GameWorld::particle_burst
-bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -1341,7 +1370,7 @@ bool c108(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.shake_camera: kern::game::GameWorld::shake_camera
-bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -1351,7 +1380,7 @@ bool c109(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.aim_view_model: kern::game::GameWorld::aim_view_model
-bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -1365,7 +1394,7 @@ bool c110(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.destroy_actor: kern::game::GameWorld::destroy_actor
-bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1375,7 +1404,7 @@ bool c111(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.heal: kern::game::GameWorld::heal
-bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1387,7 +1416,7 @@ bool c112(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.give_ammo: kern::game::GameWorld::give_ammo
-bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1399,7 +1428,7 @@ bool c113(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.call_logic_event: kern::game::GameWorld::call_logic_event
-bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<std::basic_string<char, std::char_traits<char>, std::allocator<char> > const&>>();
@@ -1411,7 +1440,7 @@ bool c114(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_sensors: kern::game::GameWorld::walker_sensors
-bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1425,7 +1454,7 @@ bool c115(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_camera: kern::game::GameWorld::walker_camera
-bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1439,7 +1468,7 @@ bool c116(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_command: kern::game::GameWorld::walker_command
-bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1458,7 +1487,7 @@ bool c117(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_look: kern::game::GameWorld::walker_look
-bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1477,7 +1506,7 @@ bool c118(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_set_autonomous: kern::game::GameWorld::walker_set_autonomous
-bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1490,7 +1519,7 @@ bool c119(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_quack: kern::game::GameWorld::walker_quack
-bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1501,7 +1530,7 @@ bool c120(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_skill: kern::game::GameWorld::walker_skill
-bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1514,7 +1543,7 @@ bool c121(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_mouth: kern::game::GameWorld::walker_mouth
-bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1527,7 +1556,7 @@ bool c122(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_holding: kern::game::GameWorld::walker_holding
-bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1538,7 +1567,7 @@ bool c123(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_pet: kern::game::GameWorld::walker_pet
-bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1551,7 +1580,7 @@ bool c124(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_hear: kern::game::GameWorld::walker_hear
-bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1564,7 +1593,7 @@ bool c125(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_servo_load: kern::game::GameWorld::walker_servo_load
-bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1584,7 +1613,7 @@ bool c126(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_driving: kern::game::GameWorld::walker_driving
-bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1595,7 +1624,7 @@ bool c127(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.set_walker_external: kern::game::GameWorld::set_walker_external
-bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1608,7 +1637,7 @@ bool c128(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.set_walker_pose_edit: kern::game::GameWorld::set_walker_pose_edit
-bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1621,7 +1650,7 @@ bool c129(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.set_walker_pose: kern::game::GameWorld::set_walker_pose
-bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1635,7 +1664,7 @@ bool c130(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.set_walker_action: kern::game::GameWorld::set_walker_action
-bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1649,7 +1678,7 @@ bool c131(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_tick_due: kern::game::GameWorld::walker_tick_due
-bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1660,7 +1689,7 @@ bool c132(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_probe: kern::game::GameWorld::walker_probe
-bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1674,7 +1703,7 @@ bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_push: kern::game::GameWorld::walker_push
-bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1687,7 +1716,7 @@ bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_said: kern::game::GameWorld::walker_said
-bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1698,7 +1727,7 @@ bool c135(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_joints: kern::game::GameWorld::walker_joints
-bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1709,7 +1738,7 @@ bool c136(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.set_walker_play_external: kern::game::GameWorld::set_walker_play_external
-bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1722,7 +1751,7 @@ bool c137(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.set_walker_play_action: kern::game::GameWorld::set_walker_play_action
-bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1735,7 +1764,7 @@ bool c138(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.set_walker_detector: kern::game::GameWorld::set_walker_detector
-bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1748,7 +1777,7 @@ bool c139(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_play_due: kern::game::GameWorld::walker_play_due
-bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1759,7 +1788,7 @@ bool c140(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_playing: kern::game::GameWorld::walker_playing
-bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1770,7 +1799,7 @@ bool c141(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_sees: kern::game::GameWorld::walker_sees
-bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1792,7 +1821,7 @@ bool c142(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walker_state: kern::game::GameWorld::walker_state
-bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<unsigned int>>();
@@ -1803,7 +1832,7 @@ bool c143(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.walkers: kern::game::GameWorld::walkers
-bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->walkers();
@@ -1812,7 +1841,7 @@ bool c144(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.art_stats: kern::game::GameWorld::art_stats
-bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   decltype(auto) r = self->art_stats();
@@ -1821,7 +1850,7 @@ bool c145(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game.blueprints_running: kern::game::blueprints_running
-bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::logic::Runtime* a0 = ev::object<kern::logic::Runtime>(o, in, 0, "logic");
   if (!a0) return false;
   decltype(auto) r = kern::game::blueprints_running(*a0);
@@ -1830,7 +1859,7 @@ bool c146(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game.blueprint_count: kern::game::blueprint_count
-bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::logic::Runtime* a0 = ev::object<kern::logic::Runtime>(o, in, 0, "logic");
   if (!a0) return false;
   decltype(auto) r = kern::game::blueprint_count(*a0);
@@ -1839,7 +1868,7 @@ bool c147(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game.blueprint_name: kern::game::blueprint_name
-bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::logic::Runtime* a0 = ev::object<kern::logic::Runtime>(o, in, 0, "logic");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
@@ -1850,7 +1879,7 @@ bool c148(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game.blueprint_tier: kern::game::blueprint_tier
-bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::logic::Runtime* a0 = ev::object<kern::logic::Runtime>(o, in, 0, "logic");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
@@ -1861,7 +1890,7 @@ bool c149(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game.blueprint_functions: kern::game::blueprint_functions
-bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::logic::Runtime* a0 = ev::object<kern::logic::Runtime>(o, in, 0, "logic");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
@@ -1872,7 +1901,7 @@ bool c150(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game.blueprint_nodes: kern::game::blueprint_nodes
-bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::logic::Runtime* a0 = ev::object<kern::logic::Runtime>(o, in, 0, "logic");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
@@ -1883,7 +1912,7 @@ bool c151(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game.blueprint_disabled: kern::game::blueprint_disabled
-bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::logic::Runtime* a0 = ev::object<kern::logic::Runtime>(o, in, 0, "logic");
   if (!a0) return false;
   auto a1 = ev::blank<std::remove_cvref_t<std::size_t>>();
@@ -1894,7 +1923,7 @@ bool c152(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.mixer: kern::game::SoundBank::mixer
-bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   decltype(auto) r = self->mixer();
@@ -1903,7 +1932,7 @@ bool c153(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.clip: kern::game::SoundBank::clip
-bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -1914,7 +1943,7 @@ bool c154(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.request: kern::game::SoundBank::request
-bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -1924,7 +1953,7 @@ bool c155(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.prepare: kern::game::SoundBank::prepare
-bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<double>>();
@@ -1935,7 +1964,7 @@ bool c156(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.ready: kern::game::SoundBank::ready
-bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -1946,7 +1975,7 @@ bool c157(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.failed: kern::game::SoundBank::failed
-bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -1957,7 +1986,7 @@ bool c158(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.pending_imports: kern::game::SoundBank::pending_imports
-bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   decltype(auto) r = self->pending_imports();
@@ -1966,7 +1995,7 @@ bool c159(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.source: kern::game::SoundBank::source
-bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -1977,7 +2006,7 @@ bool c160(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.set_pcm: kern::game::SoundBank::set_pcm
-bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -1997,7 +2026,7 @@ bool c161(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.set_failed: kern::game::SoundBank::set_failed
-bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -2009,7 +2038,7 @@ bool c162(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.duration: kern::game::SoundBank::duration
-bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   std::string a0;
@@ -2020,7 +2049,7 @@ bool c163(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.clear: kern::game::SoundBank::clear
-bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   self->clear();
@@ -2028,7 +2057,7 @@ bool c164(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.queued: kern::game::SoundBank::queued
-bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::SoundBank>(o, in, 0, "sound_bank");
   if (!self) return false;
   decltype(auto) r = self->queued();
@@ -2037,7 +2066,7 @@ bool c165(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.begin: kern::game::GameAudio::begin
-bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   kern::game::GameWorld* a0 = ev::object<kern::game::GameWorld>(o, in, 1, "world");
@@ -2047,7 +2076,7 @@ bool c166(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.update: kern::game::GameAudio::update
-bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   kern::game::GameWorld* a0 = ev::object<kern::game::GameWorld>(o, in, 1, "world");
@@ -2061,7 +2090,7 @@ bool c167(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.end: kern::game::GameAudio::end
-bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<float>>();
@@ -2071,7 +2100,7 @@ bool c168(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.active: kern::game::GameAudio::active
-bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   decltype(auto) r = self->active();
@@ -2080,7 +2109,7 @@ bool c169(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.set_muted: kern::game::GameAudio::set_muted
-bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   auto a0 = ev::blank<std::remove_cvref_t<bool>>();
@@ -2090,7 +2119,7 @@ bool c170(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.muted: kern::game::GameAudio::muted
-bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   decltype(auto) r = self->muted();
@@ -2099,7 +2128,7 @@ bool c171(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.cues_played: kern::game::GameAudio::cues_played
-bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   decltype(auto) r = self->cues_played();
@@ -2108,7 +2137,7 @@ bool c172(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.cues_dropped: kern::game::GameAudio::cues_dropped
-bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameAudio>(o, in, 0, "game_audio");
   if (!self) return false;
   decltype(auto) r = self->cues_dropped();
@@ -2117,7 +2146,7 @@ bool c173(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.make: kern::game::GameAudio::GameAudio
-bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::audio::Mixer* a0 = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!a0) return false;
   kern::game::SoundBank* a1 = ev::object<kern::game::SoundBank>(o, in, 1, "bank");
@@ -2127,7 +2156,7 @@ bool c174(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_audio.release: kern::game::GameAudio::~GameAudio
-bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::GameAudio>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no GameAudio that was made";
     return false;
@@ -2136,7 +2165,7 @@ bool c175(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.make: kern::game::GameWorld::GameWorld
-bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c179(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::Renderer* a0 = ev::object<kern::Renderer>(o, in, 0, "renderer");
   if (!a0) return false;
   kern::game::NightWindows* a1 = ev::maybe<kern::game::NightWindows>(o, in, 1, "windows");
@@ -2146,7 +2175,7 @@ bool c176(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.release: kern::game::GameWorld::~GameWorld
-bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::GameWorld>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no GameWorld that was made";
     return false;
@@ -2155,7 +2184,7 @@ bool c177(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.logic_native: kern::game::GameWorld::logic_native
-bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c181(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::give<ev::Bool>(o, out, 0, self->logic_native);
@@ -2163,7 +2192,7 @@ bool c178(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.game_world.logic_native@set: what stands at the place kern::game::GameWorld::logic_native gives
-bool c178_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c181_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld>(o, in, 0, "game_world");
   if (!self) return false;
   ev::take<ev::Bool>(o, in, 1, self->logic_native);
@@ -2171,13 +2200,13 @@ bool c178_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.property_change.make: kern::game::GameWorld::PropertyChange::PropertyChange
-bool c179(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c182(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::GameWorld::PropertyChange>(std::unique_ptr<kern::game::GameWorld::PropertyChange>(new kern::game::GameWorld::PropertyChange())));
   return true;
 }
 
 // engine.property_change.release: kern::game::GameWorld::PropertyChange::~PropertyChange
-bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c183(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::GameWorld::PropertyChange>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no PropertyChange that was made";
     return false;
@@ -2186,7 +2215,7 @@ bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.property_change.actor: kern::game::GameWorld::PropertyChange::actor
-bool c181(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c184(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::give<ev::Int>(o, out, 0, self->actor);
@@ -2194,7 +2223,7 @@ bool c181(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.property_change.actor@set: what stands at the place kern::game::GameWorld::PropertyChange::actor gives
-bool c181_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c184_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::take<ev::Int>(o, in, 1, self->actor);
@@ -2202,7 +2231,7 @@ bool c181_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.property_change.path: kern::game::GameWorld::PropertyChange::path
-bool c182(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c185(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::give<ev::Text>(o, out, 0, self->path);
@@ -2210,7 +2239,7 @@ bool c182(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.property_change.path@set: what stands at the place kern::game::GameWorld::PropertyChange::path gives
-bool c182_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c185_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::GameWorld::PropertyChange>(o, in, 0, "property_change");
   if (!self) return false;
   ev::take<ev::Text>(o, in, 1, self->path);
@@ -2218,13 +2247,13 @@ bool c182_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.night_windows.make: kern::game::NightWindows::NightWindows
-bool c183(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c186(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   out[0] = Value::integer(o.own<kern::game::NightWindows, kern::ShaderExtension>(std::unique_ptr<kern::game::NightWindows>(new kern::game::NightWindows())));
   return true;
 }
 
 // engine.night_windows.release: kern::game::NightWindows::~NightWindows
-bool c184(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c187(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::NightWindows>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no NightWindows that was made";
     return false;
@@ -2233,7 +2262,7 @@ bool c184(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.night_windows.night: kern::game::NightWindows::night
-bool c185(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c188(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
   if (!self) return false;
   ev::give<ev::Float>(o, out, 0, self->night);
@@ -2241,7 +2270,7 @@ bool c185(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.night_windows.night@set: what stands at the place kern::game::NightWindows::night gives
-bool c185_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+bool c188_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
   auto* self = ev::object<kern::game::NightWindows>(o, in, 0, "night_windows");
   if (!self) return false;
   ev::take<ev::Float>(o, in, 1, self->night);
@@ -2249,7 +2278,7 @@ bool c185_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
 }
 
 // engine.sound_bank.make: kern::game::SoundBank::SoundBank
-bool c186(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c189(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   kern::audio::Mixer* a0 = ev::object<kern::audio::Mixer>(o, in, 0, "mixer");
   if (!a0) return false;
   out[0] = Value::integer(o.own<kern::game::SoundBank>(std::unique_ptr<kern::game::SoundBank>(new kern::game::SoundBank(*a0))));
@@ -2257,12 +2286,30 @@ bool c186(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
 }
 
 // engine.sound_bank.release: kern::game::SoundBank::~SoundBank
-bool c187(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+bool c190(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
   if (!o.release<kern::game::SoundBank>(in.empty() ? 0 : in[0].as_int())) {
     o.error = "the handle names no SoundBank that was made";
     return false;
   }
   return true;
+}
+
+// kern::game::FixedStep: the object of the engine a Blueprint is (Graph::implements "game_FixedStep")
+class Implements_game_FixedStep final : public kern::game::FixedStep {
+ public:
+  Implements_game_FixedStep(EngineObjects& o, std::shared_ptr<Implementer> by) : o_(o), by_(std::move(by)) {}
+  decltype(std::declval<kern::game::FixedStep&>().fixed_step(std::declval<double>())) fixed_step(double kern_p0) override {
+    const std::vector<Value> kern_in{ev::Conv<ev::Float>::to(o_, kern_p0)};
+    std::vector<Value> kern_out;
+    by_->call("fixed_step", kern_in, kern_out);
+  }
+
+ private:
+  EngineObjects& o_;
+  std::shared_ptr<Implementer> by_;
+};
+i64 implements_game_FixedStep(EngineObjects& o, std::shared_ptr<Implementer> by) {
+  return o.own<Implements_game_FixedStep, kern::game::FixedStep>(std::make_unique<Implements_game_FixedStep>(o, std::move(by)));
 }
 
 const EngineCall kCalls[] = {
@@ -2288,188 +2335,191 @@ const EngineCall kCalls[] = {
     {"engine.night_windows.bind", &c19},
     {"engine.night_windows.frame_uniforms", &c20},
     {"engine.game.game_status_name", &c21},
-    {"engine.game_world.set_layers", &c22},
-    {"engine.game_world.clear", &c23},
-    {"engine.game_world.actor_for_mesh", &c24},
-    {"engine.game_world.actor_matrix", &c25},
-    {"engine.game_world.actor_bounds", &c26},
-    {"engine.game_world.actor_meshes", &c27},
-    {"engine.game_world.pending_textures", &c28},
-    {"engine.game_world.set_texture_pixels", &c29},
-    {"engine.game_world.apply_lighting", &c30},
-    {"engine.game_world.time_of_day", &c31},
-    {"engine.game_world.present", &c32},
-    {"engine.game_world.stop", &c33},
-    {"engine.game_world.running", &c34},
-    {"engine.game_world.session", &c35},
-    {"engine.game_world.mode", &c36},
-    {"engine.game_world.set_paused", &c37},
-    {"engine.game_world.paused", &c38},
-    {"engine.game_world.set_mode", &c39},
-    {"engine.game_world.step", &c40},
-    {"engine.game_world.step_once", &c41},
-    {"engine.game_world.restart", &c42},
-    {"engine.game_world.update_camera", &c43},
-    {"engine.game_world.player", &c44},
-    {"engine.game_world.camera_yaw", &c45},
-    {"engine.game_world.interior_view", &c46},
-    {"engine.game_world.camera_pitch", &c47},
-    {"engine.game_world.sim_time", &c48},
-    {"engine.game_world.add_pawn", &c49},
-    {"engine.game_world.remove_pawn", &c50},
-    {"engine.game_world.pawn_source", &c51},
-    {"engine.game_world.set_pawn_input", &c52},
-    {"engine.game_world.set_local_pawn", &c53},
-    {"engine.game_world.pawns", &c54},
-    {"engine.game_world.take_alive_changes", &c55},
-    {"engine.game_world.dead_actors", &c56},
-    {"engine.game_world.set_alive", &c57},
-    {"engine.game_world.networked_actors", &c58},
-    {"engine.game_world.hud_mut", &c59},
-    {"engine.game_world.set_replica_pose", &c60},
-    {"engine.game_world.step_replica", &c61},
-    {"engine.game_world.hud", &c62},
-    {"engine.game_world.aim_blend", &c63},
-    {"engine.game_world.stats", &c64},
-    {"engine.game_world.physics", &c65},
-    {"engine.game_world.actor_body", &c66},
-    {"engine.game_world.begin_grab", &c67},
-    {"engine.game_world.move_grab", &c68},
-    {"engine.game_world.end_grab", &c69},
-    {"engine.game_world.grabbing", &c70},
-    {"engine.game_world.debug_lines", &c71},
-    {"engine.game_world.events", &c72},
-    {"engine.game_world.sound_cues", &c73},
-    {"engine.game_world.shots", &c74},
-    {"engine.game_world.damage", &c75},
-    {"engine.game_world.health_of", &c76},
-    {"engine.game_world.set_health", &c77},
-    {"engine.game_world.soldier_state", &c78},
-    {"engine.game_world.respawn_now", &c79},
-    {"engine.game_world.apply_soldier_state", &c80},
-    {"engine.game_world.set_view", &c81},
-    {"engine.game_world.set_view_hand", &c82},
-    {"engine.game_world.actor_alive", &c83},
-    {"engine.game_world.last_input", &c84},
-    {"engine.game_world.logic_runtime", &c85},
-    {"engine.game_world.key_event", &c86},
-    {"engine.game_world.take_replicated_changes", &c87},
-    {"engine.game_world.replicated_state", &c88},
-    {"engine.game_world.set_property", &c89},
-    {"engine.game_world.set_property_number", &c90},
-    {"engine.game_world.set_property_flag", &c91},
-    {"engine.game_world.set_property_text", &c92},
-    {"engine.game_world.spawn_copy", &c93},
-    {"engine.game_world.teleport", &c94},
-    {"engine.game_world.actor_velocity", &c95},
-    {"engine.game_world.set_actor_velocity", &c96},
-    {"engine.game_world.push_actor", &c97},
-    {"engine.game_world.set_simulate_physics", &c98},
-    {"engine.game_world.set_joint_motor", &c99},
-    {"engine.game_world.find_actor", &c100},
-    {"engine.game_world.actors_with_tag", &c101},
-    {"engine.game_world.has_tag", &c102},
-    {"engine.game_world.line_trace", &c103},
-    {"engine.game_world.add_score", &c104},
-    {"engine.game_world.end_game", &c105},
-    {"engine.game_world.show_message", &c106},
-    {"engine.game_world.play_sound", &c107},
-    {"engine.game_world.particle_burst", &c108},
-    {"engine.game_world.shake_camera", &c109},
-    {"engine.game_world.aim_view_model", &c110},
-    {"engine.game_world.destroy_actor", &c111},
-    {"engine.game_world.heal", &c112},
-    {"engine.game_world.give_ammo", &c113},
-    {"engine.game_world.call_logic_event", &c114},
-    {"engine.game_world.walker_sensors", &c115},
-    {"engine.game_world.walker_camera", &c116},
-    {"engine.game_world.walker_command", &c117},
-    {"engine.game_world.walker_look", &c118},
-    {"engine.game_world.walker_set_autonomous", &c119},
-    {"engine.game_world.walker_quack", &c120},
-    {"engine.game_world.walker_skill", &c121},
-    {"engine.game_world.walker_mouth", &c122},
-    {"engine.game_world.walker_holding", &c123},
-    {"engine.game_world.walker_pet", &c124},
-    {"engine.game_world.walker_hear", &c125},
-    {"engine.game_world.walker_servo_load", &c126},
-    {"engine.game_world.walker_driving", &c127},
-    {"engine.game_world.set_walker_external", &c128},
-    {"engine.game_world.set_walker_pose_edit", &c129},
-    {"engine.game_world.set_walker_pose", &c130},
-    {"engine.game_world.set_walker_action", &c131},
-    {"engine.game_world.walker_tick_due", &c132},
-    {"engine.game_world.walker_probe", &c133},
-    {"engine.game_world.walker_push", &c134},
-    {"engine.game_world.walker_said", &c135},
-    {"engine.game_world.walker_joints", &c136},
-    {"engine.game_world.set_walker_play_external", &c137},
-    {"engine.game_world.set_walker_play_action", &c138},
-    {"engine.game_world.set_walker_detector", &c139},
-    {"engine.game_world.walker_play_due", &c140},
-    {"engine.game_world.walker_playing", &c141},
-    {"engine.game_world.walker_sees", &c142},
-    {"engine.game_world.walker_state", &c143},
-    {"engine.game_world.walkers", &c144},
-    {"engine.game_world.art_stats", &c145},
-    {"engine.game.blueprints_running", &c146},
-    {"engine.game.blueprint_count", &c147},
-    {"engine.game.blueprint_name", &c148},
-    {"engine.game.blueprint_tier", &c149},
-    {"engine.game.blueprint_functions", &c150},
-    {"engine.game.blueprint_nodes", &c151},
-    {"engine.game.blueprint_disabled", &c152},
-    {"engine.sound_bank.mixer", &c153},
-    {"engine.sound_bank.clip", &c154},
-    {"engine.sound_bank.request", &c155},
-    {"engine.sound_bank.prepare", &c156},
-    {"engine.sound_bank.ready", &c157},
-    {"engine.sound_bank.failed", &c158},
-    {"engine.sound_bank.pending_imports", &c159},
-    {"engine.sound_bank.source", &c160},
-    {"engine.sound_bank.set_pcm", &c161},
-    {"engine.sound_bank.set_failed", &c162},
-    {"engine.sound_bank.duration", &c163},
-    {"engine.sound_bank.clear", &c164},
-    {"engine.sound_bank.queued", &c165},
-    {"engine.game_audio.begin", &c166},
-    {"engine.game_audio.update", &c167},
-    {"engine.game_audio.end", &c168},
-    {"engine.game_audio.active", &c169},
-    {"engine.game_audio.set_muted", &c170},
-    {"engine.game_audio.muted", &c171},
-    {"engine.game_audio.cues_played", &c172},
-    {"engine.game_audio.cues_dropped", &c173},
-    {"engine.game_audio.make", &c174},
-    {"engine.game_audio.release", &c175},
-    {"engine.game_world.make", &c176},
-    {"engine.game_world.release", &c177},
-    {"engine.game_world.logic_native", &c178},
-    {"engine.property_change.make", &c179},
-    {"engine.property_change.release", &c180},
-    {"engine.property_change.actor", &c181},
-    {"engine.property_change.path", &c182},
-    {"engine.night_windows.make", &c183},
-    {"engine.night_windows.release", &c184},
-    {"engine.night_windows.night", &c185},
-    {"engine.sound_bank.make", &c186},
-    {"engine.sound_bank.release", &c187},
-    {"engine.game_world.hud_mut@get", &c59},
-    {"engine.game_world.hud_mut@set", &c59_set},
-    {"engine.game_world.events@get", &c72},
-    {"engine.game_world.events@set", &c72_set},
-    {"engine.game_world.sound_cues@get", &c73},
-    {"engine.game_world.sound_cues@set", &c73_set},
-    {"engine.game_world.shots@get", &c74},
-    {"engine.game_world.shots@set", &c74_set},
-    {"engine.game_world.logic_native@get", &c178},
-    {"engine.game_world.logic_native@set", &c178_set},
-    {"engine.property_change.actor@get", &c181},
-    {"engine.property_change.actor@set", &c181_set},
-    {"engine.property_change.path@get", &c182},
-    {"engine.property_change.path@set", &c182_set},
-    {"engine.night_windows.night@get", &c185},
-    {"engine.night_windows.night@set", &c185_set},
+    {"engine.fixed_step.fixed_step", &c22},
+    {"engine.game_world.set_layers", &c23},
+    {"engine.game_world.clear", &c24},
+    {"engine.game_world.actor_for_mesh", &c25},
+    {"engine.game_world.actor_matrix", &c26},
+    {"engine.game_world.actor_bounds", &c27},
+    {"engine.game_world.actor_meshes", &c28},
+    {"engine.game_world.pending_textures", &c29},
+    {"engine.game_world.set_texture_pixels", &c30},
+    {"engine.game_world.apply_lighting", &c31},
+    {"engine.game_world.time_of_day", &c32},
+    {"engine.game_world.present", &c33},
+    {"engine.game_world.set_fixed_step", &c34},
+    {"engine.game_world.fixed_step_handler", &c35},
+    {"engine.game_world.stop", &c36},
+    {"engine.game_world.running", &c37},
+    {"engine.game_world.session", &c38},
+    {"engine.game_world.mode", &c39},
+    {"engine.game_world.set_paused", &c40},
+    {"engine.game_world.paused", &c41},
+    {"engine.game_world.set_mode", &c42},
+    {"engine.game_world.step", &c43},
+    {"engine.game_world.step_once", &c44},
+    {"engine.game_world.restart", &c45},
+    {"engine.game_world.update_camera", &c46},
+    {"engine.game_world.player", &c47},
+    {"engine.game_world.camera_yaw", &c48},
+    {"engine.game_world.interior_view", &c49},
+    {"engine.game_world.camera_pitch", &c50},
+    {"engine.game_world.sim_time", &c51},
+    {"engine.game_world.add_pawn", &c52},
+    {"engine.game_world.remove_pawn", &c53},
+    {"engine.game_world.pawn_source", &c54},
+    {"engine.game_world.set_pawn_input", &c55},
+    {"engine.game_world.set_local_pawn", &c56},
+    {"engine.game_world.pawns", &c57},
+    {"engine.game_world.take_alive_changes", &c58},
+    {"engine.game_world.dead_actors", &c59},
+    {"engine.game_world.set_alive", &c60},
+    {"engine.game_world.networked_actors", &c61},
+    {"engine.game_world.hud_mut", &c62},
+    {"engine.game_world.set_replica_pose", &c63},
+    {"engine.game_world.step_replica", &c64},
+    {"engine.game_world.hud", &c65},
+    {"engine.game_world.aim_blend", &c66},
+    {"engine.game_world.stats", &c67},
+    {"engine.game_world.physics", &c68},
+    {"engine.game_world.actor_body", &c69},
+    {"engine.game_world.begin_grab", &c70},
+    {"engine.game_world.move_grab", &c71},
+    {"engine.game_world.end_grab", &c72},
+    {"engine.game_world.grabbing", &c73},
+    {"engine.game_world.debug_lines", &c74},
+    {"engine.game_world.events", &c75},
+    {"engine.game_world.sound_cues", &c76},
+    {"engine.game_world.shots", &c77},
+    {"engine.game_world.damage", &c78},
+    {"engine.game_world.health_of", &c79},
+    {"engine.game_world.set_health", &c80},
+    {"engine.game_world.soldier_state", &c81},
+    {"engine.game_world.respawn_now", &c82},
+    {"engine.game_world.apply_soldier_state", &c83},
+    {"engine.game_world.set_view", &c84},
+    {"engine.game_world.set_view_hand", &c85},
+    {"engine.game_world.actor_alive", &c86},
+    {"engine.game_world.last_input", &c87},
+    {"engine.game_world.logic_runtime", &c88},
+    {"engine.game_world.key_event", &c89},
+    {"engine.game_world.take_replicated_changes", &c90},
+    {"engine.game_world.replicated_state", &c91},
+    {"engine.game_world.set_property", &c92},
+    {"engine.game_world.set_property_number", &c93},
+    {"engine.game_world.set_property_flag", &c94},
+    {"engine.game_world.set_property_text", &c95},
+    {"engine.game_world.spawn_copy", &c96},
+    {"engine.game_world.teleport", &c97},
+    {"engine.game_world.actor_velocity", &c98},
+    {"engine.game_world.set_actor_velocity", &c99},
+    {"engine.game_world.push_actor", &c100},
+    {"engine.game_world.set_simulate_physics", &c101},
+    {"engine.game_world.set_joint_motor", &c102},
+    {"engine.game_world.find_actor", &c103},
+    {"engine.game_world.actors_with_tag", &c104},
+    {"engine.game_world.has_tag", &c105},
+    {"engine.game_world.line_trace", &c106},
+    {"engine.game_world.add_score", &c107},
+    {"engine.game_world.end_game", &c108},
+    {"engine.game_world.show_message", &c109},
+    {"engine.game_world.play_sound", &c110},
+    {"engine.game_world.particle_burst", &c111},
+    {"engine.game_world.shake_camera", &c112},
+    {"engine.game_world.aim_view_model", &c113},
+    {"engine.game_world.destroy_actor", &c114},
+    {"engine.game_world.heal", &c115},
+    {"engine.game_world.give_ammo", &c116},
+    {"engine.game_world.call_logic_event", &c117},
+    {"engine.game_world.walker_sensors", &c118},
+    {"engine.game_world.walker_camera", &c119},
+    {"engine.game_world.walker_command", &c120},
+    {"engine.game_world.walker_look", &c121},
+    {"engine.game_world.walker_set_autonomous", &c122},
+    {"engine.game_world.walker_quack", &c123},
+    {"engine.game_world.walker_skill", &c124},
+    {"engine.game_world.walker_mouth", &c125},
+    {"engine.game_world.walker_holding", &c126},
+    {"engine.game_world.walker_pet", &c127},
+    {"engine.game_world.walker_hear", &c128},
+    {"engine.game_world.walker_servo_load", &c129},
+    {"engine.game_world.walker_driving", &c130},
+    {"engine.game_world.set_walker_external", &c131},
+    {"engine.game_world.set_walker_pose_edit", &c132},
+    {"engine.game_world.set_walker_pose", &c133},
+    {"engine.game_world.set_walker_action", &c134},
+    {"engine.game_world.walker_tick_due", &c135},
+    {"engine.game_world.walker_probe", &c136},
+    {"engine.game_world.walker_push", &c137},
+    {"engine.game_world.walker_said", &c138},
+    {"engine.game_world.walker_joints", &c139},
+    {"engine.game_world.set_walker_play_external", &c140},
+    {"engine.game_world.set_walker_play_action", &c141},
+    {"engine.game_world.set_walker_detector", &c142},
+    {"engine.game_world.walker_play_due", &c143},
+    {"engine.game_world.walker_playing", &c144},
+    {"engine.game_world.walker_sees", &c145},
+    {"engine.game_world.walker_state", &c146},
+    {"engine.game_world.walkers", &c147},
+    {"engine.game_world.art_stats", &c148},
+    {"engine.game.blueprints_running", &c149},
+    {"engine.game.blueprint_count", &c150},
+    {"engine.game.blueprint_name", &c151},
+    {"engine.game.blueprint_tier", &c152},
+    {"engine.game.blueprint_functions", &c153},
+    {"engine.game.blueprint_nodes", &c154},
+    {"engine.game.blueprint_disabled", &c155},
+    {"engine.sound_bank.mixer", &c156},
+    {"engine.sound_bank.clip", &c157},
+    {"engine.sound_bank.request", &c158},
+    {"engine.sound_bank.prepare", &c159},
+    {"engine.sound_bank.ready", &c160},
+    {"engine.sound_bank.failed", &c161},
+    {"engine.sound_bank.pending_imports", &c162},
+    {"engine.sound_bank.source", &c163},
+    {"engine.sound_bank.set_pcm", &c164},
+    {"engine.sound_bank.set_failed", &c165},
+    {"engine.sound_bank.duration", &c166},
+    {"engine.sound_bank.clear", &c167},
+    {"engine.sound_bank.queued", &c168},
+    {"engine.game_audio.begin", &c169},
+    {"engine.game_audio.update", &c170},
+    {"engine.game_audio.end", &c171},
+    {"engine.game_audio.active", &c172},
+    {"engine.game_audio.set_muted", &c173},
+    {"engine.game_audio.muted", &c174},
+    {"engine.game_audio.cues_played", &c175},
+    {"engine.game_audio.cues_dropped", &c176},
+    {"engine.game_audio.make", &c177},
+    {"engine.game_audio.release", &c178},
+    {"engine.game_world.make", &c179},
+    {"engine.game_world.release", &c180},
+    {"engine.game_world.logic_native", &c181},
+    {"engine.property_change.make", &c182},
+    {"engine.property_change.release", &c183},
+    {"engine.property_change.actor", &c184},
+    {"engine.property_change.path", &c185},
+    {"engine.night_windows.make", &c186},
+    {"engine.night_windows.release", &c187},
+    {"engine.night_windows.night", &c188},
+    {"engine.sound_bank.make", &c189},
+    {"engine.sound_bank.release", &c190},
+    {"engine.game_world.hud_mut@get", &c62},
+    {"engine.game_world.hud_mut@set", &c62_set},
+    {"engine.game_world.events@get", &c75},
+    {"engine.game_world.events@set", &c75_set},
+    {"engine.game_world.sound_cues@get", &c76},
+    {"engine.game_world.sound_cues@set", &c76_set},
+    {"engine.game_world.shots@get", &c77},
+    {"engine.game_world.shots@set", &c77_set},
+    {"engine.game_world.logic_native@get", &c181},
+    {"engine.game_world.logic_native@set", &c181_set},
+    {"engine.property_change.actor@get", &c184},
+    {"engine.property_change.actor@set", &c184_set},
+    {"engine.property_change.path@get", &c185},
+    {"engine.property_change.path@set", &c185_set},
+    {"engine.night_windows.night@get", &c188},
+    {"engine.night_windows.night@set", &c188_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 
@@ -2481,6 +2531,11 @@ const EngineMaker kMakers[] = {
     {EngineObjects::kind<kern::game::SoundBank>(), [](EngineObjects& o, i64 handle) -> void* { auto made = std::make_unique<ev::MadeWith<kern::game::SoundBank>>(); auto& d0 = made->keep(new kern::audio::Mixer()); made->object.emplace(d0); return o.put_made<kern::game::SoundBank>(handle, std::move(made)); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));
+
+const EngineImplement kAdapters[] = {
+    {"game_FixedStep", &implements_game_FixedStep},
+};
+const EngineImplements kAllAdapters(kAdapters, std::size(kAdapters));
 
 }  // namespace
 }  // namespace kern::logic

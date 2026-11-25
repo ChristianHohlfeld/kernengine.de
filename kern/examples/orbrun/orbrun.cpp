@@ -262,14 +262,6 @@ struct TrafficCar { bool horizontal; f32 line, lane, along, speed, dir; Vec4 tin
 
 class OrbRun final : public App {
  public:
-  RendererOptions configure() override {
-    RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 2048;
-    o.shadow.extent = 110;
-    o.shadow.bias = 0.0014f;
-    return o;
-  }
   Span<ShaderExtension* const> extensions() override { return {extensions_, 1}; }
 
   bool start(Engine& engine) override {
@@ -727,7 +719,12 @@ class OrbRun final : public App {
 
 }  // namespace
 
-App* kern_create_app() {
+int kern_main() {
   static OrbRun game;
-  return &game;
+  ProjectSettings settings;
+  settings.renderer.shadows = true;
+  settings.renderer.shadow.resolution = 2048;
+  settings.renderer.shadow.extent = 110;
+  settings.renderer.shadow.bias = 0.0014f;
+  return kern::run(game, settings);
 }
