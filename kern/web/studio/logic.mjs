@@ -759,7 +759,11 @@ export class LogicEditor {
           <i class="lg-fni">L</i><span class="lg-vn">${lgEsc(n)}</span><span class="lg-acts"><button data-unuse title="Do not use this library any more">×</button></span>
         </div>`).join("") +
       (canUse.length ? `<div class="lg-declare"><select data-use title="This Blueprint uses a library of this level: it has its types and calls its functions directly">
-        <option value="">+ Use a library…</option>${canUse.map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}</select></div>` : "");
+        <option value="">+ Use a library…</option>${canUse.map(n => `<option value="${lgEsc(n)}">${lgEsc(n)}</option>`).join("")}</select></div>` : "") +
+      // the interface of the engine it is the object of: the engine calls its functions of the interface's names
+      `<div class="lg-declare"><select data-implements title="The engine calls this Blueprint as an object of one of its interfaces: its functions of the names of the interface's (a name with ? it may leave out - the interface's own runs there)">
+        <option value=""${data.implements ? "" : " selected"}>Implements no interface of the engine</option>${(data.interfaces || []).map(i =>
+          `<option value="${lgEsc(i.name)}"${i.name === data.implements ? " selected" : ""} title="${lgEsc(i.functions.join(", "))}">Implements ${lgEsc(i.name)}</option>`).join("")}</select></div>`;
     this.el.mylist.innerHTML = section("graphs", "Graphs", "Add a state machine", graphs) + section("libs", "Libraries", "", libs) + section("vars", "Variables", "Add a variable", vars) +
       section("fns", "Functions", "Add a function", fns + declare) + section("enums", "Enums", "Add an enum", enums + adopt("enum")) + section("structs", "Structures", "Add a struct", structs + adopt("struct")) +
       section("events", "Events", "Add a custom event", events);
@@ -806,6 +810,11 @@ export class LogicEditor {
       if (r && r.ok === false) libFlag.checked = !libFlag.checked;
     };
     for (const row of this.el.mylist.querySelectorAll(".lg-lib")) row.querySelector("[data-unuse]").onclick = () => this.cmd({cmd: "logicLibrary", op: "unuse", name: row.dataset.lib});
+    const implSel = this.el.mylist.querySelector("[data-implements]");
+    if (implSel) implSel.onchange = () => {
+      const r = this.cmd({cmd: "logicImplements", name: implSel.value});
+      if (r && r.ok === false) implSel.value = data.implements || "";
+    };
     const useSel = this.el.mylist.querySelector("[data-use]");
     if (useSel) useSel.onchange = () => {
       if (!useSel.value) return;

@@ -2855,6 +2855,11 @@ template <> struct To<ActorHandle> {
 
 /// What a wire does when its ends have different types: kern::to<Float>(index). The same
 /// conversions the interpreter makes (Value::converted).
-template <class T, class S> T to(const S& v) { return logic::detail::To<T>::from(v); }
+template <class T, class S> T to(const S& v) {
+  if constexpr (requires { typename S::kern_place_value; })
+    return to<T>(static_cast<typename S::kern_place_value>(v));   // (a place of the engine: what stands there - engine_direct.h)
+  else
+    return logic::detail::To<T>::from(v);
+}
 
 }  // namespace kern

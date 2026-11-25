@@ -708,4 +708,16 @@ class GameWorld {
   std::unordered_map<ActorId, std::pair<Vec3, Quat>> replica_poses_;
 };
 
+/// A Blueprint running in a world's logic, as the logic shows it (blueprints_running).
+struct BlueprintRunning {
+  std::string name;             // its actor's name ("Level": the level's own)
+  std::string tier;             // how it runs: "interpreter", "compiled (WebAssembly)", "compiling", "native C++"
+  std::size_t functions = 0;    // the functions of its graph
+  std::size_t nodes = 0;        // ... and its nodes
+  bool disabled = false;        // stopped after an error (logic::Instance::disabled)
+};
+/// The Blueprints a logic runs, in the order it runs them (logic::Runtime::instances): what a Blueprint or a tool
+/// shows of them - the node engine.blueprints_running.
+std::vector<BlueprintRunning> blueprints_running(const logic::Runtime& logic);
+
 }  // namespace kern::game
