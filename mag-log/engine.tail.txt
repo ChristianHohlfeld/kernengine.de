@@ -1,0 +1,12 @@
+/dev/shm/spawncity-jobs-chris/work-kandidat-1725-voll-171842-13139/kern/tests/test_main.cpp: In function ‘void {anonymous}::test_studio_logic_implements()’:
+/dev/shm/spawncity-jobs-chris/work-kandidat-1725-voll-171842-13139/kern/tests/test_main.cpp:12211:82: error: possibly dangling reference to a temporary [-Werror=dangling-reference]
+12211 |   for (const json::Value& i : f.cmd(R"({"cmd":"logicCompile"})")["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
+      |                                                                                  ^
+/dev/shm/spawncity-jobs-chris/work-kandidat-1725-voll-171842-13139/kern/tests/test_main.cpp:12211:81: note: the temporary was destroyed at the end of the full expression ‘(& {anonymous}::StudioFixture::cmd(const char*)(((const char*)"{\"cmd\":\"logicCompile\"}")).kern::json::Value::operator[](std::basic_string_view<char>(((const char*)"issues"))))->kern::json::Value::items()’
+12211 |   for (const json::Value& i : f.cmd(R"({"cmd":"logicCompile"})")["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
+      |                               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~
+cc1plus: all warnings being treated as errors
+
+real	3m48,374s
+user	20m53,845s
+sys	0m45,537s
