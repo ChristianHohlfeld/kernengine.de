@@ -31,6 +31,7 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+#include <tuple>
 #include <vector>
 
 #include "kern/logic/engine_host.h"
@@ -542,25 +543,40 @@ struct Field : PlaceOps<Field<D, Tag, C, B, CF, BF, Cm, Bm>, Tag, CF, BF>, Field
 };
 
 /// The output of a node of the engine that binds a place of the engine (P: engine_nodes.gen.h - the object's
-/// class, C, Tag, the input of the handle, at(object) and the names "<function>@get", "<function>@set").
+/// class, C, Tag, the input of the handle, In - the function's further inputs as C++ has them: the index of an
+/// entry of an array the object holds, or none -, at(objects, object, in) - null where `in` names no entry: it
+/// says why in objects.error - and the names "<function>@get", "<function>@set").
 template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag, typename P::C, B>, FieldsOf<Place<P, B>, typename P::Tag, typename P::C, B> {
   using Tag = typename P::Tag;
   using C = typename P::C;
   Place() : FieldsOf<Place, Tag, C, B>(this) {}
-  Place(const Place& p) : FieldsOf<Place, Tag, C, B>(this), kern_world(p.kern_world), kern_handle(p.kern_handle), kern_at(p.kern_at), kern_generation(p.kern_generation) {}
+  Place(const Place& p)
+      : FieldsOf<Place, Tag, C, B>(this), kern_world(p.kern_world), kern_handle(p.kern_handle), kern_in(p.kern_in), kern_door_in(p.kern_door_in),
+        kern_at(p.kern_at), kern_generation(p.kern_generation) {}
   Place& operator=(const Place& p) {
-    kern_world = p.kern_world, kern_handle = p.kern_handle, kern_at = p.kern_at, kern_generation = p.kern_generation;
+    kern_world = p.kern_world, kern_handle = p.kern_handle, kern_in = p.kern_in, kern_door_in = p.kern_door_in, kern_at = p.kern_at,
+    kern_generation = p.kern_generation;
     return *this;
   }
   using PlaceOps<Place, Tag, C, B>::operator=;
 
   /// The node ran: the place of the object of `handle` (what the engine holds there: `at`, null where the
   /// class has not the engine's objects or the handle names no object).
-  void kern_bind(const BlueprintWorld& world, i64 handle, C* at) {
+  void kern_bind(const BlueprintWorld& world, i64 handle, const typename P::In& in, C* at) {
     kern_world = &world;
     kern_handle = handle;
+    kern_in = in;
     kern_at = at;
     kern_generation = at && world.engine ? world.engine->generation() : 0;
+  }
+  /// The same, by a class without the engine's objects: what the door is given for it (the handle and the
+  /// further inputs, as the node was given them).
+  void kern_bind(const BlueprintWorld& world, std::vector<Value> door_in) {
+    kern_world = &world;
+    kern_handle = door_in.empty() ? 0 : door_in[0].as_int();
+    kern_door_in = std::move(door_in);
+    kern_at = nullptr;
+    kern_generation = 0;
   }
   /// What stands there now.
   RefCore<Tag, C, B> ref() const {
@@ -572,9 +588,9 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
         // (the object of the handle may not be the one it was: looked up again, as the door does)
         o->begin_call();
         typename P::Object* const self = object_of<typename P::Object>(*o, kern_handle, P::pin);
-        kern_at = self ? &P::at(*self) : nullptr;
+        kern_at = self ? P::at(*o, *self, kern_in) : nullptr;
         kern_generation = o->generation();
-        if (!self) {
+        if (!kern_at) {
           if (host) host->engine_failed(P::get);
           return none(r);
         }
@@ -584,18 +600,20 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
     }
     struct Door final : PlaceDoor {
       Host* host = nullptr;
-      i64 handle = 0;
+      std::vector<Value> in;
       B b{};
       void wrote() override {
-        std::vector<Value> none;
-        host->engine(P::set, {Value::integer(handle), to_value(b)}, none);
+        std::vector<Value> none, given = in;
+        given.push_back(to_value(b));
+        host->engine(P::set, given, none);
       }
     };
+    std::vector<Value> in = kern_door_in.empty() ? std::vector<Value>{Value::integer(kern_handle)} : kern_door_in;
     std::vector<Value> out{Value::zero(pin_type_of<B>())};
-    if (!host || !host->engine(P::get, {Value::integer(kern_handle)}, out)) return none(r);
+    if (!host || !host->engine(P::get, in, out)) return none(r);
     auto door = std::make_shared<Door>();
     door->host = host;
-    door->handle = kern_handle;
+    door->in = std::move(in);
     door->b = from_value<B>(out[0].converted(pin_type_of<B>()));
     r.kern_own = &door->b;
     r.kern_door = door;
@@ -612,6 +630,8 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
   }
   const BlueprintWorld* kern_world = nullptr;
   i64 kern_handle = 0;
+  typename P::In kern_in{};
+  std::vector<Value> kern_door_in;   // (only without the engine's objects - nothing is asked for it else)
   mutable C* kern_at = nullptr;
   mutable u64 kern_generation = 0;
 };

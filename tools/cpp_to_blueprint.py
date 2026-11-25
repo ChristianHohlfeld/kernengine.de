@@ -11313,14 +11313,18 @@ class Api:
                 changes = True
         counts = {name: params[k][0] for name, k in counts.items()}
         ret = qtype(d).split("(")[0].strip()
-        place = False
+        place, index = False, 0
         if ret != "void":
             bt, gives_place, handle = self.handed(ret)
             raws["result"] = ret
             outs.insert(0, ("result", bt, handle))
             # a reference (not const) to something the engine holds, by a method that only looks it up: a place of the
             # engine (kern/docs/blueprint_cpp.md, "Plätze der Engine") - the node binds it, the place nodes work on it
-            place = gives_place and handle is None and method and not ins[1:] and len(outs) == 1 and self.looks_up(d)
+            # (or an entry of an array the object holds, at the one input - `return buses_[static_cast<u32>(b)];`: its
+            # length is known, `index`; an input outside it names no entry, the call fails as it fails without an object)
+            looked = self.looks_up(d) if gives_place and handle is None and method and len(outs) == 1 else None
+            place = looked == 0 and not ins[1:] or bool(looked) and len(ins[1:]) == 1 and ins[1][2] is None
+            index = looked if place else 0
         qualified = self.home(d) + "::" + d["name"]
         # (a function that formats a text writes it somewhere - the last error, the log: a step)
         value = not place and printf is None and ret != "void" and len(outs) == 1 and (const or not method) and not changes and qualified not in ENGINE_STEPS
@@ -11330,7 +11334,7 @@ class Api:
         words = d["name"].replace("_", " ").title()
         return {"type": self.type_of(d), "cpp": qualified, "label": words, "category": "Engine: " + self.home(d).split("::")[-1].replace("kern", "Engine"),
                 "help": u.comment_of(d), "value": value, "place": place, "ins": ins, "outs": outs, "params": params, "decl": d, "counts": counts, "per": per,
-                "clock": self.reads_clock(d), "raws": raws, "printf": None if printf is None else params[all_params.index(printf)][0]}
+                "clock": self.reads_clock(d), "raws": raws, "index": index, "printf": None if printf is None else params[all_params.index(printf)][0]}
 
     def printf_format(self, d):
         """The parameter that is the format of a function that formats a text as printf does - its declaration says so
@@ -11347,19 +11351,33 @@ class Api:
     @staticmethod
     def looks_up(d):
         """Does the method only look up a member of its object - is its body `return member_;`, nothing else? (What
-        it gives is then where the object holds it, and asking for it does nothing.)"""
-        def bare(x):
-            while x.get("kind") in ("ImplicitCastExpr", "ParenExpr") and len(kids(x)) == 1:
+        it gives is then where the object holds it, and asking for it does nothing.) 0 then; or the length N of the
+        array member it looks into at its one parameter - `return member_[static_cast<u32>(p)];` (casts of the
+        parameter allowed) -; None for any other body."""
+        def bare(x, casts=("ImplicitCastExpr", "ParenExpr")):
+            while x.get("kind") in casts and len(kids(x)) == 1:
                 x = kids(x)[0]
             return x
+        def of_this(member):
+            return member.get("kind") == "MemberExpr" and len(kids(member)) == 1 and bare(kids(member)[0]).get("kind") == "CXXThisExpr"
         body = [x for x in kids(d) if x.get("kind") == "CompoundStmt"]
         if len(body) != 1 or len(kids(body[0])) != 1 or kids(body[0])[0].get("kind") != "ReturnStmt":
-            return False
+            return None
         given = kids(kids(body[0])[0])
         if len(given) != 1:
-            return False
+            return None
         member = bare(given[0])
-        return member.get("kind") == "MemberExpr" and len(kids(member)) == 1 and bare(kids(member)[0]).get("kind") == "CXXThisExpr"
+        if of_this(member):
+            return 0
+        parms = [x for x in kids(d) if x.get("kind") == "ParmVarDecl"]
+        if member.get("kind") != "ArraySubscriptExpr" or len(kids(member)) != 2 or len(parms) != 1:
+            return None
+        array, at = bare(kids(member)[0]), bare(kids(member)[1], ("ImplicitCastExpr", "ParenExpr", "CXXStaticCastExpr", "CStyleCastExpr"))
+        n = re.search(r"\[(\d+)\]$", array.get("type", {}).get("qualType", ""))
+        named = at.get("referencedDecl", {}).get("id")
+        if not of_this(array) or n is None or at.get("kind") != "DeclRefExpr" or named != parms[0].get("id") or int(n.group(1)) < 1:
+            return None
+        return int(n.group(1))
 
     def reads_clock(self, d):
         """Does the declaration say that the function reads a clock (`KERN_CLOCK f64 now_ms();`, kern/core/base.h)?"""

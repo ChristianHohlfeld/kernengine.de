@@ -388,6 +388,12 @@ class Calls:
         assert len(ptypes) == len(f["params"]), (f["type"], ptypes, f["params"])
         return ptypes
 
+    @staticmethod
+    def outside_text(f):
+        """What the engine says where the index a place of an entry of an array is bound at names no entry
+        (EngineFunction::place with Api.function1's "index": C++ leaves such a call open)."""
+        return f"the input {f['ins'][1][0]} names no entry: there are {f['index']}"
+
     def body(self, f, need):
         """The lines of the call of a node: its inputs made into the arguments, the call, its outputs."""
         d, role, tree = f["decl"], f.get("role"), self.tree
@@ -487,6 +493,9 @@ class Calls:
                 if pin_out is not None:
                     after.append(f"ev::give<{self.tag(outs[pin_out][0], need)}>(o, out, {out_at[pin_out]}, {a});")
         lines += later
+        if f.get("index"):   # (a place of an entry of an array the object holds: its index names one of them, or the call fails)
+            a = arg_of[f["ins"][1][0]]
+            lines.append(f"if (static_cast<std::size_t>({a}) >= {f['index']}) {{ o.error = {c_text(self.outside_text(f))}; return false; }}")
         if role == "make":
             q = f["class"]
             made = f"new {q}({', '.join(args)})" if mangled else f"new {q}()"
@@ -632,6 +641,9 @@ class Calls:
                 if pin_out is not None:
                     after.append(lambda a=a, pin_out=pin_out: give(pin_out, outs[pin_out][0], a))
         lines += later
+        if f.get("index"):   # (a place of an entry of an array the object holds: its index names one of them, or the call fails)
+            a = arg_of[f["ins"][1][0]]
+            lines.append(f"if (static_cast<std::size_t>({a}) >= {f['index']}) {{ kern_o->error = {c_text(self.outside_text(f))}; {fail(given)} }}")
         if role == "make":
             q = f["class"]
             made = f"new {q}({', '.join(args)})" if mangled else f"new {q}()"
@@ -733,26 +745,49 @@ class Calls:
                 pin, _, q = f["ins"][0]
                 m, out = f["decl"]["name"], f["outs"][0]
                 named = m if f.get("field") else m + "()"   # (a field of the object, or what the method names)
+                # (its further inputs as C++ has them - the index of an entry of an array the object holds: In; at() is
+                # null where the index names no entry, and says so as the door says it - outside_text)
+                more = [(n_, bt_, P_) for (n_, bt_, _), P_ in zip(f["ins"][1:], self.ptypes(f))]
+                cpp_in = ", ".join(f"std::remove_cvref_t<{P_}>" for _, _, P_ in more)
+                looked = m + "(" + ", ".join(f"std::declval<std::remove_cvref_t<{P_}>>()" for _, _, P_ in more) + ")" if more else named
+                if more:
+                    (n0, _, _), = more
+                    at = [f"  static C* at(EngineObjects& o, Object& self, const In& in) {{",
+                          f"    if (static_cast<std::size_t>(std::get<0>(in)) >= {f['index']}) {{ o.error = {c_text(self.outside_text(f))}; return nullptr; }}",
+                          f"    return &self.{m}(std::get<0>(in));", "  }"]
+                else:
+                    at = [f"  static C* at(EngineObjects&, Object& self, const In&) {{ return &self.{named}; }}"]
                 places.append([f"struct P_{name} {{",
                                f"  using Object = {q};",
-                               f"  using C = std::remove_reference_t<decltype((std::declval<{q}&>().{named}))>;",
+                               f"  using C = std::remove_reference_t<decltype((std::declval<{q}&>().{looked}))>;",
                                f"  using Tag = {self.dtag(out[1], need)};",
+                               f"  using In = std::tuple<{cpp_in}>;",
                                f"  static constexpr const char* pin = {c_text(pin)};",
                                f"  static constexpr const char* get = {c_text(f['type'] + '@get')};",
                                f"  static constexpr const char* set = {c_text(f['type'] + '@set')};",
-                               f"  static C& at(Object& o) {{ return o.{named}; }}",
+                               *at,
                                "};"])
                 lines.append(f"  /// The place {f['cpp']} gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.")
                 lines.append(f"  template <class B> using {name}_place = {EV}Place<engine_direct::P_{name}, B>;")
                 handle = f"static_cast<::kern::i64>({pin})"
+                P_name = f"engine_direct::P_{name}"
+                taken = []
+                for k_, (n_, bt_, P_) in enumerate(more):
+                    taken += [f"auto kern_a{k_} = {EV}blank<std::remove_cvref_t<{P_}>>();",
+                              f"{EV}Direct<{self.dtag(bt_, need)}>::from(*kern_o, {n_}, kern_a{k_});"]
+                bind = ["kern_o->begin_call();", f"auto* const kern_self = {EV}object_of<{q}>(*kern_o, {handle}, {c_text(pin)});",
+                        f"typename {P_name}::In kern_in{{}};"]
+                if more:
+                    bind += ["if (kern_self) {", *["  " + x for x in taken], f"  kern_in = typename {P_name}::In{{{', '.join(f'kern_a{k_}' for k_ in range(len(more)))}}};", "}"]
+                bind += [f"auto* const kern_at = kern_self ? {P_name}::at(*kern_o, *kern_self, kern_in) : nullptr;",
+                         f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, kern_in, kern_at);",
+                         f"if (!kern_at) {failed}", "return;"]
                 # (a field: binding it is no call - the door says nothing there; the object is looked up where the place
                 # is first used, and a missing one is told there as <node>@get, as the door tells it)
-                function(f"template <class KernNode> void {name}(KernNode& kern_n, {', '.join(params)})",
-                         None if f.get("field") else
-                         ["kern_o->begin_call();", f"auto* const kern_self = {EV}object_of<{q}>(*kern_o, {handle}, {c_text(pin)});",
-                          f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, kern_self ? &engine_direct::P_{name}::at(*kern_self) : nullptr);",
-                          f"if (!kern_self) {failed}", "return;"],
-                         ([] if f.get("field") else [f"{door};"]) + [f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, nullptr);"])
+                function(f"template <{', '.join(['class KernNode'] + templates)}> void {name}(KernNode& kern_n, {', '.join(params)})",
+                         None if f.get("field") else bind,
+                         [f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, {{}}, nullptr);"] if f.get("field") else
+                         [f"{door};", f"kern_n.{out[0]}.kern_bind(this->kern_world, {{{', '.join(values)}}});"])
                 bodies += lines
                 continue
             if f["outs"]:
@@ -938,10 +973,18 @@ class Calls:
                     # <node>@get (what the node gives: the place, as a value), changed through <node>@set (the value it
                     # has then, put in its place)
                     pin, _, q = f["ins"][0]
+                    tg = self.tag(f['outs'][0][1], need)
+                    if f.get("field"):
+                        set_lines = [f"auto* self = ev::object<{q}>(o, in, 0, {c_text(pin)});", "if (!self) return false;",
+                                     f"ev::take<{tg}>(o, in, 1, self->{f['decl']['name']});"]
+                    else:
+                        # (the call as the node makes it - its inputs, the index checked -, and the value after them put there)
+                        got = lines[:next(i for i, x in enumerate(lines) if x.startswith("decltype(auto) r = "))]
+                        call = next(x for x in lines if x.startswith("decltype(auto) r = "))[len("decltype(auto) r = "):-1]
+                        set_lines = got + [f"ev::take<{tg}>(o, in, {len(f['ins'])}, {call});"]
                     bodies += [f"// {f['type']}@set: what stands at the place {f['cpp']} gives",
                                f"bool c{k}_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {{",
-                               f"  auto* self = ev::object<{q}>(o, in, 0, {c_text(pin)});", "  if (!self) return false;",
-                               f"  ev::take<{self.tag(f['outs'][0][1], need)}>(o, in, 1, self->{f['decl']['name']}{'' if f.get('field') else '()'});", "  return true;", "}", ""]
+                               *["  " + x for x in set_lines], "  return true;", "}", ""]
                 if f.get("role") == "make" and f["class"] in plans and plans[f["class"]][0] is f:
                     # (a host without an object at a handle - a test - makes one there: see default_makers)
                     makers.append((f["class"], self.maker_text(f["class"], plans, headers)))
