@@ -10,8 +10,8 @@
 
 #include "game.h"
 #include "game_world.h"
-#include "level_blueprints.h"  // the Blueprints the game calls as their classes: qr_code, qr_code_cpp
-#include "person_hit.h"
+#include "blueprint_call.h"     // (rules::decimal: a number of the game into a Blueprint)
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes: qr_code, qr_code_cpp, person_hit
 #include "mp_art.h"
 #include "mp_rules.h"
 #include "tiles.h"
@@ -498,9 +498,11 @@ i32 Game::remote_on_segment(Vec3 from, Vec3 to, f32& t_out, mp::Zone& zone_out) 
   // HITBOX_PADDING); the round's entry decides the zone (a steep shot through the head is a head shot)
   mp::Zone best_zone = mp::Zone::torso;
   auto zones = [&](Vec3 feet, f32 yaw, f32 speed, f32& t_hit, mp::Zone& z) {
-    const BodyPart part = person_hit::hit(feet, yaw, speed, from, seg, t_hit, 1.16f);
-    z = part == BodyPart::head ? mp::Zone::head : part == BodyPart::legs ? mp::Zone::legs : mp::Zone::torso;
-    return part != BodyPart::none;
+    f64 t = t_hit;  // (the Blueprint person_hit, called as its class: its numbers - rules::decimal in, static_cast<f32> out)
+    const blueprints::person_hit::BodyPart part = kern::logic::blueprint<blueprints::person_hit>().hit(t, feet, rules::decimal(yaw), rules::decimal(speed), from, seg, 1.16).Result;
+    t_hit = static_cast<f32>(t);
+    z = part == blueprints::person_hit::BodyPart::head ? mp::Zone::head : part == blueprints::person_hit::BodyPart::legs ? mp::Zone::legs : mp::Zone::torso;
+    return part != blueprints::person_hit::BodyPart::none;
   };
   for (std::size_t i = 0; i < rs.size(); ++i) {
     const net::Remote& r = rs[i];
