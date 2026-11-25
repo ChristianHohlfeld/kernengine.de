@@ -11,7 +11,7 @@
 # run does): the Blueprints of the engine's headers they use are written anew. LINK=1 then compiles every file and the
 # engine, links them with tools/all_program_run.cpp and plays the level without a window (Begin and TICKS steps); a link
 # that fails says which symbols are missing. WEB=1 (WASI_SDK set) builds the same as a game for the browser, as
-# tools/export_game.sh does (kern/build.sh --studio with the classes): its size, and the memory of its compilers.
+# tools/export_game.sh does (kern/build.sh --studio with the classes; --app: they call kern::Engine of the app runtime): its size, and the memory of its compilers.
 #
 # CI: workflow_dispatch of ci.yml with probe="all_program".
 set -uo pipefail
@@ -31,6 +31,34 @@ python3 - "$out/all.klevel" <<'PY'
 import sys
 s = open(sys.argv[1]).read()
 open(sys.argv[1], "w").write(s.replace('"folder": "Source"', '"folder": "Program"'))
+PY
+# The structs of the engine as the Blueprints of the engine's headers hold them (and every Blueprint that holds a copy of
+# them, "from" that library): a field the engine has since got (kern/logic/engine_nodes.gen.h, S_<struct>)
+# is added where it can be said - a flag, a whole or decimal number, a text - as the converter's next full run writes it.
+# What cannot be said so is reported. (In the copy only: the level is written by the full run.)
+python3 - "$out/all.klevel" "$root/kern/include/kern/logic/engine_nodes.gen.h" <<'PY'
+import json, re, sys
+level = json.load(open(sys.argv[1]))
+gen = open(sys.argv[2]).read()
+engine = {}
+for m in re.finditer(r"^struct S_(\w+) \{\n(.*)$", gen, re.M):
+    engine[m.group(1)] = re.findall(r"ev::Direct<(ev::[\w<>:]+?)>::from\(o, f\d+, x\.(\w+)\)", m.group(2))
+kinds = {"ev::Bool": ("bool", False), "ev::Int": ("int", 0), "ev::Float": ("float", 0), "ev::Text": ("text", "")}
+added, missing = 0, set()
+for actor in level["actors"]:
+    for st in actor.get("components", {}).get("logic", {}).get("structs", []):
+        lib = st.get("from") or actor["name"]
+        if not lib.startswith("engine_") or st["name"] not in engine: continue
+        have = {f["name"]: f for f in st["fields"]}
+        want = engine[st["name"]]
+        names = [n for _, n in want]
+        if [n for n in names if n in have] != [f["name"] for f in st["fields"]] or len(have) == len(names): continue  # (only fields added, in the engine's order)
+        if any(k not in kinds for k, n in want if n not in have):
+            missing.update(f"{st['name']}.{n} ({k})" for k, n in want if n not in have and k not in kinds); continue
+        st["fields"] = [have[n] if n in have else {"name": n, "type": kinds[k][0], "value": kinds[k][1]} for k, n in want]
+        added += len(names) - len(have)
+json.dump(level, open(sys.argv[1], "w"), indent=1, ensure_ascii=False)
+print(f"structs of the engine brought up to its headers: {added} fields added" + (f"; not sayable: {', '.join(sorted(missing))}" if missing else ""))
 PY
 mkdir -p "$out/gen"
 "$root/tools/blueprint_cpp.sh" "$out/all.klevel" "$out/gen/level_blueprints.cpp" "$out/gen/level_blueprints.h" Program || exit 1
@@ -54,8 +82,12 @@ cat "$out"/logs/*.log | grep 'error:' | sed -E 's/^[^ ]* error: //; s/kern_bluep
 
 if [ "${WEB:-}" = 1 ]; then
   # ---- the same for the browser: the level's runtime with every class compiled in (tools/export_game.sh's way)
+  # (the game's entry, kern_create_app, is still main.cpp's: in its place one that has no app - so the build says how
+  # large the rest is; the missing entry is reported)
+  printf '#include "kern/app/app.h"\nkern::App* kern_create_app() { return nullptr; }  // (all_program.sh: the entry is not a Blueprint yet)\n' > "$out/entry_missing.cpp"
+  echo "web build: the entry kern_create_app is not in the level yet (main.cpp) - built with one that has no app"
   if KERN_JOBS="${LINK_JOBS:-3}" /usr/bin/time -f "web build: peak_kb=%M seconds=%e (the largest compiler of the build)" \
-       "$root/kern/build.sh" --studio --commercial "$out/all_program.wasm" "$out"/gen/*.cpp -I"$out/gen" > "$out/web.log" 2>&1; then
+       "$root/kern/build.sh" --app --studio --commercial "$out/all_program.wasm" "$out"/gen/*.cpp "$out/entry_missing.cpp" -I"$out/gen" > "$out/web.log" 2>&1; then
     echo "web build: $(du -h "$out/all_program.wasm" | cut -f1) ($(stat -c %s "$out/all_program.wasm") bytes); $(grep -o 'web build: peak.*' "$out/web.log")"
   else
     echo "web build fails: $(grep -c 'error' "$out/web.log") lines with an error"; grep -E 'error|undefined symbol' "$out/web.log" | sort | uniq -c | sort -rn | head -40
