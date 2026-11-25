@@ -12899,8 +12899,9 @@ TEST(studio_logic_structs) {
   // (its settings: the variable, and the path from it to the place - a text on the node)
   std::string variables, path_kind, path_value;
   const json::Value tuned = node(tune);
+  const json::Value shared = f.s->state()["logic"]["choices"];   // (the lists every node shares: a parameter names its list)
   for (const json::Value& p : tuned["params"].items()) {
-    for (const json::Value& ch : p["choices"].items())
+    for (const json::Value& ch : (p["choices"].is_null() ? shared[p["list"].as_string()] : p["choices"]).items())
       if (p["key"].as_string() == "variable") variables += ch[0].as_string() + " ";
     if (p["key"].as_string() == "path") path_kind = p["kind"].as_string(), path_value = p["value"].as_string();
   }
