@@ -1,6 +1,6 @@
-// Browser test of the Blueprint editor's functions, formulas and C++ view, and of SpawnCity's
+// Browser test of the Blueprint editor's functions, formulas and C++ view, and of a game's
 // level file in the editor (Playwright + Chromium):
-//   node blueprint_e2e.mjs <base url of the repository root>
+//   node blueprint_e2e.mjs <base url of the repository root> [<a game's level file, relative to it>]
 //
 //  1. a function made with the mouse and the keyboard in My Blueprint and Details: its name, an
 //     input and an output, a Formula node between the entry and the Return, a call from Begin
@@ -10,14 +10,15 @@
 //     in the list's type from its pin, For Each over it - as C++, changed there, and played;
 //     then an enum and a struct, each made in My Blueprint and edited in Details, a variable of
 //     its type, its nodes from the action menu - as C++, changed there, and played;
-//  2. kern/games/spawncity/level/spawncity.klevel opens as a level: its actors are there, their
+//  2. (with a game's level file named) it opens as a level: its actors are there, their
 //     Blueprints compile without errors with the editor's own node library, and Play runs them
 //     as machine code. (The game's project file must stay a file the editor reads.)
 import {createRequire} from "node:module";
 
 const {chromium} = await import("playwright").catch(() => createRequire(import.meta.url)("playwright"));
 const base = (process.argv[2] || "").replace(/\/$/, "");
-if (!base) { console.error("usage: node blueprint_e2e.mjs <base url>"); process.exit(2); }
+const gameLevel = process.argv[3] || "";   // (a game's level file, relative to the base: its cases - section 2 - run only then)
+if (!base) { console.error("usage: node blueprint_e2e.mjs <base url> [<level file>]"); process.exit(2); }
 let failures = 0;
 const check = (ok, what) => { if (!ok) failures++; console.log(ok ? "ok  " : "FAIL", what); };
 const browser = await chromium.launch({args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]});
@@ -599,58 +600,60 @@ await page.click(".lg-cppclose");
 check(errorsOf(await logic()).length === 0, "both compile" + (errorsOf(await logic()).length ? ": " + errorsOf(await logic()).join(" | ") : ""));
 await cmd({cmd: "logicClose"});
 
-// ---- 2. SpawnCity's level file -------------------------------------------------------------------
-// The whole project first: every Blueprint of the level file, the folder "Source" with it - the Blueprints written
-// from the game's C++ (the Blueprint Game has every function of ~40 files, tens of thousands of nodes). The editor
-// opens each one (step 6 of kern/games/spawncity/BLUEPRINTS.md, "the project loads in the editor"): a Blueprint
-// too large for one canvas shows a function's body at a time - its largest is opened too. Then the level as the
-// built game carries it (kern/games/spawncity/build.sh: without "Source"), and Play runs that.
-const levelText = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();
-let withBlueprint = [];
-for (const whole of [true, false]) {
-  const file = JSON.parse(levelText);
-  if (!whole) file.actors = file.actors.filter(a => a.folder !== "Source");
-  const text = JSON.stringify(file);
-  const what = whole ? "the whole project" : "the level the game carries";
-  const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});
-  check(opened?.ok !== false, `SpawnCity's level file opens in the editor (${what})` + (opened?.error ? ": " + opened.error : ""));
-  const st = await state();
-  check(st.level?.name === "SpawnCity", `it is the level SpawnCity (${st.level?.name})`);
-  // (the level file says which actors carry a Blueprint; the editor's state lists every actor as [id, name])
-  const carriers = file.actors.filter(a => a.components?.logic).map(a => a.name);
-  withBlueprint = (st.actors || []).filter(([, name]) => carriers.includes(name)).map(([id, name]) => ({id, name}));
-  check(carriers.length >= 1 && withBlueprint.length === carriers.length && carriers.includes("Wanted"), `its ${carriers.length} Blueprints are there (${what})`);
-  let slowest = ["", 0], nodes = 0, bad = 0;
-  for (const a of withBlueprint) {
-    const start = Date.now();
-    await cmd({cmd: "logicOpen", owner: a.id});
-    let l = await logic();
-    const issues = errorsOf(l);
-    let ok = issues.length === 0 && l.nodes.every(n => n.title);
-    if (l.sheets?.length) {
-      // (sheets: what is shown is one function's body - the largest one is drawn too, and it is that function's)
-      const largest = l.sheets.reduce((x, y) => (y.nodes > x.nodes ? y : x));
-      await cmd({cmd: "logicSheet", function: largest.name});
-      l = await logic();
-      ok = ok && l.sheet === largest.name && l.nodes.length === largest.nodes && l.nodes.every(n => n.title) && l.nodes.some(n => n.id === largest.entry);
-      ok = ok && await until(async () => await page.locator("#logicEditor .lg-node").count() === largest.nodes, 60000);
+if (gameLevel) {
+  // ---- 2. a game's level file (only when one is named: the engine's cases above need no game) ------------
+  // The whole project first: every Blueprint of the level file, the folder "Source" with it - the Blueprints written
+  // from the game's C++ (the Blueprint Game has every function of ~40 files, tens of thousands of nodes). The editor
+  // opens each one (the project loads in the editor): a Blueprint
+  // too large for one canvas shows a function's body at a time - its largest is opened too. Then the level as the
+  // built game carries it (without the folder "Source"), and Play runs that.
+  const levelText = await (await fetch(base + "/" + gameLevel)).text();
+  let withBlueprint = [];
+  for (const whole of [true, false]) {
+    const file = JSON.parse(levelText);
+    if (!whole) file.actors = file.actors.filter(a => a.folder !== "Source");
+    const text = JSON.stringify(file);
+    const what = whole ? "the whole project" : "the level the game carries";
+    const opened = await cmd({cmd: "open", text, name: gameLevel.split("/").pop()});
+    check(opened?.ok !== false, `the level file ${gameLevel} opens in the editor (${what})` + (opened?.error ? ": " + opened.error : ""));
+    const st = await state();
+    check(st.level?.name === JSON.parse(levelText).name, `it is the level ${JSON.parse(levelText).name} (${st.level?.name})`);
+    // (the level file says which actors carry a Blueprint; the editor's state lists every actor as [id, name])
+    const carriers = file.actors.filter(a => a.components?.logic).map(a => a.name);
+    withBlueprint = (st.actors || []).filter(([, name]) => carriers.includes(name)).map(([id, name]) => ({id, name}));
+    check(carriers.length >= 1 && withBlueprint.length === carriers.length && carriers.includes("Wanted"), `its ${carriers.length} Blueprints are there (${what})`);
+    let slowest = ["", 0], nodes = 0, bad = 0;
+    for (const a of withBlueprint) {
+      const start = Date.now();
+      await cmd({cmd: "logicOpen", owner: a.id});
+      let l = await logic();
+      const issues = errorsOf(l);
+      let ok = issues.length === 0 && l.nodes.every(n => n.title);
+      if (l.sheets?.length) {
+        // (sheets: what is shown is one function's body - the largest one is drawn too, and it is that function's)
+        const largest = l.sheets.reduce((x, y) => (y.nodes > x.nodes ? y : x));
+        await cmd({cmd: "logicSheet", function: largest.name});
+        l = await logic();
+        ok = ok && l.sheet === largest.name && l.nodes.length === largest.nodes && l.nodes.every(n => n.title) && l.nodes.some(n => n.id === largest.entry);
+        ok = ok && await until(async () => await page.locator("#logicEditor .lg-node").count() === largest.nodes, 60000);
+      }
+      const ms = Date.now() - start;
+      if (ms > slowest[1]) slowest = [a.name, ms];
+      nodes += l.counts?.nodes || 0;
+      if (!ok) bad++;
+      // (one line for each of the rule Blueprints the game runs, and for every one that fails; the others are summed below)
+      if (!ok || !whole) check(ok, `${a.name}: its Blueprint compiles in the editor (${l.functions.length} functions, ${l.counts?.nodes} nodes)` + (issues.length ? ": " + issues.slice(0, 3).join(" | ") : ""));
+      await cmd({cmd: "logicClose"});
     }
-    const ms = Date.now() - start;
-    if (ms > slowest[1]) slowest = [a.name, ms];
-    nodes += l.counts?.nodes || 0;
-    if (!ok) bad++;
-    // (one line for each of the rule Blueprints the game runs, and for every one that fails; the others are summed below)
-    if (!ok || !whole) check(ok, `${a.name}: its Blueprint compiles in the editor (${l.functions.length} functions, ${l.counts?.nodes} nodes)` + (issues.length ? ": " + issues.slice(0, 3).join(" | ") : ""));
-    await cmd({cmd: "logicClose"});
+    if (whole) {
+      check(bad === 0, `every one of the ${withBlueprint.length} Blueprints opens and compiles in the editor (${nodes} nodes; the slowest, ${slowest[0]}, in ${slowest[1]} ms)`);
+      check(slowest[1] < 20000, `none takes longer than 20 s to open (${slowest[0]}: ${slowest[1]} ms)`);
+    }
   }
-  if (whole) {
-    check(bad === 0, `every one of the ${withBlueprint.length} Blueprints opens and compiles in the editor (${nodes} nodes; the slowest, ${slowest[0]}, in ${slowest[1]} ms)`);
-    check(slowest[1] < 20000, `none takes longer than 20 s to open (${slowest[0]}: ${slowest[1]} ms)`);
-  }
+  await cmd({cmd: "play"});
+  check(await until(async () => (await status()).logic?.compiled >= withBlueprint.length, 60000), `Play runs them as machine code (${(await status()).logic?.compiled} compiled)`);
+  await cmd({cmd: "stop"});
 }
-await cmd({cmd: "play"});
-check(await until(async () => (await status()).logic?.compiled >= withBlueprint.length, 60000), `Play runs them as machine code (${(await status()).logic?.compiled} compiled)`);
-await cmd({cmd: "stop"});
 check(errors.length === 0, "no page errors" + (errors.length ? ": " + errors.slice(0, 3).join(" | ") : ""));
 await browser.close();
 console.log(failures ? `${failures} FAILED` : "blueprint test passed");

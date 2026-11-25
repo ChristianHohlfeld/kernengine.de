@@ -155,6 +155,11 @@ ENGINE_HEADERS = set()
 ENGINE_HEADERS_DIR = os.path.join(ROOT, "kern", "include", "kern")   # (the engine's headers: their types are Blueprints' only where marked)
 
 
+def engine_only(field):
+    """A field marked KERN_ENGINE_ONLY (kern/core/base.h): the engine's own, no part of a Blueprint's value."""
+    return any(isinstance(c, dict) and c.get("kind") == "AnnotateAttr" for c in field.get("inner", ()))
+
+
 def is_word(name):
     return name in CPP_WORDS or name in FORMULA_WORDS or name in NODES or bool(NODE_SHAPE.match(name))
 
@@ -1853,7 +1858,7 @@ class Unit:
             # engine itself - as a value or owned (std::unique_ptr): an object too (Mesh: its Bvh)
             if c.get("kind") == "CXXConstructorDecl" and c.get("explicitlyDeleted") and re.fullmatch(r"\s*\w+\s*\(\s*const\s+[\w:]+\s*&\s*\)\s*", qtype(c)):
                 return True
-            if c.get("kind") == "FieldDecl":
+            if c.get("kind") == "FieldDecl" and not engine_only(c):
                 raw = qtype(c).strip()
                 if not re.search(r"(&|\*\s*(const)?)$", raw) and q not in self.deciding:
                     self.deciding.add(q)
@@ -2142,6 +2147,8 @@ class Unit:
                 if c.get("kind") in ("CXXMethodDecl", "CXXDestructorDecl") and c.get("virtual"):
                     raise Wait(f"the class {q.split('::')[-1]} (virtual functions)")
                 if c.get("kind") != "FieldDecl":
+                    continue
+                if engine_only(c):   # (KERN_ENGINE_ONLY: the engine's own field - not part of the type as a Blueprint holds it)
                     continue
                 if self.state_pointer(o, c):
                     self.state_pointers.add(c["id"])

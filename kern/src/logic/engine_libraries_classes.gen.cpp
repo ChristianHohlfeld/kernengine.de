@@ -1091,23 +1091,185 @@ struct engine_audio_synth_Native final : kern::logic::NativeBlueprint {
 
 // ---------------------------------------------------------------------------
 // The Blueprint of actor "engine_game_level" (its class: in the header)
-namespace kern_blueprint_402ced772ba1edd9 {
+namespace kern_blueprint_721df53dd61b4632 {
 
 // How the engine reaches the Blueprint engine_game_level by name (written by logic::native_glue after its
 // text): glue, not part of the notation - nothing to edit here.
-}  // namespace kern_blueprint_402ced772ba1edd9
+}  // namespace kern_blueprint_721df53dd61b4632
 namespace kern::logic::detail {
-template <> struct Held<::kern_blueprint_402ced772ba1edd9::engine_game_level::game_Transform> {
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_CityComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 8 && is_value<kern::i64>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<kern::i64>(*v.field(6)) && is_value<bool>(*v.field(7)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_CityComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<kern::i64>(*v.field(6)), from_value<bool>(*v.field(7))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_CityComponent& s) { return Value::structure({to_value(s.seed), to_value(s.blocks), to_value(s.pitch), to_value(s.street), to_value(s.max_height), to_value(s.trees), to_value(s.traffic), to_value(s.night_windows)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_HealthComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 11 && is_value<kern::f64>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::logic::Text>(*v.field(7)) && is_value<kern::logic::Text>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<kern::f64>(*v.field(10)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_HealthComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::logic::Text>(*v.field(7)), from_value<kern::logic::Text>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<kern::f64>(*v.field(10))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_HealthComponent& s) { return Value::structure({to_value(s.max_health), to_value(s.armor), to_value(s.regen_delay), to_value(s.regen_rate), to_value(s.respawn), to_value(s.respawn_delay), to_value(s.points), to_value(s.hit_sound), to_value(s.death_sound), to_value(s.explode_radius), to_value(s.explode_damage)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_LightComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_LightComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_LightComponent& s) { return Value::structure({to_value(s.color), to_value(s.intensity), to_value(s.range)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MaterialDesc> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 11 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<bool>(*v.field(6)) && is_value<bool>(*v.field(7)) && is_value<bool>(*v.field(8)) && is_value<kern::logic::Text>(*v.field(9)) && is_value<kern::f64>(*v.field(10)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_MaterialDesc from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::Vec3>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<bool>(*v.field(6)), from_value<bool>(*v.field(7)), from_value<bool>(*v.field(8)), from_value<kern::logic::Text>(*v.field(9)), from_value<kern::f64>(*v.field(10))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_MaterialDesc& s) { return Value::structure({to_value(s.color), to_value(s.roughness), to_value(s.metalness), to_value(s.emissive), to_value(s.emissive_strength), to_value(s.opacity), to_value(s.unlit), to_value(s.cast_shadow), to_value(s.double_sided), to_value(s.texture), to_value(s.tiling)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_PickupComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 6 && is_value<kern::f64>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::logic::Text>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::i64>(*v.field(5)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_PickupComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::f64>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::logic::Text>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::i64>(*v.field(5))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_PickupComponent& s) { return Value::structure({to_value(s.points), to_value(s.burst_color), to_value(s.respawn), to_value(s.sound), to_value(s.heal), to_value(s.ammo)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_RotatorComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 1 && is_value<kern::Vec3>(*v.field(0)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_RotatorComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_RotatorComponent& s) { return Value::structure({to_value(s.rate)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Transform> {
   static constexpr PinType type = PinType::structure;
   static bool is(const Value& v) { return v.type == type && v.fields() == 3 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)); }
-  static ::kern_blueprint_402ced772ba1edd9::engine_game_level::game_Transform from(const Value& v) {
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_Transform from(const Value& v) {
     if (!is(v)) return {};
     return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::Vec3>(*v.field(2))};
   }
-  static Value to(const ::kern_blueprint_402ced772ba1edd9::engine_game_level::game_Transform& s) { return Value::structure({to_value(s.position), to_value(s.rotation), to_value(s.scale)}); }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_Transform& s) { return Value::structure({to_value(s.position), to_value(s.rotation), to_value(s.scale)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_AudioComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 13 && is_value<kern::logic::Text>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<bool>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::audio_Rolloff>(*v.field(8)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::audio_Bus>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<kern::f64>(*v.field(11)) && is_value<kern::f64>(*v.field(12)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_AudioComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Text>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<bool>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::audio_Rolloff>(*v.field(8)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::audio_Bus>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<kern::f64>(*v.field(11)), from_value<kern::f64>(*v.field(12))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_AudioComponent& s) { return Value::structure({to_value(s.sound), to_value(s.volume), to_value(s.pitch), to_value(s.the_loop), to_value(s.autoplay), to_value(s.spatial), to_value(s.min_distance), to_value(s.max_distance), to_value(s.rolloff), to_value(s.bus), to_value(s.doppler), to_value(s.pitch_by_speed), to_value(s.delay)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_BodyComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 16 && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Motion>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<bool>(*v.field(6)) && is_value<bool>(*v.field(7)) && is_value<kern::List<bool>>(*v.field(8)) && is_value<kern::List<bool>>(*v.field(9)) && is_value<kern::Vec3>(*v.field(10)) && is_value<kern::Vec3>(*v.field(11)) && is_value<kern::logic::Text>(*v.field(12)) && is_value<kern::f64>(*v.field(13)) && is_value<kern::Vec3>(*v.field(14)) && is_value<kern::List<kern::f64>>(*v.field(15)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_BodyComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Motion>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<bool>(*v.field(6)), from_value<bool>(*v.field(7)), from_value<kern::List<bool>>(*v.field(8)), from_value<kern::List<bool>>(*v.field(9)), from_value<kern::Vec3>(*v.field(10)), from_value<kern::Vec3>(*v.field(11)), from_value<kern::logic::Text>(*v.field(12)), from_value<kern::f64>(*v.field(13)), from_value<kern::Vec3>(*v.field(14)), from_value<kern::List<kern::f64>>(*v.field(15))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_BodyComponent& s) { return Value::structure({to_value(s.motion), to_value(s.mass), to_value(s.linear_damping), to_value(s.angular_damping), to_value(s.gravity_scale), to_value(s.bullet), to_value(s.start_awake), to_value(s.allow_sleep), to_value(s.lock_linear), to_value(s.lock_angular), to_value(s.linear_velocity), to_value(s.angular_velocity), to_value(s.impact_sound), to_value(s.impact_threshold), to_value(s.center_of_mass), to_value(s.inertia)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ColliderComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 17 && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ColliderShape>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::List<kern::Vec3>>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<kern::logic::Text>(*v.field(11)) && is_value<bool>(*v.field(12)) && is_value<kern::i64>(*v.field(13)) && is_value<kern::i64>(*v.field(14)) && is_value<kern::i64>(*v.field(15)) && is_value<kern::logic::Text>(*v.field(16)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_ColliderComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ColliderShape>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::Vec3>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::List<kern::Vec3>>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<kern::logic::Text>(*v.field(11)), from_value<bool>(*v.field(12)), from_value<kern::i64>(*v.field(13)), from_value<kern::i64>(*v.field(14)), from_value<kern::i64>(*v.field(15)), from_value<kern::logic::Text>(*v.field(16))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_ColliderComponent& s) { return Value::structure({to_value(s.shape), to_value(s.center), to_value(s.rotation), to_value(s.size), to_value(s.radius), to_value(s.length), to_value(s.points), to_value(s.density), to_value(s.friction), to_value(s.restitution), to_value(s.rolling_resistance), to_value(s.surface), to_value(s.sensor), to_value(s.category), to_value(s.mask), to_value(s.group), to_value(s.impact_sound)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ControllerComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 25 && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ControlMode>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_CameraMode>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<kern::f64>(*v.field(11)) && is_value<kern::logic::Text>(*v.field(12)) && is_value<kern::logic::Text>(*v.field(13)) && is_value<kern::logic::Text>(*v.field(14)) && is_value<kern::f64>(*v.field(15)) && is_value<kern::f64>(*v.field(16)) && is_value<kern::f64>(*v.field(17)) && is_value<bool>(*v.field(18)) && is_value<bool>(*v.field(19)) && is_value<kern::logic::Text>(*v.field(20)) && is_value<bool>(*v.field(21)) && is_value<kern::logic::Text>(*v.field(22)) && is_value<bool>(*v.field(23)) && is_value<kern::f64>(*v.field(24)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_ControllerComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ControlMode>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_CameraMode>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<kern::f64>(*v.field(11)), from_value<kern::logic::Text>(*v.field(12)), from_value<kern::logic::Text>(*v.field(13)), from_value<kern::logic::Text>(*v.field(14)), from_value<kern::f64>(*v.field(15)), from_value<kern::f64>(*v.field(16)), from_value<kern::f64>(*v.field(17)), from_value<bool>(*v.field(18)), from_value<bool>(*v.field(19)), from_value<kern::logic::Text>(*v.field(20)), from_value<bool>(*v.field(21)), from_value<kern::logic::Text>(*v.field(22)), from_value<bool>(*v.field(23)), from_value<kern::f64>(*v.field(24))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_ControllerComponent& s) { return Value::structure({to_value(s.mode), to_value(s.max_speed), to_value(s.acceleration), to_value(s.turn_rate), to_value(s.jump_speed), to_value(s.boost), to_value(s.boost_speed), to_value(s.hover_height), to_value(s.camera), to_value(s.camera_distance), to_value(s.camera_height), to_value(s.camera_fov), to_value(s.engine_sound), to_value(s.jump_sound), to_value(s.boost_sound), to_value(s.crouch_speed), to_value(s.eye_height), to_value(s.look_sensitivity), to_value(s.head_bob), to_value(s.autonomous), to_value(s.gait), to_value(s.rollers), to_value(s.actions), to_value(s.Kern_extras), to_value(s.servo_delay)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_JointComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 24 && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_JointKind>(*v.field(0)) && is_value<kern::i64>(*v.field(1)) && is_value<kern::Vec3>(*v.field(2)) && is_value<kern::Vec3>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<bool>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<kern::f64>(*v.field(11)) && is_value<bool>(*v.field(12)) && is_value<kern::f64>(*v.field(13)) && is_value<kern::f64>(*v.field(14)) && is_value<kern::f64>(*v.field(15)) && is_value<kern::f64>(*v.field(16)) && is_value<kern::f64>(*v.field(17)) && is_value<bool>(*v.field(18)) && is_value<kern::f64>(*v.field(19)) && is_value<kern::f64>(*v.field(20)) && is_value<kern::f64>(*v.field(21)) && is_value<kern::f64>(*v.field(22)) && is_value<kern::logic::Text>(*v.field(23)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_JointComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_JointKind>(*v.field(0)), from_value<kern::i64>(*v.field(1)), from_value<kern::Vec3>(*v.field(2)), from_value<kern::Vec3>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<bool>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<kern::f64>(*v.field(11)), from_value<bool>(*v.field(12)), from_value<kern::f64>(*v.field(13)), from_value<kern::f64>(*v.field(14)), from_value<kern::f64>(*v.field(15)), from_value<kern::f64>(*v.field(16)), from_value<kern::f64>(*v.field(17)), from_value<bool>(*v.field(18)), from_value<kern::f64>(*v.field(19)), from_value<kern::f64>(*v.field(20)), from_value<kern::f64>(*v.field(21)), from_value<kern::f64>(*v.field(22)), from_value<kern::logic::Text>(*v.field(23))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_JointComponent& s) { return Value::structure({to_value(s.kind), to_value(s.target), to_value(s.anchor), to_value(s.axis), to_value(s.collide_connected), to_value(s.enable_limit), to_value(s.lower), to_value(s.upper), to_value(s.reference), to_value(s.enable_motor), to_value(s.motor_speed), to_value(s.max_motor_force), to_value(s.enable_spring), to_value(s.spring_hertz), to_value(s.spring_damping), to_value(s.length), to_value(s.break_force), to_value(s.break_torque), to_value(s.servo), to_value(s.servo_target), to_value(s.servo_stiffness), to_value(s.servo_damping), to_value(s.servo_friction), to_value(s.break_sound)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MeshComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 12 && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Shape>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::i64>(*v.field(4)) && is_value<kern::logic::Text>(*v.field(5)) && is_value<bool>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<kern::logic::Text>(*v.field(10)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MaterialDesc>(*v.field(11)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_MeshComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Shape>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::i64>(*v.field(4)), from_value<kern::logic::Text>(*v.field(5)), from_value<bool>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<kern::logic::Text>(*v.field(10)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MaterialDesc>(*v.field(11))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_MeshComponent& s) { return Value::structure({to_value(s.shape), to_value(s.size), to_value(s.radius), to_value(s.height), to_value(s.segments), to_value(s.asset), to_value(s.collision), to_value(s.friction), to_value(s.restitution), to_value(s.rolling_resistance), to_value(s.surface), to_value(s.material)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MoverComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::Vec3>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MoverMode>(*v.field(3)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_MoverComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::Vec3>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MoverMode>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_MoverComponent& s) { return Value::structure({to_value(s.offset), to_value(s.period), to_value(s.phase), to_value(s.mode)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_TriggerComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 6 && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_TriggerAction>(*v.field(0)) && is_value<kern::logic::Text>(*v.field(1)) && is_value<bool>(*v.field(2)) && is_value<kern::logic::Text>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::i64>(*v.field(5)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_TriggerComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_TriggerAction>(*v.field(0)), from_value<kern::logic::Text>(*v.field(1)), from_value<bool>(*v.field(2)), from_value<kern::logic::Text>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::i64>(*v.field(5))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_TriggerComponent& s) { return Value::structure({to_value(s.action), to_value(s.message), to_value(s.once), to_value(s.sound), to_value(s.strength), to_value(s.target)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WeaponComponent> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 17 && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WeaponKind>(*v.field(0)) && is_value<kern::f64>(*v.field(1)) && is_value<kern::f64>(*v.field(2)) && is_value<bool>(*v.field(3)) && is_value<kern::i64>(*v.field(4)) && is_value<kern::i64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<kern::f64>(*v.field(11)) && is_value<kern::f64>(*v.field(12)) && is_value<kern::i64>(*v.field(13)) && is_value<kern::f64>(*v.field(14)) && is_value<kern::logic::Text>(*v.field(15)) && is_value<kern::logic::Text>(*v.field(16)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_WeaponComponent from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WeaponKind>(*v.field(0)), from_value<kern::f64>(*v.field(1)), from_value<kern::f64>(*v.field(2)), from_value<bool>(*v.field(3)), from_value<kern::i64>(*v.field(4)), from_value<kern::i64>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<kern::f64>(*v.field(11)), from_value<kern::f64>(*v.field(12)), from_value<kern::i64>(*v.field(13)), from_value<kern::f64>(*v.field(14)), from_value<kern::logic::Text>(*v.field(15)), from_value<kern::logic::Text>(*v.field(16))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_WeaponComponent& s) { return Value::structure({to_value(s.kind), to_value(s.damage), to_value(s.fire_rate), to_value(s.automatic), to_value(s.magazine), to_value(s.reserve), to_value(s.reload_time), to_value(s.spread), to_value(s.aim_spread), to_value(s.recoil), to_value(s.range), to_value(s.headshot), to_value(s.impulse), to_value(s.pellets), to_value(s.aim_fov), to_value(s.fire_sound), to_value(s.reload_sound)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WorldSettings> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 34 && is_value<kern::logic::Text>(*v.field(0)) && is_value<kern::Vec3>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::f64>(*v.field(3)) && is_value<kern::f64>(*v.field(4)) && is_value<kern::f64>(*v.field(5)) && is_value<kern::f64>(*v.field(6)) && is_value<kern::f64>(*v.field(7)) && is_value<kern::f64>(*v.field(8)) && is_value<kern::f64>(*v.field(9)) && is_value<kern::f64>(*v.field(10)) && is_value<bool>(*v.field(11)) && is_value<kern::Vec3>(*v.field(12)) && is_value<bool>(*v.field(13)) && is_value<kern::f64>(*v.field(14)) && is_value<kern::f64>(*v.field(15)) && is_value<kern::logic::Text>(*v.field(16)) && is_value<kern::f64>(*v.field(17)) && is_value<kern::f64>(*v.field(18)) && is_value<kern::f64>(*v.field(19)) && is_value<kern::f64>(*v.field(20)) && is_value<kern::logic::Text>(*v.field(21)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_GameGoal>(*v.field(22)) && is_value<kern::f64>(*v.field(23)) && is_value<kern::f64>(*v.field(24)) && is_value<kern::i64>(*v.field(25)) && is_value<bool>(*v.field(26)) && is_value<kern::f64>(*v.field(27)) && is_value<kern::logic::Text>(*v.field(28)) && is_value<kern::f64>(*v.field(29)) && is_value<kern::logic::Text>(*v.field(30)) && is_value<kern::f64>(*v.field(31)) && is_value<kern::f64>(*v.field(32)) && is_value<kern::f64>(*v.field(33)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_WorldSettings from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Text>(*v.field(0)), from_value<kern::Vec3>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::f64>(*v.field(3)), from_value<kern::f64>(*v.field(4)), from_value<kern::f64>(*v.field(5)), from_value<kern::f64>(*v.field(6)), from_value<kern::f64>(*v.field(7)), from_value<kern::f64>(*v.field(8)), from_value<kern::f64>(*v.field(9)), from_value<kern::f64>(*v.field(10)), from_value<bool>(*v.field(11)), from_value<kern::Vec3>(*v.field(12)), from_value<bool>(*v.field(13)), from_value<kern::f64>(*v.field(14)), from_value<kern::f64>(*v.field(15)), from_value<kern::logic::Text>(*v.field(16)), from_value<kern::f64>(*v.field(17)), from_value<kern::f64>(*v.field(18)), from_value<kern::f64>(*v.field(19)), from_value<kern::f64>(*v.field(20)), from_value<kern::logic::Text>(*v.field(21)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_GameGoal>(*v.field(22)), from_value<kern::f64>(*v.field(23)), from_value<kern::f64>(*v.field(24)), from_value<kern::i64>(*v.field(25)), from_value<bool>(*v.field(26)), from_value<kern::f64>(*v.field(27)), from_value<kern::logic::Text>(*v.field(28)), from_value<kern::f64>(*v.field(29)), from_value<kern::logic::Text>(*v.field(30)), from_value<kern::f64>(*v.field(31)), from_value<kern::f64>(*v.field(32)), from_value<kern::f64>(*v.field(33))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_WorldSettings& s) { return Value::structure({to_value(s.channels), to_value(s.gravity), to_value(s.substeps), to_value(s.step_hz), to_value(s.time_of_day), to_value(s.day_length), to_value(s.sun_azimuth), to_value(s.fog_density), to_value(s.exposure), to_value(s.ao_radius), to_value(s.shadow_distance), to_value(s.clouds), to_value(s.ground_color), to_value(s.ground), to_value(s.ground_friction), to_value(s.ground_restitution), to_value(s.ground_surface), to_value(s.contact_hertz), to_value(s.contact_damping), to_value(s.contact_speed), to_value(s.kill_z), to_value(s.title), to_value(s.goal), to_value(s.time_limit), to_value(s.score_target), to_value(s.player), to_value(s.observer), to_value(s.master_volume), to_value(s.music), to_value(s.music_volume), to_value(s.ambience), to_value(s.ambience_volume), to_value(s.reverb), to_value(s.doppler)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Actor> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 22 && is_value<kern::i64>(*v.field(0)) && is_value<kern::logic::Text>(*v.field(1)) && is_value<kern::i64>(*v.field(2)) && is_value<kern::logic::Text>(*v.field(3)) && is_value<bool>(*v.field(4)) && is_value<bool>(*v.field(5)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Transform>(*v.field(6)) && is_value<kern::List<kern::logic::Text>>(*v.field(7)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MeshComponent>>(*v.field(8)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_LightComponent>>(*v.field(9)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_BodyComponent>>(*v.field(10)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ColliderComponent>>(*v.field(11)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_JointComponent>>(*v.field(12)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ControllerComponent>>(*v.field(13)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_PickupComponent>>(*v.field(14)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_TriggerComponent>>(*v.field(15)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_RotatorComponent>>(*v.field(16)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MoverComponent>>(*v.field(17)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_CityComponent>>(*v.field(18)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_AudioComponent>>(*v.field(19)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WeaponComponent>>(*v.field(20)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_HealthComponent>>(*v.field(21)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_Actor from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::i64>(*v.field(0)), from_value<kern::logic::Text>(*v.field(1)), from_value<kern::i64>(*v.field(2)), from_value<kern::logic::Text>(*v.field(3)), from_value<bool>(*v.field(4)), from_value<bool>(*v.field(5)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Transform>(*v.field(6)), from_value<kern::List<kern::logic::Text>>(*v.field(7)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MeshComponent>>(*v.field(8)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_LightComponent>>(*v.field(9)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_BodyComponent>>(*v.field(10)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ColliderComponent>>(*v.field(11)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_JointComponent>>(*v.field(12)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_ControllerComponent>>(*v.field(13)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_PickupComponent>>(*v.field(14)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_TriggerComponent>>(*v.field(15)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_RotatorComponent>>(*v.field(16)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_MoverComponent>>(*v.field(17)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_CityComponent>>(*v.field(18)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_AudioComponent>>(*v.field(19)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WeaponComponent>>(*v.field(20)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_HealthComponent>>(*v.field(21))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_Actor& s) { return Value::structure({to_value(s.id), to_value(s.name), to_value(s.parent), to_value(s.folder), to_value(s.hidden), to_value(s.locked), to_value(s.transform), to_value(s.tags), to_value(s.mesh), to_value(s.light), to_value(s.body), to_value(s.colliders), to_value(s.joints), to_value(s.controller), to_value(s.pickup), to_value(s.trigger), to_value(s.rotator), to_value(s.mover), to_value(s.city), to_value(s.audio), to_value(s.weapon), to_value(s.health)}); }
+};
+template <> struct Held<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Level> {
+  static constexpr PinType type = PinType::structure;
+  static bool is(const Value& v) { return v.type == type && v.fields() == 4 && is_value<kern::logic::Text>(*v.field(0)) && is_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WorldSettings>(*v.field(1)) && is_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Actor>>(*v.field(2)) && is_value<kern::i64>(*v.field(3)); }
+  static ::kern_blueprint_721df53dd61b4632::engine_game_level::game_Level from(const Value& v) {
+    if (!is(v)) return {};
+    return {from_value<kern::logic::Text>(*v.field(0)), from_value<::kern_blueprint_721df53dd61b4632::engine_game_level::game_WorldSettings>(*v.field(1)), from_value<kern::List<::kern_blueprint_721df53dd61b4632::engine_game_level::game_Actor>>(*v.field(2)), from_value<kern::i64>(*v.field(3))};
+  }
+  static Value to(const ::kern_blueprint_721df53dd61b4632::engine_game_level::game_Level& s) { return Value::structure({to_value(s.name), to_value(s.world), to_value(s.actors), to_value(s.next_id)}); }
 };
 }  // namespace kern::logic::detail
-namespace kern_blueprint_402ced772ba1edd9 {
+namespace kern_blueprint_721df53dd61b4632 {
 namespace {
 struct engine_game_level_Native final : kern::logic::NativeBlueprint {
   engine_game_level self;
@@ -1123,8 +1285,23 @@ struct engine_game_level_Native final : kern::logic::NativeBlueprint {
     using kern::logic::to_value;
     (void)args;
     results.clear();
+    if (function == "BodyComponent_explicit_inertia") {
+      kern::logic::NativeParam<&engine_game_level::BodyComponent_explicit_inertia, 0> inner0{};
+      auto& place0 = busy_BodyComponent_explicit_inertia ? inner0 : place_BodyComponent_explicit_inertia_0;
+      place0 = native_arg<kern::logic::NativeParam<&engine_game_level::BodyComponent_explicit_inertia, 0>>(args, 0, kern::logic::NativeParam<&engine_game_level::BodyComponent_explicit_inertia, 0>{});
+      const bool was_busy = busy_BodyComponent_explicit_inertia;
+      busy_BodyComponent_explicit_inertia = true;
+      kern::logic::native_call(true);
+      const auto out = self.BodyComponent_explicit_inertia(place0);
+      kern::logic::native_call(false);
+      results = {to_value(out.Result)};
+      busy_BodyComponent_explicit_inertia = was_busy;
+      return true;
+    }
     return false;
   }
+  kern::logic::NativeParam<&engine_game_level::BodyComponent_explicit_inertia, 0> place_BodyComponent_explicit_inertia_0{};
+  bool busy_BodyComponent_explicit_inertia = false;
   bool get(std::string_view variable, kern::logic::Value& out) const override {
     (void)out;
     return false;
@@ -1135,10 +1312,10 @@ struct engine_game_level_Native final : kern::logic::NativeBlueprint {
   }
 };
 [[maybe_unused]] const bool engine_game_level_registered =
-    (kern::logic::register_native_blueprint(0x5a27993cee70894bull, [] { return std::unique_ptr<kern::logic::NativeBlueprint>(new engine_game_level_Native()); }), true);
+    (kern::logic::register_native_blueprint(0x25cbe249eceea0a6ull, [] { return std::unique_ptr<kern::logic::NativeBlueprint>(new engine_game_level_Native()); }), true);
 }  // namespace
 
-}  // namespace kern_blueprint_402ced772ba1edd9
+}  // namespace kern_blueprint_721df53dd61b4632
 
 // ---------------------------------------------------------------------------
 // The Blueprint of actor "engine_game_runtime" (its class: in the header)

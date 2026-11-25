@@ -338,7 +338,7 @@ jobs:
           sleep 1
           mkdir -p artifacts/e2e
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771
-          # functions and formulas in the Blueprint editor; SpawnCity's level file opens in the editor
+          # functions and formulas in the Blueprint editor (the engine's cases: no game's level)
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8771
           # the native export: a game whose Blueprints run as their compiled C++ classes
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/export_e2e.mjs http://127.0.0.1:8771/generated/native_export.html
@@ -352,6 +352,48 @@ jobs:
 
   # One input reader for every host (kern.mjs BrowserInput, readGamepad): its contract, the example
   # games and SpawnCity with a real mouse and keyboard - beside the Studio's test, not after it.
+  e2e-spawncity:
+    # the game's cases: its level file in the editor (the engine's e2e above needs no game)
+    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: _site
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-export
+          path: generated
+      - name: Playwright (cached)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /tmp/e2e
+            ~/.cache/ms-playwright
+          key: playwright-1.56.0
+      - name: SpawnCity's level file in the editor
+        run: |
+          set -euo pipefail
+          mkdir -p generated && cp _site/editor/index.html generated/studio.html && cp _site/generated/kern_studio.wasm generated/
+          # the app files next to the page, as deployed (manifest, icons, service worker, the Lehrer's module)
+          cp -r _site/editor/manifest.webmanifest _site/editor/sw.js _site/editor/build.json _site/editor/icons _site/editor/microduck _site/editor/kern_lehrer.wasm generated/
+          [ -d /tmp/e2e/node_modules/playwright ] || npm install --prefix /tmp/e2e --no-audit --no-fund playwright@1.56.0
+          # The browser itself (cached, else from Playwright's CDN) is what the test needs. Its system
+          # packages - fonts above all - come from Ubuntu's archive: when that cannot be reached
+          # within three minutes, the test runs with what the runner image has.
+          /tmp/e2e/node_modules/.bin/playwright install chromium || { echo "::error::playwright install failed"; exit 1; }
+          timeout 180 /tmp/e2e/node_modules/.bin/playwright install-deps chromium || echo "::warning::playwright install-deps failed: Ubuntu's archive is not reachable"
+          python3 -m http.server 8771 --bind 127.0.0.1 >/tmp/http.log 2>&1 &
+          sleep 1
+          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8771 kern/games/spawncity/level/spawncity.klevel
+
   input:
     if: ${{ inputs.probe == '' || inputs.probe == null }}
     needs: build

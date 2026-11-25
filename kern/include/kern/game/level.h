@@ -46,7 +46,7 @@ enum class KERN_BLUEPRINT_TYPE Shape : u8 { box, sphere, cylinder, cone, capsule
 const char* shape_name(Shape s);
 bool parse_shape(std::string_view s, Shape& out);
 
-struct MaterialDesc {
+struct KERN_BLUEPRINT_TYPE MaterialDesc {
   Vec3 color{0.8f, 0.8f, 0.8f};  // sRGB
   f32 roughness = 0.6f, metalness = 0;
   Vec3 emissive{0, 0, 0};       // sRGB colour, multiplied by emissive_strength
@@ -57,7 +57,7 @@ struct MaterialDesc {
   f32 tiling = 1;               // texture repeats per metre (planes, boxes) or per surface
 };
 
-struct MeshComponent {
+struct KERN_BLUEPRINT_TYPE MeshComponent {
   Shape shape = Shape::box;
   Vec3 size{1, 1, 1};           // box, plane (x, y), ramp
   f32 radius = 0.5f;            // sphere, cylinder, cone, capsule, torus (major)
@@ -72,16 +72,16 @@ struct MeshComponent {
   MaterialDesc material;
 };
 
-struct LightComponent {
+struct KERN_BLUEPRINT_TYPE LightComponent {
   Vec3 color{1, 0.95f, 0.85f};
   f32 intensity = 20;
   f32 range = 12;
 };
 
-enum class Motion : u8 { fixed, kinematic, dynamic };
+enum class KERN_BLUEPRINT_TYPE Motion : u8 { fixed, kinematic, dynamic };
 const char* motion_name(Motion m);
 
-struct BodyComponent {
+struct KERN_BLUEPRINT_TYPE BodyComponent {
   Motion motion = Motion::dynamic;
   f32 mass = 0;                 // kg; 0 = from the colliders' densities
   f32 linear_damping = 0, angular_damping = 0.05f, gravity_scale = 1;
@@ -99,10 +99,10 @@ struct BodyComponent {
   bool explicit_inertia() const { return inertia[0] > 0 && inertia[1] > 0 && inertia[2] > 0; }
 };
 
-enum class ColliderShape : u8 { automatic, box, sphere, capsule, hull };
+enum class KERN_BLUEPRINT_TYPE ColliderShape : u8 { automatic, box, sphere, capsule, hull };
 const char* collider_shape_name(ColliderShape s);
 
-struct ColliderComponent {
+struct KERN_BLUEPRINT_TYPE ColliderComponent {
   ColliderShape shape = ColliderShape::automatic;  // automatic: fitted to the mesh
   Vec3 center;                  // actor-local offset
   Vec3 rotation;                // Euler degrees
@@ -119,10 +119,10 @@ struct ColliderComponent {
   std::string impact_sound = "auto";
 };
 
-enum class JointKind : u8 { hinge, slider, ball, fixed, distance, wheel, motor, parallel, no_collision };
+enum class KERN_BLUEPRINT_TYPE JointKind : u8 { hinge, slider, ball, fixed, distance, wheel, motor, parallel, no_collision };
 const char* joint_kind_name(JointKind k);
 
-struct JointComponent {
+struct KERN_BLUEPRINT_TYPE JointComponent {
   JointKind kind = JointKind::hinge;
   ActorId target = 0;           // the other actor (0 = the world)
   Vec3 anchor;                  // actor-local
@@ -153,12 +153,12 @@ struct JointComponent {
 /// aim, a weapon from its WeaponComponent, health from its HealthComponent).
 /// walker: an articulated robot that walks on its own servos, driven by its control policy (the
 /// Micro Duck: Pollen Robotics' trained neural network, see docs/walker.md).
-enum class ControlMode : u8 { hovercar, rolling, character, flyer, vehicle, soldier, walker };
+enum class KERN_BLUEPRINT_TYPE ControlMode : u8 { hovercar, rolling, character, flyer, vehicle, soldier, walker };
 const char* control_mode_name(ControlMode m);
-enum class CameraMode : u8 { chase, first_person, top_down };
+enum class KERN_BLUEPRINT_TYPE CameraMode : u8 { chase, first_person, top_down };
 const char* camera_mode_name(CameraMode m);
 
-struct ControllerComponent {
+struct KERN_BLUEPRINT_TYPE ControllerComponent {
   ControlMode mode = ControlMode::hovercar;
   f32 max_speed = 36;           // m/s
   f32 acceleration = 24;        // m/s^2
@@ -192,11 +192,11 @@ struct ControllerComponent {
   f32 servo_delay = 0.02f;
 };
 
-enum class WeaponKind : u8 { rifle, pistol, shotgun, sniper };
+enum class KERN_BLUEPRINT_TYPE WeaponKind : u8 { rifle, pistol, shotgun, sniper };
 const char* weapon_kind_name(WeaponKind k);
 
 /// A hitscan weapon for soldier players (server-authoritative and lag-compensated in multiplayer).
-struct WeaponComponent {
+struct KERN_BLUEPRINT_TYPE WeaponComponent {
   WeaponKind kind = WeaponKind::rifle;
   f32 damage = 24;              // per hit (per pellet for shotguns)
   f32 fire_rate = 600;          // rounds per minute
@@ -220,7 +220,7 @@ struct WeaponComponent {
 /// Handling of a weapon type: damage, rate, magazine, spread and recoil.
 WeaponComponent weapon_preset(WeaponKind kind);
 
-struct HealthComponent {
+struct KERN_BLUEPRINT_TYPE HealthComponent {
   f32 max_health = 100;
   f32 armor = 0;                // absorbs damage first
   f32 regen_delay = 5;          // seconds after the last damage, 0 = no regeneration
@@ -234,7 +234,7 @@ struct HealthComponent {
   f32 explode_damage = 80;      // damage at the centre, falling off to 0 at the radius
 };
 
-struct PickupComponent {
+struct KERN_BLUEPRINT_TYPE PickupComponent {
   f32 points = 1;
   Vec3 burst_color{0.55f, 1.0f, 0.92f};
   f32 respawn = 0;              // seconds, 0 = gone for this run
@@ -243,10 +243,10 @@ struct PickupComponent {
   i32 ammo = 0;                 // rounds added to the collector's reserve
 };
 
-enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event };
+enum class KERN_BLUEPRINT_TYPE TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event };
 const char* trigger_action_name(TriggerAction a);
 
-struct TriggerComponent {
+struct KERN_BLUEPRINT_TYPE TriggerComponent {
   TriggerAction action = TriggerAction::goal;
   std::string message;
   bool once = true;
@@ -256,7 +256,7 @@ struct TriggerComponent {
 };
 
 /// A sound emitter: a looping ambience, a machine hum, a radio, a one-shot.
-struct AudioComponent {
+struct KERN_BLUEPRINT_TYPE AudioComponent {
   std::string sound = "builtin:hum";  // "builtin:<name>" or an imported sound asset id
   f32 volume = 1;               // linear gain (0..4)
   f32 pitch = 1;                // playback rate
@@ -272,21 +272,21 @@ struct AudioComponent {
   f32 delay = 0;                // seconds after the start
 };
 
-struct RotatorComponent {
+struct KERN_BLUEPRINT_TYPE RotatorComponent {
   Vec3 rate{0, 0, 60};          // degrees per second about the actor's local axes
 };
 
-enum class MoverMode : u8 { sine, ping_pong, loop };
+enum class KERN_BLUEPRINT_TYPE MoverMode : u8 { sine, ping_pong, loop };
 const char* mover_mode_name(MoverMode m);
 
-struct MoverComponent {
+struct KERN_BLUEPRINT_TYPE MoverComponent {
   Vec3 offset{0, 0, 1};         // metres, relative to the start position (parent space)
   f32 period = 2;               // seconds per cycle
   f32 phase = 0;                // 0..1
   MoverMode mode = MoverMode::sine;
 };
 
-struct CityComponent {
+struct KERN_BLUEPRINT_TYPE CityComponent {
   u32 seed = 20261022;
   i32 blocks = 7;               // blocks per side
   f32 pitch = 80;               // metres from street to street
@@ -297,7 +297,7 @@ struct CityComponent {
   bool night_windows = true;    // lit windows at night (shader extension)
 };
 
-struct Actor {
+struct KERN_BLUEPRINT_TYPE Actor {
   ActorId id = 0;
   std::string name;
   ActorId parent = 0;
@@ -320,13 +320,13 @@ struct Actor {
   std::optional<AudioComponent> audio;
   std::optional<WeaponComponent> weapon;
   std::optional<HealthComponent> health;
-  std::optional<logic::Graph> logic;   // the actor's own logic graph (Self = this actor)
+  KERN_ENGINE_ONLY std::optional<logic::Graph> logic;   // the actor's own logic graph (Self = this actor) - the engine's, not a Blueprint's value
 };
 
-enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score };
+enum class KERN_BLUEPRINT_TYPE GameGoal : u8 { none, collect_all, reach_goal, survive, score };
 const char* game_goal_name(GameGoal g);
 
-struct WorldSettings {
+struct KERN_BLUEPRINT_TYPE WorldSettings {
   /// The names of the level's collision channels, separated by commas: the first is bit 1 of a
   /// collider's category and mask (Box3D's category bits: "they should represent your application
   /// object types"), the second bit 2, the third bit 4 ... up to 32. A new collider is of the
@@ -418,15 +418,15 @@ std::vector<std::string> channel_names(const WorldSettings& w);
 /// no bit. "*" or "All": every bit.
 u32 channel_bits(const WorldSettings& w, std::string_view names);
 
-struct Level {
+struct KERN_BLUEPRINT_TYPE Level {
   std::string name = "Untitled";
   WorldSettings world;
   std::vector<Actor> actors;
-  std::vector<TextureAsset> textures;
-  std::vector<SoundAsset> sounds;
-  std::vector<MotionAsset> motions;  // what the Lehrer taught the level's Micro Ducks
-  logic::Graph logic;            // the level graph (Self = none; sees every actor's events)
-  EditorCamera camera;
+  KERN_ENGINE_ONLY std::vector<TextureAsset> textures;  // (the engine's: shared by undo snapshots)
+  KERN_ENGINE_ONLY std::vector<SoundAsset> sounds;
+  KERN_ENGINE_ONLY std::vector<MotionAsset> motions;  // what the Lehrer taught the level's Micro Ducks
+  KERN_ENGINE_ONLY logic::Graph logic;  // the level graph (Self = none; sees every actor's events)
+  KERN_ENGINE_ONLY EditorCamera camera;  // (the editor's)
   ActorId next_id = 1;
 
   Actor* find(ActorId id);

@@ -16,10 +16,15 @@
 /// for Blueprints - a node that takes or gives another type of the engine is no node, and the engine's
 /// other types (logic::Graph, game::Level ...) stay inside it. In front of the name:
 /// struct KERN_BLUEPRINT_TYPE Pose { ... };  enum class KERN_BLUEPRINT_TYPE BodyType : u8 { ... };
+/// KERN_ENGINE_ONLY in front of a field of such a type: the engine's own (a cache, what the engine shares between
+/// its copies, a graph of the logic) - not part of the type as a Blueprint holds it; a value a Blueprint makes
+/// leaves it as the type's default.
 #if defined(__clang__)
 #define KERN_BLUEPRINT_TYPE [[clang::annotate("kern_blueprint_type")]]
+#define KERN_ENGINE_ONLY [[clang::annotate("kern_engine_only")]]
 #else
 #define KERN_BLUEPRINT_TYPE
+#define KERN_ENGINE_ONLY
 #endif
 
 /// KERN_CLOCK before a function of the engine that reads a clock: what it gives changes by itself, from one
