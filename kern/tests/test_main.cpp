@@ -2394,20 +2394,21 @@ struct Host : kern::Blueprint {
   // when the list is empty); bytes go out the same way, as u8
   CHECK(g.function("game_audio") && g.function("game_audio")->wire == "floats at len u32 -> floats" &&
         glue.find("KERN_EXPORT(game_audio) const kern::f32* game_audio(const kern::f32* a0, kern::u32 a2, kern::u32 a3) {") != std::string::npos &&
-        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out(held, ") != std::string::npos);
-  CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take() {") != std::string::npos && glue.find("return kern::logic::export_bytes_out(held, ") != std::string::npos);
+        glue.find("(kern::logic::export_floats_in(a0, a2), ") != std::string::npos && glue.find("return kern::logic::export_floats_out(object->") != std::string::npos);
+  CHECK(glue.find("KERN_EXPORT(game_take) const kern::u8* game_take() {") != std::string::npos && glue.find("return kern::logic::export_bytes_out(object->") != std::string::npos);
   {
-    std::vector<u8> held_bytes;
-    std::vector<f32> held_floats;
+    // (a program's own C++ gives through the same functions, one place for each kind)
     const f32 in[3] = {0.5f, -1.25f, 3.0f};
     const logic::List<f64> floats = logic::export_floats_in(in, 3);
     CHECK(floats.size() == 3 && floats[1] == -1.25);
-    const f32* out = logic::export_floats_out(held_floats, floats);
-    CHECK(out && out[0] == 0.5f && out[2] == 3.0f);
+    const f32* out = logic::export_floats_out(floats);
+    CHECK(out && out[0] == 0.5f && out[2] == 3.0f && out == logic::export_kept_floats().data());
     const u8 bytes_in[2] = {7, 255};
-    const u8* bytes_out = logic::export_bytes_out(held_bytes, logic::export_bytes_in(bytes_in, 2));
+    const u8* bytes_out = logic::export_bytes_out(logic::export_bytes_in(bytes_in, 2));
     CHECK(bytes_out && bytes_out[0] == 7 && bytes_out[1] == 255);
-    CHECK(!logic::export_bytes_out(held_bytes, logic::List<logic::Whole>{}) && !logic::export_floats_out(held_floats, logic::List<f64>{}));   // (nothing: none)
+    CHECK(!logic::export_bytes_out(logic::List<logic::Whole>{}) && !logic::export_floats_out(logic::List<f64>{}));   // (nothing: none)
+    CHECK(std::string(logic::export_text(std::string("abc"))) == "abc" && logic::export_text_length() == 3 && logic::export_text_out(logic::Text("hello")) == logic::export_kept_text().c_str() &&
+          logic::export_text_length() == 5);
   }
   // what does not fit is said
   logic::Function f = hud ? *hud : logic::Function{};

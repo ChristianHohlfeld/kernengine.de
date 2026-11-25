@@ -5593,7 +5593,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       else if (words[k] == "len") params += "kern::u32 " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
       else params += "kern::" + words[k] + " " + a, args += "kern::logic::export_in<" + type(f.inputs[k].type, f.inputs[k].of) + ">(" + a + ")";
     }
-    // (a list that goes out - bytes, floats: a pointer to its entries in the C type, kept until that export gives the next; none when it is empty)
+    // (a list that goes out - bytes, floats: a pointer to its entries in the C type, kept until an export gives the next of its kind; none when it is empty)
     const bool listed = out_word == "bytes" || out_word == "floats";
     const std::string ret = out_word.empty() ? "void" : out_word == "text" ? "const char*" : out_word == "bytes" ? "const kern::u8*" : out_word == "floats" ? "const kern::f32*" : "kern::" + out_word;
     const std::string none = out_word.empty() ? "return;" : out_word == "text" ? "return \"\";" : listed ? "return nullptr;" : "return 0;";
@@ -5602,7 +5602,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
          "  if (!object) " + none + "\n";
     if (out_word.empty()) s += "  object->" + f.name + "(" + args + ");\n";
     else if (out_word == "text") s += "  return kern::logic::export_text_out(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
-    else if (listed) s += std::string("  static std::vector<") + (out_word == "bytes" ? "kern::u8" : "kern::f32") + "> held;\n  return kern::logic::export_" + out_word + "_out(held, object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
+    else if (listed) s += "  return kern::logic::export_" + out_word + "_out(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
     else s += "  return kern::logic::export_out<kern::" + out_word + ">(object->" + f.name + "(" + args + ")." + f.outputs[0].name + ");\n";
     s += "}\n";
   }

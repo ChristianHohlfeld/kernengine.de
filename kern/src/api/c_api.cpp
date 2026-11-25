@@ -6,6 +6,7 @@
 
 #include "kern/geo/mesh_data.h"
 #include "kern/gfx/renderer.h"
+#include "kern/logic/blueprint_class.h"
 
 using namespace kern;
 
@@ -89,6 +90,9 @@ KERN_EXPORT(kern_alloc) void* kern_alloc(u32 bytes) { return std::malloc(bytes ?
 KERN_EXPORT(kern_free) void kern_free(void* p) { std::free(p); }
 KERN_EXPORT(kern_last_error) const char* kern_last_error() { return last_error(); }
 KERN_EXPORT(kern_clear_error) void kern_clear_error() { clear_error(); }
+/// The length of the text an export of the program gave last (a Blueprint's or the program's own C++: both keep
+/// it in one place - kern::logic::export_text, kern/logic/blueprint_class.h); the host reads the text by its pointer.
+KERN_EXPORT(kern_text_length) u32 kern_text_length() { return logic::export_text_length(); }
 
 // ---- renderer ----
 KERN_EXPORT(kern_renderer_init) i32 kern_renderer_init(const u32* d) {

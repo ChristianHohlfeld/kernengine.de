@@ -74,29 +74,65 @@ inline List<f64> export_floats_in(const f32* floats, u32 length) {
   for (u32 i = 0; i < length; ++i) out.push_back(static_cast<f64>(floats[i]));
   return out;
 }
-/// Bytes the export gives (a List of Int): each entry as a u8, as C++ converts it, kept in `held` - the export's
-/// own, until it gives the next -; the host reads them by the pointer, as many as it knows. An empty list gives none (null).
-inline const u8* export_bytes_out(std::vector<u8>& held, const List<Whole>& bytes) {
-  held.clear();
-  for (const Whole& b : bytes) held.push_back(static_cast<u8>(b.v));
-  return held.empty() ? nullptr : held.data();
-}
-/// Floats the export gives (a List of Float): each entry as an f32, as C++ converts it, kept in `held` as bytes are.
-inline const f32* export_floats_out(std::vector<f32>& held, const List<f64>& floats) {
-  held.clear();
-  for (const f64 x : floats) held.push_back(static_cast<f32>(x));
-  return held.empty() ? nullptr : held.data();
-}
 /// A number as the export gives it (i32, u32, f32, f64): as C++ converts it.
 template <class C, class Out> C export_out(const Out& x) {
   if constexpr (std::is_same_v<Out, Whole>) return static_cast<C>(x.v);
   else return static_cast<C>(x);
 }
-/// A text the export gives: its characters, kept until an export gives the next text (the host reads them by
-/// the pointer, as far as its length says).
-inline const char* export_text_out(const Text& text) {
+
+// What an export gives its host by a pointer - a text, bytes, floats - is kept here until an export gives the next
+// of its kind (one place for each kind, in the whole program: a program's own C++ gives through the same functions
+// as the glue of a class). The host reads it by the pointer at once - a text as far as kern_text_length says
+// (kern/src/api/c_api.cpp), bytes and floats as many as it knows.
+inline std::string& export_kept_text() {
   static std::string held;
-  held.assign(text.view());
+  return held;
+}
+inline std::vector<u8>& export_kept_bytes() {
+  static std::vector<u8> held;
+  return held;
+}
+inline std::vector<f32>& export_kept_floats() {
+  static std::vector<f32> held;
+  return held;
+}
+/// A text an export gives: its characters, kept (export_kept_text).
+inline const char* export_text(std::string_view text) {
+  std::string& held = export_kept_text();
+  held.assign(text);
   return held.c_str();
+}
+inline const char* export_text(const std::string& text) { return export_text(std::string_view(text)); }
+/// Bytes an export gives: kept (export_kept_bytes); none (null) when there are none.
+inline const u8* export_bytes(Span<const u8> bytes) {
+  std::vector<u8>& held = export_kept_bytes();
+  held.assign(bytes.begin(), bytes.end());
+  return held.empty() ? nullptr : held.data();
+}
+inline const u8* export_bytes(const std::vector<u8>& bytes) { return export_bytes(Span<const u8>(bytes.data(), bytes.size())); }
+/// Floats an export gives: kept (export_kept_floats); none (null) when there are none.
+inline const f32* export_floats(Span<const f32> floats) {
+  std::vector<f32>& held = export_kept_floats();
+  held.assign(floats.begin(), floats.end());
+  return held.empty() ? nullptr : held.data();
+}
+inline const f32* export_floats(const std::vector<f32>& floats) { return export_floats(Span<const f32>(floats.data(), floats.size())); }
+/// The length of the text an export gave last.
+inline u32 export_text_length() { return static_cast<u32>(export_kept_text().size()); }
+
+/// What a Blueprint's export gives (the glue of its class): a Text, a List of Int (each entry as a u8, as C++
+/// converts it) or a List of Float (each as an f32), given as a program's own C++ gives it (above).
+inline const char* export_text_out(const Text& text) { return export_text(text.view()); }
+template <class L> const u8* export_bytes_out(const L& bytes) {
+  std::vector<u8> made;
+  made.reserve(bytes.size());
+  for (const auto& b : bytes) made.push_back(static_cast<u8>(Whole(b).v));
+  return export_bytes(made);
+}
+template <class L> const f32* export_floats_out(const L& floats) {
+  std::vector<f32> made;
+  made.reserve(floats.size());
+  for (const auto& x : floats) made.push_back(static_cast<f32>(static_cast<f64>(x)));
+  return export_floats(made);
 }
 }  // namespace kern::logic

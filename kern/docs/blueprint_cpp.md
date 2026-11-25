@@ -1244,8 +1244,12 @@ KERN_EXPORT_AS("game_hud", "text len bytes len i32 -> text") game_hudResult game
   auf f32 – eine `List<Float>`, jede Zahl, wie C++ ein f32 wandelt (`const f32* samples, u32 count` wird
   `floats at len`).
 - Heraus geht auch eine Liste: `bytes` (eine `List<Int>`) und `floats` (eine `List<Float>`) geben einen Zeiger auf
-  ihre Einträge als u8 bzw. f32 (wie C++ wandelt), gehalten vom Export selbst bis zu seinem nächsten Aufruf; wie viele
-  es sind, weiß der Host (wie beim C++ eines Programms, das `const f32*` gibt). Eine leere Liste gibt keinen (null).
+  ihre Einträge als u8 bzw. f32 (wie C++ wandelt); wie viele es sind, weiß der Host. Eine leere Liste gibt keinen (null).
+- Was ein Export so gibt – Text, Bytes, Floats –, hält das Programm an einer Stelle je Art, bis ein Export das nächste
+  dieser Art gibt (`kern::logic::export_text`, `export_bytes`, `export_floats` in `kern/logic/blueprint_class.h`): der
+  Kleber einer Klasse gibt dadurch, und das C++ eines Programms gibt dadurch (`return kern::logic::export_text(s);`) –
+  der Konverter liest so einen Export als Funktion, die `s` gibt. Die Länge des letzten Texts sagt der Export der
+  Engine `kern_text_length`.
 - Die Klasse schreibt den Export in ihren Kleber (`logic::native_glue`): eine C-Funktion unter dem Namen,
   die die Funktion am Objekt der Instanz ruft, die als die Klasse läuft (die zuletzt gestartete:
   `kern::logic::blueprint_object`, `kern/logic/blueprint_class.h`) – nichts wird beim Namen gesucht. Läuft
