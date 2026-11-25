@@ -257,7 +257,7 @@ void Game::explosion(Vec3 at, f32 radius, f32 damage, bool by_player, BlastBy ki
   world_->physics().explode(at, radius, radius * 0.5f, 6.0f);
   world_->particle_burst(at, {3.0f, 1.2f, 0.3f});
   world_->particle_burst(at + Vec3{0, 0, 0.8f}, {1.1f, 1.1f, 1.1f});
-  world_->play_sound(combat_sfx(combat_audio::Kind::explosion), at, 1, 1, true);
+  world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::explosion), at, 1, 1, true);
   osfx("player_vehicle_runtime_v2.playExplosion", at);  // "arondight:world-explosion"
   const f32 cam_d = kern::length(cam_.eye - at);
   world_->shake_camera(clampf(1.4f - cam_d / (radius * 3), 0, 1.2f));
@@ -429,7 +429,7 @@ void Game::step_cop(PoliceUnit& u, PoliceUnit::Cop& c, f32 dt) {
     s.surface = r.hit ? 1 : 0;
   }
   world_->shots().push_back(s);
-  world_->play_sound(combat_sfx(combat_audio::Kind::pistol), from, 0.85f, 1.0f, true);
+  world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::pistol), from, 0.85f, 1.0f, true);
   osfx("police_ground_units.playShot", from);
 }
 
@@ -751,7 +751,7 @@ bool Game::update_police_drones(f32 dt) {
     s.surface = accurate ? 3 : (r.hit ? 1 : 0);
     s.normal = r.normal;
     world_->shots().push_back(s);
-    world_->play_sound(combat_sfx(combat_audio::Kind::shot), d.pos, 0.6f, 1.25f, true);
+    world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::shot), d.pos, 0.6f, 1.25f, true);
     osfx("wanted_police_drones.shot", d.pos);
     if (accurate && now - last_player_hit_ >= kPdDamageCooldown) {
       last_player_hit_ = now;

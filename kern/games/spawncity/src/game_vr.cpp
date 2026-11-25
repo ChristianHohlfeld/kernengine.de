@@ -106,7 +106,7 @@ void Game::vr_melee(i32 side, f32 dt) {
   h.strike_at = now;
   look_.vm_fire_at = now;
   osfx(knife ? "gameplay_final_runtime_v2.knifeHit" : "gameplay_final_runtime_v2.punchThud", at_hit, side == 1 ? 0 : 1, 0);
-  world_->play_sound(combat_sfx(combat_audio::Kind::hit), at_hit, 0.7f, knife ? 1.3f : 0.8f, true);
+  world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::hit), at_hit, 0.7f, knife ? 1.3f : 0.8f, true);
   world_->shake_camera(0.04f * k);  // the jolt of a landed blow (the hand has no haptics from here)
   vr_pulse_[side] = std::fmin(1.0f, 0.4f + 0.3f * k);  // and the controller's rumble (host.mjs)
 }

@@ -2,7 +2,10 @@
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_api.h"
 
+#include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -1135,31 +1138,49 @@ bool Graph::place_of(const Node& n, Variable& out, std::string* why, std::string
 namespace {
 /// The nodes of a function's body: the steps its Function Entry leads to along exec wires, and
 /// the values they read.
-std::vector<u32> body_nodes(const Graph& g, u32 entry, const Library& lib) {
+/// A graph's nodes by id and, for each node, the wires at it in the order the graph has them: what a walk over a
+/// body asks at every step. Built once for a walk - or for the walks over all bodies (Graph::bodies).
+struct Wiring {
+  std::unordered_map<u32, const Node*> node;
+  std::unordered_map<u32, std::vector<const Link*>> at;
+  explicit Wiring(const Graph& g) {
+    node.reserve(g.nodes.size());
+    for (const Node& n : g.nodes) node.try_emplace(n.id, &n);   // (the first of an id, as Graph::find)
+    for (const Link& l : g.links) {
+      at[l.from].push_back(&l);
+      if (l.to != l.from) at[l.to].push_back(&l);
+    }
+  }
+};
+std::vector<u32> body_nodes(const Graph& g, const Wiring& w, u32 entry, const Library& lib) {
   std::vector<u32> todo{entry}, seen{entry};
+  std::unordered_set<u32> have{entry};
   auto take = [&](u32 id) {
-    if (std::find(seen.begin(), seen.end(), id) != seen.end()) return;
+    if (!have.insert(id).second) return;
     seen.push_back(id);
     todo.push_back(id);
   };
   while (!todo.empty()) {
     const u32 at = todo.back();
     todo.pop_back();
-    const Node* n = g.find(at);
-    if (!n) continue;
+    const auto found = w.node.find(at);
+    if (found == w.node.end()) continue;
+    const auto wires = w.at.find(at);
+    if (wires == w.at.end()) continue;
     std::vector<PinDef> in, out;
-    lib.pins(*n, g, in, out);
-    for (const Link& l : g.links) {
-      if (l.from == at)
+    lib.pins(*found->second, g, in, out);
+    for (const Link* l : wires->second) {
+      if (l->from == at)
         for (const PinDef& p : out)
-          if (p.id == l.out && p.type == PinType::exec) take(l.to);
-      if (l.to == at)
+          if (p.id == l->out && p.type == PinType::exec) take(l->to);
+      if (l->to == at)
         for (const PinDef& p : in)
-          if (p.id == l.in && p.type != PinType::exec) take(l.from);
+          if (p.id == l->in && p.type != PinType::exec) take(l->from);
     }
   }
   return seen;
 }
+std::vector<u32> body_nodes(const Graph& g, u32 entry, const Library& lib) { return body_nodes(g, Wiring(g), entry, lib); }
 }  // namespace
 std::string Graph::body_of(u32 node, const Library& lib) const {
   std::string body;
@@ -1171,6 +1192,21 @@ std::string Graph::body_of(u32 node, const Library& lib) const {
     body = entry.param("function");
   }
   return body;
+}
+std::unordered_map<u32, std::string> Graph::bodies(const Library& lib) const {
+  std::unordered_map<u32, std::string> of;
+  std::unordered_map<u32, bool> two;   // (in the bodies of two functions: body_of says "")
+  const Wiring w(*this);
+  for (const Node& entry : nodes) {
+    if (entry.type != "func.entry") continue;
+    const std::string name = entry.param("function");
+    for (u32 id : body_nodes(*this, w, entry.id, lib)) {
+      auto [it, fresh] = of.try_emplace(id, name);
+      if (!fresh && it->second != name) two[id] = true;
+    }
+  }
+  for (const auto& [id, yes] : two) of.erase(id);
+  return of;
 }
 StateMachine* Graph::machine(u32 id) {
   for (StateMachine& m : machines) if (m.id == id) return &m;
@@ -1699,6 +1735,10 @@ json::Value graph_to_json(const Graph& g) {
       if (f.external) o.set("external", true);
       if (!f.remote.empty()) o.set("remote", f.remote);
       if (!f.from.empty()) o.set("from", f.from);
+      if (!f.exported.empty()) {
+        o.set("export", f.exported);
+        o.set("wire", f.wire);
+      }
       if (!f.help.empty()) o.set("help", f.help);
       o.set("inputs", pins(f.inputs));
       o.set("outputs", pins(f.outputs));
@@ -1723,6 +1763,58 @@ json::Value graph_to_json(const Graph& g) {
     root.set("comments", std::move(comments));
   }
   return root;
+}
+
+bool export_ok(const Function& f, std::string* why) {
+  auto no = [&](std::string w) {
+    if (why) *why = std::move(w);
+    return false;
+  };
+  if (f.exported.empty()) return f.wire.empty() || no("a wire without an export name");
+  if (f.external || !f.from.empty()) return no("a function of another Blueprint is not exported here");
+  if (f.exported.size() > 64 || !(std::isalpha(static_cast<unsigned char>(f.exported[0])) || f.exported[0] == '_') ||
+      !std::all_of(f.exported.begin(), f.exported.end(), [](char c) { return std::isalnum(static_cast<unsigned char>(c)) || c == '_'; }))
+    return no("the export name \"" + f.exported + "\" is no C name");
+  std::vector<std::string> words;
+  bool arrow = false;
+  std::string out;
+  for (std::size_t i = 0; i < f.wire.size();) {
+    while (i < f.wire.size() && f.wire[i] == ' ') ++i;
+    std::size_t e = i;
+    while (e < f.wire.size() && f.wire[e] != ' ') ++e;
+    if (e == i) break;
+    const std::string w = f.wire.substr(i, e - i);
+    i = e;
+    if (w == "->") {
+      if (arrow) return no("the wire \"" + f.wire + "\" has two arrows");
+      arrow = true;
+    } else if (arrow) {
+      if (!out.empty()) return no("the wire \"" + f.wire + "\" gives one output at most");
+      out = w;
+    } else {
+      words.push_back(w);
+    }
+  }
+  if (words.size() != f.inputs.size()) return no("the wire \"" + f.wire + "\" names " + std::to_string(words.size()) + " inputs, the function has " + std::to_string(f.inputs.size()));
+  if (out.empty() != f.outputs.empty() || f.outputs.size() > 1) return no("an exported function gives one output or none, and its wire says so after ->");
+  auto fits = [](const std::string& w, const FunctionPin& p, bool input) {
+    const bool number = (p.type == PinType::integer || p.type == PinType::number || p.type == PinType::boolean) && !p.ref;
+    if (w == "i32" || w == "u32" || w == "f32" || w == "f64") return number;
+    if (w == "len" || w == "at") return input && p.type == PinType::integer && !p.ref;
+    if (w == "text") return p.type == PinType::text && (!p.ref || p.constant);
+    if (w == "bytes") return input && p.type == PinType::integer_list && (!p.ref || p.constant);
+    return false;
+  };
+  for (std::size_t k = 0; k < words.size(); ++k) {
+    if (!fits(words[k], f.inputs[k], true)) return no("the input " + f.inputs[k].name + " cannot cross as " + words[k] + " (i32, u32, f32, f64: a number or a flag by value; text: a Text; bytes: a List of Int; len, at: an Int)");
+    const std::size_t before = k >= 2 && words[k - 1] == "at" ? k - 2 : k - 1;
+    if (words[k] == "len" && (k == 0 || (words[before] != "text" && words[before] != "bytes"))) return no("len is the length of the text or the bytes before it (after the bytes' at)");
+    if (words[k] == "at" && (k == 0 || words[k - 1] != "bytes")) return no("at is the place in the bytes before it");
+    const std::size_t after = k + 1 < words.size() && words[k + 1] == "at" ? k + 2 : k + 1;
+    if (words[k] == "bytes" && (after >= words.size() || words[after] != "len")) return no("bytes are followed by their length: bytes len (or bytes at len)");
+  }
+  if (!out.empty() && !fits(out, f.outputs[0], false)) return no("the output " + f.outputs[0].name + " cannot cross as " + out + " (i32, u32, f32, f64 or text)");
+  return true;
 }
 
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
@@ -1911,6 +2003,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     f.external = v["external"].as_bool();
     f.remote = v["remote"].as_string();
     if (!f.remote.empty() && !f.external) return bad("function \"" + f.name + "\" has the name of another Blueprint's function, but is none of another Blueprint");
+    f.exported = v["export"].as_string();
+    f.wire = v["wire"].as_string();
     f.help = v["help"].as_string();
     auto pins = [&](const json::Value& list, std::vector<FunctionPin>& out, const char* what) {
       for (const json::Value& x : list.items()) {
@@ -1928,6 +2022,7 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
       return true;
     };
     if (!pins(v["inputs"], f.inputs, "an input") || !pins(v["outputs"], f.outputs, "an output") || !pins(v["locals"], f.locals, "a local variable")) return false;
+    if (std::string why; !export_ok(f, &why)) return bad("function \"" + f.name + "\": " + why);
     g.functions.push_back(std::move(f));
   }
   for (const json::Value& v : j["comments"].items()) {

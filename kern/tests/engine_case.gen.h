@@ -26,7 +26,7 @@ struct Engine : kern::Blueprint {
   KERN_ENUM(logic_TriggerKind, event, timer, condition, automatic);
   KERN_STRUCT(logic_Transition) { U32 id = 0; U32 from = 0; U32 to = 0; logic_TriggerKind trigger = logic_TriggerKind::event; Text event = ""; Float seconds = 1.0; Text variable = ""; Text label = ""; };
   KERN_STRUCT(logic_StateMachine) { U32 id = 0; Text name = "State Machine"; List<logic_State> states = List<logic_State>{}; List<logic_Transition> transitions = List<logic_Transition>{}; };
-  KERN_STRUCT(logic_Function) { Text name = ""; List<Int> inputs = List<Int>{}; List<Int> outputs = List<Int>{}; List<Int> locals = List<Int>{}; Bool pure = false; Bool external = false; Text remote = ""; Text from = ""; Text help = ""; };
+  KERN_STRUCT(logic_Function) { Text name = ""; List<Int> inputs = List<Int>{}; List<Int> outputs = List<Int>{}; List<Int> locals = List<Int>{}; Bool pure = false; Bool external = false; Text remote = ""; Text from = ""; Text exported = ""; Text wire = ""; Text help = ""; };
   KERN_STRUCT(logic_EnumType) { Text name = ""; List<Text> values = List<Text>{}; Text help = ""; Bool project = false; Text from = ""; };
   KERN_STRUCT(logic_StructType) { Text name = ""; List<Int> fields = List<Int>{}; Text help = ""; Bool project = false; Text from = ""; };
   KERN_STRUCT(logic_CommentBox) { U32 id = 0; Float x = 0.0; Float y = 0.0; Float w = 400.0; Float h = 200.0; Text text = "Comment"; U32 color = 0; };

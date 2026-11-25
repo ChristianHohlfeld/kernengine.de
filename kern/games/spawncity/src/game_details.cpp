@@ -220,11 +220,11 @@ namespace sc {
 
 namespace {
 // "sc:<kind><variant>" for every sound of the bank (built once).
-const std::string& sfx_id(combat_audio::Kind k, u32 v) {
+const std::string& sfx_id(blueprints::combat_audio::combat_audio_Kind k, u32 v) {
   static std::vector<std::string> ids;
   if (ids.empty())
-    for (u8 i = 0; i < static_cast<u8>(combat_audio::Kind::count); ++i)
-      for (u32 n = 0; n < 4; ++n) ids.push_back(std::string("sc:") + combat_audio::kind_name(static_cast<combat_audio::Kind>(i)) + std::to_string(n));
+    for (u8 i = 0; i < static_cast<u8>(blueprints::combat_audio::combat_audio_Kind::count); ++i)
+      for (u32 n = 0; n < 4; ++n) ids.push_back(std::string("sc:") + std::string(kern::logic::blueprint<blueprints::combat_audio_cpp>().kind_name(static_cast<blueprints::combat_audio::combat_audio_Kind>(i)).Result.view()) + std::to_string(n));
   return ids[static_cast<std::size_t>(k) * 4 + v];
 }
 }  // namespace
@@ -233,22 +233,24 @@ void Game::combat_audio_init() {
   if (combat_audio_ready_ || !bank_) return;
   // Rendered once (combat_audio_bank.mjs prebakes its bank at load too), then handed to Kern's
   // SoundBank as decoded PCM, so play_sound("sc:pistol2", ...) works like any imported sound.
-  for (u8 i = 0; i < static_cast<u8>(combat_audio::Kind::count); ++i) {
-    const auto k = static_cast<combat_audio::Kind>(i);
-    for (u32 v = 0; v < combat_audio::kVariants[i]; ++v) {
-      const std::vector<f32> pcm = combat_audio::render(k, v);
+  for (u8 i = 0; i < static_cast<u8>(blueprints::combat_audio::combat_audio_Kind::count); ++i) {
+    const auto k = static_cast<blueprints::combat_audio::combat_audio_Kind>(i);
+    for (u32 v = 0; v < blueprints::combat_audio_cpp::kVariants[i]; ++v) {
+      // (the Blueprint's samples, 64 bit, made once into the 32-bit PCM the engine's bank takes - its boundary)
+      std::vector<f32> pcm;
+      for (const f64 x : kern::logic::blueprint<blueprints::combat_audio_cpp>().render(k, v, blueprints::combat_audio_cpp::kSampleRate).Result) pcm.push_back(static_cast<f32>(x));
       const std::string& id = sfx_id(k, v);
       bank_->request(id);
-      bank_->set_pcm(id, pcm.data(), static_cast<u32>(pcm.size()), 1, combat_audio::kSampleRate);
+      bank_->set_pcm(id, pcm.data(), static_cast<u32>(pcm.size()), 1, blueprints::combat_audio_cpp::kSampleRate);
     }
   }
   combat_audio_ready_ = true;
 }
 
-const char* Game::combat_sfx(combat_audio::Kind k) {
+const char* Game::combat_sfx(blueprints::combat_audio::combat_audio_Kind k) {
   // playCombatAudio: the variants take turns.
   const u8 i = static_cast<u8>(k);
-  const u32 v = sfx_cursor_[i]++ % combat_audio::kVariants[i];
+  const u32 v = sfx_cursor_[i]++ % blueprints::combat_audio_cpp::kVariants[i];
   return sfx_id(k, v).c_str();
 }
 

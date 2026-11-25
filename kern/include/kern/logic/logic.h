@@ -591,6 +591,18 @@ struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   const FunctionPin* input(std::string_view name) const;
   const FunctionPin* output(std::string_view name) const;
@@ -674,6 +686,10 @@ struct Graph {
   /// exec wires - or to a step that reads it. Empty: none does (an event's path, nothing), or
   /// more than one. Where the places a call names are looked up (the call's setting "scope").
   std::string body_of(u32 node, const class Library& lib) const;
+  /// body_of for every node at once: the function each node of a body stands in. A node that is in no body, or in the
+  /// bodies of two functions, is not in the map - body_of gives "" for it. One walk over each body, where asking
+  /// body_of node by node walks every body for every node.
+  std::unordered_map<u32, std::string> bodies(const class Library& lib) const;
   StateMachine* machine(u32 id);
   const StateMachine* machine(std::string_view name) const;
   const Function* function(std::string_view name) const;
@@ -704,6 +720,8 @@ bool is_path_pin(std::string_view id);
 std::string ref_key(std::string_view input, std::string_view what);
 
 json::Value graph_to_json(const Graph& g);
+/// Is a function's export (Function::exported, Function::wire) one the glue can write? False: why not.
+bool export_ok(const Function& f, std::string* why = nullptr);
 bool graph_from_json(const json::Value& j, Graph& out, std::string* error = nullptr);
 
 /// The value something of type `t` has when nothing else is said: the zero of a value type, the
@@ -1136,7 +1154,17 @@ class NativeBlueprint {
   virtual bool call(std::string_view function, std::span<const Value> args, Results& results) = 0;
   virtual bool get(std::string_view variable, Value& out) const = 0;
   virtual bool set(std::string_view variable, const Value& value) = 0;
+  /// The class's object, where `type` is the key of its class (class_key): what the program's own C++
+  /// calls directly (kern/logic/blueprint_class.h). Null for the key of any other class - and from a
+  /// NativeBlueprint that is no Blueprint's class.
+  virtual void* object(const void* type) {
+    (void)type;
+    return nullptr;
+  }
 };
+/// The key of the class T, one in the whole program (an inline variable has one address): what
+/// NativeBlueprint::object is asked by.
+template <class T> inline constexpr char class_key = 0;
 using NativeBlueprintFactory = std::unique_ptr<NativeBlueprint> (*)();
 /// The order of a function's inputs: those by reference come first. An input by value has a
 /// default (`Float by = 0.5`), a reference has none (the call names its place) - and in C++ every
@@ -1312,6 +1340,9 @@ class Instance {
   /// interpreter.
   bool compiled() const { return blueprint_ || jit_fn_ >= 0; }
   const char* tier() const { return blueprint_ ? "native C++" : jit_fn_ >= 0 ? "compiled (WebAssembly)" : jit_pending_ ? "compiling" : "interpreter"; }
+  /// Where it runs as its compiled class T, the object of that class (null: it runs otherwise, or as
+  /// another class) - what the program's own C++ calls directly (kern/logic/blueprint_class.h).
+  template <class T> T* native_object() const { return blueprint_ ? static_cast<T*>(blueprint_->object(&class_key<T>)) : nullptr; }
   i32 id() const { return id_; }
 
   // ---- generated code support (the JIT's modules call these) ----

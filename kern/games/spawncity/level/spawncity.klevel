@@ -81315,7 +81315,36 @@
      "kind": "kern-logic",
      "version": 1,
      "nextId": 296,
-     "variables": [],
+     "variables": [
+      {
+       "name": "kMaxAccuracy",
+       "type": "float",
+       "value": 65,
+       "help": "gps_live_mode.mjs: MAX_ACCURACY_M 65, MAX_SPEED_MPS 75, GAP_RESET_MS 12000, REANCHOR_KM 40",
+       "const": true
+      },
+      {
+       "name": "kMaxSpeed",
+       "type": "float",
+       "value": 75,
+       "help": "gps_live_mode.mjs: MAX_ACCURACY_M 65, MAX_SPEED_MPS 75, GAP_RESET_MS 12000, REANCHOR_KM 40",
+       "const": true
+      },
+      {
+       "name": "kGapReset",
+       "type": "float",
+       "value": 12,
+       "help": "gps_live_mode.mjs: MAX_ACCURACY_M 65, MAX_SPEED_MPS 75, GAP_RESET_MS 12000, REANCHOR_KM 40",
+       "const": true
+      },
+      {
+       "name": "kReanchorKm",
+       "type": "float",
+       "value": 40,
+       "help": "gps_live_mode.mjs: MAX_ACCURACY_M 65, MAX_SPEED_MPS 75, GAP_RESET_MS 12000, REANCHOR_KM 40",
+       "const": true
+      }
+     ],
      "library": true,
      "enums": [
       {
@@ -82744,7 +82773,7 @@
   {
    "id": 152,
    "name": "person_hit",
-   "folder": "Source",
+   "folder": "Program",
    "transform": {
     "position": [
      0,
@@ -87177,7 +87206,7 @@
   {
    "id": 153,
    "name": "qr_code",
-   "folder": "Source",
+   "folder": "Program",
    "transform": {
     "position": [
      0,
@@ -296774,7 +296803,7 @@
   {
    "id": 224,
    "name": "combat_audio_cpp",
-   "folder": "Source",
+   "folder": "Program",
    "transform": {
     "position": [
      0,
@@ -296809,6 +296838,33 @@
        "type": "float",
        "value": 0.08522727272727272,
        "help": "Reward / fail cues in E-flat minor at ~176 BPM, 16ths, a filtered pulse over a sine sub and a dotted-8th echo (renderCue).",
+       "const": true
+      },
+      {
+       "name": "kSampleRate",
+       "type": "int",
+       "of": "u32",
+       "value": 44100,
+       "const": true
+      },
+      {
+       "name": "kVariants",
+       "type": "int_list",
+       "of": "u32",
+       "count": 11,
+       "value": [
+        3,
+        4,
+        4,
+        4,
+        2,
+        4,
+        2,
+        3,
+        4,
+        3,
+        2
+       ],
        "const": true
       }
      ],
@@ -511022,7 +511078,7 @@
   {
    "id": 243,
    "name": "qr_code_cpp",
-   "folder": "Source",
+   "folder": "Program",
    "transform": {
     "position": [
      0,
@@ -1448242,7 +1448298,7 @@
   {
    "id": 279,
    "name": "combat_audio",
-   "folder": "Source",
+   "folder": "Program",
    "transform": {
     "position": [
      0,

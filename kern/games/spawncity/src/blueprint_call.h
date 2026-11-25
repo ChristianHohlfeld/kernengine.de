@@ -41,6 +41,11 @@ inline f64 decimal(f32 x) {
 /// (A 64-bit number - a time in milliseconds, a number counted in 64 bit - is passed as it is: no
 /// decimal() of it.)
 
+/// The loop guard of the logic the game's Blueprints run in (Runtime::budget: loop passes in one step).
+/// The functions the game calls loop long - a code encoded bit by bit, a sound sample by sample, a
+/// number raised to a 256-bit power -, so the game and its tests set the guard to this.
+inline constexpr kern::u32 kLoopBudget = 2000000000u;
+
 /// The Blueprint of one of the level's actors - Blueprint g_rules{"Lamps"}: bound to the logic the level's
 /// Blueprints run in (the game once its world has started, tests the one they run), it finds the actor by
 /// its name at every call.

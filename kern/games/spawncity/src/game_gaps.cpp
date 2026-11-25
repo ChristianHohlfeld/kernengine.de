@@ -533,13 +533,13 @@ void Game::gaps_update(f32 dt) {
     if (now - g.last_organic < gaps::organic_min_gap_s()) continue;
     g.last_organic = now;
     ++g.organic_plays;
-    world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, gaps::organic_gain() * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), gaps::organic_rate(gaps::Organic::person), false);
+    world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::crack), cam_.eye, gaps::organic_gain() * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), gaps::organic_rate(gaps::Organic::person), false);
     osfx("world-kill", p.pos, 0);  // kind person
     // and the voice: a dying cry at the body, its pitch the person's (low, middle, high voices by
     // the seed, a little random on top), now and then a long one
     {
       const f32 voice = p.seed % 3 == 0 ? 0.78f : p.seed % 3 == 1 ? 0.92f : 1.12f;
-      world_->play_sound(combat_sfx(combat_audio::Kind::scream), p.pos + Vec3{0, 0, 1.5f}, 0.42f * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), voice * (0.94f + rng_.unit() * 0.12f), true);
+      world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::scream), p.pos + Vec3{0, 0, 1.5f}, 0.42f * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), voice * (0.94f + rng_.unit() * 0.12f), true);
     }
   }
   // a hit that does not kill: a short pain grunt (the voice's scream, faster and quieter), at most
@@ -549,7 +549,7 @@ void Game::gaps_update(f32 dt) {
     if (p.kind == People::Kind::zombie || now - g.last_pain < 0.12f) continue;
     g.last_pain = now;
     const f32 voice = p.seed % 3 == 0 ? 0.85f : p.seed % 3 == 1 ? 1.0f : 1.2f;
-    world_->play_sound(combat_sfx(combat_audio::Kind::scream), p.pos + Vec3{0, 0, 1.5f}, 0.26f * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), voice * (1.35f + rng_.unit() * 0.25f), true);
+    world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::scream), p.pos + Vec3{0, 0, 1.5f}, 0.26f * clampf(ui_.settings.get(Opt::audio_fx) / 100, 0, 1), voice * (1.35f + rng_.unit() * 0.25f), true);
   }
   g.death_scan = now;
   // ---- flight-fire impacts (impact_explosion_overlay.mjs): the drone MG's rounds that hit something

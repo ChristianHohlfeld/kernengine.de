@@ -696,7 +696,7 @@ struct World {
   RuleBlueprint old_side, new_side;
   converted::ActorsStarted old_actors, new_actors;
   explicit World(const std::vector<std::string>& actors) : old_side(nullptr, nullptr, false, actors), new_side(nullptr, nullptr, false, actors) {
-    old_side.rt.budget = new_side.rt.budget = 2000000000u;
+    old_side.rt.budget = new_side.rt.budget = sc::rules::kLoopBudget;
     SC_CHECK(old_side.problems.empty() && new_side.problems.empty(), "the actors: %s%s", old_side.problems.c_str(), new_side.problems.c_str());
     old_actors.keep(old_side, actors);
     new_actors.keep(new_side, actors);

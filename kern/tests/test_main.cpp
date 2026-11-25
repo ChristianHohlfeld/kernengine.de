@@ -30,6 +30,7 @@
 #include "kern/game/net_game.h"
 #include "kern/logic/actor_blueprint.h"
 #include "kern/logic/blueprint.h"
+#include "kern/logic/blueprint_class.h"
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_host.h"
 #include "blueprint_native.h"
@@ -2345,6 +2346,65 @@ struct Ends : kern::Blueprint {
   }
 }
 
+TEST(logic_function_export) {
+  // A function the program gives its host under a fixed C name (Function::exported, KERN_EXPORT_AS): the name
+  // and how its values cross (the wire) are part of the Blueprint - in its graph, its text, both ways - and the
+  // glue of its class writes the C function (logic::native_glue; blueprint_native_test calls the case's).
+  const char* text = R"kn(
+struct Host : kern::Blueprint {
+  struct game_hudResult { Text Result = ""; };
+  KERN_EXPORT_AS("game_hud", "text len bytes len i32 f32 -> text") game_hudResult game_hud(Text ask = "", Int ask_length = 0, List<Int> data = List<Int>{}, Int data_length = 0, Int view = 0, Float scale = 0.0) {
+    return {ask};
+  }
+  KERN_EXPORT_AS("game_tick", "f64") void game_tick(Float dt = 0.0) {
+  }
+  KERN_EXPORT_AS("game_push", "bytes at len") void game_push(const List<Int>& data, Int data_at = 0, Int length = 0) {
+  }
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  const logic::Function* hud = g.function("game_hud");
+  CHECK(hud && hud->exported == "game_hud" && hud->wire == "text len bytes len i32 f32 -> text");
+  CHECK(g.function("game_tick") && g.function("game_tick")->exported == "game_tick" && g.function("game_tick")->wire == "f64");
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+  std::string written;
+  CHECK(logic::to_cpp(g, "Host", written, &error) && written.find("  KERN_EXPORT_AS(\"game_hud\", \"text len bytes len i32 f32 -> text\") game_hudResult game_hud(") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(written, read, nullptr, &error) && read == g);
+  std::string glue;
+  CHECK(logic::native_glue(g, "Host", glue, &error) && glue.find("KERN_EXPORT(game_hud) const char* game_hud(const char* a0, kern::u32 a1, const kern::u8* a2, kern::u32 a3, kern::i32 a4, kern::f32 a5) {") != std::string::npos &&
+        glue.find("KERN_EXPORT(game_tick) void game_tick(kern::f64 a0) {") != std::string::npos);
+  // a pointer of C is a list and the place in it (at): no C parameter - from the host the place is 0
+  CHECK(g.function("game_push") && g.function("game_push")->wire == "bytes at len" &&
+        glue.find("KERN_EXPORT(game_push) void game_push(const kern::u8* a0, kern::u32 a2) {") != std::string::npos &&
+        glue.find("(kern::logic::export_bytes_in(a0, a2), ") != std::string::npos);
+  // what does not fit is said
+  logic::Function f = hud ? *hud : logic::Function{};
+  CHECK(logic::export_ok(f));
+  f.wire = "text len bytes len i32 -> text";   // (one word too few)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes i32 i32 f32 -> text";   // (bytes without their len)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text text bytes len i32 f32 -> text";   // (a text where an Int is)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes len i32 f32 -> bytes";   // (bytes do not go out)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes at i32 i32 f32 -> text";   // (an at where the bytes' len is)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text at bytes len i32 f32 -> text";   // (an at after a text: a text has no place, it is a Text)
+  CHECK(!logic::export_ok(f));
+  f.wire = "i32 at bytes len i32 f32 -> text";   // (an at after no bytes)
+  CHECK(!logic::export_ok(f));
+  f.wire = "text len bytes len i32 f32 -> text";
+  f.exported = "game hud";
+  CHECK(!logic::export_ok(f));
+  CHECK(!logic::from_cpp(std::string(text).replace(std::string(text).find("\"f64\""), 5, "\"text\""), read, nullptr, &error));
+}
+
 TEST(logic_call_on_actor_by_its_name) {
   // A function of another Blueprint named here otherwise (KERN_EXTERN_AS): Call on Actor calls it by the
   // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.
@@ -4603,6 +4663,7 @@ TEST(logic_native_blueprints) {
       heat = value.as_number();
       return true;
     }
+    void* object(const void* type) override { return type == &logic::class_key<Fake> ? this : nullptr; }
   };
   const logic::Graph g = logic_graph(R"({"variables":[{"name":"Heat","type":"float","value":5}],
     "functions":[{"name":"Twice","pure":true,"inputs":[{"name":"x","type":"float","value":0}],"outputs":[{"name":"r","type":"float","value":0}]}],
@@ -4616,6 +4677,12 @@ TEST(logic_native_blueprints) {
   CHECK(inst->call_number("Twice", {4}) == 9);
   CHECK(inst->get("Heat").as_number() == 1 && inst->set("Heat", logic::Value::number(3)) && inst->call_number("Twice", {4}) == 11);
   CHECK(!inst->set("Nope", logic::Value::number(1)) && inst->call_number("Nope", {1}, -7) == -7 && inst->has_function("Twice"));
+  // the program's own C++ calls the class directly (kern/logic/blueprint_class.h): bound once to the object the
+  // runtime runs the Blueprint as - what it does there is what the instance has, and the other way round
+  CHECK(inst->native_object<Fake>() && !inst->native_object<FakeLogicHost>());
+  CHECK(logic::bind_blueprint<Fake>(rt) && &logic::blueprint<Fake>() == inst->native_object<Fake>());
+  logic::blueprint<Fake>().heat = 6;
+  CHECK(inst->get("Heat").as_number() == 6 && inst->set("Heat", logic::Value::number(3)) && logic::blueprint<Fake>().heat == 3);
   // a moved node is the same Blueprint (the hash leaves places out); a changed one is another:
   // the class never runs a graph it was not written from
   logic::Graph moved = g, changed = g;
@@ -4629,6 +4696,8 @@ TEST(logic_native_blueprints) {
   plain.native = false;
   logic::Instance* interpreted = plain.add(g, 0, "Plain");
   CHECK(std::string(interpreted->tier()) != "native C++" && interpreted->call_number("Twice", {4}) == 8 && interpreted->get("Heat").as_number() == 5);
+  // (no instance there runs as the class: nothing is bound)
+  CHECK(!interpreted->native_object<Fake>() && !logic::bind_blueprint<Fake>(plain) && !logic::blueprint_object<Fake>);
   // the glue for it: every function and variable by name, registered under the graph's hash
   std::string glue, why;
   CHECK(logic::native_glue(g, "Hosted", glue, &why));
@@ -4636,7 +4705,10 @@ TEST(logic_native_blueprints) {
                            // (the argument is made, the function runs between the two calls a host can measure by, what it gave is handed back)
                            "      kern::f64 in0 = native_arg<kern::f64>(args, 0, 0.0);\n      kern::logic::native_call(true);\n      const auto out = self.Twice(std::move(in0));\n"
                            "      kern::logic::native_call(false);\n      results = {to_value(out.r)};",
-                           "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }", "kern::logic::register_native_blueprint(0x"})
+                           "if (variable == \"Heat\") { kern::logic::native_set(self.Heat, value); return true; }",
+                           // (the object, for the program's C++ that calls the class directly)
+                           "  void* object(const void* type) override { return type == &kern::logic::class_key<Hosted> ? &self : nullptr; }\n",
+                           "kern::logic::register_native_blueprint(0x"})
     CHECK(glue.find(line) != std::string::npos);
   {
     // a node that is not a function of blueprint.h (NodeDef::native: a library decides for its own
@@ -7741,9 +7813,11 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(app->extensions().empty() && !app->configure().shadows);  // (App's own)
   app->stop(engine);
   CHECK(a->get("Stopped").b);
-  // an interface no Blueprint implements in this build (a pure function the engine hands a pointer): no object
-  const logic::EngineInterface* const transport = logic::engine_interface("net_Transport");
-  CHECK(transport && *transport->waits && logic::engine_implement(objects, "net_Transport", logic::implementer_of(*w)) == 0);
+  // a function the engine hands a pointer without its count (material_uniforms) has no way to a Blueprint: the
+  // interface's own runs there; an interface the build has not: no object
+  const logic::EngineInterface* const shader = logic::engine_interface("ShaderExtension");
+  CHECK(shader && std::any_of(shader->functions.begin(), shader->functions.end(), [](const logic::EngineVirtual& v) { return std::string(v.name) == "material_uniforms" && *v.waits; }));
+  CHECK(logic::engine_implement(objects, "Nothing", logic::implementer_of(*w)) == 0);
   // check(): every pure function there, each of the interface's types
   logic::Graph wrong;
   CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<\"ShaderExtension\"> {\n  void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
@@ -11929,6 +12003,97 @@ TEST(micro_duck_example_level_runs) {
   CHECK(f.world->walker_state(l.world.player) != "Idle");  // autonomous
 }
 
+// A Blueprint too large for one canvas (logic_edit.cpp, kCanvasNodes) shows one function's body at a time: the
+// editor's state has the nodes and wires of that sheet only, the lists every node shares once, and what the page
+// needs of the others as counts. Opening such a Blueprint took time with the square of its nodes before.
+TEST(studio_blueprint_sheets) {
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  // 60 functions of 42 nodes each (F(x) = x * 2 * 2 ...), and the events: Begin calls F0.
+  json::Value g = json::Value::object(), fns = json::Value::array(), nodes = json::Value::array(), links = json::Value::array();
+  auto node = [&](u32 id, const char* type, const char* key = nullptr, const std::string& value = {}) {
+    json::Value n = json::Value::object();
+    n.set("id", id);
+    n.set("type", type);
+    if (key) { json::Value p = json::Value::object(); p.set(key, value); n.set("params", std::move(p)); }
+    nodes.push(std::move(n));
+  };
+  auto link = [&](u32 from, const char* out, u32 to, const char* in) {
+    json::Value l = json::Value::array();
+    l.push(from); l.push(out); l.push(to); l.push(in);
+    links.push(std::move(l));
+  };
+  for (u32 k = 0; k < 60; ++k) {
+    const std::string name = "F" + std::to_string(k);
+    json::Value fn, in, out;
+    json::parse(R"({"pure":true})", fn);
+    json::parse(R"([{"name":"x","type":"float","value":0}])", in);
+    json::parse(R"([{"name":"result","type":"float","value":0}])", out);
+    fn.set("name", name); fn.set("inputs", std::move(in)); fn.set("outputs", std::move(out));
+    fns.push(std::move(fn));
+    const u32 base = 1000 + k * 100;
+    node(base, "func.entry", "function", name);
+    for (u32 i = 1; i <= 40; ++i) {
+      node(base + i, "math.mul");
+      link(base + i - 1, i == 1 ? "x" : "result", base + i, "a");
+    }
+    node(base + 41, "func.return", "function", name);
+    link(base, "then", base + 41, "exec");
+    link(base + 40, "result", base + 41, "result");
+  }
+  node(1, "event.begin");
+  node(2, "func.pure", "function", "F0");
+  g.set("functions", std::move(fns)); g.set("nodes", std::move(nodes)); g.set("links", std::move(links));
+  json::Value level;
+  CHECK(json::parse(game::to_text(f.s->level()), level));
+  level.set("logic", std::move(g));
+  json::Value open = json::Value::object();
+  open.set("cmd", "open"); open.set("text", json::stringify(level)); open.set("name", "sheets.klevel");
+  CHECK(f.s->command(open)["ok"].as_bool());
+  CHECK(f.s->level().logic.nodes.size() == 60 * 42 + 2);
+  CHECK(no_errors(logic::check(f.s->level().logic)));
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  json::Value l = f.s->state()["logic"];
+  // the events' sheet: the two nodes that stand in no function
+  CHECK(l["sheets"].size() == 60 && l["sheet"].as_string().empty() && l["nodes"].size() == 2 && l["links"].size() == 0);
+  CHECK(l["sheets"][7]["name"].as_string() == "F7" && l["sheets"][7]["nodes"].as_number() == 42 && l["sheets"][7]["entry"].as_number() == 1700);
+  CHECK(l["counts"]["nodes"].as_number() == 60 * 42 + 2 && l["counts"]["links"].as_number() == 60 * 42);
+  CHECK(l["counts"]["calls"]["F0"].as_number() == 1 && l["counts"]["calls"]["F1"].is_null());
+  CHECK(l["functions"].size() == 60);  // (every function is listed, whatever is shown)
+  // the function a call names: one list for all nodes
+  CHECK(l["choices"]["function"].size() == 60);
+  bool listed = false;
+  for (const json::Value& n : l["nodes"].items())
+    for (const json::Value& p : n["params"].items()) listed = listed || (p["key"].as_string() == "function" && p["list"].as_string() == "function" && p["choices"].is_null());
+  CHECK(listed);
+  // a function's sheet: its body and the wires in it
+  CHECK(f.cmd(R"({"cmd":"logicSheet","function":"F7"})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["sheet"].as_string() == "F7" && l["view"].as_string() == "graph" && l["nodes"].size() == 42 && l["links"].size() == 42);
+  bool own = true, wired = false;
+  for (const json::Value& n : l["nodes"].items()) {
+    own = own && n["id"].as_number() >= 1700 && n["id"].as_number() <= 1741 && !n["title"].as_string().empty();
+    if (n["id"].as_number() == 1705) wired = n["inputs"][0]["linked"].as_bool() && !n["inputs"][1]["linked"].as_bool();
+  }
+  CHECK(own && wired);
+  // a node of another sheet is found and shown
+  json::Value found = f.cmd(R"({"cmd":"logicFind","query":"begin"})");
+  CHECK(found["hits"].size() == 1 && found["hits"][0]["node"].as_number() == 1 && found["hits"][0]["sheet"].is_null());
+  found = f.cmd(R"({"cmd":"logicFind","query":"multiply"})");
+  CHECK(found["hits"].size() == 200 && found["more"].as_bool() && found["hits"][0]["sheet"].as_string() == "F0");
+  CHECK(f.cmd(R"({"cmd":"logicReveal","node":4320})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["sheet"].as_string() == "F33");
+  CHECK(f.cmd(R"({"cmd":"logicReveal","node":1})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["sheet"].as_string().empty());
+  CHECK(!f.cmd(R"({"cmd":"logicReveal","node":999999})")["ok"].as_bool());
+  // a small Blueprint shows all of itself: no sheets
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicTemplate","template":"robot_avoid"})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["sheets"].is_null() && l["nodes"].size() == 9 && l["counts"]["nodes"].as_number() == 9);
+}
+
 TEST(studio_robot_template_compiles) {
   StudioFixture f;
   CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
@@ -12368,6 +12533,7 @@ TEST(studio_logic_implements) {
   if (f.s->level().actors.empty()) return;
   const game::ActorId id = f.s->level().actors.back().id;
   CHECK(f.cmd((std::string(R"({"cmd":"logicOpen","owner":)") + std::to_string(id) + "}").c_str())["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Time","type":"float"})")["ok"].as_bool());   // (the actor has a Blueprint now)
   json::Value st = f.s->state();
   bool offered = false, transport = false;
   for (const json::Value& i : st["logic"]["interfaces"].items()) {
@@ -12378,7 +12544,9 @@ TEST(studio_logic_implements) {
     }
     transport = transport || i["name"].as_string() == "net_Transport";
   }
-  CHECK(offered && !transport && st["logic"]["implements"].as_string().empty());
+  CHECK(offered);
+  CHECK(transport);
+  CHECK(st["logic"]["implements"].as_string().empty());
   CHECK(f.cmd(R"({"cmd":"logicImplements","name":"ShaderExtension"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
   CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
@@ -12386,7 +12554,7 @@ TEST(studio_logic_implements) {
   const json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
   for (const json::Value& i : compiled["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
   CHECK(missing);
-  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"net_Transport"})")["ok"].as_bool() && !f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string().empty());
 }
@@ -13494,8 +13662,9 @@ TEST(studio_logic_structs) {
   // (its settings: the variable, and the path from it to the place - a text on the node)
   std::string variables, path_kind, path_value;
   const json::Value tuned = node(tune);
+  const json::Value shared = f.s->state()["logic"]["choices"];   // (the lists every node shares: a parameter names its list)
   for (const json::Value& p : tuned["params"].items()) {
-    for (const json::Value& ch : p["choices"].items())
+    for (const json::Value& ch : (p["choices"].is_null() ? shared[p["list"].as_string()] : p["choices"]).items())
       if (p["key"].as_string() == "variable") variables += ch[0].as_string() + " ";
     if (p["key"].as_string() == "path") path_kind = p["kind"].as_string(), path_value = p["value"].as_string();
   }
