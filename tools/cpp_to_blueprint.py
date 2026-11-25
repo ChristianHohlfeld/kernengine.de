@@ -3802,8 +3802,10 @@ class Emit:
                 copies.append((p, name, t))
         if "ref" in f.kinds:
             f.pure = False   # (it changes a place of its caller: a step, not a value)
-        if f.pure and self.writes_outside(d, body):
+        if (f.pure or (f.state and not f.mutates)) and self.writes_outside(d, body):
             f.pure = False   # (it changes what is not its own - through a reference, a pointer, a call's place: a step)
+            if f.state:
+                f.mutates = True   # (of a function of a state: what it changes may be the state's - through its getter, `game().pad`)
         # what a call changes or gives, as the test compares it: the object, what the C++ returns, what it wrote
         # through its parameters. The function itself gives what the C++ returns (a constructor: the object).
         if d.get("kind") == "CXXDestructorDecl":
@@ -12390,6 +12392,18 @@ class TestWriter:
             if n.get("_named"):   # (a name for a part of a value - Emit.stood: the source has the name, there for every call)
                 return
             k, ks = n.get("kind"), kids(n)
+            if k == "CallExpr" and len(ks) == 1:
+                # the getter of the one object of a state (`game()`): in the test the object the call is compared on - as
+                # the Blueprint has it, its own object (Function.is_this; kern_state_now, set where the test calls)
+                c = ks[0]
+                while c.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(c):
+                    c = kids(c)[0]
+                r = self.tree.body.get((c.get("referencedDecl") or {}).get("id")) or self.tree.decl.get((c.get("referencedDecl") or {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
+                if r is not None and function_key(self.tree, r) in self.u.world.getters:
+                    obj = re.sub(r"\b(const|volatile)\b|&", "", qtype(r).split("(")[0]).strip()
+                    a, b = span(n)
+                    edits.append((a, 1, 0, b, f"(*static_cast<{obj}*>(kern_state_now))"))
+                    return
             if k == "CallExpr" and len(ks) > 1:
                 # A function of a namespace of the program, called by its name alone with a value of the engine: C++ looks
                 # it up where the call stands and - by the argument - in the engine's namespace, where no function of the
@@ -14217,6 +14231,8 @@ class TestWriter:
                 want_record(owner)   # (a constant of a class the Blueprint does not have stands for itself)
         def want_function(i):
             e = tree.template_of.get(i) or tree.body.get(i) or tree.decl.get(i) or {}
+            if e.get("kind") == "FunctionDecl" and function_key(tree, e) in u.world.getters:
+                return   # (the getter of a state's one object: in the test the object a call is compared on - guard)
             held = tree.owner.get(e.get("id")) or tree.owner.get(i)
             if held and held.startswith(ENGINE + "::") and (held in u.objects_seen or u.object_of(held + "*")):
                 return   # (a method of a class of the engine with a life of its own: its stand-in has what the source calls - stand_ins)
@@ -15169,7 +15185,8 @@ class TestWriter:
                 target = (f"{self.names[owner]}({args})" if f.ctor else f"(void)(made_state = converted::made_static<{self.names[owner]}>())" if state_made
                           else f"{self.names[owner]}::{d['name']}({args})" if owner and static
                           else f"s->{d['name']}({args})" if f.state and owner
-                          else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner else f"{here}{free or self.function_name(d)}({args})")
+                          else f"a0.{d['name']}({args})" if owner and f.self_type is not None else f"{self.names[owner]}{{}}.{d['name']}({args})" if owner
+                          else f"(kern_state_now = s.get(), {here}{free or self.function_name(d)}({args}))" if f.state else f"{here}{free or self.function_name(d)}({args})")
                 parts = {"self": "a0", "result": "r"}   # (what the call changed: run's own values, handed back as they are)
                 if f.state:
                     # (the object after the call: all its variables are compared - of the constructor, the one it made)
@@ -15343,6 +15360,7 @@ class TestWriter:
                 "// and the mathematics of the Blueprint language; the Blueprint must give exactly what it gives (../converted.h).",
                 *system, *own, '#include "../converted.h"', *[f"#ifndef {n}\n#define {n} {self.widen(v)}\n#endif" for n, v in macros], "",
                 f"namespace {ns} {{", f"namespace converted = ::{tree.namespace}::converted;",
+                "[[maybe_unused]] inline void* kern_state_now = nullptr;   // (the object of the state a call is compared on: what its getter - game() - gives)",
                 "using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;",
                 WIDE_PRELUDE, *([POINTED_PRELUDE] if self.pointed else []), *usings, *self.spaces_named(said_texts), "",
                 f"// ---- {os.path.basename(self.path)} and what it uses, as it stands ----",
