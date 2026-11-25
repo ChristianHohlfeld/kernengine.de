@@ -58,6 +58,8 @@ inline Clocks g_clocks;
 inline bool test_engine(kern::logic::EngineStandIn& kept, kern::logic::EngineObjects& objects, std::string_view function, const std::vector<kern::logic::Value>& in,
                         std::vector<kern::logic::Value>& out) {
   if (!real_engine()) return kept.engine(function, in, out);
+  // (a place of the engine read or set - "<function>@get", "@set" - is no call of the source: not written down)
+  if (function.ends_with("@get") || function.ends_with("@set")) return kern::logic::call_engine(objects, function, in, out);
   const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
   if (!f) return false;
   kept.calls.push_back(kern::logic::engine_call_shown(function, in));

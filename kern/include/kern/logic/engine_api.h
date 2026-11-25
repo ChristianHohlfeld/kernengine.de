@@ -68,12 +68,41 @@ struct EngineFunction {
   /// It reads a clock (KERN_CLOCK, kern/core/base.h: now_ms, wall_ms): what it gives changes by itself - two
   /// plays of the same program on the engine itself do not get the same from it (kern/tests/native_show.h).
   bool clock = false;
+  /// A field of an object of the engine (`Mesh::visible`, `TextureDesc::width`): a place as above, but no function
+  /// is called - the node binds it without asking the engine anything; reading and setting it is "<type>@get" /
+  /// "<type>@set" (kern/docs/blueprint_cpp.md, "Felder eines Objekts der Engine").
+  bool field = false;
 };
 
 /// Every function of the engine that is a node, in the order of the headers.
 const std::vector<EngineFunction>& engine_functions();
 /// The function of a node type, or null.
 const EngineFunction* engine_function(std::string_view type);
+
+/// An interface of the engine (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"): a class of the engine whose
+/// functions are virtual - kern::App, kern::ShaderExtension. The engine calls an object of it; a Blueprint can be that
+/// object (Graph::implements names the interface): its functions of the names of the interface's are what the engine
+/// calls. Each virtual function is the node of the table that calls it (EngineVirtual::node): the Blueprint's function
+/// has that node's inputs after the first (the object: the Blueprint itself) and its outputs, in their order and of
+/// their types. One that is pure the Blueprint must have; one that is not it may have - else the interface's own runs.
+struct EngineVirtual {
+  const char* name;  // the function: "vertex"
+  const char* node;  // its node: "engine.shader_extension.vertex"
+  bool pure;
+  /// Why the engine cannot hand this one to a Blueprint ("is handed a pointer"; "": it can) - a Blueprint has no
+  /// function of its name, the interface's own runs.
+  const char* waits = "";
+};
+struct EngineInterface {
+  const char* name;  // as a Blueprint names it: "ShaderExtension", "net_Transport"
+  const char* cpp;   // "kern::ShaderExtension"
+  std::vector<EngineVirtual> functions;
+  /// Why no Blueprint implements it in this build ("" where one can): a function of it whose pins the engine
+  /// cannot hand to a Blueprint and take back (a pointer the engine writes through) - tools/engine_api.py says which.
+  const char* waits = "";
+};
+const std::vector<EngineInterface>& engine_interfaces();
+const EngineInterface* engine_interface(std::string_view name);
 /// The nodes of the table, in a library (Library::core has them).
 void add_engine_nodes(Library& lib);
 
@@ -81,8 +110,13 @@ void add_engine_nodes(Library& lib);
 /// its outputs' forms - made from the function's name and its inputs, so the same call gets the
 /// same answer in every tier - and keeps what it was asked, call by call. An output list with a
 /// count (EnginePin::count) has no more entries than that input says (times EnginePin::per).
+/// A place of the engine (EngineFunction::place) is a state of the stand-in, per function and inputs: what
+/// "<function>@get" gives there is what "<function>@set" set there last (at first a value of the output's
+/// form, made from the call) - and neither is a call it keeps: the function was called once, when the place
+/// was bound; what is read and set there after is the engine's memory, as in C++.
 struct EngineStandIn {
   std::vector<std::string> calls;  // "engine.world.pose(1, {2, 0})" ...
+  std::map<std::string, Value> places;  // "engine.game_world.shots(1)" -> what is there
   bool engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
   /// The Callbacks a call hands it are called - three times each, with inputs drawn from the call - and what they
   /// give is written down with the call and goes into its answer. Handed to an object of the engine (the call's first

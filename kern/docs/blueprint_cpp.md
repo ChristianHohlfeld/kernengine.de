@@ -1328,6 +1328,91 @@ selbst“).
   oder mehrere, wird das Objekt nicht gemacht (`tools/engine_api.py --list` nennt, welche Klassen und
   warum). Erzeugt in `kMakers` jeder `engine_calls.gen.cpp`; keine Liste von Klassen.
 
+### Plätze der Engine
+
+Gibt eine Methode eines Objekts der Engine eine Referenz ohne `const` auf etwas, das das Objekt hält, und
+schlägt sie es nur nach – ihr Rumpf ist genau `return feld_;` (`std::vector<ShotEvent>& shots() { return
+shots_; }`; `tools/engine_api.py` prüft das am Baum, nicht am Namen), keine weiteren Eingänge, und was sie gibt,
+ist selbst kein Objekt der Engine –, dann ist ihr Knoten ein **Platz der Engine** (`EngineFunction::place`, in
+der Liste `place`), keine Kopie. Jede andere Funktion, die `T&` gibt, bleibt ein Knoten, der eine Kopie gibt.
+
+```cpp
+void Shoot() {
+  engine_game_world_shots(n12, World);   // auto& shots = world->shots();  - einmal gebunden
+  list_add(n12.result, Shot);             // shots.push_back(shot);
+  n12.result[0].to = Vector{0.0, 0.0, 1.0};  // shots[0].to = {0, 0, 1};
+  Count = list_length<game_ShotEvent>(n12.result);  // shots.size()
+}
+struct { engine_game_world_shots_place<List<game_ShotEvent>> result = {}; } n12;
+```
+
+- **Der Platz ist der Ausgang des Knotens.** Läuft der Knoten, bindet er den Platz (in C++: `auto& r = f();`,
+  ein Aufruf). Die Knoten von Plätzen – Get, Set, Add to, Take, die Schritte einer Liste, auch mit Weg
+  (`n12.result[i].to`) – nennen ihn statt einer Variablen: Einstellung `bound` = Id des Knotens (statt
+  `variable`), der Weg wie gehabt. Sein Member ist immer `<knoten>_place<Typ> result = {};`
+  (`engine_values::Place`), auch wo ihn niemand nennt. Der Editor bietet diese Knoten auf einem Platz der Engine
+  an wie auf einer Variablen („Places of the Engine“).
+- **Regeln (check).** Vom Platz geht kein Draht (ein Draht wäre ein Schnappschuss; die Klasse liest, was jetzt
+  dort steht). Der bindende Knoten liegt auf jedem Weg zu jedem Knoten, der den Platz nennt, in derselben Kette
+  – ein Platz gilt, solange in C++ die Referenz gälte: im Lauf der Funktion, in dem der Knoten lief; über ein
+  Warten (ein latenter Knoten) oder einen anderen Einstieg hinweg nicht. Ein Platz ist kein Referenz-Argument
+  eines Aufrufs. „Gehaltener Eintrag bleibt“ gilt wie für Variablen; ein Eintrag neben der Liste ist ein eigener
+  mit den Defaults, von dem nichts bleibt.
+- **Interpreter und JIT (durch die Tür).** Der Knoten ruft seine Funktion durch die Tür (aufgezeichnet, wie
+  jeder Aufruf) und hält im Ausgang die Eingänge, mit denen er band. Jedes Nennen liest durch die Tür
+  `<funktion>@get` (`engine.game_world.shots@get`), jede Änderung liest so und setzt danach `<funktion>@set`
+  (`kern/src/<Teil>/engine_calls.gen.cpp`, aus derselben Tabelle). Scheitert `@get` (das Handle nennt kein
+  Objekt mehr), erfährt es der Host, gelesen wird die Null des Typs, geschrieben wird ins Leere. Der JIT
+  übernimmt einen Graphen mit Plätzen nicht; er läuft im Interpreter.
+- **Klasse (direkt, typisiert, ohne Kopie).** Binden ist ein Nachschlagen: das Handle und die Adresse dessen,
+  was die Engine hält (`P::C`, z. B. `std::vector<kern::game::ShotEvent>`). Jedes Nennen arbeitet dort: ein
+  Feld eines Eintrags wird gelesen, wie C++ es liest (ein 32-Bit-Feld der Engine wird erst beim Lesen eine
+  64-Bit-Zahl und beim Schreiben zurück), `list_add` hängt an die Liste der Engine an, `list_length` zählt ohne
+  zu lesen – kein `logic::Value`, keine Kopie: Nennen fordert keinen Speicher an, wo C++ keinen anfordert.
+  `logic::EngineObjects` zählt die Freigaben (`generation()`): Ist seit dem Binden ein Objekt geendet, schlägt
+  die Klasse das Handle neu nach, wie die Tür es jedes Mal tut – sie schreibt nie auf einen toten Zeiger und
+  sagt dem Host dasselbe wie die Tür (`<funktion>@get`), liest die Null des Typs, schreibt ins Leere. Ohne
+  Objekte der Engine (ein Test mit dem Stellvertreter) liest dieselbe Klasse durch die Tür (`@get`) in eine
+  eigene Kopie und setzt jede Änderung zurück (`@set`) – was der Interpreter tut.
+- **Stellvertreter.** `logic::EngineStandIn` hält je Funktion und Eingängen, was hinter dem Platz steht
+  (anfangs aus der Form des Ausgangs, wie jede Antwort); `@get` gibt es, `@set` setzt es – beides sind keine
+  Aufrufe, die er aufzeichnet (die Quelle ruft `shots()` einmal und schreibt dann in den Speicher).
+- **Geprüft:** der native Fall „EnginePlaces“ (`kern/tests/blueprint_native.h`: Felder, Einträge, Listen in
+  Einträgen, 32-Bit-Felder, die Schritte einer Liste, neben der Liste, Freigabe während gebunden, ein Platz ohne
+  Objekt) gegen den Stellvertreter und auf der Engine selbst – der Interpreter durch die Tür, die Klasse direkt,
+  jede Variable und alles, was der Host erfährt, gleich; im Fall „Engine“ jeder Platz der Tabelle;
+  `engine_places_class_names_the_engines_list` vergleicht die Liste der Engine mit dem, was C++ mit
+  `BuildingBuilder::chunks()` tut, Bit für Bit, und zählt die Speicheranforderungen; der Fall mit jedem Knoten
+  hat einen Platz (`kern/tests/test_main.cpp`).
+- **Ein Eintrag eines Arrays des Objekts.** Ist der Rumpf genau `return feld_[p];` – `feld_` ein Array fester
+  Länge N des Objekts, `p` der eine Parameter (ganze Zahl oder Aufzählung, Umwandlungen erlaubt;
+  `BusSettings& bus(Bus b) { return buses_[static_cast<u32>(b)]; }`) –, ist der Knoten ebenso ein Platz: er
+  bindet den Eintrag, den sein Eingang nennt, und hält die Eingänge, mit denen er band (`@get`/`@set` bekommen
+  sie, `@set` den Wert danach). Ein Index außerhalb 0…N−1 nennt keinen Eintrag – C++ lässt den Aufruf offen –:
+  der Aufruf scheitert in jeder Stufe gleich („the input b names no entry: there are 6“), gelesen wird die Null,
+  geschrieben ins Leere. In der Klasse hält der Platz die Eingänge in den Typen von C++ (`P::In`, ohne
+  Speicher), `P::at` prüft den Index. Geprüft: `engine_place_at_an_entry_of_an_array` und der Fall „Engine“
+  (dort auch an einem gemachten Objekt, der Eingang bei seinem Default).
+- **Ein Platz als Eingang einer Funktion der Engine.** Ein Knoten, der einen Platz nennt (ein Eintrag, ein Feld
+  eines Eintrags: `n12.result[i].mesh`), kann der Eingang eines Knotens der Engine sein – `kern::weld(c.mesh)` auf
+  einem Eintrag von `b.chunks()`. Der Eingang bekommt, was jetzt dort steht (gelesen, wie jedes Nennen liest:
+  `engine_values::input_value`); was die Funktion daraus macht, ist ihr Ausgang und wird mit Set dorthin
+  gesetzt, wie C++ es dort hinterlässt. In jeder Stufe gleich; geprüft im Fall „EnginePlaces“ (`Weld`) und in
+  `engine_places_class_names_the_engines_list` gegen `kern::weld` auf der Liste von C++.
+
+### Felder eines Objekts der Engine
+
+Ein öffentliches Feld eines Objekts der Engine mit Handle (`Mesh::visible`, `Mesh::material`, `TextureDesc::width`) ist
+ein Platz der Engine wie das, was `T& f() { return f_; }` nennt: Knoten `engine.<klasse>.<feld>` (Handle → Platz),
+`EngineFunction::field`. `tools/engine_api.py` nimmt jedes öffentliche, nicht statische Feld, das kein `const`, keine
+Referenz, kein Zeiger, kein Array und kein Objekt der Engine ist (sonst wartet es, `--list` nennt es) – eine Regel,
+keine Liste. Anders als eine Methode fragt das Binden die Engine nichts: der Knoten ruft keine Funktion (Interpreter,
+JIT, Klasse; keine Aufzeichnung), Lesen und Setzen gehen wie bei jedem Platz durch `<feld>@get` / `<feld>@set`.
+Der Konverter schreibt `m->visible`, `td.width = 64` als diesen Platz (Emit.engine_field); `m->material.viewmodel` liest
+das Feld `viewmodel` des Platzes. Im Test hält der Stellvertreter des Objekts jedes Feld, das das Programm nennt, als
+eigenes Feld – C++ liest und setzt es dort, ungesehen – und `converted::FieldSync` gleicht es mit der Engine ab: vor
+jedem Aufruf der Engine gesetzt, danach gelesen, ebenso, wenn ein Aufruf der Quelle beginnt und endet (wie die Plätze).
+
 ### Rückrufe der Engine (Callback)
 
 Wo die Engine eine Funktion des Programms ruft – eine Höhe je Punkt (`kern::HeightSampler`, ein Zeiger auf eine
@@ -1375,6 +1460,64 @@ struct Site : virtual kern::Blueprint, virtual Ground {
   Eingängen; was er gibt, steht in der Aufzeichnung und geht in die Antwort ein. Einem Objekt gegeben, ruft er ihn bei
   jedem späteren Aufruf auf diesem Objekt wieder, bis es freigegeben wird – so wird auch der behaltene Weg verglichen.
 - Geprüft: `logic_callbacks` (kern/tests/test_main.cpp).
+
+### Schnittstellen der Engine (ein Blueprint als Objekt, das die Engine ruft)
+
+Eine Klasse der Engine mit virtuellen Funktionen – `kern::App` (configure, extensions, start, update, resized, stop),
+`kern::ShaderExtension` (name, die Stücke des Shader-Texts, bind, frame_uniforms …) – ist eine **Schnittstelle**: die
+Engine ruft ein Objekt von ihr. Ein Blueprint kann dieses Objekt sein (Entscheidung E-c2). Anders als ein Callback (eine
+Funktion einer Bibliothek, ohne Welt) ist es ein Blueprint mit Zustand, der in der Welt läuft.
+
+```cpp
+struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+  Float Time = 0.0;
+  struct nameResult { Text result = ""; };
+  KERN_PURE nameResult name() { return {"water"}; }
+  void frame_uniforms(Int cache = 0, Int renderer = 0) { engine_uniform_cache_set_float(cache, 3, Time); }
+};
+```
+
+- **Sprache:** `Graph::implements` nennt die Schnittstelle mit ihrem Namen in den Blueprints (`EngineInterface::name`:
+  `App`, `ShaderExtension`, `net_Transport`); JSON `"implements"`, im Text die letzte Basis `kern::Implements<"…">`. Die
+  Funktionen des Blueprints mit den Namen der virtuellen Funktionen sind, was die Engine ruft: jede hat die Eingänge des
+  Knotens dieser Funktion nach dem ersten (das Objekt ist der Blueprint selbst) und seine Ausgänge, in ihrer Reihenfolge,
+  von ihren Typen – ein Objekt der Engine als Handle (`Int engine`), ein Struct der Engine als Struct des Blueprints
+  (`Frame frame`), `const char*` als Text.
+- **Regeln (check):** die Schnittstelle gibt es; jede reine virtuelle Funktion hat der Blueprint; jede Funktion mit dem
+  Namen einer virtuellen hat deren Eingänge und Ausgänge (keine Referenz: die Engine übergibt Werte) und ist seine eigene;
+  eine Bibliothek ist kein Objekt. Eine nicht reine, die der Blueprint nicht hat, ist die der Schnittstelle.
+- **Engine:** `tools/engine_api.py` schreibt aus dem Header je Schnittstelle die Tabelle (`engine_interfaces()`,
+  `EngineVirtual`: Name, Knoten, rein) und im `engine_calls.gen.cpp` ihres Teils den **Adapter**
+  (`Implements_<Name>`, eine Klasse, die von der Schnittstelle erbt): jede virtuelle Funktion gibt dem Blueprint, was die
+  Engine ihr gibt, als Werte (`Conv<…>::to`; ein Objekt der Engine als Handle in denselben `EngineObjects`, `adopt`), ruft
+  seine Funktion beim Namen (`Implementer`, an der Grenze wie `Instance::call` – jede Stufe) und gibt der Engine, was er
+  gibt (`Conv<…>::from`; ein Text bleibt mit den Objekten, eine Liste hinter einem `Span` im Adapter bis zur nächsten
+  Frage). Gab er nichts (er ist zu Ende, der Aufruf scheiterte), bekommt die Engine die Null dessen, was sie fragte
+  (`""` für einen Text). `logic::engine_implement(objects, instance)` macht das Objekt der Engine eines laufenden
+  Blueprints; das Handle nennt auch ein Objekt der Schnittstelle (was man der Engine gibt: `engine.renderer.init(…,
+  extensions)`).
+- **Was noch wartet:** eine virtuelle Funktion, der die Engine einen Zeiger gibt oder die durch das Gegebene schreibt
+  (`ShaderExtension::material_uniforms`, `net::Transport::send/receive`), hat noch keinen Weg zum Blueprint
+  (`EngineVirtual::waits`): dort läuft die der Schnittstelle; ist sie rein (`Transport`), implementiert kein Blueprint die
+  Schnittstelle (`EngineInterface::waits`).
+- **Editor:** im Abschnitt „Libraries“ die Auswahl „Implements …“ (Befehl `logicImplements`), mit den Funktionen jeder
+  Schnittstelle (eine mit `?` darf fehlen).
+- **Konverter:** eine Klasse des Programms, von der es genau ein statisches Objekt gibt (der Zustand eines Blueprints,
+  `state_classes`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
+  Funktionen alle virtuell sind und die nichts hält – `class SpawnCityApp final : public kern::App`,
+  `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<"App">` im Text), ihre Overrides sind seine
+  Funktionen mit den Namen der Schnittstelle; was sie nicht kann, sagt check() wie bei einem geschriebenen Blueprint.
+- Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
+  Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
+  Aufrufe auf der Klasse), `studio_logic_implements`.
+
+**Die Blueprints der Welt.** Was eine Logik laufen lässt, sieht ein Blueprint mit dem Knoten der Engine
+`engine.game.blueprints_running` (`kern::game::blueprints_running(const logic::Runtime&)`, das Handle aus
+`engine.game_world.logic_runtime`): je Blueprint Name, Stufe, Zahl der Funktionen und Knoten seines Graphen, ob er
+angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Ohne Kopie, einzeln: `engine.game.blueprint_count`
+und je Index `blueprint_name` (die Referenz, wo die Logik den Namen hält), `blueprint_tier`, `blueprint_functions`,
+`blueprint_nodes`, `blueprint_disabled` – ein Index ohne Blueprint nennt keinen („“, 0, false). Die Sprache selbst (`kern::logic::`) hat keine
+Knoten; was ein Programm von ihr zeigt, geht durch diese Funktion. Geprüft: `engine_blueprints_running`.
 
 ### Formeln
 
