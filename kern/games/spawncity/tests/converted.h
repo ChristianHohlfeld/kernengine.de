@@ -1624,7 +1624,9 @@ struct Blueprint {
       std::chrono::steady_clock::time_point at = std::chrono::steady_clock::now();
       ~Began() {
         const double took = std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count();
-        if (took >= 1.0) std::printf("  time: Blueprint %s: %.1f s before its first call (read from the level, linked, checked and started - the interpreter and the class)\n", actor, took);
+        const StartTimes& t = g_start_times;
+        if (took >= 1.0) std::printf("  time: Blueprint %s: %.1f s before its first call (read from the level, linked, checked and started - the interpreter and the class; so far in the test: read %.1f s, linked %.1f s, checked %.1f s, added %.1f s, begun %.1f s)\n", actor, took,
+                                     t.read, t.link, t.check, t.add, t.begin);
       }
     } began{actor};
     interpreted = std::make_unique<RuleBlueprint>(actor, nullptr, false, actors);

@@ -1,5 +1,6 @@
 // A rule actor of the level as the tests run it (see blueprint_call.h for how the game calls one).
 #pragma once
+#include <chrono>
 #include <cstdlib>
 #include <map>
 #include <memory>
@@ -149,6 +150,18 @@ inline kern::logic::Runtime& no_logic() {
   return logic;
 }
 
+/// Where the time goes before a Blueprint's first call (converted::Blueprint says it): reading it - and what it uses - from
+/// the level, linking it, checking it, adding it to its runtime and beginning it, in seconds, over all the runtimes made.
+struct StartTimes {
+  double read = 0, link = 0, check = 0, add = 0, begin = 0;
+  struct Step {
+    double& into;
+    std::chrono::steady_clock::time_point at = std::chrono::steady_clock::now();
+    ~Step() { into += std::chrono::duration<double>(std::chrono::steady_clock::now() - at).count(); }
+  };
+};
+inline StartTimes g_start_times;
+
 /// A rule actor of the level running in a logic runtime of its own, the C++ that calls it bound to that -
 /// with the Blueprints of other actors of the level beside it (`others`), each by its name: Find Actor by
 /// Name finds them (the host's find_actor), and Call on Actor and Get Variable on Actor reach them as in
@@ -192,13 +205,16 @@ struct RuleBlueprint {
     rt.blueprints = [](std::string_view name) { return level_blueprint(name); };
     rt.native = native;
     if (actor) {
-      const kern::logic::Graph* held = level_blueprint(actor, &error);
+      const kern::logic::Graph* held;
+      { StartTimes::Step t{g_start_times.read}; held = level_blueprint(actor, &error); }
       if (!held) { problems = error; return; }
       const kern::logic::Graph& g = *held;
       kern::logic::Graph whole;
-      if (!kern::logic::link(g, rt.blueprints, whole, &error)) { problems = error; return; }
-      for (const kern::logic::Issue& i : kern::logic::check(whole)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
-      inst = rt.add(g, 2, actor);
+      bool linked;
+      { StartTimes::Step t{g_start_times.link}; linked = kern::logic::link(g, rt.blueprints, whole, &error); }
+      if (!linked) { problems = error; return; }
+      { StartTimes::Step t{g_start_times.check}; for (const kern::logic::Issue& i : kern::logic::check(whole)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n"; }
+      { StartTimes::Step t{g_start_times.add}; inst = rt.add(g, 2, actor); }
       host.actors.emplace(actor, 2);
     }
     kern::logic::ActorRef next = 3;
@@ -210,7 +226,7 @@ struct RuleBlueprint {
       if (rt.add(*g, next, name)) host.actors.emplace(name, next);
       ++next;
     }
-    rt.begin();
+    { StartTimes::Step t{g_start_times.begin}; rt.begin(); }
     if (bind) bound = bind(rt);
   }
   /// The running Blueprint of the actor of this name (null: none here).
