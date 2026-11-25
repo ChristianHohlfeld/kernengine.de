@@ -24,6 +24,7 @@ i64 EngineObjects::put(Kinds kinds, void (*end)(void*)) {
 }
 
 void EngineObjects::place(i64 handle, Kinds kinds, void (*end)(void*), void* owner) {
+  ++generation_;
   Entry e;
   e.at = kinds.front().second;
   e.end = end;
@@ -69,6 +70,7 @@ bool EngineObjects::end(i64 handle, Kind k) {
   if (it == entries_.end()) return false;
   const auto x = std::find_if(it->second.begin(), it->second.end(), [&](const Entry& e) { return e.kinds.front().first == k; });
   if (x == it->second.end() || !x->end) return false;
+  ++generation_;
   Entry e;
   take(entries_, handle, x->at, e);
   order_.erase(std::find(order_.begin(), order_.end(), std::pair<i64, void*>{handle, e.at}));
@@ -111,6 +113,7 @@ void EngineObjects::forget_lent(i64 lender) {
 }
 
 void EngineObjects::clear() {
+  ++generation_;
   // (what it owns ends in the reverse order it came - what came later may hold what came before)
   while (!order_.empty()) {
     const auto [handle, at] = order_.back();

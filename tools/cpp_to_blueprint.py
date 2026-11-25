@@ -3240,6 +3240,7 @@ class Emit:
         self.scopes = []      # per block being written: the objects of the engine made in it, (local, class) - released where it ends
         self.types = {}       # decl id -> its Blueprint type
         self.locals = []      # (name, type): declared at the top of the body
+        self.bound = set()    # the nodes of the engine that bind a place of the engine (n12): a place starts at their output
         self.lengths = {}     # the local variables that are lists of a fixed length (name -> length)
         self.taken = set()
         self.temps = set()     # the local variables of the function's own making (temp)
@@ -5005,6 +5006,14 @@ class Emit:
                         out += self.take_pre()
                     continue
                 raw = qtype(v)
+                if "&" in raw and not re.search(r"\bconst\b", raw) and kids(v) and v.get("init"):
+                    # (auto& r = world_->shots(); - a place of the engine, bound once: r names it)
+                    held = self.unwrap(kids(v)[-1])
+                    bound = self.engine_place(held) if held.get("kind") == "CXXMemberCallExpr" else None
+                    if bound is not None:
+                        self.names[v["id"]], self.types[v["id"]] = bound
+                        out += self.take_pre()
+                        continue
                 if ("&" in raw and not re.search(r"\bconst\b", raw) and not self.u.object_of(raw)) or self.u.clean(raw) == "std::_Bit_reference":
                     raise Wait("a reference to something it changes")
                 wide_init = kids(v) and v.get("init") and self.u.clean(raw) in ("unsigned long", "long", "unsigned long long", "long long") and self.is64(kids(v)[-1])
@@ -7193,10 +7202,12 @@ class Emit:
             return self.ex(b, bt)
         raise Wait("data handed to the engine in another shape")
 
-    def engine(self, d, obj, args):
+    def engine(self, d, obj, args, as_place=False):
         """A call of a function of the engine: its node. Every call is a step of its own before the statement
         it stands in - it runs once, where C++ calls it. Gives (the steps, the text and the type of what the
-        call returns - or None, None)."""
+        call returns - or None, None). A function that gives a place of the engine (EngineFunction::place,
+        kern/docs/blueprint_cpp.md "Plätze der Engine") binds it: `as_place` - the text is the place (n12.result),
+        else what is there now, read."""
         u = self.u
         try:
             f = u.api().function(d)
@@ -7207,11 +7218,6 @@ class Emit:
         if known != mine:
             raise Wait(f"the engine's {d.get('name')}() (its node is another one in the engine: {'none' if known is None else 'its pins differ'})")
         self.f.asks_engine = True
-        if f.get("place"):
-            # (what it gives is a reference to something the engine holds: written as a node that gives a value, a change
-            # through the reference - `world.sound_cues().clear()` - would change a copy. The node that binds the place
-            # is not written here yet)
-            raise Wait(f"the engine's {d.get('name')}() (it gives a place of the engine: a reference to what the engine holds - the node that binds it is not written yet)")
         u.engine_calls[d["id"]] = f
         ins, done, own = list(f["ins"]), [], None   # (done: the inputs in the order C++ works them out - see operand)
         if d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
@@ -7302,6 +7308,15 @@ class Emit:
             return first + [f"{fn}({', '.join(texts)});"], None, None
         node = u.next_node
         u.next_node += 1
+        if f.get("place"):
+            (o, bt, _), = outs
+            u.members.append(f"  struct {{ {fn}_place<{bt}> {o} = {{}}; }} n{node};")
+            self.bound.add(f"n{node}")
+            lines = first + [f"{fn}({', '.join([f'n{node}'] + texts)});"]
+            if as_place:
+                return lines, f"n{node}.{o}", bt
+            tmp = self.temp(d["name"], bt)
+            return lines + [f"{tmp} = n{node}.{o};"], tmp, bt
         u.members.append("  struct { " + " ".join(f"{bt} {o} = {u.zero(bt)};" for o, bt, _ in outs) + f" }} n{node};")
         lines, got = first + [f"{fn}({', '.join([f'n{node}'] + texts)});"], (None, None)
         for o, bt, _ in outs:
@@ -8669,16 +8684,16 @@ class Emit:
     def is_local(self, name):
         """Is this a name a place can start at in the function being written: one of its variables or one of
         its inputs (not what a node gives)?"""
-        return any(name == n for n, _ in self.locals) or any(name == n for n, _ in self.f.params) or ((self.f.state or self.f.sees_state) and self.u.is_state_variable(name))
+        return name in self.bound or any(name == n for n, _ in self.locals) or any(name == n for n, _ in self.f.params) or ((self.f.state or self.f.sees_state) and self.u.is_state_variable(name))
 
     def writable(self, place):
         """Can this place be changed: does it start at a variable of the function or at a reference input
         that is not const? (An input by value and a const reference are read.)"""
         root = re.match(r"\w+", place).group(0)
-        return (any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
+        return (root in self.bound or any(root == n for n, _ in self.locals) or any(root == n and kind == "ref" for (n, _), kind in zip(self.f.params, self.f.kinds))
                 or ((self.f.state or self.f.sees_state) and self.u.is_state_variable(root)))   # (a variable of the Blueprint: C++ said whether the method may change it)
 
-    def place_arg(self, n, t, kind, after, fixed=None):
+    def place_arg(self, n, t, kind, after, fixed=None, callee=None):
         """What a call gives a reference input: the place the argument is. Where the argument is none of the
         notation's places (a value, a map's row by its key ...), a variable holds it for the call - and is
         stored back after it, when the function changes it (`after`: the lines for that). `fixed`: the input
@@ -8686,6 +8701,12 @@ class Emit:
         is given as the place it is also to a function that may run handlers: the language checks
         that call - the list stays, or the run stops there (docs/blueprint_cpp.md, E18)."""
         got = self.spot(n)
+        if got is not None and callee is not None and re.match(r"\w+", got[0]).group(0) in self.bound:
+            # (a place of the engine is no reference input of a function - check() says so: a function that only reads
+            # it and asks nothing of the engine gets what stands there, as it reads it; anything else waits)
+            if kind == "ref" or callee.asks_engine:
+                raise Wait("a place of the engine handed to a function by reference (it changes it or asks the engine)")
+            got = None
         if got is not None and got[1] == t and (kind != "ref" or self.writable(got[0])):
             return got[0]
         held = self.temp("a", t, fixed)
@@ -8773,9 +8794,74 @@ class Emit:
             return got[0] + ".items", self.u.rows[got[1]]
         return got
 
+    def engine_field(self, b):
+        """`mesh->visible`, `td.width`: a field of an object of the engine (Api.fields) - its place, bound before the
+        statement by the node of the field, which asks the engine nothing (EngineFunction::field): (its text
+        n12.result, its type), or None where `b` is no such field."""
+        if b.get("kind") != "MemberExpr" or not kids(b) or not ENGINE_NODES:
+            return None
+        fd = self.tree.decl.get(b.get("referencedMemberDecl"))
+        q = self.tree.owner.get(fd["id"]) if fd is not None and fd.get("kind") == "FieldDecl" else None
+        if q is None or not q.startswith(ENGINE + "::") or not self.u.engine_object(q):
+            return None
+        f = next((g for g, c in self.u.api().fields(q) if c["id"] == fd["id"]), None)
+        if f is None:
+            return None
+        if isinstance(f, Wait):
+            raise Wait(f"the field {q.split('::')[-1]}::{fd['name']} of an object of the engine ({f})")
+        known = self.u.engine_table().get(f["type"])
+        mine = (f["value"], [(n, *self.u.api().pin(bt)) for n, bt, _ in f["ins"]], [(n, *self.u.api().pin(bt)) for n, bt, _ in f["outs"]])
+        if known != mine:
+            raise Wait(f"the field {q.split('::')[-1]}::{fd['name']} of an object of the engine (its node is another one in the engine: {'none' if known is None else 'its pins differ'})")
+        cached = b.get("_bound")
+        if cached is not None and cached[0] is self.writing and cached[1] == self.serial:
+            return cached[2]
+        u, bt = self.u, f["outs"][0][1]
+        handle = self.ex(kids(b)[0], "Int")   # (the object: its handle - also where C++ points at it)
+        u.engine_calls[fd["id"]] = f
+        self.f.asks_engine = True
+        self.f.pure = False   # (it binds a place of the engine: a statement before the one it stands in)
+        node = u.next_node
+        u.next_node += 1
+        fn = f["type"].replace(".", "_")
+        u.members.append(f"  struct {{ {fn}_place<{bt}> result = {{}}; }} n{node};")
+        self.bound.add(f"n{node}")
+        self.hoist([f"{fn}(n{node}, {handle});"])
+        b["_bound"] = (self.writing, self.serial, (f"n{node}.result", bt))
+        return f"n{node}.result", bt
+
+    def engine_place(self, b):
+        """`world_->shots()` where a place is named (push_back on it, an entry of it set): the node binds the place
+        before the statement, once - (its text n12.result, its type) -, or None where the call gives no place of
+        the engine."""
+        if b.get("kind") == "MemberExpr":
+            return self.engine_field(b)
+        if b.get("kind") != "CXXMemberCallExpr" or not kids(b) or kids(b)[0].get("kind") != "MemberExpr":
+            return None
+        m = kids(b)[0]
+        d = self.engine_decl(m.get("referencedMemberDecl"))
+        if d is None:
+            return None
+        try:
+            f = self.u.api().function(d)
+        except Wait:
+            return None
+        if not f.get("place"):
+            return None
+        cached = b.get("_bound")
+        if cached is not None and cached[0] is self.writing and cached[1] == self.serial:
+            return cached[2]
+        lines, text, bt = self.engine(d, kids(m)[0] if kids(m) else None, [x for x in kids(b)[1:]], as_place=True)
+        self.hoist(lines)
+        b["_bound"] = (self.writing, self.serial, (text, bt))
+        return text, bt
+
     def spot_held(self, n):
         b = self.unwrap(n)
         k = b.get("kind")
+        bound = self.engine_place(b)
+        if bound is not None:
+            return bound
         if k == "CXXConstructExpr" and re.match(r"(?:kern::)?Span<", self.ctype(b)):
             # (a view of a whole list - kern::Span made of it - is that list: its place)
             a = [x for x in kids(b) if x.get("kind") != "CXXDefaultArgExpr"]
@@ -8999,6 +9085,9 @@ class Emit:
                     raise Wait("the state of its object (a method)")
                 fname, ft = self.u.field(self.f.self_type, t["name"])
                 return [f"{self.self_var()}.{fname} = {value(ft)};"]
+            bound = self.engine_field(t)   # (a field of an object of the engine: its place, set)
+            if bound is not None:
+                return [f"{bound[0]} = {value(bound[1])};"]
             at_iterator = self.entry_of(base)
             if at_iterator is not None:
                 base = at_iterator
@@ -9109,7 +9198,7 @@ class Emit:
                     self.self_var()   # (a method that only reads its object does not call one that changes it)
                 done.append([None, None, self.self_name, True])
             else:
-                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after), place=True)
+                self.operand(done, obj, g.self_type, lambda: self.place_arg(obj, g.self_type, kinds[0], after, callee=g), place=True)
             params = params[1:]
             kinds = kinds[1:]
         first = len(g.params) - len(params)   # (a method: its object is the first input)
@@ -9128,7 +9217,7 @@ class Emit:
                 continue
             (_, pt), kind = params[j], kinds[j]
             if kind:
-                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j)), place=True)
+                self.operand(done, a, pt, lambda: self.place_arg(a, pt, kind, after, g.fixed.get(first + j), callee=g), place=True)
             else:
                 self.operand(done, a, pt, lambda: self.ex(a, pt))
             j += 1
@@ -9453,6 +9542,9 @@ class Emit:
                     raise Wait("the state of its object (a method)")
                 fname, ft = u.field(self.f.self_type, b["name"])
                 return f"struct_break<{self.f.self_type}>({self.self_name}).{fname}", ft
+            bound = self.engine_field(b)   # (a field of an object of the engine: its place, read)
+            if bound is not None:
+                return bound
             at_iterator = self.entry_of(base)
             if at_iterator is not None:
                 base = at_iterator
@@ -11095,6 +11187,58 @@ class Api:
                 "category": "Engine: " + q.split("::")[-1], "help": f"Ends the {q.split('::')[-1]} (its destructor): the handle is none after it.",
                 "value": False, "ins": [(group, "Int", q)], "outs": [], "params": [], "decl": rec, "role": "release", "class": q}
 
+    def fields(self, q):
+        """The fields of an object of the engine (a class with a handle) a program reads and sets - `Mesh::visible`,
+        `TextureDesc::width`: each a place of the engine (EngineFunction::field), as a method that only names it
+        (`T& f() { return f_; }`) would be - the node binds it and asks nothing. [(dict or Wait, the field)] for its
+        public fields that are not static, not const and not references; a field whose type has no place in the
+        language (a pointer, an object of the engine, an array) waits."""
+        known = self.__dict__.setdefault("fields_of", {})   # (worked out once a class)
+        if q not in known:
+            known[q] = self.fields1(q)
+        return known[q]
+
+    def fields1(self, q):
+        rec = self.tree.records.get(q)
+        if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or any((q + "::").startswith(s) for s in ENGINE_SKIP) or not self.reachable(q):
+            return []
+        group = snake(q.split("::")[-1])
+        out, access = [], "private" if rec.get("tagUsed") == "class" else "public"
+        for c in kids(rec):
+            if c.get("kind") == "AccessSpecDecl":
+                access = c.get("access", access)
+                continue
+            if c.get("kind") != "FieldDecl" or access != "public" or not c.get("name"):
+                continue
+            raw = qtype(c).strip()
+            try:
+                if raw.endswith("&") or re.match(r"const\b", raw) or re.search(r"\*\s*(const)?$", raw) or "[" in raw or self.u.object_of(raw):
+                    raise Wait("a field that is no value of the language (a reference, a pointer, an array, an object of the engine)")
+                looked, self.u.lookup_scope = self.u.lookup_scope, self.u.scope_for(rec) or self.u.lookup_scope
+                try:
+                    bt = self.u.btype(raw)
+                finally:
+                    self.u.lookup_scope = looked
+                self.pin(bt)
+                self.shape(bt, raw)
+                out.append(({"type": f"engine.{group}.{c['name']}", "cpp": f"{q}::{c['name']}", "label": c["name"].replace("_", " ").title(),
+                             "category": "Engine: " + q.split("::")[-1], "help": self.u.comment_of(c), "value": False, "place": True, "field": True,
+                             "ins": [(group, "Int", q)], "outs": [("result", bt, None)], "params": [], "decl": c, "class": q, "counts": {}, "per": {},
+                             "clock": False, "raws": {"result": raw}}, c))
+            except Wait as w:
+                out.append((w, c))
+        return out
+
+    def field_node(self, fd):
+        """The node of a field of an object of the engine (Api.fields) - None where `fd` is none or its type has no place."""
+        if fd is None or fd.get("kind") != "FieldDecl":
+            return None
+        q = self.tree.owner.get(fd["id"])
+        if q is None or not q.startswith(ENGINE + "::") or not self.u.engine_object(q):
+            return None
+        f = next((g for g, c in self.fields(q) if c["id"] == fd["id"]), None)
+        return None if isinstance(f, Wait) else f
+
     def function(self, d):
         """The node of a declared function of the engine: a dict - or Wait, when its types have no place. (Its
         types' names are looked up as C++ looks them up where it is declared: `Shape` in kern::game is
@@ -12637,6 +12781,13 @@ class TestWriter:
         ret = "void" if ret_raw == "void" else self.spell(ret_raw)
         if ret_raw != "void" and not self.u.object_of(ret_raw):
             self.result_ok(ret_raw)
+        if f.get("place"):
+            # (a place of the engine: a reference to what the test keeps of it - converted::engine_place)
+            held = re.sub(r"\s*&$", "", ret)
+            ret = held + "&"   # (a reference, as C++ has it - spell names the type it refers to)
+            const = " const" if cls and qtype(d).rstrip().endswith("const") else ""
+            return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const};",
+                    f'inline {ret} {cls + "::" if cls else ""}{d["name"]}({", ".join(a for a, _ in params)}){const} {{ return converted::engine_place<{held}, {shape(held)}>("{f["type"]}", {{{", ".join(values)}}}); }}')
         # (its own names begin with kern_: a parameter may be called `out` or `result` - hull_mesh's)
         body = [f'const std::vector<converted::Value> kern_out = converted::engine_call("{f["type"]}", {{{", ".join(values)}}});']
         said = ""
@@ -12709,7 +12860,7 @@ class TestWriter:
         function. (Their declarations where the engine's header has them, their definitions after the helpers
         of the test's structs.)"""
         u, tree = self.u, self.tree
-        by_class, free, had = collections.defaultdict(list), [], set()
+        by_class, free, had, fields = collections.defaultdict(list), [], set(), collections.defaultdict(list)
         for f in [*u.engine_calls.values(), *(f for i, f in self.more_engine.items() if i not in u.engine_calls)]:
             # (one stand-in a node: a function the dumps declare more than once - each header a source includes is
             # dumped with it - is the same function of the engine, called from here or there)
@@ -12718,7 +12869,9 @@ class TestWriter:
             had.add(f["type"])
             d = f["decl"]
             owner = tree.owner.get(d["id"])
-            if f.get("role") in ("make", "release"):
+            if f.get("field"):
+                fields[f["class"]].append(f)   # (a field of the object: a field of its stand-in - converted::FieldSync)
+            elif f.get("role") in ("make", "release"):
                 by_class[f["class"]].append(f)   # (its constructor and its destructor)
             elif owner and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static":
                 by_class[owner].append(f)
@@ -12741,7 +12894,7 @@ class TestWriter:
         # (the logic the level's Blueprints run in, and the program's way to call them, are the test's own: it
         # runs the actors' Blueprints in a real one - converted::Blueprint, RuleBlueprint)
         own_logic = self.OWN_LOGIC
-        objects = {q for q in u.objects_seen | set(by_class) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
+        objects = {q for q in u.objects_seen | set(by_class) | set(fields) | self.more_objects | set(self.object_enums) if q in tree.records and u.engine_object(q) and q not in own_logic}
         for q in sorted(objects):   # (the classes of the engine they derive from: stand-ins too - HostTransport is a Transport)
             for b in self.engine_bases(q):
                 objects.add(b)
@@ -12762,6 +12915,17 @@ class TestWriter:
                     continue   # (the one function, which the source and a piece of another file name by two declarations of it)
                 decls.append("  " + a)
                 defs.append((("object", q), b))
+            if fields.get(q):
+                # (the fields the program reads and sets: its own, kept as the engine's by converted::FieldSync)
+                shape = lambda x: re.sub(r"\b[ui]64\b", "converted::Whole", x)
+                syncs = []
+                for f in sorted(fields[q], key=lambda f: f["decl"]["name"]):
+                    t = self.spell(f["raws"]["result"])
+                    self.result_ok(f["raws"]["result"])
+                    decls.append(f"  {t} {f['decl']['name']}{{}};")
+                    syncs.append(f'converted::field_sync<{t}, {shape(t)}>("{f["type"]}", s, s.{f["decl"]["name"]}, set);')
+                decls += [f"  static void kern_sync(void* o, bool set) {{ {name}& s = *static_cast<{name}*>(o); {' '.join(syncs)} }}",
+                          f"  converted::FieldSync kern_fields{{this, &{name}::kern_sync}};"]
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
@@ -13921,7 +14085,7 @@ class TestWriter:
                     e = tree.decl.get(i) if i else None
                     # (by the declaration's own address: a dump may name it by another one - Tree.join_dumps -, and
                     # it is one function, with one stand-in)
-                    if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e)):
+                    if e is not None and e["id"] not in out and (e["id"] in u.engine_calls or u.api().declared_only(e) or u.api().field_node(e) is not None):
                         out[e["id"]] = e
                 # an object of the engine made - `std::make_unique<kern::net::Client>(transport_, config(), seed)`, or by its
                 # constructor: its constructor of these arguments is one the source calls (the test that takes the piece
@@ -14245,8 +14409,10 @@ class TestWriter:
                 # (what the source gave, kept: as the Blueprint holds it, a view of it may be what is compared)
                 # (on zeroed memory: what C++ leaves open in what the call makes is the Blueprint's zero - converted::Zeroed)
                 "      converted::zero_stack();",
+                *(["      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)"] if any(f.get("field") for f in u.engine_calls.values()) else []),
                 f"      const converted::Zeroed<decltype(run({', '.join(names)}))> held([&] {{ return run({', '.join(names)}); }});",
                 "      const auto& made = held.get();",
+                *(["      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)"] if any(f.get("place") for f in u.engine_calls.values()) else []),
                 f"      const auto& want = {self.wrap('made', want_type)};" if self.wrap('made', want_type) != 'made' else "      const auto& want = made;",
                 "      converted::g_can_bail = false;",
                 "      converted::may_bail(false);",
@@ -14289,7 +14455,7 @@ class TestWriter:
         for i, d in self.engine_called(G).items():
             if i not in u.engine_calls:
                 try:
-                    self.more_engine[i] = u.api().function(d)
+                    self.more_engine[i] = u.api().field_node(d) or u.api().function(d)   # (a field of an object of the engine: Api.fields)
                 except Wait:
                     pass
         object_chunks, object_defs = self.stand_ins(pairs)

@@ -85,7 +85,10 @@ def table_text(api, functions):
             return "{" + ", ".join(out) + "}"
         lines.append(f"      {{{c_text(f['type'])}, {c_text(f['cpp'])}, {c_text(f['label'])}, {c_text(f['category'])}, {c_text(f['help'])}, {'true' if f['value'] else 'false'},")
         lines.append(f"       {pins(f['ins'])},")
-        lines.append(f"       {pins(f['outs'])}" + (f", {'true' if f.get('place') else 'false'}, true" if f.get("clock") else ", true" if f.get("place") else "") + "},")
+        flags = [bool(f.get("place")), bool(f.get("clock")), bool(f.get("field"))]
+        while flags and not flags[-1]:
+            flags.pop()
+        lines.append(f"       {pins(f['outs'])}" + "".join(", true" if x else ", false" for x in flags) + "},")
     lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
     return "\n".join(lines)
 
@@ -112,6 +115,30 @@ def case_text(api, functions):
             variables.append(f"  {bt} {inputs[bt]} = {zero(bt)};")
         return inputs[bt]
     node = 10
+
+    def place_lines(f, name, at, args, r, binder):
+        bt = f["outs"][0][1]
+        out = [f"{name}({', '.join([f'n{binder}'] + args)});"]
+        variables.append(f"  {bt} {r}_0 = {zero(bt)};")
+        out.append(f"{r}_0 = {at};")
+        if bt.startswith("List<"):
+            item = bt[5:-1]
+            variables.append(f"  Int {r}_1 = 0;")
+            variables.append(f"  {item} {r}_2 = {zero(item)};")
+            variables.append(f"  {bt} {r}_3 = {zero(bt)};")
+            out += [f"list_add({at}, {value(item)});", f"{at}[0] = {value(item)};", f"{r}_1 = list_length<{item}>({at});",
+                    f"{r}_2 = {at}[9];", f"{r}_3 = {at};"]
+        else:
+            variables.append(f"  {bt} {r}_3 = {zero(bt)};")
+            out += [f"{at} = {value(bt)};", f"{r}_3 = {at};"]
+        return out
+
+    # (where the class of a place has a maker without inputs and a releaser: the place of an object it made - and of
+    # the same handle after the object ended)
+    made = {}
+    for f in functions:
+        if f.get("role") in ("make", "release") and (f["role"] == "release" or not f["ins"]):
+            made.setdefault(f.get("class"), {})[f["role"]] = f
     for k, f in enumerate(functions):
         name = f["type"].replace(".", "_")
         args = [value(bt) for _, bt, _ in f["ins"]]
@@ -122,6 +149,12 @@ def case_text(api, functions):
             lines.append(f"R{k} = {name}({', '.join(args)});")
         elif not f["outs"]:
             lines.append(f"{name}({', '.join(args)});")
+        elif f.get("place"):
+            # (a place of the engine: the node binds it, the nodes of places name it - read, set, and a list's
+            # length, an item added, an entry set, one beside it read; here on the handle of no object)
+            node += 1
+            members.append(f"  struct {{ {name}_place<{f['outs'][0][1]}> {f['outs'][0][0]} = {{}}; }} n{node};")
+            lines += place_lines(f, name, f"n{node}.{f['outs'][0][0]}", args, f"R{k}", node)
         else:
             node += 1
             members.append("  struct { " + " ".join(f"{bt} {o} = {zero(bt)};" for o, bt, _ in f["outs"]) + f" }} n{node};")
@@ -133,6 +166,24 @@ def case_text(api, functions):
         method = f.get("role") is None and d.get("kind") == "CXXMethodDecl" and d.get("storageClass") != "static"
         on_object = (method and bool(f["ins"]) and f["ins"][0][2] is not None) or f.get("role") == "release" or (f.get("role") == "make" and not f["ins"])
         (bodies if on_object else free).append(lines)
+    places = []
+    for k, f in enumerate(functions):
+        life = made.get(f["ins"][0][2] if f.get("place") and f["ins"] else None, {})
+        if "make" not in life or "release" not in life:
+            continue
+        node += 1
+        maker, name, mk = life["make"]["type"].replace(".", "_"), f["type"].replace(".", "_"), node
+        variables.append(f"  Int H{k} = 0;")
+        members.append(f"  struct {{ Int result = 0; }} n{mk};")
+        node += 1
+        members.append(f"  struct {{ {name}_place<{f['outs'][0][1]}> {f['outs'][0][0]} = {{}}; }} n{node};")
+        lines = [f"{maker}(n{mk});", f"H{k} = n{mk}.result;", *place_lines(f, name, f"n{node}.{f['outs'][0][0]}", [f"H{k}"], f"P{k}", node)]
+        lines.append(f"{life['release']['type'].replace('.', '_')}(H{k});")
+        variables.append(f"  {f['outs'][0][1]} P{k}_4 = {zero(f['outs'][0][1])};")
+        lines += [f"P{k}_4 = n{node}.{f['outs'][0][0]};", f"n{node}.{f['outs'][0][0]} = {value(f['outs'][0][1])};"]
+        places.append(lines)
+    if places:
+        bodies.append([ln for body in places for ln in body])
     word = re.compile(r"[A-Za-z_]\w*")
     used = set(word.findall("\n".join(variables + members)))
     keep, changed = [False] * len(u.types), True
@@ -344,6 +395,10 @@ class Calls:
             q = f["class"]
             return [f"if (!o.release<{q}>(in.empty() ? 0 : in[0].as_int())) {{",
                     f"  o.error = \"the handle names no {q.split('::')[-1]} that was made\";", "  return false;", "}", "return true;"]
+        if f.get("field"):   # (a field of the object: what stands there - "<type>@get" - nothing is called)
+            q, (pin0, _, _) = f["class"], f["ins"][0]
+            return [f'auto* self = ev::object<{q}>(o, in, 0, {c_text(pin0)});', "if (!self) return false;",
+                    f"ev::give<{self.tag(f['outs'][0][1], need)}>(o, out, 0, self->{d['name']});", "return true;"]
         mangled = d.get("mangledName")
         ptypes = self.ptypes(f)
         parms = [p for p in c2b.kids(d) if p.get("kind") == "ParmVarDecl"]   # (their declarations: an array's length)
@@ -609,7 +664,7 @@ class Calls:
         gives."""
         api, EV = self.api, self.EV
         plain = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
-        need, bodies, headers = set(), [], set()
+        need, bodies, headers, places = set(), [], set(), []
 
         def typed(bt):
             if bt in plain:
@@ -638,6 +693,10 @@ class Calls:
             def function(head, direct, through, start=()):
                 lines.append(f"  {head} {{")
                 lines.extend("    " + x for x in start)
+                if direct is None:   # (the same in both ways)
+                    lines.extend("    " + x for x in through)
+                    lines.append("  }")
+                    return
                 lines.append("    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {")
                 lines.extend("      " + x for x in direct)
                 lines.append("    }")
@@ -664,8 +723,38 @@ class Calls:
                 bodies += lines
                 continue
             # a step: what it gives goes to the node's member (n.result ...), when the text reads it
-            direct, _ = self.direct(f, need, "unread", lambda given: f"{{ {failed} return; }}")
-            function(f"{head}void {name}({', '.join(params)})", direct + ["return;"], [f"{door};"])
+            if not f.get("field"):   # (a field binds only: nothing is called - see below)
+                direct, _ = self.direct(f, need, "unread", lambda given: f"{{ {failed} return; }}")
+                function(f"{head}void {name}({', '.join(params)})", direct + ["return;"], [f"{door};"])
+            if f.get("place"):
+                # a place of the engine: the node binds it - its member n.result is the place (ev::Place), `auto& r =
+                # object->f();` once; through the door the function is called as it is there, and the place is read
+                # and set through it after (<node>@get, <node>@set)
+                pin, _, q = f["ins"][0]
+                m, out = f["decl"]["name"], f["outs"][0]
+                named = m if f.get("field") else m + "()"   # (a field of the object, or what the method names)
+                places.append([f"struct P_{name} {{",
+                               f"  using Object = {q};",
+                               f"  using C = std::remove_reference_t<decltype((std::declval<{q}&>().{named}))>;",
+                               f"  using Tag = {self.dtag(out[1], need)};",
+                               f"  static constexpr const char* pin = {c_text(pin)};",
+                               f"  static constexpr const char* get = {c_text(f['type'] + '@get')};",
+                               f"  static constexpr const char* set = {c_text(f['type'] + '@set')};",
+                               f"  static C& at(Object& o) {{ return o.{named}; }}",
+                               "};"])
+                lines.append(f"  /// The place {f['cpp']} gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.")
+                lines.append(f"  template <class B> using {name}_place = {EV}Place<engine_direct::P_{name}, B>;")
+                handle = f"static_cast<::kern::i64>({pin})"
+                # (a field: binding it is no call - the door says nothing there; the object is looked up where the place
+                # is first used, and a missing one is told there as <node>@get, as the door tells it)
+                function(f"template <class KernNode> void {name}(KernNode& kern_n, {', '.join(params)})",
+                         None if f.get("field") else
+                         ["kern_o->begin_call();", f"auto* const kern_self = {EV}object_of<{q}>(*kern_o, {handle}, {c_text(pin)});",
+                          f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, kern_self ? &engine_direct::P_{name}::at(*kern_self) : nullptr);",
+                          f"if (!kern_self) {failed}", "return;"],
+                         ([] if f.get("field") else [f"{door};"]) + [f"kern_n.{out[0]}.kern_bind(this->kern_world, {handle}, nullptr);"])
+                bodies += lines
+                continue
             if f["outs"]:
                 order = [o for o, _, _ in f["outs"]]
 
@@ -689,7 +778,9 @@ class Calls:
                 "// The engine's enums and structs a pin names, between the type a Blueprint's class holds and the engine's",
                 "// (engine_values::Direct): an enum's values in the order of the Blueprint's enum; a struct field by field -",
                 "// the Blueprint's struct has the engine's fields in their order.",
-                "namespace engine_direct {", "namespace ev = engine_values;", "", *self.direct_types_text(need), "", "}  // namespace engine_direct", "",
+                "namespace engine_direct {", "namespace ev = engine_values;", "", *self.direct_types_text(need), "",
+                "// The places of the engine (engine_values::Place): the object's class, what it holds there, how it is reached.",
+                *[x for p in places for x in p], "", "}  // namespace engine_direct", "",
                 "template <class Core> struct EngineNodesOf : Core {",
                 "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;",
                 "  template <class T> using List = logic::List<T>;", "",
@@ -716,6 +807,11 @@ class Calls:
                       f"  template <class B> static B make(EngineObjects& o, const {q}& x) {{ B b{{" + ", ".join(f"ev::made<{tg}>(o, x.{c})" for (_, _, _, c), tg in zip(fields, tags)) + "}; " +
                       (f"[[maybe_unused]] const auto& [{bound}] = b; " if fields else "") + "return b; }",
                       f"  template <class C> static void pass(EngineObjects& o, const C& x) {{ " + " ".join(f"ev::Direct<{tg}>::pass(o, x.{c});" for (_, _, _, c), tg in zip(fields, tags)) + " }",
+                      # (a place of the engine that is such a struct, or an entry of one: its fields by their names - ev::Field)
+                      "  template <class D, class C, class B> struct Fields {",
+                      *[f"    ev::Field<D, {tg}, C, B, decltype({q}::{c}), decltype(B::{n}), &{q}::{c}, &B::{n}> {n};" for (n, _, _, c), tg in zip(fields, tags)],
+                      "    explicit Fields(D* kern_d)" + (" : " + ", ".join(f"{n}(kern_d)" for n, _, _, _ in fields) if fields else "") + " { (void)kern_d; }",
+                      "  };",
                       "};"]
         return lines
 
@@ -845,7 +941,7 @@ class Calls:
                     bodies += [f"// {f['type']}@set: what stands at the place {f['cpp']} gives",
                                f"bool c{k}_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {{",
                                f"  auto* self = ev::object<{q}>(o, in, 0, {c_text(pin)});", "  if (!self) return false;",
-                               f"  ev::take<{self.tag(f['outs'][0][1], need)}>(o, in, 1, self->{f['decl']['name']}());", "  return true;", "}", ""]
+                               f"  ev::take<{self.tag(f['outs'][0][1], need)}>(o, in, 1, self->{f['decl']['name']}{'' if f.get('field') else '()'});", "  return true;", "}", ""]
                 if f.get("role") == "make" and f["class"] in plans and plans[f["class"]][0] is f:
                     # (a host without an object at a handle - a test - makes one there: see default_makers)
                     makers.append((f["class"], self.maker_text(f["class"], plans, headers)))
@@ -896,6 +992,11 @@ def main(argv):
                 waiting.append((q + "::" + q.split("::")[-1], str(w)))
         if made:
             functions.append(api.releaser(q))
+        for f, c in api.fields(q):   # (its fields: places of the engine - Api.fields)
+            if isinstance(f, Wait):
+                waiting.append((q + "::" + c["name"], str(f)))
+            else:
+                functions.append(f)
     if api.unsaid:   # (a whole number beside a pointer must say in its type that it is its count: no length is guessed)
         raise SystemExit("engine_api.py: a whole number beside a pointer that does not say in its type that it counts what the pointer shows - "
                          "declare it kern::Count<Per> (Per numbers each):\n  " + "\n  ".join(sorted(set(api.unsaid))))

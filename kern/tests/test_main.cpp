@@ -4110,6 +4110,28 @@ static logic::Graph every_node_graph(bool wired) {
     for (const logic::PinDef& p : out)
       if (p.type != PinType::exec) read(id, p, tail, tail_pin);
   }
+  // A place of the engine (Graph::Root::bound, setting "bound"): the node of the engine binds it when it runs, the
+  // nodes of places name it - read whole, an entry set, added to, its length (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  {
+    const u32 e = add("event.custom", {{"name", "Bound"}});
+    const u32 b = add("engine.game_world.events");
+    g.find(b)->set_value("game_world", json::Value(3));
+    wire(e, "then", b, first_exec(b, true));
+    const std::string at = std::to_string(b);
+    const u32 a = add("list.add", {{"bound", at}});
+    g.find(a)->set_value("item", json::Value("x \"y\""));
+    wire(b, first_exec(b, false), a, first_exec(a, true));
+    const u32 s = add("var.set", {{"bound", at}, {"path", "[]"}});
+    g.find(s)->set_value("path0", json::Value(1));
+    g.find(s)->set_value("value", json::Value("z"));
+    wire(a, first_exec(a, false), s, first_exec(s, true));
+    const u32 r = add("var.get", {{"bound", at}});
+    const u32 l = add("list.length", {{"type", "text"}});
+    wire(r, "value", l, "list");
+    const u32 v = add("var.set", {{"variable", "VI"}});
+    wire(l, "length", v, "value");
+    wire(s, first_exec(s, false), v, first_exec(v, true));
+  }
   g.comments.push_back({next++, -40.5f, 12, 640, 320.25f, "Everything \"there is\"", 0x336699});
   g.comments.push_back({next++, 0, 0, 100, 100, "", 0});
   g.next_id = next + 3;
@@ -6965,6 +6987,151 @@ template <> struct Held<Probe::game_Transform> : HeldBy<Probe::game_Transform, &
 template <> struct Held<Probe::physics_Pose> : HeldBy<Probe::physics_Pose, &Probe::physics_Pose::position, &Probe::physics_Pose::rotation> {};
 }  // namespace kern::logic::detail
 
+// A place of the engine in a Blueprint's class (kern/logic/engine_direct.h, Place): the class below is the text of
+// the native case EnginePlaces (blueprint_native.h) as it stands - the node of kern::BuildingBuilder::chunks binds
+// the engine's list, the nodes of places name it.
+namespace engine_place_probe {
+struct EnginePlaces : kern::Blueprint {
+  // ---- types ----
+  KERN_STRUCT(MeshData) {
+    List<Float> positions = List<Float>{};
+    List<Float> normals = List<Float>{};
+    List<Float> colors = List<Float>{};
+    List<Float> uvs = List<Float>{};
+    List<Float> extra = List<Float>{};
+    Int extra_size = 0;
+    List<Int> indices = List<Int>{};
+  };
+  KERN_STRUCT(GeoChunk) {
+    Int x = 0;
+    Int y = 0;
+    Int items = 0;
+    Int triangles = 0;
+    Int hash = 0;
+    Bool welded = false;
+    MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+  };
+
+  // ---- variables ----
+  Int Builder = 0;
+  Int Length = 0;
+  Int At = 0;
+  Int X = 0;
+  Int Items = 0;
+  Float P0 = 0.0;
+  Int Beside = 0;
+  Int Set = 0;
+  List<GeoChunk> Chunks = List<GeoChunk>{};
+  Int LengthAfter = 0;
+  Bool Removed = false;
+  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}};
+  Int Before = 0;
+  Int Gone = 0;
+  Int GoneLength = 0;
+  List<GeoChunk> GoneChunks = List<GeoChunk>{};
+  Int AppendedLength = 0;
+  List<GeoChunk> Appended = List<GeoChunk>{};
+
+  // ---- functions ----
+  void Bind() {
+    engine_building_builder_make(n1);
+    Builder = n1.result;
+    engine_building_builder_chunks(n2, Builder);
+    Length = list_length<GeoChunk>(n2.result);
+  }
+
+  void Change() {
+    engine_building_builder_chunks(n7, Builder);
+    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<Float>{0.1, 2.5}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 2, List<Int>{1, 2}}});
+    At = n3.index;
+    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    n7.result[0].items = 7;
+    n5.value = (n7.result[0].x += 3);
+    X = n5.value;
+    n7.result[1].mesh.positions = List<Float>{0.3333333333333333, 4.0};
+    P0 = n7.result[1].mesh.positions[0];
+    n7.result[1].mesh.positions[1] = 0.1;
+    Items = n7.result[0].items;
+    Removed = list_contains<GeoChunk>(n7.result, First);
+    First = list_get<GeoChunk>(n7.result, 1);
+    P0 = math_mul(n7.result[1].mesh.positions[0], 2.0);
+    LengthAfter = list_length<Float>(n7.result[1].mesh.positions);
+    Beside = n7.result[5].x;
+    n6.value = (n7.result[5].x = 9);
+    Set = n6.value;
+    Chunks = n7.result;
+    First = n7.result[0];
+    LengthAfter = list_length<GeoChunk>(n7.result);
+    list_insert(n7.result, 0, First);
+    list_remove_at(n7.result, 1);
+    list_remove(n4, n7.result, First);
+    Removed = n4.removed;
+  }
+
+  void Append() {
+    engine_building_builder_chunks(n10, Builder);
+    engine_building_builder_chunks(n11, Builder);
+    list_append(n10.result, Chunks);
+    list_add(n10.result, First);
+    AppendedLength = list_length<GeoChunk>(n11.result);
+    Appended = n11.result;
+  }
+
+  void Release() {
+    engine_building_builder_chunks(n8, Builder);
+    Before = n8.result[0].x;
+    engine_building_builder_release(Builder);
+    Gone = n8.result[0].x;
+    n8.result[0].x = 4;
+    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    GoneLength = list_length<GeoChunk>(n8.result);
+    GoneChunks = n8.result;
+  }
+
+  void Read() {
+    engine_building_builder_chunks(n9, Builder);
+    Gone = n9.result[1].x;
+    n9.result[0].items = 4;
+    GoneLength = list_length<GeoChunk>(n9.result);
+  }
+
+  // ---- what nodes give and keep ----
+  struct { Int result = 0; } n1;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
+  struct { Int index = 0; } n3;
+  struct { Bool removed = false; } n4;
+  struct { Int value = 0; } n5;
+  struct { Int value = 0; } n6;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
+};
+
+}  // namespace engine_place_probe
+
+namespace kern::logic::detail {
+using engine_place_probe::EnginePlaces;
+template <>
+struct Held<EnginePlaces::MeshData> : HeldBy<EnginePlaces::MeshData, &EnginePlaces::MeshData::positions, &EnginePlaces::MeshData::normals, &EnginePlaces::MeshData::colors, &EnginePlaces::MeshData::uvs,
+                                             &EnginePlaces::MeshData::extra, &EnginePlaces::MeshData::extra_size, &EnginePlaces::MeshData::indices> {};
+template <>
+struct Held<EnginePlaces::GeoChunk> : HeldBy<EnginePlaces::GeoChunk, &EnginePlaces::GeoChunk::x, &EnginePlaces::GeoChunk::y, &EnginePlaces::GeoChunk::items, &EnginePlaces::GeoChunk::triangles,
+                                             &EnginePlaces::GeoChunk::hash, &EnginePlaces::GeoChunk::welded, &EnginePlaces::GeoChunk::mesh> {};
+}  // namespace kern::logic::detail
+
+namespace engine_place_probe {
+inline std::string shown(const EnginePlaces& p) {
+  std::string s;
+  const auto put = [&](const char* name, const auto& v) { s += std::string(name) + "=" + logic::engine_shown(logic::to_value(v)) + "\n"; };
+  put("Builder", p.Builder), put("Length", p.Length), put("At", p.At), put("X", p.X), put("Items", p.Items), put("P0", p.P0), put("Beside", p.Beside), put("Set", p.Set);
+  put("Chunks", p.Chunks), put("LengthAfter", p.LengthAfter), put("Removed", p.Removed), put("First", p.First), put("Before", p.Before), put("Gone", p.Gone);
+  put("GoneLength", p.GoneLength), put("GoneChunks", p.GoneChunks), put("AppendedLength", p.AppendedLength), put("Appended", p.Appended);
+  return s;
+}
+}  // namespace engine_place_probe
+
 namespace engine_probe {
 
 // A mixer: made, set up, given a clip, played and rendered - handles, a list the engine takes, a text, a
@@ -7160,6 +7327,89 @@ TEST(engine_calls_class_asks_for_no_memory) {
   CHECK(through_door > 0);
   if (by_itself != 0) std::printf("the class asked for memory %ld times in calls of the engine it made itself\n", by_itself);
   CHECK(itself.door == 0 && a.Rate == 48000 && b.Rate == 48000 && a.shown() == b.shown());
+}
+
+// A place of the engine in the class: what the class does to the engine's list where it stands is what C++ does to
+// kern::BuildingBuilder::chunks() - the same list, bit for bit; through the door (a host without the engine's
+// objects) the class reads and sets it as the interpreter does, and both tell the host the same; an object that
+// ended while its place was bound is not written (EngineObjects::generation): its place reads the zero of its type.
+TEST(engine_places_class_names_the_engines_list) {
+  using engine_place_probe::EnginePlaces;
+  NativeEngineHost itself, door;
+  itself.direct = true;
+  EnginePlaces a, b;
+  a.kern_world.host = &itself;
+  a.kern_world.engine = itself.engine_objects();
+  b.kern_world.host = &door;
+  for (EnginePlaces* p : {&a, &b}) {
+    p->Bind();
+    p->Change();
+  }
+  CHECK(itself.door == 0 && door.door > 0);
+  // ... the engine's list: what C++ makes of it
+  kern::BuildingBuilder* const held = logic::engine_values::object_of<kern::BuildingBuilder>(itself.objects, static_cast<i64>(a.Builder), "building_builder");
+  CHECK(held != nullptr);
+  kern::BuildingBuilder cpp;
+  std::vector<GeoChunk>& c = cpp.chunks();
+  GeoChunk made;
+  made.x = 3, made.y = -4, made.items = 5, made.welded = true, made.mesh.positions = {static_cast<f32>(0.1), 2.5f}, made.mesh.extra_size = 2, made.mesh.indices = {1, 2};
+  c.push_back(made);
+  c.push_back(GeoChunk{});
+  c[0].items = 7;
+  c[0].x += 3;
+  c[1].mesh.positions = {static_cast<f32>(0.3333333333333333), 4.0f};
+  c[1].mesh.positions[1] = static_cast<f32>(0.1);
+  const std::vector<GeoChunk> chunks = c;
+  const GeoChunk first = c[0];
+  c.insert(c.begin(), first);
+  c.erase(c.begin() + 1);
+  std::erase_if(c, [&](const GeoChunk& k) { return k.x == first.x && k.y == first.y && k.items == first.items && k.welded == first.welded && k.mesh.positions == first.mesh.positions && k.mesh.indices == first.mesh.indices; });
+  const auto same = [](const std::vector<GeoChunk>& x, const std::vector<GeoChunk>& y) {
+    bool r = x.size() == y.size();
+    for (std::size_t k = 0; r && k < x.size(); ++k) {
+      const GeoChunk &p = x[k], &q = y[k];
+      r = p.x == q.x && p.y == q.y && p.items == q.items && p.triangles == q.triangles && p.hash == q.hash && p.welded == q.welded && p.mesh.extra_size == q.mesh.extra_size &&
+          p.mesh.indices == q.mesh.indices && p.mesh.positions.size() == q.mesh.positions.size() && p.mesh.normals == q.mesh.normals && p.mesh.colors == q.mesh.colors &&
+          p.mesh.uvs == q.mesh.uvs && p.mesh.extra == q.mesh.extra;
+      for (std::size_t j = 0; r && j < p.mesh.positions.size(); ++j) r = std::bit_cast<u32>(p.mesh.positions[j]) == std::bit_cast<u32>(q.mesh.positions[j]);
+    }
+    return r;
+  };
+  CHECK(held && same(held->chunks(), c) && c.size() == 1);
+  // ... and what the class read: what the door read
+  CHECK(shown(a) == shown(b));
+  CHECK(a.X == 6 && a.Items == 7 && a.Set == 9 && a.Beside == 0 && a.LengthAfter == 2 && a.Removed);
+  CHECK(std::bit_cast<u64>(static_cast<f64>(a.P0)) == std::bit_cast<u64>(2.0 * static_cast<f64>(static_cast<f32>(0.3333333333333333))));
+  // what naming the place costs: a field read, a field set, the length - no memory asked for (C++: none either)
+  logic::Whole x = 0, length = 0;
+  const long asked = memory_asked_by([&] {
+    a.engine_building_builder_chunks(a.n7, a.Builder);
+    x = a.n7.result[0].x;
+    a.n7.result[0].items = 11;
+    length = a.list_length<EnginePlaces::GeoChunk>(a.n7.result);
+  });
+  CHECK(asked == 0 && static_cast<i64>(x) == c[0].x && static_cast<i64>(length) == 1 && held && held->chunks()[0].items == 11);
+  b.engine_building_builder_chunks(b.n7, b.Builder);
+  b.n7.result[0].items = 11;
+  // a list appended at the place, then an item added; read through a second place on the same list - what C++'s insert
+  // of a range and push_back do (the library grows the list)
+  c[0].items = 11;
+  c.insert(c.end(), chunks.begin(), chunks.end());
+  c.push_back(first);
+  for (EnginePlaces* p : {&a, &b}) p->Append();
+  CHECK(held && same(held->chunks(), c) && a.AppendedLength == 4 && shown(a) == shown(b));
+  // the object ends while its place is bound: the class does not write where it was, and says what the door says
+  itself.told.clear(), door.told.clear();
+  for (EnginePlaces* p : {&a, &b}) {
+    p->Release();
+    p->Read();
+  }
+  CHECK(shown(a) == shown(b));
+  CHECK(itself.told == door.told);
+  CHECK(itself.told.find(" !engine.building_builder.chunks@get: ") != std::string::npos && itself.told.find("chunks@set") == std::string::npos);
+  CHECK(a.Before == c[0].x && a.Gone == 0 && a.GoneLength == 0 && a.GoneChunks.empty());
+  CHECK(itself.objects.size() == 0 && itself.door == 0);
+  if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
 TEST(audio_mixer_panning_and_limits) {
@@ -11596,6 +11846,31 @@ TEST(studio_logic_functions) {
   // undo brings it back
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["functions"].size() == 1);
+}
+
+TEST(studio_logic_places_of_the_engine) {
+  // A place of the engine in the editor: the action menu offers the nodes of places on it as on a variable - its
+  // Get, its Set, an entry's Set and the steps of a list, each naming the node that binds it ("bound").
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Int Count = 0;\n\n  void Note() {\n    engine_game_world_events(n2, 1);\n    list_add(n2.result, \"x\");\n"
+                                                "    Count = list_length<Text>(n2.result);\n  }\n\n  struct { engine_game_world_events_place<List<Text>> result = {}; } n2;\n};\n"}})["ok"].as_bool());
+  const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "n2"}});
+  bool get = false, set = false, entry = false, add = false;
+  for (const json::Value& e : pal["items"].items()) {
+    if (e["category"].as_string() != "Places of the Engine" || e["params"]["bound"].as_string() != "2" || e["params"].has("variable")) continue;
+    get = get || (e["type"].as_string() == "var.get" && e["label"].as_string() == "Get n2");
+    set = set || (e["type"].as_string() == "var.set" && !e["params"].has("path"));
+    entry = entry || (e["type"].as_string() == "var.set" && e["params"]["path"].as_string() == "[]");
+    add = add || e["type"].as_string() == "list.add";
+  }
+  CHECK(get && set && entry && add);
 }
 
 TEST(studio_logic_local_variables) {
