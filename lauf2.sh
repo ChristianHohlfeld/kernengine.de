@@ -146,7 +146,7 @@ run_job() {  # name
       ( ( time KERN_JOBS=$(( N / 3 )) kern/tests/run.sh ) > mag-log/engine.log 2>&1; echo "engine rc=$? $(date '+%T')" > "$W/tmp/engine.when" ) &
       local engine_pid=$!
       # (die Texte der Blueprints gehen mit nach mag-zwischen/texts: scheitert das Einlesen ins Level, lässt sich jeder Text einzeln nachlesen)
-      ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted --texts "$W/mag-zwischen/texts" -- \
+      ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 TEST_ERRORS=1 $conv --level level/spawncity.klevel --test tests/converted --texts "$W/mag-zwischen/texts" -- \
           $(cd kern/games/spawncity 2>/dev/null; ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when
       # (Level und Tests sofort, mit dem Protokoll der Konvertierung in mag-zwischen/ - nicht in mag-log/: ein Auftrag gilt als fertig, sobald mag-log zweimal geschrieben ist)
