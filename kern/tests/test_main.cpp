@@ -17,6 +17,7 @@
 #include "kern/audio/synth.h"
 #include "kern/game/walker_policy.h"
 #include "kern/game/runtime.h"
+#include "kern/game/level_app.h"
 #include "kern/game/walker.h"
 #include "kern/lehrer/env.h"
 #include "kern/lehrer/nn.h"
@@ -7951,6 +7952,119 @@ TEST(engine_object_of_a_blueprint) {
   other.add(water, 11, "Water");
   CHECK(other.engine_object(11) == 0);   // (a host without objects of the engine)
   host.objects.clear();
+}
+
+// The App of a program built from a level (kern/game/level_app.h): its level, as the program carries it (text), is
+// played once in a world - before the renderer starts, as kern_app_start asks for the App first -, and the App is the
+// engine's object of the one Blueprint there that implements App. The engine calls it as any App: extensions before
+// the renderer, then start, update, stop - in this order -; the world's ticks run as Runtime::fire says: the level's
+// own graph first, then the Blueprints of its actors in the order of the level.
+TEST(app_from_the_level) {
+  auto graph = [](const char* cpp) {
+    logic::Graph g;
+    std::string error;
+    CHECK(logic::from_cpp(cpp, g, nullptr, &error));
+    CHECK(error.empty());
+    return g;
+  };
+  game::Level l;
+  l.logic = graph("struct Level : kern::Blueprint {\n"
+                  "  KERN_EVENT(on1, event_tick)\n"
+                  "  void on1(Float delta) {\n"
+                  "    debug_print(\"tick level\", false);\n"
+                  "  }\n"
+                  "};\n");
+  game::Actor main;
+  main.name = "Main";
+  main.logic = graph("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                     "  // ---- types ----\n"
+                     "  KERN_STRUCT(Frame) {\n"
+                     "    Float time = 0.0;\n"
+                     "    Float dt = 0.0;\n"
+                     "    Int64 index = Int64{0x0};\n"
+                     "  };\n"
+                     "\n"
+                     "  // ---- functions ----\n"
+                     "  struct startResult { Bool result = false; };\n"
+                     "  startResult start(Int engine = 0) {\n"
+                     "    debug_print(\"start\", false);\n"
+                     "    return {true};\n"
+                     "  }\n"
+                     "\n"
+                     "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                     "    debug_print(\"update\", false);\n"
+                     "  }\n"
+                     "\n"
+                     "  void stop(Int engine = 0) {\n"
+                     "    debug_print(\"stop\", false);\n"
+                     "  }\n"
+                     "\n"
+                     "  KERN_EVENT(on1, event_tick)\n"
+                     "  void on1(Float delta) {\n"
+                     "    debug_print(\"tick Main\", false);\n"
+                     "  }\n"
+                     "};\n");
+  CHECK(main.logic && main.logic->implements == "App");
+  game::Actor second;
+  second.name = "Second";
+  second.logic = graph("struct Second : kern::Blueprint {\n"
+                       "  KERN_EVENT(on1, event_tick)\n"
+                       "  void on1(Float delta) {\n"
+                       "    debug_print(\"tick Second\", false);\n"
+                       "  }\n"
+                       "};\n");
+  l.actors.push_back(main);
+  l.actors.push_back(second);
+  for (game::Actor& a : l.actors) a.id = l.next_id++;
+  const std::string text = game::to_text(l);
+
+  Renderer renderer;   // (not started yet: the App is asked for first)
+  CHECK(game::program_world() == nullptr);
+  App* const app = game::start_program_level(text, renderer);
+  CHECK(app != nullptr);
+  game::GameWorld* const world = game::program_world();
+  CHECK(world != nullptr);
+  if (!app || !world) return;
+  CHECK(game::start_program_level(text, renderer) == app);   // (made once)
+  CHECK(game::level_app(*world) == app);
+  RendererOptions o;
+  CHECK(renderer.init(o, app->extensions()));
+  CHECK(app->extensions().empty());   // (App's own)
+  Engine engine(renderer);
+  std::vector<std::string> said;
+  auto take = [&] {
+    for (const std::string& e : world->events())
+      if (e.rfind("Logic: ", 0) == 0) said.push_back(e.substr(7));
+    world->events().clear();
+  };
+  take();
+  CHECK(app->start(engine));
+  Frame f;
+  f.time = 0.5, f.dt = 0.25f, f.index = 1;
+  app->update(engine, f);
+  game::PlayInput in;
+  for (int i = 0; i < 3; ++i) world->step(1.0f / 30, in);
+  take();
+  app->stop(engine);
+  take();
+  // start, update, then each fixed step's ticks (the level's graph, Main, Second), then stop
+  bool order = said.size() >= 5 && (said.size() - 3) % 3 == 0 && said.front() == "start" && said[1] == "update" && said.back() == "stop";
+  for (std::size_t i = 2; order && i + 1 < said.size(); i += 3)
+    order = said[i] == "tick level" && said[i + 1] == "tick Main" && said[i + 2] == "tick Second";
+  CHECK(order);
+  if (!order)
+    for (const std::string& s : said) std::printf("  app_from_the_level: %s\n", s.c_str());
+  game::end_program_level();
+  CHECK(game::program_world() == nullptr);
+  // no Blueprint that implements App, or two of them: no App, and no world is kept
+  game::Level none = l;
+  none.actors[0].logic->implements.clear();
+  CHECK(game::start_program_level(game::to_text(none), renderer) == nullptr && game::program_world() == nullptr);
+  game::Level two = l;
+  two.actors[1].logic = two.actors[0].logic;
+  CHECK(game::start_program_level(game::to_text(two), renderer) == nullptr && game::program_world() == nullptr);
+  CHECK(game::start_program_level("{ broken", renderer) == nullptr);
+  renderer.shutdown();
 }
 
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds

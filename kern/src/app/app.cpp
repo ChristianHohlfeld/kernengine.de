@@ -1,6 +1,6 @@
 // Application runtime: Input bookkeeping and the C ABI the platform layer
-// (kern/web/app.mjs) drives. Only linked into modules that define
-// kern_create_app() (the C ABI below references it).
+// (kern/web/app.mjs) drives. The App is the program's kern_create_app() - or, where it defines none, the App of the
+// level it carries (kern_level_app, kern/game/level_app.h).
 #include "kern/app/app.h"
 
 #include <cmath>
@@ -188,6 +188,12 @@ Engine& engine_instance() {
   static Engine engine(c_api_renderer());
   return engine;
 }
+
+/// The App of a program that makes none itself: the program's level's (kern/game/level_app.h - the engine's object of
+/// the one Blueprint there that implements App), where the game runtime is linked in; else none. A program's own
+/// kern_create_app() wins.
+extern "C" __attribute__((weak)) App* kern_level_app(Engine& engine);
+__attribute__((weak)) App* kern_create_app() { return kern_level_app ? kern_level_app(engine_instance()) : nullptr; }
 
 /// Launch parameters, before kern_app_start ("k=v&k2=v2", URL-encoded).
 KERN_EXPORT(kern_app_set_args) void kern_app_set_args(const char* text, u32 length) { engine_instance().set_args(text, length); }

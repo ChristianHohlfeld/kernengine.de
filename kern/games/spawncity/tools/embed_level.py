@@ -76,6 +76,13 @@ std::string_view level_text() {{
 
 }}  // namespace sc::rules
 
+// The level as the program carries it, for the engine (kern/game/level_app.h: the App of a program that makes none).
+extern "C" const char* kern_level_text(unsigned* length) {{
+  const std::string_view text = sc::rules::level_text();
+  *length = static_cast<unsigned>(text.size());
+  return text.data();
+}}
+
 // The level's "project" for the engine (kern_app_start, kern/app/project.h).
 extern "C" const char* kern_project_text(unsigned* length) {{
   static const char text[] = R"KLEVEL({project})KLEVEL";
