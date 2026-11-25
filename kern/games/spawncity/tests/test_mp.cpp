@@ -1,9 +1,13 @@
-// Multiplayer: the rules (mp_rules.h) and three sessions (host + two clients) over a loopback
-// "wire" as the page's transports carry the datagrams.
+// Multiplayer: the rules and three sessions (host + two clients) over a loopback "wire" as the page's transports
+// carry the datagrams. The rules are the level's Blueprint mp_rules_cpp (beside its Multiplayer Blueprint), the
+// people people_cpp, the QR code qr_code_cpp - called as their classes, as the program calls them
+// (level_blueprints.h). The sessions run on the C++ (net_session.h) until the engine carries net::Transport:
+// the class's transport is the engine's (engine_host_transport_*), which the engine does not run yet.
 #include <algorithm>
 #include <functional>
 #include <map>
 #include <set>
+#include <string>
 
 #include "blueprint_call.h"
 #include "lamps.h"
@@ -18,106 +22,153 @@
 
 using namespace sc;
 
+namespace {
+using Mp = blueprints::mp_rules_cpp;
+using Pp = blueprints::people_cpp;
+/// A Blueprint of the level running as its class, beside the level's Blueprint `with` it asks (none: on its own).
+template <class T>
+struct ClassBlueprint {
+  RuleBlueprint rules;
+  bool bound = false;
+  ClassBlueprint(const char* with, const char* actor)
+      : rules(with ? with : actor, nullptr, true, with ? std::vector<std::string>{actor} : std::vector<std::string>{}) {
+    rules.rt.budget = rules::kLoopBudget;
+    bound = rules.problems.empty() && kern::logic::bind_blueprint<T>(rules.rt);
+  }
+  T& operator*() { return kern::logic::blueprint<T>(); }
+};
+std::string str(const kern::logic::Text& t) { return std::string(t.view()); }
+Mp::List<Mp::U8> u8s(std::initializer_list<int> v) {
+  Mp::List<Mp::U8> out;
+  for (int x : v) out.push_back(Mp::U8(static_cast<u8>(x)));
+  return out;
+}
+}  // namespace
+
+#define MP_BOUND                                                                       \
+  ClassBlueprint<Mp> b("Multiplayer", "mp_rules_cpp");                                 \
+  SC_CHECK(b.bound, "mp_rules_cpp runs as its class: %s", b.rules.problems.c_str());  \
+  if (!b.bound) return;                                                                \
+  Mp& m = *b
+
 SC_TEST(mp_pose_timeline_interpolates_on_sender_clock) {
-  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
-  mp::PoseTimeline t;
+  MP_BOUND;
+  Mp::mp_PoseTimeline t;
   // 30 Hz poses moving 1 m per packet along x, received with 40 ms latency and some jitter.
   for (int i = 0; i < 12; ++i) {
     const f64 src = 1000 + i * 33.0, rx = src + 40 + (i % 3) * 7.0;
-    t.push({static_cast<f32>(i), 0, 0}, Quat{}, {30, 0, 0}, true, src, rx);
+    m.PoseTimeline_push(t, {static_cast<f32>(i), 0, 0}, Mp::Quat{}, {30, 0, 0}, true, src, rx);
   }
   // Remote "now" = local - offset (40 ms floor); sample 90 ms behind it.
-  const mp::PoseSample s = t.sample(1000 + 11 * 33.0 + 40);
+  const Mp::mp_PoseSample s = m.PoseTimeline_sample(t, 1000 + 11 * 33.0 + 40).Result;
   SC_CHECK(s.valid && !s.extrapolated, "interpolated");
   const f32 expect = static_cast<f32>((11 * 33.0 - 90) / 33.0);
-  SC_CHECK(std::fabs(s.p.x - expect) < 0.35f, "x %.2f expect %.2f (offset %.1f)", s.p.x, expect, t.clock_offset_ms());
+  SC_CHECK(std::fabs(s.p.x - expect) < 0.35f, "x %.2f expect %.2f (offset %.1f)", static_cast<f64>(s.p.x), static_cast<f64>(expect), static_cast<f64>(t.offset_));
   // Past the newest packet: at most 100 ms of extrapolation, then hold.
-  const mp::PoseSample late = t.sample(1000 + 11 * 33.0 + 40 + 400);
-  SC_CHECK(late.extrapolated && late.p.x <= 11 + 30 * 0.1f + 0.5f, "extrapolation capped %.2f", late.p.x);
-  SC_CHECK(!t.push({0, 0, 0}, Quat{}, {}, false, 1000, 5000), "older source time refused");
+  const Mp::mp_PoseSample late = m.PoseTimeline_sample(t, 1000 + 11 * 33.0 + 40 + 400).Result;
+  SC_CHECK(late.extrapolated && late.p.x <= 11 + 30 * 0.1f + 0.5f, "extrapolation capped %.2f", static_cast<f64>(late.p.x));
+  SC_CHECK(!m.PoseTimeline_push(t, {0, 0, 0}, Mp::Quat{}, {}, false, 1000, 5000).Result, "older source time refused");
 }
 
 SC_TEST(mp_rules_damage_regen_spawn_vote) {
-  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
-  SC_CHECK(mp::round_damage(mp::Weapon::glock, mp::Zone::torso) == 26, "glock");
-  SC_CHECK(mp::round_damage(mp::Weapon::glock, mp::Zone::head) == 78, "glock head");
-  SC_CHECK(mp::round_damage(mp::Weapon::smg, mp::Zone::legs) == 8, "smg legs");
-  SC_CHECK(mp::round_damage(mp::Weapon::sniper, mp::Zone::head) == 100, "sniper head capped");
-  SC_CHECK(mp::judge_hit(true, true, false, false, 0, 0, 100) == mp::HitVerdict::friendly_fire_off, "ff off");
-  SC_CHECK(mp::judge_hit(true, true, true, false, 0, 0, 100) == mp::HitVerdict::applied, "self damage always");
-  SC_CHECK(mp::judge_hit(true, true, false, true, 100, 2000, 100) == mp::HitVerdict::protected_target, "protected");
-  SC_CHECK(mp::judge_hit(true, true, false, true, 100, 0, 0) == mp::HitVerdict::already_down, "down");
-  SC_CHECK(mp::regen(50, 4000, 0, 1) == 50, "no regen within 5 s");
-  SC_CHECK(mp::regen(50, 6000, 0, 1) == 62, "12 HP/s");
-  Rng rng{7};
+  MP_BOUND;
+  using W = Mp::mp_Weapon;
+  using Z = Mp::mp_Zone;
+  using V = Mp::mp_HitVerdict;
+  using St = Mp::mp_Ballot_Status;
+  auto round_damage = [&](W w, Z z) { return static_cast<f64>(m.round_damage(w, z).Result); };
+  SC_CHECK(round_damage(W::glock, Z::torso) == 26, "glock");
+  SC_CHECK(round_damage(W::glock, Z::head) == 78, "glock head");
+  SC_CHECK(round_damage(W::smg, Z::legs) == 8, "smg legs");
+  SC_CHECK(round_damage(W::sniper, Z::head) == 100, "sniper head capped");
+  SC_CHECK(m.judge_hit(true, true, false, false, 0, 0, 100).Result == V::friendly_fire_off, "ff off");
+  SC_CHECK(m.judge_hit(true, true, true, false, 0, 0, 100).Result == V::applied, "self damage always");
+  SC_CHECK(m.judge_hit(true, true, false, true, 100, 2000, 100).Result == V::protected_target, "protected");
+  SC_CHECK(m.judge_hit(true, true, false, true, 100, 0, 0).Result == V::already_down, "down");
+  SC_CHECK(m.regen(50, 4000, 0, 1).Result == 50, "no regen within 5 s");
+  SC_CHECK(m.regen(50, 6000, 0, 1).Result == 62, "12 HP/s");
+  Mp::Rng rng;
+  rng.s = 7;
   for (int i = 0; i < 50; ++i) {
-    const Vec2 o = mp::respawn_offset(rng);
+    const Vec3 o = m.respawn_offset(rng).Result;
     const f32 r = std::hypot(o.x, o.y);
-    SC_CHECK(r >= 2.99f && r <= 5.01f, "respawn radius %.2f", r);
+    SC_CHECK(r >= 2.99f && r <= 5.01f, "respawn radius %.2f", static_cast<f64>(r));
   }
-  Vec2 c;
-  SC_CHECK(mp::group_spawn_center({{0, 0}, {30, 0}, {60, 0}, {1000, 0}}, c) && c.x == 30, "medoid of the big group %.0f", c.x);
-  mp::Ballot b;
+  Vec3 c;
+  SC_CHECK(m.group_spawn_center({{0, 0, 0}, {30, 0, 0}, {60, 0, 0}, {1000, 0, 0}}, c, 65).Result && c.x == 30, "medoid of the big group %.0f", static_cast<f64>(c.x));
+  Mp::mp_Ballot bl;
+  auto create = [&](u32 id, u8 key, bool value, u8 host, std::initializer_list<int> members, f64 now) {
+    return static_cast<bool>(m.create_ballot(bl, id, key, value, host, u8s(members), now).Result);
+  };
+  St did = St::pending;
+  auto vote = [&](u8 voter, bool approve, std::initializer_list<int> current, f64 now) { return m.cast_vote(bl, did, voter, approve, u8s(current), now).Result; };
   // rules_vote_engine.mjs: no ballot with one voter, a host outside the roster or without an id
-  SC_CHECK(!mp::create_ballot(b, 1, 0, true, 1, {1}, 0) && b.status == mp::Ballot::Status::invalid, "one voter: invalid");
-  SC_CHECK(!mp::create_ballot(b, 1, 0, true, 9, {1, 2}, 0) && !mp::create_ballot(b, 0, 0, true, 1, {1, 2}, 0), "host not in the roster, no id: invalid");
-  SC_CHECK(mp::ballot_name(mp::Ballot::Status::pending) == "pending" && mp::ballot_name(b.status) == "invalid", "a ballot's status by its name");
-  SC_CHECK(mp::create_ballot(b, 7, 0, true, 2, {3, 1, 2, 2}, 0) && b.members.size() == 3 && b.expires_ms == 30000 && b.yes.size() == 1, "pending, each player once, the host has said yes");
-  mp::Ballot::Status did = mp::Ballot::Status::pending;
-  SC_CHECK(mp::cast_vote(b, 2, true, {1, 2, 3}, 1000, did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "the host has voted: ignored");
-  SC_CHECK(mp::cast_vote(b, 7, true, {1, 2, 3}, 1000, did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::ignored, "a stranger: ignored");
-  SC_CHECK(!mp::ballot_stale(b, {3, 2, 1}, 1000) && mp::ballot_stale(b, {1, 2}, 1000) && mp::ballot_stale(b, {1, 2, 3}, 30000), "stale: the roster changed or the time is up");
-  SC_CHECK(mp::cast_vote(b, 1, true, {3, 2, 1}, 2000, did) == mp::Ballot::Status::pending && did == mp::Ballot::Status::pending, "one more yes");
-  SC_CHECK(mp::cast_vote(b, 3, true, {1, 2, 3}, 3000, did) == mp::Ballot::Status::approved && did == mp::Ballot::Status::approved, "unanimous: approved");
-  SC_CHECK(mp::create_ballot(b, 8, 0, false, 1, {1, 2}, 0) && mp::cast_vote(b, 2, true, {1, 2, 4}, 1000) == mp::Ballot::Status::cancelled, "roster changed: cancelled");
-  SC_CHECK(mp::create_ballot(b, 9, 0, false, 1, {1, 2}, 0) && mp::cast_vote(b, 2, true, {1, 2}, 30000) == mp::Ballot::Status::cancelled, "expired after 30 s");
-  SC_CHECK(mp::create_ballot(b, 1, 0, true, 255, {3, 255, 1}, 0), "ballot");
-  SC_CHECK(mp::cast_vote(b, 1, true, {1, 3, 255}, 10) == mp::Ballot::Status::pending, "pending");
-  SC_CHECK(mp::cast_vote(b, 3, true, {1, 3, 255}, 20) == mp::Ballot::Status::approved, "unanimous");
-  SC_CHECK(mp::create_ballot(b, 2, 0, true, 255, {1, 255}, 0) && mp::cast_vote(b, 1, false, {1, 255}, 1) == mp::Ballot::Status::rejected, "one no");
-  SC_CHECK(mp::create_ballot(b, 3, 0, true, 255, {1, 255}, 0) && mp::cast_vote(b, 1, true, {1, 255}, 40000) == mp::Ballot::Status::cancelled, "expired");
-  const std::vector<u32> cols = mp::assign_colors({"0", "1", "255"});
+  SC_CHECK(!create(1, 0, true, 1, {1}, 0) && bl.status == St::invalid, "one voter: invalid");
+  SC_CHECK(!create(1, 0, true, 9, {1, 2}, 0) && !create(0, 0, true, 1, {1, 2}, 0), "host not in the roster, no id: invalid");
+  SC_CHECK(str(m.ballot_name(St::pending).Result) == "pending" && str(m.ballot_name(bl.status).Result) == "invalid", "a ballot's status by its name");
+  SC_CHECK(create(7, 0, true, 2, {3, 1, 2, 2}, 0) && bl.members.size() == 3 && bl.expires_ms == 30000 && bl.yes.size() == 1, "pending, each player once, the host has said yes");
+  did = St::pending;
+  SC_CHECK(vote(2, true, {1, 2, 3}, 1000) == St::pending && did == St::ignored, "the host has voted: ignored");
+  SC_CHECK(vote(7, true, {1, 2, 3}, 1000) == St::pending && did == St::ignored, "a stranger: ignored");
+  SC_CHECK(!m.ballot_stale(bl, u8s({3, 2, 1}), 1000).Result && m.ballot_stale(bl, u8s({1, 2}), 1000).Result && m.ballot_stale(bl, u8s({1, 2, 3}), 30000).Result,
+           "stale: the roster changed or the time is up");
+  SC_CHECK(vote(1, true, {3, 2, 1}, 2000) == St::pending && did == St::pending, "one more yes");
+  SC_CHECK(vote(3, true, {1, 2, 3}, 3000) == St::approved && did == St::approved, "unanimous: approved");
+  SC_CHECK(create(8, 0, false, 1, {1, 2}, 0) && vote(2, true, {1, 2, 4}, 1000) == St::cancelled, "roster changed: cancelled");
+  SC_CHECK(create(9, 0, false, 1, {1, 2}, 0) && vote(2, true, {1, 2}, 30000) == St::cancelled, "expired after 30 s");
+  SC_CHECK(create(1, 0, true, 255, {3, 255, 1}, 0), "ballot");
+  SC_CHECK(vote(1, true, {1, 3, 255}, 10) == St::pending, "pending");
+  SC_CHECK(vote(3, true, {1, 3, 255}, 20) == St::approved, "unanimous");
+  SC_CHECK(create(2, 0, true, 255, {1, 255}, 0) && vote(1, false, {1, 255}, 1) == St::rejected, "one no");
+  SC_CHECK(create(3, 0, true, 255, {1, 255}, 0) && vote(1, true, {1, 255}, 40000) == St::cancelled, "expired");
+  Mp::List<Mp::Text> ids;
+  for (const char* id : {"0", "1", "255"}) ids.push_back(Mp::Text(std::string(id)));
+  const auto cols = m.assign_colors(ids).Result;
   SC_CHECK(cols[0] != cols[1] && cols[1] != cols[2] && cols[0] != cols[2], "distinct colours");
 }
 
 SC_TEST(mp_voice_codec_and_stream) {
-  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
-  for (f32 v : {0.0f, 0.1f, -0.3f, 0.7f, -0.99f}) SC_CHECK(std::fabs(mp::decode_mulaw(mp::encode_mulaw(v)) - v) < 0.02f + std::fabs(v) * 0.04f, "mu-law %.2f", v);
-  SC_CHECK(mp::proximity_gain(3) == 1 && mp::proximity_gain(70) == 0 && std::fabs(mp::proximity_gain(37.5f) - 0.5f) < 0.01f, "gain");
-  SC_CHECK(mp::voice_gain(500, true) >= 0.85f, "everywhere");
-  mp::VoiceCapture cap;
-  std::vector<f32> tone(48000);
-  for (std::size_t i = 0; i < tone.size(); ++i) tone[i] = 0.5f * std::sin(static_cast<f32>(i) * 2 * kPi * 440 / 48000);
-  cap.push({tone.data(), 4800}, 48000);  // 100 ms -> one 80 ms frame
-  std::vector<u8> frame;
-  SC_CHECK(cap.take(frame) && frame.size() == mp::kVoiceFrame && !cap.take(frame), "one frame");
-  mp::VoiceStream vs;
-  SC_CHECK(vs.push(1, frame, 1) && !vs.push(1, frame, 1), "sequence");
-  std::vector<f32> out(48000 * 2, 0.0f);
-  vs.render(out, 48000, 48000);
-  f32 peak = 0;
-  for (f32 s : out) peak = std::fmax(peak, std::fabs(s));
+  MP_BOUND;
+  for (f32 v : {0.0f, 0.1f, -0.3f, 0.7f, -0.99f})
+    SC_CHECK(std::fabs(m.decode_mulaw(m.encode_mulaw(v).Result).Result - v) < 0.02f + std::fabs(v) * 0.04f, "mu-law %.2f", static_cast<f64>(v));
+  SC_CHECK(m.proximity_gain(3).Result == 1 && m.proximity_gain(70).Result == 0 && std::fabs(m.proximity_gain(37.5f).Result - 0.5f) < 0.01f, "gain");
+  SC_CHECK(m.voice_gain(500, true).Result >= 0.85f, "everywhere");
+  Mp::mp_VoiceCapture cap;
+  Mp::List<Mp::Float> tone;
+  for (std::size_t i = 0; i < 4800; ++i) tone.push_back(0.5f * std::sin(static_cast<f32>(i) * 2 * kPi * 440 / 48000));
+  m.VoiceCapture_push(cap, tone, 48000);  // 100 ms -> one 80 ms frame
+  Mp::List<Mp::U8> frame;
+  SC_CHECK(m.VoiceCapture_take(cap, frame).Result && frame.size() == Mp::kVoiceFrame && !m.VoiceCapture_take(cap, frame).Result, "one frame");
+  Mp::mp_VoiceStream vs;
+  SC_CHECK(m.VoiceStream_push(vs, frame, 1, 1).Result && !m.VoiceStream_push(vs, frame, 1, 1).Result, "sequence");
+  Mp::List<Mp::Float> out;
+  for (int i = 0; i < 48000 * 2; ++i) out.push_back(0.0f);
+  m.VoiceStream_render(vs, out, 48000, 48000);
+  f64 peak = 0;
+  for (f64 s : out) peak = std::fmax(peak, std::fabs(s));
   SC_CHECK(peak > 0.4f && peak < 0.6f, "played back %.2f", peak);
-  SC_CHECK(!vs.speaking(), "drained");
+  SC_CHECK(vs.queue_.empty(), "drained");
 }
 
 SC_TEST(mp_navigation_math) {
-  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
-  const std::vector<Vec2> route = {{0, 0}, {0, 100}, {100, 100}};
-  const mp::Turn t = mp::upcoming_turn(route, {0, 10});
-  SC_CHECK(t.dir == mp::Turn::Dir::right && std::fabs(t.distance - 90) < 1, "right turn in 90 m (%d %.1f)", static_cast<int>(t.dir), t.distance);
-  const std::vector<mp::Crumb> c = mp::sample_breadcrumbs(route, {0, 10});
+  MP_BOUND;
+  const Mp::List<Mp::Vector> route = {{0, 0, 0}, {0, 100, 0}, {100, 100, 0}};
+  const Mp::mp_Turn t = m.upcoming_turn(route, {0, 10, 0}, 250, 12, 38).Result;
+  SC_CHECK(t.dir == Mp::mp_Turn_Dir::right && std::fabs(t.distance - 90) < 1, "right turn in 90 m (%d %.1f)", static_cast<int>(t.dir), static_cast<f64>(t.distance));
+  const auto c = m.sample_breadcrumbs(route, {0, 10, 0}, 5, 18, 9).Result;
   SC_CHECK(c.size() == 5 && std::fabs(c[0].p.y - 19) < 0.01f, "crumbs");
-  SC_CHECK(std::fabs(mp::route_left(route, {0, 10}) - 190) < 0.5f, "left %.1f", mp::route_left(route, {0, 10}));
-  const mp::MapEdge e = mp::locate_map_peer({500, 100}, 400, 300);
-  SC_CHECK(e.offmap && std::fabs(e.p.x - 384) < 0.01f, "edge %.1f", e.p.x);
-  SC_CHECK(mp::format_distance(1234) == "1,2 km" && mp::format_distance(337) == "340 m", "fmt %s", mp::format_distance(1234).c_str());
-  mp::PingBoard pb;
-  SC_CHECK(pb.toggle(1, {0, 0, 0}, 0xff, 0) && pb.all().size() == 1, "ping set");
-  SC_CHECK(!pb.toggle(1, {2, 0, 0}, 0xff, 10) && pb.all().empty(), "ping removed within 5 m");
-  pb.set(2, {}, 1, 0);
-  pb.expire(91000);
-  SC_CHECK(pb.all().empty(), "expired after 90 s");
+  const f64 left = m.route_left(route, {0, 10, 0}).Result;
+  SC_CHECK(std::fabs(left - 190) < 0.5f, "left %.1f", left);
+  const Mp::mp_MapEdge e = m.locate_map_peer({500, 100, 0}, 400, 300, 16, 16, 30).Result;
+  SC_CHECK(e.offmap && std::fabs(e.p.x - 384) < 0.01f, "edge %.1f", static_cast<f64>(e.p.x));
+  const std::string km = str(m.format_distance(1234).Result);
+  SC_CHECK(km == "1,2 km" && str(m.format_distance(337).Result) == "340 m", "fmt %s", km.c_str());
+  Mp::mp_PingBoard pb;
+  SC_CHECK(m.PingBoard_toggle(pb, 1, {0, 0, 0}, 0xff, 0).Result && pb.pings_.size() == 1, "ping set");
+  SC_CHECK(!m.PingBoard_toggle(pb, 1, {2, 0, 0}, 0xff, 10).Result && pb.pings_.empty(), "ping removed within 5 m");
+  m.PingBoard_set(pb, 2, {}, 1, 0);
+  m.PingBoard_expire(pb, 91000);
+  SC_CHECK(pb.pings_.empty(), "expired after 90 s");
 }
 
 namespace {
@@ -352,7 +403,7 @@ SC_TEST(mp_qr_code_structure) {
   auto dark = [&](i64 x, i64 y) { return code.Code_dark(c, x, y).Result; };
   for (auto [x, y] : {std::pair<i64, i64>{0, 0}, {size - 7, 0}, {0, size - 7}}) SC_CHECK(dark(x, y) && dark(x + 6, y + 6) && !dark(x + 1, y + 1) && dark(x + 3, y + 3), "finder");
   SC_CHECK(dark(8, size - 8) && dark(8, 6) && !dark(9, 6), "dark module and timing");
-  blueprints::qr_code_cpp::Int level = 9, mask = 9;
+  blueprints::qr_code_cpp::U32 level = 9, mask = 9;
   SC_CHECK(qr.read_format(c, level, mask).Result && level == 1 && mask == 0, "format L / mask 0 (%lld %lld)", static_cast<long long>(level), static_cast<long long>(mask));
   SC_CHECK(!qr.encode(std::string(3000, 'x'), c).Result, "too long");
 }
@@ -412,38 +463,46 @@ SC_TEST(mp_swarm_police_and_enemies_are_seen_by_the_others) {
 
 // ... and a hit on a mate's unit is noted here for him by the unit's own rule, never applied here.
 SC_TEST(mp_people_note_hits_on_a_mates_unit) {
-  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
-  People town;
-  const i32 officer = town.add_officer({0, 0, 0}, 0, -1, 7);
-  town.at(officer).hp = 1e6f;
-  town.at(officer).remote = true;
+  ClassBlueprint<Pp> b(nullptr, "people_cpp");
+  SC_CHECK(b.bound, "people_cpp runs as its class: %s", b.rules.problems.c_str());
+  if (!b.bound) return;
+  Pp& pp = *b;
+  using State = Pp::People_State;
+  auto shot = [&](Pp::People& p, Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now) {
+    return static_cast<i32>(pp.People_shot(p, to, from, damage, by_player, now, -1, 0.5f).Result);
+  };
+  Pp::People town;
+  auto at = [](Pp::People& p, i32 i) -> Pp::People_Person& { return p.people_[static_cast<std::size_t>(i)]; };
+  const i32 officer = static_cast<i32>(pp.People_add_officer(town, {0, 0, 0}, 0, -1, 7).Result);
+  at(town, officer).hp = 1e6f;
+  at(town, officer).remote = true;
   Vec3 to{5, 0, 1.0f};
-  SC_CHECK(town.shot({-5, 0, 1.0f}, to, 26, true, 10) == officer && !town.last_head(), "the round meets him (body)");
-  std::vector<People::RemoteHit> hits;
-  town.take_remote_hits(hits);
-  SC_CHECK(hits.size() == 1 && hits[0].index == officer && hits[0].damage == 150, "a Glock round on an officer: six counted hits of 25 (%f)", hits.empty() ? 0.0 : hits[0].damage);
-  SC_CHECK(town.at(officer).hp == 1e6f && town.at(officer).state != People::State::down, "nothing applied here");
+  SC_CHECK(shot(town, {-5, 0, 1.0f}, to, 26, true, 10) == officer && !pp.People_last_head(town).Result, "the round meets him (body)");
+  Pp::List<Pp::People_RemoteHit> hits;
+  pp.People_take_remote_hits(town, hits);
+  SC_CHECK(hits.size() == 1 && hits[0].index == officer && hits[0].damage == 150, "a Glock round on an officer: six counted hits of 25 (%f)", hits.empty() ? 0.0 : static_cast<f64>(hits[0].damage));
+  SC_CHECK(at(town, officer).hp == 1e6f && at(town, officer).state != State::down, "nothing applied here");
   to = {5, 0, 1.0f};
-  town.shot({-5, 0, 1.0f}, to, 13, true, 10.5f);
+  shot(town, {-5, 0, 1.0f}, to, 13, true, 10.5f);
   hits.clear();
-  town.take_remote_hits(hits);
+  pp.People_take_remote_hits(town, hits);
   SC_CHECK(hits.size() == 1 && hits[0].damage == 25, "an MP round: one hit of 25");
   // a blast is not noted: the owner's machine runs it on the real unit
-  town.blast({0.5f, 0, 0.9f}, 8, 200, true, 11);
+  pp.People_blast(town, {0.5f, 0, 0.9f}, 8, 200, true, 11);
   hits.clear();
-  town.take_remote_hits(hits);
-  std::vector<People::Death> deaths;
-  town.take_deaths(deaths);
-  SC_CHECK(hits.empty() && deaths.empty() && town.at(officer).hp == 1e6f, "a blast leaves a mate's unit to its owner");
+  pp.People_take_remote_hits(town, hits);
+  Pp::List<Pp::People_Death> deaths;
+  pp.People_take_deaths(town, deaths);
+  SC_CHECK(hits.empty() && deaths.empty() && at(town, officer).hp == 1e6f, "a blast leaves a mate's unit to its owner");
   // our own officer beside him takes the same round by the same rule (the single-player path)
-  People own;
-  const i32 mine = own.add_officer({0, 0, 0}, 0, 0, 7);
+  Pp::People own;
+  const i32 mine = static_cast<i32>(pp.People_add_officer(own, {0, 0, 0}, 0, 0, 7).Result);
   to = {5, 0, 1.0f};
-  own.shot({-5, 0, 1.0f}, to, 13, true, 10);
-  SC_CHECK(own.at(mine).hp == 75, "our own officer: 100 - 25 (%f)", own.at(mine).hp);
+  shot(own, {-5, 0, 1.0f}, to, 13, true, 10);
+  SC_CHECK(at(own, mine).hp == 75, "our own officer: 100 - 25 (%f)", static_cast<f64>(at(own, mine).hp));
   to = {5, 0, 1.0f};
-  own.shot({-5, 0, 1.0f}, to, 26, true, 10.2f);
-  SC_CHECK(own.at(mine).state == People::State::down, "and down under the Glock");
+  shot(own, {-5, 0, 1.0f}, to, 26, true, 10.2f);
+  SC_CHECK(at(own, mine).state == State::down, "and down under the Glock");
 }
 
 // More units than one message carries arrive complete - in numbered parts, never a list with

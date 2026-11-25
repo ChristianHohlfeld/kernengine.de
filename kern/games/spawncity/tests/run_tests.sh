@@ -67,6 +67,7 @@ called_by_tests=(
   world_traffic_cpp
   controls_cpp
   touch_play_cpp
+  mp_rules_cpp
 )
 "$kern/../tools/blueprint_cpp.sh" "$game/level/spawncity.klevel" "$game/src/level_blueprints.cpp" "$game/src/level_blueprints.h" Program "${called_by_tests[@]}"
 # Kern's engine-side pieces the models use (physics, geometry builders, the renderer headless on
