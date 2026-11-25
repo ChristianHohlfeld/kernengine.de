@@ -5746,8 +5746,8 @@ SC_TEST(lowered_combat_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // Race::crossed(i32, Vec3, Vec3)  ->  Race::crossed(i32, Vec3, Vec3)
-    ::sc::lowered::Tally tally("Race::crossed(i32, Vec3, Vec3)");
+  {  // Race::crossed(i32, kern::Vec3, kern::Vec3)  ->  Race::crossed(i32, kern::Vec3, kern::Vec3)
+    ::sc::lowered::Tally tally("Race::crossed(i32, kern::Vec3, kern::Vec3)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
@@ -5823,11 +5823,11 @@ SC_TEST(lowered_combat_rules_cpp) {
       ::sc::lowered::Arg<i32> o0;
       ::sc::lowered::Arg<i32> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
-      ::sc::lowered::Arg<Vec3> o1;
-      ::sc::lowered::Arg<Vec3> n1;
+      ::sc::lowered::Arg<kern::Vec3> o1;
+      ::sc::lowered::Arg<kern::Vec3> n1;
       ::sc::lowered::draw_pair(draw, o1, n1);
-      ::sc::lowered::Arg<Vec3> o2;
-      ::sc::lowered::Arg<Vec3> n2;
+      ::sc::lowered::Arg<kern::Vec3> o2;
+      ::sc::lowered::Arg<kern::Vec3> n2;
       ::sc::lowered::draw_pair(draw, o2, n2);
       std::optional<std::remove_cvref_t<decltype(::sc_old_combat_rules::sc::combat::Race::crossed(o0.get(), o1.get(), o2.get()))>> o_r;
       std::optional<std::remove_cvref_t<decltype(::sc_new_combat_rules::sc::combat::Race::crossed(n0.get(), n1.get(), n2.get()))>> n_r;
@@ -5908,8 +5908,8 @@ SC_TEST(lowered_combat_rules_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // Race::update(Vec3, f32)  ->  Race::update(Vec3, f32)
-    ::sc::lowered::Tally tally("Race::update(Vec3, f32)");
+  {  // Race::update(kern::Vec3, f32)  ->  Race::update(kern::Vec3, f32)
+    ::sc::lowered::Tally tally("Race::update(kern::Vec3, f32)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc::lowered::draw_pair(draw, ::sc_old_combat_rules::sc::combat::kTriggerHeat, ::sc_new_combat_rules::sc::combat::kTriggerHeat);
@@ -5986,8 +5986,8 @@ SC_TEST(lowered_combat_rules_cpp) {
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
       ::sc_new_combat_rules::sc::combat::Race n_self{};
       ::sc::lowered::carry(o_self, n_self);
-      ::sc::lowered::Arg<Vec3> o0;
-      ::sc::lowered::Arg<Vec3> n0;
+      ::sc::lowered::Arg<kern::Vec3> o0;
+      ::sc::lowered::Arg<kern::Vec3> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
       ::sc::lowered::Arg<f32> o1;
       ::sc::lowered::Arg<f32> n1;

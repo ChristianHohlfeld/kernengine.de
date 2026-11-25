@@ -387,12 +387,12 @@ SC_TEST(lowered_combat_detail_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // bullet_impulse(Vec3, Round)  ->  bullet_impulse(Vec3, Round)
-    ::sc::lowered::Tally tally("bullet_impulse(Vec3, Round)");
+  {  // bullet_impulse(kern::Vec3, Round)  ->  bullet_impulse(kern::Vec3, Round)
+    ::sc::lowered::Tally tally("bullet_impulse(kern::Vec3, Round)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
-      ::sc::lowered::Arg<Vec3> o0;
-      ::sc::lowered::Arg<Vec3> n0;
+      ::sc::lowered::Arg<kern::Vec3> o0;
+      ::sc::lowered::Arg<kern::Vec3> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
       ::sc::lowered::Arg<::sc_old_combat_detail::sc::detail::Round> o1;
       ::sc::lowered::Arg<::sc_new_combat_detail::sc::detail::Round> n1;

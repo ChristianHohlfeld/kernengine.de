@@ -2979,16 +2979,16 @@ SC_TEST(lowered_city_stream_cpp) {
       tally.take(old_defined && new_defined, differs.text, old_asks, new_asks, call);
     }
   }
-  {  // CityStream::update(Vec3, f64)  ->  CityStream::update(Vec3, f64)
-    ::sc::lowered::Tally tally("CityStream::update(Vec3, f64)");
+  {  // CityStream::update(kern::Vec3, f64)  ->  CityStream::update(kern::Vec3, f64)
+    ::sc::lowered::Tally tally("CityStream::update(kern::Vec3, f64)");
     ::sc::converted::Draw draw;
     for (int call = 0; tally.more(call); ++call) {
       ::sc_old_city_stream::sc::CityStream o_self{};
       if (draw.flag()) ::sc::lowered::draw(draw, o_self);
       ::sc_new_city_stream::sc::CityStream n_self{};
       ::sc::lowered::carry(o_self, n_self);
-      ::sc::lowered::Arg<Vec3> o0;
-      ::sc::lowered::Arg<Vec3> n0;
+      ::sc::lowered::Arg<kern::Vec3> o0;
+      ::sc::lowered::Arg<kern::Vec3> n0;
       ::sc::lowered::draw_pair(draw, o0, n0);
       ::sc::lowered::Arg<f64> o1;
       ::sc::lowered::Arg<f64> n1;

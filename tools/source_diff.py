@@ -123,6 +123,17 @@ def split_params(sig):
     return ret, out
 
 
+def engine_named(t, desugared):
+    """A type as the source spells it, where it names a class of the engine by a name a using-declaration gave it
+    (`using kern::MeshData;` in vehicle_art.cpp: `const MeshData &`) - by its full name (`const kern::MeshData &`):
+    the test does not stand where that declaration does."""
+    def full(m):
+        w = m.group(0)
+        q = re.search(r"(?<![\w:])((?:::)?kern::(?:\w+::)*)" + re.escape(w) + r"\b", desugared or "")
+        return q.group(1) + w if q else w
+    return re.sub(r"(?<![\w:])(?!(?:const|volatile|unsigned|signed|struct|class|enum)\b)[A-Za-z_]\w*\b(?!\s*::)", full, t)
+
+
 class Fn:
     """A function of the changed file with its body."""
 
@@ -140,7 +151,15 @@ class Fn:
         sig = (node.get("type") or {}).get("qualType", "")
         self.ret, self.sig_params = split_params(sig) if "(" in sig else ("", [])
         self.const = bool(re.search(r"\)\s*const\b", sig))
-        self.params = [(p.get("name") or f"p{k}", (p.get("type") or {}).get("qualType", ""), C.qtype(p)) for k, p in enumerate(x for x in kids(node) if x.get("kind") == "ParmVarDecl")]
+        # (a name of the engine the definition spells by a using-declaration of its file: the first declaration - the
+        # header's, which every file sees - or the compiler's own spelling says which class it is)
+        first = node
+        while version.decl_by_id.get(first.get("previousDecl")):
+            first = version.decl_by_id[first["previousDecl"]]
+        declared = [x for x in kids(first) if x.get("kind") == "ParmVarDecl"]
+        ps = [x for x in kids(node) if x.get("kind") == "ParmVarDecl"]
+        said = lambda k, p: " ".join([(p.get("type") or {}).get("desugaredQualType") or "", ((declared[k].get("type") or {}).get("qualType", "") if len(declared) == len(ps) else ""), C.qtype(p)])
+        self.params = [(p.get("name") or f"p{k}", engine_named((p.get("type") or {}).get("qualType", ""), said(k, p)), C.qtype(p)) for k, p in enumerate(ps)]
         self.body = next((c for c in kids(node) if c.get("kind") == "CompoundStmt"), None)
 
     @property
