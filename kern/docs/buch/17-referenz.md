@@ -228,7 +228,7 @@ Vom Host `kern/web/app.mjs` getrieben ([Kapitel 12](12-eigene-spiele.md)).
 | Funktion | Beschreibung |
 |---|---|
 | `void kern_app_set_args(const char* text, u32 length)` | Startparameter vor dem Start (`k=v&k2=v2`, URL-kodiert) |
-| `i32 kern_app_start(i32 width, i32 height)` | die App, die `kern_main` gab: `configure()`, Renderer-Init, `start()` |
+| `i32 kern_app_start(i32 width, i32 height)` | die App, die `kern_main` gab: ihre Einstellungen (das Profil des Startparameters `profile`), Renderer-Init, `start()` |
 | `i32 kern_app_frame(f64 now_ms, i32 page_hidden)` | ein Frame: `update()` (dt auf 0…0,1 s begrenzt), dann Rendern; 0, wenn das Rendern scheitert |
 | `i32 kern_app_resize(i32 width, i32 height)` | Größe; ruft `resized()` |
 | `void kern_app_key(u32 key, i32 down)` | Taste (`kern::Key`) |

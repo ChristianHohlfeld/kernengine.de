@@ -25,22 +25,27 @@
       },
       "grade": true
     },
-    "mobile": {
-      "shadow": {
-        "resolution": 1024,
-        "extent": 70,
-        "bias": 0.0016,
-        "filter": 4
-      },
-      "ao": {
-        "enabled": true,
-        "quality": "low",
-        "halfResolution": true,
-        "radius": 1.6,
-        "power": 2.2,
-        "adaptive": true
+    "profiles": [
+      {
+        "name": "mobile",
+        "renderer": {
+          "shadow": {
+            "resolution": 1024,
+            "extent": 70,
+            "bias": 0.0016,
+            "filter": 4
+          },
+          "ao": {
+            "enabled": true,
+            "quality": "low",
+            "halfResolution": true,
+            "radius": 1.6,
+            "power": 2.2,
+            "adaptive": true
+          }
+        }
       }
-    },
+    ],
     "heapReserveMb": 320
   },
   "levels": [

@@ -142,7 +142,6 @@ class ProgramApp final : public App {
     if (!program.running()) program.start(project);
     return program.app();
   }
-  RendererOptions configure() override { App* a = app(); return a ? a->configure() : RendererOptions{}; }
   Span<ShaderExtension* const> extensions() override { App* a = app(); return a ? a->extensions() : Span<ShaderExtension* const>{}; }
   bool start(Engine& engine) override { App* a = app(); return a && a->start(engine); }
   void update(Engine& engine, const Frame& frame) override { if (App* a = program.app()) a->update(engine, frame); }

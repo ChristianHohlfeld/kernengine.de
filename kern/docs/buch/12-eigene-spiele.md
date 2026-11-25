@@ -164,7 +164,6 @@ Die API steht in `kern/include/kern/app/app.h` und wird mit `#include "kern/kern
 
 | Methode | Wann | Zweck |
 |---|---|---|
-| `RendererOptions configure()` | einmal, vor `start` | Schatten, Bloom und weitere Renderer-Optionen (Breite und Höhe setzt die Engine) |
 | `Span<ShaderExtension* const> extensions()` | einmal, vor `start` | eigene Shader-Erweiterungen; sie müssen die App überleben |
 | `bool start(Engine&)` | einmal | Meshes anlegen, Zustand vorbereiten; `false` bricht ab |
 | `void update(Engine&, const Frame&)` | jeden Bildschirm-Frame | Eingabe lesen, Spiel fortschreiben, Szene aktualisieren |
@@ -210,7 +209,7 @@ Seite (app.mjs)                       Modul (src/app/app.cpp)
 ---------------------------------------------------------------------------
 kern_app_set_args("?time=0.6")   ->   Engine::set_args
 kern_main()                      ->   kern::run(app, settings)  (Einstieg des Programms)
-kern_app_start(w, h)             ->   configure(), Renderer::init, start()
+kern_app_start(w, h)             ->   settings (profile=<name>), Renderer::init, start()
 Tastatur / Maus / Touch          ->   kern_app_key / _pointer / _wheel / _touch / _focus
 requestAnimationFrame:
   kern_app_frame(now, hidden)    ->   update(engine, frame); input.end_frame(); render()
@@ -243,17 +242,12 @@ using namespace kern;
 ```cpp
 class Hello final : public App {
  public:
-  RendererOptions configure() override {
-    RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 1024;
-    o.shadow.extent = 40;
-    return o;
-  }
 ```
 
-`configure` legt den Renderer fest, bevor es ihn gibt: Sonnenschatten mit einer 1024er-Karte, die 40 m
-abdeckt. Breite und Höhe trägt die Engine selbst ein.
+Den Renderer legen, bevor es ihn gibt, die Einstellungen fest, die `kern_main` mit der App übergibt (`kern::run(app,
+settings)`, unten): Sonnenschatten mit einer 1024er-Karte, die 40 m abdeckt. Breite und Höhe trägt die Engine selbst
+ein. Einen zweiten Weg gibt es nicht (die App hat kein `configure`): ein Spiel mit Projekt-Datei nimmt sie aus seinem
+Projekt (12.2.7).
 
 ```cpp
   bool start(Engine& engine) override {
@@ -369,7 +363,11 @@ auf z = 0, ihre Vertexfarbe ist orange). Weiße Tints lassen diese Farbe unverä
 ```cpp
 int kern_main() {
   static Hello app;
-  return kern::run(app);
+  ProjectSettings settings;
+  settings.renderer.shadows = true;
+  settings.renderer.shadow.resolution = 1024;
+  settings.renderer.shadow.extent = 40;
+  return kern::run(app, settings);
 }
 ```
 
@@ -616,8 +614,10 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
 
 Die Projekt-Datei (`<name>.kproject`, `kern::game::Project`, `include/kern/game/project.h`; siehe `kern/docs/project.md`)
 trägt die Einstellungen, die die Engine beim Start des Programms anwendet: ihr Feld `"settings"`
-(`kern::ProjectSettings`, `include/kern/app/project.h`) – die Renderer-Optionen (`renderer`), den Teil fürs Telefon
-(`mobile`: Schatten und Umgebungsverdeckung, beim Startparameter `mobile=1`) und `heapReserveMb`, den Heap, der vor
+(`kern::ProjectSettings`, `include/kern/app/project.h`) – die Renderer-Optionen (`renderer`), dieselben
+als Geräteprofile (`profiles`: je ein Name und die Renderer-Optionen auf dieser Art Gerät – der `renderer` des
+Projekts mit den Schlüsseln, die das Profil nennt, darüber –, gewählt beim Start mit dem Startparameter
+`profile=<name>`) und `heapReserveMb`, den Heap, der vor
 dem Start einmal genommen und zurückgegeben wird (der Allokator behält ihn; das Spiel stockt nicht, weil der Speicher
 beim Spielen Stück für Stück wächst). Ein Level enthält nur seine Welt: eine Level-Datei mit dem alten Feld
 `"project"` wird mit Stelle und Grund abgelehnt.
@@ -626,9 +626,11 @@ Der Bau bettet Projekt und Levels ein (`kern/tools/embed_project.py <name.kproje
 `kern::game::embedded_project()` (`include/kern/game/embedded.h`) ist das daraus gelesene Projekt. Der Einstieg des
 Programms gibt der Engine die Einstellungen des Projekts mit seiner App: `kern::run(kern::game::embedded_project())` für
 ein Projekt, dessen App ein Programm-Blueprint ist, `kern::run(app, kern::game::embedded_project().settings)` für eine
-App aus C++. `kern_app_start` wendet sie vor allem anderen der App an: mit Einstellungen startet der Renderer mit `renderer` statt
-`App::configure()`, danach der Heap-Vorgriff und bei `mobile=1` Schatten und Verdeckung des Telefons – dann
-`App::start()`. Ohne entscheidet die App.
+App aus C++. `kern_app_start` wendet sie vor allem anderen der App an: der Renderer startet mit dem Profil, das `profile=<name>`
+nennt, sonst mit `renderer` (ein Name, zu dem das Projekt kein Profil hat, ist ein Fehler im Log, mit den Namen, die es
+hat); danach der Heap-Vorgriff – dann `App::start()`. `kern::run(app)` ohne Einstellungen: die Vorgaben der Engine. Das
+feste Telefon-Feld von früher (`"mobile"`), ein Profil ohne Namen oder mit einem Namen zweimal werden mit Stelle
+abgelehnt.
 
 ## 12.3 Die Plattformschicht `web/app.mjs`
 

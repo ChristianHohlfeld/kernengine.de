@@ -213,9 +213,6 @@ const std::vector<EngineFunction>& engine_functions() {
       {"engine.engine.set_stereo_cross", "kern::Engine::set_stereo_cross", "Set Stereo Cross", "Engine: Engine", "", false,
        {{"engine", PinType::integer, "", "i"}, {"on", PinType::boolean, "", "b"}},
        {}},
-      {"engine.app.configure", "kern::App::configure", "Configure", "Engine: App", "Renderer configuration, asked once before start().", false,
-       {{"app", PinType::integer, "", "i"}},
-       {{"result", PinType::structure, "RendererOptions", "{iib{inni}{bbb}{be4bnnb}b}"}}},
       {"engine.app.extensions", "kern::App::extensions", "Extensions", "Engine: App", "Shader extensions the game uses (must outlive the app).", false,
        {{"app", PinType::integer, "", "i"}},
        {{"result", PinType::integer_list, "", "[i]"}}},
@@ -2658,7 +2655,7 @@ const std::vector<EngineFunction>& engine_functions() {
 
 const std::vector<EngineInterface>& engine_interfaces() {
   static const std::vector<EngineInterface> all = {
-      {"App", "kern::App", {{"configure", "engine.app.configure", false}, {"extensions", "engine.app.extensions", false}, {"start", "engine.app.start", true}, {"update", "engine.app.update", true}, {"resized", "engine.app.resized", false}, {"stop", "engine.app.stop", false}}},
+      {"App", "kern::App", {{"extensions", "engine.app.extensions", false}, {"start", "engine.app.start", true}, {"update", "engine.app.update", true}, {"resized", "engine.app.resized", false}, {"stop", "engine.app.stop", false}}},
       {"game_FixedStep", "kern::game::FixedStep", {{"fixed_step", "engine.fixed_step.fixed_step", true}}},
       {"ShaderExtension", "kern::ShaderExtension", {{"name", "engine.shader_extension.name", true}, {"attributes", "engine.shader_extension.attributes", false}, {"vertex_declarations", "engine.shader_extension.vertex_declarations", false}, {"vertex", "engine.shader_extension.vertex", false}, {"fragment_declarations", "engine.shader_extension.fragment_declarations", false}, {"fragment_discard", "engine.shader_extension.fragment_discard", false}, {"fragment_input", "engine.shader_extension.fragment_input", false}, {"fragment_surface", "engine.shader_extension.fragment_surface", false}, {"bind", "engine.shader_extension.bind", false}, {"frame_uniforms", "engine.shader_extension.frame_uniforms", false}, {"material_uniforms", "engine.shader_extension.material_uniforms", false, "is handed a pointer without its count"}}},
       {"net_Transport", "kern::net::Transport", {{"address", "engine.transport.address", true}, {"send", "engine.transport.send", true}, {"receive", "engine.transport.receive", true}, {"advance_time", "engine.transport.advance_time", false}}},

@@ -18,7 +18,7 @@ namespace {
 
 class SpawnCityApp final : public kern::App {
  public:
-  kern::RendererOptions configure() override {
+  kern::RendererOptions configure() {   // (App::configure is gone: the settings are the project's - kern::run)
     kern::RendererOptions o;
     o.shadows = true;
     o.shadow.resolution = 2048;  // stylized_world_style.mjs: 2048, mobile 1024 (the page passes ?mobile=1)

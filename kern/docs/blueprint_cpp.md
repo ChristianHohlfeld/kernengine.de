@@ -1508,7 +1508,7 @@ struct Site : virtual kern::Blueprint, virtual Ground {
 
 ### Schnittstellen der Engine (ein Blueprint als Objekt, das die Engine ruft)
 
-Eine Klasse der Engine mit virtuellen Funktionen – `kern::App` (configure, extensions, start, update, resized, stop),
+Eine Klasse der Engine mit virtuellen Funktionen – `kern::App` (extensions, start, update, resized, stop),
 `kern::ShaderExtension` (name, die Stücke des Shader-Texts, bind, frame_uniforms …) – ist eine **Schnittstelle**: die
 Engine ruft ein Objekt von ihr. Ein Blueprint kann dieses Objekt sein (Entscheidung E-c2). Anders als ein Callback (eine
 Funktion einer Bibliothek, ohne Welt) ist es ein Blueprint mit Zustand, der in der Welt läuft.

@@ -229,7 +229,7 @@ Driven by the host `kern/web/app.mjs` ([Chapter 12](12-your-own-games.md)).
 | Function | Description |
 |---|---|
 | `void kern_app_set_args(const char* text, u32 length)` | start parameters before the start (`k=v&k2=v2`, URL-encoded) |
-| `i32 kern_app_start(i32 width, i32 height)` | the App `kern_main` gave: `configure()`, renderer init, `start()` |
+| `i32 kern_app_start(i32 width, i32 height)` | the App `kern_main` gave: its settings (the profile of the launch argument `profile`), renderer init, `start()` |
 | `i32 kern_app_frame(f64 now_ms, i32 page_hidden)` | one frame: `update()` (dt clamped to 0…0.1 s), then rendering; 0 if rendering fails |
 | `i32 kern_app_resize(i32 width, i32 height)` | size; calls `resized()` |
 | `void kern_app_key(u32 key, i32 down)` | key (`kern::Key`) |

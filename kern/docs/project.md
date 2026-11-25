@@ -25,7 +25,7 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
   "name": "Mein Spiel",
   "settings": {
     "renderer": { "shadows": true, "shadow": { … }, "bloom": { … }, "ao": { … }, "grade": true },
-    "mobile": { "shadow": { … }, "ao": { … } },
+    "profiles": [ { "name": "mobile", "renderer": { "shadow": { … }, "ao": { … } } } ],
     "heapReserveMb": 0
   },
   "levels": ["levels/start.klevel", "levels/wald.klevel"],
@@ -38,8 +38,12 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
 }
 ```
 
-- `settings` enthält die heutigen Projekt-Einstellungen (`kern/app/project.h`, `ProjectSettings`). Die Engine wendet sie
-  vor dem Start des Renderers an. Ein Level hat dann keinen Abschnitt `"project"` mehr.
+- `settings` (`kern/app/project.h`, `ProjectSettings`) ist der **eine** Weg, den Renderer einzurichten (die App hat kein
+  `configure`): `renderer`, die Geräteprofile `profiles` (je Name und Renderer – der des Projekts mit den Schlüsseln
+  des Profils darüber; gewählt beim Start mit dem Startparameter `profile=<name>`, ein unbekannter Name ist ein Fehler
+  im Log mit den vorhandenen Namen) und `heapReserveMb` (0–4095). Die Engine wendet sie vor dem Start des Renderers an;
+  `kern::run` übergibt sie (4.). Das feste Telefon-Feld `"mobile"` früherer Dateien, ein Profil ohne Namen oder mit
+  doppeltem Namen: Fehler mit Stelle. Ein Level hat keinen Abschnitt `"project"`.
 - `levels` nennt die Levels des Projekts (Pfade relativ zur Projekt-Datei), `startLevel` das erste davon. Welches Level
   wann läuft, entscheidet das Programm (siehe 4.); `startLevel` ist nur die Vorgabe, die der Editor bei Play öffnet und
   die ein Programm ohne eigene Wahl nimmt.
@@ -179,6 +183,7 @@ Eingang **World** (Int, der Handle einer GameWorld):
   `studio_project`, e2e im Modul-Bau.
 - Gebaut (Teil 3): der eine Einstieg `kern_main()` mit `kern::run(App&, settings)` / `kern::run(Project)`; die
   schwachen Symbole `kern_create_app`, `kern_project_app`, `kern_project_text` und `kern_game_extensions` sind
-  ersatzlos entfernt (Test `run_the_program_of_a_project`).
+  ersatzlos entfernt (Test `run_the_program_of_a_project`). Einstellungen: ein Weg – `App::configure()` ist entfernt,
+  Geräteprofile als Liste `profiles` statt `mobile` (Tests `game_project_round_trip`, `studio_project`).
 - Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

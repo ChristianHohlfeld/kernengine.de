@@ -9,14 +9,6 @@ using namespace kern;
 
 class Hello final : public App {
  public:
-  RendererOptions configure() override {
-    RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 1024;
-    o.shadow.extent = 40;
-    return o;
-  }
-
   bool start(Engine& engine) override {
     Renderer& r = engine.renderer();
     ground_ = r.allocate_id();
@@ -80,5 +72,9 @@ class Hello final : public App {
 
 int kern_main() {
   static Hello app;
-  return kern::run(app);
+  ProjectSettings settings;   // (the renderer before it exists: sun shadows, a 1024 map covering 40 m)
+  settings.renderer.shadows = true;
+  settings.renderer.shadow.resolution = 1024;
+  settings.renderer.shadow.extent = 40;
+  return kern::run(app, settings);
 }

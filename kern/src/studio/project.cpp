@@ -96,7 +96,7 @@ json::Value Studio::project_json() const {
   for (const std::string& l : project_.levels) levels.push(l);
   o.set("levels", std::move(levels));
   o.set("startLevel", project_.first_level());
-  o.set("settings", project_.settings.set ? project_to_json(project_.settings) : json::Value::object());
+  o.set("settings", project_to_json(project_.settings));
   json::Value bps = json::Value::array();
   for (std::size_t i = 0; i < project_.blueprints.size(); ++i) {
     const game::ProgramBlueprint& b = project_.blueprints[i];

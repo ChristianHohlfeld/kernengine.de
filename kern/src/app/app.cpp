@@ -156,17 +156,23 @@ bool g_running = false;
 }  // namespace
 
 namespace kern {
+/// The renderer the project's settings start: the device profile the launch argument profile=<name> names, else the
+/// project's. A name the project has no profile of: an error in the log with the names it has, and the project's.
+RendererOptions start_renderer(const ProjectSettings& p, const Engine& e) {
+  const std::string want = e.arg("profile", "");
+  if (want.empty()) return p.renderer;
+  if (const DeviceProfile* d = p.profile(want)) return d->renderer;
+  std::string names;
+  for (const DeviceProfile& d : p.profiles) names += (names.empty() ? "" : ", ") + d.name;
+  log(LogLevel::error, "the launch argument profile=%s names no device profile of the project (it has: %s) - the renderer starts with the project's",
+      want.c_str(), names.empty() ? "none" : names.c_str());
+  return p.renderer;
+}
 /// Between the renderer's init and App::start: the heap grown once - one block taken and given back stays in the
-/// allocator's free space (wasm memory never shrinks), so the game does not stall growing it piece by piece -
-/// and with mobile=1 the phone's shadows and ambient occlusion on the renderer.
-void apply_project_start(const ProjectSettings& p, Engine& e) {
+/// allocator's free space (wasm memory never shrinks), so the game does not stall growing it piece by piece.
+void reserve_heap(const ProjectSettings& p) {
   if (p.heap_reserve_mb > 0)
     if (void* reserve = std::malloc(static_cast<std::size_t>(p.heap_reserve_mb) << 20)) std::free(reserve);
-  if (p.mobile_set && e.arg_number("mobile", 0) > 0) {
-    ShadowOptions s = p.mobile_shadow;
-    e.renderer().set_shadows(&s);
-    e.renderer().set_ambient_occlusion(p.mobile_ao);
-  }
 }
 namespace {
 /// The project's settings the program's kern_main() handed over with its App (kern::run).
@@ -198,11 +204,11 @@ KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
   Engine& engine = engine_instance();
   g_engine = &engine;
   const ProjectSettings& project = g_settings;
-  RendererOptions options = project.set ? project.renderer : g_app->configure();
+  RendererOptions options = start_renderer(project, engine);
   options.width = width;
   options.height = height;
   if (!engine.renderer().init(options, g_app->extensions())) return 0;
-  if (project.set) apply_project_start(project, engine);
+  reserve_heap(project);
   if (!g_app->start(engine)) return 0;
   g_running = true;
   g_start_ms = g_last_ms = -1;

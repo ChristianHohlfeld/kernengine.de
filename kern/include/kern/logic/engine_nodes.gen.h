@@ -2795,23 +2795,11 @@ struct P_engine_character_mover_settings {
 template <class B> class ClassImplements_App final : public kern::App {
  public:
   explicit ClassImplements_App(B& b) : b_(b) {}
-  template <class X> static constexpr bool kern_has_configure = requires { requires std::is_same_v<typename MemberOf<decltype(&X::configure)>::type, X>; };
   template <class X> static constexpr bool kern_has_extensions = requires { requires std::is_same_v<typename MemberOf<decltype(&X::extensions)>::type, X>; };
   template <class X> static constexpr bool kern_has_start = requires { requires std::is_same_v<typename MemberOf<decltype(&X::start)>::type, X>; };
   template <class X> static constexpr bool kern_has_update = requires { requires std::is_same_v<typename MemberOf<decltype(&X::update)>::type, X>; };
   template <class X> static constexpr bool kern_has_resized = requires { requires std::is_same_v<typename MemberOf<decltype(&X::resized)>::type, X>; };
   template <class X> static constexpr bool kern_has_stop = requires { requires std::is_same_v<typename MemberOf<decltype(&X::stop)>::type, X>; };
-  decltype(std::declval<kern::App&>().configure()) configure() override {
-    if constexpr (!kern_has_configure<B>) {
-      return kern::App::configure();
-    } else {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.configure();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::App&>().configure())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
   decltype(std::declval<kern::App&>().extensions()) extensions() override {
     if constexpr (!kern_has_extensions<B>) {
       return kern::App::extensions();
@@ -3912,30 +3900,6 @@ template <class Core> struct EngineNodesOf : Core {
       return;
     }
     this->kern_engine("engine.engine.set_stereo_cross", {to_value(engine), to_value(on)}, {});
-  }
-  /// Renderer configuration, asked once before start().
-  void engine_app_configure(Int app) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::App>(*kern_o, static_cast<::kern::i64>(app), "app");
-      if (!kern_self) { this->kern_engine_failed("engine.app.configure"); return; }
-      decltype(auto) kern_r = kern_self->configure();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::pass(*kern_o, kern_r);
-      return;
-    }
-    this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure});
-  }
-  template <class KernNode> void engine_app_configure(KernNode& kern_n, Int app) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::App>(*kern_o, static_cast<::kern::i64>(app), "app");
-      if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.app.configure"); return; }
-      decltype(auto) kern_r = kern_self->configure();
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.app.configure", {to_value(app)}, {PinType::structure});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Shader extensions the game uses (must outlive the app).
   void engine_app_extensions(Int app) {

@@ -3,7 +3,7 @@
 // ("format": "kern-project"); a level (kern/game/level.h) holds only its world.
 //
 //   { "format": "kern-project", "version": 1, "name": "My Game",
-//     "settings": { "renderer": { ... }, "mobile": { ... }, "heapReserveMb": 0 },   (kern/app/project.h)
+//     "settings": { "renderer": { ... }, "profiles": [{ "name": ..., "renderer": { ... } }], "heapReserveMb": 0 },   (kern/app/project.h)
 //     "levels": ["levels/start.klevel"], "startLevel": "levels/start.klevel",
 //     "blueprints": [ { "name": "MyGame", "logic": { ... } }, { "name": "Math", "logic": { "library": true, ... } } ] }
 //
@@ -32,7 +32,7 @@ struct ProgramBlueprint {
 
 struct Project {
   std::string name = "Untitled";
-  ProjectSettings settings;                 // what the engine applies before the renderer starts (settings.set: named)
+  ProjectSettings settings;                 // what the engine applies before the renderer starts (kern::run)
   std::vector<std::string> levels;          // the project's levels, paths relative to the project file
   std::string start_level;                  // one of `levels` ("": none named - the first, if any)
   std::vector<ProgramBlueprint> blueprints;  // the program's Blueprints and libraries, in their order

@@ -18,6 +18,11 @@ namespace kern {
 /// refused: 1, and the log says why (the first App stays).
 int run(App& app, const ProjectSettings& settings = {});
 
+/// The renderer the settings start (kern_app_start): the device profile the launch argument profile=<name> names,
+/// else the project's renderer. A name the project has no profile of is an error in the log (with the names it has);
+/// the project's renderer then.
+RendererOptions start_renderer(const ProjectSettings& settings, const Engine& engine);
+
 }  // namespace kern
 
 /// The program's one entry, which the program defines (C linkage; the platform layer calls it once, before

@@ -58,6 +58,8 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   const mobile = params.has("mobile") ? params.get("mobile") === "1" : coarse && Math.min(screen.width, screen.height) < 900;
   let args = location.search || "?";
   if (!params.has("mobile")) args += (args.length > 1 ? "&" : "") + "mobile=" + (mobile ? 1 : 0);
+  // (the renderer of a phone: the project's device profile "mobile" - spawncity.kproject, chosen by the launch argument)
+  if (mobile && !params.has("profile")) args += (args.length > 1 ? "&" : "") + "profile=mobile";
 
   const style = document.createElement("style");
   style.textContent = TOUCH_STYLE;

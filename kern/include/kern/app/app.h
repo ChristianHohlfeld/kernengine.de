@@ -186,8 +186,6 @@ class Engine {
 class App {
  public:
   virtual ~App() = default;
-  /// Renderer configuration, asked once before start().
-  virtual RendererOptions configure() { return {}; }
   /// Shader extensions the game uses (must outlive the app).
   virtual Span<ShaderExtension* const> extensions() { return {}; }
   virtual bool start(Engine& engine) = 0;

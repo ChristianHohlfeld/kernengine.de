@@ -150,7 +150,6 @@ the renderer, geometry, particles and math).
 
 | Method | When | Purpose |
 |---|---|---|
-| `RendererOptions configure()` | once, before `start` | shadows, bloom and other renderer options (the engine sets width and height) |
 | `Span<ShaderExtension* const> extensions()` | once, before `start` | custom shader extensions; they must outlive the app |
 | `bool start(Engine&)` | once | create meshes, prepare state; `false` aborts |
 | `void update(Engine&, const Frame&)` | every display frame | read input, advance the game, update the scene |
@@ -195,7 +194,7 @@ Page (app.mjs)                        Module (src/app/app.cpp)
 ---------------------------------------------------------------------------
 kern_app_set_args("?time=0.6")   ->   Engine::set_args
 kern_main()                      ->   kern::run(app, settings)  (the program's entry)
-kern_app_start(w, h)             ->   configure(), Renderer::init, start()
+kern_app_start(w, h)             ->   settings (profile=<name>), Renderer::init, start()
 keyboard / mouse / touch         ->   kern_app_key / _pointer / _wheel / _touch / _focus
 requestAnimationFrame:
   kern_app_frame(now, hidden)    ->   update(engine, frame); input.end_frame(); render()
@@ -228,17 +227,11 @@ using namespace kern;
 ```cpp
 class Hello final : public App {
  public:
-  RendererOptions configure() override {
-    RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 1024;
-    o.shadow.extent = 40;
-    return o;
-  }
 ```
 
-`configure` defines the renderer before it exists: sun shadows with a 1024 map covering 40 m. The engine
-fills in width and height itself.
+The renderer is set up before it exists by the settings `kern_main` hands over with the App (`kern::run(app,
+settings)`, below): sun shadows with a 1024 map covering 40 m. The engine fills in width and height itself. There is
+no second way (the App has no `configure`): a game with a project file takes them from its project (12.2.7).
 
 ```cpp
   bool start(Engine& engine) override {
@@ -354,7 +347,11 @@ on z = 0, and its vertex color is orange). White tints leave this color unchange
 ```cpp
 int kern_main() {
   static Hello app;
-  return kern::run(app);
+  ProjectSettings settings;
+  settings.renderer.shadows = true;
+  settings.renderer.shadow.resolution = 1024;
+  settings.renderer.shadow.extent = 40;
+  return kern::run(app, settings);
 }
 ```
 
@@ -599,7 +596,8 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
 The project file (`<name>.kproject`, `kern::game::Project`, `include/kern/game/project.h`; see `kern/docs/project.md`)
 carries the settings the engine applies when the program starts: its member `"settings"` (`kern::ProjectSettings`,
 `include/kern/app/project.h`). It holds the renderer options (`renderer`: shadows, bloom, ambient occlusion, grade),
-a phone's part (`mobile`: shadows and ambient occlusion, used with the launch argument `mobile=1`) and
+the device profiles (`profiles`: each a name and the renderer options on that kind of device - the project's
+`renderer` with the keys the profile names on top - chosen at start by the launch argument `profile=<name>`) and
 `heapReserveMb`, the heap taken once and given back before the game starts - the allocator keeps it, so the game
 does not stall growing WebAssembly memory piece by piece while playing. A level holds only its world: a level file
 with the old member `"project"` is refused with the place and the reason.
@@ -608,8 +606,8 @@ with the old member `"project"` is refused with the place and the reason.
 "settings": {
  "renderer": {"shadows": true, "shadow": {"resolution": 2048, "extent": 110, "bias": 0.0014, "filter": 9},
               "ao": {"quality": "medium", "halfResolution": false}},
- "mobile": {"shadow": {"resolution": 1024, "extent": 70, "bias": 0.0016, "filter": 4},
-            "ao": {"quality": "low", "halfResolution": true}},
+ "profiles": [{"name": "mobile", "renderer": {"shadow": {"resolution": 1024, "extent": 70, "bias": 0.0016, "filter": 4},
+                                              "ao": {"quality": "low", "halfResolution": true}}}],
  "heapReserveMb": 320
 }
 ```
@@ -619,9 +617,11 @@ it writes defines `kern::game::embedded_project_text()` and `kern::game::embedde
 `kern::game::embedded_project()` (`include/kern/game/embedded.h`) is the project read from it. The program's entry
 hands the engine the project's settings with its App: `kern::run(kern::game::embedded_project())` for a project whose
 App is a program Blueprint, `kern::run(app, kern::game::embedded_project().settings)` for an App of C++. `kern_app_start`
-applies them before anything of the App: with settings, the renderer starts with `renderer` instead of
-`App::configure()`; after its init the heap is reserved and, with `mobile=1`, the phone's shadows and ambient
-occlusion are set - then `App::start()` runs. Without (`kern::run(app)`), the App decides. Missing keys keep the defaults of the engine's structs.
+applies them before anything of the App: the renderer starts with the profile `profile=<name>` names, else with
+`renderer` (a name the project has no profile of is an error in the log, with the names it has); after its init the
+heap is reserved - then `App::start()` runs. `kern::run(app)` without settings: the engine's defaults. Missing keys keep
+the defaults of the engine's structs; the fixed phone part of before (`"mobile"`), a profile without a name or with a
+name twice are refused with the place.
 
 ---
 

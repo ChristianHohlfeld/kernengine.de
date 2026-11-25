@@ -1265,24 +1265,23 @@ TEST(game_euler_and_transforms) {
 }
 
 // The project file (kern/game/project.h): settings, levels, start level and the program's Blueprints round-trip as
-// written (a 32-bit number as its decimal); a phone's part starts from the desktop's shadows; a level holds only its
-// world - one with the old member "project" is refused with the place and the reason.
+// written (a 32-bit number as its decimal); a device profile starts from the project's renderer; a level holds only
+// its world - one with the old member "project" is refused with the place and the reason.
 TEST(game_project_round_trip) {
   game::Project pr;
-  CHECK(game::to_text(pr).find("\"settings\"") == std::string::npos);
   pr.name = "Probe";
-  pr.settings.set = true;
   pr.settings.renderer.shadows = true;
   pr.settings.renderer.shadow.resolution = 2048;
   pr.settings.renderer.shadow.extent = 110;
   pr.settings.renderer.shadow.bias = 0.0014f;
   pr.settings.renderer.ao.quality = AoQuality::medium;
   pr.settings.renderer.ao.half_resolution = false;
-  pr.settings.mobile_set = true;
-  pr.settings.mobile_shadow.resolution = 1024;
-  pr.settings.mobile_shadow.bias = 0.0016f;
-  pr.settings.mobile_shadow.filter = 4;
-  pr.settings.mobile_ao.quality = AoQuality::low;
+  DeviceProfile phone{"mobile", pr.settings.renderer};
+  phone.renderer.shadow.resolution = 1024;
+  phone.renderer.shadow.bias = 0.0016f;
+  phone.renderer.shadow.filter = 4;
+  phone.renderer.ao.quality = AoQuality::low;
+  pr.settings.profiles = {phone, {"laptop", {}}};
   pr.settings.heap_reserve_mb = 320;
   pr.levels = {"levels/start.klevel", "levels/wald.klevel"};
   pr.start_level = "levels/wald.klevel";
@@ -1300,25 +1299,36 @@ TEST(game_project_round_trip) {
   CHECK(game::from_text(text, back, &error));
   CHECK(error.empty() && game::to_text(back) == text);
   const ProjectSettings& p = back.settings;
-  CHECK(p.set && p.renderer.shadows && p.renderer.shadow.resolution == 2048 && p.renderer.shadow.extent == 110 && p.renderer.shadow.bias == 0.0014f);
+  CHECK(p.renderer.shadows && p.renderer.shadow.resolution == 2048 && p.renderer.shadow.extent == 110 && p.renderer.shadow.bias == 0.0014f);
   CHECK(p.renderer.ao.quality == AoQuality::medium && !p.renderer.ao.half_resolution && p.renderer.bloom.enabled && p.renderer.grade);
-  CHECK(p.mobile_set && p.mobile_shadow.resolution == 1024 && p.mobile_shadow.bias == 0.0016f && p.mobile_shadow.filter == 4 && p.mobile_ao.quality == AoQuality::low);
+  const DeviceProfile* m = p.profile("mobile");
+  CHECK(p.profiles.size() == 2 && m == &p.profiles[0] && p.profile("laptop") == &p.profiles[1] && p.profile("tablet") == nullptr);
+  CHECK(m && m->renderer.shadow.resolution == 1024 && m->renderer.shadow.bias == 0.0016f && m->renderer.shadow.filter == 4 && m->renderer.ao.quality == AoQuality::low && m->renderer.shadows);
   CHECK(p.heap_reserve_mb == 320);
   CHECK(back.name == "Probe" && back.levels.size() == 2 && back.start_level == "levels/wald.klevel" && back.first_level() == "levels/wald.klevel");
   CHECK(back.blueprints.size() == 2 && back.blueprints[0].name == "Spiel" && back.blueprints[1].logic.library && back.blueprint("Mathe") == &back.blueprints[1]);
   back.start_level.clear();
   CHECK(back.first_level() == "levels/start.klevel");
-  // The settings as a program carries them (kern_project_text: the whole project file): a phone's part takes the
-  // desktop's shadows where it names none; no text, or a project without settings, is none; a text that is no project
-  // is an error.
+  // The settings as the project file holds them (the one way to set up the renderer - kern::run hands them over): a
+  // profile takes the project's renderer where it names nothing; missing settings are the engine's defaults; the fixed
+  // phone part of before ("mobile"), a profile without a name or with one twice, a heap out of range: an error with
+  // the place.
   ProjectSettings q;
-  CHECK(project_settings_from_text("{\"format\":\"kern-project\",\"settings\":{\"renderer\":{\"shadow\":{\"extent\":90}},\"mobile\":{\"ao\":{\"quality\":\"low\"}},\"heapReserveMb\":64}}", q));
-  CHECK(q.set && q.renderer.shadow.extent == 90 && q.mobile_set && q.mobile_shadow.extent == 90 && q.mobile_ao.quality == AoQuality::low && q.heap_reserve_mb == 64);
-  CHECK(project_settings_from_text("", q) && !q.set);
-  CHECK(project_settings_from_text("{\"format\":\"kern-project\"}", q) && !q.set);
-  CHECK(!project_settings_from_text("{\"heapReserveMb\":64}", q, &error) && !q.set && error.find("kern-project") != std::string::npos);
-  CHECK(!project_settings_from_text("{broken", q) && !q.set);
-  CHECK(project_settings_from_text("{\"format\":\"kern-project\",\"settings\":{\"heapReserveMb\":-5}}", q) && q.heap_reserve_mb == 0);
+  auto settings = [&](const char* text) {
+    json::Value v;
+    error.clear();
+    CHECK(json::parse(text, v));
+    return project_from_json(v, q, &error);
+  };
+  CHECK(settings("{\"renderer\":{\"shadow\":{\"extent\":90}},\"profiles\":[{\"name\":\"mobile\",\"renderer\":{\"ao\":{\"quality\":\"low\"}}}],\"heapReserveMb\":64}"));
+  CHECK(q.renderer.shadow.extent == 90 && q.profile("mobile") && q.profile("mobile")->renderer.shadow.extent == 90 && q.profile("mobile")->renderer.ao.quality == AoQuality::low && q.heap_reserve_mb == 64);
+  CHECK(settings("{}") && q.profiles.empty() && q.heap_reserve_mb == 0 && q.renderer.shadow.extent == RendererOptions{}.shadow.extent);
+  CHECK(!settings("{\"mobile\":{}}") && error.find("settings: mobile: a device profile is one of \"profiles\"") == 0);
+  CHECK(!settings("{\"profiles\":[{\"renderer\":{}}]}") && error == "settings: profiles[0]: a profile has a name");
+  CHECK(!settings("{\"profiles\":[{\"name\":\"a\"},{\"name\":\"a\"}]}") && error == "settings: profiles[1]: the profile a stands twice");
+  CHECK(!settings("{\"heapReserveMb\":-5}") && error == "settings: heapReserveMb: from 0 to 4095");
+  CHECK(!settings("[]") && error == "settings: must be an object");
+  CHECK(!game::from_text("{\"format\":\"kern-project\",\"settings\":{\"mobile\":{}}}", back, &error) && error.find("settings: mobile") == 0);
   // a level is a world: its old member "project" is an error with the place
   game::Level l = game::basic_level();
   const std::string level = game::to_text(l);
@@ -7872,7 +7882,7 @@ TEST(engine_interface_a_class_implements) {
   a.update(engine, f);
   CHECK(static_cast<i64>(r.Updates) == 2 && r.Last == 2.0 && !r.Stopped);
   a.resized(engine);
-  CHECK(a.extensions().empty() && !a.configure().shadows);  // (App's own)
+  CHECK(a.extensions().empty());  // (App's own)
   a.stop(engine);
   CHECK(r.Stopped);
   // without the engine's objects (a class a test holds): the handles it is handed are the adapter's own
@@ -7991,7 +8001,7 @@ TEST(engine_interface_a_blueprint_implements) {
   app->update(engine, f);
   CHECK(a->get("Updates").i == 2 && a->get("Last").n == 2.0 && !a->get("Stopped").b);
   app->resized(engine);
-  CHECK(app->extensions().empty() && !app->configure().shadows);  // (App's own)
+  CHECK(app->extensions().empty());  // (App's own)
   app->stop(engine);
   CHECK(a->get("Stopped").b);
   // a function the engine hands a pointer without its count (material_uniforms) has no way to a Blueprint: the
@@ -8339,6 +8349,19 @@ TEST(run_the_program_of_a_project) {
     void update(Engine&, const Frame&) override {}
   } other;
   CHECK(run(other) == 1);   // (an App was given already: the first stays)
+  // the renderer the settings start: the profile the launch argument names, else the project's (an unknown name: the
+  // project's, and the log says which it has)
+  ProjectSettings ps;
+  ps.renderer.shadow.resolution = 2048;
+  ps.profiles.push_back({"mobile", ps.renderer});
+  ps.profiles[0].renderer.shadow.resolution = 512;
+  Renderer r0;
+  Engine e0(r0);
+  CHECK(start_renderer(ps, e0).shadow.resolution == 2048);
+  e0.set_args("profile=mobile", 14);
+  CHECK(start_renderer(ps, e0).shadow.resolution == 512);
+  e0.set_args("profile=tablet", 14);
+  CHECK(start_renderer(ps, e0).shadow.resolution == 2048);
   CHECK(kern_app_start(64, 48) == 1);
   CHECK(kern_app_frame(0, 0) == 1 && kern_app_frame(16, 0) == 1);
   kern_app_stop();
@@ -13147,9 +13170,12 @@ TEST(studio_project) {
   json::Value settings;
   json::parse(R"({"renderer":{"shadows":false},"heapReserveMb":64})", settings);
   CHECK(cmd({{"cmd", "projectSet"}, {"settings", settings}})["ok"].as_bool());
-  CHECK(f.s->project().settings.set && f.s->project().settings.heap_reserve_mb == 64 && f.s->project().start_level == "levels/wald.klevel");
+  CHECK(f.s->project().settings.heap_reserve_mb == 64 && !f.s->project().settings.renderer.shadows && f.s->project().start_level == "levels/wald.klevel");
+  json::Value phone;
+  json::parse(R"({"mobile":{}})", phone);   // (the fixed phone part of before: refused, with the place - a profile is one of "profiles")
+  CHECK(cmd({{"cmd", "projectSet"}, {"settings", phone}})["error"].as_string().find("settings: mobile") == 0);
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
-  CHECK(!f.s->project().settings.set);
+  CHECK(f.s->project().settings.heap_reserve_mb == 0 && f.s->project().settings.renderer.shadows == RendererOptions{}.shadows);
   CHECK(f.cmd(R"({"cmd":"redo"})")["ok"].as_bool());
   // saved and opened again: the same project
   const json::Value saved = f.cmd(R"({"cmd":"projectSave"})");

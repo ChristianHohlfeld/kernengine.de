@@ -194,14 +194,6 @@ Kontextverlust und ein Statuskanal. Das kleinste Beispiel ist `kern/examples/hel
 ```cpp
 class Hello final : public App {
  public:
-  RendererOptions configure() override {
-    RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 1024;
-    o.shadow.extent = 40;
-    return o;
-  }
-
   bool start(Engine& engine) override {
     Renderer& r = engine.renderer();
     ground_ = r.allocate_id();

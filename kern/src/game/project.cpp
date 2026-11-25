@@ -36,7 +36,7 @@ json::Value to_json(const Project& p) {
   o.set("format", "kern-project");
   o.set("version", 1);
   o.set("name", p.name);
-  if (p.settings.set) o.set("settings", project_to_json(p.settings));
+  o.set("settings", project_to_json(p.settings));
   json::Value levels = json::Value::array();
   for (const std::string& l : p.levels) levels.push(l);
   o.set("levels", std::move(levels));
@@ -61,8 +61,8 @@ bool from_json(const json::Value& doc, Project& out, std::string* error) {
   Project p;
   if (doc["name"].is_string()) p.name = doc["name"].as_string();
   if (const json::Value* s = doc.find("settings")) {
-    if (!s->is_object()) return fail(error, "settings: must be an object");
-    project_from_json(*s, p.settings);
+    std::string why;
+    if (!project_from_json(*s, p.settings, &why)) return fail(error, why);
   }
   if (const json::Value* ls = doc.find("levels")) {
     if (!ls->is_array()) return fail(error, "levels: must be a list of paths");
