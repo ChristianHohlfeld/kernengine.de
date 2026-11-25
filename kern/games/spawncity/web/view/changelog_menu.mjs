@@ -7,6 +7,13 @@
 // Mouse, touch, keyboard (Esc closes) and the pad (pad_actions.mjs: up/down scroll, B closes).
 export const CHANGELOG_MENU_VERSION="title-changelog-v1";
 export const CHANGELOG=Object.freeze([
+  {date:"2026-11-25",time:"15:30",title:"Blueprints: das Spiel als Blueprints, Stufe 1",items:[
+    "Aus dem C++ des Spiels schreibt der Konverter jetzt 1.763 von 1.847 Funktionen als Blueprints (158 Blueprints). 1.718 davon vergleicht ein Test Bit für Bit mit ihrem Quelltext.",
+    "Das Spiel selbst läuft weiter aus seinem C++ und trägt die erzeugten Blueprints nicht mit: Laden und Spielen bleiben, wie sie waren.",
+    "Der Vergleich läuft auch gegen die Engine selbst, nicht nur gegen einen Stellvertreter.",
+    "Neue Bausteine der Sprache: Maps und Sets als lokale Variablen, Listen gleichen Typs vergleichen, Zahlen als Bitmuster lesen, Texte zerlegen.",
+    "Engine: ein Knoten der Engine ruft in der exportierten Klasse die Funktion der Engine direkt und typisiert.",
+  ]},
   {date:"2026-11-14",time:"10:30",title:"Blueprints: Listen in einem Zug",items:[
     "Vier neue Bausteine für Listen: Länge setzen, Liste anhängen, Liste einfügen und Platz vorhalten. Sie tun in einem Schritt, wofür vorher eine Schleife aus einzelnen Einträgen nötig war.",
     "Der Konverter schreibt damit resize, vector(n), insert einer ganzen Liste und reserve so, wie C++ sie ausführt: mit einer Speicheranforderung.",

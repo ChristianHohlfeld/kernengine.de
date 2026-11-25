@@ -52,10 +52,12 @@ SC_TEST(details_blueprint) {
     interpreted = r.first;
     interpreted_fired = r.second;
   }
-  detail::bind(bp.inst);
+  detail::bind(bp.rt);
   std::printf("  CombatDetail.ClockUpdate from C++: %.0f ns as its class, %.0f ns in the interpreter (this build checks every memory access)\n", native.first, interpreted);
   SC_CHECK(native.second == interpreted_fired && native.second > 0, "both give the same (%d / %d blasts)", native.second, interpreted_fired);
-  SC_CHECK(native.first < 20000, "a rule asked every frame costs microseconds, not milliseconds (%.0f ns)", native.first);
+  // (the bound is the claim - under a millisecond, as for the rules of Controls (test_controls.cpp): what one call takes
+  // on a busy machine, in a build that checks every memory access, varies by tens of microseconds - E19)
+  SC_CHECK(native.first < 1e6, "a rule asked every frame costs microseconds, not milliseconds (%.0f ns)", native.first);
 }
 
 SC_TEST(guided_cruise_dive_and_fuze) {

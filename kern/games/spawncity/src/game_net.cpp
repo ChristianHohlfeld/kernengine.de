@@ -67,58 +67,9 @@ mp::Weapon mp_weapon(weapons::Id id) {
 }
 }  // namespace
 
-/// Per-player multiplayer presentation state (owned by Game through mp_).
-struct MpLocal {
-  MpArt art;
-  f32 world_own[16] = {};  // our own WORLD switches while the host's apply
-  bool world_saved = false;
-  mp::PingBoard pings;
-  struct Tracer { Vec3 p, v; f32 left; u32 color; };
-  std::vector<Tracer> tracers;
-  struct Flash { Vec3 p; f32 r; f64 born, life; };
-  std::vector<Flash> flashes;
-  struct Feed { net::Kill k; f64 at; };
-  std::vector<Feed> feed;
-  f64 hit_at = -1e12, hurt_at = -1e12, last_hurt = -1e12, regen_clock = 0, last_by_at = -1e12;
-  bool hit_kill = false, hit_head = false;
-  u8 shot_zone = 0;  // the zone of our last round on a mate (tests)
-  Vec3 hurt_from;
-  u8 last_by = net::kNobody, last_weapon = 0, last_zone = 0;
-  f32 last_hp = -1;
-  bool was_dead = false;
-  Vec3 death_feet;
-  // voice (proximity_voice.mjs): explicit consent - the page opens the microphone only while mic is on
-  mp::VoiceCapture capture;
-  bool mic = false, muted = false, everywhere = false;
-  u32 seq = 0;
-  bool r3_was = false, r3_latched = false, y_was = false;
-  // the joining player's spawn anchor
-  bool anchor_pending = false;
-  Vec3 anchor;
-  // the host left: 1 we take over, 2 we join the one who does (lan_vs.mjs authority handover)
-  i32 migrate = 0;
-  bool rejoined = false;  // back in after a handover: no spawn anchor (we stay where we are)
-  // big map + navigation (world_map_full.mjs)
-  bool map_open = false;
-  bool has_dest = false;
-  f64 dest_lon = 0, dest_lat = 0;
-  Vec2 dest;
-  std::string dest_name;
-  std::vector<Vec2> route;
-  bool route_streets = false;
-  f64 route_at = -1e12;
-  u32 fetch_id = 0;          // > 0: the page should fetch a road route (no street graph to the goal)
-  std::string fetch_json;
-  u32 frames = 0;
-  bool ff_setting = false, ff_rule = false;  // the FRIENDLY FIRE setting / the session's rule as last seen
-};
-
-void MpLocalDelete::operator()(MpLocal* m) const { delete m; }
-
-MpLocal& Game::mp_local() {
-  if (!mp_) mp_.reset(new MpLocal);
-  if (!mp_->art.ready() && engine_) mp_->art.init(engine_->renderer);
-  return *mp_;
+void Game::mp_local_ready() {
+  if (!mp_) mp_ = std::make_unique<MpLocal>();
+  if (!mp_->art.ready() && engine_) mp_->art.init(engine_->renderer());
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -140,10 +91,11 @@ bool Game::world_rule_locked(Opt o) const {
 
 void Game::net_world_rules() {
   Settings& st = ui_.settings;
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   if (!net_.active()) {
     // out of the session: our own switches again
-    if (m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) st.set(kWorldRules[i], m.world_own[i]); m.world_saved = false; }
+    if (m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) st.set(ui_.settings_table, kWorldRules[i], m.world_own[i]); m.world_saved = false; }
     return;
   }
   if (net_.hosting()) {
@@ -157,7 +109,7 @@ void Game::net_world_rules() {
   if (!m.world_saved) { for (u32 i = 0; i < std::size(kWorldRules); ++i) m.world_own[i] = st.get(kWorldRules[i]); m.world_saved = true; }
   for (u32 i = 0; i < std::size(kWorldRules); ++i) {
     const f32 v = (mask >> i) & 1u ? 1.0f : 0.0f;
-    if (st.get(kWorldRules[i]) != v) st.set(kWorldRules[i], v);
+    if (st.get(kWorldRules[i]) != v) st.set(ui_.settings_table, kWorldRules[i], v);
   }
 }
 
@@ -165,9 +117,9 @@ std::string Game::world_rules_json() const {
   std::string o = net_.active() && !net_.hosting() ? ",\"worldLocked\":true,\"worldRules\":{" : ",\"worldLocked\":false,\"worldRules\":{";
   bool first = true;
   for (Opt w : kWorldRules) {
-    const char* key = opt_spec(w).key;  // "world.people"
+    const std::string& key = opt_spec(ui_.settings_table, w).key;  // "world.people": the name after "world."
     o += first ? "\"" : ",\"";
-    o += key + 6;
+    for (std::size_t c = 6; c < key.size(); ++c) o += key[c];
     o += ui_.settings.on(w) ? "\":true" : "\":false";
     first = false;
   }
@@ -192,16 +144,16 @@ net::PlayerState Game::my_state() const {
   s.avatar_yaw = world_->camera_yaw() * kDeg;
   s.yaw = world_->camera_yaw() * kDeg;
   s.pitch = world_->camera_pitch() * kDeg;
-  if (engine_ && engine_->xr) {
+  if (engine_ && engine_->xr()) {
     // VR: where the gun points (the right hand's ray) is the aim the others see - yaw and pitch
     Vec3 from, dir;
     if (mode_ == Mode::foot && vr_hand_ray(from, dir)) { s.yaw = std::atan2(dir.y, dir.x); s.pitch = -std::asin(clampf(dir.z, -1, 1)); }
-    else { const Vec3 f = engine_->xr_forward; s.pitch = -std::asin(clampf(f.z, -1, 1)); }
+    else { const Vec3 f = engine_->xr_forward(); s.pitch = -std::asin(clampf(f.z, -1, 1)); }
   }
   s.speed = std::hypot(b.velocity.x, b.velocity.y);
   const kern::game::Hud& h = world_->hud();
   s.health = h.health >= 0 ? clampf(h.health / std::fmax(1.0f, h.max_health) * 100, 0, 100) : 100;
-  s.stars = static_cast<u8>(wanted_.stars());
+  s.stars = static_cast<u8>(wanted::stars());
   s.weapon = static_cast<u8>(foot_weapon_);
   // the hands and the blows (the others draw his arms there: game_net.cpp draw)
   s.hands = 0;
@@ -209,7 +161,7 @@ net::PlayerState Game::my_state() const {
   if (mode_ == Mode::foot && !player_dead_) {
     const f32 tnow = world_->sim_time();
     const Vec3 feet = matrix_of(soldier_).translation() - Vec3{0, 0, 0.73f};
-    if (engine_ && engine_->xr && vr_) {
+    if (engine_ && engine_->xr() && vr_) {
       kern::Mat4 hm;
       bool any = false;
       for (i32 side = 0; side < 2; ++side)
@@ -277,7 +229,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
   lat_ = lat;
   destruction_.reset(city_);
   city_.clear();
-  city_.start(engine_->renderer, world_->physics(), lon_, lat_, engine_->arg_number("dem", 1) > 0 && engine_->arg_number("offline", 0) <= 0);
+  city_.start(engine_->renderer(), world_->physics(), lon_, lat_, engine_->arg_number("dem", 1) > 0 && engine_->arg_number("offline", 0) <= 0);
   if (engine_->arg_number("offline", 0) > 0) city_.go_offline();
   for (TrafficCar& c : cars_) {
     if (c.placed) world_->set_alive(c.actor, false);
@@ -289,7 +241,7 @@ void Game::rebase_origin(f64 lon, f64 lat) {
   for (PoliceDrone& d : pdrones_) d.active = false;
   people_.clear();
   projectiles_.clear();
-  wanted_.clear();
+  wanted::clear();
   if (mode_ != Mode::foot) command("mode foot");
   world_placed_ = false;
   world_->set_paused(true);
@@ -301,7 +253,8 @@ void Game::rebase_origin(f64 lon, f64 lat) {
 // per frame
 
 void Game::update_net(f32 dt) {
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   ++m.frames;
   const f64 now = time_ * 1000;
   m.pings.expire(now);
@@ -326,7 +279,7 @@ void Game::update_net(f32 dt) {
   }
   if (m.ff_rule != net_.friendly_fire()) {
     m.ff_rule = net_.friendly_fire();
-    ui_.settings.set(Opt::world_friendly_fire, m.ff_rule ? 1.0f : 0.0f);
+    ui_.settings.set(ui_.settings_table, Opt::world_friendly_fire, m.ff_rule ? 1.0f : 0.0f);
     m.ff_setting = m.ff_rule;
   }
   net_.update(time_, dt, world_placed_ ? my_state() : net::PlayerState{}, world_placed_);  // no pose before the world stands
@@ -381,7 +334,7 @@ void Game::update_net(f32 dt) {
     if (k.by == net_.self_slot() && k.victim != net_.self_slot()) {
       m.hit_at = now;
       m.hit_kill = true;
-      wanted_.report(wanted::Crime::player, true);  // vs_multiplayer.mjs: a pvp kill is a crime
+      wanted::report(wanted::Crime::player, true);  // vs_multiplayer.mjs: a pvp kill is a crime
     }
   }
   for (const net::Fx& f : net_.take_fx()) {
@@ -501,7 +454,8 @@ void Game::update_net(f32 dt) {
 
 void Game::mp_input(kern::Engine& e, f32 dt) {
   (void)dt;
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   (void)e;
   // H / K, Z / middle mouse, M and the pad's R3, R3+Y, D-pad right, VIEW hold are read with every
   // other control in game_controls.cpp (voice_control_bindings.mjs, ping_marker.mjs, pad_actions.mjs).
@@ -513,12 +467,13 @@ void Game::mp_input(kern::Engine& e, f32 dt) {
   }
 }
 
-void Game::voice_capture(const f32* samples, u32 count, u32 rate) {
-  MpLocal& m = mp_local();
-  if (m.mic && !m.muted) m.capture.push(samples, count, rate);
+void Game::voice_capture(kern::Span<const f32> samples, u32 rate) {
+  mp_local_ready();
+  MpLocal& m = *mp_;
+  if (m.mic && !m.muted) m.capture.push(samples, rate);
 }
 
-void Game::mix_voice(f32* out, u32 frames) {
+void Game::mix_voice(std::vector<f32>& out, u32 frames) {
   if (!net_.active() || !mp_ || !mixer_.ready()) return;
   for (net::Remote& r : net_.remotes()) r.voice.render(out, frames, mixer_.sample_rate());
 }
@@ -629,7 +584,8 @@ bool Game::hit_remotes(Vec3 from, Vec3& to, f32 damage, bool melee) {
   const net::Remote& r = rs[static_cast<std::size_t>(best)];
   const bool body_zone = r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone || r.state.mode == net::PlayerMode::parachute;
   const mp::Zone zone = body_zone ? best_zone : mp::Zone::torso;
-  mp_local().shot_zone = static_cast<u8>(zone);
+  mp_local_ready();
+  mp_->shot_zone = static_cast<u8>(zone);
   const mp::Weapon w = mp_weapon(wid);
   net_.request_hit(r.state.slot, mp::round_damage(w, zone), static_cast<u8>(w), static_cast<u8>(zone), from);
   return true;
@@ -754,8 +710,8 @@ void Game::draw_remote_vehicles() {
   if (net_.active()) {
     if (!remote_car_) remote_car_ = std::make_unique<Car>(CarSpec::car());
     if (!remote_bus_) remote_bus_ = std::make_unique<Car>(CarSpec::bus());
-    Vec3 motors[4];
-    f32 angles[4];
+    std::array<Vec3, 4> motors;
+    std::array<f32, 4> angles;
     for (const net::Remote& r : net_.remotes()) {
       const Vec3 color = mp::rgb(net_.color_of(r.state.slot));
       auto drone_at = [&](const kern::Mat4& mtx, bool armed) {
@@ -869,11 +825,11 @@ bool Game::project_screen(Vec3 p, f32& x, f32& y, f32& depth) const {
 }
 
 std::string Game::mp_hud_json() {
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   const f64 now = time_ * 1000;
   std::string s;
   char b[512];
-  auto add = [&](const char* fmt, auto... v) { std::snprintf(b, sizeof b, fmt, v...); s += b; };
   const f32 w = frame_w_, h = frame_h_;
   // Screen point of a world point (vs_multiplayer.mjs renderMarker: off screen at the edge with
   // an arrow; phones keep it off the sticks).
@@ -889,8 +845,10 @@ std::string Game::mp_hud_json() {
     angle = std::atan2(y, x) / kDeg - 90;
   };
   s += ",\"mp\":{";
-  add("\"frames\":%u,\"mapOpen\":%s", m.frames, m.map_open ? "true" : "false");
-  add(",\"voice\":{\"mic\":%s,\"muted\":%s,\"all\":%s,\"tx\":%u}", m.mic ? "true" : "false", m.muted ? "true" : "false", m.everywhere ? "true" : "false", m.seq);
+  std::snprintf(b, sizeof b, "\"frames\":%u,\"mapOpen\":%s", m.frames, m.map_open ? "true" : "false");
+  s += b;
+  std::snprintf(b, sizeof b, ",\"voice\":{\"mic\":%s,\"muted\":%s,\"all\":%s,\"tx\":%u}", m.mic ? "true" : "false", m.muted ? "true" : "false", m.everywhere ? "true" : "false", m.seq);
+  s += b;
   // Pings (labels: distance).
   s += ",\"pings\":[";
   bool first = true;
@@ -898,8 +856,9 @@ std::string Game::mp_hud_json() {
     const f32 d = kern::length(cam_.eye - p.p), sc = clampf(d / 22, 1, 40);
     f32 nx, ny, depth;
     const bool on = project_screen(p.p + Vec3{0, 0, 3.4f * sc}, nx, ny, depth);
-    add("%s{\"on\":%s,\"x\":%.0f,\"y\":%.0f,\"d\":%.0f,\"color\":\"%s\",\"fade\":%.2f,\"mine\":%s}", first ? "" : ",", on ? "true" : "false", (nx + 1) / 2 * w,
-        (1 - ny) / 2 * h, d, hex(p.color).c_str(), mp::PingBoard::fade(p, now), p.owner == net_.self_slot() ? "true" : "false");
+    std::snprintf(b, sizeof b, "%s{\"on\":%s,\"x\":%.0f,\"y\":%.0f,\"d\":%.0f,\"color\":\"%s\",\"fade\":%.2f,\"mine\":%s}", first ? "" : ",", on ? "true" : "false", (nx + 1) / 2 * w,
+                               (1 - ny) / 2 * h, d, hex(p.color).c_str(), mp::PingBoard::fade(p, now), p.owner == net_.self_slot() ? "true" : "false");
+    s += b;
     first = false;
   }
   s += "]";
@@ -921,25 +880,30 @@ std::string Game::mp_hud_json() {
     std::string turn;
     if (t.dir != mp::Turn::Dir::none)
       turn = std::string(t.dir == mp::Turn::Dir::left ? "links" : t.dir == mp::Turn::Dir::right ? "rechts" : "wenden") + " in " + mp::format_distance(t.distance);
-    add(",\"nav\":{\"name\":\"%s\",\"dist\":\"%s\",\"arrow\":\"%s\",\"turn\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"streets\":%s}",
-        esc(m.dest_name).c_str(), mp::format_distance(left).c_str(), mp::bearing_arrow(rel).c_str(), turn.c_str(), cx, cy, on ? "true" : "false", ca,
-        m.route_streets ? "true" : "false");
+    std::snprintf(b, sizeof b, ",\"nav\":{\"name\":\"%s\",\"dist\":\"%s\",\"arrow\":\"%s\",\"turn\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"streets\":%s}",
+                               esc(m.dest_name).c_str(), mp::format_distance(left).c_str(), mp::bearing_arrow(rel).c_str(), turn.c_str(), cx, cy, on ? "true" : "false", ca,
+                               m.route_streets ? "true" : "false");
+    s += b;
   }
   if (!m.fetch_json.empty()) s += ",\"navFetch\":" + m.fetch_json;
   if (net_.active()) {
     const u8 self = net_.self_slot();
-    add(",\"self\":%u,\"index\":%u,\"color\":\"%s\",\"host\":%s,\"connected\":%s,\"ff\":%s,\"vote\":\"%s\",\"votePending\":%s,\"status\":\"%s\",\"poses\":%u",
-        self, net_.index_of(self), hex(net_.color_of(self)).c_str(), net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
-        net_.friendly_fire() ? "true" : "false", esc(net_.vote_text()).c_str(), net_.vote_pending() ? "true" : "false", esc(net_.status()).c_str(), net_.sent_poses());
-    add(",\"hit\":%.0f,\"hitKill\":%s,\"hitHead\":%s,\"hitShow\":%s", now - m.hit_at, m.hit_kill ? "true" : "false", m.hit_head ? "true" : "false",
-        now - m.hit_at < (m.hit_kill ? kKillMarkerMs : kHitMarkerMs) ? "true" : "false");
+    std::snprintf(b, sizeof b, ",\"self\":%u,\"index\":%u,\"color\":\"%s\",\"host\":%s,\"connected\":%s,\"ff\":%s,\"vote\":\"%s\",\"votePending\":%s,\"status\":\"%s\",\"poses\":%u",
+                               self, net_.index_of(self), hex(net_.color_of(self)).c_str(), net_.hosting() ? "true" : "false", net_.connected() ? "true" : "false",
+                               net_.friendly_fire() ? "true" : "false", esc(net_.vote_text()).c_str(), net_.vote_pending() ? "true" : "false", esc(net_.status()).c_str(), net_.sent_poses());
+    s += b;
+    std::snprintf(b, sizeof b, ",\"hit\":%.0f,\"hitKill\":%s,\"hitHead\":%s,\"hitShow\":%s", now - m.hit_at, m.hit_kill ? "true" : "false", m.hit_head ? "true" : "false",
+                               now - m.hit_at < (m.hit_kill ? kKillMarkerMs : kHitMarkerMs) ? "true" : "false");
+    s += b;
     {
       // Damage direction: where the hit came from relative to the view (mp_fun_hud.mjs onHurt).
       const Vec3 look = cam_.target - cam_.eye;
       const f32 ang = (std::atan2(look.y, look.x) - std::atan2(m.hurt_from.y - cam_.eye.y, m.hurt_from.x - cam_.eye.x)) / kDeg;
-      add(",\"hurt\":%s,\"hurtAngle\":%.0f", now - m.hurt_at < kHurtMs ? "true" : "false", ang);
+      std::snprintf(b, sizeof b, ",\"hurt\":%s,\"hurtAngle\":%.0f", now - m.hurt_at < kHurtMs ? "true" : "false", ang);
+      s += b;
     }
-    add(",\"shield\":%s", net_.protected_now(self, now) ? "true" : "false");
+    std::snprintf(b, sizeof b, ",\"shield\":%s", net_.protected_now(self, now) ? "true" : "false");
+    s += b;
     // Players: nameplates (P1.., distance, health), the board, who is talking.
     s += ",\"players\":[";
     first = true;
@@ -959,19 +923,21 @@ std::string Game::mp_hud_json() {
       const Vec3 look = cam_.target - cam_.eye;
       const f32 rel = wrap_pi(std::atan2(his.x - cam_.eye.x, his.y - cam_.eye.y) - std::atan2(look.x, look.y)) / kDeg;
       // (stars: his wanted level - his own, as in the original; the plate shows it)
-      add("%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
-          "\"dz\":%.1f,\"rel\":%.0f,"
-          "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f,\"stars\":%u}",
-          first ? "" : ",", r.state.slot, net_.index_of(r.state.slot), hex(net_.color_of(r.state.slot)).c_str(), r.shown_hp, r.state.flags & net::kDead ? "true" : "false",
-          mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, now < r.speaking_until ? "true" : "false",
-          r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y, static_cast<unsigned>(std::min<u8>(r.state.stars, 5)));
+      std::snprintf(b, sizeof b, "%s{\"slot\":%u,\"index\":%u,\"color\":\"%s\",\"hp\":%.0f,\"dead\":%s,\"mode\":\"%s\",\"x\":%.0f,\"y\":%.0f,\"on\":%s,\"angle\":%.0f,\"d\":%.1f,"
+                                 "\"dz\":%.1f,\"rel\":%.0f,"
+                                 "\"talk\":%s,\"protected\":%s,\"wx\":%.1f,\"wy\":%.1f,\"stars\":%u}",
+                                 first ? "" : ",", r.state.slot, net_.index_of(r.state.slot), hex(net_.color_of(r.state.slot)).c_str(), r.shown_hp, r.state.flags & net::kDead ? "true" : "false",
+                                 mode_name(static_cast<Mode>(r.state.mode)), x, y, on ? "true" : "false", ang, d, dz, rel, now < r.speaking_until ? "true" : "false",
+                                 r.state.flags & net::kProtected ? "true" : "false", r.shown.x, r.shown.y, static_cast<unsigned>(std::min<u8>(r.state.stars, 5)));
+      s += b;
       first = false;
     }
     s += "],\"scores\":[";
     first = true;
     for (const mp::Score& sc : net_.scores().ranked()) {
-      add("%s{\"index\":%u,\"color\":\"%s\",\"self\":%s,\"k\":%u,\"d\":%u}", first ? "" : ",", net_.index_of(sc.slot), hex(net_.color_of(sc.slot)).c_str(),
-          sc.slot == self ? "true" : "false", sc.kills, sc.deaths);
+      std::snprintf(b, sizeof b, "%s{\"index\":%u,\"color\":\"%s\",\"self\":%s,\"k\":%u,\"d\":%u}", first ? "" : ",", net_.index_of(sc.slot), hex(net_.color_of(sc.slot)).c_str(),
+                                 sc.slot == self ? "true" : "false", sc.kills, sc.deaths);
+      s += b;
       first = false;
     }
     s += "],\"feed\":[";
@@ -979,14 +945,15 @@ std::string Game::mp_hud_json() {
     for (auto it = m.feed.rbegin(); it != m.feed.rend(); ++it) {
       const net::Kill& k = it->k;
       const bool accident = k.by == net::kNobody || k.by == k.victim;
-      add("%s{\"by\":%u,\"byColor\":\"%s\",\"bySelf\":%s,\"victim\":%u,\"victimColor\":\"%s\",\"victimSelf\":%s,\"weapon\":\"%s\",\"head\":%s,\"accident\":%s,\"age\":%.0f}",
-          first ? "" : ",", accident ? 0 : net_.index_of(k.by), accident ? "#ffffff" : hex(net_.color_of(k.by)).c_str(), k.by == self ? "true" : "false",
-          net_.index_of(k.victim), hex(net_.color_of(k.victim)).c_str(), k.victim == self ? "true" : "false",
-          mp::weapon_label(static_cast<mp::Weapon>(k.weapon)).c_str(), k.zone == static_cast<u8>(mp::Zone::head) ? "true" : "false", accident ? "true" : "false", now - it->at);
+      std::snprintf(b, sizeof b, "%s{\"by\":%u,\"byColor\":\"%s\",\"bySelf\":%s,\"victim\":%u,\"victimColor\":\"%s\",\"victimSelf\":%s,\"weapon\":\"%s\",\"head\":%s,\"accident\":%s,\"age\":%.0f}",
+                                 first ? "" : ",", accident ? 0 : net_.index_of(k.by), accident ? "#ffffff" : hex(net_.color_of(k.by)).c_str(), k.by == self ? "true" : "false",
+                                 net_.index_of(k.victim), hex(net_.color_of(k.victim)).c_str(), k.victim == self ? "true" : "false",
+                                 mp::weapon_label(static_cast<mp::Weapon>(k.weapon)).c_str(), k.zone == static_cast<u8>(mp::Zone::head) ? "true" : "false", accident ? "true" : "false", now - it->at);
+      s += b;
       first = false;
     }
     s += "]";
-    if (player_dead_) add(",\"respawnIn\":%.1f", std::fmax(0.0f, world_->hud().respawn_in));
+    if (player_dead_) { std::snprintf(b, sizeof b, ",\"respawnIn\":%.1f", std::fmax(0.0f, world_->hud().respawn_in)); s += b; }
   }
   return s + "}";
 }
@@ -994,7 +961,8 @@ std::string Game::mp_hud_json() {
 std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
   // The big map (world_map_full.mjs, "a world it draws itself"): streets, players, pings,
   // destination and route around (cx, cy) in local metres.
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   std::string o;
   char b[256];
   const Vec3 me = focus_position();
@@ -1064,7 +1032,8 @@ std::string Game::bigmap_json(f32 cx, f32 cy, f32 range) {
 // commands (the page and the tests)
 
 std::string Game::net_command(const std::string& cmd) {
-  MpLocal& m = mp_local();
+  mp_local_ready();
+  MpLocal& m = *mp_;
   auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
   const f64 now = time_ * 1000;
   if (starts("net ")) {
@@ -1122,7 +1091,9 @@ std::string Game::net_command(const std::string& cmd) {
       Vec3 to = steep ? c + Vec3{-2, 0, -4} : c + Vec3{-3, 0, 0};
       const Vec3 from = steep ? c + Vec3{2, 0, 4} : c + Vec3{3, 0, 0};
       const bool hit = hit_remotes(from, to, static_cast<f32>(std::atof(rest.c_str() + 4)));
-      return hit ? std::string("hit ") + mp::zone_name(static_cast<mp::Zone>(mp_local().shot_zone)) : "miss";
+      if (!hit) return "miss";
+      mp_local_ready();
+      return std::string("hit ") + mp::zone_name(static_cast<mp::Zone>(mp_->shot_zone));
     }
     if (rest.rfind("blast", 0) == 0) {
       if (net_.remotes().empty()) return "nobody";
@@ -1170,7 +1141,7 @@ std::string Game::net_command(const std::string& cmd) {
       // Tests (no microphone in a headless browser): 100 ms of a 440 Hz tone as if spoken.
       std::vector<f32> tone(4800);
       for (std::size_t i = 0; i < tone.size(); ++i) tone[i] = 0.4f * std::sin(static_cast<f32>(i) * 2 * kPi * 440 / 48000);
-      for (int k = 0; k < std::max(1, std::atoi(cmd.c_str() + 11)); ++k) voice_capture(tone.data(), 4800, 48000);
+      for (int k = 0; k < std::max(1, std::atoi(cmd.c_str() + 11)); ++k) voice_capture(tone, 48000);
       return std::to_string(m.seq);
     }
     if (rest == "state") {

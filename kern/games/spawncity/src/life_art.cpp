@@ -19,12 +19,12 @@ Vec3 rgb(u32 h) { return {((h >> 16) & 255) / 255.0f, ((h >> 8) & 255) / 255.0f,
 
 bool LifeArt::make(kern::Renderer& r, Part& p, const kern::MeshData& mesh, const kern::Material& m) {
   p.id = r.allocate_id();
-  kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
-  in.material = m;
-  in.visible = false;
-  static const Mat4 parked = Mat4::translate({0, 0, -1000});
-  in.transforms = kern::Span<const f32>(parked.m, 16);
-  if (!r.upsert(p.id, in)) { r.release_id(p.id); p.id = 0; return false; }
+  kern::MeshLook look;
+  look.material = m;
+  look.extra_slot = kern::kMaxExtensionAttributes;
+  look.visible = false;
+  const Mat4 parked = Mat4::translate({0, 0, -1000});
+  if (!kern::upsert(r, p.id, mesh, look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
   return true;
 }
 
@@ -44,7 +44,11 @@ bool LifeArt::init(kern::Renderer& r) {
 }
 
 void LifeArt::begin() {
-  for (Part* p : {&box_, &ball_, &cyl_, &glow_}) { p->transforms.clear(); p->tints.clear(); }
+  auto empty = [](Part& p) { p.transforms.clear(); p.tints.clear(); };
+  empty(box_);
+  empty(ball_);
+  empty(cyl_);
+  empty(glow_);
 }
 
 void LifeArt::put(Part& p, const Mat4& m, Vec3 tint) {
@@ -183,12 +187,16 @@ void LifeArt::life(const Life& life, f32 now, Vec3 eye, f32 range) {
 }
 
 void LifeArt::end() {
-  for (Part* p : {&box_, &ball_, &cyl_, &glow_}) {
-    if (!p->id) continue;
-    const bool any = !p->transforms.empty();
-    if (any) r_->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()), kern::Span<const f32>(p->tints.data(), p->tints.size()));
-    r_->set_visible(p->id, any);
-  }
+  auto show = [&](const Part& p) {
+    if (!p.id) return;
+    const bool any = !p.transforms.empty();
+    if (any) r_->update_instances(p.id, p.transforms, p.tints);
+    r_->set_visible(p.id, any);
+  };
+  show(box_);
+  show(ball_);
+  show(cyl_);
+  show(glow_);
 }
 
 }  // namespace sc

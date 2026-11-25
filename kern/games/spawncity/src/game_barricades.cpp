@@ -69,35 +69,36 @@ Vec3 Game::gaps_zombie_goal(i32 person, Vec3 pos, Vec3 player, f32 now, bool& wa
   }
   if (!p_in) return player;
   // doorFor: the nearest door of the shelter
-  const GapsState::DoorView* d = nullptr;
+  std::size_t nearest = doors.size();  // (its place in doors; none: the end)
   f32 dd = 1e9f;
-  for (const GapsState::DoorView& v : doors) {
-    const f32 k = std::hypot(pos.x - v.c.x, pos.y - v.c.y);
-    if (k < dd) { dd = k; d = &v; }
+  for (std::size_t i = 0; i < doors.size(); ++i) {
+    const f32 k = std::hypot(pos.x - doors[i].c.x, pos.y - doors[i].c.y);
+    if (k < dd) { dd = k; nearest = i; }
   }
-  if (!d) return player;
-  walled = d->planks > 0;
-  const Vec2 o = d->c + d->n * 1.15f;
+  if (nearest == doors.size()) return player;
+  const GapsState::DoorView& door = doors[nearest];
+  walled = door.planks > 0;
+  const Vec2 o = door.c + door.n * 1.15f;
   if (std::hypot(o.x - pos.x, o.y - pos.y) >= 0.9f) return {o.x, o.y, pos.z};
-  if (d->planks > 0) {
+  if (door.planks > 0) {
     // breach: one plank per door every PLANK_MS, whoever pounds on it
     hold = true;
-    f32& door_next = g.door_next_break[d->key * 31 + d->i];
+    f32& door_next = g.door_next_break[door.key * 31 + door.i];
     if (now >= z.next_plank && now >= door_next) {
       z.next_plank = now + kPlankS * (0.8f + rng_.unit() * 0.5f);
       door_next = now + kPlankS * 0.9f;
-      std::vector<u8>& st = g.planks[d->key];
-      if (d->i < static_cast<i32>(st.size()) && st[static_cast<std::size_t>(d->i)] > 0) {
-        --st[static_cast<std::size_t>(d->i)];
-        townsync_plank(d->key, static_cast<u8>(d->i), static_cast<u8>(st.size()), -1);
+      std::vector<u8>& st = g.planks[door.key];
+      if (door.i < static_cast<i32>(st.size()) && st[static_cast<std::size_t>(door.i)] > 0) {
+        --st[static_cast<std::size_t>(door.i)];
+        townsync_plank(door.key, static_cast<u8>(door.i), static_cast<u8>(st.size()), -1);
       }
-      world_->play_sound(combat_sfx(combat_audio::Kind::bounce), {d->c.x, d->c.y, d->floor + 1}, 0.5f, 0.55f, true);
+      world_->play_sound(combat_sfx(combat_audio::Kind::bounce), {door.c.x, door.c.y, door.floor + 1}, 0.5f, 0.55f, true);
       ++g.planks_broken;
     }
-    return {o.x - d->n.x * 0.2f, o.y - d->n.y * 0.2f, pos.z};  // facing the door
+    return {o.x - door.n.x * 0.2f, o.y - door.n.y * 0.2f, pos.z};  // facing the door
   }
   z.entering = true;
-  z.enter_at = d->c - d->n * 1.8f;
+  z.enter_at = door.c - door.n * 1.8f;
   return {z.enter_at.x, z.enter_at.y, pos.z};
 }
 
@@ -107,15 +108,16 @@ bool Game::gaps_repair_barricade() {
   std::vector<GapsState::DoorView> doors;
   if (!gaps_barricade_doors(doors)) return false;
   const Vec3 me = player_position();
-  const GapsState::DoorView* best = nullptr;
+  std::size_t nearest = doors.size();  // (its place in doors; none: the end)
   f32 bd = kRepairM;
-  for (const GapsState::DoorView& v : doors) {
-    const f32 k = std::hypot(me.x - v.c.x, me.y - v.c.y);
-    if (k < bd) { bd = k; best = &v; }
+  for (std::size_t i = 0; i < doors.size(); ++i) {
+    const f32 k = std::hypot(me.x - doors[i].c.x, me.y - doors[i].c.y);
+    if (k < bd) { bd = k; nearest = i; }
   }
-  if (!best || best->planks >= kPlanks || combat_.zombies.points < kRepairCost) return false;
-  ++gaps_->planks[best->key][static_cast<std::size_t>(best->i)];
-  townsync_plank(best->key, static_cast<u8>(best->i), static_cast<u8>(gaps_->planks[best->key].size()), 1);
+  if (nearest == doors.size() || doors[nearest].planks >= kPlanks || combat_.zombies.points < kRepairCost) return false;
+  const GapsState::DoorView& best = doors[nearest];
+  ++gaps_->planks[best.key][static_cast<std::size_t>(best.i)];
+  townsync_plank(best.key, static_cast<u8>(best.i), static_cast<u8>(gaps_->planks[best.key].size()), 1);
   combat_.zombies.points -= kRepairCost;
   world_->play_sound(combat_sfx(combat_audio::Kind::bounce), cam_.eye, 0.4f, 0.7f, false);  // playCombatAudio "bounce" .4 / .7
   osfx("zombie_nights.repairKnock", cam_.eye);
@@ -144,10 +146,11 @@ void Game::gaps_barricades_draw() {
     m.roughness = 0.85f;
     kern::MeshData box = kern::primitives::box({kDoorW + 0.5f, 0.06f, 0.2f}, {0.42f, 0.29f, 0.17f});
     g.plank_part.id = g.renderer->allocate_id();
-    kern::MeshInput in = box.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    if (!g.renderer->upsert(g.plank_part.id, in)) { g.renderer->release_id(g.plank_part.id); g.plank_part.id = 0; return; }
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    if (!kern::upsert(*g.renderer, g.plank_part.id, box, look)) { g.renderer->release_id(g.plank_part.id); g.plank_part.id = 0; return; }
   }
   g.plank_part.transforms.clear();
   g.plank_part.tints.clear();

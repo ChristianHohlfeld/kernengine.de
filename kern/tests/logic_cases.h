@@ -16,6 +16,10 @@ namespace logic_cases {
 struct Case {
   const char* name;
   const char* graph;
+  // C++ leaves open what the scenario does (a function that calls itself for ever: C++ runs out of
+  // its stack) - the interpreter and the JIT stop it with the same error; the Blueprint's class is
+  // not run on it (blueprint_native.h).
+  bool cpp_leaves_open = false;
 };
 
 inline const std::vector<Case>& cases() {
@@ -99,6 +103,61 @@ inline const std::vector<Case>& cases() {
           {"id":6,"type":"var.set","params":{"variable":"H"}},{"id":7,"type":"math.formula","params":{"formula":"ceil(x * 0.7) + (x % 2 == 0 && x != 0) * 100"}}],
         "links":[[1,"then",2,"exec"],[1,"value",3,"value"],[3,"result",2,"value"],[2,"then",4,"exec"],[1,"value",5,"x"],[5,"result",4,"amount"],
           [4,"then",6,"exec"],[1,"value",7,"x"],[7,"result",6,"value"]]})kg"},
+      // The sign of -0 (Copy Sign, the formula's copysign): -Go's value is -0 for 0, and Copy Sign
+      // gives the size of 3 with that sign - -3 in every tier, where Sign of -0 says 0.
+      {"signed_zero",
+       R"kg({"variables":[{"name":"F","type":"float","value":0},{"name":"G","type":"float","value":0},{"name":"Signs","type":"float_list","value":[]}],
+        "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.add","params":{"variable":"G"}},{"id":3,"type":"math.negate"},
+          {"id":4,"type":"math.copysign","values":{"a":3}},{"id":5,"type":"var.set","params":{"variable":"F"}},
+          {"id":6,"type":"math.formula","params":{"formula":"copysign(1, z) * 100 + copysign(value, 1 - value)"}},{"id":7,"type":"list.add","params":{"variable":"Signs"}}],
+        "links":[[1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",4,"b"],[4,"result",2,"amount"],[2,"then",5,"exec"],[3,"result",6,"z"],[1,"value",6,"value"],
+          [6,"result",5,"value"],[5,"then",7,"exec"],[6,"result",7,"item"]]})kg"},
+      // The bits of a float (Bits of Float 32, Float 32 of Bits: std::bit_cast) - of Go's value * 0.1 - 0.25 as a
+      // float, and the float of them again; and End Play, once, when play ends (Runtime::end).
+      {"float_bits_end",
+       R"kg({"variables":[{"name":"Bits","type":"int_list","value":[]},{"name":"Back","type":"float_list","value":[]},{"name":"Ended","type":"int","value":0}],
+        "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"list.add","params":{"variable":"Bits"}},
+          {"id":3,"type":"math.formula","params":{"formula":"value * 0.1 - 0.25"}},{"id":4,"type":"math.bits_of_float32"},
+          {"id":5,"type":"list.add","params":{"variable":"Back"}},{"id":6,"type":"math.float32_of_bits"},
+          {"id":7,"type":"event.end"},{"id":8,"type":"var.set","params":{"variable":"Ended"},"values":{"value":7}}],
+        "links":[[1,"then",2,"exec"],[1,"value",3,"value"],[3,"result",4,"a"],[4,"result",2,"item"],[2,"then",5,"exec"],[4,"result",6,"a"],[6,"result",5,"item"],
+          [7,"then",8,"exec"]]})kg"},
+      // The bytes of a struct (Bytes of Struct, Struct of Bytes): Go's value goes into a struct of
+      // numbers, its bytes into B, and back - from the first byte and from the second (the last byte
+      // missing: 0). Flags is cut to 16 bits, Speed to a float's, Vx is signed.
+      {"bytes",
+       R"kg({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":0},{"name":"Vx","type":"int","value":-3},)kg"
+       R"kg({"name":"Flags","type":"int","value":70000},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0}]}],)kg"
+       R"kg("variables":[{"name":"B","type":"int_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}},{"name":"Shifted","type":"struct","of":"Frame","value":{}}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},)kg"
+       R"kg({"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},)kg"
+       R"kg({"id":5,"type":"math.formula","params":{"formula":"value * 0.1"}},{"id":6,"type":"math.round"},{"id":7,"type":"var.set","params":{"variable":"Back"}},)kg"
+       R"kg({"id":8,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"}},{"id":9,"type":"var.get","params":{"variable":"B"}},)kg"
+       R"kg({"id":10,"type":"var.set","params":{"variable":"Shifted"}},)kg"
+       R"kg({"id":11,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"16: u32@0 u16@4 i16@6 u16@8 bool@10 f32@12"},"values":{"at":1}}],)kg"
+       R"kg("links":[[1,"then",2,"exec"],[4,"value",3,"value"],[3,"bytes",2,"value"],[1,"value",5,"value"],[5,"result",4,"Speed"],[1,"value",6,"a"],[6,"result",4,"Seq"],)kg"
+       R"kg([2,"then",7,"exec"],[9,"value",8,"bytes"],[8,"value",7,"value"],[7,"then",10,"exec"],[9,"value",11,"bytes"],[11,"value",10,"value"]]})kg"},
+      // The bytes of lists of numbers (Copy Bytes, memcpy between them): floats into bytes (not all of
+      // them), bytes into floats from a place Go's value says (beyond the bytes: 0; the last float
+      // written in part keeps its other bytes), a list into itself (as memmove), an Int64 into bytes at
+      // a place beyond the list's end, whole numbers into a list of a fixed length of doubles, floats
+      // into bytes of whole numbers from before the list's start.
+      {"copy_bytes",
+       R"kg({"variables":[{"name":"B","type":"int_list","value":[0,0,0,0,0,0,0,0,0,0,0,0]},{"name":"F","type":"float_list","value":[0.1,-2.5,1e30]},)kg"
+       R"kg({"name":"G","type":"float_list","value":[9,9,9,9]},{"name":"W","type":"int_list","value":[70000,-3,7,65535]},{"name":"L","type":"int64_list","value":[]},)kg"
+       R"kg({"name":"Big","type":"int64","value":"18364758544493064720"},{"name":"Fx","type":"float_list","count":3,"value":[0.5,0.25,-1]}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},)kg"
+       R"kg({"id":2,"type":"list.copy_bytes","params":{"variable":"B","code":"u8","from_code":"f32"},"values":{"at":1,"from":0,"count":10}},{"id":3,"type":"var.get","params":{"variable":"F"}},)kg"
+       R"kg({"id":4,"type":"list.copy_bytes","params":{"variable":"G","code":"f32","from_code":"u8"},"values":{"at":0,"count":13}},{"id":5,"type":"math.round"},)kg"
+       R"kg({"id":6,"type":"var.get","params":{"variable":"B"}},)kg"
+       R"kg({"id":7,"type":"list.copy_bytes","params":{"variable":"W","code":"u16","from_code":"u16"},"values":{"at":1,"from":0,"count":5}},{"id":8,"type":"var.get","params":{"variable":"W"}},)kg"
+       R"kg({"id":15,"type":"list.add","params":{"variable":"L"}},{"id":16,"type":"var.get","params":{"variable":"Big"}},)kg"
+       R"kg({"id":9,"type":"list.copy_bytes","params":{"variable":"B","code":"u8","from_code":"i64"},"values":{"from":0,"count":16}},{"id":11,"type":"var.get","params":{"variable":"L"}},)kg"
+       R"kg({"id":12,"type":"list.copy_bytes","params":{"variable":"Fx","code":"f64","from_code":"i32"},"values":{"at":0,"from":1,"count":12}},)kg"
+       R"kg({"id":14,"type":"list.copy_bytes","params":{"variable":"W","code":"i8","from_code":"f32"},"values":{"at":-1,"from":0,"count":4}}],)kg"
+       R"kg("links":[[1,"then",2,"exec"],[3,"value",2,"items"],[2,"then",4,"exec"],[1,"value",5,"a"],[5,"result",4,"from"],[6,"value",4,"items"],)kg"
+       R"kg([4,"then",7,"exec"],[8,"value",7,"items"],[7,"then",15,"exec"],[16,"value",15,"item"],[15,"then",9,"exec"],[5,"result",9,"at"],[11,"value",9,"items"],)kg"
+       R"kg([9,"then",12,"exec"],[8,"value",12,"items"],[12,"then",14,"exec"],[3,"value",14,"items"]]})kg"},
       {"events_and_time",
        R"({"variables":[{"name":"Ticks","type":"int","value":0},{"name":"Elapsed","type":"float","value":0},{"name":"Heard","type":"float","value":0},{"name":"Last","type":"text","value":""}],
         "nodes":[{"id":1,"type":"event.tick"},{"id":2,"type":"var.add","params":{"variable":"Ticks"}},{"id":3,"type":"var.add","params":{"variable":"Elapsed"}},
@@ -152,6 +211,58 @@ inline const std::vector<Case>& cases() {
           [45,"then1",46,"exec"],[45,"then2",46,"exec"],[45,"then3",46,"exec"],[45,"then4",46,"exec"],[45,"then5",46,"exec"],[45,"then6",46,"exec"],[45,"then7",46,"exec"],
           [45,"then8",46,"exec"],[45,"then9",46,"exec"],[45,"then10",46,"exec"],
           [50,"then",51,"exec"],[50,"v",51,"v"],[60,"then",61,"exec"],[60,"v",62,"a"],[62,"result",61,"condition"],[61,"true",63,"exec"],[60,"v",64,"a"],[64,"result",63,"value"]]})"},
+      // Functions that call themselves - each call with its own values, in every tier as in C++: Fib
+      // reads what its first call gave after its second (Fib(15) = 610), Loop calls itself in the
+      // body of its For Loop (the index is the call's own: 2 + 2 Loop(n - 1) steps).
+      {"recursion_direct",
+       R"({"variables":[{"name":"R","type":"int","value":0},{"name":"Count","type":"int","value":0}],
+        "functions":[{"name":"Fib","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"r","type":"int","value":0}]},
+          {"name":"Loop","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fib"}},{"id":21,"type":"flow.branch"},{"id":22,"type":"math.compare","params":{"op":"<"},"values":{"b":2}},
+          {"id":23,"type":"func.return","params":{"function":"Fib"}},{"id":24,"type":"func.call","params":{"function":"Fib"}},{"id":25,"type":"math.sub","values":{"b":1}},
+          {"id":26,"type":"func.call","params":{"function":"Fib"}},{"id":27,"type":"math.sub","values":{"b":2}},{"id":28,"type":"func.return","params":{"function":"Fib"}},{"id":29,"type":"math.add"},
+          {"id":40,"type":"func.entry","params":{"function":"Loop"}},{"id":41,"type":"flow.for","values":{"first":1,"last":2}},{"id":42,"type":"flow.branch"},
+          {"id":43,"type":"math.compare","params":{"op":">"},"values":{"b":0}},{"id":44,"type":"func.call","params":{"function":"Loop"}},{"id":45,"type":"math.sub","values":{"b":1}},
+          {"id":46,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},{"id":47,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"func.call","params":{"function":"Fib"}},{"id":3,"type":"math.add","values":{"b":10}},
+          {"id":4,"type":"var.add","params":{"variable":"R"}},{"id":5,"type":"func.call","params":{"function":"Loop"}}],
+        "links":[[20,"then",21,"exec"],[20,"n",22,"a"],[22,"result",21,"condition"],[21,"true",23,"exec"],[20,"n",23,"r"],[21,"false",24,"exec"],[20,"n",25,"a"],[25,"result",24,"n"],
+          [24,"then",26,"exec"],[20,"n",27,"a"],[27,"result",26,"n"],[26,"then",28,"exec"],[24,"r",29,"a"],[26,"r",29,"b"],[29,"result",28,"r"],
+          [40,"then",41,"exec"],[41,"body",42,"exec"],[40,"n",43,"a"],[43,"result",42,"condition"],[42,"true",44,"exec"],[40,"n",45,"a"],[45,"result",44,"n"],[44,"then",46,"exec"],[42,"false",47,"exec"],
+          [1,"then",2,"exec"],[1,"value",3,"a"],[3,"result",2,"n"],[2,"then",4,"exec"],[2,"r",4,"amount"],[4,"then",5,"exec"],[1,"value",5,"n"]]})"},
+      // Through others: Ping calls Pong, Pong calls Ping; Ping's second step (a Sequence) runs when
+      // the calls below it are over, with its own n (Trail: the order the calls end in).
+      {"recursion_through",
+       R"({"variables":[{"name":"Trail","type":"float","value":0},{"name":"Hops","type":"int","value":0}],
+        "functions":[{"name":"Ping","inputs":[{"name":"n","type":"float","value":0}],"outputs":[]},{"name":"Pong","inputs":[{"name":"n","type":"float","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Ping"}},{"id":11,"type":"flow.sequence","params":{"count":"2"}},{"id":12,"type":"flow.branch"},
+          {"id":13,"type":"math.compare","params":{"op":">"},"values":{"b":0}},{"id":14,"type":"func.call","params":{"function":"Pong"}},{"id":15,"type":"math.sub","values":{"b":1}},
+          {"id":16,"type":"var.set","params":{"variable":"Trail"}},{"id":17,"type":"math.formula","params":{"formula":"(acc * 7 + x) % 1000003"}},{"id":18,"type":"var.get","params":{"variable":"Trail"}},
+          {"id":30,"type":"func.entry","params":{"function":"Pong"}},{"id":31,"type":"var.add","params":{"variable":"Hops"},"values":{"amount":1}},{"id":32,"type":"func.call","params":{"function":"Ping"}},
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"func.call","params":{"function":"Ping"}}],
+        "links":[[10,"then",11,"exec"],[11,"then0",12,"exec"],[10,"n",13,"a"],[13,"result",12,"condition"],[12,"true",14,"exec"],[10,"n",15,"a"],[15,"result",14,"n"],
+          [11,"then1",16,"exec"],[18,"value",17,"acc"],[10,"n",17,"x"],[17,"result",16,"value"],
+          [30,"then",31,"exec"],[31,"then",32,"exec"],[30,"n",32,"n"],[1,"then",2,"exec"],[1,"value",2,"n"]]})"},
+      // Deep: 5000 calls one in another - more than the interpreter reached on the 1 MiB stack of the
+      // WebAssembly build while each call was a call of C++ (about 700).
+      {"recursion_deep",
+       R"({"variables":[{"name":"Depth","type":"int","value":0}],
+        "functions":[{"name":"Down","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Down"}},{"id":11,"type":"flow.branch"},{"id":12,"type":"math.compare","params":{"op":">"},"values":{"b":0}},
+          {"id":13,"type":"var.add","params":{"variable":"Depth"},"values":{"amount":1}},{"id":14,"type":"func.call","params":{"function":"Down"}},{"id":15,"type":"math.sub","values":{"b":1}},
+          {"id":1,"type":"event.custom","params":{"name":"Open"}},{"id":2,"type":"func.call","params":{"function":"Down"},"values":{"n":5000}}],
+        "links":[[10,"then",11,"exec"],[10,"n",12,"a"],[12,"result",11,"condition"],[11,"true",13,"exec"],[13,"then",14,"exec"],[10,"n",15,"a"],[15,"result",14,"n"],
+          [1,"then",2,"exec"]]})"},
+      // For ever: the call past Runtime::kCallsDeep (65536) stops the chain and the Blueprint, in the
+      // interpreter and with the JIT at the same call. C++ leaves it open (its stack runs out).
+      {"recursion_endless",
+       R"({"variables":[{"name":"Steps","type":"int","value":0}],
+        "functions":[{"name":"Forever","inputs":[{"name":"n","type":"int","value":0}],"outputs":[]}],
+        "nodes":[{"id":10,"type":"func.entry","params":{"function":"Forever"}},{"id":11,"type":"var.add","params":{"variable":"Steps"},"values":{"amount":1}},
+          {"id":12,"type":"func.call","params":{"function":"Forever"}},
+          {"id":1,"type":"event.custom","params":{"name":"Open"}},{"id":2,"type":"func.call","params":{"function":"Forever"}}],
+        "links":[[10,"then",11,"exec"],[11,"then",12,"exec"],[10,"n",12,"n"],[1,"then",2,"exec"]]})",
+       true},
       // Whole numbers at their ends: a variable doubled 70 times stays at Int's end, one past 2^53
       // adds as a number does, Float to Int of what does not fit, Floor and Round of endless and
       // of what is no number - every tier holds a whole number the same way (logic::normal). Int's
@@ -377,6 +488,174 @@ inline const std::vector<Case>& cases() {
         {"name":"Outer","inputs":[{"name":"x","type":"float","value":1},
         {"name":"again","type":"bool","value":false}],"outputs":[{"name":"mine","type":"float","value":0}],"locals":[{"name":"Own","type":"float","value":0.25}]},
         {"name":"Join","inputs":[{"name":"a","type":"text","value":"a"}],"outputs":[{"name":"text","type":"text","value":""}],"locals":[{"name":"Total","type":"text","value":"<"}]}]})"},
+      // Lists of a fixed length (Fixed<Float, 3>): a variable, a field of a struct - also of structs
+      // in a fixed list -, an input, an output and a local variable of a function, a reference to
+      // one. Entries are set and read, also beside the list; a list set there as a whole is cut or
+      // filled up (a longer list, a shorter one, Make List, Make Struct, a Take leaves the zeros);
+      // read as a whole it is a list.
+      {"fixed_lists",
+       R"({"structs":[{"name":"Mat","fields":[{"name":"m","type":"float_list","count":4,"value":[1,0,0,1]},{"name":"Name","type":"text","value":"m"}]},
+          {"name":"Rig","fields":[{"name":"Bones","type":"struct_list","of":"Mat","count":2,"value":[{"m":[1,0,0,1],"Name":"a"},{"m":[2,0,0,2],"Name":"b"}]},{"name":"Free","type":"float_list","value":[]}]}],"variables":[
+          {"name":"Axis","type":"float_list","count":3,"value":[1,2,3]},{"name":"Tags","type":"text_list","count":2,"value":["x","y"]},
+          {"name":"Bits","type":"bool_list","count":3,"value":[true,false,true]},{"name":"Now","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"now"}},
+          {"name":"Body","type":"struct","of":"Rig","value":{"Bones":[{"m":[1,0,0,1],"Name":"a"},{"m":[2,0,0,2],"Name":"b"}],"Free":[]}},
+          {"name":"Any","type":"float_list","value":[9]},{"name":"Shown","type":"text","value":""},{"name":"Sum","type":"float","value":0}],"nodes":[
+          {"id":3,"type":"flow.for","values":{"first":0,"last":2}},{"id":10,"type":"event.custom","params":{"name":"Go"}},
+          {"id":12,"type":"func.call","params":{"function":"Scaled"}},{"id":30,"type":"event.custom","params":{"name":"Open"}},
+          {"id":31,"type":"var.take","params":{"variable":"Axis"}},{"id":34,"type":"flow.for_each","params":{"type":"text"}},
+          {"id":35,"type":"func.entry","params":{"function":"Mul"}},{"id":36,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":0}},
+          {"id":37,"type":"math.add"},{"id":38,"type":"math.mul"},{"id":39,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":0}},
+          {"id":40,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":0}},{"id":41,"type":"math.mul"},
+          {"id":42,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":1}},
+          {"id":43,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":44,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":1}},{"id":45,"type":"math.add"},{"id":46,"type":"math.mul"},
+          {"id":47,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":0}},
+          {"id":48,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":1}},{"id":49,"type":"math.mul"},
+          {"id":50,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":1}},
+          {"id":51,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":52,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":2}},{"id":53,"type":"math.add"},{"id":54,"type":"math.mul"},
+          {"id":55,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":56,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":0}},{"id":57,"type":"math.mul"},
+          {"id":58,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":59,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":60,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".m[]"},"values":{"path0":3}},{"id":61,"type":"math.add"},{"id":62,"type":"math.mul"},
+          {"id":63,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":2}},
+          {"id":64,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":1}},{"id":65,"type":"math.mul"},
+          {"id":66,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":67,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".m[]"},"values":{"path0":3}},
+          {"id":68,"type":"var.set","params":{"variable":"R","scope":"Mul","path":".Name"}},{"id":69,"type":"text.append","values":{"b":"*"}},
+          {"id":70,"type":"var.get","params":{"variable":"a","scope":"Mul","path":".Name"}},{"id":71,"type":"var.get","params":{"variable":"b","scope":"Mul","path":".Name"}},
+          {"id":72,"type":"func.return","params":{"function":"Mul"}},{"id":73,"type":"var.get","params":{"variable":"R","scope":"Mul"}},
+          {"id":74,"type":"func.entry","params":{"function":"Scaled"}},{"id":75,"type":"var.set","params":{"variable":"Made","scope":"Scaled","path":"[]"}},
+          {"id":76,"type":"math.mul"},{"id":77,"type":"list.get","params":{"type":"float"}},{"id":78,"type":"func.return","params":{"function":"Scaled"}},
+          {"id":79,"type":"var.get","params":{"variable":"Made","scope":"Scaled"}},{"id":80,"type":"func.entry","params":{"function":"Bump"}},
+          {"id":81,"type":"var.add","params":{"variable":"axis","scope":"Bump","path":"[]"},"values":{"path0":0}},
+          {"id":82,"type":"var.set","params":{"variable":"axis","scope":"Bump","path":"[]"},"values":{"path0":5,"value":7}},
+          {"id":83,"type":"var.set","params":{"variable":"Axis","path":"[]"}},{"id":84,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":85,"type":"var.set","params":{"variable":"Axis"}},{"id":86,"type":"var.set","params":{"variable":"Any"}},{"id":87,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":88,"type":"list.add","params":{"variable":"Any"}},{"id":89,"type":"var.set","params":{"variable":"Axis"}},{"id":90,"type":"var.get","params":{"variable":"Any"}},
+          {"id":91,"type":"var.set","params":{"variable":"Tags"}},{"id":92,"type":"list.make","params":{"type":"text","count":"1"}},
+          {"id":93,"type":"func.call","params":{"function":"Bump","axis.variable":"Axis"},"values":{"by":0.5}},{"id":94,"type":"var.set","params":{"variable":"Now","path":".m"}},
+          {"id":95,"type":"list.make","params":{"type":"float","count":"4"},"values":{"item1":1,"item2":2,"item3":3}},
+          {"id":96,"type":"var.set","params":{"variable":"Body","path":".Bones[].m[]"},"values":{"path0":1,"path1":3}},
+          {"id":97,"type":"var.set","params":{"variable":"Body","path":".Bones[].Name"},"values":{"value":"hit"}},{"id":98,"type":"var.set","params":{"variable":"Now"}},
+          {"id":99,"type":"func.pure","params":{"function":"Mul","a.variable":"Now","b.variable":"Body","b.path":".Bones[]"},"values":{"b.path0":0}},
+          {"id":100,"type":"var.set","params":{"variable":"Bits","path":"[]"},"values":{"path0":1}},{"id":101,"type":"math.compare","params":{"op":">"},"values":{"b":3}},
+          {"id":102,"type":"var.add","params":{"variable":"Sum"}},{"id":103,"type":"math.add"},{"id":104,"type":"math.add"},
+          {"id":105,"type":"list.length","params":{"type":"float"}},{"id":106,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":107,"type":"list.get","params":{"type":"float"},"values":{"index":3}},{"id":108,"type":"var.get","params":{"variable":"Now","path":".m"}},
+          {"id":109,"type":"list.find","params":{"type":"float"}},{"id":110,"type":"var.get","params":{"variable":"Axis"}},
+          {"id":111,"type":"var.set","params":{"variable":"Shown"}},{"id":112,"type":"text.append"},{"id":113,"type":"var.get","params":{"variable":"Shown"}},
+          {"id":114,"type":"var.get","params":{"variable":"Axis"}},{"id":115,"type":"list.contains","params":{"type":"text"},"values":{"item":""}},
+          {"id":116,"type":"var.get","params":{"variable":"Tags"}},{"id":117,"type":"var.set","params":{"variable":"Any"}},{"id":118,"type":"var.set","params":{"variable":"Body"}},
+          {"id":119,"type":"struct.make","params":{"struct":"Rig"}},{"id":120,"type":"list.make","params":{"type":"Mat","count":"1"}},
+          {"id":121,"type":"var.get","params":{"variable":"Now"}},{"id":122,"type":"var.get","params":{"variable":"Any"}},{"id":123,"type":"var.get","params":{"variable":"Tags"}},
+          {"id":124,"type":"var.set","params":{"variable":"Shown"}},{"id":125,"type":"text.append","values":{"b":"|"}},{"id":126,"type":"var.get","params":{"variable":"Shown"}},
+          {"id":127,"type":"var.set","params":{"variable":"Now","path":".m"}},{"id":128,"type":"var.get","params":{"variable":"Any"}},
+          {"id":129,"type":"var.set","params":{"variable":"Shown"}},{"id":130,"type":"text.append"},{"id":131,"type":"var.get","params":{"variable":"Shown"}},
+          {"id":132,"type":"var.get","params":{"variable":"Bits"}},{"id":133,"type":"var.get","params":{"variable":"Body","path":".Bones[].m"},"values":{"path0":1}}],"links":[
+          [3,"body",75,"exec"],[3,"completed",78,"exec"],[3,"index",75,"path0"],[3,"index",77,"index"],[10,"then",83,"exec"],[10,"value",12,"by"],[10,"value",83,"path0"],
+          [10,"value",83,"value"],[10,"value",88,"item"],[10,"value",92,"item0"],[10,"value",95,"item0"],[10,"value",96,"value"],[10,"value",97,"path0"],[10,"value",101,"a"],
+          [10,"value",109,"item"],[12,"then",85,"exec"],[12,"v",85,"value"],[30,"then",31,"exec"],[31,"then",117,"exec"],[31,"value",117,"value"],[34,"body",124,"exec"],
+          [34,"completed",127,"exec"],[34,"item",125,"c"],[35,"then",36,"exec"],[36,"then",44,"exec"],[37,"result",36,"value"],[38,"result",37,"a"],[39,"value",38,"a"],
+          [40,"value",38,"b"],[41,"result",37,"b"],[42,"value",41,"a"],[43,"value",41,"b"],[44,"then",52,"exec"],[45,"result",44,"value"],[46,"result",45,"a"],[47,"value",46,"a"],
+          [48,"value",46,"b"],[49,"result",45,"b"],[50,"value",49,"a"],[51,"value",49,"b"],[52,"then",60,"exec"],[53,"result",52,"value"],[54,"result",53,"a"],[55,"value",54,"a"],
+          [56,"value",54,"b"],[57,"result",53,"b"],[58,"value",57,"a"],[59,"value",57,"b"],[60,"then",68,"exec"],[61,"result",60,"value"],[62,"result",61,"a"],[63,"value",62,"a"],
+          [64,"value",62,"b"],[65,"result",61,"b"],[66,"value",65,"a"],[67,"value",65,"b"],[68,"then",72,"exec"],[69,"result",68,"value"],[70,"value",69,"a"],[71,"value",69,"c"],
+          [73,"value",72,"out"],[74,"by",76,"b"],[74,"then",3,"exec"],[74,"v",77,"list"],[76,"result",75,"value"],[77,"item",76,"a"],[79,"value",78,"v"],[80,"by",81,"amount"],
+          [80,"then",81,"exec"],[81,"then",82,"exec"],[83,"then",12,"exec"],[84,"value",12,"v"],[85,"then",86,"exec"],[86,"then",88,"exec"],[87,"value",86,"value"],
+          [88,"then",89,"exec"],[89,"then",91,"exec"],[90,"value",89,"value"],[91,"then",93,"exec"],[92,"list",91,"value"],[93,"then",94,"exec"],[94,"then",96,"exec"],
+          [95,"list",94,"value"],[96,"then",97,"exec"],[97,"then",98,"exec"],[98,"then",100,"exec"],[99,"out",98,"value"],[100,"then",102,"exec"],[101,"result",100,"value"],
+          [102,"then",111,"exec"],[103,"result",102,"amount"],[104,"result",103,"a"],[105,"length",104,"a"],[106,"value",105,"list"],[107,"item",104,"b"],[108,"value",107,"list"],
+          [109,"index",103,"b"],[110,"value",109,"list"],[112,"result",111,"value"],[113,"value",112,"a"],[114,"value",112,"b"],[115,"result",112,"c"],[116,"value",115,"list"],
+          [117,"then",118,"exec"],[118,"then",34,"exec"],[119,"value",118,"value"],[120,"list",119,"Bones"],[121,"value",120,"item0"],[122,"value",119,"Free"],
+          [123,"value",34,"list"],[125,"result",124,"value"],[126,"value",125,"a"],[127,"then",129,"exec"],[128,"value",127,"value"],[130,"result",129,"value"],
+          [131,"value",130,"a"],[132,"value",130,"b"],[133,"value",130,"c"]],"functions":[
+          {"name":"Mul","pure":true,"inputs":[{"name":"a","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}},{"name":"b","type":"struct","of":"Mat","ref":"const","value":{"m":[1,0,0,1],"Name":"m"}}],"outputs":[{"name":"out","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}],"locals":[{"name":"R","type":"struct","of":"Mat","value":{"m":[1,0,0,1],"Name":"m"}}]},
+          {"name":"Scaled","inputs":[{"name":"v","type":"float_list","count":3,"value":[1,1,1]},{"name":"by","type":"float","value":2}],"outputs":[{"name":"v","type":"float_list","count":3,"value":[]}],"locals":[{"name":"Made","type":"float_list","count":3,"value":[]}]},
+          {"name":"Bump","inputs":[{"name":"axis","type":"float_list","count":3,"ref":true,"value":[]},{"name":"by","type":"float","value":1}],"outputs":[]}]})"},
+      // Sort List: a list of structs in the order a pure function says (more kills first, then fewer
+      // deaths; equal ones as they stood), numbers and texts by their own order.
+      {"list_sort",
+       R"({"structs":[{"name":"Score","fields":[{"name":"Name","type":"text","value":""},{"name":"Kills","type":"int","value":0},{"name":"Deaths","type":"int","value":0}]}],"variables":[
+          {"name":"Scores","type":"struct_list","of":"Score","value":[]},{"name":"Times","type":"float_list","value":[3.5,1,2,1]},
+          {"name":"Names","type":"text_list","value":["c","a","b"]},{"name":"Shown","type":"text","value":""}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.entry","params":{"function":"Before"}},{"id":3,"type":"func.return","params":{"function":"Before"}},{"id":4,"type":"logic.or"},
+          {"id":5,"type":"math.compare","params":{"op":">"}},{"id":6,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Kills"}},
+          {"id":7,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Kills"}},{"id":8,"type":"logic.and"},{"id":9,"type":"math.compare","params":{"op":"=="}},
+          {"id":10,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Kills"}},
+          {"id":11,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Kills"}},{"id":12,"type":"math.compare","params":{"op":"<"}},
+          {"id":13,"type":"var.get","params":{"variable":"a","scope":"Before","path":".Deaths"}},
+          {"id":14,"type":"var.get","params":{"variable":"b","scope":"Before","path":".Deaths"}},{"id":15,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":16,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"x","Kills":2,"Deaths":3}},{"id":17,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":18,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"y","Kills":5,"Deaths":1}},{"id":19,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":20,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"z","Kills":2,"Deaths":1}},{"id":21,"type":"list.add","params":{"variable":"Scores"}},
+          {"id":22,"type":"struct.make","params":{"struct":"Score"},"values":{"Name":"w","Kills":2,"Deaths":3}},
+          {"id":23,"type":"list.sort","params":{"variable":"Scores","function":"Before"}},{"id":24,"type":"list.sort","params":{"variable":"Times","function":""}},
+          {"id":25,"type":"list.sort","params":{"variable":"Names","function":""}},{"id":26,"type":"var.set","params":{"variable":"Shown"}},{"id":27,"type":"text.append"},
+          {"id":28,"type":"var.get","params":{"variable":"Scores","path":"[].Name"},"values":{"path0":0}},
+          {"id":29,"type":"var.get","params":{"variable":"Scores","path":"[].Name"},"values":{"path0":3}},{"id":30,"type":"var.get","params":{"variable":"Times"}}],"links":[
+          [1,"then",15,"exec"],[2,"then",3,"exec"],[4,"result",3,"before"],[5,"result",4,"a"],[6,"value",5,"a"],[7,"value",5,"b"],[8,"result",4,"b"],[9,"result",8,"a"],
+          [10,"value",9,"a"],[11,"value",9,"b"],[12,"result",8,"b"],[13,"value",12,"a"],[14,"value",12,"b"],[15,"then",17,"exec"],[16,"value",15,"item"],[17,"then",19,"exec"],
+          [18,"value",17,"item"],[19,"then",21,"exec"],[20,"value",19,"item"],[21,"then",23,"exec"],[22,"value",21,"item"],[23,"then",24,"exec"],[24,"then",25,"exec"],
+          [25,"then",26,"exec"],[27,"result",26,"value"],[28,"value",27,"a"],[29,"value",27,"b"],[30,"value",27,"c"]],"functions":[
+          {"name":"Before","pure":true,"inputs":[{"name":"a","type":"struct","of":"Score","value":{"Name":"","Kills":0,"Deaths":0}},{"name":"b","type":"struct","of":"Score","value":{"Name":"","Kills":0,"Deaths":0}}],"outputs":[{"name":"before","type":"bool","value":false}]}]})"},
+      // Format Text: a format as printf has it with Int, Float and Text values - widths, precision,
+      // %x %c %%, the Most input cutting what it gives (snprintf's size).
+      {"text_format",
+       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Time","type":"float","value":0}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.entry","params":{"function":"Clock"}},{"id":3,"type":"func.return","params":{"function":"Clock"}},
+          {"id":4,"type":"text.format","params":{"format":"%02d:%06.3f"},"values":{"most":-1}},{"id":5,"type":"var.set","params":{"variable":"Shown"}},
+          {"id":6,"type":"text.append"},{"id":7,"type":"func.pure","params":{"function":"Clock"}},
+          {"id":8,"type":"text.format","params":{"format":"|%s|%5.1f|%x|%c|100%%"},"values":{"most":-1,"v3":65}},
+          {"id":9,"type":"text.format","params":{"format":"%s"},"values":{"most":3,"v0":"abcdef"}}],"links":[[1,"text",8,"v0"],[1,"then",5,"exec"],[1,"value",7,"m"],
+          [1,"value",7,"s"],[1,"value",8,"v1"],[1,"value",8,"v2"],[2,"m",4,"v0"],[2,"s",4,"v1"],[2,"then",3,"exec"],[4,"result",3,"out"],[6,"result",5,"value"],[7,"out",6,"a"],
+          [8,"result",6,"b"],[9,"result",6,"c"]],"functions":[
+          {"name":"Clock","pure":true,"inputs":[{"name":"m","type":"int","value":0},{"name":"s","type":"float","value":0}],"outputs":[{"name":"out","type":"text","value":""}]}]})"},
+      // Texts as std::string reads them (find, rfind, find_*_of, substr, insert, erase, replace) and numbers
+      // and words read as C reads them (strtod, strtof, strtoll, strtoull, sscanf) - every value made into
+      // one text.
+      // A byte of a text variable set where it stands (Set Code: `s[i] = c` of a std::string) - outside the text: nothing.
+      {"text_set_code",
+       R"({"variables":[{"name":"Shown","type":"text","value":"ab\ncd"}],"nodes":[{"id":1,"type":"event.begin"},
+          {"id":2,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":2,"code":32}},
+          {"id":3,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":7,"code":33}},
+          {"id":4,"type":"text.set_code","params":{"variable":"Shown"},"values":{"index":0,"code":321}}],
+          "links":[[1,"then",2,"exec"],[2,"then",3,"exec"],[3,"then",4,"exec"]]})"},
+      {"text_scan",
+       R"({"variables":[{"name":"Shown","type":"text","value":""},{"name":"Bytes","type":"int_list","of":"u8","value":[1,2]}],"nodes":[{"id":1,"type":"event.begin"},
+          {"id":2,"type":"var.set","params":{"variable":"Shown"}},
+          {"id":30,"type":"list.insert_text","params":{"variable":"Bytes"},"values":{"index":1,"text":"A\u00e4"}},{"id":31,"type":"text.bytes","values":{"a":"hi"}},
+          {"id":32,"type":"list.append","params":{"variable":"Bytes"}},{"id":33,"type":"var.get","params":{"variable":"Bytes"}},{"id":34,"type":"text.append"},
+          {"id":35,"type":"text.repeat","values":{"a":"*","count":3}},{"id":36,"type":"text.of_bytes","values":{"at":1,"count":3}},
+          {"id":37,"type":"text.reserve","values":{"a":"r","count":64}},{"id":38,"type":"text.starts_with","values":{"a":"settings reset","b":"settings"}},
+          {"id":39,"type":"text.ends_with","values":{"a":"a.json","b":".json"}},{"id":40,"type":"text.less","values":{"a":"abc","b":"abd"}},
+          {"id":41,"type":"text.format","params":{"format":"|%d%d%d"},"values":{"most":-1}},{"id":42,"type":"text.append"},
+          {"id":3,"type":"text.append"},{"id":4,"type":"text.format","params":{"format":"%d|%d|%d|%d|%d|%d|%d|"},"values":{"most":-1}},
+          {"id":5,"type":"text.find","values":{"a":"hello world","b":"o","from":5}},{"id":6,"type":"text.rfind","values":{"a":"hello world","b":"o","from":-1}},
+          {"id":7,"type":"text.find_first_of","values":{"a":"key=value;x","b":"=;","from":4}},{"id":8,"type":"text.find_last_not_of","values":{"a":"trim   ","b":" ","from":-1}},
+          {"id":9,"type":"text.parse_int","values":{"a":"  -0x1Fz","at":0,"base":0}},{"id":10,"type":"int64.to_int"},
+          {"id":11,"type":"text.find_last_of","values":{"a":"a/b/c","b":"/","from":2}},{"id":12,"type":"text.find_first_not_of","values":{"a":"  x","b":" ","from":0}},
+          {"id":13,"type":"text.format","params":{"format":"%s|%s|%s|%s|%.17g|%d|%.9g|"},"values":{"most":-1}},
+          {"id":14,"type":"text.sub","values":{"a":"hello world","at":6,"count":-1}},{"id":15,"type":"text.replace","values":{"a":"hello world","at":0,"count":5,"b":"HELLO"}},
+          {"id":16,"type":"text.insert","values":{"a":"ac","at":1,"b":"b"}},{"id":17,"type":"text.erase","values":{"a":"settings reset","at":8,"count":-1}},
+          {"id":18,"type":"text.parse_float","values":{"a":"x 1e-3y","at":1}},{"id":19,"type":"text.parse_float32","values":{"a":"0.1","at":0}},
+          {"id":20,"type":"text.format","params":{"format":"%d %.9g %d %s|%s|%d|%d"},"values":{"most":-1}},
+          {"id":21,"type":"text.scan","params":{"format":"%f %lld %s %95[^\n]"},"values":{"a":" 2.5 -7 word rest of it","at":0,"p0":0,"p1":"0","p2":"x","p3":"y"}},
+          {"id":22,"type":"int64.to_int"},{"id":23,"type":"text.parse_uint","values":{"a":"-1","at":0,"base":10}},{"id":24,"type":"int64.low"},
+          {"id":25,"type":"text.scan","params":{"format":"x%d"},"values":{"a":"","at":0,"p0":5}},
+          {"id":26,"type":"text.scan","params":{"format":" %7s %hhd %hu %llu %x%n %*d %[^,],%i %3f%%%o"},
+           "values":{"a":"  name -129 70000 18446744073709551615 0x1Fg 9 a b,0b101 1.25%017 rest","at":0,"p0":"","p1":0,"p2":0,"p3":"0","p4":0,"p5":0,"p6":"","p7":0,"p8":0,"p9":0}},
+          {"id":27,"type":"text.format","params":{"format":"|%s %d %d %d %d %s %d %.9g %d|"},"values":{"most":-1}},{"id":28,"type":"int64.text"},{"id":29,"type":"text.append"}],
+        "links":[[1,"then",21,"exec"],[21,"then",25,"exec"],[25,"then",26,"exec"],[26,"then",30,"exec"],[30,"then",32,"exec"],[32,"then",2,"exec"],[31,"result",32,"items"],
+          [29,"result",34,"a"],[33,"value",36,"bytes"],[35,"result",34,"b"],[36,"result",34,"c"],[37,"result",35,"a"],
+          [38,"result",41,"v0"],[39,"result",41,"v1"],[40,"result",41,"v2"],[42,"result",2,"value"],[34,"result",42,"a"],[41,"result",42,"b"],[33,"value",42,"c"],
+          [26,"v0",27,"v0"],[26,"v1",27,"v1"],[26,"v2",27,"v2"],[26,"v4",27,"v3"],[26,"v5",27,"v4"],[26,"v6",27,"v5"],[26,"v7",27,"v6"],[26,"v8",27,"v7"],[26,"count",27,"v8"],
+          [26,"v3",28,"a"],[3,"result",29,"a"],[27,"result",29,"b"],[28,"result",29,"c"],[4,"result",3,"a"],[13,"result",3,"b"],[20,"result",3,"c"],
+          [5,"result",4,"v0"],[6,"result",4,"v1"],[7,"result",4,"v2"],[8,"result",4,"v3"],[9,"value",10,"a"],[10,"result",4,"v4"],[11,"result",4,"v5"],[12,"result",4,"v6"],
+          [14,"result",13,"v0"],[15,"result",13,"v1"],[16,"result",13,"v2"],[17,"result",13,"v3"],[18,"value",13,"v4"],[18,"end",13,"v5"],[19,"value",13,"v6"],
+          [21,"count",20,"v0"],[21,"v0",20,"v1"],[21,"v1",22,"a"],[22,"result",20,"v2"],[21,"v2",20,"v3"],[21,"v3",20,"v4"],[23,"value",24,"a"],[24,"result",20,"v5"],
+          [25,"count",20,"v6"]]})"},
       // Lists in one go: Set Length cuts and fills (a list of numbers, of booleans, of structs;
       // less than 0), Append and Insert List put a whole list in - at the start, in the middle,
       // past the end, a list into itself -, Reserve changes nothing one can read.
@@ -484,6 +763,29 @@ inline const std::vector<Case>& cases() {
           {"name":"Twice","inputs":[{"name":"name","type":"text","value":"n"}],"outputs":[{"name":"a","type":"text","value":""},{"name":"b","type":"text","value":""}]},
           {"name":"TakeLog","inputs":[],"outputs":[{"name":"list","type":"float_list","value":[]}]},
           {"name":"LocalTake","inputs":[{"name":"given","type":"text","value":"g"}],"outputs":[{"name":"text","type":"text","value":""},{"name":"left","type":"text","value":""}],"locals":[{"name":"Held","type":"text","value":"h"}]}]})"},
+      // An entry of a list of any length held by a call whose function runs handlers (Raise Event): while the
+      // handlers leave the list as it is, the function works on the entry (Go: Shout raises Ping, then adds to
+      // car.Speed); when a handler changes how long the list is (Open: Ping adds to Cars while Call2 holds Cars[0] -
+      // in C++ the reference would go nowhere), the run stops there with an error and the Blueprint is stopped, in
+      // every tier the same (Runtime::held_lost; logic::Held in the class).
+      {"held_entry",
+       R"({"structs":[{"name":"Car","fields":[{"name":"Speed","type":"float","value":0}]}],"variables":[
+          {"name":"Cars","type":"struct_list","of":"Car","value":[{"Speed":1}]},{"name":"Extra","type":"struct","of":"Car","value":{"Speed":5}},
+          {"name":"Grow","type":"bool","value":false},{"name":"Count","type":"int","value":0}],"nodes":[
+          {"id":1,"type":"event.custom","params":{"name":"Go"}},
+          {"id":2,"type":"func.call","params":{"function":"Shout","car.variable":"Cars","car.path":"[]"},"values":{"car.path0":0}},
+          {"id":3,"type":"func.entry","params":{"function":"Shout"}},{"id":4,"type":"flow.call","params":{"name":"Ping"}},
+          {"id":5,"type":"var.add","params":{"variable":"car","scope":"Shout","path":".Speed"},"values":{"amount":1}},
+          {"id":6,"type":"event.custom","params":{"name":"Ping"}},{"id":7,"type":"var.add","params":{"variable":"Count"},"values":{"amount":1}},
+          {"id":8,"type":"flow.branch"},{"id":9,"type":"var.get","params":{"variable":"Grow"}},
+          {"id":10,"type":"list.add","params":{"variable":"Cars"}},{"id":11,"type":"var.get","params":{"variable":"Extra"}},
+          {"id":12,"type":"event.custom","params":{"name":"Open"}},{"id":13,"type":"var.set","params":{"variable":"Grow"},"values":{"value":true}},
+          {"id":14,"type":"func.call","params":{"function":"Call2","car.variable":"Cars","car.path":"[]"},"values":{"car.path0":0}},
+          {"id":15,"type":"func.entry","params":{"function":"Call2"}},{"id":16,"type":"flow.call","params":{"name":"Ping"}}],
+        "links":[[1,"then",2,"exec"],[3,"then",4,"exec"],[4,"then",5,"exec"],[6,"then",7,"exec"],[7,"then",8,"exec"],[9,"value",8,"condition"],
+          [8,"true",10,"exec"],[11,"value",10,"item"],[12,"then",13,"exec"],[13,"then",14,"exec"],[15,"then",16,"exec"]],"functions":[
+          {"name":"Shout","inputs":[{"name":"car","type":"struct","of":"Car","ref":true,"value":{"Speed":0}}],"outputs":[]},
+          {"name":"Call2","inputs":[{"name":"car","type":"struct","of":"Car","ref":true,"value":{"Speed":0}}],"outputs":[]}]})"},
       // Call on Actor: a function called on a Blueprint (here its own: the Level's) - one that
       // calls itself that way, every call with its own parameters and local variable; a function
       // of another Blueprint nobody has (the declared defaults); calls that never end (64 deep).
@@ -500,6 +802,433 @@ inline const std::vector<Case>& cases() {
         {"id":74,"type":"func.call","params":{"function":"Forever"}}],"links":[[20,"sum",67,"b"],[20,"then",66,"exec"],[50,"then",51,"exec"],[50,"value",51,"n"],[50,"value",53,"x"],[51,"sum",72,"amount"],[51,"then",72,"exec"],[53,"then",73,"exec"],[53,"value",73,"amount"],[60,"then",74,"exec"],[61,"n",62,"value"],[61,"n",64,"a"],[61,"n",65,"a"],[61,"then",62,"exec"],[62,"then",63,"exec"],[63,"false",66,"exec"],[63,"true",20,"exec"],[64,"result",63,"condition"],[65,"result",20,"n"],[67,"result",66,"sum"],[68,"value",67,"a"],[69,"then",70,"exec"],[70,"then",71,"exec"],[72,"then",53,"exec"]],"functions":[{"name":"Missing","external":true,"inputs":[{"name":"x","type":"float","value":1}],"outputs":[{"name":"value","type":"float","value":2.5}]},
         {"name":"Down","inputs":[{"name":"n","type":"int","value":0}],"outputs":[{"name":"sum","type":"float","value":0}],"locals":[{"name":"Mine","type":"int","value":0}]},
         {"name":"Forever","inputs":[],"outputs":[]}]})"},
+      // Get Variable on Actor and Has Blueprint, on a Blueprint (here its own: the Level's) and on an actor
+      // that has none: a number, a whole number read as a decimal one, a variable it does not have, one of a
+      // type that does not become the one read (a list as a number: the zero), an enum's value and a list
+      // of structs - each as the reader's own type.
+      {"on_actor",
+       R"({"enums":[{"name":"Kind","values":["A","B","C"]}],"structs":[{"name":"Row","fields":[{"name":"Count","type":"int","value":0},{"name":"Tag","type":"text","value":""}]}],)"
+       R"("variables":[{"name":"Speed","type":"float","value":2.5},{"name":"Laps","type":"int","value":3},{"name":"Mode","type":"enum","of":"Kind","value":2},)"
+       R"({"name":"Rows","type":"struct_list","of":"Row","value":[{"Count":4,"Tag":"x"}]},{"name":"Has","type":"bool","value":false},{"name":"HasNone","type":"bool","value":false},)"
+       R"({"name":"RSpeed","type":"float","value":0},{"name":"RLaps","type":"float","value":0},{"name":"RNone","type":"float","value":0},{"name":"RWrong","type":"float","value":0},)"
+       R"({"name":"RMode","type":"enum","of":"Kind","value":0},{"name":"RRows","type":"struct_list","of":"Row","value":[]}],)"
+       R"("nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"Has"}},{"id":3,"type":"func.has_blueprint","values":{"target":0}},)"
+       R"({"id":4,"type":"var.set","params":{"variable":"HasNone"}},{"id":5,"type":"func.has_blueprint","values":{"target":99}},)"
+       R"({"id":6,"type":"var.set","params":{"variable":"RSpeed"}},{"id":7,"type":"func.get_on","params":{"variable":"Speed","type":"float"},"values":{"this":0}},)"
+       R"({"id":8,"type":"var.set","params":{"variable":"RLaps"}},{"id":9,"type":"func.get_on","params":{"variable":"Laps","type":"float"},"values":{"this":0}},)"
+       R"({"id":10,"type":"var.set","params":{"variable":"RNone"}},{"id":11,"type":"func.get_on","params":{"variable":"Missing","type":"float"},"values":{"this":0}},)"
+       R"({"id":12,"type":"var.set","params":{"variable":"RWrong"}},{"id":13,"type":"func.get_on","params":{"variable":"Rows","type":"float"},"values":{"this":0}},)"
+       R"({"id":14,"type":"var.set","params":{"variable":"RMode"}},{"id":15,"type":"func.get_on","params":{"variable":"Mode","type":"Kind"},"values":{"this":0}},)"
+       R"({"id":16,"type":"var.set","params":{"variable":"RRows"}},{"id":17,"type":"func.get_on","params":{"variable":"Rows","type":"Row_list"},"values":{"this":0}},)"
+       R"({"id":18,"type":"var.add","params":{"variable":"Laps"},"values":{"amount":1}}],)"
+       R"("links":[[1,"then",2,"exec"],[3,"result",2,"value"],[2,"then",4,"exec"],[5,"result",4,"value"],[4,"then",6,"exec"],[7,"value",6,"value"],[6,"then",8,"exec"],)"
+       R"([9,"value",8,"value"],[8,"then",10,"exec"],[11,"value",10,"value"],[10,"then",12,"exec"],[13,"value",12,"value"],[12,"then",14,"exec"],[15,"value",14,"value"],)"
+       R"([14,"then",16,"exec"],[17,"value",16,"value"],[16,"then",18,"exec"]]})"},
+      // Int64: 64 bits as u64 and i64 of C++ - every Int64 node, on values beyond 2^53 (a Float
+      // times 10^17, halves of 32 bits), dividing by 0 and the smallest i64 by -1, shifts by more
+      // than 63 (the amount's last 6 bits), Floats beyond the ends and no number, texts that are
+      // no number; literals on pins and as variables' defaults.
+      {"int64",
+       R"({"variables":[{"name":"R","type":"int64_list","value":[]},{"name":"Bs","type":"bool_list","value":[]},{"name":"Is","type":"int_list","value":[])"
+       R"(},{"name":"Fs","type":"float_list","value":[]},{"name":"Ts","type":"text_list","value":[]},{"name":"Min","type":"int64","value":"9223372036854775808")"
+       R"(},{"name":"MinusOne","type":"int64","value":"18446744073709551615"},{"name":"Zero","type":"int64","value":"0"}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"})"
+       R"(},{"id":2,"type":"math.mul","values":{"b":1e+17}},{"id":3,"type":"int64.of_float"},{"id":4,"type":"math.round"},{"id":5,"type":"math.mul","values":{"b":1000})"
+       R"(},{"id":6,"type":"int64.of_halves","values":{"low":4294967295}},{"id":7,"type":"var.get","params":{"variable":"Min"}},{"id":8,"type":"var.get","params":{"variable":"MinusOne"})"
+       R"(},{"id":9,"type":"var.get","params":{"variable":"Zero"}},{"id":10,"type":"int64.add"},{"id":11,"type":"list.add","params":{"variable":"R"}},{"id":12,"type":"int64.add")"
+       R"(},{"id":13,"type":"list.add","params":{"variable":"R"}},{"id":14,"type":"int64.add"},{"id":15,"type":"list.add","params":{"variable":"R"}},{"id":16,"type":"int64.add")"
+       R"(},{"id":17,"type":"list.add","params":{"variable":"R"}},{"id":18,"type":"int64.sub"},{"id":19,"type":"list.add","params":{"variable":"R"}},{"id":20,"type":"int64.sub")"
+       R"(},{"id":21,"type":"list.add","params":{"variable":"R"}},{"id":22,"type":"int64.sub"},{"id":23,"type":"list.add","params":{"variable":"R"}},{"id":24,"type":"int64.sub")"
+       R"(},{"id":25,"type":"list.add","params":{"variable":"R"}},{"id":26,"type":"int64.mul"},{"id":27,"type":"list.add","params":{"variable":"R"}},{"id":28,"type":"int64.mul")"
+       R"(},{"id":29,"type":"list.add","params":{"variable":"R"}},{"id":30,"type":"int64.mul"},{"id":31,"type":"list.add","params":{"variable":"R"}},{"id":32,"type":"int64.mul")"
+       R"(},{"id":33,"type":"list.add","params":{"variable":"R"}},{"id":34,"type":"int64.div"},{"id":35,"type":"list.add","params":{"variable":"R"}},{"id":36,"type":"int64.div")"
+       R"(},{"id":37,"type":"list.add","params":{"variable":"R"}},{"id":38,"type":"int64.div"},{"id":39,"type":"list.add","params":{"variable":"R"}},{"id":40,"type":"int64.div")"
+       R"(},{"id":41,"type":"list.add","params":{"variable":"R"}},{"id":42,"type":"int64.div_unsigned"},{"id":43,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":44,"type":"int64.div_unsigned"},{"id":45,"type":"list.add","params":{"variable":"R"}},{"id":46,"type":"int64.div_unsigned")"
+       R"(},{"id":47,"type":"list.add","params":{"variable":"R"}},{"id":48,"type":"int64.div_unsigned"},{"id":49,"type":"list.add","params":{"variable":"R"}},{"id":50,"type":"int64.rem")"
+       R"(},{"id":51,"type":"list.add","params":{"variable":"R"}},{"id":52,"type":"int64.rem"},{"id":53,"type":"list.add","params":{"variable":"R"}},{"id":54,"type":"int64.rem")"
+       R"(},{"id":55,"type":"list.add","params":{"variable":"R"}},{"id":56,"type":"int64.rem"},{"id":57,"type":"list.add","params":{"variable":"R"}},{"id":58,"type":"int64.rem_unsigned")"
+       R"(},{"id":59,"type":"list.add","params":{"variable":"R"}},{"id":60,"type":"int64.rem_unsigned"},{"id":61,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":62,"type":"int64.rem_unsigned"},{"id":63,"type":"list.add","params":{"variable":"R"}},{"id":64,"type":"int64.rem_unsigned")"
+       R"(},{"id":65,"type":"list.add","params":{"variable":"R"}},{"id":66,"type":"int64.and"},{"id":67,"type":"list.add","params":{"variable":"R"}},{"id":68,"type":"int64.and")"
+       R"(},{"id":69,"type":"list.add","params":{"variable":"R"}},{"id":70,"type":"int64.and"},{"id":71,"type":"list.add","params":{"variable":"R"}},{"id":72,"type":"int64.and")"
+       R"(},{"id":73,"type":"list.add","params":{"variable":"R"}},{"id":74,"type":"int64.or"},{"id":75,"type":"list.add","params":{"variable":"R"}},{"id":76,"type":"int64.or")"
+       R"(},{"id":77,"type":"list.add","params":{"variable":"R"}},{"id":78,"type":"int64.or"},{"id":79,"type":"list.add","params":{"variable":"R"}},{"id":80,"type":"int64.or")"
+       R"(},{"id":81,"type":"list.add","params":{"variable":"R"}},{"id":82,"type":"int64.xor"},{"id":83,"type":"list.add","params":{"variable":"R"}},{"id":84,"type":"int64.xor")"
+       R"(},{"id":85,"type":"list.add","params":{"variable":"R"}},{"id":86,"type":"int64.xor"},{"id":87,"type":"list.add","params":{"variable":"R"}},{"id":88,"type":"int64.xor")"
+       R"(},{"id":89,"type":"list.add","params":{"variable":"R"}},{"id":90,"type":"math.add","values":{"b":61}},{"id":91,"type":"int64.shift_left")"
+       R"(},{"id":92,"type":"list.add","params":{"variable":"R"}},{"id":93,"type":"int64.shift_left"},{"id":94,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":95,"type":"int64.shift_right"},{"id":96,"type":"list.add","params":{"variable":"R"}},{"id":97,"type":"int64.shift_right")"
+       R"(},{"id":98,"type":"list.add","params":{"variable":"R"}},{"id":99,"type":"int64.shift_right_unsigned"},{"id":100,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":101,"type":"int64.shift_right_unsigned"},{"id":102,"type":"list.add","params":{"variable":"R"}},{"id":103,"type":"int64.rotate_left")"
+       R"(},{"id":104,"type":"list.add","params":{"variable":"R"}},{"id":105,"type":"int64.rotate_left"},{"id":106,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":107,"type":"int64.rotate_right"},{"id":108,"type":"list.add","params":{"variable":"R"}},{"id":109,"type":"int64.rotate_right")"
+       R"(},{"id":110,"type":"list.add","params":{"variable":"R"}},{"id":111,"type":"int64.not"},{"id":112,"type":"list.add","params":{"variable":"R"}},{"id":113,"type":"int64.equal")"
+       R"(},{"id":114,"type":"list.add","params":{"variable":"Bs"}},{"id":115,"type":"int64.equal"},{"id":116,"type":"list.add","params":{"variable":"Bs"}},{"id":117,"type":"int64.less")"
+       R"(},{"id":118,"type":"list.add","params":{"variable":"Bs"}},{"id":119,"type":"int64.less_unsigned"},{"id":120,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":121,"type":"int64.less"},{"id":122,"type":"list.add","params":{"variable":"Bs"}},{"id":123,"type":"int64.less_unsigned")"
+       R"(},{"id":124,"type":"list.add","params":{"variable":"Bs"}},{"id":125,"type":"math.sub","values":{"b":3}},{"id":126,"type":"int64.of_int")"
+       R"(},{"id":127,"type":"list.add","params":{"variable":"R"}},{"id":128,"type":"int64.to_int"},{"id":129,"type":"list.add","params":{"variable":"Is"}},{"id":130,"type":"int64.to_int")"
+       R"(},{"id":131,"type":"list.add","params":{"variable":"Is"}},{"id":132,"type":"int64.to_int_unsigned"},{"id":133,"type":"list.add","params":{"variable":"Is"})"
+       R"(},{"id":134,"type":"int64.to_int_unsigned"},{"id":135,"type":"list.add","params":{"variable":"Is"}},{"id":136,"type":"int64.high")"
+       R"(},{"id":137,"type":"list.add","params":{"variable":"Is"}},{"id":138,"type":"int64.low"},{"id":139,"type":"list.add","params":{"variable":"Is"}},{"id":140,"type":"int64.high")"
+       R"(},{"id":141,"type":"list.add","params":{"variable":"Is"}},{"id":142,"type":"int64.count_ones"},{"id":143,"type":"list.add","params":{"variable":"Is"})"
+       R"(},{"id":144,"type":"int64.count_ones"},{"id":145,"type":"list.add","params":{"variable":"Is"}},{"id":146,"type":"int64.leading_zeros")"
+       R"(},{"id":147,"type":"list.add","params":{"variable":"Is"}},{"id":148,"type":"int64.leading_zeros"},{"id":149,"type":"list.add","params":{"variable":"Is"})"
+       R"(},{"id":150,"type":"int64.trailing_zeros"},{"id":151,"type":"list.add","params":{"variable":"Is"}},{"id":152,"type":"int64.trailing_zeros")"
+       R"(},{"id":153,"type":"list.add","params":{"variable":"Is"}},{"id":154,"type":"int64.to_float"},{"id":155,"type":"list.add","params":{"variable":"Fs"})"
+       R"(},{"id":156,"type":"int64.to_float_unsigned"},{"id":157,"type":"list.add","params":{"variable":"Fs"}},{"id":158,"type":"int64.to_float")"
+       R"(},{"id":159,"type":"list.add","params":{"variable":"Fs"}},{"id":160,"type":"int64.float_of_bits"},{"id":161,"type":"list.add","params":{"variable":"Fs"})"
+       R"(},{"id":162,"type":"int64.float_of_bits"},{"id":163,"type":"list.add","params":{"variable":"Fs"}},{"id":164,"type":"int64.of_float","values":{"a":-1e+30})"
+       R"(},{"id":165,"type":"list.add","params":{"variable":"R"}},{"id":166,"type":"int64.of_float","values":{"a":1e+30}},{"id":167,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":168,"type":"int64.of_float_unsigned","values":{"a":-5.5}},{"id":169,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":170,"type":"int64.of_float_unsigned","values":{"a":1e+30}},{"id":171,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":172,"type":"int64.of_float_unsigned","values":{"a":3.75}},{"id":173,"type":"list.add","params":{"variable":"R"}},{"id":174,"type":"int64.bits_of_float","values":{"a":0.1})"
+       R"(},{"id":175,"type":"list.add","params":{"variable":"R"}},{"id":176,"type":"math.sqrt","values":{"a":-1}},{"id":177,"type":"int64.of_float")"
+       R"(},{"id":178,"type":"list.add","params":{"variable":"R"}},{"id":179,"type":"int64.text"},{"id":180,"type":"list.add","params":{"variable":"Ts"}},{"id":181,"type":"int64.text")"
+       R"(},{"id":182,"type":"list.add","params":{"variable":"Ts"}},{"id":183,"type":"int64.text_signed"},{"id":184,"type":"list.add","params":{"variable":"Ts"})"
+       R"(},{"id":185,"type":"int64.text_signed"},{"id":186,"type":"list.add","params":{"variable":"Ts"}},{"id":187,"type":"int64.text_hex")"
+       R"(},{"id":188,"type":"list.add","params":{"variable":"Ts"}},{"id":189,"type":"int64.text_hex"},{"id":190,"type":"list.add","params":{"variable":"Ts"})"
+       R"(},{"id":191,"type":"int64.text_signed"},{"id":192,"type":"int64.of_text"},{"id":193,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":194,"type":"int64.of_text","values":{"a":"0x1F"}},{"id":195,"type":"list.add","params":{"variable":"R"}},{"id":196,"type":"int64.of_text","values":{"a":"-5"})"
+       R"(},{"id":197,"type":"list.add","params":{"variable":"R"}},{"id":198,"type":"int64.of_text","values":{"a":"18446744073709551616"})"
+       R"(},{"id":199,"type":"list.add","params":{"variable":"R"}},{"id":200,"type":"int64.of_text","values":{"a":"zz"}},{"id":201,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":202,"type":"int64.of_text","values":{"a":""}},{"id":203,"type":"list.add","params":{"variable":"R"}},{"id":204,"type":"int64.of_text","values":{"a":"-0x8000000000000000"})"
+       R"(},{"id":205,"type":"list.add","params":{"variable":"R"}},{"id":206,"type":"int64.add","values":{"a":"18446744073709551615","b":"2"})"
+       R"(},{"id":207,"type":"list.add","params":{"variable":"R"})"
+       R"(},{"id":208,"type":"var.set","params":{"variable":"Zero"}}],"links":[[1,"value",2,"a"],[2,"result",3,"a"],[1,"value",4,"a"],[4,"result",5,"a"],[5,"result",6,"high"],[3,"result",10,"a"],[6,"result",10,"b"],[1,"then",11,"exec"],[10,"result",11,"item"],[3,"result",12,"a"],[9,"value",12,"b"],[11,"then",13,"exec"],[12,"result",13,"item"],[7,"value",14,"a"],[8,"value",14,"b"],[13,"then",15,"exec"],[14,"result",15,"item"],[6,"result",16,"a"],[8,"value",16,"b"],[15,"then",17,"exec"],[16,"result",17,"item"],[3,"result",18,"a"],[6,"result",18,"b"],[17,"then",19,"exec"],[18,"result",19,"item"],[3,"result",20,"a"],[9,"value",20,"b"],[19,"then",21,"exec"],[20,"result",21,"item"],[7,"value",22,"a"],[8,"value",22,"b"],[21,"then",23,"exec"],[22,"result",23,"item"],[6,"result",24,"a"],[8,"value",24,"b"],[23,"then",25,"exec"],[24,"result",25,"item"],[3,"result",26,"a"],[6,"result",26,"b"],[25,"then",27,"exec"],[26,"result",27,"item"],[3,"result",28,"a"],[9,"value",28,"b"],[27,"then",29,"exec"],[28,"result",29,"item"],[7,"value",30,"a"],[8,"value",30,"b"],[29,"then",31,"exec"],[30,"result",31,"item"],[6,"result",32,"a"],[8,"value",32,"b"],[31,"then",33,"exec"],[32,"result",33,"item"],[3,"result",34,"a"],[6,"result",34,"b"],[33,"then",35,"exec"],[34,"result",35,"item"],[3,"result",36,"a"],[9,"value",36,"b"],[35,"then",37,"exec"],[36,"result",37,"item"],[7,"value",38,"a"],[8,"value",38,"b"],[37,"then",39,"exec"],[38,"result",39,"item"],[6,"result",40,"a"],[8,"value",40,"b"],[39,"then",41,"exec"],[40,"result",41,"item"],[3,"result",42,"a"],[6,"result",42,"b"],[41,"then",43,"exec"],[42,"result",43,"item"],[3,"result",44,"a"],[9,"value",44,"b"],[43,"then",45,"exec"],[44,"result",45,"item"],[7,"value",46,"a"],[8,"value",46,"b"],[45,"then",47,"exec"],[46,"result",47,"item"],[6,"result",48,"a"],[8,"value",48,"b"],[47,"then",49,"exec"],[48,"result",49,"item"],[3,"result",50,"a"],[6,"result",50,"b"],[49,"then",51,"exec"],[50,"result",51,"item"],[3,"result",52,"a"],[9,"value",52,"b"],[51,"then",53,"exec"],[52,"result",53,"item"],[7,"value",54,"a"],[8,"value",54,"b"],[53,"then",55,"exec"],[54,"result",55,"item"],[6,"result",56,"a"],[8,"value",56,"b"],[55,"then",57,"exec"],[56,"result",57,"item"],[3,"result",58,"a"],[6,"result",58,"b"],[57,"then",59,"exec"],[58,"result",59,"item"],[3,"result",60,"a"],[9,"value",60,"b"],[59,"then",61,"exec"],[60,"result",61,"item"],[7,"value",62,"a"],[8,"value",62,"b"],[61,"then",63,"exec"],[62,"result",63,"item"],[6,"result",64,"a"],[8,"value",64,"b"],[63,"then",65,"exec"],[64,"result",65,"item"],[3,"result",66,"a"],[6,"result",66,"b"],[65,"then",67,"exec"],[66,"result",67,"item"],[3,"result",68,"a"],[9,"value",68,"b"],[67,"then",69,"exec"],[68,"result",69,"item"],[7,"value",70,"a"],[8,"value",70,"b"],[69,"then",71,"exec"],[70,"result",71,"item"],[6,"result",72,"a"],[8,"value",72,"b"],[71,"then",73,"exec"],[72,"result",73,"item"],[3,"result",74,"a"],[6,"result",74,"b"],[73,"then",75,"exec"],[74,"result",75,"item"],[3,"result",76,"a"],[9,"value",76,"b"],[75,"then",77,"exec"],[76,"result",77,"item"],[7,"value",78,"a"],[8,"value",78,"b"],[77,"then",79,"exec"],[78,"result",79,"item"],[6,"result",80,"a"],[8,"value",80,"b"],[79,"then",81,"exec"],[80,"result",81,"item"],[3,"result",82,"a"],[6,"result",82,"b"],[81,"then",83,"exec"],[82,"result",83,"item"],[3,"result",84,"a"],[9,"value",84,"b"],[83,"then",85,"exec"],[84,"result",85,"item"],[7,"value",86,"a"],[8,"value",86,"b"],[85,"then",87,"exec"],[86,"result",87,"item"],[6,"result",88,"a"],[8,"value",88,"b"],[87,"then",89,"exec"],[88,"result",89,"item"],[4,"result",90,"a"],[6,"result",91,"a"],[90,"result",91,"by"],[89,"then",92,"exec"],[91,"result",92,"item"],[7,"value",93,"a"],[90,"result",93,"by"],[92,"then",94,"exec"],[93,"result",94,"item"],[6,"result",95,"a"],[90,"result",95,"by"],[94,"then",96,"exec"],[95,"result",96,"item"],[7,"value",97,"a"],[90,"result",97,"by"],[96,"then",98,"exec"],[97,"result",98,"item"],[6,"result",99,"a"],[90,"result",99,"by"],[98,"then",100,"exec"],[99,"result",100,"item"],[7,"value",101,"a"],[90,"result",101,"by"],[100,"then",102,"exec"],[101,"result",102,"item"],[6,"result",103,"a"],[90,"result",103,"by"],[102,"then",104,"exec"],[103,"result",104,"item"],[7,"value",105,"a"],[90,"result",105,"by"],[104,"then",106,"exec"],[105,"result",106,"item"],[6,"result",107,"a"],[90,"result",107,"by"],[106,"then",108,"exec"],[107,"result",108,"item"],[7,"value",109,"a"],[90,"result",109,"by"],[108,"then",110,"exec"],[109,"result",110,"item"],[3,"result",111,"a"],[110,"then",112,"exec"],[111,"result",112,"item"],[3,"result",113,"a"],[6,"result",113,"b"],[112,"then",114,"exec"],[113,"result",114,"item"],[9,"value",115,"a"],[9,"value",115,"b"],[114,"then",116,"exec"],[115,"result",116,"item"],[3,"result",117,"a"],[8,"value",117,"b"],[116,"then",118,"exec"],[117,"result",118,"item"],[3,"result",119,"a"],[8,"value",119,"b"],[118,"then",120,"exec"],[119,"result",120,"item"],[7,"value",121,"a"],[9,"value",121,"b"],[120,"then",122,"exec"],[121,"result",122,"item"],[7,"value",123,"a"],[9,"value",123,"b"],[122,"then",124,"exec"],[123,"result",124,"item"],[4,"result",125,"a"],[125,"result",126,"a"],[124,"then",127,"exec"],[126,"result",127,"item"],[3,"result",128,"a"],[127,"then",129,"exec"],[128,"result",129,"item"],[8,"value",130,"a"],[129,"then",131,"exec"],[130,"result",131,"item"],[8,"value",132,"a"],[131,"then",133,"exec"],[132,"result",133,"item"],[3,"result",134,"a"],[133,"then",135,"exec"],[134,"result",135,"item"],[3,"result",136,"a"],[135,"then",137,"exec"],[136,"result",137,"item"],[3,"result",138,"a"],[137,"then",139,"exec"],[138,"result",139,"item"],[8,"value",140,"a"],[139,"then",141,"exec"],[140,"result",141,"item"],[3,"result",142,"a"],[141,"then",143,"exec"],[142,"result",143,"item"],[8,"value",144,"a"],[143,"then",145,"exec"],[144,"result",145,"item"],[9,"value",146,"a"],[145,"then",147,"exec"],[146,"result",147,"item"],[6,"result",148,"a"],[147,"then",149,"exec"],[148,"result",149,"item"],[9,"value",150,"a"],[149,"then",151,"exec"],[150,"result",151,"item"],[7,"value",152,"a"],[151,"then",153,"exec"],[152,"result",153,"item"],[8,"value",154,"a"],[153,"then",155,"exec"],[154,"result",155,"item"],[8,"value",156,"a"],[155,"then",157,"exec"],[156,"result",157,"item"],[3,"result",158,"a"],[157,"then",159,"exec"],[158,"result",159,"item"],[6,"result",160,"a"],[159,"then",161,"exec"],[160,"result",161,"item"],[8,"value",162,"a"],[161,"then",163,"exec"],[162,"result",163,"item"],[163,"then",165,"exec"],[164,"result",165,"item"],[165,"then",167,"exec"],[166,"result",167,"item"],[167,"then",169,"exec"],[168,"result",169,"item"],[169,"then",171,"exec"],[170,"result",171,"item"],[171,"then",173,"exec"],[172,"result",173,"item"],[173,"then",175,"exec"],[174,"result",175,"item"],[176,"result",177,"a"],[175,"then",178,"exec"],[177,"result",178,"item"],[3,"result",179,"a"],[178,"then",180,"exec"],[179,"result",180,"item"],[8,"value",181,"a"],[180,"then",182,"exec"],[181,"result",182,"item"],[8,"value",183,"a"],[182,"then",184,"exec"],[183,"result",184,"item"],[3,"result",185,"a"],[184,"then",186,"exec"],[185,"result",186,"item"],[7,"value",187,"a"],[186,"then",188,"exec"],[187,"result",188,"item"],[6,"result",189,"a"],[188,"then",190,"exec"],[189,"result",190,"item"],[3,"result",191,"a"],[191,"result",192,"a"],[190,"then",193,"exec"],[192,"result",193,"item"],[193,"then",195,"exec"],[194,"result",195,"item"],[195,"then",197,"exec"],[196,"result",197,"item"],[197,"then",199,"exec"],[198,"result",199,"item"],[199,"then",201,"exec"],[200,"result",201,"item"],[201,"then",203,"exec"],[202,"result",203,"item"],[203,"then",205,"exec"],[204,"result",205,"item"],[205,"then",207,"exec"],[206,"result",207,"item"],[207,"then",208,"exec"],[206,"result",208,"value"]]})"},
+      // Lists Equal: two lists of one type hold the same items in the same order (the == of two
+      // std::vector) - of whole numbers that are the same until Go adds to one, of texts against a list
+      // made on the spot, and an empty list against an input nothing is wired to.
+      {"lists_equal",
+       R"({"variables":[{"name":"A","type":"int_list","value":[1,2,3]},{"name":"B","type":"int_list","value":[1,2,3]},{"name":"Same","type":"bool","value":false},
+          {"name":"After","type":"bool","value":true},{"name":"Words","type":"text_list","value":["a","b"]},{"name":"SameWords","type":"bool","value":false},
+          {"name":"Other","type":"bool","value":true},{"name":"F","type":"float_list","value":[]},{"name":"Empty","type":"bool","value":false}],
+        "nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"Same"}},{"id":3,"type":"list.equal","params":{"type":"int"}},
+          {"id":4,"type":"var.get","params":{"variable":"A"}},{"id":5,"type":"var.get","params":{"variable":"B"}},{"id":6,"type":"var.set","params":{"variable":"SameWords"}},
+          {"id":7,"type":"list.equal","params":{"type":"text"}},{"id":8,"type":"var.get","params":{"variable":"Words"}},
+          {"id":9,"type":"list.make","params":{"type":"text","count":"2"},"values":{"item0":"a","item1":"b"}},
+          {"id":10,"type":"event.custom","params":{"name":"Go"}},{"id":11,"type":"list.add","params":{"variable":"B"}},{"id":12,"type":"math.round"},
+          {"id":13,"type":"var.set","params":{"variable":"After"}},{"id":14,"type":"event.custom","params":{"name":"Open"}},{"id":15,"type":"var.set","params":{"variable":"Empty"}},
+          {"id":16,"type":"list.equal","params":{"type":"float"}},{"id":17,"type":"var.get","params":{"variable":"F"}},{"id":18,"type":"var.set","params":{"variable":"Other"}},
+          {"id":19,"type":"list.equal","params":{"type":"text"}},{"id":20,"type":"list.make","params":{"type":"text","count":"2"},"values":{"item0":"a","item1":"c"}}],
+        "links":[[1,"then",2,"exec"],[3,"result",2,"value"],[4,"value",3,"list"],[5,"value",3,"other"],[2,"then",6,"exec"],[7,"result",6,"value"],[8,"value",7,"list"],
+          [9,"list",7,"other"],[10,"then",11,"exec"],[10,"value",12,"a"],[12,"result",11,"item"],[11,"then",13,"exec"],[3,"result",13,"value"],
+          [14,"then",15,"exec"],[16,"result",15,"value"],[17,"value",16,"list"],[15,"then",18,"exec"],[19,"result",18,"value"],[8,"value",19,"list"],[20,"list",19,"other"]]})"},
+      // Lists Equal of structs: field by field, through a struct, a list of numbers and a list of structs in
+      // each item (the == of two std::vector of a struct whose == compares its fields). The same lists; one
+      // that differs only in a number of a struct in a list in an item, only in a field's struct, or is
+      // shorter; and a list whose items hold a NaN deep inside (Go adds one): it does not equal itself.
+      {"lists_equal_structs",
+       R"({"structs":[{"name":"Step","fields":[{"name":"Label","type":"text","value":"s"},{"name":"Cost","type":"float","value":1.5}]},)"
+       R"({"name":"Job","fields":[{"name":"Name","type":"text","value":"job"},{"name":"Now","type":"struct","of":"Step","value":{"Label":"s","Cost":1.5}},)"
+       R"({"name":"Costs","type":"float_list","value":[]},{"name":"Plan","type":"struct_list","of":"Step","value":[]}]}],"variables":[)"
+       R"({"name":"A","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.25},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"B","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.25},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"C","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4.5}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.25},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"D","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]}]},)"
+       R"({"name":"E","type":"struct_list","of":"Job","value":[{"Name":"a","Now":{"Label":"x","Cost":1},"Costs":[1,2],"Plan":[{"Label":"p","Cost":3},{"Label":"q","Cost":4}]},)"
+       R"({"Name":"b","Now":{"Label":"y","Cost":0.5},"Costs":[],"Plan":[]}]},)"
+       R"({"name":"N","type":"struct_list","of":"Job","value":[]},{"name":"Same","type":"bool","value":false},{"name":"Deep","type":"bool","value":true},)"
+       R"({"name":"Short","type":"bool","value":true},{"name":"Field","type":"bool","value":true},{"name":"NanSelf","type":"bool","value":true}],)"
+       R"("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.set","params":{"variable":"Same"}},{"id":3,"type":"list.equal","params":{"type":"Job"}},)"
+       R"({"id":4,"type":"var.get","params":{"variable":"A"}},{"id":5,"type":"var.get","params":{"variable":"B"}},{"id":6,"type":"var.set","params":{"variable":"Deep"}},)"
+       R"({"id":7,"type":"list.equal","params":{"type":"Job"}},{"id":8,"type":"var.get","params":{"variable":"C"}},{"id":9,"type":"var.set","params":{"variable":"Short"}},)"
+       R"({"id":10,"type":"list.equal","params":{"type":"Job"}},{"id":11,"type":"var.get","params":{"variable":"D"}},{"id":12,"type":"var.set","params":{"variable":"Field"}},)"
+       R"({"id":13,"type":"list.equal","params":{"type":"Job"}},{"id":14,"type":"var.get","params":{"variable":"E"}},)"
+       R"({"id":20,"type":"event.custom","params":{"name":"Go"}},{"id":21,"type":"list.add","params":{"variable":"N"}},)"
+       R"({"id":22,"type":"struct.make","params":{"struct":"Job"},"values":{"Name":"n"}},{"id":23,"type":"struct.make","params":{"struct":"Step"},"values":{"Label":"nan"}},)"
+       R"({"id":24,"type":"math.sub"},{"id":25,"type":"math.mul","values":{"a":1e300,"b":1e300}},{"id":26,"type":"var.set","params":{"variable":"NanSelf"}},)"
+       R"({"id":27,"type":"list.equal","params":{"type":"Job"}},{"id":28,"type":"var.get","params":{"variable":"N"}}],)"
+       R"("links":[[1,"then",2,"exec"],[3,"result",2,"value"],[4,"value",3,"list"],[5,"value",3,"other"],[2,"then",6,"exec"],[7,"result",6,"value"],)"
+       R"([4,"value",7,"list"],[8,"value",7,"other"],[6,"then",9,"exec"],[10,"result",9,"value"],[4,"value",10,"list"],[11,"value",10,"other"],)"
+       R"([9,"then",12,"exec"],[13,"result",12,"value"],[4,"value",13,"list"],[14,"value",13,"other"],[20,"then",21,"exec"],[22,"value",21,"item"],)"
+       R"([23,"value",22,"Now"],[24,"result",23,"Cost"],[25,"result",24,"a"],[25,"result",24,"b"],[21,"then",26,"exec"],[27,"result",26,"value"],)"
+       R"([28,"value",27,"list"],[28,"value",27,"other"]]})"},
+      // Maps and sets: in the order their keys came. Int, Text, enum, Int64 and Bool keys; values that
+      // are Floats, Texts, lists and structs; every node of both; a value of a map as a place
+      // (Cells[i].Count += 1, a list in it, one beside the map); taking out from the middle of the
+      // order (Open) and putting a key in again (it goes to the end); dividing by 0 into a value.
+      {"maps",
+       R"({"enums":[{"name":"Kind","values":["A","B","C"]}],"structs":[{"name":"Cell","fields":[{"name":"Count","type":"int","value":0)"
+       R"(},{"name":"Tags","type":"text_list","value":[]}]}],"variables":[{"name":"Scores","type":"map","of":"int>float","value":[[3,1.5],[1,2]])"
+       R"(},{"name":"Cells","type":"map","of":"text>struct:Cell","value":[["x",{"Count":1,"Tags":["p"]}]]},{"name":"Lists","type":"map","of":"enum:Kind>float_list","value":[])"
+       R"(},{"name":"Big","type":"map","of":"int64>text","value":[["18446744073709551615","max"]]},{"name":"Seen","type":"set","of":"int64","value":["5"])"
+       R"(},{"name":"Words","type":"set","of":"text","value":["a","b"]},{"name":"Flags","type":"set","of":"bool","value":[]},{"name":"Out","type":"float_list","value":[])"
+       R"(},{"name":"Ins","type":"int_list","value":[]},{"name":"Bs","type":"bool_list","value":[])"
+       R"(},{"name":"Ks","type":"text_list","value":[]}],"nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"math.round")"
+       R"(},{"id":3,"type":"math.mul","values":{"b":1.5}},{"id":4,"type":"map.set","params":{"variable":"Scores"}},{"id":5,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":6,"type":"list.add","params":{"variable":"Ins"}},{"id":7,"type":"math.div","values":{"b":0}},{"id":8,"type":"map.set","params":{"variable":"Scores"},"values":{"key":99})"
+       R"(},{"id":9,"type":"map.add","params":{"variable":"Cells"}},{"id":10,"type":"list.add","params":{"variable":"Ins"}},{"id":11,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":12,"type":"var.add","params":{"variable":"Cells","path":"[].Count"},"values":{"amount":1})"
+       R"(},{"id":13,"type":"list.add","params":{"variable":"Cells","path":"[].Tags"},"values":{"item":"t"}},{"id":14,"type":"math.mod","values":{"b":3}},{"id":15,"type":"math.round")"
+       R"(},{"id":16,"type":"enum.from_index","params":{"enum":"Kind"}},{"id":17,"type":"list.make","params":{"type":"float","count":"2"})"
+       R"(},{"id":18,"type":"map.set","params":{"variable":"Lists"}},{"id":19,"type":"math.add","values":{"b":1000000}},{"id":20,"type":"int64.of_halves","values":{"low":7})"
+       R"(},{"id":21,"type":"map.set","params":{"variable":"Big"},"values":{"value":"v"}},{"id":22,"type":"math.mul","values":{"b":1e+17}},{"id":23,"type":"int64.of_float")"
+       R"(},{"id":24,"type":"set.add","params":{"variable":"Seen"}},{"id":25,"type":"list.add","params":{"variable":"Bs"}},{"id":26,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":27,"type":"set.add","params":{"variable":"Words"}},{"id":28,"type":"math.compare","params":{"op":">"},"values":{"b":2})"
+       R"(},{"id":29,"type":"set.add","params":{"variable":"Flags"}},{"id":30,"type":"map.reserve","params":{"variable":"Scores"},"values":{"count":8})"
+       R"(},{"id":31,"type":"set.reserve","params":{"variable":"Words"},"values":{"count":4}},{"id":32,"type":"map.length","params":{"key":"int","value":"float"})"
+       R"(},{"id":33,"type":"var.get","params":{"variable":"Scores"}},{"id":34,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":35,"type":"map.contains","params":{"key":"int","value":"float"},"values":{"key":4}},{"id":36,"type":"var.get","params":{"variable":"Scores"})"
+       R"(},{"id":37,"type":"list.add","params":{"variable":"Bs"}},{"id":38,"type":"map.find","params":{"key":"int","value":"float"}},{"id":39,"type":"var.get","params":{"variable":"Scores"})"
+       R"(},{"id":40,"type":"list.add","params":{"variable":"Bs"}},{"id":41,"type":"list.add","params":{"variable":"Out"}},{"id":42,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":43,"type":"map.find","params":{"key":"int","value":"float"},"values":{"key":1234}},{"id":44,"type":"var.get","params":{"variable":"Scores"})"
+       R"(},{"id":45,"type":"list.add","params":{"variable":"Bs"}},{"id":46,"type":"list.add","params":{"variable":"Out"}},{"id":47,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":48,"type":"map.key_at","params":{"key":"text","value":"Cell"},"values":{"index":0}},{"id":49,"type":"var.get","params":{"variable":"Cells"})"
+       R"(},{"id":50,"type":"list.add","params":{"variable":"Ks"}},{"id":51,"type":"map.key_at","params":{"key":"text","value":"Cell"},"values":{"index":99})"
+       R"(},{"id":52,"type":"var.get","params":{"variable":"Cells"}},{"id":53,"type":"list.add","params":{"variable":"Ks"})"
+       R"(},{"id":54,"type":"map.find","params":{"key":"text","value":"Cell"},"values":{"key":"2"}},{"id":55,"type":"var.get","params":{"variable":"Cells"})"
+       R"(},{"id":56,"type":"list.add","params":{"variable":"Bs"}},{"id":57,"type":"struct.break","params":{"struct":"Cell"}},{"id":58,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":59,"type":"list.length","params":{"type":"text"}},{"id":60,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":61,"type":"map.find","params":{"key":"Kind","value":"float_list"}},{"id":62,"type":"var.get","params":{"variable":"Lists"})"
+       R"(},{"id":63,"type":"list.length","params":{"type":"float"}},{"id":64,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":65,"type":"map.key_at","params":{"key":"int64","value":"text"},"values":{"index":1}},{"id":66,"type":"var.get","params":{"variable":"Big"}},{"id":67,"type":"int64.text")"
+       R"(},{"id":68,"type":"list.add","params":{"variable":"Ks"}},{"id":69,"type":"set.length","params":{"key":"int64"}},{"id":70,"type":"var.get","params":{"variable":"Seen"})"
+       R"(},{"id":71,"type":"list.add","params":{"variable":"Ins"}},{"id":72,"type":"set.contains","params":{"key":"text"},"values":{"key":"a"})"
+       R"(},{"id":73,"type":"var.get","params":{"variable":"Words"}},{"id":74,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":75,"type":"set.contains","params":{"key":"bool"},"values":{"key":true}},{"id":76,"type":"var.get","params":{"variable":"Flags"})"
+       R"(},{"id":77,"type":"list.add","params":{"variable":"Bs"}},{"id":78,"type":"set.key_at","params":{"key":"int64"},"values":{"index":0})"
+       R"(},{"id":79,"type":"var.get","params":{"variable":"Seen"}},{"id":80,"type":"int64.text"},{"id":81,"type":"list.add","params":{"variable":"Ks"})"
+       R"(},{"id":82,"type":"set.find","params":{"key":"text"},"values":{"key":"4"}},{"id":83,"type":"var.get","params":{"variable":"Words"})"
+       R"(},{"id":84,"type":"list.add","params":{"variable":"Ins"}},{"id":85,"type":"var.get","params":{"variable":"Cells","path":"[].Tags"},"values":{"path0":0})"
+       R"(},{"id":86,"type":"list.length","params":{"type":"text"}},{"id":87,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":88,"type":"var.get","params":{"variable":"Cells","path":"[].Count"},"values":{"path0":50}},{"id":89,"type":"list.add","params":{"variable":"Ins"})"
+       R"(},{"id":90,"type":"event.custom","params":{"name":"Open"}},{"id":91,"type":"map.remove","params":{"variable":"Scores"},"values":{"key":2})"
+       R"(},{"id":92,"type":"list.add","params":{"variable":"Bs"}},{"id":93,"type":"map.remove","params":{"variable":"Scores"},"values":{"key":77})"
+       R"(},{"id":94,"type":"list.add","params":{"variable":"Bs"}},{"id":95,"type":"map.remove_at","params":{"variable":"Cells"},"values":{"index":1})"
+       R"(},{"id":96,"type":"map.remove_at","params":{"variable":"Cells"},"values":{"index":-1})"
+       R"(},{"id":97,"type":"map.remove","params":{"variable":"Big"},"values":{"key":"18446744073709551615"}},{"id":98,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":99,"type":"set.remove","params":{"variable":"Words"},"values":{"key":"a"}},{"id":100,"type":"list.add","params":{"variable":"Bs"})"
+       R"(},{"id":101,"type":"set.remove_at","params":{"variable":"Seen"},"values":{"index":0}},{"id":102,"type":"set.remove_at","params":{"variable":"Seen"},"values":{"index":40})"
+       R"(},{"id":103,"type":"map.clear","params":{"variable":"Lists"}},{"id":104,"type":"set.clear","params":{"variable":"Flags"})"
+       R"(},{"id":105,"type":"map.set","params":{"variable":"Cells"},"values":{"key":"new"})"
+       R"(},{"id":106,"type":"struct.make","params":{"struct":"Cell"},"values":{"Count":7}}],"links":[[1,"value",2,"a"],[1,"value",3,"a"],[1,"then",4,"exec"],[2,"result",4,"key"],[3,"result",4,"value"],[4,"then",5,"exec"],[4,"added",5,"item"],[5,"then",6,"exec"],[4,"index",6,"item"],[1,"value",7,"a"],[6,"then",8,"exec"],[7,"result",8,"value"],[8,"then",9,"exec"],[2,"result",9,"key"],[9,"then",10,"exec"],[9,"index",10,"item"],[10,"then",11,"exec"],[9,"added",11,"item"],[11,"then",12,"exec"],[9,"index",12,"path0"],[12,"then",13,"exec"],[9,"index",13,"path0"],[2,"result",14,"a"],[14,"result",15,"a"],[15,"result",16,"index"],[1,"value",17,"item0"],[3,"result",17,"item1"],[13,"then",18,"exec"],[16,"value",18,"key"],[17,"list",18,"value"],[2,"result",19,"a"],[19,"result",20,"high"],[18,"then",21,"exec"],[20,"result",21,"key"],[1,"value",22,"a"],[22,"result",23,"a"],[21,"then",24,"exec"],[23,"result",24,"key"],[24,"then",25,"exec"],[24,"added",25,"item"],[25,"then",26,"exec"],[24,"index",26,"item"],[26,"then",27,"exec"],[2,"result",27,"key"],[1,"value",28,"a"],[27,"then",29,"exec"],[28,"result",29,"key"],[29,"then",30,"exec"],[30,"then",31,"exec"],[33,"value",32,"map"],[31,"then",34,"exec"],[32,"length",34,"item"],[36,"value",35,"map"],[34,"then",37,"exec"],[35,"result",37,"item"],[39,"value",38,"map"],[2,"result",38,"key"],[37,"then",40,"exec"],[38,"found",40,"item"],[40,"then",41,"exec"],[38,"value",41,"item"],[41,"then",42,"exec"],[38,"index",42,"item"],[44,"value",43,"map"],[42,"then",45,"exec"],[43,"found",45,"item"],[45,"then",46,"exec"],[43,"value",46,"item"],[46,"then",47,"exec"],[43,"index",47,"item"],[49,"value",48,"map"],[47,"then",50,"exec"],[48,"key",50,"item"],[52,"value",51,"map"],[50,"then",53,"exec"],[51,"key",53,"item"],[55,"value",54,"map"],[53,"then",56,"exec"],[54,"found",56,"item"],[54,"value",57,"value"],[56,"then",58,"exec"],[57,"Count",58,"item"],[57,"Tags",59,"list"],[58,"then",60,"exec"],[59,"length",60,"item"],[62,"value",61,"map"],[16,"value",61,"key"],[61,"value",63,"list"],[60,"then",64,"exec"],[63,"length",64,"item"],[66,"value",65,"map"],[65,"key",67,"a"],[64,"then",68,"exec"],[67,"result",68,"item"],[70,"value",69,"set"],[68,"then",71,"exec"],[69,"length",71,"item"],[73,"value",72,"set"],[71,"then",74,"exec"],[72,"result",74,"item"],[76,"value",75,"set"],[74,"then",77,"exec"],[75,"result",77,"item"],[79,"value",78,"set"],[78,"key",80,"a"],[77,"then",81,"exec"],[80,"result",81,"item"],[83,"value",82,"set"],[81,"then",84,"exec"],[82,"index",84,"item"],[85,"value",86,"list"],[84,"then",87,"exec"],[86,"length",87,"item"],[87,"then",89,"exec"],[88,"value",89,"item"],[90,"then",91,"exec"],[91,"then",92,"exec"],[91,"removed",92,"item"],[92,"then",93,"exec"],[93,"then",94,"exec"],[93,"removed",94,"item"],[94,"then",95,"exec"],[95,"then",96,"exec"],[96,"then",97,"exec"],[97,"then",98,"exec"],[97,"removed",98,"item"],[98,"then",99,"exec"],[99,"then",100,"exec"],[99,"removed",100,"item"],[100,"then",101,"exec"],[101,"then",102,"exec"],[102,"then",103,"exec"],[103,"then",104,"exec"],[104,"then",105,"exec"],[106,"value",105,"value"]]})"},
+      // The whole numbers of a formula (band bor bxor shl shr wrap32 wrap32s mul32) at their edges - 0, 1, 2^31,
+      // 2^32, 2^53 - 1, 2^53, 2^53 + 2, Int's ends, not a number, endless, -0 -, each alone and handed on to another
+      // (the class hands the whole number on, kern::math::Exact: the same as through the double), into a Float and over
+      // a wire into an Int (R: the 64 bits of each Float, W: the Ints); and Compare with every operator (chosen when the class is compiled).
+      {"formula_bits_edges",
+       R"kg({"variables":[{"name":"In","type":"float_list","value":[0,1,-1,2147483648,-2147483648,4294967296,-4294967296,9007199254740991,-9007199254740991,9007199254740992,-9007199254740992,9007199254740994,-9007199254740994,9223372036854775807,-9223372036854775808,0.5,-2.75]},{)kg"
+       R"kg("name":"R","type":"int64_list","value":[]},{"name":"W","type":"int_list","value":[]}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"list.add","params":{"variable":"In"}},{)kg"
+       R"kg("id":3,"type":"math.formula","params":{"formula":"big * 10"},"values":{"big":1e+308}},{"id":4,"type":"list.add","params":{"variable":"In"}},{)kg"
+       R"kg("id":5,"type":"math.formula","params":{"formula":"-(big * 10)"},"values":{"big":1e+308}},{"id":6,"type":"list.add","params":{"variable":"In"}},{)kg"
+       R"kg("id":7,"type":"math.formula","params":{"formula":"big * 10 - big * 10"},"values":{"big":1e+308}},{"id":8,"type":"list.add","params":{"variable":"In"}},{)kg"
+       R"kg("id":9,"type":"math.formula","params":{"formula":"-zero"},"values":{"zero":0}},{"id":10,"type":"var.get","params":{"variable":"In"}},{"id":11,"type":"flow.for_each","params":{"type":"float"}},{)kg"
+       R"kg("id":12,"type":"list.add","params":{"variable":"R"}},{"id":13,"type":"math.formula","params":{"formula":"wrap32(a)"}},{"id":14,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":15,"type":"math.formula","params":{"formula":"wrap32(a)"}},{"id":16,"type":"list.add","params":{"variable":"R"}},{"id":17,"type":"math.formula","params":{"formula":"wrap32s(a)"}},{)kg"
+       R"kg("id":18,"type":"list.add","params":{"variable":"W"}},{"id":19,"type":"math.formula","params":{"formula":"bxor(wrap32(a), wrap32s(a))"}},{"id":20,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":21,"type":"math.formula","params":{"formula":"a"}},{"id":22,"type":"flow.for_each","params":{"type":"float"}},{"id":23,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":24,"type":"math.formula","params":{"formula":"band(a, b)"}},{"id":25,"type":"list.add","params":{"variable":"W"}},{"id":26,"type":"math.formula","params":{"formula":"band(a, b)"}},{)kg"
+       R"kg("id":27,"type":"list.add","params":{"variable":"R"}},{"id":28,"type":"math.formula","params":{"formula":"bor(a, b)"}},{"id":29,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":30,"type":"math.formula","params":{"formula":"bxor(a, b)"}},{"id":31,"type":"list.add","params":{"variable":"W"}},{"id":32,"type":"math.formula","params":{"formula":"bxor(a, b)"}},{)kg"
+       R"kg("id":33,"type":"list.add","params":{"variable":"R"}},{"id":34,"type":"math.formula","params":{"formula":"shl(a, b)"}},{"id":35,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":36,"type":"math.formula","params":{"formula":"shr(a, b)"}},{"id":37,"type":"list.add","params":{"variable":"R"}},{"id":38,"type":"math.formula","params":{"formula":"mul32(a, b)"}},{)kg"
+       R"kg("id":39,"type":"list.add","params":{"variable":"W"}},{"id":40,"type":"math.formula","params":{"formula":"mul32(a, b)"}},{"id":41,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":42,"type":"math.formula","params":{"formula":"bxor(shl(a, 13), shr(b, 17))"}},{"id":43,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":44,"type":"math.formula","params":{"formula":"bxor(shl(a, 13), shr(b, 17))"}},{"id":45,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":46,"type":"math.formula","params":{"formula":"band(bor(a, b), wrap32s(bxor(a, b)))"}},{"id":47,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":48,"type":"math.formula","params":{"formula":"shl(wrap32(a), shr(b, 60))"}},{"id":49,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":50,"type":"math.formula","params":{"formula":"mul32(shr(a, 1), band(b, 4294967295)) + 0.5"}},{"id":51,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":52,"type":"math.formula","params":{"formula":"shr(shl(a, 10), 3)"}},{"id":53,"type":"list.add","params":{"variable":"R"}},{"id":54,"type":"math.formula","params":{"formula":"shr(shl(a, 10), 3)"}},{)kg"
+       R"kg("id":55,"type":"list.add","params":{"variable":"R"}},{"id":56,"type":"math.formula","params":{"formula":"a + b"}},{"id":57,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":58,"type":"math.formula","params":{"formula":"a * b"}},{"id":59,"type":"math.compare","params":{"op":"=="}},{"id":60,"type":"math.compare","params":{"op":"!="}},{)kg"
+       R"kg("id":61,"type":"math.compare","params":{"op":"<"}},{"id":62,"type":"math.compare","params":{"op":"<="}},{"id":63,"type":"math.compare","params":{"op":">"}},{)kg"
+       R"kg("id":64,"type":"math.compare","params":{"op":">="}},{"id":65,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":66,"type":"math.formula","params":{"formula":"e + n * 2 + l * 4 + le * 8 + g * 16 + ge * 32"}},{"id":67,"type":"int64.bits_of_float"},{"id":68,"type":"int64.bits_of_float"},{)kg"
+       R"kg("id":69,"type":"int64.bits_of_float"},{"id":70,"type":"int64.bits_of_float"},{"id":71,"type":"int64.bits_of_float"},{"id":72,"type":"int64.bits_of_float"},{"id":73,"type":"int64.bits_of_float"},{)kg"
+       R"kg("id":74,"type":"int64.bits_of_float"},{"id":75,"type":"int64.bits_of_float"},{"id":76,"type":"int64.bits_of_float"},{"id":77,"type":"int64.bits_of_float"},{"id":78,"type":"int64.bits_of_float"},{)kg"
+       R"kg("id":79,"type":"int64.bits_of_float"},{)kg"
+       R"kg("id":80,"type":"int64.bits_of_float"}],"links":[[3,"result",2,"item"],[1,"then",2,"exec"],[5,"result",4,"item"],[2,"then",4,"exec"],[7,"result",6,"item"],[4,"then",6,"exec"],[9,"result",8,"item"],[6,"then",8,"exec"],[10,"value",11,"list"],[8,"then",11,"exec"],[11,"item",13,"a"],[13,"result",67,"a"],[67,"result",12,"item"],[11,"body",12,"exec"],[11,"item",15,"a"],[15,"result",14,"item"],[12,"then",14,"exec"],[11,"item",17,"a"],[17,"result",68,"a"],[68,"result",16,"item"],[14,"then",16,"exec"],[11,"item",19,"a"],[19,"result",18,"item"],[16,"then",18,"exec"],[11,"item",21,"a"],[21,"result",20,"item"],[18,"then",20,"exec"],[10,"value",22,"list"],[20,"then",22,"exec"],[11,"item",24,"a"],[22,"item",24,"b"],[24,"result",69,"a"],[69,"result",23,"item"],[22,"body",23,"exec"],[11,"item",26,"a"],[22,"item",26,"b"],[26,"result",25,"item"],[23,"then",25,"exec"],[11,"item",28,"a"],[22,"item",28,"b"],[28,"result",70,"a"],[70,"result",27,"item"],[25,"then",27,"exec"],[11,"item",30,"a"],[22,"item",30,"b"],[30,"result",71,"a"],[71,"result",29,"item"],[27,"then",29,"exec"],[11,"item",32,"a"],[22,"item",32,"b"],[32,"result",31,"item"],[29,"then",31,"exec"],[11,"item",34,"a"],[22,"item",34,"b"],[34,"result",72,"a"],[72,"result",33,"item"],[31,"then",33,"exec"],[11,"item",36,"a"],[22,"item",36,"b"],[36,"result",73,"a"],[73,"result",35,"item"],[33,"then",35,"exec"],[11,"item",38,"a"],[22,"item",38,"b"],[38,"result",74,"a"],[74,"result",37,"item"],[35,"then",37,"exec"],[11,"item",40,"a"],[22,"item",40,"b"],[40,"result",39,"item"],[37,"then",39,"exec"],[11,"item",42,"a"],[22,"item",42,"b"],[42,"result",75,"a"],[75,"result",41,"item"],[39,"then",41,"exec"],[11,"item",44,"a"],[22,"item",44,"b"],[44,"result",43,"item"],[41,"then",43,"exec"],[11,"item",46,"a"],[22,"item",46,"b"],[46,"result",76,"a"],[76,"result",45,"item"],[43,"then",45,"exec"],[11,"item",48,"a"],[22,"item",48,"b"],[48,"result",77,"a"],[77,"result",47,"item"],[45,"then",47,"exec"],[11,"item",50,"a"],[22,"item",50,"b"],[50,"result",78,"a"],[78,"result",49,"item"],[47,"then",49,"exec"],[11,"item",52,"a"],[52,"result",51,"item"],[49,"then",51,"exec"],[11,"item",54,"a"],[54,"result",79,"a"],[79,"result",53,"item"],[51,"then",53,"exec"],[11,"item",56,"a"],[22,"item",56,"b"],[56,"result",80,"a"],[80,"result",55,"item"],[53,"then",55,"exec"],[11,"item",58,"a"],[22,"item",58,"b"],[58,"result",57,"item"],[55,"then",57,"exec"],[11,"item",59,"a"],[22,"item",59,"b"],[11,"item",60,"a"],[22,"item",60,"b"],[11,"item",61,"a"],[22,"item",61,"b"],[11,"item",62,"a"],[22,"item",62,"b"],[11,"item",63,"a"],[22,"item",63,"b"],[11,"item",64,"a"],[22,"item",64,"b"],[59,"result",66,"e"],[60,"result",66,"n"],[61,"result",66,"l"],[62,"result",66,"le"],[63,"result",66,"g"],[64,"result",66,"ge"],[66,"result",65,"item"],[57,"then",65,"exec"]]})kg"},
+      // A formula of whole numbers with Int inputs (Formula::whole: in a Blueprint's C++ [](Int a, Int b) -> Int) at the edges of
+      // Int - 0, 1, shift widths 31 .. 65, 2^31, 2^32, 2^53 - 1, 2^53, 2^53 + 2, 2^62, Int's ends, each negative too -, into an
+      // Int over a wire (W) and as the 64 bits of its Float (R); a number written out in it (band(a, 0.5)); and a + b, a formula of Floats.
+      {"formula_whole_ints",
+       R"kg({"variables":[{"name":"In","type":"int_list","value":[0,1,-1,2,31,32,63,64,65,2147483648,-2147483648,4294967296,-4294967296,9007199254740991,-9007199254740991,9007199254740992,-9007199254740992,9007199254740994,-9007199254740994,4611686018427387904,-4611686018427387904,9223372036854775807,-9223372036854775807]},{)kg"
+       R"kg("name":"R","type":"int64_list","value":[]},{"name":"W","type":"int_list","value":[]}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"In"}},{)kg"
+       R"kg("id":3,"type":"flow.for_each","params":{"type":"int"}},{"id":4,"type":"list.add","params":{"variable":"W"}},{"id":5,"type":"math.formula","params":{"formula":"wrap32(a)"}},{)kg"
+       R"kg("id":6,"type":"list.add","params":{"variable":"W"}},{"id":7,"type":"math.formula","params":{"formula":"wrap32s(a)"}},{"id":8,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":9,"type":"math.formula","params":{"formula":"wrap32(shl(a, 40))"}},{"id":10,"type":"int64.bits_of_float"},{"id":11,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":12,"type":"math.formula","params":{"formula":"band(a, 0.5)"}},{"id":13,"type":"list.add","params":{"variable":"R"}},{"id":14,"type":"math.formula","params":{"formula":"shr(a, 1)"}},{)kg"
+       R"kg("id":15,"type":"int64.bits_of_float"},{"id":16,"type":"flow.for_each","params":{"type":"int"}},{"id":17,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":18,"type":"math.formula","params":{"formula":"band(a, b)"}},{"id":19,"type":"list.add","params":{"variable":"R"}},{"id":20,"type":"math.formula","params":{"formula":"bor(a, b)"}},{)kg"
+       R"kg("id":21,"type":"int64.bits_of_float"},{"id":22,"type":"list.add","params":{"variable":"W"}},{"id":23,"type":"math.formula","params":{"formula":"bxor(a, b)"}},{)kg"
+       R"kg("id":24,"type":"list.add","params":{"variable":"R"}},{"id":25,"type":"math.formula","params":{"formula":"bxor(a, b)"}},{"id":26,"type":"int64.bits_of_float"},{)kg"
+       R"kg("id":27,"type":"list.add","params":{"variable":"W"}},{"id":28,"type":"math.formula","params":{"formula":"shl(a, b)"}},{"id":29,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":30,"type":"math.formula","params":{"formula":"shl(a, b)"}},{"id":31,"type":"int64.bits_of_float"},{"id":32,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":33,"type":"math.formula","params":{"formula":"shr(a, b)"}},{"id":34,"type":"list.add","params":{"variable":"W"}},{"id":35,"type":"math.formula","params":{"formula":"mul32(a, b)"}},{)kg"
+       R"kg("id":36,"type":"list.add","params":{"variable":"R"}},{"id":37,"type":"math.formula","params":{"formula":"mul32(a, b)"}},{"id":38,"type":"int64.bits_of_float"},{)kg"
+       R"kg("id":39,"type":"list.add","params":{"variable":"W"}},{"id":40,"type":"math.formula","params":{"formula":"bxor(shl(a, 13), shr(b, 17))"}},{"id":41,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":42,"type":"math.formula","params":{"formula":"shl(a, band(b, 63))"}},{"id":43,"type":"int64.bits_of_float"},{"id":44,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":45,"type":"math.formula","params":{"formula":"shl(a, band(b, 63))"}},{"id":46,"type":"list.add","params":{"variable":"W"}},{"id":47,"type":"math.formula","params":{"formula":"shr(shl(a, 10), 3)"}},{)kg"
+       R"kg("id":48,"type":"list.add","params":{"variable":"W"}},{)kg"
+       R"kg("id":49,"type":"math.formula","params":{"formula":"a + b"}}],"links":[[2,"value",3,"list"],[1,"then",3,"exec"],[3,"item",5,"a"],[5,"result",4,"item"],[3,"body",4,"exec"],[3,"item",7,"a"],[7,"result",6,"item"],[4,"then",6,"exec"],[3,"item",9,"a"],[9,"result",10,"a"],[10,"result",8,"item"],[6,"then",8,"exec"],[3,"item",12,"a"],[12,"result",11,"item"],[8,"then",11,"exec"],[3,"item",14,"a"],[14,"result",15,"a"],[15,"result",13,"item"],[11,"then",13,"exec"],[2,"value",16,"list"],[13,"then",16,"exec"],[3,"item",18,"a"],[16,"item",18,"b"],[18,"result",17,"item"],[16,"body",17,"exec"],[3,"item",20,"a"],[16,"item",20,"b"],[20,"result",21,"a"],[21,"result",19,"item"],[17,"then",19,"exec"],[3,"item",23,"a"],[16,"item",23,"b"],[23,"result",22,"item"],[19,"then",22,"exec"],[3,"item",25,"a"],[16,"item",25,"b"],[25,"result",26,"a"],[26,"result",24,"item"],[22,"then",24,"exec"],[3,"item",28,"a"],[16,"item",28,"b"],[28,"result",27,"item"],[24,"then",27,"exec"],[3,"item",30,"a"],[16,"item",30,"b"],[30,"result",31,"a"],[31,"result",29,"item"],[27,"then",29,"exec"],[3,"item",33,"a"],[16,"item",33,"b"],[33,"result",32,"item"],[29,"then",32,"exec"],[3,"item",35,"a"],[16,"item",35,"b"],[35,"result",34,"item"],[32,"then",34,"exec"],[3,"item",37,"a"],[16,"item",37,"b"],[37,"result",38,"a"],[38,"result",36,"item"],[34,"then",36,"exec"],[3,"item",40,"a"],[16,"item",40,"b"],[40,"result",39,"item"],[36,"then",39,"exec"],[3,"item",42,"a"],[16,"item",42,"b"],[42,"result",43,"a"],[43,"result",41,"item"],[39,"then",41,"exec"],[3,"item",45,"a"],[16,"item",45,"b"],[45,"result",44,"item"],[41,"then",44,"exec"],[3,"item",47,"a"],[47,"result",46,"item"],[44,"then",46,"exec"],[3,"item",49,"a"],[16,"item",49,"b"],[49,"result",48,"item"],[46,"then",48,"exec"]]})kg"},
+      // +, - and * between whole functions in a formula of whole numbers (logic::Sum in the class: i64 where every number and
+      // every result on the way is a whole number of at most 2^53, else the doubles) - every pair of the Ints of formula_whole_ints,
+      // into an Int (W) and as the 64 bits of the Float (R): sums and products past 2^53, past Int's ends (a * b * a), a large
+      // result taken back ((a + b) - b), a number written out that is not whole (b * 2.5).
+      {"formula_whole_arith",
+       R"kg({"variables":[{"name":"In","type":"int_list","value":[0,1,-1,2,31,32,63,64,65,2147483648,-2147483648,4294967296,-4294967296,9007199254740991,-9007199254740991,9007199254740992,-9007199254740992,900719)kg"
+       R"kg(9254740994,-9007199254740994,4611686018427387904,-4611686018427387904,9223372036854775807,-9223372036854775807]},{"name":"R","type":"int64_list","value":[]},{"name":"W","type":"int_list","value":[]}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"In"}},{"id":3,"type":"flow.for_each","params":{"type":"int"}},{"id":4,"type":"flow.for_each","params":{"type":"int)kg"
+       R"kg("}},{"id":5,"type":"list.add","params":{"variable":"W"}},{"id":6,"type":"math.formula","params":{"formula":"wrap32(a + b)"}},{"id":7,"type":"list.add","params":{"variable":"W"}},{"id":8,"type":"math.f)kg"
+       R"kg(ormula","params":{"formula":"wrap32(a - b)"}},{"id":9,"type":"list.add","params":{"variable":"W"}},{"id":10,"type":"math.formula","params":{"formula":"wrap32(a * b)"}},{"id":11,"type":"list.add","para)kg"
+       R"kg(ms":{"variable":"W"}},{"id":12,"type":"math.formula","params":{"formula":"wrap32s(a * b + a)"}},{"id":13,"type":"list.add","params":{"variable":"W"}},{"id":14,"type":"math.formula","params":{"formula")kg"
+       R"kg(:"band(a * 3 - b, 4294967295)"}},{"id":15,"type":"list.add","params":{"variable":"W"}},{"id":16,"type":"math.formula","params":{"formula":"wrap32(a + mul32(b, 7))"}},{"id":17,"type":"list.add","params)kg"
+       R"kg(":{"variable":"W"}},{"id":18,"type":"math.formula","params":{"formula":"shl(a + 1, band(b, 63))"}},{"id":19,"type":"list.add","params":{"variable":"W"}},{"id":20,"type":"math.formula","params":{"formu)kg"
+       R"kg(la":"bor(a + b, 0)"}},{"id":21,"type":"list.add","params":{"variable":"R"}},{"id":22,"type":"math.formula","params":{"formula":"bor(a + b, 0)"}},{"id":23,"type":"int64.bits_of_float"},{"id":24,"type":)kg"
+       R"kg("list.add","params":{"variable":"R"}},{"id":25,"type":"math.formula","params":{"formula":"bor(a - b, 0)"}},{"id":26,"type":"int64.bits_of_float"},{"id":27,"type":"list.add","params":{"variable":"R"}},)kg"
+       R"kg({"id":28,"type":"math.formula","params":{"formula":"bor(a * b, 0)"}},{"id":29,"type":"int64.bits_of_float"},{"id":30,"type":"list.add","params":{"variable":"R"}},{"id":31,"type":"math.formula","params)kg"
+       R"kg(":{"formula":"bxor(a + b - b, 0)"}},{"id":32,"type":"int64.bits_of_float"},{"id":33,"type":"list.add","params":{"variable":"R"}},{"id":34,"type":"math.formula","params":{"formula":"bor(a * b * a, 0)"})kg"
+       R"kg(},{"id":35,"type":"int64.bits_of_float"},{"id":36,"type":"list.add","params":{"variable":"R"}},{"id":37,"type":"math.formula","params":{"formula":"bor(a - b * 2.5, 0)"}},{"id":38,"type":"int64.bits_of)kg"
+       R"kg(_float"},{"id":39,"type":"list.add","params":{"variable":"R"}},{"id":40,"type":"math.formula","params":{"formula":"shr(a * a - b * b, 1)"}},{"id":41,"type":"int64.bits_of_float"},{"id":42,"type":"list)kg"
+       R"kg(.add","params":{"variable":"R"}},{"id":43,"type":"math.formula","params":{"formula":"bor(wrap32(a) * wrap32(b) + 1, 0)"}},{"id":44,"type":"int64.bits_of_float"}],"links":[[2,"value",3,"list"],[1,"then)kg"
+       R"kg(",3,"exec"],[2,"value",4,"list"],[3,"body",4,"exec"],[3,"item",6,"a"],[4,"item",6,"b"],[6,"result",5,"item"],[4,"body",5,"exec"],[3,"item",8,"a"],[4,"item",8,"b"],[8,"result",7,"item"],[5,"then",7,"ex)kg"
+       R"kg(ec"],[3,"item",10,"a"],[4,"item",10,"b"],[10,"result",9,"item"],[7,"then",9,"exec"],[3,"item",12,"a"],[4,"item",12,"b"],[12,"result",11,"item"],[9,"then",11,"exec"],[3,"item",14,"a"],[4,"item",14,"b"])kg"
+       R"kg(,[14,"result",13,"item"],[11,"then",13,"exec"],[3,"item",16,"a"],[4,"item",16,"b"],[16,"result",15,"item"],[13,"then",15,"exec"],[3,"item",18,"a"],[4,"item",18,"b"],[18,"result",17,"item"],[15,"then",)kg"
+       R"kg(17,"exec"],[3,"item",20,"a"],[4,"item",20,"b"],[20,"result",19,"item"],[17,"then",19,"exec"],[3,"item",22,"a"],[4,"item",22,"b"],[22,"result",23,"a"],[23,"result",21,"item"],[19,"then",21,"exec"],[3,")kg"
+       R"kg(item",25,"a"],[4,"item",25,"b"],[25,"result",26,"a"],[26,"result",24,"item"],[21,"then",24,"exec"],[3,"item",28,"a"],[4,"item",28,"b"],[28,"result",29,"a"],[29,"result",27,"item"],[24,"then",27,"exec")kg"
+       R"kg(],[3,"item",31,"a"],[4,"item",31,"b"],[31,"result",32,"a"],[32,"result",30,"item"],[27,"then",30,"exec"],[3,"item",34,"a"],[4,"item",34,"b"],[34,"result",35,"a"],[35,"result",33,"item"],[30,"then",33,)kg"
+       R"kg("exec"],[3,"item",37,"a"],[4,"item",37,"b"],[37,"result",38,"a"],[38,"result",36,"item"],[33,"then",36,"exec"],[3,"item",40,"a"],[4,"item",40,"b"],[40,"result",41,"a"],[41,"result",39,"item"],[36,"the)kg"
+       R"kg(n",39,"exec"],[3,"item",43,"a"],[4,"item",43,"b"],[43,"result",44,"a"],[44,"result",42,"item"],[39,"then",42,"exec"]]})kg"},
+      // A formula with Int inputs (Formula::int_input) and an Int result where its value is +, - or * of them (Formula::whole_result,
+      // read only by Ints) - in the class [](Int a, Int b) -> Int over logic::Sum - at the edges of Int (every pair of the Ints of
+      // formula_whole_ints: 2^53, 2^53 + 2, 2^62, Int's ends, mixed signs), into an Int (W) and as the 64 bits of a Float (R): i - 1,
+      // 2 * a + 1, products past Int's ends, a number that is not whole (a * 0.5), comparisons with Float results ((a < 0) != (b < 0),
+      // an Int against 2^53 + 1 and 2^63 written out), an input read where it stays a Float (?:, /), an input typed in (f), +, - and *
+      // of whole functions alone (a Float), and one formula read by an Int and a Float (-> Float).
+      {"formula_int_sums",
+       R"kg({"variables":[{"name":"In","type":"int_list","value":[0,1,-1,2,31,32,63,64,65,2147483648,-2147483648,4294967296,-4294967296,9007199254740991,-9007199254740991,9007199254740992,-9007199254740992,900719)kg"
+       R"kg(9254740994,-9007199254740994,4611686018427387904,-4611686018427387904,9223372036854775807,-9223372036854775807]},{"name":"R","type":"int64_list","value":[]},{"name":"W","type":"int_list","value":[]}],)kg"
+       R"kg("nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"In"}},{"id":3,"type":"flow.for_each","params":{"type":"int"}},{"id":4,"type":"flow.for_each","params":{"type":"int)kg"
+       R"kg("}},{"id":5,"type":"math.formula","params":{"formula":"a - 1"}},{"id":6,"type":"list.add","params":{"variable":"W"}},{"id":7,"type":"math.formula","params":{"formula":"2 * a + 1"}},{"id":8,"type":"lis)kg"
+       R"kg(t.add","params":{"variable":"W"}},{"id":9,"type":"math.formula","params":{"formula":"a + b"}},{"id":10,"type":"list.add","params":{"variable":"W"}},{"id":11,"type":"math.formula","params":{"formula":")kg"
+       R"kg(a - b"}},{"id":12,"type":"list.add","params":{"variable":"W"}},{"id":13,"type":"math.formula","params":{"formula":"a * b"}},{"id":14,"type":"list.add","params":{"variable":"W"}},{"id":15,"type":"math.)kg"
+       R"kg(formula","params":{"formula":"a * b - a"}},{"id":16,"type":"list.add","params":{"variable":"W"}},{"id":17,"type":"math.formula","params":{"formula":"a * 0.5 + b"}},{"id":18,"type":"list.add","params":)kg"
+       R"kg({"variable":"W"}},{"id":19,"type":"math.formula","params":{"formula":"(a < 0) != (b < 0)"}},{"id":20,"type":"list.add","params":{"variable":"W"}},{"id":21,"type":"math.formula","params":{"formula":"a )kg"
+       R"kg(- 1 < b"}},{"id":22,"type":"list.add","params":{"variable":"W"}},{"id":23,"type":"math.formula","params":{"formula":"a == 9007199254740993"}},{"id":24,"type":"list.add","params":{"variable":"W"}},{"id)kg"
+       R"kg(":25,"type":"math.formula","params":{"formula":"a >= 9223372036854775807"}},{"id":26,"type":"list.add","params":{"variable":"W"}},{"id":27,"type":"math.formula","params":{"formula":"a < b ? a : b"}},{)kg"
+       R"kg("id":28,"type":"list.add","params":{"variable":"W"}},{"id":29,"type":"math.formula","params":{"formula":"a / 2 + b"}},{"id":30,"type":"list.add","params":{"variable":"W"}},{"id":31,"type":"math.formul)kg"
+       R"kg(a","params":{"formula":"a + f"},"values":{"f":0.25}},{"id":32,"type":"list.add","params":{"variable":"W"}},{"id":33,"type":"math.formula","params":{"formula":"band(a, 7) * b + a"}},{"id":34,"type":"li)kg"
+       R"kg(st.add","params":{"variable":"W"}},{"id":35,"type":"math.formula","params":{"formula":"band(a, 1) + 2"}},{"id":36,"type":"list.add","params":{"variable":"W"}},{"id":37,"type":"math.formula","params":{)kg"
+       R"kg("formula":"b - a * 3 >= a + 1"}},{"id":38,"type":"list.add","params":{"variable":"W"}},{"id":39,"type":"math.formula","params":{"formula":"a + b"}},{"id":40,"type":"int64.bits_of_float"},{"id":41,"typ)kg"
+       R"kg(e":"list.add","params":{"variable":"R"}},{"id":42,"type":"math.formula","params":{"formula":"a * b * a"}},{"id":43,"type":"int64.bits_of_float"},{"id":44,"type":"list.add","params":{"variable":"R"}},{)kg"
+       R"kg("id":45,"type":"math.formula","params":{"formula":"a - 1"}},{"id":46,"type":"int64.bits_of_float"},{"id":47,"type":"list.add","params":{"variable":"R"}},{"id":48,"type":"math.formula","params":{"formu)kg"
+       R"kg(la":"(a < b) + (a == b) * 2"}},{"id":49,"type":"int64.bits_of_float"},{"id":50,"type":"list.add","params":{"variable":"R"}},{"id":51,"type":"math.formula","params":{"formula":"a * b + 1"}},{"id":52,"t)kg"
+       R"kg(ype":"list.add","params":{"variable":"W"}},{"id":53,"type":"int64.bits_of_float"},{"id":54,"type":"list.add","params":{"variable":"R"}}],"links":[[2,"value",3,"list"],[1,"then",3,"exec"],[2,"value",4,)kg"
+       R"kg("list"],[3,"body",4,"exec"],[3,"item",5,"a"],[5,"result",6,"item"],[4,"body",6,"exec"],[3,"item",7,"a"],[7,"result",8,"item"],[6,"then",8,"exec"],[3,"item",9,"a"],[4,"item",9,"b"],[9,"result",10,"item)kg"
+       R"kg("],[8,"then",10,"exec"],[3,"item",11,"a"],[4,"item",11,"b"],[11,"result",12,"item"],[10,"then",12,"exec"],[3,"item",13,"a"],[4,"item",13,"b"],[13,"result",14,"item"],[12,"then",14,"exec"],[3,"item",15)kg"
+       R"kg(,"a"],[4,"item",15,"b"],[15,"result",16,"item"],[14,"then",16,"exec"],[3,"item",17,"a"],[4,"item",17,"b"],[17,"result",18,"item"],[16,"then",18,"exec"],[3,"item",19,"a"],[4,"item",19,"b"],[19,"result")kg"
+       R"kg(,20,"item"],[18,"then",20,"exec"],[3,"item",21,"a"],[4,"item",21,"b"],[21,"result",22,"item"],[20,"then",22,"exec"],[3,"item",23,"a"],[23,"result",24,"item"],[22,"then",24,"exec"],[3,"item",25,"a"],[2)kg"
+       R"kg(5,"result",26,"item"],[24,"then",26,"exec"],[3,"item",27,"a"],[4,"item",27,"b"],[27,"result",28,"item"],[26,"then",28,"exec"],[3,"item",29,"a"],[4,"item",29,"b"],[29,"result",30,"item"],[28,"then",30,)kg"
+       R"kg("exec"],[3,"item",31,"a"],[31,"result",32,"item"],[30,"then",32,"exec"],[3,"item",33,"a"],[4,"item",33,"b"],[33,"result",34,"item"],[32,"then",34,"exec"],[3,"item",35,"a"],[35,"result",36,"item"],[34,)kg"
+       R"kg("then",36,"exec"],[3,"item",37,"a"],[4,"item",37,"b"],[37,"result",38,"item"],[36,"then",38,"exec"],[3,"item",39,"a"],[4,"item",39,"b"],[39,"result",40,"a"],[40,"result",41,"item"],[38,"then",41,"exec)kg"
+       R"kg("],[3,"item",42,"a"],[4,"item",42,"b"],[42,"result",43,"a"],[43,"result",44,"item"],[41,"then",44,"exec"],[3,"item",45,"a"],[45,"result",46,"a"],[46,"result",47,"item"],[44,"then",47,"exec"],[3,"item")kg"
+       R"kg(,48,"a"],[4,"item",48,"b"],[48,"result",49,"a"],[49,"result",50,"item"],[47,"then",50,"exec"],[3,"item",51,"a"],[4,"item",51,"b"],[51,"result",52,"item"],[50,"then",52,"exec"],[51,"result",53,"a"],[53)kg"
+       R"kg(,"result",54,"item"],[52,"then",54,"exec"]]})kg"
+      },
+      // A value for %s that is not a Text (what int64.text* give, long enough to be held on the heap): the class
+      // hands Format Text a view of that value itself, which lives until the call ends (BlueprintCore::format_arg).
+      {"format_text_of_value",
+       R"kg({"variables":[{"name":"X","type":"int64","value":"18364758544493064720"},{"name":"T","type":"text","value":""}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"var.get","params":{"variable":"X"}},{"id":3,"type":"int64.text_signed"},{"id":4,"type":"int64.text"},{"id":5,"type":"int64.text_hex"},{"id":6,"type":"text.format","params":{"format":"%s|%s|%s|%s"},"values":{"most":-1}},{"id":7,"type":"var.set","params":{"variable":"T"}}],"links":[[1,"then",7,"exec"],[2,"value",3,"a"],[2,"value",4,"a"],[2,"value",5,"a"],[3,"result",6,"v0"],[4,"result",6,"v1"],[5,"result",6,"v2"],[3,"result",6,"v3"],[6,"result",7,"value"]]})kg"},
+      // A formula of whole numbers whose input is an entry of a list at an index worked out by another formula
+      // (In[kern::to<Int>(...)]): the reader counts the wires into the formula itself, not those its arguments make.
+      {"formula_whole_indexed",
+       R"kg({"variables":[{"name":"In","type":"int_list","value":[5,-7,4294967301,9007199254740993,-1]},{"name":"W","type":"int_list","value":[]}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.for","values":{"first":0,"last":3}},{"id":3,"type":"var.get","params":{"variable":"In"}},{"id":4,"type":"math.formula","params":{"formula":"i + 1"}},{"id":5,"type":"list.get","params":{"type":"int"}},{"id":6,"type":"math.formula","params":{"formula":"wrap32(a * 3 + b)"}},{"id":7,"type":"list.add","params":{"variable":"W"}}],"links":[[1,"then",2,"exec"],[2,"body",7,"exec"],[2,"index",4,"i"],[3,"value",5,"list"],[4,"result",5,"index"],[5,"item",6,"a"],[2,"index",6,"b"],[6,"result",7,"item"]]})kg"},
+      // A list of a fixed length written out on an input (Make Struct's field of three): in the class Fixed<Float, 3>{...},
+      // its type's length - no list asked for (the same entries, the rest zero).
+      {"fixed_literal_input",
+       R"kg({"structs":[{"name":"Trio","fields":[{"name":"m","type":"float_list","count":3,"value":[0,0,0]},{"name":"k","type":"int","value":0}]}],"variables":[{"name":"P","type":"struct","of":"Trio","value":{"m":[0,0,0],"k":0}},{"name":"Q","type":"struct","of":"Trio","value":{"m":[0,0,0],"k":0}}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"struct.make","params":{"struct":"Trio"},"values":{"m":[1.5,-2,0],"k":7}},{"id":3,"type":"var.set","params":{"variable":"P"}},{"id":4,"type":"struct.make","params":{"struct":"Trio"},"values":{"m":[0,0,4],"k":1}},{"id":5,"type":"var.set","params":{"variable":"Q"}}],"links":[[1,"then",3,"exec"],[2,"value",3,"value"],[3,"then",5,"exec"],[4,"value",5,"value"]]})kg"},
+      // Ints of a fixed width (U8 ... I32, logic::kWidthNames): every place holds the low bits of what it is given, as C++
+      // stores them - a variable by Set (an Int, a Float made whole), a field of a struct, an input and an output and a local
+      // variable of a function, Add to Variable (the low bits of the sum) - at the edges of every width and of Int (2^53,
+      // Int's ends), and mul32 of two of them (C++'s u32 * u32).
+      {"fixed_widths",
+       R"kg({"kind":"kern-logic","version":1,"nextId":78,"variables":[{"name":"In","type":"int_list","value":[0,1,-1,127,128,255,256,-128,-129,32767,32768,65535,65536,-32768,-32769,2147483647,2147483648,429496729)kg"
+       R"kg(5,4294967296,-2147483648,-2147483649,9007199254740992,-9007199254740994,9223372036854776000,-9223372036854776000]},{"name":"F","type":"float_list","value":[0.5,-0.5,255.9,-1.5,1e+30,-1e+30,4294967296.)kg"
+       R"kg(7,0]},{"name":"W","type":"int_list","value":[]},{"name":"A","type":"int","of":"u8","value":0},{"name":"B","type":"int","of":"i8","value":0},{"name":"Cc","type":"int","of":"u16","value":0},{"name":"D",)kg"
+       R"kg("type":"int","of":"i16","value":0},{"name":"E","type":"int","of":"u32","value":4294967295},{"name":"G","type":"int","of":"i32","value":-2147483648},{"name":"S","type":"struct","of":"P","value":{"a":0})kg"
+       R"kg(}],"structs":[{"name":"P","fields":[{"name":"a","type":"int","of":"u16","value":0}]}],"nodes":[{"id":1,"type":"event.begin","x":0,"y":290},{"id":3,"type":"flow.for_each","x":280,"y":290,"params":{"typ)kg"
+       R"kg(e":"int"}},{"id":4,"type":"flow.for_each","x":7000,"y":290,"params":{"type":"float"}},{"id":30,"type":"func.call","x":6160,"y":290,"params":{"function":"Twice"}},{"id":31,"type":"func.entry","x":0,"y")kg"
+       R"kg(:0,"params":{"function":"Twice"}},{"id":32,"type":"var.set","x":280,"y":0,"params":{"variable":"Here","scope":"Twice"}},{"id":33,"type":"func.return","x":560,"y":0,"params":{"function":"Twice"}},{"id")kg"
+       R"kg(:34,"type":"var.get","x":440,"y":150,"params":{"variable":"Here","scope":"Twice"}},{"id":35,"type":"var.get","x":160,"y":440,"params":{"variable":"In"}},{"id":36,"type":"var.set","x":560,"y":290,"para)kg"
+       R"kg(ms":{"variable":"A"}},{"id":37,"type":"var.set","x":840,"y":290,"params":{"variable":"B"}},{"id":38,"type":"var.set","x":1120,"y":290,"params":{"variable":"Cc"}},{"id":39,"type":"var.set","x":1400,"y")kg"
+       R"kg(:290,"params":{"variable":"D"}},{"id":40,"type":"var.set","x":1680,"y":290,"params":{"variable":"E"}},{"id":41,"type":"var.set","x":1960,"y":290,"params":{"variable":"G"}},{"id":42,"type":"var.set","x)kg"
+       R"kg(":2240,"y":290,"params":{"variable":"S","path":".a"}},{"id":43,"type":"list.add","x":2520,"y":290,"params":{"variable":"W"}},{"id":44,"type":"var.get","x":2400,"y":440,"params":{"variable":"A"}},{"id")kg"
+       R"kg(:45,"type":"list.add","x":2800,"y":290,"params":{"variable":"W"}},{"id":46,"type":"var.get","x":2680,"y":440,"params":{"variable":"B"}},{"id":47,"type":"list.add","x":3080,"y":290,"params":{"variable")kg"
+       R"kg(:"W"}},{"id":48,"type":"var.get","x":2960,"y":440,"params":{"variable":"Cc"}},{"id":49,"type":"list.add","x":3360,"y":290,"params":{"variable":"W"}},{"id":50,"type":"var.get","x":3240,"y":440,"params")kg"
+       R"kg(:{"variable":"D"}},{"id":51,"type":"list.add","x":3640,"y":290,"params":{"variable":"W"}},{"id":52,"type":"var.get","x":3520,"y":440,"params":{"variable":"E"}},{"id":53,"type":"list.add","x":3920,"y":)kg"
+       R"kg(290,"params":{"variable":"W"}},{"id":54,"type":"var.get","x":3800,"y":440,"params":{"variable":"G"}},{"id":55,"type":"list.add","x":4200,"y":290,"params":{"variable":"W"}},{"id":56,"type":"var.get","x)kg"
+       R"kg(":4080,"y":440,"params":{"variable":"S","path":".a"}},{"id":57,"type":"var.add","x":4480,"y":290,"params":{"variable":"A"}},{"id":58,"type":"var.add","x":4760,"y":290,"params":{"variable":"G"}},{"id":)kg"
+       R"kg(59,"type":"var.add","x":5040,"y":290,"params":{"variable":"E"},"values":{"amount":-4294967297}},{"id":60,"type":"list.add","x":5320,"y":290,"params":{"variable":"W"}},{"id":61,"type":"var.get","x":520)kg"
+       R"kg(0,"y":440,"params":{"variable":"A"}},{"id":62,"type":"list.add","x":5600,"y":290,"params":{"variable":"W"}},{"id":63,"type":"var.get","x":5480,"y":440,"params":{"variable":"G"}},{"id":64,"type":"list.)kg"
+       R"kg(add","x":5880,"y":290,"params":{"variable":"W"}},{"id":65,"type":"var.get","x":5760,"y":440,"params":{"variable":"E"}},{"id":66,"type":"list.add","x":6440,"y":290,"params":{"variable":"W"}},{"id":67,")kg"
+       R"kg(type":"list.add","x":6720,"y":290,"params":{"variable":"W"}},{"id":68,"type":"math.formula","x":6600,"y":440,"params":{"formula":"mul32(a, b)"}},{"id":69,"type":"var.get","x":6600,"y":530,"params":{"v)kg"
+       R"kg(ariable":"E"}},{"id":70,"type":"var.get","x":6600,"y":620,"params":{"variable":"G"}},{"id":71,"type":"var.get","x":6880,"y":440,"params":{"variable":"F"}},{"id":72,"type":"var.set","x":7280,"y":290,"p)kg"
+       R"kg(arams":{"variable":"A"}},{"id":73,"type":"var.set","x":7560,"y":290,"params":{"variable":"G"}},{"id":74,"type":"list.add","x":7840,"y":290,"params":{"variable":"W"}},{"id":75,"type":"var.get","x":7720)kg"
+       R"kg(,"y":440,"params":{"variable":"A"}},{"id":76,"type":"list.add","x":8120,"y":290,"params":{"variable":"W"}},{"id":77,"type":"var.get","x":8000,"y":440,"params":{"variable":"G"}}],"links":[[1,"then",3,")kg"
+       R"kg(exec"],[3,"body",36,"exec"],[3,"completed",4,"exec"],[3,"item",30,"x"],[3,"item",36,"value"],[3,"item",37,"value"],[3,"item",38,"value"],[3,"item",39,"value"],[3,"item",40,"value"],[3,"item",41,"value)kg"
+       R"kg("],[3,"item",42,"value"],[3,"item",57,"amount"],[3,"item",58,"amount"],[4,"body",72,"exec"],[4,"item",72,"value"],[4,"item",73,"value"],[30,"r",66,"item"],[30,"then",66,"exec"],[31,"then",32,"exec"],[)kg"
+       R"kg(31,"x",32,"value"],[32,"then",33,"exec"],[34,"value",33,"r"],[35,"value",3,"list"],[36,"then",37,"exec"],[37,"then",38,"exec"],[38,"then",39,"exec"],[39,"then",40,"exec"],[40,"then",41,"exec"],[41,"th)kg"
+       R"kg(en",42,"exec"],[42,"then",43,"exec"],[43,"then",45,"exec"],[44,"value",43,"item"],[45,"then",47,"exec"],[46,"value",45,"item"],[47,"then",49,"exec"],[48,"value",47,"item"],[49,"then",51,"exec"],[50,"v)kg"
+       R"kg(alue",49,"item"],[51,"then",53,"exec"],[52,"value",51,"item"],[53,"then",55,"exec"],[54,"value",53,"item"],[55,"then",57,"exec"],[56,"value",55,"item"],[57,"then",58,"exec"],[58,"then",59,"exec"],[59,)kg"
+       R"kg("then",60,"exec"],[60,"then",62,"exec"],[61,"value",60,"item"],[62,"then",64,"exec"],[63,"value",62,"item"],[64,"then",30,"exec"],[65,"value",64,"item"],[66,"then",67,"exec"],[68,"result",67,"item"],[)kg"
+       R"kg(69,"value",68,"a"],[70,"value",68,"b"],[71,"value",4,"list"],[72,"then",73,"exec"],[73,"then",74,"exec"],[74,"then",76,"exec"],[75,"value",74,"item"],[77,"value",76,"item"]],"machines":[],"functions":)kg"
+       R"kg([{"name":"Twice","inputs":[{"name":"x","type":"int","of":"i16","value":0}],"outputs":[{"name":"r","type":"int","of":"u8","value":0}],"locals":[{"name":"Here","type":"int","of":"i16","value":0}]}]})kg"},
+      // Lists of Ints of a fixed width (List<U8>, List<I8>, List<U32>): an item is stored as C++ stores it there (Add, Insert,
+      // Set Length's value, Insert Text Bytes - an I8 holds the bytes 128 .. 255 as -128 .. -1 -, Copy Bytes of its width); Find,
+      // Contains and Remove Item compare the number (std::find of 256 in a std::vector<u8> finds nothing); Text of Bytes, Struct of
+      // Bytes and Copy Bytes read a list of any width (kAnyWidth). The same values as the C++ of std::vector<u8> ... (checked so).
+      {"fixed_width_lists",
+       R"kg({"kind":"kern-logic","version":1,"nextId":42,"variables":[{"name":"In","type":"int_list","value":[0,1,-1,127,128,255,256,-128,-129,65535,65536,-32769,4294967295,4294967296,9007199254740992,-9007199254)kg"
+       R"kg(740994]},{"name":"W","type":"int_list","value":[]},{"name":"Z","type":"bool_list","value":[]},{"name":"B","type":"int_list","of":"u8","value":[1,2,255]},{"name":"S","type":"int_list","of":"i8","value")kg"
+       R"kg(:[]},{"name":"U","type":"int_list","of":"u32","value":[]},{"name":"Hh","type":"struct","of":"H","value":{"a":0,"b":0}}],"structs":[{"name":"H","fields":[{"name":"a","type":"int","of":"u16","value":0},)kg"
+       R"kg({"name":"b","type":"int","of":"u8","value":0}]}],"nodes":[{"id":1,"type":"event.begin","x":0,"y":0},{"id":3,"type":"flow.for_each","x":280,"y":0,"params":{"type":"int"}},{"id":4,"type":"flow.for_each")kg"
+       R"kg(,"x":4200,"y":0,"params":{"type":"u8"}},{"id":5,"type":"flow.for_each","x":4760,"y":0,"params":{"type":"i8"}},{"id":6,"type":"var.get","x":160,"y":150,"params":{"variable":"In"}},{"id":7,"type":"list.)kg"
+       R"kg(add","x":560,"y":0,"params":{"variable":"B"}},{"id":8,"type":"list.insert","x":840,"y":0,"params":{"variable":"S"},"values":{"index":0}},{"id":9,"type":"list.add","x":1120,"y":0,"params":{"variable":")kg"
+       R"kg(U"}},{"id":10,"type":"list.add","x":1400,"y":0,"params":{"variable":"W"}},{"id":11,"type":"list.find","x":1280,"y":150,"params":{"type":"u8"}},{"id":12,"type":"var.get","x":1280,"y":240,"params":{"var)kg"
+       R"kg(iable":"B"}},{"id":13,"type":"list.add","x":1680,"y":0,"params":{"variable":"Z"}},{"id":14,"type":"list.contains","x":1560,"y":150,"params":{"type":"i8"}},{"id":15,"type":"var.get","x":1560,"y":240,"p)kg"
+       R"kg(arams":{"variable":"S"}},{"id":16,"type":"list.insert_text","x":1960,"y":0,"params":{"variable":"S"},"values":{"index":1,"text":"\u00ffz"}},{"id":17,"type":"list.resize","x":2240,"y":0,"params":{"vari)kg"
+       R"kg(able":"U"},"values":{"length":20,"value":-1}},{"id":18,"type":"list.copy_bytes","x":2520,"y":0,"params":{"variable":"B","code":"u8","from_code":"u32"},"values":{"at":0,"from":0,"count":8}},{"id":19,"t)kg"
+       R"kg(ype":"var.get","x":2400,"y":150,"params":{"variable":"U"}},{"id":20,"type":"list.add","x":2800,"y":0,"params":{"variable":"W"}},{"id":21,"type":"text.length","x":2680,"y":150},{"id":22,"type":"text.of)kg"
+       R"kg(_bytes","x":2680,"y":240,"values":{"at":0,"count":6}},{"id":23,"type":"var.get","x":2680,"y":330,"params":{"variable":"B"}},{"id":24,"type":"var.set","x":3080,"y":0,"params":{"variable":"Hh"}},{"id":2)kg"
+       R"kg(5,"type":"struct.of_bytes","x":2960,"y":150,"params":{"struct":"H","layout":"4: u16@0 u8@2"},"values":{"at":1}},{"id":26,"type":"var.get","x":2960,"y":240,"params":{"variable":"B"}},{"id":27,"type":"l)kg"
+       R"kg(ist.add","x":3360,"y":0,"params":{"variable":"W"}},{"id":28,"type":"var.get","x":3240,"y":150,"params":{"variable":"Hh","path":".a"}},{"id":29,"type":"list.add","x":3640,"y":0,"params":{"variable":"W")kg"
+       R"kg(}},{"id":30,"type":"var.get","x":3520,"y":150,"params":{"variable":"Hh","path":".b"}},{"id":31,"type":"list.remove","x":3920,"y":0,"params":{"variable":"B"},"values":{"item":255}},{"id":32,"type":"var)kg"
+       R"kg(.get","x":4080,"y":150,"params":{"variable":"B"}},{"id":33,"type":"list.add","x":4480,"y":0,"params":{"variable":"W"}},{"id":34,"type":"var.get","x":4640,"y":150,"params":{"variable":"S"}},{"id":35,"t)kg"
+       R"kg(ype":"list.add","x":5040,"y":0,"params":{"variable":"W"}},{"id":36,"type":"list.add","x":5320,"y":0,"params":{"variable":"W"}},{"id":37,"type":"list.get","x":5200,"y":150,"params":{"type":"u32"},"valu)kg"
+       R"kg(es":{"index":3}},{"id":38,"type":"var.get","x":5200,"y":240,"params":{"variable":"U"}},{"id":39,"type":"list.add","x":5600,"y":0,"params":{"variable":"W"}},{"id":40,"type":"list.length","x":5480,"y":1)kg"
+       R"kg(50,"params":{"type":"u32"}},{"id":41,"type":"var.get","x":5480,"y":240,"params":{"variable":"U"}}],"links":[[1,"then",3,"exec"],[3,"body",7,"exec"],[3,"completed",16,"exec"],[3,"item",7,"item"],[3,"it)kg"
+       R"kg(em",8,"item"],[3,"item",9,"item"],[3,"item",11,"item"],[3,"item",14,"item"],[4,"body",33,"exec"],[4,"completed",5,"exec"],[4,"item",33,"item"],[5,"body",35,"exec"],[5,"completed",36,"exec"],[5,"item",)kg"
+       R"kg(35,"item"],[6,"value",3,"list"],[7,"then",8,"exec"],[8,"then",9,"exec"],[9,"then",10,"exec"],[10,"then",13,"exec"],[11,"index",10,"item"],[12,"value",11,"list"],[14,"result",13,"item"],[15,"value",14,)kg"
+       R"kg("list"],[16,"then",17,"exec"],[17,"then",18,"exec"],[18,"then",20,"exec"],[19,"value",18,"items"],[20,"then",24,"exec"],[21,"result",20,"item"],[22,"result",21,"a"],[23,"value",22,"bytes"],[24,"then",)kg"
+       R"kg(27,"exec"],[25,"value",24,"value"],[26,"value",25,"bytes"],[27,"then",29,"exec"],[28,"value",27,"item"],[29,"then",31,"exec"],[30,"value",29,"item"],[31,"then",4,"exec"],[32,"value",4,"list"],[34,"val)kg"
+       R"kg(ue",5,"list"],[36,"then",39,"exec"],[37,"item",36,"item"],[38,"value",37,"list"],[40,"length",39,"item"],[41,"value",40,"list"]],"machines":[]})kg"},
+      // Maps whose values are Ints of a fixed width (Map<Int, List<U8>>, Map<Int, U8>, Map<Int, List<I32>>, Map<Int, I16>): the map is the
+      // place - a value is stored as C++ stores it there (Set at Key, Add / Insert / Set Length on a value's list, Set Variable on a value),
+      // defaults and literals hold values of the width. The same values as the C++ of std::vector<u8> ... in a map (checked so).
+      {"fixed_width_map_values",
+       R"kg({"kind":"kern-logic","version":1,"nextId":22,"variables":[{"name":"In","type":"int_list","value":[0,1,-1,127,128,255,256,-128,-129,65535,65536,-32769,4294967295,4294967296,9007199254740992,-9007199254)kg"
+       R"kg(740994]},{"name":"B","type":"int_list","of":"u8","value":[1,2,255]},{"name":"M","type":"map","of":"int>int_list:u8","value":[[9,[1,2]]]},{"name":"N","type":"map","of":"int>int:u8","value":[[1,255]]},{)kg"
+       R"kg("name":"P","type":"map","of":"int>int_list:i32","value":[]},{"name":"Q","type":"map","of":"int>int:i16","value":[]},{"name":"Got","type":"int","value":0}],"nodes":[{"id":1,"type":"event.begin","x":0,")kg"
+       R"kg(y":0},{"id":3,"type":"flow.for_each","x":840,"y":0,"params":{"type":"int"}},{"id":4,"type":"map.add","x":280,"y":0,"params":{"variable":"M"},"values":{"key":1}},{"id":5,"type":"map.add","x":560,"y":0,)kg"
+       R"kg("params":{"variable":"P"},"values":{"key":5}},{"id":6,"type":"var.get","x":720,"y":150,"params":{"variable":"In"}},{"id":7,"type":"list.add","x":1120,"y":0,"params":{"variable":"M","path":"[]"},"value)kg"
+       R"kg(s":{"path0":1}},{"id":8,"type":"list.insert","x":1400,"y":0,"params":{"variable":"P","path":"[]"},"values":{"path0":0,"index":0}},{"id":9,"type":"map.set","x":1680,"y":0,"params":{"variable":"N"}},{"i)kg"
+       R"kg(d":10,"type":"map.set","x":1960,"y":0,"params":{"variable":"Q"}},{"id":11,"type":"list.resize","x":2240,"y":0,"params":{"variable":"P","path":"[]"},"values":{"path0":0,"length":20,"value":-1}},{"id":1)kg"
+       R"kg(2,"type":"map.set","x":2520,"y":0,"params":{"variable":"M"},"values":{"key":2}},{"id":13,"type":"var.get","x":2400,"y":150,"params":{"variable":"B"}},{"id":14,"type":"var.set","x":2800,"y":0,"params":)kg"
+       R"kg({"variable":"M","path":"[]"},"values":{"path0":0}},{"id":15,"type":"var.get","x":2680,"y":150,"params":{"variable":"B"}},{"id":16,"type":"map.set","x":3080,"y":0,"params":{"variable":"M"},"values":{"k)kg"
+       R"kg(ey":3}},{"id":17,"type":"list.make","x":2960,"y":150,"params":{"type":"u8","count":"2"},"values":{"item0":300,"item1":-1}},{"id":18,"type":"var.set","x":3360,"y":0,"params":{"variable":"Got"}},{"id":1)kg"
+       R"kg(9,"type":"map.find","x":3240,"y":150,"params":{"key":"int","value":"u8"},"values":{"key":256}},{"id":20,"type":"var.get","x":3240,"y":240,"params":{"variable":"N"}},{"id":21,"type":"var.set","x":3640,)kg"
+       R"kg("y":0,"params":{"variable":"N","path":"[]"},"values":{"path0":0,"value":300}}],"links":[[1,"then",4,"exec"],[3,"body",7,"exec"],[3,"completed",11,"exec"],[3,"index",10,"key"],[3,"item",7,"item"],[3,"i)kg"
+       R"kg(tem",8,"item"],[3,"item",9,"key"],[3,"item",9,"value"],[3,"item",10,"value"],[4,"then",5,"exec"],[5,"then",3,"exec"],[6,"value",3,"list"],[7,"then",8,"exec"],[8,"then",9,"exec"],[9,"then",10,"exec"],[)kg"
+       R"kg(11,"then",12,"exec"],[12,"then",14,"exec"],[13,"value",12,"value"],[14,"then",16,"exec"],[15,"value",14,"value"],[16,"then",18,"exec"],[17,"list",16,"value"],[18,"then",21,"exec"],[19,"value",18,"valu)kg"
+       R"kg(e"],[20,"value",19,"map"]],"machines":[]})kg"},
+      // Append into the variable it reads (NodeDef::takes_first: in the class text_append(std::move(T), ...) appends where T's
+      // characters are) - with the index, with T itself (T + T: T as it was), and T into U.
+      {"append_in_place",
+       R"kg({"variables":[{"name":"T","type":"text","value":"a"},{"name":"U","type":"text","value":""}],"nodes":[{"id":1,"type":"event.begin"},{"id":2,"type":"flow.for","values":{"first":1,"last":4}},{"id":3,"type":"var.set","params":{"variable":"T"}},{"id":4,"type":"text.append","values":{"c":"-"}},{"id":5,"type":"var.get","params":{"variable":"T"}},{"id":6,"type":"var.set","params":{"variable":"T"}},{"id":7,"type":"text.append"},{"id":8,"type":"var.get","params":{"variable":"T"}},{"id":9,"type":"var.get","params":{"variable":"T"}},{"id":10,"type":"var.set","params":{"variable":"U"}},{"id":11,"type":"text.append"},{"id":12,"type":"var.get","params":{"variable":"U"}},{"id":13,"type":"var.get","params":{"variable":"T"}}],"links":[[1,"then",2,"exec"],[2,"body",3,"exec"],[5,"value",4,"a"],[2,"index",4,"b"],[4,"result",3,"value"],[3,"then",6,"exec"],[8,"value",7,"a"],[9,"value",7,"b"],[7,"result",6,"value"],[6,"then",10,"exec"],[12,"value",11,"a"],[13,"value",11,"b"],[11,"result",10,"value"]]})kg"},
   };
   return list;
 }
@@ -534,6 +1263,7 @@ inline std::string play(kern::logic::Runtime& rt, Host& host, kern::logic::Insta
   for (int i = 0; i < 120; ++i) { host.t += 1.0 / 60; rt.tick(1.0f / 60); }
   rt.call("Go", 0, {{"value", Value::number(1)}});
   for (int i = 0; i < 60; ++i) { host.t += 1.0 / 60; rt.tick(1.0f / 60); }
+  rt.end();   // (End Play)
   std::string out;
   for (const auto& v : inst->graph().variables) out += v.name + "=" + inst->get(v.name).as_text() + "\n";
   for (const auto& m : inst->graph().machines) out += m.name + ":" + inst->state(m.name) + "\n";

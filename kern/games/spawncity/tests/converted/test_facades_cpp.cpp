@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,18 +34,62 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class Surface : u8 { none, cloth, tpu, floor };
-namespace Facades { inline const char* vertex_declarations()  { return "flat out vec4 vWall;\n"; } }
-namespace Facades { inline const char* vertex()  { return "  vWall = aWall;\n"; } }
-namespace Facades { inline const char* fragment_declarations()  {
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Program : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  unsigned int location(const char* name) const;
+};
+struct UniformCache : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ExtensionAttribute {
+  const char* key;   // name used by hosts to supply the stream (e.g. "facade")
+  u32 size;          // 1..4 floats per vertex
+  const char* glsl;  // attribute name in GLSL (e.g. "aFacade")
+};
+struct ShaderExtension : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Facades final {
+ public:
+  f32 night = 0;  // 0 day .. 1 night (game_look.cpp)
+  
+  Span<const ExtensionAttribute> attributes() const;
+  const char* vertex_declarations() const;
+  const char* vertex() const;
+  const char* fragment_declarations() const;
+  const char* fragment_surface() const;
+  void bind(const Program& p);
+  
+
+ private:
+  u32 u_night_ = 0;
+};
+constexpr ExtensionAttribute kWall[] = {{"wall", 4, "aWall"}};
+Span<const ExtensionAttribute> Facades::attributes() const { return {kWall, 1}; }
+const char* Facades::vertex_declarations() const { return "flat out vec4 vWall;\n"; }
+const char* Facades::vertex() const { return "  vWall = aWall;\n"; }
+const char* Facades::fragment_declarations() const {
   return R"GLSL(
 // flat: constant per wall (world_city_buildings.mjs snaps the seed for the same reason)
 flat in vec4 vWall;
 uniform float uNight;
 float fh(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 )GLSL";
-} }
-namespace Facades { inline const char* fragment_surface()  {
+}
+const char* Facades::fragment_surface() const {
   // FACADE_GLSL of world_city_buildings.mjs; u = vUV.x, len = vWall.x, z = vUV.y, H = vWall.y,
   // seed = vWall.z, floorH = vWall.w. Glass: Kern's surfaceGlass (sky reflection) for the
   // original's roughness 0.07 / metalness 0.35 / Fresnel sky emissive.
@@ -101,72 +145,159 @@ namespace Facades { inline const char* fragment_surface()  {
     }
   }
 )GLSL";
-} }
+}
+void Facades::bind(const Program& p) { u_night_ = p.location("uNight"); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+[[maybe_unused]] static ExtensionAttribute draw_kern__ExtensionAttribute(converted::Draw& draw) {
+  ExtensionAttribute s{};
+  s.key = draw.c_word();
+  s.size = static_cast<unsigned int>(draw.below(40));
+  s.glsl = draw.c_word();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const ExtensionAttribute& s) { return converted::Value::structure({arg(s.key), arg(s.size), arg(s.glsl)}); }
+[[maybe_unused]] static bool same(const ExtensionAttribute& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.key, (*got.rows)[0]), ".key") && converted::at_place(same(want.size, (*got.rows)[1]), ".size") && converted::at_place(same(want.glsl, (*got.rows)[2]), ".glsl"); }
+[[maybe_unused]] static bool defined(const ExtensionAttribute& s) { return defined(s.key) && defined(s.size) && defined(s.glsl); }
+[[maybe_unused]] static std::string text(const ExtensionAttribute& s) { return std::string("{") + text(s.key) + ", " + text(s.size) + ", " + text(s.glsl) + "}"; }
+[[maybe_unused]] static void take(ExtensionAttribute& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<const char*>(s.key, (*v.rows)[0]); converted::take_as<unsigned int>(s.size, (*v.rows)[1]); converted::take_as<const char*>(s.glsl, (*v.rows)[2]); }
+[[maybe_unused]] static Facades draw_Facades(converted::Draw& draw) {
+  Facades s{};
+  s.night = draw.number();
+  s.u_night_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Facades& s) { return converted::Value::structure({arg(s.night), arg(s.u_night_)}); }
+[[maybe_unused]] static bool same(const Facades& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.night, (*got.rows)[0]), ".night") && converted::at_place(same(want.u_night_, (*got.rows)[1]), ".u_night_"); }
+[[maybe_unused]] static bool defined(const Facades& s) { return defined(s.night) && defined(s.u_night_); }
+[[maybe_unused]] static std::string text(const Facades& s) { return std::string("{") + text(s.night) + ", " + text(s.u_night_) + "}"; }
+[[maybe_unused]] static void take(Facades& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.night, (*v.rows)[0]); converted::take_as<unsigned int>(s.u_night_, (*v.rows)[1]); }
+inline unsigned int Program::location(const char* name) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.program.location", {converted::value_of(*this), converted::value_of(name)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
 
 SC_TEST(converted_facades_cpp) {
   converted::Blueprint bp("facades_cpp");
-  {  // Facades::vertex_declarations
-    converted::Tally tally("Facades_vertex_declarations");
+  {  // Facades::attributes
+    converted::Tally tally("Facades_attributes");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::vertex_declarations(); }); };
+    const auto run = [&]() { return converted::counted([&] { return Facades{}.attributes(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Facades::vertex_declarations
+    converted::Tally tally("Facades_vertex_declarations");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]() { return converted::counted([&] { return Facades{}.vertex_declarations(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Facades::vertex
     converted::Tally tally("Facades_vertex");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::vertex(); }); };
+    const auto run = [&]() { return converted::counted([&] { return Facades{}.vertex(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Facades::fragment_declarations
     converted::Tally tally("Facades_fragment_declarations");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::fragment_declarations(); }); };
+    const auto run = [&]() { return converted::counted([&] { return Facades{}.fragment_declarations(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Facades::fragment_surface
     converted::Tally tally("Facades_fragment_surface");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_facades_cpp::Facades::fragment_surface(); }); };
+    const auto run = [&]() { return converted::counted([&] { return Facades{}.fragment_surface(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Facades::bind
+    converted::Tally tally("Facades_bind");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Facades& a0, [[maybe_unused]] const Program& a1) { converted::counted([&] { return a0.bind(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      Facades a0 = draw_Facades(draw);
+      const Program& a1 = *converted::engine_object<Program>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

@@ -21,9 +21,10 @@ namespace sc {
 /// (the Blueprint's struct Pack) and how the game's C++ asks.
 class Jetpack {
  public:
-  /// The running Blueprint of the actor "Jetpack" (the game binds it once its world has started;
-  /// tests bind the one they run).
-  static void bind(kern::logic::Instance* blueprint);
+  /// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+  /// tests the one they run): the Blueprint of the actor "Jetpack" is found by its name at every call.
+  /// True: the actor has a Blueprint that runs there.
+  static bool bind(kern::logic::Runtime& logic);
   // The Blueprint's variables Acc, AirAccel, MaxClimb, Gravity, FallSafe and IgnitionDamp.
   static f32 acc();
   static f32 air_accel();
@@ -42,8 +43,15 @@ class Jetpack {
   u32 ignitions = 0;
 
  private:
-  kern::logic::Value pack() const;
-  void take(const kern::logic::Value& v);
+  /// The Blueprint's struct Pack, as it takes and gives it.
+  struct Pack {
+    f64 fuel = 1;
+    bool thrusting = false, used = false;
+    u32 ignitions = 0;
+    f64 burst_left = 0, ground_since = -1, last_thrust = -99;
+  };
+  Pack pack() const;
+  void take(const Pack& p);
   f32 burst_left_ = 0, ground_since_ = -1, last_thrust_ = -99;
 };
 
@@ -90,14 +98,20 @@ class MusicSynth {
  public:
   struct Station { const char* name; const char* genre; f32 bpm; u32 seed; };
   static constexpr i32 kMenu = -1;
-  static const Station kStations[];
+  static constexpr Station kStations[] = {
+      {"KERN FM", "Synthwave", 100, 11},
+      {"BODENSEE BEATS", "House", 124, 23},
+      {"LOFI LAGUNE", "Lo-Fi", 78, 37},
+      {"8-BIT RADIO", "Chiptune", 144, 41},
+      {"NACHTSCHICHT", "Techno", 132, 53},
+  };
   static i32 station_count();
 
   void init(u32 rate);
   /// The programme to play (kMenu, a station index, or -2 = silence) and its level 0..1.
   void select(i32 programme, f32 level);
   /// Adds `frames` stereo frames into `out` (interleaved).
-  void render_add(f32* out, u32 frames);
+  void render_add(std::vector<f32>& out, u32 frames);
   i32 programme() const { return programme_; }
   f32 level() const { return gain_; }
   f32 peak = 0;  // of the last block (tests)

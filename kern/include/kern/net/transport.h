@@ -34,9 +34,9 @@ class Transport {
  public:
   virtual ~Transport() = default;
   virtual Address address() const = 0;
-  virtual bool send(Address to, const u8* data, int bytes) = 0;
+  virtual bool send(Address to, const u8* data, Count<1> bytes) = 0;
   /// Next received datagram (bytes, 0 = none); `from` is the sender.
-  virtual int receive(Address& from, u8* data, int max_bytes) = 0;
+  virtual int receive(Address& from, u8* data, Count<1> max_bytes) = 0;
   /// Moves simulated time (delivers delayed packets).
   virtual void advance_time(f64 time) { (void)time; }
 };
@@ -59,7 +59,7 @@ class Simulator {
     f64 deliver = 0;
     std::vector<u8> data;
   };
-  void send(Address from, Address to, const u8* data, int bytes, f64 now);
+  void send(Address from, Address to, const u8* data, Count<1> bytes, f64 now);
   /// Packets due at `now`, in delivery order.
   void take_due(f64 now, std::vector<Packet>& out);
   void clear() { queue_.clear(); }
@@ -102,11 +102,11 @@ class HostTransport final : public Transport {
   explicit HostTransport(Address self = {1}) : self_(self) {}
   Address address() const override { return self_; }
   void set_address(Address a) { self_ = a; }
-  bool send(Address to, const u8* data, int bytes) override;
-  int receive(Address& from, u8* data, int max_bytes) override;
+  bool send(Address to, const u8* data, Count<1> bytes) override;
+  int receive(Address& from, u8* data, Count<1> max_bytes) override;
   void advance_time(f64 time) override;
   /// Host side: a datagram arrived from `from`.
-  void push_incoming(Address from, const u8* data, int bytes);
+  void push_incoming(Address from, const u8* data, Count<1> bytes);
   /// Host side: the next datagram to put on the wire (false when none).
   bool take_outgoing(Address& to, std::vector<u8>& data);
   Simulator& simulator() { return sim_; }

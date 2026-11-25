@@ -3,6 +3,7 @@
 // per vehicle, poses from the interpolated Box3D bodies every frame.
 #pragma once
 
+#include <array>
 #include <vector>
 
 #include "car.h"
@@ -20,7 +21,7 @@ class VehicleArt {
   /// The jet (body frame +Y nose) with gear when down.
   void jet(const kern::Mat4& body, bool gear_down, f32 nozzle, f32 thrust01, bool cockpit_view);
   /// The quad (body frame -X nose); rotor angles per motor.
-  void drone(const kern::Mat4& body, const Vec3* motors, const f32* rotor_angles, f32 prop_d, bool armed, bool fpv_view);
+  void drone(const kern::Mat4& body, const std::array<Vec3, 4>& motors, const std::array<f32, 4>& rotor_angles, f32 prop_d, bool armed, bool fpv_view);
   /// A pilot under the canopy (open: the chute is out).
   void parachute(Vec3 pilot, f32 heading, bool open);
   /// Uploads all instance lists.
@@ -34,6 +35,9 @@ class VehicleArt {
   };
   bool make(kern::Renderer& r, Part& p, const kern::MeshData& mesh, const kern::Material& m, bool tinted);
   void put(Part& p, const kern::Mat4& m, Vec3 tint = {1, 1, 1});
+  /// A part's instances: none at the start of a frame (begin), handed to the renderer at its end (end).
+  static void clear(Part& p);
+  void upload(Part& p);
 
   kern::Renderer* r_ = nullptr;
   Part car_body_, car_glass_, car_lights_, car_tail_, wheel_, bus_body_, bus_glass_;

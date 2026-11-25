@@ -7,8 +7,8 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <unordered_map>
 #include "../../src/city_stream.h"
+#include "kern/core/map.h"
 #include "../converted.h"
 
 namespace converted_road_graph {
@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,20 +34,7 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
-};
-namespace Earcut { struct Node {
-    u32 i;
-    f64 x, y;
-    Node *prev, *next;
-    i32 z;
-    Node *prev_z, *next_z;
-    bool steiner;
-  }; }
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
-enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 };
+namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
 enum class RoadClass : u8 { motorway, trunk, primary, secondary, tertiary, minor, service, track, path, pedestrian, river, canal, stream };
 struct RoadGraph {
  public:
@@ -85,7 +72,7 @@ struct RoadGraph {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const RoadGraph::Node& s) { return converted::Value::structure({arg(s.p), arg(s.edges)}); }
-[[maybe_unused]] static bool same(const RoadGraph::Node& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.p, (*got.rows)[0]) && same(want.edges, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const RoadGraph::Node& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.edges, (*got.rows)[1]), ".edges"); }
 [[maybe_unused]] static bool defined(const RoadGraph::Node& s) { return defined(s.p) && defined(s.edges); }
 [[maybe_unused]] static std::string text(const RoadGraph::Node& s) { return std::string("{") + text(s.p) + ", " + text(s.edges) + "}"; }
 [[maybe_unused]] static void take(RoadGraph::Node& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Vec2>(s.p, (*v.rows)[0]); converted::take_as<std::vector<std::pair<int, double>>>(s.edges, (*v.rows)[1]); }
@@ -97,7 +84,7 @@ struct RoadGraph {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const RoadGraph& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.built_from)), arg(s.nodes_), arg(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_))}); }
-[[maybe_unused]] static bool same(const RoadGraph& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]) && same(want.nodes_, (*got.rows)[1]) && same(converted::shaped<converted::wide::Map<converted::Whole, int>>(want.cells_), (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const RoadGraph& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(converted::shaped<converted::Whole>(want.built_from), (*got.rows)[0]), ".built_from") && converted::at_place(same(want.nodes_, (*got.rows)[1]), ".nodes_") && converted::at_place(same(converted::shaped<converted::wide::Map<converted::Whole, int>>(want.cells_), (*got.rows)[2]), ".cells_"); }
 [[maybe_unused]] static bool defined(const RoadGraph& s) { return defined(converted::shaped<converted::Whole>(s.built_from)) && defined(s.nodes_) && defined(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)); }
 [[maybe_unused]] static std::string text(const RoadGraph& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.built_from)) + ", " + text(s.nodes_) + ", " + text(converted::shaped<converted::wide::Map<converted::Whole, int>>(s.cells_)) + "}"; }
 [[maybe_unused]] static void take(RoadGraph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<converted::Whole>(s.built_from, (*v.rows)[0]); converted::take_as<std::vector<RoadGraph::Node>>(s.nodes_, (*v.rows)[1]); converted::take_as<converted::wide::Map<converted::Whole, int>>(s.cells_, (*v.rows)[2]); }
@@ -107,33 +94,43 @@ SC_TEST(converted_road_graph) {
   {  // RoadGraph::empty
     converted::Tally tally("RoadGraph_empty");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0) { return converted::counted([&] { return a0.empty(); }); };
+    const auto run = [&]([[maybe_unused]] RoadGraph& a0) { return converted::counted([&] { return a0.empty(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const RoadGraph a0 = draw_RoadGraph(draw);
+      RoadGraph a0 = draw_RoadGraph(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // RoadGraph::size
     converted::Tally tally("RoadGraph_size");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] RoadGraph a0) { return converted::counted([&] { return a0.size(); }); };
+    const auto run = [&]([[maybe_unused]] RoadGraph& a0) { return converted::counted([&] { return a0.size(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const RoadGraph a0 = draw_RoadGraph(draw);
+      RoadGraph a0 = draw_RoadGraph(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

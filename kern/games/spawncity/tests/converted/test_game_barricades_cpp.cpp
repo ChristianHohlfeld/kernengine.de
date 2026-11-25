@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,10 +35,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
-};
 struct MeshData {
   std::vector<f32> positions, normals, colors, uvs;
   std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
@@ -63,21 +59,15 @@ struct MeshData {
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   
 };
-enum class Surface : u8 { none, cloth, tpu, floor };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
-};
-enum class Key : u8 {
-  unknown = 0,
-  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
-  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
-  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
-  count
-};
-namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; }
-enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 };
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace CityStream { namespace Tile { enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed }; } }
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
+}; }
 namespace Interiors { struct Door { Vec2 c, d, n; }; }
 namespace Interiors { struct Core { Vec2 o, u, v; }; }
 namespace Interiors { struct Plan {
@@ -95,6 +85,15 @@ namespace Interiors { struct Plan {
     std::vector<Vec3> lamps;     // ceiling light panels
     u32 furniture = 0;
   }; }
+namespace net { namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; } }
+namespace town { enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 }; }
+enum class Key : u8 {
+  unknown = 0,
+  a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
+  digit0, digit1, digit2, digit3, digit4, digit5, digit6, digit7, digit8, digit9,
+  left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
+  count
+};
 i64 building_key(const Interiors::Plan& p) {
   if (p.outer.empty()) return 0;
   return (converted::shl_bits(static_cast<i64>(std::lround(converted::at(p.outer, 0).x * 10)), 32)) ^ (static_cast<i64>(std::lround(converted::at(p.outer, 0).y * 10)) & 0xffffffffll) ^ static_cast<i64>(p.outer.size());
@@ -112,7 +111,7 @@ i64 building_key(const Interiors::Plan& p) {
 }
 namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Door& s) { return converted::Value::structure({arg(s.c), arg(s.d), arg(s.n)}); }
-[[maybe_unused]] static bool same(const Interiors::Door& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.c, (*got.rows)[0]) && same(want.d, (*got.rows)[1]) && same(want.n, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Interiors::Door& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.c, (*got.rows)[0]), ".c") && converted::at_place(same(want.d, (*got.rows)[1]), ".d") && converted::at_place(same(want.n, (*got.rows)[2]), ".n"); }
 [[maybe_unused]] static bool defined(const Interiors::Door& s) { return defined(s.c) && defined(s.d) && defined(s.n); }
 [[maybe_unused]] static std::string text(const Interiors::Door& s) { return std::string("{") + text(s.c) + ", " + text(s.d) + ", " + text(s.n) + "}"; }
 [[maybe_unused]] static void take(Interiors::Door& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.c, (*v.rows)[0]); converted::take_as<Vec2>(s.d, (*v.rows)[1]); converted::take_as<Vec2>(s.n, (*v.rows)[2]); }
@@ -126,7 +125,7 @@ namespace Interiors { using converted::arg; using converted::same; using convert
 }
 namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Core& s) { return converted::Value::structure({arg(s.o), arg(s.u), arg(s.v)}); }
-[[maybe_unused]] static bool same(const Interiors::Core& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.o, (*got.rows)[0]) && same(want.u, (*got.rows)[1]) && same(want.v, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Interiors::Core& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.o, (*got.rows)[0]), ".o") && converted::at_place(same(want.u, (*got.rows)[1]), ".u") && converted::at_place(same(want.v, (*got.rows)[2]), ".v"); }
 [[maybe_unused]] static bool defined(const Interiors::Core& s) { return defined(s.o) && defined(s.u) && defined(s.v); }
 [[maybe_unused]] static std::string text(const Interiors::Core& s) { return std::string("{") + text(s.o) + ", " + text(s.u) + ", " + text(s.v) + "}"; }
 [[maybe_unused]] static void take(Interiors::Core& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec2>(s.o, (*v.rows)[0]); converted::take_as<Vec2>(s.u, (*v.rows)[1]); converted::take_as<Vec2>(s.v, (*v.rows)[2]); }
@@ -143,7 +142,7 @@ namespace Interiors { using converted::arg; using converted::same; using convert
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
-[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.positions, (*got.rows)[0]) && same(want.normals, (*got.rows)[1]) && same(want.colors, (*got.rows)[2]) && same(want.uvs, (*got.rows)[3]) && same(want.extra, (*got.rows)[4]) && same(want.extra_size, (*got.rows)[5]) && same(want.indices, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.positions, (*got.rows)[0]), ".positions") && converted::at_place(same(want.normals, (*got.rows)[1]), ".normals") && converted::at_place(same(want.colors, (*got.rows)[2]), ".colors") && converted::at_place(same(want.uvs, (*got.rows)[3]), ".uvs") && converted::at_place(same(want.extra, (*got.rows)[4]), ".extra") && converted::at_place(same(want.extra_size, (*got.rows)[5]), ".extra_size") && converted::at_place(same(want.indices, (*got.rows)[6]), ".indices"); }
 [[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
 [[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
 [[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
@@ -172,7 +171,7 @@ namespace Interiors { using converted::arg; using converted::same; using convert
 }
 namespace Interiors { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
 [[maybe_unused]] static converted::Value arg(const Interiors::Plan& s) { return converted::Value::structure({arg(s.outer), arg(s.inner), arg(s.holes), arg(s.inner_holes), arg(s.doors), arg(s.levels), arg(s.base), arg(s.top), arg(s.floor_h), arg(s.area), arg(s.has_core), arg(s.roof_access), arg(s.core), arg(s.mesh), arg(s.glass), arg(s.points), arg(s.indices), arg(s.lamps), arg(s.furniture)}); }
-[[maybe_unused]] static bool same(const Interiors::Plan& want, const converted::Value& got) { return got.rows && got.rows->size() == 19 && same(want.outer, (*got.rows)[0]) && same(want.inner, (*got.rows)[1]) && same(want.holes, (*got.rows)[2]) && same(want.inner_holes, (*got.rows)[3]) && same(want.doors, (*got.rows)[4]) && same(want.levels, (*got.rows)[5]) && same(want.base, (*got.rows)[6]) && same(want.top, (*got.rows)[7]) && same(want.floor_h, (*got.rows)[8]) && same(want.area, (*got.rows)[9]) && same(want.has_core, (*got.rows)[10]) && same(want.roof_access, (*got.rows)[11]) && same(want.core, (*got.rows)[12]) && same(want.mesh, (*got.rows)[13]) && same(want.glass, (*got.rows)[14]) && same(want.points, (*got.rows)[15]) && same(want.indices, (*got.rows)[16]) && same(want.lamps, (*got.rows)[17]) && same(want.furniture, (*got.rows)[18]); }
+[[maybe_unused]] static bool same(const Interiors::Plan& want, const converted::Value& got) { return converted::rows_of(got, 19) && converted::at_place(same(want.outer, (*got.rows)[0]), ".outer") && converted::at_place(same(want.inner, (*got.rows)[1]), ".inner") && converted::at_place(same(want.holes, (*got.rows)[2]), ".holes") && converted::at_place(same(want.inner_holes, (*got.rows)[3]), ".inner_holes") && converted::at_place(same(want.doors, (*got.rows)[4]), ".doors") && converted::at_place(same(want.levels, (*got.rows)[5]), ".levels") && converted::at_place(same(want.base, (*got.rows)[6]), ".base") && converted::at_place(same(want.top, (*got.rows)[7]), ".top") && converted::at_place(same(want.floor_h, (*got.rows)[8]), ".floor_h") && converted::at_place(same(want.area, (*got.rows)[9]), ".area") && converted::at_place(same(want.has_core, (*got.rows)[10]), ".has_core") && converted::at_place(same(want.roof_access, (*got.rows)[11]), ".roof_access") && converted::at_place(same(want.core, (*got.rows)[12]), ".core") && converted::at_place(same(want.mesh, (*got.rows)[13]), ".mesh") && converted::at_place(same(want.glass, (*got.rows)[14]), ".glass") && converted::at_place(same(want.points, (*got.rows)[15]), ".points") && converted::at_place(same(want.indices, (*got.rows)[16]), ".indices") && converted::at_place(same(want.lamps, (*got.rows)[17]), ".lamps") && converted::at_place(same(want.furniture, (*got.rows)[18]), ".furniture"); }
 [[maybe_unused]] static bool defined(const Interiors::Plan& s) { return defined(s.outer) && defined(s.inner) && defined(s.holes) && defined(s.inner_holes) && defined(s.doors) && defined(s.levels) && defined(s.base) && defined(s.top) && defined(s.floor_h) && defined(s.area) && defined(s.has_core) && defined(s.roof_access) && defined(s.core) && defined(s.mesh) && defined(s.glass) && defined(s.points) && defined(s.indices) && defined(s.lamps) && defined(s.furniture); }
 [[maybe_unused]] static std::string text(const Interiors::Plan& s) { return std::string("{") + text(s.outer) + ", " + text(s.inner) + ", " + text(s.holes) + ", " + text(s.inner_holes) + ", " + text(s.doors) + ", " + text(s.levels) + ", " + text(s.base) + ", " + text(s.top) + ", " + text(s.floor_h) + ", " + text(s.area) + ", " + text(s.has_core) + ", " + text(s.roof_access) + ", " + text(s.core) + ", " + text(s.mesh) + ", " + text(s.glass) + ", " + text(s.points) + ", " + text(s.indices) + ", " + text(s.lamps) + ", " + text(s.furniture) + "}"; }
 [[maybe_unused]] static void take(Interiors::Plan& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 19) return; converted::take_as<std::vector<Vec2>>(s.outer, (*v.rows)[0]); converted::take_as<std::vector<Vec2>>(s.inner, (*v.rows)[1]); converted::take_as<std::vector<std::vector<Vec2>>>(s.holes, (*v.rows)[2]); converted::take_as<std::vector<std::vector<Vec2>>>(s.inner_holes, (*v.rows)[3]); converted::take_as<std::vector<Interiors::Door>>(s.doors, (*v.rows)[4]); converted::take_as<std::vector<double>>(s.levels, (*v.rows)[5]); converted::take_as<double>(s.base, (*v.rows)[6]); converted::take_as<double>(s.top, (*v.rows)[7]); converted::take_as<double>(s.floor_h, (*v.rows)[8]); converted::take_as<double>(s.area, (*v.rows)[9]); converted::take_as<bool>(s.has_core, (*v.rows)[10]); converted::take_as<bool>(s.roof_access, (*v.rows)[11]); converted::take_as<Interiors::Core>(s.core, (*v.rows)[12]); converted::take_as<MeshData>(s.mesh, (*v.rows)[13]); converted::take_as<MeshData>(s.glass, (*v.rows)[14]); converted::take_as<std::vector<Vec3>>(s.points, (*v.rows)[15]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[16]); converted::take_as<std::vector<Vec3>>(s.lamps, (*v.rows)[17]); converted::take_as<unsigned int>(s.furniture, (*v.rows)[18]); }
@@ -183,17 +182,22 @@ SC_TEST(converted_game_barricades_cpp) {
   {  // building_key
     converted::Tally tally("building_key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Interiors::Plan a0) { return converted::counted([&] { return converted_game_barricades_cpp::building_key(a0); }); };
+    const auto run = [&]([[maybe_unused]] Interiors::Plan& a0) { return converted::counted([&] { return converted_game_barricades_cpp::building_key(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Interiors::Plan a0 = draw_Interiors__Plan(draw);
+      Interiors::Plan a0 = draw_Interiors__Plan(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = converted::shaped<converted::Whole>(run(a0));
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

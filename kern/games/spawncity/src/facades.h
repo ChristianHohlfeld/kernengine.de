@@ -12,17 +12,19 @@
 
 namespace sc {
 
-class Facades final : public kern::ShaderExtension {
+// Plain state with the functions of a shader extension: the renderer gets it as
+// LookExtension<Facades> (shader_look.h).
+class Facades final {
  public:
   f32 night = 0;  // 0 day .. 1 night (game_look.cpp)
-  const char* name() const override { return "spawncity-facades"; }
-  kern::Span<const kern::ExtensionAttribute> attributes() const override;
-  const char* vertex_declarations() const override;
-  const char* vertex() const override;
-  const char* fragment_declarations() const override;
-  const char* fragment_surface() const override;
-  void bind(const kern::Program& p) override;
-  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) override;
+  const char* name() const { return "spawncity-facades"; }
+  kern::Span<const kern::ExtensionAttribute> attributes() const;
+  const char* vertex_declarations() const;
+  const char* vertex() const;
+  const char* fragment_declarations() const;
+  const char* fragment_surface() const;
+  void bind(const kern::Program& p);
+  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&);
 
  private:
   u32 u_night_ = 0;

@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,10 +35,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count };
-using ClipId = u32;
-using VoiceId = u64;
+namespace audio { enum class Bus : u8 { master = 0, music, sfx, ambience, ui, voice, count }; }
+namespace audio { using ClipId = u32; }
+namespace audio { using VoiceId = u64; }
 struct Mixer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 struct SoundFx {
  public:
@@ -48,8 +49,8 @@ struct SoundFx {
 
  private:
   struct Loop {
-    ClipId clip = 0;
-    VoiceId voice = 0;
+    audio::ClipId clip = 0;
+    audio::VoiceId voice = 0;
     f32 volume = 0;
   };
   
@@ -64,15 +65,15 @@ struct SoundFx {
 [[maybe_unused]] static SoundFx::Loop draw_SoundFx__Loop(converted::Draw& draw) {
   SoundFx::Loop s{};
   s.clip = static_cast<unsigned int>(draw.below(40));
-  s.voice = static_cast<unsigned long>(draw.below(40));
+  s.voice = static_cast<u64>(draw.bits());
   s.volume = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const SoundFx::Loop& s) { return converted::Value::structure({arg(s.clip), arg(s.voice), arg(s.volume)}); }
-[[maybe_unused]] static bool same(const SoundFx::Loop& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.clip, (*got.rows)[0]) && same(want.voice, (*got.rows)[1]) && same(want.volume, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const SoundFx::Loop& s) { return defined(s.clip) && defined(s.voice) && defined(s.volume); }
-[[maybe_unused]] static std::string text(const SoundFx::Loop& s) { return std::string("{") + text(s.clip) + ", " + text(s.voice) + ", " + text(s.volume) + "}"; }
-[[maybe_unused]] static void take(SoundFx::Loop& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.clip, (*v.rows)[0]); converted::take_as<unsigned long>(s.voice, (*v.rows)[1]); converted::take_as<double>(s.volume, (*v.rows)[2]); }
+[[maybe_unused]] static converted::Value arg(const SoundFx::Loop& s) { return converted::Value::structure({arg(s.clip), arg(converted::shaped<converted::Whole>(s.voice)), arg(s.volume)}); }
+[[maybe_unused]] static bool same(const SoundFx::Loop& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.clip, (*got.rows)[0]), ".clip") && converted::at_place(same(converted::shaped<converted::Whole>(want.voice), (*got.rows)[1]), ".voice") && converted::at_place(same(want.volume, (*got.rows)[2]), ".volume"); }
+[[maybe_unused]] static bool defined(const SoundFx::Loop& s) { return defined(s.clip) && defined(converted::shaped<converted::Whole>(s.voice)) && defined(s.volume); }
+[[maybe_unused]] static std::string text(const SoundFx::Loop& s) { return std::string("{") + text(s.clip) + ", " + text(converted::shaped<converted::Whole>(s.voice)) + ", " + text(s.volume) + "}"; }
+[[maybe_unused]] static void take(SoundFx::Loop& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.clip, (*v.rows)[0]); converted::take_as<converted::Whole>(s.voice, (*v.rows)[1]); converted::take_as<double>(s.volume, (*v.rows)[2]); }
 [[maybe_unused]] static SoundFx draw_SoundFx(converted::Draw& draw) {
   SoundFx s{};
   s.mixer_ = converted::engine_object<Mixer>(1 + draw.below(6));
@@ -86,7 +87,7 @@ struct SoundFx {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const SoundFx& s) { return converted::Value::structure({arg(s.mixer_), arg(s.rotor_), arg(s.prop_wash_), arg(s.engine_), arg(s.turbine_), arg(s.roar_), arg(s.wind_), arg(s.siren_)}); }
-[[maybe_unused]] static bool same(const SoundFx& want, const converted::Value& got) { return got.rows && got.rows->size() == 8 && same(want.mixer_, (*got.rows)[0]) && same(want.rotor_, (*got.rows)[1]) && same(want.prop_wash_, (*got.rows)[2]) && same(want.engine_, (*got.rows)[3]) && same(want.turbine_, (*got.rows)[4]) && same(want.roar_, (*got.rows)[5]) && same(want.wind_, (*got.rows)[6]) && same(want.siren_, (*got.rows)[7]); }
+[[maybe_unused]] static bool same(const SoundFx& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.mixer_, (*got.rows)[0]), ".mixer_") && converted::at_place(same(want.rotor_, (*got.rows)[1]), ".rotor_") && converted::at_place(same(want.prop_wash_, (*got.rows)[2]), ".prop_wash_") && converted::at_place(same(want.engine_, (*got.rows)[3]), ".engine_") && converted::at_place(same(want.turbine_, (*got.rows)[4]), ".turbine_") && converted::at_place(same(want.roar_, (*got.rows)[5]), ".roar_") && converted::at_place(same(want.wind_, (*got.rows)[6]), ".wind_") && converted::at_place(same(want.siren_, (*got.rows)[7]), ".siren_"); }
 [[maybe_unused]] static bool defined(const SoundFx& s) { return defined(s.mixer_) && defined(s.rotor_) && defined(s.prop_wash_) && defined(s.engine_) && defined(s.turbine_) && defined(s.roar_) && defined(s.wind_) && defined(s.siren_); }
 [[maybe_unused]] static std::string text(const SoundFx& s) { return std::string("{") + text(s.mixer_) + ", " + text(s.rotor_) + ", " + text(s.prop_wash_) + ", " + text(s.engine_) + ", " + text(s.turbine_) + ", " + text(s.roar_) + ", " + text(s.wind_) + ", " + text(s.siren_) + "}"; }
 [[maybe_unused]] static void take(SoundFx& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<Mixer*>(s.mixer_, (*v.rows)[0]); converted::take_as<SoundFx::Loop>(s.rotor_, (*v.rows)[1]); converted::take_as<SoundFx::Loop>(s.prop_wash_, (*v.rows)[2]); converted::take_as<SoundFx::Loop>(s.engine_, (*v.rows)[3]); converted::take_as<SoundFx::Loop>(s.turbine_, (*v.rows)[4]); converted::take_as<SoundFx::Loop>(s.roar_, (*v.rows)[5]); converted::take_as<SoundFx::Loop>(s.wind_, (*v.rows)[6]); converted::take_as<SoundFx::Loop>(s.siren_, (*v.rows)[7]); }
@@ -96,17 +97,22 @@ SC_TEST(converted_sound_fx) {
   {  // SoundFx::ready
     converted::Tally tally("SoundFx_ready");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SoundFx a0) { return converted::counted([&] { return a0.ready(); }); };
+    const auto run = [&]([[maybe_unused]] SoundFx& a0) { return converted::counted([&] { return a0.ready(); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const SoundFx a0 = draw_SoundFx(draw);
+      SoundFx a0 = draw_SoundFx(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

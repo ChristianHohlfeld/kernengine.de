@@ -17,7 +17,7 @@ class PeopleArt {
   void begin();
   void person(const People::Person& p, f32 now);
   /// The fallen as ragdolls (ragdoll.cpp bones): the same rounded body, face and hair as standing.
-  void ragdolls(const std::vector<Ragdolls::Draw>& bones);
+  void ragdolls(const std::vector<Ragdolls::Draw>& bones, const Ragdolls& dolls);
   /// A person's hair colour (the dead's dull, a zombie's grey-green).
   static Vec3 hair_color(const People::Person& p);
   /// A light bar on a car roof (chassis frame), flashing when `on`.
@@ -42,6 +42,9 @@ class PeopleArt {
   };
   bool make(kern::Renderer& r, Part& p, const kern::MeshData& mesh, const kern::Material& m, bool tinted);
   void put(Part& p, const kern::Mat4& m, Vec3 tint = {1, 1, 1});
+  /// A part's instances: none at the start of a frame (begin), handed to the renderer at its end (end).
+  static void clear(Part& p);
+  void upload(Part& p);
   kern::Renderer* r_ = nullptr;
   Part leg_, torso_, arm_, head_, hand_, hair_, vest_, door_, cap_, bar_, lamp_, flame_, pd_body_, pd_rotor_, shell_, pole_, lamp_head_;
   Part rd_pelvis_, rd_chest_, rd_upper_, rd_fore_, rd_thigh_, rd_shin_;  // a ragdoll's bones, rounded

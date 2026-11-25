@@ -22,11 +22,10 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "common.h"
+#include "kern/core/map.h"
 #include "kern/geo/mesh_data.h"
 #include "kern/geo/roads.h"
 #include "kern/gfx/renderer.h"
@@ -71,9 +70,9 @@ class Terrain {
   static constexpr i32 kImageZoom = 15, kImagePixels = 64;
   std::string take_image_requests();
   /// RGBA of a requested imagery tile (any size; averaged down to 64 x 64 as the original's mosaic).
-  void provide_image(const TileKey& key, const u8* rgba, u32 width, u32 height);
+  void provide_image(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height);
   void fail_image(const TileKey& key);
-  void provide(const TileKey& key, const u8* rgba, u32 width, u32 height);
+  void provide(const TileKey& key, kern::Span<const u8> rgba, u32 width, u32 height);
   void fail(const TileKey& key);
 
   /// The ground's shape is decided (elevation loaded, or flat because there is none).
@@ -117,15 +116,15 @@ class Terrain {
   void remove_tints(u64 owner);
 
   // ---- road corridors (terrain_craters.mjs setRoadCorridors) ----
-  /// A street's corridor: its centre line and its width with the pavements (road width + 3.4 m).
-  struct RoadLine { const std::vector<Vec2>* points; f32 width; };
   /// The streets of one map tile (`owner`, its square `bounds`): inside that square the ground is
   /// level across every street and smooth along it (the height of the street's smoothed centre
   /// line, blending back to the natural ground over 4.5 m) - physics, the ground mesh, the roads
   /// and the walkers all read this one height. Only the tile's own streets shape its square (a
   /// tile's data holds every street within reach of it), so the ground there does not depend on
   /// which neighbours are loaded. The elevation under the streets must be known (covers).
-  void set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<RoadLine>& roads);
+  /// A street's corridor is its centre line and `widths` of it: its width with the pavements (road
+  /// width + 3.4 m); a street of width 0 has none.
+  void set_corridors(u64 owner, const kern::Vec4& bounds, const std::vector<MapFeatures::Road>& roads, const std::vector<f32>& widths);
   void remove_corridors(u64 owner);
   /// Whether the streets of the map tile at (x, y) have shaped the ground there (or no city runs).
   bool corridors_at(f32 x, f32 y) const;
@@ -167,22 +166,28 @@ class Terrain {
  private:
   struct DemTile { TileKey key; std::vector<f32> h; u32 w = 0, hgt = 0; bool failed = false, requested = false; };
   struct Grid { f32 x0 = 0, y0 = 0, step = 10; u32 n = 0; std::vector<f32> h; f32 cx = 0, cy = 0; };
-  struct Job;
+  /// The elevation grid that is being computed (run_job).
+  struct Job {
+    Grid g;
+    u32 id = 0;  // the elevation grid job (kern/core/jobs.h, kDemJob)
+    bool side = false;  // a window round a far mate (host), not the player's own
+    i32 x0 = 0, y0 = 0, x1 = 0, y1 = 0;  // its elevation tiles
+  };
   struct RenderTile { u32 mesh = 0; bool skirt = true; };
   struct CollisionTile { kern::physics::Body body; };
   struct WaterBlock { u64 bits[4] = {}; std::vector<Vec2> flow; std::vector<f32> speed; };
   struct Bridge { Vec2 c; f32 hl, hw, yaw; };
   struct Crater { Vec2 c; f32 r, depth, rim; };
   struct CorridorSeg { f32 ax, ay, dx, dy, l2, ha, hb, half; };
-  struct CorridorSet { u64 owner = 0; kern::Vec4 bounds, box; std::unordered_map<u64, std::vector<CorridorSeg>> grid; };
+  struct CorridorSet { u64 owner = 0; kern::Vec4 bounds, box; kern::Map<u64, std::vector<CorridorSeg>> grid; };
   std::vector<std::unique_ptr<CorridorSet>> corridors_;
-  mutable const CorridorSet* corridor_hit_ = nullptr;  // the set of the last query (queries come in runs)
-  const CorridorSet* corridor_set(f32 x, f32 y) const;
+  /// The place in corridors_ of the map tile's set whose square holds the point, or -1.
+  i32 corridor_set(f32 x, f32 y) const;
   f32 road_field(f32 x, f32 y) const;
   f32 road_level(f32 x, f32 y, f32 h) const;
   struct Tint { u64 owner; kern::Vec4 box; Vec3 lin; std::vector<std::vector<Vec2>> rings; };
   struct Image { TileKey key; std::vector<f32> albedo; bool requested = false, failed = false; };  // 64 x 64 linear rgb
-  std::unordered_map<u64, Image> images_;
+  kern::Map<u64, Image> images_;
   std::vector<TileKey> image_requests_;
   Vec2 image_at_{1e9f, 1e9f};
   void plan_images(Vec3 focus);
@@ -196,8 +201,6 @@ class Terrain {
   f32 sample_dem(f64 lon, f64 lat, bool& ok) const;
   f32 grid_at(const Grid& g, f32 x, f32 y) const;
   bool water_cell(i32 cx, i32 cy) const;
-  mutable u64 wc_key_ = ~0ull;            // water_cell's last block (its key, its bits or none)
-  mutable const u64* wc_bits_ = nullptr;
   void set_water_cell(i32 cx, i32 cy);
   bool on_bridge(f32 x, f32 y) const;
   void dirty(f32 x0, f32 y0, f32 x1, f32 y1, bool notify = true);
@@ -215,22 +218,22 @@ class Terrain {
   Grid grid_;
   std::vector<Grid> side_;  // host: windows round far mates (plan_side_dem)
   std::unique_ptr<Job> job_;
-  std::unordered_map<u64, DemTile> dem_tiles_;
+  kern::Map<u64, DemTile> dem_tiles_;
   std::vector<TileKey> requests_;
   u32 dem_failures_ = 0;
   f64 retry_at_ = 0;
   // water raster: 64 m blocks of 16 x 16 cells (4 m)
-  std::unordered_map<u64, WaterBlock> water_;
+  kern::Map<u64, WaterBlock> water_;
   std::vector<Bridge> bridges_;
   std::vector<Crater> craters_;
   std::vector<Tint> tints_;
   void repaint(const kern::Vec4& box);
   // tiles: render keyed by (level, i, j), collision by (i, j)
-  std::unordered_map<u64, RenderTile> render_;
-  std::unordered_map<u64, CollisionTile> collision_;
-  std::unordered_map<u64, u32> water_meshes_;
-  std::unordered_map<u64, bool> water_detail_;  // the chunk is drawn cell by cell (world_water.mjs, 1000 m)
-  std::unordered_set<u64> dirty_render_, dirty_collision_, dirty_water_;
+  kern::Map<u64, RenderTile> render_;
+  kern::Map<u64, CollisionTile> collision_;
+  kern::Map<u64, u32> water_meshes_;
+  kern::Map<u64, bool> water_detail_;  // the chunk is drawn cell by cell (world_water.mjs, 1000 m)
+  kern::Set<u64> dirty_render_, dirty_collision_, dirty_water_;
   std::vector<u64> want_render_, want_collision_, want_water_;
   Vec3 planned_focus_{1e9f, 1e9f, 0}, planned_anchor_{1e9f, 1e9f, 0};
   std::vector<Vec3> planned_extra_;
@@ -244,7 +247,7 @@ class Terrain {
 f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim);
 
 /// Terrarium RGB -> metres.
-inline f32 terrarium_height(const u8* px) { return static_cast<f32>(px[0]) * 256.0f + static_cast<f32>(px[1]) + static_cast<f32>(px[2]) / 256.0f - 32768.0f; }
+inline f32 terrarium_height(u8 r, u8 g, u8 b) { return static_cast<f32>(r) * 256.0f + static_cast<f32>(g) + static_cast<f32>(b) / 256.0f - 32768.0f; }
 
 /// Morphological opening + two box blurs over an n x n grid (terrain_elevation.mjs bareEarth).
 void bare_earth(std::vector<f32>& h, u32 n, f32 step, f32 open_m, f32 blur_m);

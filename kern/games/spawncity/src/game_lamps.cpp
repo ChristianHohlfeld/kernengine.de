@@ -63,12 +63,12 @@ void Game::gaps_lamps_init(kern::Renderer& r) {
   GapsState& g = *gaps_;
   auto make = [&](GapsState::Part& p, const kern::MeshData& mesh, kern::Material m) {
     p.id = r.allocate_id();
-    kern::MeshInput in = mesh.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
-    in.transforms = kern::Span<const f32>(parked.m, 16);
-    if (!r.upsert(p.id, in)) { r.release_id(p.id); p.id = 0; }
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
+    if (!kern::upsert(r, p.id, mesh, look, kern::Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; }
   };
   const Vec3 steel = rgb(0x2b2e31), head = rgb(0x2a2a28);
   kern::MeshData pole;
@@ -112,19 +112,18 @@ void Game::gaps_lamps_place() {
   // with every road set): taken whenever the set of tiles changes - a tile that goes takes its
   // lamps along, what was broken stays broken (by cell). Not in open water.
   GapsState& g = *gaps_;
-  auto ground = [this](f32 x, f32 y) { return city_.ground_height(x, y); };
   if (g.lamp_serial != city_.furniture_serial()) {
     g.lamp_serial = city_.furniture_serial();
-    std::vector<CityStream::Furniture> tiles;
+    std::vector<u64> tiles;
     city_.furniture(tiles);
     std::vector<lamps::Field::Spot> spots;
-    for (const CityStream::Furniture& f : tiles)
-      for (const MapFeatures::Spot& sp : *f.lamps)
-        if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a});
-    g.lamps.rebuild(spots, ground);
+    for (u64 tile : tiles)
+      for (const MapFeatures::Spot& sp : city_.features(tile).lamps)
+        if (!city_.terrain().water_at(sp.p.x, sp.p.y)) spots.push_back({sp.p.x, sp.p.y, sp.a, city_.ground_height(sp.p.x, sp.p.y)});
+    g.lamps.rebuild(spots);
     g.lamps_dirty = true;
   }
-  for (const kern::Vec4& r : ground_changes_) { g.lamps.reground(r.x, r.y, r.z, r.w, ground); g.lamps_dirty = true; }
+  for (const kern::Vec4& r : ground_changes_) { g.lamps.reground(r.x, r.y, r.z, r.w, city_); g.lamps_dirty = true; }
   if (g.lamps_dirty) gaps_lamps_mirror();
 }
 
@@ -139,7 +138,8 @@ void Game::gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net) {
   GapsState& g = *gaps_;
   if (i < 0 || i >= static_cast<i32>(g.lamps.all().size())) return;
   const u8 was = g.lamps.all()[static_cast<std::size_t>(i)].state;
-  if (!g.lamps.set_state(i, state)) return;
+  if (!lamps::worse(was, state)) return;  // setState: only ever worse (asked before the field is changed)
+  g.lamps.set(i, state);
   const lamps::Lamp& l = g.lamps.all()[static_cast<std::size_t>(i)];
   g.lamps_dirty = true;
   ++g.lamps_broken_events;
@@ -251,7 +251,11 @@ void Game::gaps_lamps_reset() {
 void Game::gaps_lamps_draw() {
   if (!gaps_) return;
   GapsState& g = *gaps_;
-  for (GapsState::Part* p : {&g.lamp_pole, &g.lamp_glow, &g.lamp_pool, &g.lamp_fallen}) { p->transforms.clear(); p->tints.clear(); }
+  auto clear = [](GapsState::Part& p) { p.transforms.clear(); p.tints.clear(); };
+  clear(g.lamp_pole);
+  clear(g.lamp_glow);
+  clear(g.lamp_pool);
+  clear(g.lamp_fallen);
   auto put = [](GapsState::Part& p, const Mat4& m, kern::Vec4 tint) {
     p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
     p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, tint.w});
@@ -280,12 +284,16 @@ void Game::gaps_lamps_draw() {
       put(g.lamp_fallen, Mat4::trs(s.position, s.rotation, {1, 1, 1}) * Mat4::translate({0, 0, -lamps::kPoleH / 2}), {1, 1, 1, 1});
     }
   }
-  for (GapsState::Part* p : {&g.lamp_pole, &g.lamp_glow, &g.lamp_pool, &g.lamp_fallen}) {
-    if (!p->id || !g.renderer) continue;
-    if (p->transforms.empty()) { g.renderer->set_visible(p->id, false); continue; }
-    g.renderer->update_instances(p->id, kern::Span<const f32>(p->transforms.data(), p->transforms.size()), kern::Span<const f32>(p->tints.data(), p->tints.size()));
-    g.renderer->set_visible(p->id, true);
-  }
+  auto show = [&](const GapsState::Part& p) {
+    if (!p.id || !g.renderer) return;
+    if (p.transforms.empty()) { g.renderer->set_visible(p.id, false); return; }
+    g.renderer->update_instances(p.id, kern::Span<const f32>(p.transforms.data(), p.transforms.size()), kern::Span<const f32>(p.tints.data(), p.tints.size()));
+    g.renderer->set_visible(p.id, true);
+  };
+  show(g.lamp_pole);
+  show(g.lamp_glow);
+  show(g.lamp_pool);
+  show(g.lamp_fallen);
 }
 
 }  // namespace sc

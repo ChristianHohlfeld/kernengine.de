@@ -11,6 +11,11 @@
 #include <type_traits>
 #include <utility>
 
+/// KERN_CLOCK before a function of the engine that reads a clock: what it gives changes by itself, from one
+/// call to the next with nothing else changed. Its node says so (tools/engine_api.py: EngineFunction::clock) -
+/// a test that plays a program twice does not expect it to give the same twice.
+#define KERN_CLOCK
+
 namespace kern {
 
 using u8 = std::uint8_t;
@@ -35,7 +40,10 @@ enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 void log(LogLevel level, const char* format, ...) __attribute__((format(printf, 2, 3)));
 
 /// Monotonic milliseconds (performance.now() in the browser).
-f64 now_ms();
+KERN_CLOCK f64 now_ms();
+/// The wall clock: whole milliseconds since 1970-01-01 00:00 UTC (Date.now() in the browser) - a time
+/// several machines agree on (a shared round, a time of day); for measuring durations, now_ms.
+KERN_CLOCK f64 wall_ms();
 
 template <class T>
 constexpr T min_of(T a, T b) { return b < a ? b : a; }
@@ -58,6 +66,20 @@ struct Span {
   constexpr T* begin() const { return data; }
   constexpr T* end() const { return data + size; }
   constexpr bool empty() const { return size == 0; }
+};
+
+/// A count beside a pointer a function writes numbers through, where each thing it counts is `Per`
+/// numbers: `void render(f32* out, Count<2> frames)` writes 2 * frames numbers (interleaved stereo).
+/// It is the whole number it holds - given as one, read as one; what a function writes there is said
+/// by its signature (the engine's nodes give the room it says: kern/logic/engine_api.h).
+template <u32 Per>
+struct Count {
+  static_assert(Per > 0);
+  static constexpr u32 per = Per;
+  u32 n = 0;
+  constexpr Count() = default;
+  constexpr Count(u32 v) : n(v) {}
+  constexpr operator u32() const { return n; }
 };
 
 /// FNV-1a, used for string keys and cache signatures.

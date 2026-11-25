@@ -129,25 +129,27 @@ constexpr f32 kSpawnGraceS = 6;      // SPAWN_GRACE_MS: right after the world is
 void Game::gaps_init(kern::Engine& e) {
   gaps_ = std::make_unique<GapsState>();
   GapsState& g = *gaps_;
-  g.smoke = gaps::SmokeField(mobile_ ? 48 : 78);  // MAX_PUFFS
-  g.renderer = &e.renderer;
+  g.smoke = gaps::SmokeField::of(mobile_ ? 48 : 78);  // MAX_PUFFS
+  g.renderer = &e.renderer();
   const kern::MeshData disc = smoke_disc();
-  for (GapsState::Part* p : {&g.disc, &g.ember}) {
+  auto make_part = [&](GapsState::Part& p, bool ember) {
     kern::Material m;
     m.alpha = kern::AlphaMode::blend;
     m.unlit = true;
     m.double_sided = true;
     m.cast_shadow = false;
-    if (p == &g.ember) m.emissive = {1.0f, 0.54f, 0.24f};  // 0xff8a3d, additive in SpawnCity
-    p->id = e.renderer.allocate_id();
-    kern::MeshInput in = disc.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
-    in.transforms = kern::Span<const f32>(parked.m, 16);
-    if (!e.renderer.upsert(p->id, in)) { e.renderer.release_id(p->id); p->id = 0; }
-  }
-  gaps_lamps_init(e.renderer);  // street lamps (game_lamps.cpp)
+    if (ember) m.emissive = {1.0f, 0.54f, 0.24f};  // 0xff8a3d, additive in SpawnCity
+    p.id = e.renderer().allocate_id();
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
+    if (!kern::upsert(e.renderer(), p.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(p.id); p.id = 0; }
+  };
+  make_part(g.disc, false);
+  make_part(g.ember, true);
+  gaps_lamps_init(e.renderer());  // street lamps (game_lamps.cpp)
   {
     // the GUIDED trail: soft light-grey puffs (0xd9dcdf, opacity .42, 1.6 m)
     kern::Material m;
@@ -156,18 +158,18 @@ void Game::gaps_init(kern::Engine& e) {
     m.double_sided = true;
     m.cast_shadow = false;
     m.color = {0.851f, 0.863f, 0.875f, 1};
-    g.trail_part.id = e.renderer.allocate_id();
-    kern::MeshInput in = disc.as_input(kern::kMaxExtensionAttributes);
-    in.material = m;
-    in.visible = false;
-    static const Mat4 parked = Mat4::translate({0, 0, -1000});
-    in.transforms = kern::Span<const f32>(parked.m, 16);
-    if (!e.renderer.upsert(g.trail_part.id, in)) { e.renderer.release_id(g.trail_part.id); g.trail_part.id = 0; }
+    g.trail_part.id = e.renderer().allocate_id();
+    kern::MeshLook look;
+    look.material = m;
+    look.extra_slot = kern::kMaxExtensionAttributes;
+    look.visible = false;
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
+    if (!kern::upsert(e.renderer(), g.trail_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(g.trail_part.id); g.trail_part.id = 0; }
     // the foot rocket's smoke (gameplay_final_runtime_v2.mjs ensureSmoke: 0xd8d8d8 sprites)
     m.color = {0.847f, 0.847f, 0.847f, 1};
-    in.material = m;
-    g.rocket_part.id = e.renderer.allocate_id();
-    if (!e.renderer.upsert(g.rocket_part.id, in)) { e.renderer.release_id(g.rocket_part.id); g.rocket_part.id = 0; }
+    look.material = m;
+    g.rocket_part.id = e.renderer().allocate_id();
+    if (!kern::upsert(e.renderer(), g.rocket_part.id, disc, look, kern::Span<const f32>(parked.m, 16))) { e.renderer().release_id(g.rocket_part.id); g.rocket_part.id = 0; }
   }
 }
 
@@ -223,14 +225,15 @@ void Game::gaps_guided(f32 dt) {
   }
   for (GapsState::MotorVoice& v : g.motors) v.alive = false;
   for (const guided::Flight& f : guided_) {
-    GapsState::MotorVoice* v = nullptr;
-    for (GapsState::MotorVoice& q : g.motors)
-      if (q.born == f.m.born) { v = &q; break; }
-    if (!v) { g.motors.push_back({f.m.born, -1, 0, false}); v = &g.motors.back(); }
-    v->alive = true;
+    std::size_t voice = g.motors.size();  // the missile's motor voice: the one it has, or a new one
+    for (std::size_t i = 0; i < g.motors.size(); ++i)
+      if (g.motors[i].born == f.m.born) { voice = i; break; }
+    if (voice == g.motors.size()) g.motors.push_back({f.m.born, -1, 0, false});
+    GapsState::MotorVoice& v = g.motors[voice];
+    v.alive = true;
     if (!f.m.motor) continue;  // dropped off the rail, the motor not lit yet
-    if (v->lit < 0) {
-      v->lit = now;
+    if (v.lit < 0) {
+      v.lit = now;
       gaps_guided_sounds();
       world_->play_sound("sc:guidedbang", cam_.eye, 1, 1, false);
       if (g.motor_clip) {
@@ -244,15 +247,15 @@ void Game::gaps_guided(f32 dt) {
         p.volume = 0.5f;
         p.bus = kern::audio::Bus::sfx;
         p.fade_in = 0.06f;
-        v->v = mixer_.play(g.motor_clip, p);
+        v.v = mixer_.play(g.motor_clip, p);
       }
     }
-    if (v->v) {
+    if (v.v) {
       // .5 at 60 ms, exponentially to .28 at .6 s
-      const f32 t = now - v->lit;
+      const f32 t = now - v.lit;
       const f32 vol = t < 0.06f ? 0.5f * t / 0.06f : 0.5f * std::pow(0.28f / 0.5f, std::fmin(1.0f, (t - 0.06f) / 0.54f));
-      mixer_.set_volume(v->v, vol);
-      mixer_.set_position(v->v, f.m.p, f.m.v);
+      mixer_.set_volume(v.v, vol);
+      mixer_.set_position(v.v, f.m.p, f.m.v);
     }
     // a puff 0.9 m behind the missile every frame
     const f32 sp = kern::length(f.m.v);
@@ -326,10 +329,9 @@ void Game::gaps_send_jets(bool strike, Vec3 p, f32 offset, f32 alt) {
 // ---------------------------------------------------------------------------------------------
 // spawn gates
 
-bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
-  if (!gaps_ || !world_) return true;
-  if (gaps_->world_shown >= 0 && world_->sim_time() - gaps_->world_shown < kSpawnGraceS) return true;
-  std::vector<spawn::Viewer> vs;
+bool Game::gaps_spawn_viewers(std::vector<spawn::Viewer>& vs) const {
+  if (!gaps_ || !world_) return false;
+  if (gaps_->world_shown >= 0 && world_->sim_time() - gaps_->world_shown < kSpawnGraceS) return false;
   // the presented camera, judged with the unscoped field of view (spawnViewFovDeg)
   spawn::Viewer me;
   me.eye = cam_.eye;
@@ -356,6 +358,12 @@ bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
     v.forward = kern::normalize(v.forward, {1, 0, 0});
     vs.push_back(v);
   }
+  return true;
+}
+
+bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
+  std::vector<spawn::Viewer> vs;
+  if (!gaps_spawn_viewers(vs)) return true;
   // (whether buildings hide the point is the Blueprint's own question to the world: a ray against the channel "World")
   const bool ok = spawn::can_spawn(vs, p, far_entry, height);
   ++(ok ? gaps_->spawn_allowed : gaps_->spawn_denied);
@@ -406,14 +414,14 @@ void Game::gaps_update(f32 dt) {
   const f32 now = world_->sim_time();
   g.frame_dt = dt;
   if (g.world_shown < 0) g.world_shown = now;
-  if (wanted_.stars() <= 0 || player_dead_)
+  if (wanted::stars() <= 0 || player_dead_)
     for (f32& d : g.pd_due) d = -1;
   // reportCrime: a crime that keeps (or raises) a wanted level reveals the player - the last contact
   // is now and the last known position is where he is (the drones search there); a new star sounds
   // a short square chirp 520 + 90 s -> 760 + 100 s Hz (0.16 s, .022).
   {
-    const f32 heat = wanted_.heat();
-    const i32 stars = wanted_.stars();
+    const f32 heat = wanted::heat();
+    const i32 stars = wanted::stars();
     if (heat > g.last_heat + 1e-3f && stars > 0) {
       last_contact_ = now;
       last_known_ = player_position();
@@ -815,7 +823,7 @@ void Game::gaps_hud(std::string& s) {
   // police dispatch (renderInboundHud): drones inbound and the next arrival
   u32 inbound = 0;
   f32 next = 1e9f;
-  if (wanted_.stars() > 0)
+  if (wanted::stars() > 0)
     for (u32 i = 0; i < 5; ++i)
       if (g.pd_due[i] > now && !pdrones_[i].active) { ++inbound; next = std::fmin(next, g.pd_due[i] - now); }
   std::snprintf(b, sizeof b, ",\"gaps\":{\"inbound\":%u,\"inboundS\":%.1f,\"sirenCar\":%.4f,\"sirenDrone\":%.4f,\"smoke\":%zu,\"puffs\":%u,\"organic\":%u,"

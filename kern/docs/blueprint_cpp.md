@@ -55,6 +55,10 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   C++-Klassen in eine Quelle des Spiels (`tools/blueprint_cpp.sh`); `logic::Runtime` lässt einen
   Graphen, dessen Klasse im Programm steckt, als diese Klasse laufen (Stufe „native C++“).
   SpawnCitys Regel-Blueprint „Wanted“ läuft so im ausgelieferten Spiel.
+- **Fertig: Maps, Sets und Int64.** `Map<Int, Float>`, `Set<Text>` in der Reihenfolge, in der ihre
+  Schlüssel kamen (`kern::Map`, `kern::Set`), und 64 Bit wie `u64`/`i64` von C++ (`Int64`) – als
+  Typen von Variablen, Feldern, Pins und lokalen Variablen, mit ihren Knoten, in jeder Stufe
+  dasselbe (siehe „Maps und Sets“, „Int64“).
 - **Fertig: ein C++ je Blueprint.** Den früheren Export (eine Schleife über Knotennummern, die in
   die Knoten-Bibliothek zurückrief) gibt es nicht mehr.
 - **Fertig: der native Export.** `tools/export_game.sh level.klevel spiel.html` schreibt ein Level
@@ -94,7 +98,7 @@ tools/export_game.sh, .mjs           der native Export: ein Level als Spiel, die
   „Plätze“).
 - **Die Stufen stimmen überein:** Was Interpreter, JIT und Klasse verschieden taten – Funktionen,
   die über Events wieder aufgerufen werden, die Tiefe von Events und Werten, ganze Zahlen an
-  ihren Enden, der Stapel des JIT –, ist gleichgezogen (21 Tier-Fälle, in jeder Stufe dasselbe).
+  ihren Enden, der Stapel des JIT –, ist gleichgezogen (28 Tier-Fälle, in jeder Stufe dasselbe).
 
 ## Im Editor
 
@@ -186,17 +190,21 @@ KERN_LAYOUT(Demo) {
 | Funktion mit Ausgängen | `struct FnResult { Float y = 0.0; };` und `FnResult Fn(Float x = 1.5) { ... }` |
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
+| Make Callback (eine Funktion einer Bibliothek, die die Engine ruft) | `callback<&Lib::fn>(platz)`, Typ `Callback<Float(Float, Float)>` |
 | Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
 | Bibliothek (ein Blueprint, der nichts behält) und wer sie benutzt | `struct Workshop : virtual kern::Library { … };` · `struct Garage : virtual kern::Blueprint, virtual Workshop { … };` – Aufruf `Workshop::skid(Spare[i], 1.0);` (siehe „Bibliotheken“) |
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
 | Typ des Projekts (mehrere Blueprints des Levels haben ihn, alle gleich) | `KERN_PROJECT_ENUM(Mode, Closed, Open);` · `KERN_PROJECT_STRUCT(Door) { Mode State = Mode::Closed; };` – sonst wie `KERN_ENUM` / `KERN_STRUCT` |
 | Funktion eines anderen Blueprints | `KERN_EXTERN FnResult Fn(Float x = 1.5);` – wie sie aussieht, ohne Rumpf (mit `struct FnResult { ... };` darüber, wenn sie Ausgänge hat) |
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
+| Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable hat oder eine, deren Typ nicht zu ihm wird: „Ein Weg“); ein Wert-Knoten |
+| Has Blueprint | `func_has_blueprint(target)` – ob Target (`Actor{0}`: das Level) einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt); ein Wert-Knoten |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |
 | Return | `return {wert, wert};` bzw. `return;` |
 | Event | `KERN_EVENT(on5, event_custom<"Hit">)` und `void on5(Actor actor, Float value, Text text) { ... }` |
+| Begin Play, End Play | `KERN_EVENT(on1, event_begin)` · `KERN_EVENT(on2, event_end)` – End Play läuft einmal, wenn das Spiel endet (`Runtime::end`, `GameWorld::stop`) oder der Actor die Welt verlässt (`Runtime::remove`), und nur, wenn Begin Play gelaufen ist; in jeder Stufe gleich |
 | State Machine | `kern::Machine machine3 = machine("Door").state(...).on_event(...).after(...).when(...).automatic(...);` |
 | Knoten-Einstellungen (Parameter) | Template-Argumente: `flow_tween<"smooth">`, `event_custom<"Hit">` |
 | Einstellung, die einen Typ nennt („Type“ von Select, Reroute, den Listen-Knoten; „Enum“ der Knoten einer Aufzählung; „Struct“ von Make und Break) | der Typ selbst: `logic_select<Float>(pick, a, b)`, `value_reroute<List<Text>>(x)`, `list_make<Vector, "2">(a, b)`, `enum_name<Mode>(wert)`, `struct_make<Weapon>(...)` |
@@ -206,8 +214,11 @@ KERN_LAYOUT(Demo) {
 | Get Variable | der Name der Variablen – oder der Platz, den der Knoten nennt: `Held.Damage`, `Cars[i].Wheels[j].Slip` |
 | Set / Add to Variable | `Heat = wert;` / `Heat += wert;` – an einem Platz genauso: `Held.Damage = wert;`, `Scores[i] = wert;`, `Cars[i].Speed += wert;`; wird ihr Ergebnis gelesen: `n5.value = (Heat += wert);` |
 | Take Variable | `var_take(Punkte);` – der Platz ist das Argument, eine Variable oder ein Platz in ihr (`var_take(Cars[i].Wheels);`); wird sein Ergebnis gelesen: `var_take(n7, Punkte);` und `n7.value`. Gibt, was am Platz steht, und lässt dort den leeren Wert des Typs (siehe „Übergeben statt kopieren“) |
-| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index` |
-| Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Make List) | `list_get<Float>(Scores, 0)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
+| Schritt, der eine Liste ändert (Add to List, Insert, Remove, Clear – und in einem Zug: Set Length, Append List, Insert List, Reserve, Copy Bytes) | `list_add(Scores, wert);` – der Platz der Liste ist das erste Argument, eine Variable oder eine Liste darin (`list_add(Cars[i].Wheels, rad);`); wird sein Ergebnis gelesen: `list_add(n7, Scores, wert);` und `n7.index`. Copy Bytes nennt die Zahlen beider Listen als Einstellungen: `list_copy_bytes<"u8", "f32">(Out, 0, Grid, 0, n);` (siehe „Die Bytes eines Werts“) |
+| Wert-Knoten auf einer Liste (Length, Get Item, Contains, Find, Lists Equal, Make List) | `list_get<Float>(Scores, 0)`, `list_equal<Int>(Members, Roster)`, `list_make<Text, "2">("a", "b")` – die Einstellung „Type“ ist der Typ der Einträge |
+| Schritt, der eine Map oder ein Set ändert (Set at Key, Add Key, Remove Key, Remove Index, Clear, Reserve) | `map_set(Cells, key, wert);`, `set_add(Seen, key);` – der Platz ist das erste Argument; wird sein Ergebnis gelesen: `map_add(n7, Cells, key);` und `n7.added`, `n7.index` (siehe „Maps und Sets“) |
+| Wert-Knoten auf einer Map oder einem Set (Length, Has Key, Key At, Find) | `map_find<Int, Float>(Scores, 7).value`, `set_contains<Text>(Words, "a")` – die Einstellungen „Key“ und „Value“ sind die Typen der Schlüssel und Werte |
+| Rechnen mit 64 Bit (Int64 Add, Divide Unsigned, Shift Right, Less Unsigned …) | `int64_add(a, b)`, `int64_div_unsigned(a, b)`, `int64_less(a, b)` – was die 64 Bit bedeuten, sagt der Knoten (siehe „Int64“) |
 | For Each | `for (auto it9 = flow_for_each<Float>(n9, Scores); it9.next();) { ... }` – im Rumpf `n9.item` und `n9.index` |
 | Wert-Knoten einer Aufzählung (Equal, Enum to Text, Text to Enum, Enum to Index, Index to Enum, All Values) | `enum_name<Mode>(State)`, `enum_from_name<Mode>(text).value`, `enum_values<Mode>()` – die Einstellung „Enum“ ist die Aufzählung selbst |
 | Make und Break einer Struktur | `struct_make<Weapon>("Bow", Kind::Ranged, 12.0)` – ein Wert je Feld, in der Reihenfolge der Felder; `struct_break<Weapon>(Held).Damage` – das Feld bei seinem Namen |
@@ -227,6 +238,7 @@ KERN_LAYOUT(Demo) {
 | Schritt, der einfach weitergeht | `debug_print(text, true);` |
 | was ein Knoten gibt und anderswo gelesen wird | Member `struct { Float value = 0.0; } n12;`, gelesen als `n12.value` |
 | was ein Knoten sich merkt (Schleifenindex, Do Once, Wartezeit, Zufallsfolge) | Member `kern::Node<12> n12;` bzw. `struct : kern::Node<12> { Int index = 0; } n12;` |
+| was ein Schritt einer Funktion gibt oder eine ihrer Schleifen sich merkt, wo es nur der Weg dieser Funktion nach ihm liest | lokal in der Methode, als erste Zeilen ihres Rumpfs nach den lokalen Variablen: `FnResult n14;`, `struct { Float value = 0.0; } n12;`, `struct : kern::Node<9> { Int index = 0; } n9;` – jeder Aufruf hat seine eigenen (siehe „Werte eines Aufrufs“) |
 | Wert, den mehrere Eingänge lesen | ein Name: `const auto n7 = [&] { return math_add(a, b); };`, gelesen als `n7()` |
 | Schritt, zu dem mehrere Drähte führen (oder keiner) | eine eigene Methode `void go9() { ... }`, jeder Draht ist ein Aufruf `go9();` |
 | Wert, den niemand liest | `(void)math_add(1.0, 2.0);` in `void detached() { ... }` |
@@ -240,6 +252,7 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 |---|---|---|
 | Boolean | `Bool` | `true`, `false` |
 | Integer | `Int` | `12`, `-3` |
+| Integer fester Breite – der Typ eines **Platzes** (siehe „Ganze Zahlen fester Breite“) | `U8`, `U16`, `U32`, `I8`, `I16`, `I32` | `200`, `-3` – eine Zahl, die die Breite hält |
 | Float | `Float` | `0.5`, `12.0`, `1e+21` |
 | Vector | `Vector` | `Vector{1.0, -2.5, 3.0}` |
 | Text | `Text` | `"a \"b\"\n"` (Escapes `\n \t \r \" \\` und oktal `\ooo`) |
@@ -247,6 +260,10 @@ Der Name einer Knotenfunktion ist der Knotentyp mit `_` statt `.` (`math.add` �
 | Liste eines dieser Typen | `List<Bool>`, `List<Int>`, `List<Float>`, `List<Vector>`, `List<Text>`, `List<Actor>` | `List<Float>{1.0, 2.5}`, leer: `List<Float>{}` |
 | Aufzählung des Blueprints, Liste ihrer Werte | ihr Name: `Mode`, `List<Mode>` | `Mode::Open`, `List<Mode>{Mode::Closed, Mode::Open}`, leer: `List<Mode>{}` |
 | Struktur des Blueprints, Liste davon | ihr Name: `Weapon`, `List<Weapon>` | `Weapon{"Knife", Kind::Melee, 25.0}` – ein Wert für jedes Feld, in der Reihenfolge der Deklaration; `List<Weapon>{Weapon{...}, Weapon{...}}`, leer: `List<Weapon>{}` |
+| Int64 – 64 Bit, wie `u64` und `i64` von C++ sie halten (siehe „Int64“) | `Int64`, Liste: `List<Int64>` | `Int64{0x1f}` – die Bits, hexadezimal geschrieben; gelesen wird jede ganze Zahl, die C++ schreibt (`Int64{31}`) |
+| Map – Werte eines Typs unter Schlüsseln, in der Reihenfolge, in der die Schlüssel kamen (siehe „Maps und Sets“) | `Map<Int, Float>`, `Map<Text, Cell>`, `Map<Kind, List<Float>>` | `Map<Int, Float>{{3, 1.5}, {1, 2.0}}` – die Einträge in ihrer Reihenfolge, je `{Schlüssel, Wert}`; leer: `Map<Int, Float>{}` |
+| Set – Schlüssel in der Reihenfolge, in der sie kamen | `Set<Int>`, `Set<Int64>`, `Set<Text>` | `Set<Text>{"a", "b"}`, leer: `Set<Text>{}` |
+| Liste fester Länge – der Typ eines **Platzes**: einer Variablen, eines Felds, eines Ein- oder Ausgangs, einer lokalen Variablen (siehe „Listen fester Länge“) | `Fixed<Float, 16>`, `Fixed<Weapon, 4>` | `Fixed<Float, 3>{1.0, 2.5}` – die Einträge bis zum letzten, der nicht null ist: Was nicht dasteht, ist null, wie in C++ (lauter Nullen: `Fixed<Float, 3>{}`); mehr als die Länge ist ein Fehler |
 
 Zahlen stehen in der kürzesten Form, die genau denselben Wert wieder ergibt. Jeder Draht, dessen
 Enden verschiedene Typen haben, ist ein `kern::to<Typ>(...)` – keine stille Umwandlung. Der Wert
@@ -304,12 +321,234 @@ void on1(Actor actor, Float value, Text text) {
   waren), `list_reserve(Scores, 64);` (Platz vorhalten: Nichts, was man lesen kann, ändert sich –
   die Liste wächst danach so weit, ohne noch einmal Speicher anzufordern). Eine Schleife aus
   einzelnen Add wächst mehrmals; darum gibt es diese Schritte.
+- **Vergleichen.** Lists Equal sagt, ob zwei Listen eines Typs dasselbe halten: gleich viele Einträge,
+  und jeder gleich dem an seiner Stelle – `list_equal<Int>(Members, Roster)`, in C++ das `==` zweier
+  `std::vector` (`a != b` ist `logic_not(list_equal<Int>(a, b))`). Verglichen wird wie bei Contains
+  und Find Item: Zahlen nach ihrem Wert (ein NaN gleicht nichts), Strukturen Feld für Feld. Gelesen
+  wird, wo die Listen stehen – der Vergleich kopiert nichts; eine Liste fester Länge passt wie jede.
+  Eine Liste von Strukturen schreibt der Konverter so, wenn das `==` der Struktur in C++ dasselbe sagt:
+  `= default`, oder von Hand jedes Feld genau einmal, in der Reihenfolge der Deklaration, mit `&&`
+  verbunden (`return x == o.x && y == o.y;`), und jedes Feld selbst so vergleichbar (Zahlen, Flags,
+  Aufzählungen, Texte als `std::string`, Vektoren, Listen und Strukturen davon). Ein anderes `==` ist
+  das eigene der Struktur und wartet.
+- **Ordnen.** Sort List bringt eine Liste an ihrem Platz in eine Reihenfolge, stabil (gleiche Einträge
+  behalten ihre): `list_sort<nullptr>(Scores);` nach der eigenen Ordnung der Einträge (Zahlen, ganze
+  Zahlen, Flags, Texte, Werte von Aufzählungen, Int64 nach den Bits als `u64`), oder
+  `list_sort<&Board::Before>(*this, Scores);` nach einer reinen Funktion des Blueprints, die zwei
+  Einträge nimmt (als Wert oder als const-Referenz) und ein Flag gibt: Steht der erste vor dem
+  zweiten? `*this` ist das Objekt, auf dem sie läuft – die Klasse, in der der Aufruf steht, auch
+  wenn sie eine Bibliothek ist, die andere Blueprints benutzen (deren Funktion kommt dann mit, wie
+  eine, die sie aufruft). In C++ ist das `std::stable_sort(v.begin(), v.end(), before)`.
 - **Die generischen Knoten** (Length, Get Item, Contains, Find, Make List, For Each, auch Select
   und Reroute) tragen den Typ als Einstellung; im Editor nimmt ein solcher Knoten den Typ des
   ersten Drahts an, der an ihn kommt.
 - **Was sie tun, steht einmal:** `kern::logic::list` in `kern/logic/nodes.h` – die Knoten des
   Interpreters und die Funktionen der Klasse rufen dieselben Funktionen auf.
 - Gameplay: „All Actors with Tag“ (`actor_all_with_tag(tag)`) gibt eine `List<Actor>`.
+
+### Listen fester Länge
+
+Ein **Platz** kann als Liste fester Länge deklariert sein: Er hat immer genau so viele Einträge.
+Ein Wert, der an einem **Eingang** steht, dessen Typ eine Liste fester Länge ist (das Feld einer Struktur bei Make Struct,
+der Eingang einer Funktion), wird ebenso mit seinem Typ geschrieben: `struct_make<Trio>(Fixed<Float, 3>{1.5, -2.0}, 7)` – die
+Länge ist die des Eingangs (`PinDef::count`, aus dem Typ des Felds bzw. des Eingangs). Der Leser lehnt eine andere Länge ab;
+`List<Float>{…}` dort liest er wie bisher (dieselben Einträge, der Rest null). In C++ fordert das keinen Speicher an.
+
+In C++ ist `Fixed<Float, 16>` ein `std::array` – es liegt dort, wo es steht, und fordert keinen
+Speicher an (eine `List` ist ein `std::vector`: Jede hat ihren eigenen Speicher). Damit kostet
+eine Matrix im Blueprint, was sie im C++ kostet.
+
+```cpp
+KERN_STRUCT(Mat4) {
+  Fixed<Float, 16> m = Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0};
+};
+Fixed<Float, 3> Axis = Fixed<Float, 3>{0.0, 0.0, 1.0};
+
+struct ScaledResult { Fixed<Float, 3> v = Fixed<Float, 3>{}; };
+ScaledResult Scaled(const Fixed<Float, 3>& v, Float by = 2.0) {
+  Fixed<Float, 3> Made = Fixed<Float, 3>{};
+  for (auto it3 = flow_for(n3, 0, 2); it3.next();) {
+    Made[n3.index] = math_mul(v[n3.index], by);
+  }
+  return {std::move(Made)};
+}
+```
+
+- **Die Länge gehört zur Deklaration des Platzes**, nicht zum Wert: Eine Variable, ein Feld einer
+  Struktur, ein Eingang (als Wert oder als Referenz), ein Ausgang und eine lokale Variable einer
+  Funktion können sie haben – 1 bis 65.536 Einträge. Was durch einen Pin fließt, ist eine Liste:
+  Ein Pin hat keine Länge, und die Knoten, die Listen lesen (Length, Get Item, Contains, Find, For
+  Each), lesen eine Liste fester Länge wie jede andere – in der Klasse dort, wo sie steht
+  (`kern::logic::Items`, ohne Kopie).
+- **Einträge werden gesetzt und gelesen wie die einer Liste** (`Axis[1] = wert;`,
+  `Jetzt.m[i]`), auch neben der Liste gilt dasselbe (siehe „Plätze“).
+- **Nichts ändert die Länge.** Add, Insert, Remove, Clear, Set Length, Append, Insert List und
+  Reserve an einem solchen Platz sind ein Fehler des Graphen (`"Axis" is a list of a fixed length
+  (3): its entries are set …`).
+- **Was als Ganzes dort gesetzt wird, hat danach die Länge des Platzes:** eine längere Liste wird
+  abgeschnitten, eine kürzere mit dem Nullwert ihrer Einträge aufgefüllt – bei einem Set, bei
+  Make einer Struktur, bei dem Wert, den ein Aufruf einem Eingang gibt, bei dem, was ein Return
+  gibt, bei einem Wert von außen (`Instance::set`). Ein Take lässt lauter Nullwerte zurück. In
+  der Klasse tut das die Zuweisung an `Fixed`, im Interpreter `logic::fitted`.
+- **Als Ganzes gelesen ist es eine Liste** – eine Kopie mit eigenem Speicher, wie
+  `std::vector(a.begin(), a.end())`. Von einem festen Platz an einen festen (`A.m = B.m;`) wird
+  nichts angefordert.
+- **Make List gibt, was es bekommt, als das, was es ist** – so viele Einträge, in der Klasse ein
+  `Fixed`: an einem festen Platz gesetzt (`Jetzt.m = list_make<Float, "16">(...)`,
+  `struct_make<Mat4>(list_make<Float, "16">(...))`) fordert es keinen Speicher an; wo eine Liste
+  gebraucht wird, wird es eine.
+- **Eine Referenz ist der Platz selbst, nichts wandelt um:** `Fixed<Float, 3>&` bekommt einen
+  Platz, der als `Fixed<Float, 3>` deklariert ist – keine `List<Float>` und keine andere Länge.
+- **Im Dokument** steht die Länge als `"count"` neben dem Typ; im Editor als „Length“ neben dem
+  Typ einer Variablen, eines Felds, eines Pins oder einer lokalen Variablen (0: beliebig lang).
+
+### Maps und Sets
+
+Eine **Map** hält Werte eines Typs, jeden unter einem Schlüssel; ein **Set** hält Schlüssel. Ihre
+Einträge stehen in der Reihenfolge, in der ihre Schlüssel kamen – wie eine `Map` und ein `Set`
+von JavaScript: Wer durch eine geht, bekommt diese Reihenfolge, auf jeder Maschine, in jeder Stufe
+und in jedem Build. In C++ ist `Map<Int, Float>` ein `kern::Map` (`kern/core/map.h`, für den
+Blueprint `kern::logic::Map`), `Set<Int>` ein `kern::Set` – derselbe Behälter, den ein Programm
+statt `std::unordered_map` und `std::unordered_set` benutzt; ein Schlüssel wird über einen Index
+gefunden, dessen Hash überall derselbe ist (er entscheidet nur, wie schnell, nie, wo ein Eintrag
+steht).
+
+```cpp
+KERN_STRUCT(Cell) {
+  Int Count = 0;
+  List<Text> Tags = List<Text>{};
+};
+Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};
+Map<Text, Cell> Cells = Map<Text, Cell>{};
+Set<Int64> Seen = Set<Int64>{};
+
+KERN_EVENT(on1, event_custom<"Hit">)
+void on1(Actor actor, Float value, Text text) {
+  map_set(Scores, 7, value);
+  map_add(n4, Cells, text);
+  Cells[n4.index].Count += 1;
+  list_add(Cells[n4.index].Tags, "hit");
+  Total = map_find<Int, Float>(Scores, 7).value;
+  map_remove(Scores, 3);
+}
+```
+
+- **Schlüssel** sind Bool, Int, Int64, Text oder der Wert einer Aufzählung – Typen, deren Gleichheit
+  genau ist. Ein Float, ein Vector, eine Liste, eine Struktur ist kein Schlüssel (`the keys of a map
+  or a set are Bool, Int, Int64, Text or an enum`). **Werte** einer Map sind jeder Typ, den eine
+  Variable haben kann, auch Listen und Strukturen – aber keine Map, kein Set und keine Liste fester
+  Länge (eine Map in einer Map ist eine Map, deren Werte eine Struktur mit einer Map als Feld sind –
+  so, wie eine Liste von Listen).
+- **Der Typ** steht im Dokument als `"type": "map"` mit `"of": "int>float"` (Schlüssel `>` Wert;
+  ein Typ des Blueprints mit seinem Namen: `"text>struct:Cell"`, `"enum:Kind>float_list"`), ein Set
+  mit `"of": "int64"`. Im Text der Fehler und im Editor: `map<int>float>`, „Map of Integer to Float“.
+- **Ein Eintrag kommt ans Ende.** Set at Key gibt einem Schlüssel seinen Wert – seinem Eintrag oder
+  einem neuen am Ende; Add Key legt einen neuen Eintrag mit dem Nullwert des Werttyps an (eine
+  Struktur mit ihren Defaults), es sei denn, der Schlüssel hat schon einen. Beide sagen, ob er neu
+  war (`added`), und wo er steht (`index`). Kommt ein Schlüssel wieder, nachdem er herausgenommen
+  wurde, steht er am Ende.
+- **Herausnehmen** – Remove Key, Remove Index – lässt die anderen Einträge in ihrer Reihenfolge;
+  der nach dem herausgenommenen steht danach an dessen Stelle. Remove Index jenseits der Map tut
+  nichts.
+- **Kein Index führt ins Leere.** Key At jenseits gibt den Nullwert des Schlüsseltyps, Find gibt
+  `found = false`, den Nullwert des Werttyps und `index = -1`.
+- **Ein Wert einer Map ist ein Platz – bei der Stelle seines Eintrags:** `Cells[i]`, `Cells[i].Count
+  += 1`, `list_add(Cells[i].Tags, x)` (siehe „Plätze“). Die Stelle ist die in der Reihenfolge der
+  Schlüssel, nicht der Schlüssel selbst: Den Schlüssel findet Find, Set at Key und Add Key geben
+  seine Stelle. Ein Platz neben der Map ist ein eigener Eintrag mit den Defaults, von dem nichts
+  bleibt – wie neben einer Liste. Ein Schlüssel ist kein Platz: Er wird nie geändert, wo er steht.
+- **Ein gehaltener Eintrag bleibt, wo er ist:** Hält ein Aufruf einen Platz in einer Map
+  (`Touch(Cells[i])`), tut nichts in ihm einen Schritt, der Einträge hinein- oder herausnimmt –
+  auch Set at Key und Reserve nicht (`check()`, siehe „Referenz-Eingänge“). In der Klasse stehen die
+  Einträge hintereinander im Speicher; ein neuer kann sie verschieben.
+- **Eine Map auf einem Draht ist ein Wert**, wie eine Liste: Wer sie liest, hat sie, wie sie war.
+  Sie passt nur in einen Eingang derselben Schlüssel und Werte und wird in nichts umgewandelt,
+  auch nicht in Text.
+- **Im Dokument** steht eine Map als `[[schlüssel, wert], ...]` in der Reihenfolge ihrer Einträge,
+  ein Set als `[schlüssel, ...]`; ein Int64 als Schlüssel ist der Text seiner Bits als u64
+  (`"18446744073709551615"`). Steht ein Schlüssel zweimal da, gilt der erste; im Text ist das ein
+  Fehler (`the key 1 is said twice`).
+- **Was sie tun, steht einmal:** `kern::logic::map` und `kern::logic::set` in `kern/logic/nodes.h`
+  – die Knoten des Interpreters (auf `MapEntries`, einer `kern::Map` der Werte des Interpreters)
+  und die Funktionen der Klasse (auf `kern::logic::Map`) rufen dieselben Funktionen auf dem
+  gleichen Behälter auf. Der JIT ruft die Knotenfunktionen.
+- **Kosten in der Klasse**, wie das C++, das der Blueprint ist: Find, Has Key und Set at Key eines
+  vorhandenen Schlüssels fordern keinen Speicher an; ein neuer Eintrag hängt sich an einen
+  `std::vector` an (Reserve hält Platz vor, wie bei einer Liste), der Index wächst, wenn er halb voll
+  ist. Herausnehmen schiebt die folgenden Einträge nach vorn und baut den Index neu – das kostet so
+  viel, wie Einträge hinter dem herausgenommenen stehen.
+
+### Ganze Zahlen fester Breite
+
+Ein Platz – eine Variable, ein Feld, ein Ein- oder Ausgang, eine lokale Variable – kann ein Int fester Breite sein:
+`U8`, `U16`, `U32` (0 bis 2^w − 1) und `I8`, `I16`, `I32` (−2^(w−1) bis 2^(w−1) − 1); im Graphen ein Int mit der Breite
+am Platz (`"type":"int","of":"u32"`, Einstellung `u32`), wie die Länge bei `Fixed`. **Über einen Draht fließt ein Int** –
+die Breite hat nur der Platz. Was der Platz bekommt, hält er, wie C++ eine ganze Zahl in einem `std::uint32_t` speichert
+(`static_cast<u32>(x)`): die unteren w Bits des Int, bei Vorzeichen im Zweierkomplement – beim Setzen (`X = n3.item;`,
+`S.a = …`, `return {…}`, Aufruf, von außen) und bei Add to Variable (`E += -4294967297;`: die unteren Bits der Summe).
+Eine Float wird erst zum Int (`kern::to<Int>(x)` – auf null zu, außerhalb das nächste Ende von Int), dann gespeichert;
+`kern::to<U8>` gibt es nicht. Jeder Wert einer Breite ist kleiner als 2^32 und so in einem double genau – Interpreter
+und JIT halten ihn genau; der JIT überlässt Set/Add einer solchen Variablen der Funktion des Knotens. Das Produkt zweier
+`U32`, wie C++ es rechnet, ist `kern::math::mul32(a, b)` (für `I32`: `wrap32s(mul32(a, b))`); Produkte bis 16 Bit sind
+als Int genau. In der Klasse ist `U32` `logic::Sized<u32>` (nodes.h): gelesen ein Int, gespeichert wie C++.
+Eine Vorgabe außerhalb der Breite ist ein Fehler (`U8 X = 256;`). Die Schlüssel einer Map haben keine Breite; ihre **Werte**
+können eine haben (`Map<Int, U8>`, `Map<Int, List<U32>>`, im Graphen `"of":"int>int_list:u32"`, Einstellung Value `u32_list`): die Map ist
+der Platz, ein Wert wird gespeichert wie C++ ihn in einer `std::map<…, std::vector<u32>>` speichert – Set at Key, Set Variable auf
+`M[i]`, Add/Insert/Set Length auf der Liste eines Werts (`list_add(M[0], x)`), eine ganze Map beim Setzen und von außen; ihre
+Vorgabe und ein Literal halten nur Werte der Breite (`Map<Int, U8>{{1, 256}}` ist ein Fehler). In der Klasse ist ein solcher Wert
+`logic::Sized<u32>` bzw. `List<Sized<u32>>`; Find gibt ihn als Int.
+
+**Listen fester Breite** (`List<U8>` … `List<I32>`, im Graphen `"type":"int_list","of":"u8"`, Einstellung `u8_list`) halten jeden
+Eintrag wie `std::vector<u8>`: was hineinkommt, wird gespeichert wie C++ es dort speichert – Add, Insert, der Wert von Set Length,
+`List<U8>{…}` (Make List mit Typ `u8`), Insert Text Bytes (eine `List<I8>` hält die Bytes 128 … 255 als −128 … −1), eine ganze Liste
+beim Setzen; Copy Bytes schreibt in eine Liste einer Breite nur Zahlen dieser Breite (`list_copy_bytes<"u8", …>(B, …)` bei
+`List<U8> B`). Find, Contains und Remove Item vergleichen die Zahl, wie C++ ein `std::uint8_t` mit einem `int` vergleicht
+(`std::find` von 256 in einem `std::vector<u8>` findet nichts): in der Klasse `logic::Sought<T>` (ein Int bei `Sized<T>`).
+Eine Liste einer Breite ist ein eigener Typ: sie geht nicht in einen Eingang `List<Int>` und umgekehrt (C++: kein
+`std::vector<int>` aus einem `std::vector<u8>`). Die Knoten, die die Zahlen einer Liste lesen, wie sie sind – Text of Bytes,
+Struct of Bytes, Items von Copy Bytes – nehmen eine Liste von Ints **jeder** Breite (`List<Int>`, `List<U8>` …; Eingang
+`kAnyWidth`); in der Klasse eine Funktion über die Einträge (`logic::items_of`, `Items<T>`). Was Bytes gibt – Bytes of Text,
+Bytes of S –, gibt eine `List<U8>` (C++: `std::vector<u8>`, `std::array<u8, N>`). Ein Feld einer Breite hat in
+einer Anordnung (Bytes of Struct, Struct of Bytes) seine eigene Breite (`U16 a` ↔ `u16@0`). Die Listenknoten mit Typ
+(`list_length<U8>(B)`, `flow_for_each<U8>(n4, B)`) nennen die Breite als Typ der Einträge; ein Ausgang `item` ist dort ein `U8`.
+
+### Int64
+
+`Int64` sind 64 Bit, wie ein `u64` oder ein `i64` von C++ sie hält: ein Schlüssel aus zwei
+32-Bit-Zahlen, ein Hash, der Zustand eines Zufallsgenerators. Ein `Int` ist eine ganze Zahl, wie
+ein Blueprint sie hält – bis 2^53 genau; ein `Int64` hat alle 64 Bit. **Was die Bits bedeuten, sagt
+der Knoten**, der sie liest – wie in WebAssembly: Int64 Less vergleicht sie als `i64`, Int64 Less
+Unsigned als `u64`; Divide und Remainder gibt es als `i64` und als `u64`, Shift Right mit und ohne
+Vorzeichen.
+
+```cpp
+Int64 State = Int64{0x853c49e6748fea9b};
+
+KERN_PURE Int64 Next(Int64 s) {
+  return int64_add(int64_mul(s, Int64{0x5851f42d4c957f2d}), Int64{0x14057b7ef767814f});
+}
+```
+
+- **Wie C++, für jeden Wert festgelegt:** Add, Subtract und Multiply gehen bei 2^64 herum, Shift
+  Left auch. Wo C++ nichts festlegt, legt der Knoten es fest, in jeder Stufe gleich: Divide und
+  Remainder durch 0 geben 0, das kleinste `i64` durch −1 gibt sich selbst (Remainder 0); ein Shift und
+  ein Rotate gehen um die letzten 6 Bit ihres Betrags; Float to Int64 gibt für „keine Zahl“ 0 und
+  jenseits der Enden das nächste Ende (Unsigned: unter 0 ist 0).
+- **Umwandeln sagt ein Knoten**, keiner still: Int to Int64 (die Bits eines `i64`), Int64 to Int
+  und Int64 to Int Unsigned (die Bits als `i64` bzw. `u64`, so genau, wie ein Int es hält), Int64
+  to Float (Unsigned), Float to Int64 (Unsigned), Bits of Float und Float of Bits (IEEE 754), Int64
+  of Halves, High, Low (je 32 Bit), Count Ones, Leading Zeros, Trailing Zeros, Int64 to Text (als
+  `u64`, als `i64`, hexadezimal) und Text to Int64 (dezimal, `0x`, ein `-` davor: das
+  Zweierkomplement; was keine Zahl ist: 0). Ein Draht von Int64 zu Int, Float oder Text ist ein
+  Fehler.
+- **Im Text** ist ein Int64 `Int64{0x1f}` (die Bits, hexadezimal), im Dokument der Text seiner
+  Bits als `u64` (`"18446744073709551615"` – mehr, als eine Zahl von JSON genau hält). Es kann
+  Schlüssel einer Map und eines Sets sein, und eine `List<Int64>` sortiert nach den Bits als `u64`.
+- **Was sie tun, steht einmal:** `PureNodes::int64_*` in `kern/logic/nodes.h` – der Knoten und die
+  Klasse rufen dieselbe Funktion; in der Klasse ist ein Int64 ein `kern::logic::Int64` (ein `u64`),
+  ein Knoten ein Ausdruck auf ihm, ohne Speicher anzufordern.
+- Ein `u64` oder `i64` eines Programms, das ein Bitmuster ist, ist im Blueprint ein `Int64`; die
+  Knoten der Engine nehmen und geben ihre 64-Bit-Zahlen als Int64-Pins (`tools/engine_api.py`).
 
 ### Aufzählungen
 
@@ -481,6 +720,95 @@ Die Knoten einer Struktur (`S` ist die Struktur):
 | Break S | `struct_break<S>(wert).Feld` | das Feld des Werts |
 | Find Row (Find S by Feld) | `list_find_row<&S::Feld>(liste, wert)` | `.found`, `.row`, `.index`: der erste Eintrag einer Liste von S, dessen Feld der Wert ist |
 | Set an einem Platz (Set Variable mit Pfad) | `Variable.Feld = wert;` | ändert das eine Feld der Variablen; gibt das Feld, wie es jetzt ist |
+| Bytes of S | `struct_bytes<S, "20: u32@0 u16@4 …">(wert)` | die Bytes des Werts im Layout der Einstellung (siehe „Die Bytes eines Werts“) |
+| S of Bytes | `struct_of_bytes<S, "20: u32@0 u16@4 …">(bytes, at)` | der Wert, dessen Bytes bei `at` in der Liste beginnen |
+
+### Die Bytes eines Werts
+
+Ein Protokoll auf einem Draht, eine Datei, eine Prüfsumme lesen und schreiben die Bytes einer
+Struktur: in C++ `std::bit_cast` oder `std::memcpy` zwischen einer Struktur und Bytes – ihre
+Objektdarstellung. Die Sprache hat das als zwei Knoten einer Struktur aus Zahlen. Wie C++ die
+Struktur auslegt, ist ihre Einstellung „Layout“: die Größe in Bytes, dann für jedes Feld, in der
+Reihenfolge der Felder, die Zahl, als die C++ es hält, und wo es beginnt.
+
+```cpp
+KERN_STRUCT(Frame) { Int Magic = 827736398; Int Version = 1; Int Sequence = 0; Int Vx = 0; };
+// #pragma pack(1) struct Frame { uint32_t magic; uint16_t version, sequence; int16_t vx; };
+Fixed<U8, 10> Bytes = struct_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Now);
+Frame Back = struct_of_bytes<Frame, "10: u32@0 u16@4 u16@6 i16@8">(Bytes, 0);
+```
+
+- **Die Zahlen:** `bool` (ein Feld vom Typ Bool), `u8 i8 u16 i16 u32 i32` (Int: geschrieben wird
+  die Zahl auf so viele Bits gekürzt, wie C++ sie umwandelt; gelesen, wo ein `i` steht, mit
+  Vorzeichen), `u64 i64` (Int64: die 64 Bit), `f32 f64` (Float: die Bits der Zahl als `float` –
+  gerundet, wie C++ rundet – oder als `double`). Ein NaN behält Vorzeichen und die oberen Bits
+  seiner Nutzlast und ist still – auf jeder Plattform dasselbe, nicht das, was eine Maschine
+  gerade tut (WebAssembly lässt es offen).
+- **Die Bytes stehen little-endian**, auf jeder Plattform gleich (die Engine läuft nur auf
+  solchen). Ein Byte, das kein Feld deckt (was C++ als Füllung lässt), ist 0.
+- **Bytes of S** gibt so viele Bytes, wie das Layout groß ist, je eine Zahl 0 bis 255 (eine `List<U8>`) – in der
+  Klasse eine Liste fester Länge (`Fixed<U8, N>`): sie liegt, wo sie steht, nichts wird
+  angefordert, wie bei `std::array<uint8_t, N>`.
+- **S of Bytes** liest die Felder aus einer Liste von Zahlen, beginnend bei `at`. Ein Byte ist
+  das, was C++ einem `unsigned char` von der Zahl lässt: ihre letzten 8 Bit. Wo die Liste keins
+  hat – vor ihr, hinter ihr –, ist es 0 (kein Index führt ins Leere).
+- **Regeln (`check`):** Das Layout ist lesbar, 1 bis 65.536 Bytes groß, jedes Feld liegt darin,
+  keine zwei teilen sich ein Byte, es hat so viele Felder wie die Struktur, und jedes passt zum
+  Typ seines Felds. Eine Struktur mit einem Feld anderer Art (Text, Vektor, Liste, Aufzählung,
+  Struktur) hat keine Bytes.
+- **In jeder Stufe dasselbe:** `kern::logic::bytes` in `kern/logic/nodes.h` – der Interpreter
+  liest die Felder aus dem Wert, die Klasse aus dem `struct`, Bit für Bit gleich; der JIT gibt
+  die Knoten ihrer Funktion. Tier-Fall `bytes`, im Klassenvergleich jede Zahl, ein Byte ohne
+  Feld und Felder in anderer Reihenfolge als die Bytes.
+- **Der Konverter** schreibt damit, was das Programm mit den Bytes eines Werts tut: das Layout
+  liest er beim Compiler ab (`-fdump-record-layouts`, das, was C++ für diese Struktur festlegt,
+  auch unter `#pragma pack`); `memcpy(&wert, bytes, sizeof wert)` ist S of Bytes; ein Zeiger auf
+  Bytes (`const void*`, `const uint8_t*`), dem ein Aufruf `&wert` gibt, bekommt die Bytes des
+  Werts (Bytes of S, eine Liste fester Länge); `std::bit_cast<std::array<uint8_t, N>>(wert)` sind
+  seine Bytes ebenso (Bytes of S, N so groß wie die Struktur); `offsetof(S, feld)` ist die Zahl, die
+  das Layout sagt. Ein `float` ist im Layout `f32` (das Feld ein Float). Eine Struktur mit Füllung,
+  einer Zahl, deren Breite die Plattform bestimmt (`long`, `size_t`, `char`), einer Aufzählung,
+  einem Bitfeld oder einem Feld, das keine Zahl ist, hat dort noch keine Bytes und wartet mit Grund.
+  Der Test hält einen `float` des Programms als 64-Bit-Zahl; wo das Programm die Bytes einer
+  Struktur mit einem nimmt, schreibt er sie aus, wie das Layout des Programms sie legt (der `float`
+  als seine 32 Bit, gerundet, wie C++ einen `double` zu einem `float` macht – `converted::layout`).
+- **Die Bytes einer Liste von Zahlen** (`std::memcpy` zwischen einer Liste von `float`, `u32`, …
+  und Bytes – oder zwischen zwei Listen von Zahlen) sind ein Schritt auf dem Platz der Liste, in die
+  geschrieben wird: **Copy Bytes**, in einem Zug.
+
+  ```cpp
+  // std::memcpy(out.data(), grid.data(), out.size());   out: std::vector<u8>, grid: std::vector<f32>
+  list_copy_bytes<"u8", "f32">(Out, 0, Grid, 0, list_length<Int>(Out));
+  // std::memcpy(v + 2, in.data + h, 8);                 v: f32[4], in: kern::Span<const u8>
+  list_copy_bytes<"f32", "u8">(V, 2, In, H, 8);
+  ```
+
+  Die erste Einstellung ist die Zahl, als die C++ jeden Eintrag des Platzes hält, die zweite die
+  der Einträge von Items (`u8 i8 u16 i16 u32 i32`: ein Int, `u64 i64`: ein Int64, `f32 f64`: ein
+  Float – wie oben, little-endian; ein `f32` sind die 32 Bit der Zahl als `float`). Dann: wo im
+  Platz (`At`, ein Eintrag), was (`Items`), ab welchem ihrer Einträge (`From`) und wie viele Bytes
+  (`Count`) – wie `memcpy(ziel + at, quelle + from, count)`. Ein Byte, das Items nicht hat (vor
+  ihnen, hinter ihnen), ist 0; eines, das hinter oder vor dem Platz läge, wird nicht geschrieben:
+  die Liste behält ihre Länge (auch eine Liste fester Länge kann der Platz sein); ein Eintrag, von
+  dem nur einige Bytes geschrieben werden, behält die anderen. Items werden gelesen, wie sie vorher
+  waren – eine Liste in sich selbst wie `memmove`. Es kostet, was `memcpy` kostet: ein Durchgang über
+  die geschriebenen Einträge, nichts wird angefordert (nur wo eine Liste in sich selbst als eine
+  andere Zahl kopiert wird, als sie ist, werden ihre Einträge vorher genommen). In jeder Stufe
+  dieselbe Funktion (`kern::logic::bytes::copy` in `kern/logic/nodes.h`); `check` verlangt, dass die
+  Zahl zur Liste passt. Tier-Fall `copy_bytes`, Unit-Test `logic_copy_bytes` (gegen `memcpy` und
+  `memmove` von C++). Der Konverter schreibt so jedes `memcpy` / `memmove`, dessen Zeiger auf
+  Einträge von Listen von Zahlen zeigen (`v.data()`, `v.data() + k`, ein Array, ein Zeiger in eine
+  Liste, `span.data`) – die Zahl liest er am Typ des Zeigers ab –, und eines aus `&wert` einer
+  Struktur aus Zahlen in eine Liste von Bytes (dessen Bytes, Bytes of S). Ein `char` (sein Vorzeichen
+  ist das der Plattform), ein `long`, ein `bool` hat keine solche Zahl; zwischen zwei Listen von
+  Bytes bleibt es die Schleife über ihre Einträge.
+- **Die Bits einer Zahl** (`std::bit_cast` zwischen einer Gleitkommazahl und einer ganzen Zahl
+  ihrer Breite) sind eigene Knoten: Bits of Float 32 (`math_bits_of_float32(x)`: die 32 Bit der
+  Zahl als `float`, 0 bis 2^32 − 1) und Float 32 of Bits (`math_float32_of_bits(b)`: der `float`
+  der letzten 32 Bit des Int), für 64 Bit Bits of Float und Float of Bits mit einem Int64. Ein NaN
+  ist wie oben still, mit Vorzeichen und den oberen Bits seiner Nutzlast. Der Konverter schreibt
+  `std::bit_cast<u32>(f)`, `std::bit_cast<i32>(f)` (das Zweierkomplement der 32 Bit),
+  `std::bit_cast<f32>(u)`, `std::bit_cast<u64>(d)` und `std::bit_cast<f64>(w)` damit.
 
 ### Plätze
 
@@ -568,6 +896,11 @@ LeerenResult Leeren() {
     Runde liest, wird kopiert; was jede Runde erst neu setzt, wird übergeben. Jeder Aufruf hat
     seine lokalen Variablen für sich (in der Klasse sind es die von C++), darum ist das allein
     eine Frage der Schritte dieses Aufrufs.
+  - **die Variable, die ein Wert als ersten Eingang liest und die der eine Schritt, der diesen Wert liest,
+    als Ganzes auf ihn setzt** – bei einem Knoten, der das von sich sagt (`NodeDef::takes_first`: Append):
+    `O = text_append(std::move(O), x, "");` hängt dort an, wo O seine Zeichen hat. Den alten Wert liest danach
+    nichts mehr (der Schritt setzt O sofort neu); was die anderen Eingänge lesen, ist vorher gelesen, und ist
+    ein anderer Eingang O selbst (`text_append(std::move(O), O, "")`), nimmt text_append O, wie es war.
   - **was der Schritt direkt davor gab** (`n4.punkte`), wenn dieser Eingang es als einziger liest.
     „Direkt davor“: ein einfacher Schritt, dessen einer Weg zu diesem Schritt führt, und kein
     anderer Weg führt hierher – der Schritt läuft genau einmal nach jedem seiner Läufe, und
@@ -595,6 +928,131 @@ LeerenResult Leeren() {
   den leeren (`Instance::change`). Neben einer Liste gibt er den Default, wie jedes Lesen dort.
   Für die Regel der gehaltenen Listeneinträge (Referenz-Eingänge) ist ein Take ein Set: Er setzt
   etwas an die Stelle dessen, was dort stand.
+
+### Texte des Programms
+
+Ein Text, der im Blueprint ausgeschrieben ist – der Wert an einem Pin, der Default einer Variablen
+oder eines Felds, ein Eintrag einer ausgeschriebenen Liste –, gehört zum Programm. In der Klasse
+ist `Text` deshalb kein `std::string`, sondern `kern::logic::Text` (`nodes.h`):
+
+- **Ein ausgeschriebener Text wird nicht kopiert.** `Text Name = "spawncity-facades";` verweist auf
+  die Zeichen, die das Programm ohnehin hält – wie ein `const char*` auf ein Literal in C++. Den
+  Wert weiterzugeben, in eine Struktur zu setzen, aus einer Funktion zu geben, zu vergleichen
+  fordert keinen Speicher an, wie lang der Text auch ist.
+- **Ein Text, der beim Laufen entsteht**, hält seine Zeichen selbst, so wie ein `std::string`:
+  Append, eine Zahl als Text, was die Engine gibt. Ihn zu kopieren kostet, was es in C++ kostet;
+  wo er zum letzten Mal gelesen wird, reicht `std::move` ihn weiter.
+- **Die Knoten lesen die Zeichen, wo sie stehen** (`text_equal`, `text_contains`, `text_length`);
+  `text_append` fordert für das Ergebnis einmal Speicher an. Der Name eines Werts einer
+  Aufzählung (`enum_name`) ist ebenfalls ein Text des Programms.
+- **Im Interpreter ändert sich nichts**: Dort ist ein Text ein Wert wie jeder andere. Was ein
+  Blueprint rechnet, ist in jeder Stufe dasselbe, Zeichen für Zeichen.
+
+Wer die Klasse von Hand aus C++ ruft: Ein `std::string` wird zu einem `Text` (er wird gehalten),
+ein Literal auch (es wird referenziert). Ein Puffer, in den geschrieben wird (`char b[64]`), wird
+abgelehnt – seine Zeichen gehören in einen `std::string`. Gelesen wird ein `Text` als
+`std::string_view` (`text.view()`), als eigener `std::string` mit `text.str()`.
+
+### Text formatieren
+
+**Format Text** (`text.format`) macht einen Text aus einem Format, wie es `printf` in C hat, und den
+Werten seiner Umwandlungen – Zeichen für Zeichen, was `snprintf` gibt:
+
+```cpp
+Text Zeit = text_format<"%02d:%06.3f">(-1, minuten, sekunden);   // "03:07.250"
+Text Kurz = text_format<"%s">(3, name);                          // höchstens 3 Bytes, wie snprintf mit Größe 4
+```
+
+- Das Format ist die Einstellung; seine Umwandlungen bestimmen die Eingänge, in ihrer Reihenfolge:
+  `%d %i %u %x %X %o %c` nehmen ein Int, `%f %F %e %E %g %G` ein Float, `%s` einen Text, `%%` ist ein
+  Prozentzeichen. Flags `- + Leerzeichen 0 #`, Breite und Genauigkeit als Zahlen (bis 512); `*`
+  gibt es nicht. Breiten der ganzen Zahlen wie in C: `hh` 8, `h` 16, ohne 32, `l ll j z t` 64 Bit.
+- Der erste Eingang **Most**: höchstens so viele Bytes (das `size - 1` von `snprintf`); kleiner als
+  0: alles.
+- Zahlen werden exakt gerundet (`std::to_chars`, die Rundung von `printf`: die nächste Dezimalzahl
+  zum binären Wert, bei Gleichstand gerade) – auf jeder Maschine derselbe Text. (Einzige bekannte
+  Abweichung von glibc: `%#g`, wo glibc gegen den C-Standard eine Null zu wenig schreibt.)
+- Ein Format, das der Knoten nicht kennt, ist ein Fehler des Graphen, mit Grund.
+
+### Texte lesen
+
+Was `std::string` und `std::string_view` über ihre Zeichen sagen, sagt je ein Knoten – mit derselben
+Antwort, Zeichen für Zeichen (`logic::texts`, `nodes.h`). Ein Platz in einem Text ist ein `Int`; wo
+C++ `npos` gibt (ein `size_t`, der kein Platz ist), ist es **−1** – der `size_t`, mit Vorzeichen
+gelesen, wie ein Blueprint jeden `size_t` hält –, und ein Platz, der hineingeht, wird ebenso gelesen
+(−1: `npos`, „bis zum Ende“).
+
+```cpp
+Int Leer = text_find(Befehl, " ", 0);                 // cmd.find(' ')
+Bool Ist = math_compare<"==">(kern::to<Float>(text_rfind(Befehl, "set ", 0)), 0.0);   // cmd.rfind("set ", 0) == 0
+Text Rest = text_sub(Befehl, 4, -1);                  // cmd.substr(4)
+Befehl = text_erase(std::move(Befehl), 0, 3);         // cmd.erase(0, 3) – am Platz, ohne Kopie
+```
+
+| Knoten | C++ | gibt |
+|---|---|---|
+| Find Text, Find Last Text | `find(b, from)`, `rfind(b, from)` | den Platz oder −1 |
+| Find First Of, Find Last Of, Find First Not Of, Find Last Not Of | `find_first_of(set, from)` … | den Platz oder −1 |
+| Sub Text | `substr(at, count)` | die Zeichen (count −1 oder über das Ende: bis zum Ende) |
+| Starts With, Ends With | `starts_with(b)`, `ends_with(b)` | Bool |
+| Text Less | `a < b` | Bool – Byte für Byte als `unsigned char`, wie `std::string` ordnet |
+| Insert Text, Erase Text, Replace Text | `insert(at, b)`, `erase(at, count)`, `replace(at, count, b)` | den geänderten Text |
+| Repeat Text | `std::string(count, c)` | den Text so oft hintereinander (höchstens 2^24 Zeichen) |
+| Reserve Text | `reserve(count)` | den Text, wie er ist – in der Klasse mit Platz für Count Zeichen (höchstens 2^24) |
+| Text of Bytes | `std::string(reinterpret_cast<const char*>(bytes) + at, count)` | Count Bytes einer Liste ab At, jedes auf 8 Bit geschnitten |
+| Bytes of Text | `std::vector<u8>(text.begin(), text.end())` | die Bytes des Texts als `List<U8>` |
+| Insert Text Bytes (Schritt) | `bytes.insert(bytes.begin() + at, text.begin(), text.end())` | die Bytes des Texts in eine Liste ganzer Zahlen, wo sie steht, in einem Zug |
+
+- **Wo C++ wirft** (`at` hinter dem Ende bei `substr`, `insert`, `erase`, `replace`: `std::out_of_range`,
+  was ein Programm ohne Ausnahmen beendet), gibt Sub Text den leeren Text, die drei anderen den Text,
+  wie er ist – in jeder Stufe gleich.
+- **Kosten wie in C++:** Die Knoten lesen die Zeichen, wo sie stehen; Sub Text macht einen Text aus
+  einem Teil (wie `substr`: eine Kopie seiner Zeichen). Insert, Erase und Replace ändern den Text, den
+  sie bekommen – reicht der Text ihn mit `std::move` weiter, ändern sie ihn am Platz, ohne Kopie. (Ein
+  Teil eines `std::string_view` ist in C++ keine Kopie, im Blueprint schon: ein Text hält seine
+  Zeichen – bis 15 Zeichen ohne Anforderung von Speicher, wie `std::string`.) Ebenso Append: Ein Text,
+  den der Text mit `std::move` weiterreicht und der seine Zeichen hält, bekommt das Angehängte an seinem
+  Platz – `Log = text_append(std::move(Log), x, "")` kostet, was `log += x` kostet; mit Reserve Text vorher
+  ohne neue Anforderung.
+- `compare()` sagt in C++ nur sein Vorzeichen fest zu – der Konverter schreibt es nicht, `==` und `<`
+  schon.
+
+### Zahlen und Wörter aus einem Text
+
+**Parse Float**, **Parse Float 32**, **Parse Int**, **Parse Int Unsigned** lesen eine Zahl an einem
+Platz eines Texts, wie C sie liest: `strtod`, `strtof`, `strtoll`, `strtoull` (und mit ihnen `atof`,
+`atoi`, `atol`, `strtol`, `strtoul` – `long` hat 64 Bit). **Scan Text** liest wie `sscanf`:
+
+```cpp
+ParsedFloat Z = text_parse_float(Befehl, 6);          // std::strtod(cmd.c_str() + 6, &end): Z.value, Z.end
+Int N = int64_to_int(text_parse_int(Befehl, 7, 10).value);   // std::atol(cmd.c_str() + 7)
+text_scan<"%lf %lf %95[^\n]">(n12, Befehl, 6, Lat, Lon, Name);   // sscanf(cmd.c_str() + 6, …, &lat, &lon, name)
+Lat = n12.v0;  Lon = n12.v1;  Name = n12.v2;          // n12.count: was sscanf gibt
+```
+
+- **Der Text als C-String an einem Platz** (`s.c_str() + at`): von `at` bis zu seinem ersten Null-Byte;
+  ein `at` hinter dem Text (oder unter 0 – in C ein Zeiger ins Nichts) liest einen leeren.
+- **End** ist der Platz direkt hinter dem Gelesenen – nichts gelesen: `at` selbst, wie Cs `end`-Zeiger
+  der ist, den der Aufruf bekam. Die ganzen Zahlen geben ihre 64 Bit als `Int64` (jenseits des Bereichs
+  das Ende des Bereichs wie C, unsigned mit `-` davor das Zweierkomplement); Base 0 liest das Präfix
+  (`0x`, `0b`, `0`).
+- **Scan Text:** Das Format ist die Einstellung; jede Umwandlung, die einen Wert gibt, hat einen Ausgang
+  (`v0` …) und einen Eingang **Before** mit dem, was dort vorher stand – es bleibt, wo der Scan nicht
+  hinkommt (wie die Variable, in die `sscanf` nicht schrieb). `%d %i %u %o %x %X %b` geben ganze Zahlen
+  (`hh h` und ohne: 8, 16, 32 Bit als Int – wie C sie abschneidet; `l ll j z t q L`: 64 Bit als Int64),
+  `%f %e %g %a` (`F E G A`) eine Zahl (ohne: ein `float`, `l`: ein `double`), `%s` und `%[…]` ein Wort,
+  `%n` die gelesenen Zeichen; Breiten, `*` (gelesen, nicht gegeben), `%%`; ein Leerzeichen im Format
+  liest jede Folge von Leerzeichen. **Count**: wie viele Werte gelesen wurden, −1, wenn der Text vor dem
+  ersten endete. Was das Format nicht hat (`%c`, `%m`, `%Lf`, `$`), ist ein Fehler des Graphen, mit Grund.
+- **Zeichen für Zeichen wie glibc** (2.39, im Modus von C23, mit dem C++ übersetzt: `0b` vor einer
+  binären Zahl; C-Locale): dieselben Zeichen gelesen, derselbe Wert, dieselbe Anzahl – `logic::scan`
+  geht den Weg von glibcs Scanner Schritt für Schritt (`"100ergs"` mit `%f`: 100, das `e` ist gelesen;
+  `"0x"` mit `%f`: kein Wert; `%x` von `"0xg"`: 0). Den Wert einer endlichen Zahl rechnet die
+  C-Bibliothek aus den gelesenen Zeichen (korrekt gerundet – auf jeder Maschine derselbe);
+  unendlich, NaN und die Nutzlast einer NaN (`"nan(0x7f)"`) rechnet der Knoten selbst, wie glibc.
+  Gegen glibc geprüft mit 12 Millionen Eingaben und Formaten, ohne eine Abweichung.
+- In der Klasse fordern die Knoten keinen Speicher an (eine Zahl von mehr als 255 Zeichen ausgenommen);
+  Scan Text macht einen Text nur für ein Wort, das es liest – eines bis 15 Zeichen ohne Anforderung.
 
 ### Referenz-Eingänge
 
@@ -653,18 +1111,35 @@ void on1(Float delta) {
 - **Ein Eintrag, der gehalten wird, bleibt, wo er ist** (Regel, `check()`): Nennt ein Aufruf
   einen Platz in einer Liste (`Cars[i]`, `Cars[i].Wheels[j]`), dann ändert nichts, was die
   Funktion tut – sie selbst oder was sie aufruft –, die Länge dieser Liste oder setzt eine andere
-  an ihre Stelle; und sie führt keinen Schritt aus, der Handler starten kann (Call Event, Call on
-  Actor, ein Gameplay-Schritt: `NodeDef::raises`) – ein Handler könnte dasselbe tun. So bleibt
-  „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
+  an ihre Stelle. So bleibt „kein Index führt ins Leere“ auch dort wahr, wo die Referenz eine
   Referenz von C++ ist. Die Liste selbst als Referenz zu geben und zu ändern
   (`Fill(Cars[i].Marks)`), ein Feld des Eintrags zu ändern oder eine andere Liste – das alles
   geht.
+- **Handler, während ein Eintrag gehalten wird** (geprüft): Führt die Funktion einen Schritt aus,
+  der Handler starten kann (Call Event, Call on Actor, ein Gameplay-Schritt: `NodeDef::raises`),
+  weiß niemand vorher, ob ein Handler die Liste ändert – C++ hätte dann eine Referenz ins Leere
+  (undefiniert). Der Aufruf wird darum geprüft, in jeder Stufe gleich: vor ihm wird jede Liste
+  beliebiger Länge (jede Map, jeder besessene Wert) auf dem Weg zum Eintrag gemerkt, nach ihm
+  muss sie dieselbe Länge haben – in der Klasse auch ihre Einträge an derselben Stelle (`data()`) –,
+  sonst endet der Lauf dort mit einem Fehler wie am Schleifenwächter (`Runtime::held_lost`: die
+  Schleifen der Kette enden, die Kette läuft zu Ende, der Blueprint wird angehalten). Im Text steht
+  die Prüfung um den Aufruf – sie folgt aus dem Graphen, der Leser liest sie als nichts:
+  `const kern::logic::Held held_12(Cars, Cars[n4.index].Wheels); Car_step(Cars[n4.index].Wheels[0]); held_after(held_12);`
+  (die Listen von außen nach innen; die Klasse sieht eine innere nur an, solange die äußere blieb).
+  Der Interpreter und der JIT prüfen die Längen in `Instance::call`. Eine Funktion, die als Wert
+  gelesen wird, rechnet nur – sie startet keine Handler; startet sie doch welche, wird ein solcher
+  Eintrag abgewiesen. Ein Eintrag einer Liste fester Länge (`Fixed<Car, 2> Two`, siehe „Listen
+  fester Länge“) bleibt immer, wo er ist: `Shout(Two[1])` braucht keine Prüfung,
+  `Hum(Two[1].Marks[0])` prüft `Two[1].Marks`.
 - **Von außen** (`Instance::call`, der Kleber der Klasse) nimmt ein Referenz-Eingang einen Wert:
   Er ist dann eine eigene Variable des Aufrufs, die mit diesem Wert beginnt, und was die
   Funktion aus ihr gemacht hat, steht hinter den Ausgängen in `results` – für jeden
   Referenz-Eingang, der nicht const ist, in der Reihenfolge der Eingänge.
 - **Call on Actor gibt Werte:** Eine Funktion eines anderen Blueprints (`KERN_EXTERN`) hat keine
-  Referenz-Eingänge.
+  Referenz-Eingänge. Hat der andere Blueprint sie unter einem anderen Namen, sagt ihn
+  `KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);` (JSON: `"remote"`) – so ruft ein
+  Blueprint die Funktionen „Update“ zweier Actors, die verschieden aussehen; Call on Actor ruft sie in
+  jeder Stufe beim Namen des anderen Blueprints.
 
 ### Bibliotheken
 
@@ -745,6 +1220,162 @@ struct Garage : virtual kern::Blueprint, virtual Workshop {     // ein Blueprint
   Bibliothek, passt die übersetzte Klasse ihrer Benutzer nicht mehr, und sie laufen im
   Interpreter, bis neu gebaut ist.
 
+### Knoten der Engine
+
+Was nur die Engine kann – ein Strahl durch die Physik, ein Mesh zeichnen, einen Ton mischen –, ist
+ein Knoten (`tools/engine_api.py` liest die Header der Engine und schreibt die Tabelle
+`kern/src/logic/engine_api.gen.cpp`, die Funktionen der Klasse `engine_nodes.gen.h` und den Fall
+`kern/tests/engine_case.gen.h`, der jeden Knoten einmal aufruft): `kern::physics::World::cast_ray`
+ist `engine.world.cast_ray`, im Text `engine_world_cast_ray(world, from, to …)`. Interpreter und
+JIT rufen ihn durch eine Tür, `logic::Host::engine`; ein Test bindet dort den Stellvertreter
+`logic::EngineStandIn`, der aus der Form jedes Ausgangs antwortet – gleich in jeder Stufe – oder
+die Engine selbst. Eine Liste in der Form hat 0 bis 2 Einträge; eine Liste fester Länge – ein Feld,
+das in C++ ein Array ist (`f32 m[16]` von `Mat4`: Form `{[16n]}`) – genau so viele, wie C++ hält; was da sein kann oder nicht (`std::optional`, `std::unique_ptr` eines Werts: Form `[?…]`) – keinen oder einen, nie zwei. Die Klasse ruft die Funktion der Engine selbst (unten: „In der Klasse der Aufruf
+selbst“).
+
+- **In der Klasse der Aufruf selbst** (`kern/logic/engine_direct.h`): Gibt der Host der Klasse die
+  Objekte der Engine (`Host::engine_objects`, in der Klasse `kern_world.engine` – der Host eines
+  Spiels, `GameWorld`, tut das), dann ist `engine_world_cast_ray(World, From, To, Filter, 0)` der
+  Aufruf `objects.get<physics::World>(World)->cast_ray(From, To, filter, {})`: typisiert, ohne
+  `logic::Value`, ohne Liste von Werten, ohne Namen. Jeder Eingang wird aus dem C++-Typ, den er in
+  der Klasse hat, was die C++-Funktion nimmt – eine Zahl die Zahl, eine Struktur des Blueprints die
+  der Engine Feld für Feld (der Reihe nach: die Struktur des Blueprints hat die Felder der Engine,
+  sonst übersetzt die Klasse nicht), ein Enum der Wert an derselben Stelle –, und was die Funktion
+  gibt, wird ebenso der Typ der Klasse. Was die Klasse schon als den Typ hält, den die Funktion
+  nimmt, wird übergeben, wie es dasteht: ein `Float`, wo sie `f64` nimmt, ein `Vector` als `Vec3`,
+  eine `List<Vector>` als `std::vector<Vec3>` (auch als Zeiger mit Anzahl), ein Text, der im
+  Programm ausgeschrieben ist oder beim Lauf entstand, als `const char*`, `std::string_view` oder
+  `const std::string&` – ohne Kopie. Ein Handle wird einmal nachgeschlagen, in denselben
+  `EngineObjects`, die die Tür benutzt: ein Objekt, ein Handle, wer auch fragt. Wo die Funktion
+  der Engine keinen Speicher anfordert, fordert der Aufruf keinen an.
+  Er tut, was die Tür mit demselben Aufruf tut, Bit für Bit – auch wo ein Aufruf scheitert (ein
+  Handle ohne Objekt der Klasse: der Host erfährt es, `Host::engine_failed`, die Ausgänge sind
+  ihre Nullen; eine Struktur ihre Defaults) und wo niemand einen Ausgang liest (ein Objekt der
+  Engine darin hat sein Handle trotzdem). Hat der Host keine Objekte oder gibt er sie nicht (ein
+  Test, der die Aufrufe mitschreibt; der Stellvertreter), ruft dieselbe Klasse durch die Tür.
+  `tools/engine_api.py` schreibt beides aus derselben Tabelle: die Aufrufe hinter der Tür
+  (`kern/src/<Teil>/engine_calls.gen.cpp`) und die Funktionen der Klasse (`engine_nodes.gen.h`);
+  `engine_values::Direct<…>` sagt je Typ des Blueprints, was `engine_values::Conv<…>` der Tür über
+  einen Wert sagt. Geprüft: der native Fall „Engine“ spielt seine Aufrufe auf Objekten ein
+  weiteres Mal auf der Engine selbst – der Interpreter durch die Tür, die Klasse direkt, jede
+  Variable gleich, und die Klasse nicht ein Mal durch die Tür (`kern/tests/blueprint_native.h`,
+  `native_show.h`); seine freien Funktionen ebenso, dreimal (Tür, Klasse, Tür), jedes Mal in einem eigenen
+  Prozess, der vom selben Zustand der Engine ausgeht (die Nummer des nächsten Jobs, ihr letzter Fehler …), und
+  mit den Jobs der Engine auf dem Frame-Thread (`kern::jobs::set_threads(false)`: wann ein Job läuft, legen die
+  Aufrufe fest) – alle drei geben dasselbe, Zeichen für Zeichen; nur was eine Uhr gibt, ist nicht zweimal
+  dasselbe: Eine Funktion, die eine Uhr liest, sagt es in ihrem Header (`KERN_CLOCK f64 now_ms();`), die
+  Tabelle hat es (`EngineFunction::clock`), und der Test vergleicht die Variablen nicht, die aus ihr kommen; `engine_calls_class_calls_the_engine_itself` vergleicht dieselbe Klasse mit und
+  ohne Objekte und mit C++ selbst, `engine_calls_class_asks_for_no_memory` zählt die
+  Speicheranforderungen (`kern/tests/test_main.cpp`). Ein Build, der Klassen bindet, bindet die
+  Teile der Engine, deren Funktionen sie rufen (ein Knoten, den keine Klasse ruft, braucht nichts).
+
+- **Eine Methode eines Objekts der Engine ist ihr Knoten** (ein Objekt mit einem Leben für sich:
+  eine Klasse – die Physik, der Renderer, der Mixer –, eine Struktur, die nicht kopiert werden kann
+  oder ein solches Objekt hält; im Blueprint ein Handle). Das gilt auch, wo ihr Header sie
+  definiert (`int width() const { return width_; }`, `bool ready() const`): was das Objekt hält,
+  ist das der Engine. Der Konverter schreibt einen Aufruf von ihr als den Knoten, und keine Funktion
+  eines Blueprints – der Plan des Programms folgt ihm nicht, kein Blueprint eines Headers der Engine
+  wird darum geschrieben oder als solche Funktion getestet.
+- **Was eine Funktion durch einen Parameter schreibt, ist ein weiterer Ausgang:** durch eine
+  Referenz (`std::vector<u64>& out`), durch einen Zeiger, der null sein darf (`bool* changed =
+  nullptr` – der Aufruf nimmt den Wert, wo er ihn will, oder nirgends), und durch einen Zeiger auf
+  Zahlen mit ihrer Anzahl daneben (`void render(f32* out, Count<2> frames)`): eine Liste der Zahlen,
+  die die Engine dort hinschreibt (`out`, List<Float>), die Anzahl bleibt ein Eingang. In der
+  Tabelle nennt der Ausgang seine Anzahl (`EnginePin::count`); der Stellvertreter gibt nicht mehr
+  Einträge, als sie sagt – den Platz, den der Aufruf ihm gibt. Der Aufruf `mixer_.render(out_.data(),
+  frames)` schreibt die Zahlen des Knotens in die Liste, auf die der Zeiger zeigt, ab dem Eintrag,
+  auf den er zeigt, einen nach dem anderen; die Liste behält ihre Länge, wie in C++. **Dass die
+  Zahl neben einem Zeiger seine Anzahl ist, sagt allein ihr Typ:** `kern::Count<Per>` (kern/core/base.h
+  – die ganze Zahl, die er hält; Per Zahlen oder Einträge je Gezähltem): `void render(f32* out,
+  Count<2> frames)` schreibt 2 × frames Zahlen; die Tabelle sagt es (`EnginePin::per`), der
+  Stellvertreter gibt so viele, der Aufruf im Test nimmt so viele. Ebenso für einen Zeiger, den die
+  Engine liest: `push_incoming(from, const u8* data, Count<1> bytes)`, `triangulate(const f64* xy,
+  Count<2> vertex_count, …)` – die Tür und die Klasse weisen eine kürzere Liste ab, der Test der
+  Quelle zeichnet Per × Anzahl Werte auf. Steht neben einem Zeiger eine ganze Zahl eines anderen
+  Typs, sagt sie nichts über seine Länge: `tools/engine_api.py` hält mit der Liste dieser
+  Erklärungen an (kein Name wird gelesen, keine Länge geraten).
+- **Eine Funktion, die einen Text formatiert wie printf** – ihre Erklärung sagt es:
+  `bool fail(const char* format, ...) __attribute__((format(printf, 1, 2)))`, `log(level, format, ...)` –
+  ist ein Knoten, der den fertigen Text nimmt (Eingang `text`, Text) und ein Schritt ist (sie schreibt
+  ihn irgendwohin: den letzten Fehler, das Protokoll). Die Tür und die Klasse geben ihn der Engine als
+  `fail("%s", text)` – die Engine schreibt ihn, wie sie das Format geschrieben hätte. Der Konverter
+  schreibt den Aufruf `fail("bad %d", n)` als `engine_fail(text_format<"bad %d">(-1, n))` (Format Text,
+  ein ausgeschriebenes Format, wie bei snprintf); der Test der Quelle zeichnet den Text auf, den das
+  Format mit seinen Werten macht (vsnprintf) – verglichen wird Text gegen Text, Bit für Bit.
+- **Der Knoten auf der Engine selbst** (`kern/logic/engine_host.h`): `logic::call_engine(objects,
+  function, in, out)` ruft die echte Funktion eines Knotens – `tools/engine_api.py` schreibt jeden
+  Aufruf aus den Headern (`kern/src/<Teil>/engine_calls.gen.cpp`, ein Teil der Engine je Datei: ein
+  Build hat die Funktionen der Teile, die er bindet). Jeder Eingang wird, was die C++-Funktion nimmt,
+  jeder Ausgang kommt aus dem, was sie gibt oder schreibt; welcher C++-Typ ein Pin ist, sagt der
+  Compiler, welcher Typ des Blueprints, sagt die Tabelle – passt beides nicht zusammen (ein Int-Pin,
+  wo C++ ein `TextureAsset` hat; eine Struktur `physics_Shape`, wo es `game::Shape` ist), übersetzt
+  die Datei nicht: Das prüft jede Beschreibung gegen die echte Funktion. Was die Engine durch einen
+  Zeiger schreibt, bekommt genau den Platz, den die Tabelle sagt, und einen Zaun dahinter; schreibt
+  sie darüber hinaus, scheitert der Aufruf (die Tabelle sagt dann nicht, was die Engine tut).
+  `logic::EngineObjects` hält die Objekte hinter den Handles: was ein Make-Knoten macht oder eine
+  Funktion als Wert gibt, gehört ihm bis zum Release (oder bis es endet, in umgekehrter Reihenfolge);
+  was eine Funktion als Referenz oder Zeiger gibt, ist das des Hosts – dasselbe Objekt hat immer
+  dasselbe Handle. Handles zählen ab 1 in der Reihenfolge, in der die Objekte kamen. Der Host eines
+  Spiels (`GameWorld`) ruft so die Engine; ein Test, der Quelle und Blueprint gegen die echte Engine
+  vergleicht, gibt jeder Seite eigene Objekte, gleich aufgesetzt: Ein Handle, das sie noch nicht
+  kennt, nennt ein Objekt, wie C++ es ohne Argumente macht (`engine_make_default`). Nimmt sein
+  Konstruktor Werte und andere Objekte der Engine (`Client(Transport&, config, salt)`,
+  `GameWorld(Renderer&)`), bekommt jeder Wert seine Null (wie C++ ihn ohne Argumente macht), ein
+  Zeiger auf ein Objekt null, und jedes Objekt hinter einer Referenz wird ebenso mitgemacht – ohne
+  Handle, gehalten mit dem Objekt (`MadeWith`) und nach ihm beendet; ein Parameter mit Default bleibt
+  beim Default. Hat die Engine von der Klasse hinter der Referenz keinen Konstruktor (`Transport`),
+  wird die eine Klasse gemacht, die von ihr abgeleitet ist und so gemacht werden kann – gibt es keine
+  oder mehrere, wird das Objekt nicht gemacht (`tools/engine_api.py --list` nennt, welche Klassen und
+  warum). Erzeugt in `kMakers` jeder `engine_calls.gen.cpp`; keine Liste von Klassen.
+
+### Rückrufe der Engine (Callback)
+
+Wo die Engine eine Funktion des Programms ruft – eine Höhe je Punkt (`kern::HeightSampler`, ein Zeiger auf eine
+Funktion mit ihrem `void*`), ob eine Stelle verformt ist (`std::function<bool(f64, f64, f64)>` in `RoadOptions`) –,
+gibt ihr ein Blueprint einen **Callback**: eine Funktion einer Bibliothek als Wert, den nur die Engine ruft.
+
+```cpp
+struct Ground : virtual kern::Library {
+  KERN_STRUCT(Field) { Float Base = 1.0; Float Slope = 0.5; };
+  struct heightResult { Float h = 0.0; };
+  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) { ... }
+};
+struct Site : virtual kern::Blueprint, virtual Ground {
+  Field Here = Field{2.0, 0.5};
+  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
+  void Make() { Kept = callback<&Ground::height>(Here); }
+};
+```
+
+- **Typ** `Callback<R(A…)>` (Pin-Typ `callback`, `TypeRef::of` die Signatur `float(float,float)`; ohne Ergebnis
+  `Callback<void(Int)>`): R und A sind Bool, Int, Float, Vector, Int64 – was C++ als Wert übergibt. Ein Callback steht in
+  einer Variablen, einem Feld, einem Ein- oder Ausgang, einer lokalen Variablen; nicht in einer Liste, Map oder einem Set.
+  Unbound ist `Callback<…>{}`: ruft die Engine ihn, bekommt sie die Null von R.
+- **Make Callback** (`func.callback`, Wert-Knoten, `callback<&Lib::fn>(platz)`, ohne Platz `callback<&Lib::fn>()`): nennt
+  eine **Funktion einer Bibliothek** mit höchstens einem Ausgang. Ist ihr erster Eingang eine const-Referenz, bindet der
+  Knoten ihn an den Platz, den er nennt (Einstellungen wie die Referenz-Eingänge von Call); die übrigen Eingänge gibt die
+  Engine. Gelesen wird der Platz, wie er steht, wenn die Engine ruft.
+- **Regeln (check):** die Funktion braucht nichts von der Welt – auf ihrem Weg und dem der Funktionen, die sie ruft, kein
+  Knoten der Engine oder des Spiels, kein Print, keine Game Time, kein Random, kein Call Event/Call on Actor, nichts, was
+  wartet oder sich etwas merkt (`NodeDef::world`). Darum darf die Engine sie rufen, wann und wie oft sie will: sie ändert
+  nichts, und jede Stufe gibt dasselbe. Ein Blueprint ruft, vergleicht und wandelt einen Callback nicht.
+- **Interpreter und JIT:** der Wert hält die Nummer der Instanz, die Funktion und den Platz (`Instance::Spot`); die Engine
+  ruft ihn synchron auf dem Frame-Thread (`Callable::call` → `Instance::call_inside`). Ist die Instanz zu Ende, ist er
+  unbound.
+- **Klasse:** `kern::logic::Callback<R(A…)>` sind zwei Wörter, `{R (*fn)(void*, A…); void* place;}` – der Thunk ruft die
+  Funktion der Bibliothek auf `the_library<L>` (eine Bibliothek hält nichts) mit dem Platz. Zur Engine gehen sie Feld für
+  Feld (`HeightSampler{fn, user}`: dieselben Kosten wie der Zeiger mit `void*` in C++) oder als `std::function`, die die
+  beiden Wörter hält (keine Anforderung).
+- **Tür:** `Conv<Callback<…>>` macht den Funktionszeiger mit `void*` (ein Trampolin auf den `Callable`) bzw. die
+  `std::function`. Was ein Aufruf der Engine an Callbacks bekommt, bleibt für den Aufruf; einer Methode eines Objekts der
+  Engine gegeben (sein Handle zuerst), bleibt es mit dem Objekt, bis es endet (`EngineObjects::kept_by`).
+- **Tabelle:** `tools/engine_api.py` erkennt die C++-Form am Typ – ein Struct der Engine aus genau einem Zeiger auf eine
+  Funktion mit `void*` vorn und einem `void*`, oder `std::function<R(A…)>`; Form `c<gibt>(<nimmt>)`, z. B. `cn(nn)`.
+- **Stellvertreter:** `EngineStandIn` ruft jeden Callback, den ein Aufruf bekommt, dreimal mit aus dem Aufruf gewürfelten
+  Eingängen; was er gibt, steht in der Aufzeichnung und geht in die Antwort ein. Einem Objekt gegeben, ruft er ihn bei
+  jedem späteren Aufruf auf diesem Objekt wieder, bis es freigegeben wird – so wird auch der behaltene Weg verglichen.
+- Geprüft: `logic_callbacks` (kern/tests/test_main.cpp).
+
 ### Formeln
 
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas
@@ -754,8 +1385,60 @@ Für ganze Zahlen, wie eine Maschine sie hat, gibt es `band`, `bor`, `bxor`, `sh
 einer Zahl) und `wrap32`, `wrap32s`, `mul32` (Rechnen, das bei 32 Bit umbricht), dazu `single` (die Zahl, wie
 eine 32-Bit-Kommazahl sie hält) – in jeder Stufe
 dieselben Funktionen von `kern::math`.
+`copysign(a, b)` ist der Betrag von `a` mit dem Vorzeichen von `b` – auch dem von −0 (`copysign(1, -0)`
+ist −1, wo `sign(-0)` 0 sagt): `std::copysign`, eine Operation auf dem Vorzeichenbit, in jeder Stufe
+dieselbe (im JIT `f64.copysign` von WebAssembly). Als Knoten heißt sie Copy Sign (`math_copysign`). Der
+Konverter schreibt `std::copysign` und `copysignf` damit.
+`remainder(a, b)` ist der Rest nach IEEE 754: `a − n · b`, mit `n` der ganzen Zahl, die `a / b` am
+nächsten liegt (von zweien die gerade) – `std::remainder`, exakt (das Ergebnis ist immer eine Zahl, die
+ein `double` hält), also auf jeder Plattform dieselben Bits; ist es 0, hat es das Vorzeichen von `a`.
+Durch 0 ergibt es 0, wie `mod`. Damit wird ein Winkel auf −180 … 180 gebracht (`remainder(w, 360)`);
+der Konverter schreibt `std::remainder` und `remainderf` damit.
 Zurückgelesen wird der Lambda-Rumpf als Formel, in ihrer einen kanonischen Schreibweise
 (`Formula::text()`).
+
+**Formel ganzer Zahlen.** `band`, `bor`, `bxor`, `shl`, `shr`, `wrap32`, `wrap32s` und `mul32` geben für
+jede Zahl eine ganze Zahl und nehmen ihre Argumente als ganze Zahlen (zur 0 hin abgeschnitten) – das steht
+bei jeder dieser Funktionen in der Tabelle der Formel-Funktionen (formula.cpp, `whole`), nirgends sonst.
+Eine Formel, deren Wurzel eine solche Funktion ist und die jeden Eingang nur als Argument einer solchen
+Funktion liest (`Formula::whole_result()`, unten), und deren Eingänge alle Drähte von einem Int sind, steht mit Int-Eingängen
+und einem Int da, die Ints so, wie sie sind (ohne `kern::to<Float>`):
+`Seed = kern::to<Int>(kern::formula([](Int s) -> Int { return kern::math::bxor(s, kern::math::wrap32(kern::math::shl(s, 13.0))); }, Seed));`
+Der Graph ist derselbe (der Draht vom Int in den Float-Eingang der Formel), und in jeder Stufe derselbe
+Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double; die Klasse reicht die ganze Zahl
+weiter (`kern::math::Exact`) – ihre Bits sind die des doubles, das sie ist (genau, solange sie in ±2^53
+liegt, sonst über dieses double), und ihr Int ist `normal` von ihr, also `whole` ihres doubles. Zahlen im
+Ausdruck sind wie sonst `double`-Literale (`13.0`; `band(a, 0.5)` nimmt 0).
+`+`, `−` und `×` dürfen zwischen solchen Funktionen stehen (`wrap32(a + b)`, `wrap32(base + mul32(i, s))`,
+`band(a * b - 1.0, 255.0)`): ganz sind sie dort, wo sie nur Eingänge, geschriebene Zahlen, solche Funktionen
+und einander bekommen und ihr Wert selbst als ganze Zahl gelesen wird (`kWholeOperators` in formula.cpp,
+neben der Tabelle). Ihr Wert ist in jeder Stufe der der Formel – die beiden Zahlen als double, als double
+verknüpft. Die Klasse rechnet ihn in i64, wo das dasselbe ist (jede Zahl darin und jedes Ergebnis auf dem
+Weg eine ganze Zahl von höchstens 2^53: dann ist jede Operation über das double exakt), sonst über die doubles
+(`logic::Sum` in nodes.h: der Wert wird erst ausgerechnet, wo er gebraucht wird – als Zahl genau wie die
+Formel, an `band` … `mul32` als ganze Zahl, als Int `whole` dieser Zahl).
+
+**Int-Eingänge und Int-Ergebnis, Eingang für Eingang** (`Formula::int_input(k)`, `Formula::whole_result()` – eine
+Regel am Ausdruck, keine Namen). Ein Eingang ist ein `Int`, wo sein Draht von einem Int kommt und die Formel ihn
+nur als ganze Zahl liest: als Argument einer solchen Funktion, als Seite eines Vergleichs (`==` `!=` `<` `<=` `>`
+`>=`), dessen andere Seite ein Eingang, eine geschriebene Zahl, eine solche Funktion oder ein solches `+`/`−`/`×` ist,
+oder durch `+`, `−`, `×` (die nur Eingänge, Zahlen, solche Funktionen und einander bekommen), deren Wert selbst so
+gelesen wird oder der Wert der Formel ist. Unter `/`, `%`, `^`, einer anderen Funktion, `-a`, `!` oder `?:` ist er
+ein Float (Int/Int wäre in C++ ganzzahlige Division; `/` steht ohnehin als `kern::math::div`). Jeder andere Eingang
+ist ein Float wie oben – ein Float-Eingang oder eine geschriebene Zahl macht nur diesen Eingang zum Float:
+`kern::formula([](Int a, Float f) -> Float { return a + f; }, n3.item, 0.25)`.
+Das Ergebnis ist ein `Int`, wo jeder Eingang einer ist und die Wurzel eine solche Funktion ist oder ein `+`/`−`/`×`,
+in dem ein Eingang steht – im zweiten Fall nur, wo alles, was den Wert liest, ein Int ist (jenseits der Enden von Int
+ist das Int sein Ende, das double nicht): `List[kern::to<Int>(kern::formula([](Int i) -> Int { return i - 1.0; }, i))]`.
+Sonst ein `Float`, auch mit Int-Eingängen: `kern::formula([](Int i, Int n) -> Float { return (i < 0.0) != (n < 0.0); }, i, n)`.
+In jeder Stufe derselbe Wert: Interpreter und JIT rechnen wie bei jeder Formel über das double. In der Klasse ist jedes
+Int als double exakt (`normal`), und die Umwandlung erhält die Ordnung – der Vergleich zweier Ints oder eines Ints mit
+einer Zahl in i64 bzw. über das double gibt, was der der doubles gibt (auch an 2^53 und ±(2^63 − 1): `a == 9007199254740993`
+vergleicht mit dem double 2^53); `+`/`−`/`×` sind `logic::Sum` – als Float genau die double-Rechnung, als Int
+`whole` von ihr (ganzzahlig, wo jede Zahl auf dem Weg in ±2^53 liegt). Der Leser lehnt ab: `Int` an einem Eingang,
+den die Formel anders liest (`div(a, 2.0)`, `-a`, `a * sqrt(2.0)`, `a < 3.0 ? a : 1.0`); `-> Int` mit einem Float-Eingang,
+mit einer Wurzel, die kein Int gibt (`a < 3.0`, `sin(a)`, `band(a, 1.0) + 2.0`), oder mit `+`/`−`/`×` an der Wurzel und
+einem Leser, der kein Int ist; eine geschriebene Zahl oder ein `kern::to` an einem Int-Eingang.
 
 ## Wo was steht
 
@@ -803,10 +1486,96 @@ Parametern und lokalen Variablen, in C++ ohnehin, im Interpreter und im JIT, wei
 unterbrochenen Aufruf die seinen zurückgibt. Was Knoten geben und behalten (`n7`), gehört wie immer
 dem Blueprint, nicht dem Aufruf.
 
+**Das Target beim Namen.** Find Actor by Name (`actor_find("Military")`) fragt in jeder Stufe den
+Host: `logic::Host::find_actor` – der Interpreter und das JIT im Knoten, die Klasse über
+`kern_world.host`, alle drei mit demselben Aufruf. Der Host eines Spiels nennt den Actor seiner Welt
+(`GameWorld::find_actor`: ein lebender des Namens, sonst irgendeiner, sonst keiner); ein Host ohne
+Welt nennt keinen – es sei denn, er nennt eigene: ein Test gibt so den Instanzen seiner Runtime Namen
+(`Runtime::add(g, self, …)` mit dem `self`, das `find_actor` für den Namen gibt), und Call on Actor
+und Get Variable on Actor treffen sie, wie sie im Spiel die Actors des Levels treffen.
+
+**Aufrufe aus C++.** Das C++ eines Programms ruft eine Funktion des Blueprints eines Actors so, wie
+Call on Actor sie ruft: `kern::logic::ActorBlueprint` (kern/logic/actor_blueprint.h) ist der
+Blueprint eines Actors des Levels, beim Namen des Actors gemacht. Das Programm bindet ihn an die Logik,
+in der die Blueprints des Levels laufen (`bool bind(kern::logic::Runtime&)`), sobald seine Welt läuft;
+danach findet **jeder Aufruf** den Actor beim Namen (`Host::find_actor`) und dessen laufenden Blueprint
+(`Runtime::find`) – wie `actor_find("Military")` im Blueprint, bei jedem Aufruf. Kein Zeiger auf einen
+Blueprint wird gehalten: Ein Actor, dessen Blueprint ersetzt wird, wird mit dem neuen gerufen, ein
+Name, den der Host nicht kennt, ist kein Actor – der Blueprint des Levels. Ein Aufruf gibt die Werte
+typisiert hinein und nimmt die Ausgänge der Reihe nach in die Plätze, die `std::tie` nennt:
+
+```cpp
+kern::logic::ActorBlueprint rules{"Military"};
+if (!rules.bind(logic)) return false;   // (der Actor hat keinen Blueprint, der läuft)
+f64 chance = 0;
+rules.call("HitChance", std::tie(chance), distance, speed);
+```
+
+ist als Blueprint `if (!func_has_blueprint(actor_find("Military"))) …` und
+`func_call_on<"HitChance">(actor_find("Military"), kern::out(n7.chance), distance, speed);` – mit
+`KERN_EXTERN HitChanceResult HitChance(Float d = 0.0, Float speed = 0.0);`. `bind` gibt zurück, ob der
+Actor einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt): **Has Blueprint**
+(`func_has_blueprint(Actor)`, unter „Functions“; Target leer: das Level). Die Logik, an die gebunden
+wird, ist im Blueprint seine eigene – ein Blueprint läuft in genau einer, der seines Levels. Darum
+ist ein Parameter `kern::logic::Runtime&` einer Funktion im Blueprint kein Pin: Er nennt die Logik, in
+der die Funktion läuft, und die gibt der Aufruf nicht noch einmal mit (der Konverter schreibt eine
+Funktion mit einem solchen Parameter, wo jeder Aufruf ihr die Logik weitergibt, die er selbst
+bekommen hat).
+
+**Ein Weg.** Call on Actor und Get Variable on Actor gehen durch denselben Weg der Laufzeit, gleich wer
+ruft – ein Knoten (mit den Pins, die sein Blueprint erklärt) oder das C++ des Programms (mit seinen
+Typen), in jeder Stufe: `Runtime::call_on(target, function, args, got, caller)` und
+`Runtime::get_on(target, name, as, out)`. Dort ist festgelegt:
+
+- Ziel 0 ist der Blueprint des Levels.
+- Hat das Ziel keinen Blueprint, oder einen, der nicht läuft (`disabled`: Fehler, gestoppt), oder hat
+  er die Funktion nicht, gibt der Aufruf nichts: Der Knoten hat die erklärten Defaults, das C++ die
+  Nullen seiner Typen.
+- Aufrufe auf Blueprints schachteln höchstens 64 tief; darüber wird der Aufruf ausgelassen und
+  gemeldet (mit dem Namen dessen, der ruft – im C++: „the program's C++“).
+- Ist der Blueprint des Ziels mitten in einem Aufruf derselben Funktion (Interpreter, JIT), hat der
+  unterbrochene Aufruf danach seine eigenen Werte zurück – wie in der Klasse, deren Methoden ihre
+  Parameter und lokalen Variablen selbst halten.
+- Eine Variable wird gelesen, wenn ihr Typ zu dem wird, als den der Leser sie liest
+  (`logic::convertible`: eine Zahl zu einer Zahl, der Wert einer Aufzählung zu dem einer Aufzählung,
+  eine Struktur zu einer Struktur, eine Liste zu einer Liste ihrer Art); sonst ist es die Null des
+  Typs. Welche Struktur und welche Aufzählung der Leser meint, sagt sein eigener Typ: Der Wert wird zu
+  ihm wie ein Wert von außen (was keiner seiner Werte ist, ist sein Default) – wie die Ausgänge eines
+  Aufrufs, über deren Namen der Blueprint des Ziels auch nichts sagt.
+
+Werte sind
+Flags, ganze Zahlen, Kommazahlen (64 Bit: eine 32-Bit-Zahl geht als die Dezimalzahl hinein, für die
+sie steht), Vektoren (`Vec3` oder ein eigener Typ des Programms, der zu einem `Vec3` wird und aus einem
+gemacht wird), Texte, Werte von Aufzählungen, Strukturen und Listen von all dem. Eine Struktur
+ist eine einfache Struktur des Programms (ein Aggregat: öffentliche Felder, kein eigener Konstruktor,
+keine Basis), deren Felder der Reihe nach die des Structs im Blueprint des Actors sind –
+`kern::fields_of(s)` (kern/core/fields.h) nennt sie, ohne dass eine Liste der Felder daneben steht.
+Ein Feld ist selbst ein solcher Wert, eine Kommazahl darin hat 64 Bit. Der Konverter prüft jeden Pin
+gegen den Blueprint des Actors: ein Wert für sich wird umgewandelt wie an einem Draht (im C++ in den
+Typ seines Platzes, im Blueprint in den erklärten), ein Feld einer
+Struktur und ein Eintrag einer Liste nicht – sie müssen den Typ des Blueprints haben, sonst wartet
+der Aufruf mit Grund. Jeder Ausgang beginnt mit der Null seines
+Typs: Ist kein Blueprint gebunden, hat der Actor keinen, der läuft, oder hat er die Funktion nicht,
+gibt der Aufruf das – wie Call on Actor die erklärten Defaults gibt, und die Erklärung einer Funktion
+eines anderen Blueprints hat die Nullen. Die Werte werden vor den Ausgängen genommen: Ein Wert darf aus
+einem Platz kommen, in den ein Ausgang geht.
+
+Eine Funktion mit einem Ausgang ist dort auch ein Wert: `f64 s = rules.number("Speed", x);`,
+`bool seen = rules.flag("Seen", p);` – als Blueprint derselbe Call on Actor mit einem Ausgang. Eine
+Variable des Blueprints liest `rules.get<f64>("MaxSpeed")` – als Blueprint
+`func_get_on<"MaxSpeed", Float>(actor_find("Military"))` (Get Variable on Actor), eine Liste von
+Strukturen `rules.get<std::vector<GateRow>>("Gates")` – `func_get_on<"Gates", List<GateRow>>(…)`;
+wo kein Blueprint gebunden ist, der Actor keinen hat oder der die Variable nicht, ist es die Null des
+Typs.
+
 **Wie tief es geht.** Gezählt werden Events, die aus Handlern heraus Handler erreichen: höchstens
 64 ineinander, dann wird die Kette gestoppt und es wird gemeldet – in jeder Stufe beim selben
-Event. Funktionsaufrufe zählen nicht mit: Sie können sich nicht selbst erreichen, und in C++ sind
-sie gewöhnliche Aufrufe. Werte lesen einander so tief, wie der Graph es vorgibt (ein Ausdruck in
+Event. Funktionsaufrufe zählen nicht mit. Sie schachteln höchstens 65.536 tief
+(`Runtime::kCallsDeep`) – im Interpreter und mit dem JIT ein Rahmen je Aufruf, nicht ein Aufruf von
+C++, also unabhängig vom Stapel der Maschine; der Aufruf darüber stoppt die Kette und den Blueprint
+(„function calls nest more than 65536 deep“), in beiden Stufen beim selben Aufruf. Die Klasse ruft
+ihre Methoden wie C++, ohne Zähler: Wie tief C++ kommt, lässt C++ offen (sein Stapel) – ein Aufruf,
+der so tief führt, wird im Vergleichstest nicht verglichen. Werte lesen einander so tief, wie der Graph es vorgibt (ein Ausdruck in
 C++ hat auch keine Grenze).
 
 **Wege, die sich wieder treffen.** Führen alle Wege eines Branch (oder Switch) in denselben Knoten,
@@ -836,6 +1605,21 @@ in denen C++ weiterliefe, wo der Graph aufhört.
 
 **Funktionen mit Ausgängen.** Endet ein Weg ohne Return-Knoten, behalten die Ausgänge ihre
 Vorgaben: Der Rumpf endet dann mit `return {};` (kein Knoten).
+
+**Werte eines Aufrufs.** Was ein Schritt einer Funktion gibt (`n14 = Fn(args);`, `n5.value = (Heat += x);`)
+und was eine Schleife der Funktion sich merkt, während sie läuft (Index, Eintrag), gehört dem Aufruf, wie ein
+Wert in C++: Es steht lokal in der Methode – als erste Zeilen ihres Rumpfs, nach den lokalen Variablen, nach
+Ids –, wenn jeder Schritt, der es liest (auch über Werte), auf dem Weg dieser Funktion steht und erst nach ihm
+kommt: Kein Weg vom Function Entry zu einem Leser geht an dem Schritt vorbei (eine Schleife, deren Rumpf vor ihm
+liest, ein anderer Ausgang einer Sequence oder eines Branch tun das). Eine Schleife gibt ihre Werte in ihrem Rumpf:
+was nach Completed ihren Index liest, liest nach einer Schleife ohne Durchlauf, was sie in einem früheren Aufruf gab –
+ihr Zustand bleibt dann ein Member. Sonst bleibt es ein Member der Klasse:
+gelesen in einem anderen Rumpf (`go<id>`, ein Event, ein Wert mehrerer Rümpfe), nach einem Warten, oder wo der
+Schritt in diesem Aufruf noch nicht gelaufen sein kann (dann liest man, was er im letzten Aufruf gab – in jeder
+Stufe). Was ein Knoten über Aufrufe hinweg behält (Do Once, Gate, Flip Flop, Wartezeit, Zufallsfolge), bleibt
+immer ein Member. Der Leser nimmt einen solchen Wert auch als Member an (die Form früherer Texte – derselbe
+Blueprint); geschrieben wird er lokal. Eine Deklaration im Rumpf einer Funktion für einen Knoten, der nicht so
+dieser Funktion gehört, weist er ab.
 
 ## Regeln: was kein Blueprint sein darf
 
@@ -884,9 +1668,12 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
 - **Eine Funktion eines anderen Blueprints** (`KERN_EXTERN`) hat hier keinen Rumpf: kein Function
   Entry, kein Return, kein Call und kein Function Value mit ihrem Namen, keine lokalen Variablen,
   nicht pure. Aufgerufen wird sie mit Call on Actor – ein Schritt.
-- **Eine Funktion läuft nicht noch einmal, während sie läuft:** Sie ruft sich nicht selbst auf,
-  auch nicht über andere Funktionen. (Nach einem Warten ist sie zu Ende; sich dann aufzurufen,
-  geht.)
+- **Eine Funktion darf sich selbst aufrufen**, auch über andere Funktionen – als Schritt (Call
+  Function), jeder Aufruf mit seinen eigenen Werten (Parameter, lokale Variablen, was seine Schritte
+  geben und seine Schleifen sich merken), wie in C++. Nicht als Wert: Eine Funktion, die als Wert
+  gelesen wird (pure), in einem solchen Kreis läse sich selbst – ein Wert hat keine Kreise. Und
+  was ein Schritt einer Funktion im Kreis gibt, liest nur ihr eigener Weg nach ihm (siehe „Werte
+  eines Aufrufs“: sonst wäre es ein Member für alle Aufrufe).
 - **Eine Funktion, die als Wert gelesen wird (pure), rechnet nur:** kein Set oder Add (außer auf ihre eigenen lokalen Variablen), kein
   Warten, kein Do Once, Gate oder Flip Flop, keine Aktion – und was sie als Schritt aufruft,
   rechnet ebenfalls nur. Verzweigen, Schleifen und andere Werte lesen darf sie. So ist es gleich,
@@ -898,8 +1685,11 @@ Verstöße als Fehler am betroffenen Knoten; der Editor nimmt solche Namen gar n
   anderen Blueprints (`KERN_EXTERN`) keine. Die Referenzen stehen vor den Eingängen als Wert
   (die haben einen Default, und in C++ hat nach einem Parameter mit Default jeder weitere einen).
 - **Ein Eintrag, der gehalten wird, bleibt, wo er ist:** Solange ein Aufruf einen Platz in einer
-  Liste hält, ändert nichts in ihm die Länge dieser Liste oder ersetzt sie, und nichts in ihm
+  Liste oder einer Map hält, ändert nichts in ihm die Länge dieser Liste oder Map oder ersetzt sie, und nichts in ihm
   kann Handler starten (siehe „Referenz-Eingänge“).
+- **Eine Map und ein Set** haben Schlüssel vom Typ Bool, Int, Int64, Text oder einer Aufzählung; die
+  Werte einer Map sind keine Map, kein Set und keine Liste fester Länge. Eine Map hat keine feste
+  Länge (`"count"` steht nur bei einer Liste).
 - **Add to Variable** zählt Zahlen: Integer oder Float. Menge und Ergebnis haben den Typ der
   Variablen – eine ganze Zahl wird ganzzahlig erhöht (`Count += 1;`).
 
@@ -920,6 +1710,8 @@ Form:
   Wert des Typs (bei einer Struktur: jedes Feld mit seinem Default).
 - Ohne `KERN_LAYOUT`-Block bekommen neue Knoten Ids und Plätze automatisch.
 - Ein Wert ohne `std::move`, wo der Text des Graphen es hat (derselbe Graph).
+- Eine ausgeschriebene Liste (`List<Float>{1.0, 2.0}`) als Default eines Platzes fester Länge: Es
+  sind seine Einträge, wie C++ sie nähme (nicht mehr, als er hat).
 
 Abgelehnt wird – immer mit Zeile, Spalte und dem Grund, oft mit der richtigen Schreibweise:
 
@@ -1113,7 +1905,7 @@ Aufruf Zeichen für Zeichen mit dem Interpreter** – Ergebnisse und alle Variab
 und beim Namen durch eine `logic::Instance`, die den Graphen als diese Klasse ausführt. Dazu
 spielen die Tier-Fälle (`logic_cases.h`), die ein Compiler schon ausführt, als Klassen dasselbe
 Szenario wie Interpreter und JIT – Begin Play, Events, Ticks, Wartezeiten, State Machines – mit
-demselben Ergebnis: alle 23, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
+demselben Ergebnis: alle 28, auch Aufrufe auf einem Blueprint (`call_on`: eine Funktion, die sich
 so selbst aufruft, eine erklärte Funktion, die niemand hat, und Aufrufe ohne Ende), lokale Variablen (`locals`: Zahlen und ein Text, zwei
 Funktionen mit einer gleichnamigen, eine Pure-Funktion, die ihre eigene setzt, und ein Aufruf, den
 ein zweiter Aufruf derselben Funktion unterbricht), Übergeben (`handing_over`: ein Return, das eine
@@ -1121,7 +1913,14 @@ lokale Variable und Eingänge weiterreicht, ein Set und ein Aufruf, die nehmen, 
 gab – und daneben dieselben Werte dort, wo sie noch gebraucht und also kopiert werden; Take an einer
 Variablen, einem Feld, einem Listeneintrag, neben einer Liste und in einer lokalen Variablen), Listen in
 einem Zug (`lists_at_once`: Set Length kürzt und füllt, Append und Insert List vorn, mittendrin, hinter dem
-Ende und in sich selbst, Reserve), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
+Ende und in sich selbst, Reserve), Maps und Sets (`maps`: Schlüssel vom Typ Int,
+Text, Aufzählung, Int64 und Bool, Werte als Zahlen, Texte, Listen und Strukturen, jeder Knoten beider,
+ein Wert einer Map als Platz – `Cells[i].Count += 1`, eine Liste darin, ein Platz neben der Map –,
+Herausnehmen mitten aus der Reihenfolge und ein Schlüssel, der danach wieder ans Ende kommt), Int64
+(`int64`: jeder Knoten, Werte über 2^53, Division durch 0 und das kleinste `i64` durch −1, Shifts um
+mehr als 63, Floats jenseits der Enden, Texte, die keine Zahl sind), Listen fester Länge (`fixed_lists`: Variable, Feld – auch von Strukturen in
+einer festen Liste –, Ein- und Ausgang, lokale Variable, Referenz; gesetzt mit längeren und kürzeren Listen,
+über Make und Take), Listen (`lists`: jeder Schritt, For Each über eine Liste, die
 ihr Rumpf ändert, und eine Schleife, deren Rumpf sie selbst wieder startet), Aufzählungen
 (`enums`: eine Variable und eine Liste vom Typ einer Aufzählung, Switch on Enum, der Weg zu Index
 und Name und zurück, alle Werte in einem For Each), Strukturen (`structs`: eine Variable und eine
@@ -1129,8 +1928,11 @@ Liste vom Typ einer Struktur mit einer Aufzählung, einer Struktur und Listen al
 Break und Set Field, Vergleich Feld für Feld, ein Eintrag jenseits der Liste), die Endlosschleife (`infinite_loop`: der Wächter stoppt sie in
 jeder Stufe beim selben Durchlauf), ein Handler, der sein eigenes Event auslöst
 (`event_reentry`), eine Funktion, die über ein Event wieder aufgerufen wird, und Events, die
-tiefer als 64 ineinander liegen (`function_reentry`), ganze Zahlen an ihren Enden
-(`whole_numbers`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
+tiefer als 64 ineinander liegen (`function_reentry`), Funktionen, die sich selbst rufen
+(`recursion_direct`: Fib(15) = 610, eine Schleife über den inneren Aufruf; `recursion_through`: über eine
+andere; `recursion_deep`: 5.000 tief; `recursion_endless`: der 65.537. Aufruf stoppt, in Interpreter und JIT
+gleich – die Klasse rechnet ihn nicht, `Case::cpp_leaves_open`), ganze Zahlen an ihren Enden
+(`whole_numbers`), das Vorzeichen von −0 (`signed_zero`: Copy Sign und `copysign` der Formel), die Bytes einer Struktur (`bytes`), Tweens und Timer (`waits`), Zustände (`states`) und Zufall (`random`).
 Die Blueprints: alle Ablaufformen (`Flow`), Funktionen als Wert und als Schritt (`Calls`), jeder
 Draht zwischen verschiedenen Typen (`Casts`), Listen jedes Typs mit jedem Index, auch weit
 jenseits der Liste (`Lists`), Aufzählungen als Variablen, in Listen und durch Funktionen, Switch

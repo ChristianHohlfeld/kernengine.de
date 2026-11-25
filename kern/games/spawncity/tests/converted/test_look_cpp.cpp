@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,10 +34,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
-};
 enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
 constexpr f32 kPi = 3.14159265358979323846;
 struct Quat {
@@ -143,6 +139,11 @@ struct Mat4 {
 
 
 
+  /// The same, where nobody asks whether it is one.
+  
+
+
+
 };
 struct Camera {
   Vec3 eye{0, -18, 8}, target{0, 0, 2}, up{0, 0, 1};
@@ -154,11 +155,32 @@ struct Camera {
   bool has_projection = false;
   Mat4 projection = Mat4{};
 };
-enum class Surface : u8 { none, cloth, tpu, floor };
-enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter };
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { enum class JointType : u8 { revolute, distance, prismatic, wheel, weld, motor, spherical, parallel, filter }; }
 constexpr f32 kDeg = kPi / 180.0;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
 inline f32 damp_alpha(f32 rate, f32 dt) { return rate > 0 && dt > 0 ? 1.0 - kern::math::exp(-rate * dt) : 0.0; }
+struct Rng {
+  // Plain state: `Rng{seed}` starts at that seed, an Rng of its own starts at the default one. A
+  // seed must not be 0 (xorshift would stay there) - a seed that is computed goes through seeded().
+  u32 s = 0x9e3779b9u;
+  f32 spare_ = 0;           // gaussian(): the second number of a pair, kept for the next call
+  bool has_spare_ = false;
+  /// The generator for a seed that may be 0 (0: the default seed).
+  
+  u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+  f32 unit() { return static_cast<f32>(next() >> 8) * (1.0 / 16777216.0); }
+  
+  /// Standard normal (Box-Muller), as SpawnCity's sensor noise.
+  
+
+
+
+
+
+
+
+};
 struct SkyState {
   Vec3 sun{-0.45, -0.52, 0.72};
   Vec3 moon{0.4, 0.5, 0.76};
@@ -168,7 +190,6 @@ struct SkyState {
   f32 blast_age = -1;          // < 0: no shock wave in the clouds
   Vec2 wind{0.012, 0.004};
 };
-enum class AoQuality : u8 { low = 0, medium = 1, high = 2, ultra = 3 };
 struct Lighting {
   Vec3 sun_direction{-0.45, -0.52, 0.72};
   Vec3 sun_color{2.8, 2.47, 2.11};
@@ -186,43 +207,57 @@ struct Lighting {
   f32 fog_sun_scatter = 0;     // 0..1: fog brightens toward the sun (in-scattering)
   f32 fog_horizon = 0;         // 0..1: the sky fades into the fog colour at the horizon
 };
-struct Shake {
+namespace look { struct Shake {
   static constexpr f32 kDecayPerS = 1.35, kMaxAngle = 0.055, kMaxOffset = 0.09, kFreq = 19;
   f32 trauma = 0, seed = 17.3;
   void add(f32 amount, f32 cap = 1);
   /// Advances the decay; fills camera-local angles (pitch about right, yaw about up, roll about
   /// forward) and offsets (right, up). False when there is nothing to apply.
   bool sample(f32 dt, f64 time_s, f32 scale, Vec3& angles, Vec2& offset);
-};
-f32 weapon_trauma(bool full_auto, bool heavy, bool drone, f32& cap);
-f32 blast_trauma(f32 distance, f32 radius);
-void shake_camera(Camera& c, Vec3 angles, Vec2 offset);
-struct Stabilizer {
+}; }
+namespace look { f32 weapon_trauma(bool full_auto, bool heavy, bool drone, f32& cap); }
+namespace look { f32 blast_trauma(f32 distance, f32 radius); }
+namespace look { void shake_camera(Camera& c, Vec3 angles, Vec2 offset); }
+namespace look { struct Stabilizer {
   static constexpr f32 kPositionHz = 55, kOrientationHz = 45, kTeleport = 0.35, kTargetTeleport = 2.5;
   bool init = false;
   Vec3 pos, target, up;
   f32 lag = 0;  // metres between the raw and the shown eye (debug)
   
   void apply(Camera& c, f32 dt);
-};
-f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Lighting& l, SkyState& sky);
-f32 follow_phase(f32 mine, f32 authority);
-f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref);
-Vec3 hex_linear(u32 rgb);
-int police_flash(f32 now_s);
-int drone_flash(f32 now_s, int index);
-Vec3 mix3(Vec3 a, Vec3 b, f32 t) { return a + (b - a) * t; }
-f32 smooth(f32 e0, f32 e1, f32 x) {
+}; }
+namespace look { struct SpeedLines {
+  static constexpr f32 kStart = 13, kFull = 40;  // m/s
+  static constexpr int kCount = 26;
+  struct Streak { f32 a, r, len, v; bool warm; };
+  Streak s[kCount] = {};
+  bool seeded = false, have_last = false;
+  Vec3 last;
+  f32 speed = 0, k = 0;
+  Rng rng{0x5eed};
+  /// Camera position per frame; returns the strength k in [0,1].
+  f32 update(Vec3 eye, f32 dt);
+  void respawn(int i);
+}; }
+namespace look { f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Lighting& l, SkyState& sky); }
+namespace look { f32 follow_phase(f32 mine, f32 authority); }
+namespace look { bool parse_time(const char* text, f32& phase); }
+namespace look { f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref); }
+namespace look { Vec3 hex_linear(u32 rgb); }
+namespace look { int police_flash(f32 now_s); }
+namespace look { int drone_flash(f32 now_s, int index); }
+namespace look { Vec3 mix3(Vec3 a, Vec3 b, f32 t) { return a + (b - a) * t; } }
+namespace look { f32 smooth(f32 e0, f32 e1, f32 x) {
   const f32 t = clampf((x - e0) / (e1 - e0), 0, 1);
   return t * t * (3 - 2 * t);
-}
-f32 noise(f32 t, f32 o) { return kern::math::sin(t + o) * 0.5 + kern::math::sin(t * 2.31 + o * 1.7) * 0.3 + kern::math::sin(t * 4.17 + o * 2.3) * 0.2; }
-Vec3 rotate_about(Vec3 v, Vec3 axis, f32 a) { return Quat::axis_angle(axis, a).rotate(v); }
-void Shake::add(f32 amount, f32 cap) {
+} }
+namespace look { f32 noise(f32 t, f32 o) { return kern::math::sin(t + o) * 0.5 + kern::math::sin(t * 2.31 + o * 1.7) * 0.3 + kern::math::sin(t * 4.17 + o * 2.3) * 0.2; } }
+namespace look { Vec3 rotate_about(Vec3 v, Vec3 axis, f32 a) { return Quat::axis_angle(axis, a).rotate(v); } }
+namespace look { void Shake::add(f32 amount, f32 cap) {
   if (!(amount > 0)) return;
   trauma = std::fmax(trauma, std::fmin(cap, trauma + amount));
-}
-bool Shake::sample(f32 dt, f64 time_s, f32 scale, Vec3& angles, Vec2& offset) {
+} }
+namespace look { bool Shake::sample(f32 dt, f64 time_s, f32 scale, Vec3& angles, Vec2& offset) {
   angles = {};
   offset = {};
   if (trauma <= 0) return false;
@@ -233,25 +268,25 @@ bool Shake::sample(f32 dt, f64 time_s, f32 scale, Vec3& angles, Vec2& offset) {
   angles = {kMaxAngle * s * scale * noise(t, seed), kMaxAngle * s * scale * noise(t, seed + 11), kMaxAngle * 0.7 * s * scale * noise(t, seed + 23)};
   offset = {kMaxOffset * s * scale * noise(t * 0.8, seed + 37), kMaxOffset * s * scale * noise(t * 0.8, seed + 51)};
   return true;
-}
-f32 weapon_trauma(bool full_auto, bool heavy, bool drone, f32& cap) {
+} }
+namespace look { f32 weapon_trauma(bool full_auto, bool heavy, bool drone, f32& cap) {
   // Full-auto builds up to a steady rumble (capped at 0.42), heavy weapons punch.
   if (full_auto) { cap = 0.42; return drone ? 0.07 : 0.035; }
   cap = 1;
   return heavy ? 0.28 : 0.2;
-}
-f32 blast_trauma(f32 distance, f32 radius) {
+} }
+namespace look { f32 blast_trauma(f32 distance, f32 radius) {
   radius = clampf(radius, 1, 400);
   const f32 reach = radius * 9 + 30;
   if (distance > reach) return 0;
   const f32 k = kern::math::pow(1 - distance / reach, 1.6), size = clampf(radius / 12, 0.25, 0.9);
   return k * size;
-}
-void shake_camera(Camera& c, Vec3 angles, Vec2 offset) {
-  const f32 dist = std::fmax(0.5, length(c.target - c.eye));
-  Vec3 f = normalize(c.target - c.eye, {1, 0, 0});
-  Vec3 r = normalize(cross(f, c.up), {0, -1, 0});
-  Vec3 u = cross(r, f);
+} }
+namespace look { void shake_camera(Camera& c, Vec3 angles, Vec2 offset) {
+  const f32 dist = std::fmax(0.5, converted::wide::length(c.target - c.eye));
+  Vec3 f = converted::wide::normalize(c.target - c.eye, {1, 0, 0});
+  Vec3 r = converted::wide::normalize(converted::wide::cross(f, c.up), {0, -1, 0});
+  Vec3 u = converted::wide::cross(r, f);
   // three.js order: rotateX (pitch about the camera's right), rotateY (yaw about its up), rotateZ (roll).
   f = rotate_about(f, r, angles.x);
   u = rotate_about(u, r, angles.x);
@@ -262,35 +297,60 @@ void shake_camera(Camera& c, Vec3 angles, Vec2 offset) {
   c.eye += r * offset.x + u * offset.y;
   c.target = c.eye + f * dist;
   c.up = u;
-}
-void Stabilizer::apply(Camera& c, f32 dt) {
+} }
+namespace look { void Stabilizer::apply(Camera& c, f32 dt) {
   const Vec3 raw_pos = c.eye, raw_target = c.target, raw_up = c.up;
-  const bool teleport = !init || length(pos - raw_pos) > kTeleport || length(target - raw_target) > kTargetTeleport;
+  const bool teleport = !init || converted::wide::length(pos - raw_pos) > kTeleport || converted::wide::length(target - raw_target) > kTargetTeleport;
   if (teleport) {
     pos = raw_pos;
     target = raw_target;
-    up = normalize(raw_up, {0, 0, 1});
+    up = converted::wide::normalize(raw_up, {0, 0, 1});
     init = true;
   } else {
     const f32 pa = damp_alpha(kPositionHz, dt), oa = damp_alpha(kOrientationHz, dt);
     pos += (raw_pos - pos) * pa;
     target += (raw_target - target) * oa;
-    up = normalize(up + (raw_up - up) * oa, {0, 0, 1});
+    up = converted::wide::normalize(up + (raw_up - up) * oa, {0, 0, 1});
   }
-  lag = length(pos - raw_pos);
+  lag = converted::wide::length(pos - raw_pos);
   c.eye = pos;
   c.target = target;
   c.up = up;
-}
-f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Lighting& l, SkyState& sky) {
+} }
+namespace look { void SpeedLines::respawn(int i) {
+  Streak& t = converted::at(s, i);
+  t.a = rng.unit() * 2 * kPi;
+  t.r = 0.15 + rng.unit() * 0.5;
+  t.len = 0.08 + rng.unit() * 0.22;
+  t.v = 0.9 + rng.unit() * 1.4;
+  t.warm = i % 3 == 0;
+} }
+namespace look { f32 SpeedLines::update(Vec3 eye, f32 dt) {
+  if (!seeded) { for (int i = 0; i < kCount; converted::pre_inc(i)) respawn(i); seeded = true; }
+  // A jump of more than 25 m in one frame is a teleport (mode switch, respawn), not speed.
+  if (have_last && dt > 0 && converted::wide::length(eye - last) < 25) {
+    const f32 d = converted::wide::length(eye - last) / dt;
+    speed += (std::fmin(d, 90.0) - speed) * std::fmin(1.0, dt * 4);
+  }
+  last = eye;
+  have_last = true;
+  k = clampf((speed - kStart) / (kFull - kStart), 0, 1);
+  if (k <= 0) return 0;
+  for (int i = 0; i < kCount; converted::pre_inc(i)) {
+    converted::at(s, i).r += converted::at(s, i).v * dt * (0.6 + 1.8 * k);
+    if (converted::at(s, i).r > 1.15) respawn(i);
+  }
+  return k;
+} }
+namespace look { f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Lighting& l, SkyState& sky) {
   // Kern's GameWorld::apply_lighting (runtime.cpp) with the game's clock: 0.25 sunrise, 0.5 noon, 0.75 sunset.
   const f32 angle = (tod - 0.25) * 2 * kPi;
   const f32 az = sun_azimuth_deg * kDeg;
   const Vec3 across{kern::math::cos(az + kPi * 0.5), kern::math::sin(az + kPi * 0.5), 0};
   const Vec3 toward{kern::math::cos(az), kern::math::sin(az), 0};
   // Kern: a summer sun - higher, so the night is short (about a third of the cycle, not half)
-  const Vec3 sun = normalize(across * (-kern::math::cos(angle) * 0.62) + toward * 0.38 + Vec3{0, 0, kern::math::sin(angle) + 0.3}, {0, 0, 1});
-  const Vec3 moon = normalize(Vec3{-sun.x, -sun.y, std::fmax(0.35, -sun.z)}, {0, 0, 1});
+  const Vec3 sun = converted::wide::normalize(across * (-kern::math::cos(angle) * 0.62) + toward * 0.38 + Vec3{0, 0, kern::math::sin(angle) + 0.3}, {0, 0, 1});
+  const Vec3 moon = converted::wide::normalize(Vec3{-sun.x, -sun.y, std::fmax(0.35, -sun.z)}, {0, 0, 1});
   const f32 night = smooth(0.06, -0.16, sun.z);
   const f32 dusk = clampf(1 - std::fabs(sun.z) * 4, 0, 1) * (1 - night * 0.6);
   const Vec3 day_sun{4.6, 4.05, 3.46}, dusk_sun{3.75, 2.05, 1.02}, moon_light{0.36, 0.42, 0.62};  // Kern: a brighter moon (was .16 .2 .32)
@@ -318,60 +378,80 @@ f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Li
   sky.moon = moon;
   sky.night = night;
   return night;
-}
-f32 follow_phase(f32 mine, f32 authority) {
+} }
+namespace look { f32 follow_phase(f32 mine, f32 authority) {
   f32 d = authority - mine;
   d -= std::round(d);
   if (std::fabs(d) < 0.0005) return mine;
   f32 p = mine + (std::fabs(d) < 0.01 ? d * 0.5 : d);
   p -= std::floor(p);
   return p;
-}
-f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref) {
+} }
+namespace look { bool parse_time(const char* text, f32& phase) {
+  std::size_t at = 0;  // (where the reading stands)
+  while (text[at] == ' ') ++at;
+  if (!text[at]) return false;
+  char* end = nullptr;
+  const f64 a = std::strtod(text + at, &end);
+  if (end == text + at) return false;
+  if (*end == ':') {
+    const f64 m = std::strtod(end + 1, &end);
+    if (a < 0 || a > 24 || m < 0 || m >= 60) return false;
+    phase = static_cast<f32>(kern::math::mod((a + m / 60) / 24, 1.0));
+    return true;
+  }
+  if (a < 0) return false;
+  // Up to 1: a phase; otherwise hours.
+  phase = static_cast<f32>(a <= 1 ? kern::math::mod(a, 1.0) : kern::math::mod(a / 24, 1.0));
+  return true;
+} }
+namespace look { f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref) {
   const f32 d2 = std::fmax(d_ref * d_ref, 0.04), r2 = std::fmax(0.01, range * range);
   const f32 w = 1 - d2 / r2;
   const f32 att = w > 0 ? w * w / (1 + d2 / r2) : 0;
   if (att <= 0) return 0;
   // three: E = I / d^2, diffuse BRDF albedo / pi. Kern: point = I_k 0.12 att (times pi / pi).
   return three_intensity / (kPi * d2) / (0.12 * att);
-}
-Vec3 hex_linear(u32 rgb) {
+} }
+namespace look { Vec3 hex_linear(u32 rgb) {
   auto lin = [](f32 c) { return c <= 0.04045 ? c / 12.92 : kern::math::pow((c + 0.055) / 1.055, 2.4); };
   return {lin(static_cast<f32>((rgb >> 16) & 255) / 255), lin(static_cast<f32>((rgb >> 8) & 255) / 255), lin(static_cast<f32>(rgb & 255) / 255)};
-}
-int police_flash(f32 now_s) {
+} }
+namespace look { int police_flash(f32 now_s) {
   const i64 slot = converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor(now_s * 1000 / 110))), 6);
   return slot == 0 || slot == 2 ? 1 : slot == 3 || slot == 5 ? 2 : 0;
-}
-int drone_flash(f32 now_s, int index) {
-  const i64 slot = converted::rem_bits((converted::plus_bits((converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor((now_s * 1000 + index * 37) / 92))), 8)), 8)), 8);
+} }
+namespace look { int drone_flash(f32 now_s, int index) {
+  const i64 slot = converted::rem_bits((converted::plus_bits((converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor((now_s * 1000 + converted::times(index, 37)) / 92))), 8)), 8)), 8);
   return slot <= 1 ? 1 : slot == 4 || slot == 5 ? 2 : 0;
-}
+} }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static Shake draw_look__Shake(converted::Draw& draw) {
-  Shake s{};
+[[maybe_unused]] static look::Shake draw_look__Shake(converted::Draw& draw) {
+  look::Shake s{};
   s.trauma = draw.number();
   s.seed = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Shake& s) { return converted::Value::structure({arg(s.trauma), arg(s.seed)}); }
-[[maybe_unused]] static bool same(const Shake& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.trauma, (*got.rows)[0]) && same(want.seed, (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const Shake& s) { return defined(s.trauma) && defined(s.seed); }
-[[maybe_unused]] static std::string text(const Shake& s) { return std::string("{") + text(s.trauma) + ", " + text(s.seed) + "}"; }
-[[maybe_unused]] static void take(Shake& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.trauma, (*v.rows)[0]); converted::take_as<double>(s.seed, (*v.rows)[1]); }
+namespace look { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const look::Shake& s) { return converted::Value::structure({arg(s.trauma), arg(s.seed)}); }
+[[maybe_unused]] static bool same(const look::Shake& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.trauma, (*got.rows)[0]), ".trauma") && converted::at_place(same(want.seed, (*got.rows)[1]), ".seed"); }
+[[maybe_unused]] static bool defined(const look::Shake& s) { return defined(s.trauma) && defined(s.seed); }
+[[maybe_unused]] static std::string text(const look::Shake& s) { return std::string("{") + text(s.trauma) + ", " + text(s.seed) + "}"; }
+[[maybe_unused]] static void take(look::Shake& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.trauma, (*v.rows)[0]); converted::take_as<double>(s.seed, (*v.rows)[1]); }
+}
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
-  for (auto& e : s.m) e = draw.number();
+  converted::fill_array(s.m, [&]() -> double { return draw.number(); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(std::vector<double>(std::begin(s.m), std::end(s.m)))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
-[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
-[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
+[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::array_list(want.m), (*got.rows)[0]), ".m"); }
+[[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
+[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
 [[maybe_unused]] static Camera draw_kern__Camera(converted::Draw& draw) {
   Camera s{};
   s.eye = draw.vector();
@@ -387,12 +467,12 @@ int drone_flash(f32 now_s, int index) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Camera& s) { return converted::Value::structure({arg(s.eye), arg(s.target), arg(s.up), arg(s.fov), arg(s.near), arg(s.far), arg(s.orthographic), arg(s.ortho_height), arg(s.has_projection), arg(s.projection)}); }
-[[maybe_unused]] static bool same(const Camera& want, const converted::Value& got) { return got.rows && got.rows->size() == 10 && same(want.eye, (*got.rows)[0]) && same(want.target, (*got.rows)[1]) && same(want.up, (*got.rows)[2]) && same(want.fov, (*got.rows)[3]) && same(want.near, (*got.rows)[4]) && same(want.far, (*got.rows)[5]) && same(want.orthographic, (*got.rows)[6]) && same(want.ortho_height, (*got.rows)[7]) && same(want.has_projection, (*got.rows)[8]) && same(want.projection, (*got.rows)[9]); }
+[[maybe_unused]] static bool same(const Camera& want, const converted::Value& got) { return converted::rows_of(got, 10) && converted::at_place(same(want.eye, (*got.rows)[0]), ".eye") && converted::at_place(same(want.target, (*got.rows)[1]), ".target") && converted::at_place(same(want.up, (*got.rows)[2]), ".up") && converted::at_place(same(want.fov, (*got.rows)[3]), ".fov") && converted::at_place(same(want.near, (*got.rows)[4]), ".near") && converted::at_place(same(want.far, (*got.rows)[5]), ".far") && converted::at_place(same(want.orthographic, (*got.rows)[6]), ".orthographic") && converted::at_place(same(want.ortho_height, (*got.rows)[7]), ".ortho_height") && converted::at_place(same(want.has_projection, (*got.rows)[8]), ".has_projection") && converted::at_place(same(want.projection, (*got.rows)[9]), ".projection"); }
 [[maybe_unused]] static bool defined(const Camera& s) { return defined(s.eye) && defined(s.target) && defined(s.up) && defined(s.fov) && defined(s.near) && defined(s.far) && defined(s.orthographic) && defined(s.ortho_height) && defined(s.has_projection) && defined(s.projection); }
 [[maybe_unused]] static std::string text(const Camera& s) { return std::string("{") + text(s.eye) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.fov) + ", " + text(s.near) + ", " + text(s.far) + ", " + text(s.orthographic) + ", " + text(s.ortho_height) + ", " + text(s.has_projection) + ", " + text(s.projection) + "}"; }
 [[maybe_unused]] static void take(Camera& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 10) return; converted::take_as<Vec3>(s.eye, (*v.rows)[0]); converted::take_as<Vec3>(s.target, (*v.rows)[1]); converted::take_as<Vec3>(s.up, (*v.rows)[2]); converted::take_as<double>(s.fov, (*v.rows)[3]); converted::take_as<double>(s.near, (*v.rows)[4]); converted::take_as<double>(s.far, (*v.rows)[5]); converted::take_as<bool>(s.orthographic, (*v.rows)[6]); converted::take_as<double>(s.ortho_height, (*v.rows)[7]); converted::take_as<bool>(s.has_projection, (*v.rows)[8]); converted::take_as<Mat4>(s.projection, (*v.rows)[9]); }
-[[maybe_unused]] static Stabilizer draw_look__Stabilizer(converted::Draw& draw) {
-  Stabilizer s{};
+[[maybe_unused]] static look::Stabilizer draw_look__Stabilizer(converted::Draw& draw) {
+  look::Stabilizer s{};
   s.init = draw.flag();
   s.pos = draw.vector();
   s.target = draw.vector();
@@ -400,11 +480,59 @@ int drone_flash(f32 now_s, int index) {
   s.lag = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Stabilizer& s) { return converted::Value::structure({arg(s.init), arg(s.pos), arg(s.target), arg(s.up), arg(s.lag)}); }
-[[maybe_unused]] static bool same(const Stabilizer& want, const converted::Value& got) { return got.rows && got.rows->size() == 5 && same(want.init, (*got.rows)[0]) && same(want.pos, (*got.rows)[1]) && same(want.target, (*got.rows)[2]) && same(want.up, (*got.rows)[3]) && same(want.lag, (*got.rows)[4]); }
-[[maybe_unused]] static bool defined(const Stabilizer& s) { return defined(s.init) && defined(s.pos) && defined(s.target) && defined(s.up) && defined(s.lag); }
-[[maybe_unused]] static std::string text(const Stabilizer& s) { return std::string("{") + text(s.init) + ", " + text(s.pos) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.lag) + "}"; }
-[[maybe_unused]] static void take(Stabilizer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<bool>(s.init, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.target, (*v.rows)[2]); converted::take_as<Vec3>(s.up, (*v.rows)[3]); converted::take_as<double>(s.lag, (*v.rows)[4]); }
+namespace look { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const look::Stabilizer& s) { return converted::Value::structure({arg(s.init), arg(s.pos), arg(s.target), arg(s.up), arg(s.lag)}); }
+[[maybe_unused]] static bool same(const look::Stabilizer& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.init, (*got.rows)[0]), ".init") && converted::at_place(same(want.pos, (*got.rows)[1]), ".pos") && converted::at_place(same(want.target, (*got.rows)[2]), ".target") && converted::at_place(same(want.up, (*got.rows)[3]), ".up") && converted::at_place(same(want.lag, (*got.rows)[4]), ".lag"); }
+[[maybe_unused]] static bool defined(const look::Stabilizer& s) { return defined(s.init) && defined(s.pos) && defined(s.target) && defined(s.up) && defined(s.lag); }
+[[maybe_unused]] static std::string text(const look::Stabilizer& s) { return std::string("{") + text(s.init) + ", " + text(s.pos) + ", " + text(s.target) + ", " + text(s.up) + ", " + text(s.lag) + "}"; }
+[[maybe_unused]] static void take(look::Stabilizer& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<bool>(s.init, (*v.rows)[0]); converted::take_as<Vec3>(s.pos, (*v.rows)[1]); converted::take_as<Vec3>(s.target, (*v.rows)[2]); converted::take_as<Vec3>(s.up, (*v.rows)[3]); converted::take_as<double>(s.lag, (*v.rows)[4]); }
+}
+[[maybe_unused]] static look::SpeedLines::Streak draw_look__SpeedLines__Streak(converted::Draw& draw) {
+  look::SpeedLines::Streak s{};
+  s.a = draw.number();
+  s.r = draw.number();
+  s.len = draw.number();
+  s.v = draw.number();
+  s.warm = draw.flag();
+  return s;
+}
+namespace look { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const look::SpeedLines::Streak& s) { return converted::Value::structure({arg(s.a), arg(s.r), arg(s.len), arg(s.v), arg(s.warm)}); }
+[[maybe_unused]] static bool same(const look::SpeedLines::Streak& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.a, (*got.rows)[0]), ".a") && converted::at_place(same(want.r, (*got.rows)[1]), ".r") && converted::at_place(same(want.len, (*got.rows)[2]), ".len") && converted::at_place(same(want.v, (*got.rows)[3]), ".v") && converted::at_place(same(want.warm, (*got.rows)[4]), ".warm"); }
+[[maybe_unused]] static bool defined(const look::SpeedLines::Streak& s) { return defined(s.a) && defined(s.r) && defined(s.len) && defined(s.v) && defined(s.warm); }
+[[maybe_unused]] static std::string text(const look::SpeedLines::Streak& s) { return std::string("{") + text(s.a) + ", " + text(s.r) + ", " + text(s.len) + ", " + text(s.v) + ", " + text(s.warm) + "}"; }
+[[maybe_unused]] static void take(look::SpeedLines::Streak& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<double>(s.a, (*v.rows)[0]); converted::take_as<double>(s.r, (*v.rows)[1]); converted::take_as<double>(s.len, (*v.rows)[2]); converted::take_as<double>(s.v, (*v.rows)[3]); converted::take_as<bool>(s.warm, (*v.rows)[4]); }
+}
+[[maybe_unused]] static Rng draw_Rng(converted::Draw& draw) {
+  Rng s{};
+  s.s = static_cast<unsigned int>(draw.below(40));
+  s.spare_ = draw.number();
+  s.has_spare_ = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Rng& s) { return converted::Value::structure({arg(s.s), arg(s.spare_), arg(s.has_spare_)}); }
+[[maybe_unused]] static bool same(const Rng& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.s, (*got.rows)[0]), ".s") && converted::at_place(same(want.spare_, (*got.rows)[1]), ".spare_") && converted::at_place(same(want.has_spare_, (*got.rows)[2]), ".has_spare_"); }
+[[maybe_unused]] static bool defined(const Rng& s) { return defined(s.s) && defined(s.spare_) && defined(s.has_spare_); }
+[[maybe_unused]] static std::string text(const Rng& s) { return std::string("{") + text(s.s) + ", " + text(s.spare_) + ", " + text(s.has_spare_) + "}"; }
+[[maybe_unused]] static void take(Rng& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.s, (*v.rows)[0]); converted::take_as<double>(s.spare_, (*v.rows)[1]); converted::take_as<bool>(s.has_spare_, (*v.rows)[2]); }
+[[maybe_unused]] static look::SpeedLines draw_look__SpeedLines(converted::Draw& draw) {
+  look::SpeedLines s{};
+  converted::fill_array(s.s, [&]() -> look::SpeedLines::Streak { return draw_look__SpeedLines__Streak(draw); });
+  s.seeded = draw.flag();
+  s.have_last = draw.flag();
+  s.last = draw.vector();
+  s.speed = draw.number();
+  s.k = draw.number();
+  s.rng = draw_Rng(draw);
+  return s;
+}
+namespace look { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const look::SpeedLines& s) { return converted::Value::structure({arg(converted::array_list(s.s)), arg(s.seeded), arg(s.have_last), arg(s.last), arg(s.speed), arg(s.k), arg(s.rng)}); }
+[[maybe_unused]] static bool same(const look::SpeedLines& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(converted::array_list(want.s), (*got.rows)[0]), ".s") && converted::at_place(same(want.seeded, (*got.rows)[1]), ".seeded") && converted::at_place(same(want.have_last, (*got.rows)[2]), ".have_last") && converted::at_place(same(want.last, (*got.rows)[3]), ".last") && converted::at_place(same(want.speed, (*got.rows)[4]), ".speed") && converted::at_place(same(want.k, (*got.rows)[5]), ".k") && converted::at_place(same(want.rng, (*got.rows)[6]), ".rng"); }
+[[maybe_unused]] static bool defined(const look::SpeedLines& s) { return defined(converted::array_list(s.s)) && defined(s.seeded) && defined(s.have_last) && defined(s.last) && defined(s.speed) && defined(s.k) && defined(s.rng); }
+[[maybe_unused]] static std::string text(const look::SpeedLines& s) { return std::string("{") + text(converted::array_list(s.s)) + ", " + text(s.seeded) + ", " + text(s.have_last) + ", " + text(s.last) + ", " + text(s.speed) + ", " + text(s.k) + ", " + text(s.rng) + "}"; }
+[[maybe_unused]] static void take(look::SpeedLines& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; { std::vector<look::SpeedLines::Streak> items; converted::take_as<std::vector<look::SpeedLines::Streak>>(items, (*v.rows)[0]); converted::array_from(s.s, items); } converted::take_as<bool>(s.seeded, (*v.rows)[1]); converted::take_as<bool>(s.have_last, (*v.rows)[2]); converted::take_as<Vec3>(s.last, (*v.rows)[3]); converted::take_as<double>(s.speed, (*v.rows)[4]); converted::take_as<double>(s.k, (*v.rows)[5]); converted::take_as<Rng>(s.rng, (*v.rows)[6]); }
+}
 [[maybe_unused]] static Lighting draw_kern__Lighting(converted::Draw& draw) {
   Lighting s{};
   s.sun_direction = draw.vector();
@@ -424,7 +552,7 @@ int drone_flash(f32 now_s, int index) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const Lighting& s) { return converted::Value::structure({arg(s.sun_direction), arg(s.sun_color), arg(s.sky_color), arg(s.ground_color), arg(s.fog_color), arg(s.fog_density), arg(s.exposure), arg(s.env_intensity), arg(s.env_zenith), arg(s.env_horizon), arg(s.env_ground), arg(s.fog_height_falloff), arg(s.fog_sun_scatter), arg(s.fog_horizon)}); }
-[[maybe_unused]] static bool same(const Lighting& want, const converted::Value& got) { return got.rows && got.rows->size() == 14 && same(want.sun_direction, (*got.rows)[0]) && same(want.sun_color, (*got.rows)[1]) && same(want.sky_color, (*got.rows)[2]) && same(want.ground_color, (*got.rows)[3]) && same(want.fog_color, (*got.rows)[4]) && same(want.fog_density, (*got.rows)[5]) && same(want.exposure, (*got.rows)[6]) && same(want.env_intensity, (*got.rows)[7]) && same(want.env_zenith, (*got.rows)[8]) && same(want.env_horizon, (*got.rows)[9]) && same(want.env_ground, (*got.rows)[10]) && same(want.fog_height_falloff, (*got.rows)[11]) && same(want.fog_sun_scatter, (*got.rows)[12]) && same(want.fog_horizon, (*got.rows)[13]); }
+[[maybe_unused]] static bool same(const Lighting& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.sun_direction, (*got.rows)[0]), ".sun_direction") && converted::at_place(same(want.sun_color, (*got.rows)[1]), ".sun_color") && converted::at_place(same(want.sky_color, (*got.rows)[2]), ".sky_color") && converted::at_place(same(want.ground_color, (*got.rows)[3]), ".ground_color") && converted::at_place(same(want.fog_color, (*got.rows)[4]), ".fog_color") && converted::at_place(same(want.fog_density, (*got.rows)[5]), ".fog_density") && converted::at_place(same(want.exposure, (*got.rows)[6]), ".exposure") && converted::at_place(same(want.env_intensity, (*got.rows)[7]), ".env_intensity") && converted::at_place(same(want.env_zenith, (*got.rows)[8]), ".env_zenith") && converted::at_place(same(want.env_horizon, (*got.rows)[9]), ".env_horizon") && converted::at_place(same(want.env_ground, (*got.rows)[10]), ".env_ground") && converted::at_place(same(want.fog_height_falloff, (*got.rows)[11]), ".fog_height_falloff") && converted::at_place(same(want.fog_sun_scatter, (*got.rows)[12]), ".fog_sun_scatter") && converted::at_place(same(want.fog_horizon, (*got.rows)[13]), ".fog_horizon"); }
 [[maybe_unused]] static bool defined(const Lighting& s) { return defined(s.sun_direction) && defined(s.sun_color) && defined(s.sky_color) && defined(s.ground_color) && defined(s.fog_color) && defined(s.fog_density) && defined(s.exposure) && defined(s.env_intensity) && defined(s.env_zenith) && defined(s.env_horizon) && defined(s.env_ground) && defined(s.fog_height_falloff) && defined(s.fog_sun_scatter) && defined(s.fog_horizon); }
 [[maybe_unused]] static std::string text(const Lighting& s) { return std::string("{") + text(s.sun_direction) + ", " + text(s.sun_color) + ", " + text(s.sky_color) + ", " + text(s.ground_color) + ", " + text(s.fog_color) + ", " + text(s.fog_density) + ", " + text(s.exposure) + ", " + text(s.env_intensity) + ", " + text(s.env_zenith) + ", " + text(s.env_horizon) + ", " + text(s.env_ground) + ", " + text(s.fog_height_falloff) + ", " + text(s.fog_sun_scatter) + ", " + text(s.fog_horizon) + "}"; }
 [[maybe_unused]] static void take(Lighting& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec3>(s.sun_direction, (*v.rows)[0]); converted::take_as<Vec3>(s.sun_color, (*v.rows)[1]); converted::take_as<Vec3>(s.sky_color, (*v.rows)[2]); converted::take_as<Vec3>(s.ground_color, (*v.rows)[3]); converted::take_as<Vec3>(s.fog_color, (*v.rows)[4]); converted::take_as<double>(s.fog_density, (*v.rows)[5]); converted::take_as<double>(s.exposure, (*v.rows)[6]); converted::take_as<double>(s.env_intensity, (*v.rows)[7]); converted::take_as<Vec3>(s.env_zenith, (*v.rows)[8]); converted::take_as<Vec3>(s.env_horizon, (*v.rows)[9]); converted::take_as<Vec3>(s.env_ground, (*v.rows)[10]); converted::take_as<double>(s.fog_height_falloff, (*v.rows)[11]); converted::take_as<double>(s.fog_sun_scatter, (*v.rows)[12]); converted::take_as<double>(s.fog_horizon, (*v.rows)[13]); }
@@ -440,314 +568,469 @@ int drone_flash(f32 now_s, int index) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const SkyState& s) { return converted::Value::structure({arg(s.sun), arg(s.moon), arg(s.night), arg(s.clouds), arg(s.blast_direction), arg(s.blast_age), arg(s.wind)}); }
-[[maybe_unused]] static bool same(const SkyState& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(want.sun, (*got.rows)[0]) && same(want.moon, (*got.rows)[1]) && same(want.night, (*got.rows)[2]) && same(want.clouds, (*got.rows)[3]) && same(want.blast_direction, (*got.rows)[4]) && same(want.blast_age, (*got.rows)[5]) && same(want.wind, (*got.rows)[6]); }
+[[maybe_unused]] static bool same(const SkyState& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.sun, (*got.rows)[0]), ".sun") && converted::at_place(same(want.moon, (*got.rows)[1]), ".moon") && converted::at_place(same(want.night, (*got.rows)[2]), ".night") && converted::at_place(same(want.clouds, (*got.rows)[3]), ".clouds") && converted::at_place(same(want.blast_direction, (*got.rows)[4]), ".blast_direction") && converted::at_place(same(want.blast_age, (*got.rows)[5]), ".blast_age") && converted::at_place(same(want.wind, (*got.rows)[6]), ".wind"); }
 [[maybe_unused]] static bool defined(const SkyState& s) { return defined(s.sun) && defined(s.moon) && defined(s.night) && defined(s.clouds) && defined(s.blast_direction) && defined(s.blast_age) && defined(s.wind); }
 [[maybe_unused]] static std::string text(const SkyState& s) { return std::string("{") + text(s.sun) + ", " + text(s.moon) + ", " + text(s.night) + ", " + text(s.clouds) + ", " + text(s.blast_direction) + ", " + text(s.blast_age) + ", " + text(s.wind) + "}"; }
 [[maybe_unused]] static void take(SkyState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<Vec3>(s.sun, (*v.rows)[0]); converted::take_as<Vec3>(s.moon, (*v.rows)[1]); converted::take_as<double>(s.night, (*v.rows)[2]); converted::take_as<bool>(s.clouds, (*v.rows)[3]); converted::take_as<Vec3>(s.blast_direction, (*v.rows)[4]); converted::take_as<double>(s.blast_age, (*v.rows)[5]); converted::take_as<Vec2>(s.wind, (*v.rows)[6]); }
-struct Out_Shake_sample { Shake Self; bool Result; Vec3 angles; Vec2 offset; };
-[[maybe_unused]] static bool same(const Out_Shake_sample& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]) && same(want.angles, (*got.rows)[2]) && same(want.offset, (*got.rows)[3]); }
+struct Out_Shake_sample { look::Shake Self; bool Result; Vec3 angles; Vec2 offset; };
+[[maybe_unused]] static bool same(const Out_Shake_sample& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.angles, (*got.rows)[2]), ".angles") && converted::at_place(same(want.offset, (*got.rows)[3]), ".offset"); }
 [[maybe_unused]] static bool defined(const Out_Shake_sample& s) { return defined(s.Self) && defined(s.Result) && defined(s.angles) && defined(s.offset); }
 [[maybe_unused]] static std::string text(const Out_Shake_sample& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + ", " + text(s.angles) + ", " + text(s.offset) + "}"; }
 struct Out_weapon_trauma { double Result; double cap; };
-[[maybe_unused]] static bool same(const Out_weapon_trauma& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Result, (*got.rows)[0]) && same(want.cap, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_weapon_trauma& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.cap, (*got.rows)[1]), ".cap"); }
 [[maybe_unused]] static bool defined(const Out_weapon_trauma& s) { return defined(s.Result) && defined(s.cap); }
 [[maybe_unused]] static std::string text(const Out_weapon_trauma& s) { return std::string("{") + text(s.Result) + ", " + text(s.cap) + "}"; }
-struct Out_Stabilizer_apply { Stabilizer Self; Camera c; };
-[[maybe_unused]] static bool same(const Out_Stabilizer_apply& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.c, (*got.rows)[1]); }
+struct Out_Stabilizer_apply { look::Stabilizer Self; Camera c; };
+[[maybe_unused]] static bool same(const Out_Stabilizer_apply& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.c, (*got.rows)[1]), ".c"); }
 [[maybe_unused]] static bool defined(const Out_Stabilizer_apply& s) { return defined(s.Self) && defined(s.c); }
 [[maybe_unused]] static std::string text(const Out_Stabilizer_apply& s) { return std::string("{") + text(s.Self) + ", " + text(s.c) + "}"; }
+struct Out_SpeedLines_update { look::SpeedLines Self; double Result; };
+[[maybe_unused]] static bool same(const Out_SpeedLines_update& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_SpeedLines_update& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_SpeedLines_update& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 struct Out_day_lighting { double Result; Lighting l; SkyState sky; };
-[[maybe_unused]] static bool same(const Out_day_lighting& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.Result, (*got.rows)[0]) && same(want.l, (*got.rows)[1]) && same(want.sky, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const Out_day_lighting& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.l, (*got.rows)[1]), ".l") && converted::at_place(same(want.sky, (*got.rows)[2]), ".sky"); }
 [[maybe_unused]] static bool defined(const Out_day_lighting& s) { return defined(s.Result) && defined(s.l) && defined(s.sky); }
 [[maybe_unused]] static std::string text(const Out_day_lighting& s) { return std::string("{") + text(s.Result) + ", " + text(s.l) + ", " + text(s.sky) + "}"; }
+struct Out_parse_time { bool Result; double phase; };
+[[maybe_unused]] static bool same(const Out_parse_time& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.phase, (*got.rows)[1]), ".phase"); }
+[[maybe_unused]] static bool defined(const Out_parse_time& s) { return defined(s.Result) && defined(s.phase); }
+[[maybe_unused]] static std::string text(const Out_parse_time& s) { return std::string("{") + text(s.Result) + ", " + text(s.phase) + "}"; }
 
 SC_TEST(converted_look_cpp) {
   converted::Blueprint bp("look_cpp");
   {  // mix3
     converted::Tally tally("mix3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_look_cpp::mix3(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_look_cpp::look::mix3(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
-      const double a2 = draw.number();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // smooth
     converted::Tally tally("smooth");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_look_cpp::smooth(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_look_cpp::look::smooth(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // noise
     converted::Tally tally("noise");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_look_cpp::noise(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_look_cpp::look::noise(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // rotate_about
     converted::Tally tally("rotate_about");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_look_cpp::rotate_about(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_look_cpp::look::rotate_about(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const Vec3 a1 = draw.vector();
-      const double a2 = draw.number();
+      Vec3 a0 = draw.vector();
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Shake::add
     converted::Tally tally("Shake_add");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Shake a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.add(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] look::Shake& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.add(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const Shake a0 = draw_look__Shake(draw);
-      const double a1 = draw.number();
-      const double a2 = draw.number();
+      look::Shake a0 = draw_look__Shake(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Shake::sample
     converted::Tally tally("Shake_sample");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Shake a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4, [[maybe_unused]] Vec2 a5) { const auto r = converted::counted([&] { return a0.sample(std::move(a1), std::move(a2), std::move(a3), a4, a5); }); return Out_Shake_sample{a0, r, a4, a5}; };
+    const auto run = [&]([[maybe_unused]] look::Shake& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] Vec3& a4, [[maybe_unused]] Vec2& a5) { auto r = converted::counted([&] { return a0.sample(std::move(a1), std::move(a2), std::move(a3), a4, a5); }); return Out_Shake_sample{std::move(a0), std::move(r), std::move(a4), std::move(a5)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Shake a0 = draw_look__Shake(draw);
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
-      const Vec3 a4 = draw.vector();
-      const Vec2 a5 = draw.vector2();
+      look::Shake a0 = draw_look__Shake(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      Vec3 a4 = draw.vector();
+      Vec2 a5 = draw.vector2();
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a5), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a4), arg(a5), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); }, {1, 0, 2, 3});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0, 2, 3});
     }
   }
   {  // weapon_trauma
     converted::Tally tally("weapon_trauma");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] bool a0, [[maybe_unused]] bool a1, [[maybe_unused]] bool a2, [[maybe_unused]] double a3) { const auto r = converted::counted([&] { return converted_look_cpp::weapon_trauma(std::move(a0), std::move(a1), std::move(a2), a3); }); return Out_weapon_trauma{r, a3}; };
+    const auto run = [&]([[maybe_unused]] bool& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] double& a3) { auto r = converted::counted([&] { return converted_look_cpp::look::weapon_trauma(std::move(a0), std::move(a1), std::move(a2), a3); }); return Out_weapon_trauma{std::move(r), std::move(a3)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const bool a0 = draw.flag();
-      const bool a1 = draw.flag();
-      const bool a2 = draw.flag();
-      const double a3 = draw.number();
+      bool a0 = draw.flag();
+      bool a1 = draw.flag();
+      bool a2 = draw.flag();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a3), arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a3), arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // blast_trauma
     converted::Tally tally("blast_trauma");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_look_cpp::blast_trauma(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_look_cpp::look::blast_trauma(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // shake_camera
     converted::Tally tally("shake_camera");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Camera a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec2 a2) { converted::counted([&] { return converted_look_cpp::shake_camera(a0, std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] Camera& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec2& a2) { converted::counted([&] { return converted_look_cpp::look::shake_camera(a0, std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const Camera a0 = draw_kern__Camera(draw);
-      const Vec3 a1 = draw.vector();
-      const Vec2 a2 = draw.vector2();
+      Camera a0 = draw_kern__Camera(draw);
+      Vec3 a1 = draw.vector();
+      Vec2 a2 = draw.vector2();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // Stabilizer::apply
     converted::Tally tally("Stabilizer_apply");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Stabilizer a0, [[maybe_unused]] Camera a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.apply(a1, std::move(a2)); }); return Out_Stabilizer_apply{a0, a1}; };
+    const auto run = [&]([[maybe_unused]] look::Stabilizer& a0, [[maybe_unused]] Camera& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.apply(a1, std::move(a2)); }); return Out_Stabilizer_apply{std::move(a0), std::move(a1)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const Stabilizer a0 = draw_look__Stabilizer(draw);
-      const Camera a1 = draw_kern__Camera(draw);
-      const double a2 = draw.number();
+      look::Stabilizer a0 = draw_look__Stabilizer(draw);
+      Camera a1 = draw_kern__Camera(draw);
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {0, 1});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // SpeedLines::respawn
+    converted::Tally tally("SpeedLines_respawn");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] look::SpeedLines& a0, [[maybe_unused]] int& a1) { converted::counted([&] { return a0.respawn(std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      look::SpeedLines a0 = draw_look__SpeedLines(draw);
+      int a1 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // SpeedLines::update
+    converted::Tally tally("SpeedLines_update");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] look::SpeedLines& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.update(std::move(a1), std::move(a2)); }); return Out_SpeedLines_update{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      look::SpeedLines a0 = draw_look__SpeedLines(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
   {  // day_lighting
     converted::Tally tally("day_lighting");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] Lighting a4, [[maybe_unused]] SkyState a5) { const auto r = converted::counted([&] { return converted_look_cpp::day_lighting(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4, a5); }); return Out_day_lighting{r, a4, a5}; };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] Lighting& a4, [[maybe_unused]] SkyState& a5) { auto r = converted::counted([&] { return converted_look_cpp::look::day_lighting(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4, a5); }); return Out_day_lighting{std::move(r), std::move(a4), std::move(a5)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
-      const Lighting a4 = draw_kern__Lighting(draw);
-      const SkyState a5 = draw_kern__SkyState(draw);
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      Lighting a4 = draw_kern__Lighting(draw);
+      SkyState a5 = draw_kern__SkyState(draw);
+      const std::vector<converted::Value> given = {arg(a4), arg(a5), arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a4), arg(a5), arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); }, {0, 1, 2});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
     }
   }
   {  // follow_phase
     converted::Tally tally("follow_phase");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_look_cpp::follow_phase(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_look_cpp::look::follow_phase(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // parse_time
+    converted::Tally tally("parse_time");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] const char*& a0, [[maybe_unused]] double& a1) { auto r = converted::counted([&] { return converted_look_cpp::look::parse_time(a0, a1); }); return Out_parse_time{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      const char* a0 = draw.c_word();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a1), arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
     }
   }
   {  // kern_intensity
     converted::Tally tally("Kern_intensity");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_look_cpp::kern_intensity(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_look_cpp::look::kern_intensity(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // hex_linear
     converted::Tally tally("hex_linear");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] unsigned int a0) { return converted::counted([&] { return converted_look_cpp::hex_linear(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] unsigned int& a0) { return converted::counted([&] { return converted_look_cpp::look::hex_linear(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      unsigned int a0 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // police_flash
     converted::Tally tally("police_flash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0) { return converted::counted([&] { return converted_look_cpp::police_flash(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0) { return converted::counted([&] { return converted_look_cpp::look::police_flash(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // drone_flash
     converted::Tally tally("drone_flash");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] int a1) { return converted::counted([&] { return converted_look_cpp::drone_flash(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] int& a1) { return converted::counted([&] { return converted_look_cpp::look::drone_flash(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const int a1 = static_cast<int>(draw.whole());
+      double a0 = draw.number();
+      int a1 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

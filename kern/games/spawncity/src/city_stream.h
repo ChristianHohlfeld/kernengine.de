@@ -7,9 +7,9 @@
 
 #include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
+#include "kern/core/map.h"
 #include "kern/geo/buildings.h"
 #include "kern/geo/roads.h"
 #include "kern/gfx/renderer.h"
@@ -58,7 +58,7 @@ class CityStream {
   /// Tiles to fetch now, as JSON [[z,x,y],...] (each tile once).
   std::string take_requests();
   /// Uncompressed MVT bytes of a requested tile (copied).
-  void provide(const TileKey& key, const u8* bytes, std::size_t length);
+  void provide(const TileKey& key, kern::Span<const u8> bytes);
   void fail(const TileKey& key);
   /// No map service: the procedural stand-in town around the origin.
   void go_offline();
@@ -85,11 +85,10 @@ class CityStream {
   /// Walls of loaded buildings whose outline comes within `r` of p.
   void walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const;
   /// The building whose footprint contains p (-1: none); its outer ring, base and top.
-  bool building_at(Vec2 p, std::vector<Vec2>* ring = nullptr, f32* base = nullptr, f32* top = nullptr, u32* seed = nullptr) const;
-  /// The street furniture (tiles.h furnish) of every tile whose ground is final, in a fixed
-  /// order; `furniture_serial` changes whenever that set does.
-  struct Furniture { u64 tile; const std::vector<MapFeatures::Spot>* trees; const std::vector<MapFeatures::Spot>* lamps; };
-  void furniture(std::vector<Furniture>& out) const;
+  bool building_at(Vec2 p) const;
+  /// The tiles whose ground is final, in a fixed order: their street furniture (tiles.h furnish)
+  /// is features(tile).trees and .lamps; `furniture_serial` changes whenever that set does.
+  void furniture(std::vector<u64>& tiles) const;
   u32 furniture_serial() const { return furniture_serial_; }
   /// Where the ground changed since the last call (a crater, a new elevation window): what stands
   /// on it is put on it again.
@@ -109,12 +108,18 @@ class CityStream {
 
   // ---- street life and interiors (M3 life: life.h, interiors.h) ----
   /// A building or area of a built tile: tile hash + index (stable while the tile is loaded).
-  struct BuildingRef { u64 tile = 0; u32 index = 0; const MapFeatures::Building* building = nullptr; };
-  struct AreaRef { u64 key = 0; const MapFeatures::Area* area = nullptr; };
+  /// `key` names an area for as long as its tile is loaded (two references to one area have one key).
+  struct BuildingRef { u64 tile = 0; u32 index = 0; };
+  struct AreaRef { u64 key = 0; u64 tile = 0; u32 index = 0; };
+  /// The map features of a tile (of a tile that is not loaded: none).
+  const MapFeatures& features(u64 tile) const;
+  /// What a reference names, while its tile is loaded.
+  const MapFeatures::Building& building(const BuildingRef& ref) const { return features(ref.tile).buildings[ref.index]; }
+  const MapFeatures::Area& area(const AreaRef& ref) const { return features(ref.tile).areas[ref.index]; }
   /// Buildings of ready tiles whose outline's bounding box comes within `radius` of `p`.
   void buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& out) const;
-  /// The map features of every built tile (the minimap, web/view.mjs).
-  void ready_features(std::vector<const MapFeatures*>& out) const;
+  /// Every built tile (their map features: the minimap, web/view.mjs).
+  void ready_tiles(std::vector<u64>& out) const;
   /// Areas of a kind (meadows: grass) of ready tiles within `radius` of `p`.
   void areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const;
   /// Leaves one building out of the static collision (an entered interior brings its own); the
@@ -154,7 +159,6 @@ class CityStream {
   u32 furniture_serial_ = 0;
   std::vector<kern::Vec4> ground_changes_;
   struct Tile;
-  Tile* tile(const TileKey& k);
   void request_around(Vec3 focus, i32 ring_of);
   void unload_far(Vec3 focus);
   kern::Vec4 ring_bounds(Vec3 focus, i32 r) const;
@@ -199,7 +203,7 @@ class CityStream {
   kern::physics::Shape building_shape(kern::physics::Body body, const MapFeatures::Building& b);
   // damage by building seed: the height above its base that is left, and whether it collapsed
   struct Damage { f32 height = 0; bool leveled = false; };
-  std::unordered_map<u32, Damage> damage_;
+  kern::Map<u32, Damage> damage_;
   std::vector<u32> damage_log_;
   bool damage_quiet_ = false;  // merge_damage(.., false): not logged
   void begin_cells(Tile& t);
@@ -209,7 +213,7 @@ class CityStream {
   kern::physics::World* world_ = nullptr;
   kern::GeoProjector proj_;
   TileKey origin_tile_;
-  std::unordered_map<u64, std::unique_ptr<Tile>> tiles_;
+  kern::Map<u64, std::unique_ptr<Tile>> tiles_;
   std::vector<TileKey> requests_;
   std::vector<Lane> lanes_;
   bool offline_ = false;
@@ -221,5 +225,51 @@ class CityStream {
   u64 excl_tile_ = 0;  // the building left out of the collision (interiors)
   i32 excl_index_ = -1;
 };
+
+// A tile of the city as the stream holds it (here, where every file that has a CityStream sees it whole).
+struct CityStream::Tile {
+  enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed } state = State::requested;
+  TileKey key;
+  u32 tries = 0;       // failed requests so far
+  f64 retry_ms = 0;    // when a failed tile is asked for again
+  bool procedural = false;
+  MapFeatures features;
+  kern::FootprintStream footprints;
+  kern::RoadStream roads;
+  kern::BuildingBuilder buildings;
+  kern::RoadBuilder road_builder;
+  std::vector<u32> meshes;
+  kern::physics::Body body;
+  std::size_t collide_next = 0, upload_next = 0;
+  u32 colliders = 0, triangles = 0;
+  Vec2 center;
+  // terrain: road and area meshes are re-laid when the ground under them changes (craters, water)
+  kern::Vec4 bounds;  // the tile's square (x0, y0, x1, y1), set where the tile is made
+  std::vector<u32> lay_meshes, old_lay;
+  bool relay = false, relay_again = false;
+  Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
+  // the buildings' centres, and the buildings by chunk cell (160 m): the drawn city is made of
+  // cells - each wanted cell is extruded once, off the frame, and stays until it is far behind
+  std::vector<Vec2> cent;
+  kern::Map<u64, std::vector<u32>> cell_items;
+  kern::Set<u64> want_cells;                     // the cells to be drawn now (select_cells)
+  kern::Map<u64, std::vector<u32>> cell_old;     // meshes a finished job replaces (go when its uploads are done)
+  bool cell_uploading = false;
+  // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
+  u32 tile_job = 0, build_job = 0;
+  // destruction: the building chunk meshes by chunk cell; damaged cells are rebuilt alone
+  kern::Map<u64, std::vector<u32>> cell_ids;
+  kern::Set<u64> dirty_cells;
+  std::vector<u64> job_cells;
+  u32 cell_job = 0;
+  std::vector<u8> built_bytes;        // the kBuildings job's output, read one chunk per step
+  std::size_t built_at = 0;
+  bool prepared = false;
+  // interiors (M3 life): one building left out, the collision rebuilt beside the old body
+  i32 skip = -1;
+  kern::physics::Body old_body;
+  bool recollide = false;
+};
+
 
 }  // namespace sc

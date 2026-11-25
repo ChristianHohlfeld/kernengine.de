@@ -39,6 +39,14 @@ struct Case {
   /// type, also none the function's inputs have, and fewer than it has inputs. The class is given
   /// them as the engine gives them (logic::native_arg).
   std::vector<Call> outside = {};
+  /// Functions without inputs that are called once more on the engine itself (native_show.h,
+  /// native_play_on_engine): the interpreter through the host's door, the class by the calls it makes
+  /// itself (kern/logic/engine_direct.h) - the same, value for value.
+  std::vector<std::string> on_engine = {};
+  /// Functions without inputs whose calls need no object of the engine, played on the engine itself in the
+  /// compiled test (native_show.h, native_compare_on_engine): through the host's door, as the class calling the
+  /// engine itself, through the door again - the class gives what the door gives the same twice.
+  std::vector<std::string> on_engine_free = {};
   /// The libraries it uses, with those they use (each a case of its own before it): the
   /// Blueprints of its project.
   std::vector<std::pair<std::string, logic::Graph>> libraries = {};
@@ -222,6 +230,53 @@ struct Workshop : virtual kern::Library, virtual Parts {
 
   struct : kern::Node<10> { Int index = 0; } n10;
   struct : kern::Node<20> { Int index = 0; } n20;
+};
+)kn";
+// Callbacks: a function of a library as a value only the engine calls (Make Callback) - bound to a variable, to a field in
+// one, or to nothing; the place is read where it stands when the value is called (native_show calls it, as the engine would).
+inline const char* kGround = R"kn(
+struct Ground : virtual kern::Library {
+  KERN_STRUCT(Field) {
+    Float Base = 1.0;
+    Float Slope = 0.5;
+  };
+
+  struct heightResult { Float h = 0.0; };
+  /// The height of the field at (x, y): what the engine asks.
+  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {
+    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x - y; }, f.Base, f.Slope, x, y)};
+  }
+  struct highResult { Bool up = false; };
+  KERN_PURE highResult high(Float x = 0.0) {
+    return {math_compare<">">(x, 1.0)};
+  }
+};
+)kn";
+inline const char* kSite = R"kn(
+struct Site : virtual kern::Blueprint, virtual Ground {
+  KERN_STRUCT(Twin) {
+    Field First = Field{1.0, 1.0};
+    Field Second = Field{3.0, -1.0};
+  };
+
+  Field Here = Field{2.0, 0.5};
+  Twin Pair = Twin{Field{1.0, 1.0}, Field{3.0, -1.0}};
+  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};
+  Callback<Float(Float, Float)> Other = Callback<Float(Float, Float)>{};
+
+  struct MakeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; Callback<Bool(Float)> up = Callback<Bool(Float)>{}; };
+  /// Callbacks bound to a variable and to a field in one; one without a place.
+  MakeResult Make(Float base = 0.0) {
+    Here.Base = base;
+    Kept = callback<&Ground::height>(Here);
+    Other = callback<&Ground::height>(Pair.Second);
+    return {callback<&Ground::height>(Here), callback<&Ground::high>()};
+  }
+  /// The places change: what the engine reads when it calls.
+  void Again() {
+    Here.Slope = 3.0;
+    Pair.Second.Base = 7.0;
+  }
 };
 )kn";
 inline const char* kGarage = R"kn(
@@ -770,11 +825,12 @@ struct Lists : kern::Blueprint {
     return {Total, list_length<Text>(Names), n20.index};
   }
 
-  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{0}; Int where = 0; Bool has = false; };
-  /// Get Item of every type (beyond the list: its zero), Find and Contains.
+  struct AtResult { Float score = 0.0; Text name = ""; Int count = 0; Bool flag = false; Vector point = Vector{0.0, 0.0, 0.0}; Actor member = Actor{0}; Int where = 0; Bool has = false; Bool same = false; Bool shorter = false; };
+  /// Get Item of every type (beyond the list: its zero), Find, Contains and Lists Equal.
   KERN_PURE AtResult At(Int index = 0, Text name = "a") {
     return {list_get<Float>(Scores, index), list_get<Text>(Names, index), list_get<Int>(Counts, index), list_get<Bool>(Flags, index), list_get<Vector>(Points, index),
-            list_get<Actor>(Team, index), list_find<Text>(Names, name), list_contains<Text>(Names, name)};
+            list_get<Actor>(Team, index), list_find<Text>(Names, name), list_contains<Text>(Names, name), list_equal<Text>(Names, list_make<Text, "3">(name, "b", "a")),
+            list_equal<Float>(Scores, list_make<Float, "1">(1.0))};
   }
 
   struct FillResult { List<Int> counts = List<Int>{}; List<Bool> flags = List<Bool>{}; List<Vector> points = List<Vector>{}; List<Actor> team = List<Actor>{}; };
@@ -871,13 +927,14 @@ struct Enums : kern::Blueprint {
             enum_equal<Mode>(enum_from_index<Mode>(index).value, enum_from_name<Mode>(name).value)};
   }
 
-  struct TakeResult { Mode picked = Mode::Closing; List<Mode> all = List<Mode>{}; Int count = 0; Bool has = false; Mode third = Mode::Closed; };
+  struct TakeResult { Mode picked = Mode::Closing; List<Mode> all = List<Mode>{}; Int count = 0; Bool has = false; Mode third = Mode::Closed; Bool same = false; Bool all_of_them = false; };
   /// A function takes an enum's value and a list of them (with defaults) and gives them back;
   /// Select and the list nodes in the enum's type.
   TakeResult Take(Mode want = Mode::Open, List<Mode> some = List<Mode>{Mode::Closing, Mode::Open}, Bool pick = true) {
     Wanted = want;
     Seen = some;
-    return {logic_select<Mode>(pick, want, list_get<Mode>(some, 0)), enum_values<Mode>(), list_length<Mode>(some), list_contains<Mode>(some, want), list_get<Mode>(list_make<Mode, "2">(want, Mode::Opening), 2)};
+    return {logic_select<Mode>(pick, want, list_get<Mode>(some, 0)), enum_values<Mode>(), list_length<Mode>(some), list_contains<Mode>(some, want), list_get<Mode>(list_make<Mode, "2">(want, Mode::Opening), 2),
+            list_equal<Mode>(Seen, some), list_equal<Mode>(some, enum_values<Mode>())};
   }
 
   struct WalkResult { Text names = ""; Int last = 0; };
@@ -942,7 +999,7 @@ struct Structs : kern::Blueprint {
             struct_make<Aim>(vector_scale(at, damage), 2), struct_make<Solo>(damage)};
   }
 
-  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; };
+  struct TakeResult { Text name = ""; Kind type = Kind::Melee; Int count = 0; Bool has = false; Int at = 0; Weapon first = Weapon{"Fist", Kind::Melee, 10.0, List<Float>{1.0, 0.5}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{Kind::Magic}}; Aim beyond = Aim{Vector{0.0, 0.0, 1.0}, 3}; Float only = 0.0; Bool same = false; Bool one = false; };
   /// A function takes a struct and a list of them (with defaults); Break; the list nodes of a
   /// struct's type - an item from beyond the list is the struct's default.
   TakeResult Take(Weapon w = Weapon{"Club", Kind::Melee, 7.5, List<Float>{}, Aim{Vector{0.0, 0.0, 1.0}, 3}, List<Aim>{}, true, Actor{0}, List<Kind>{}}, List<Weapon> more = List<Weapon>{}, Solo one = Solo{2.5}) {
@@ -950,7 +1007,7 @@ struct Structs : kern::Blueprint {
     Rack = more;
     One = one;
     return {struct_break<Weapon>(w).Name, struct_break<Weapon>(w).Type, list_length<Weapon>(more), list_contains<Weapon>(more, w), list_find<Weapon>(more, w), list_get<Weapon>(more, 0),
-            struct_break<Weapon>(list_get<Weapon>(more, 5)).Sight, struct_break<Solo>(One).Only};
+            struct_break<Weapon>(list_get<Weapon>(more, 5)).Sight, struct_break<Solo>(One).Only, list_equal<Weapon>(Rack, more), list_equal<Weapon>(more, list_make<Weapon, "1">(w))};
   }
 
   struct LookupResult { Bool found = false; Text name = ""; Int at = 0; Float damage = 0.0; Bool byKind = false; Int kindAt = 0; Int strong = 0; };
@@ -1045,6 +1102,9 @@ inline const char* kFormulas[] = {
     "a ? b : c",
     "min(a, b) + max(b, c) + clamp(a, b, c)",
     "abs(a) + sign(b)",
+    "copysign(a, b)",
+    "copysign(1, a) * 4 + copysign(b, -c)",
+    "remainder(a, b) + remainder(c, 360) * 10 + remainder(a, 0)",
     "floor(a) + ceil(b) * 10 + round(c) * 100 + trunc(a) * 1000",
     "sqrt(a) + pow(b, 2) + exp(c / 1000) + log(b)",
     "sin(a) + cos(b) + tan(c)",
@@ -1078,13 +1138,21 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
       for (Vec3 v : {Vec3{0, 0, 0}, Vec3{1, 0, 0}, Vec3{0, -2, 0}, Vec3{1.5f, 2.5f, -3.5f}, Vec3{1000, 0.001f, 7}}) r.push_back(Value::vector(v));
       break;
     case PinType::text:
-      for (const char* v : {"", "a", "Kern", "hello world", "a \"b\" \\ c\n\ttab", "\xC3\xA4\xE2\x82\xAC"}) r.push_back(Value::text(v));
+      // (and texts C reads numbers from: signs, exponents, hexadecimal, inf and nan, what is beyond the ends)
+      for (const char* v : {"", "a", "Kern", "hello world", "a \"b\" \\ c\n\ttab", "\xC3\xA4\xE2\x82\xAC", " -12.5e3x 7", "0x1Fp-2,0b101 -0", "nan(0x7f) inf 99999999999999999999",
+                            "x=1.5%017,3 4"})
+        r.push_back(Value::text(v));
       break;
     case PinType::actor:
       for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));
       break;
     case PinType::enumeration:
       for (std::size_t k = 0; k < count; ++k) r.push_back(Value::enumeration(static_cast<i64>(k)));
+      break;
+    case PinType::int64:
+      // (64 bits at their ends: the sign bit, beyond 2^53, all ones - and divisors that are 0 and -1)
+      for (u64 v : {u64{0}, u64{1}, ~u64{0}, u64{2}, u64{7}, u64{0} - 13, u64{1} << 63, (u64{1} << 63) - 1, (u64{1} << 53) + 1, u64{0x123456789abcdef0}, u64{0xfedcba9876543210}, u64{64}})
+        r.push_back(Value::int64(v));
       break;
     default: break;
   }
@@ -1106,9 +1174,33 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
 /// The values a pin of a type of the Blueprint `g` is tried with. A struct: its default, and for
 /// each field two more with that field at other values.
 inline std::vector<Value> samples(const logic::TypeRef& t, const logic::Graph& g) {
+  if (logic::is_keyed(t.type)) {
+    // a map or a set of the keys' samples: none, one, all of them in the order they came and the other way round (a map:
+    // with the values' samples, one after the other)
+    const std::vector<Value> keys = samples(logic::key_type(t), g);
+    const std::vector<Value> values = t.type == PinType::map ? samples(logic::value_type(t), g) : std::vector<Value>{Value{}};
+    auto keyed = [&](std::vector<std::size_t> picks) {
+      Value v = Value::zero(t.type);
+      std::size_t n = 0;
+      for (std::size_t k : picks) {
+        if (keys.empty()) break;
+        v.own_entries().try_emplace(logic::key_of(keys[k % keys.size()]), t.type == PinType::map ? values[n++ % values.size()] : Value{});
+      }
+      return logic::fitted(std::move(v), t, g);  // (a map of U8 values holds U8s only - what a C++ caller hands over)
+    };
+    std::vector<std::size_t> all, back;
+    for (std::size_t k = 0; k < keys.size(); ++k) all.push_back(k);
+    back.assign(all.rbegin(), all.rend());
+    return {keyed({}), keyed({1}), keyed(all), keyed(back), keyed({2, 0, 2, 1})};
+  }
   if (logic::element_of(t.type) != PinType::structure) {
     const logic::EnumType* e = g.enumeration(t.of);
-    return samples(t.type, e ? e->values.size() : 0);
+    std::vector<Value> r = samples(t.type, e ? e->values.size() : 0);
+    // (a list of Ints of a width holds its values only - a C++ caller hands over a List<U8>, which holds no -1; one Int of a
+    // width is handed over as an Int, the input holds its low bits)
+    if (t.type == PinType::integer_list && logic::has_width(t))
+      for (Value& v : r) v = logic::fitted(v, t, g);
+    return r;
   }
   std::vector<Value> items;
   if (const logic::StructType* s = g.structure(t.of)) {
@@ -1162,13 +1254,15 @@ inline std::string add_probe(logic::Graph& g, const logic::NodeDef& def, const s
   for (const logic::PinDef& p : in) {
     if (p.type == PinType::exec) continue;
     const std::string name = "i" + std::to_string(f.inputs.size());
-    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of({p.type, p.of}, g).to_json(g, p.of) : p.def, p.of});
+    const logic::TypeRef held = logic::place_type(p);  // (an input of a list of any width: a List<Int> is given)
+    f.inputs.push_back({name, p.type, p.def.is_null() ? logic::zero_of(held, g).to_json(g, held.of) : p.def, held.of});
     g.links.push_back({entry.id, name, node.id, p.id});
   }
   for (const logic::PinDef& p : out) {
     if (p.type == PinType::exec) continue;
     const std::string name = "o" + std::to_string(f.outputs.size());
-    f.outputs.push_back({name, p.type, logic::zero_of({p.type, p.of}, g).to_json(g, p.of), p.of});
+    const logic::TypeRef held = logic::place_type(p);
+    f.outputs.push_back({name, p.type, logic::zero_of(held, g).to_json(g, held.of), held.of});
     g.links.push_back({node.id, p.id, give.id, name});
   }
   g.functions.push_back(f);
@@ -1193,7 +1287,10 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
                                          {"name":"Where","type":"struct","of":"Spot","value":{"Label":"home"}},{"name":"Hours","type":"int_list","value":[6,22]},
                                          {"name":"Stops","type":"struct_list","of":"Spot","value":[{"At":[1,2,3]}]},{"name":"Dry","type":"bool","value":true},
                                          {"name":"Guide","type":"actor","value":0},{"name":"Around","type":"enum_list","of":"Season","value":[0,3]}],"help":"A day of a season."},
-                 {"name":"Lone","fields":[{"name":"Only","type":"int","value":4}]}],"nodes":[],"links":[]})",
+                 {"name":"Lone","fields":[{"name":"Only","type":"int","value":4}]},
+                 {"name":"Wire","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Delta","type":"int","value":-5},{"name":"On","type":"bool","value":true},
+                                          {"name":"Speed","type":"float","value":0.1},{"name":"Rate","type":"float","value":-2.5},{"name":"Key","type":"int64","value":"18446744073709551615"}],
+                  "help":"A packet of numbers (Bytes of Struct)."}],"nodes":[],"links":[]})",
                      types) ||
         !logic::graph_from_json(types, c.graph))
       std::printf("blueprint_native Nodes: its types were not read\n");
@@ -1202,10 +1299,18 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
   const std::vector<std::string>& of_the_game = game::logic_node_types();
   for (const auto& d : lib.all()) {
     if (d->kind != logic::NodeKind::pure || std::find(of_the_game.begin(), of_the_game.end(), d->type) != of_the_game.end()) continue;
+    // (what another actor's Blueprint holds or whether there is one asks the runtime the class runs in - a class
+    // called by itself has none: the tier case on_actor plays them, in every stage, as the engine runs them)
+    if (d->type == "func.get_on" || d->type == "func.has_blueprint") continue;
     std::vector<std::vector<std::pair<std::string, std::string>>> variants{{}};
     if (d->type == "math.formula") {
       variants.clear();
       for (const char* formula : kFormulas) variants.push_back({{"formula", formula}});
+    } else if (d->type == "struct.bytes" || d->type == "struct.of_bytes") {
+      // (every number a layout has, a byte no field covers, and fields that are not in the struct's order)
+      variants = {{{"struct", "Wire"}, {"layout", "28: u32@0 i16@4 bool@6 f32@8 f64@12 u64@20"}},
+                  {{"struct", "Wire"}, {"layout", "24: i8@23 u16@0 bool@2 f64@3 f32@11 i64@15"}},
+                  {{"struct", "Lone"}, {"layout", "4: i32@0"}}, {{"struct", "Lone"}, {"layout", "3: u8@1"}}};
     } else if (d->params.size() == 1 && d->params[0].kind == logic::ParamDef::Kind::choice) {
       variants.clear();
       for (std::size_t i = 0; i + 1 < d->params[0].choices.size(); i += 2) variants.push_back({{d->params[0].key, d->params[0].choices[i]}});
@@ -1446,6 +1551,11 @@ inline std::vector<Case> cases() {
     r.calls.push_back({"next", {samples({PinType::structure, "Rng"}, r.graph).front(), I(5)}});
     Case& d = read("dice", kDice);
     for (i64 step : {i64{1}, i64{4}, i64{-2}}) d.calls.push_back({"roll", {I(step)}});
+    Case& ground = read("Ground", kGround);
+    for (const Value& field : samples({PinType::structure, "Field"}, ground.graph)) ground.calls.push_back({"height", {field, N(1.5), N(-2.0)}});
+    ground.calls.push_back({"high", {N(2.0)}});
+    Case& site = read("Site", kSite);
+    site.calls = {{"Make", {N(0.5)}}, {"Again", {}}, {"Make", {N(-3.0)}}};
     Case& c = read("Garage", kGarage);
     const i64 most = std::numeric_limits<i64>::max();
     for (i64 car : {i64{0}, i64{1}, i64{-1}, most})
@@ -1493,6 +1603,13 @@ inline std::vector<Case> cases() {
     // the host's stand-in - what each gives is in a variable of the Blueprint.
     Case& c = read("Engine", engine_case::kEngine);
     for (const char* run : engine_case::kRuns) c.calls.push_back({run, {}});
+    // ... and its calls on objects of the engine once more on the engine itself: there the class calls every
+    // function itself, typed, and does what the interpreter does through the door.
+    for (const char* run : engine_case::kRunsOnObjects) c.on_engine.push_back(run);
+    // ... and the others, the free functions, in the compiled test itself: three plays, each from the same state
+    // of the engine; only what a clock gave is not compared (native_show.h, native_compare_on_engine).
+    for (const char* run : engine_case::kRuns)
+      if (std::find(c.on_engine.begin(), c.on_engine.end(), run) == c.on_engine.end()) c.on_engine_free.push_back(run);
   }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.
@@ -1501,7 +1618,7 @@ inline std::vector<Case> cases() {
     c.name = std::string("Tier_") + t.name;
     c.graph = logic_cases::parse(t);
     c.scenario = true;
-    if (logic::native_ready(c.graph)) all.push_back(std::move(c));
+    if (logic::native_ready(c.graph) && !t.cpp_leaves_open) all.push_back(std::move(c));  // (what C++ leaves open is no case for the class)
   }
   return all;
 }
@@ -1576,19 +1693,32 @@ inline const char* builtin_cpp_type(PinType t) {
     case PinType::integer: return "kern::i64";
     case PinType::number: return "kern::f64";
     case PinType::vector: return "kern::Vec3";
-    case PinType::text: return "std::string";
+    case PinType::text: return "kern::logic::Text";
     case PinType::actor: return "kern::logic::ActorHandle";
+    case PinType::int64: return "kern::logic::Int64";
     case PinType::boolean_list: return "kern::List<bool>";
     case PinType::integer_list: return "kern::List<kern::logic::Whole>";
     case PinType::number_list: return "kern::List<kern::f64>";
     case PinType::vector_list: return "kern::List<kern::Vec3>";
-    case PinType::text_list: return "kern::List<std::string>";
+    case PinType::text_list: return "kern::List<kern::logic::Text>";
     case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
+    case PinType::int64_list: return "kern::List<kern::logic::Int64>";
     default: return "void";
   }
 }
 /// A pin's type in C++, outside the class `owner` (an enum and a struct are the class's own: Owner::Mode).
 inline std::string cpp_type(PinType t, const std::string& of = {}, const std::string& owner = {}) {
+  if (logic::is_keyed(t)) {
+    // a map or a set as the class holds it: Map<Int, Float> - its keys and values of the class's types (an Int: Whole)
+    const logic::TypeRef k = logic::key_type({t, of});
+    // (a value of a width: Sized<u8>, as in a List<U8>)
+    auto part = [&](const logic::TypeRef& p) {
+      if (p.type == PinType::integer) return logic::has_width(p) ? "kern::logic::Sized<kern::" + p.of + ">" : std::string("kern::logic::Whole");
+      return cpp_type(p.type, p.of, owner);
+    };
+    return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
+  }
+  if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
@@ -1610,6 +1740,7 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
     case PinType::vector: return "kern::Vec3{" + number(v.v.x, "f") + ", " + number(v.v.y, "f") + ", " + number(v.v.z, "f") + "}";
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
+    case PinType::int64: std::snprintf(b, sizeof b, "kern::logic::Int64{0x%llxull}", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;
     case PinType::enumeration: return "static_cast<" + owner + "::" + of + ">(" + std::to_string(v.i) + ")";
     case PinType::structure: {
       const logic::StructType* s = g ? g->structure(of) : nullptr;
@@ -1618,6 +1749,16 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
       return r + "}";
     }
     default: break;
+  }
+  if (logic::is_keyed(v.type)) {
+    // a map: Map<K, V>{{key, value}, ...}, a set: Set<K>{key, ...} - in the order the keys came
+    const logic::TypeRef k = logic::key_type({v.type, of}), val = v.type == PinType::map ? logic::value_type({v.type, of}) : logic::TypeRef{};
+    std::string r = cpp_type(v.type, of, owner) + "{";
+    for (std::size_t n = 0; n < v.size(); ++n) {
+      const std::string key = cpp_value(logic::key_value(v.keyed().key_at(n), k.type), k.of, owner, g);
+      r += (n ? ", " : "") + (v.type == PinType::map ? "{" + key + ", " + cpp_value(v.keyed().value_at(n), val.of, owner, g) + "}" : key);
+    }
+    return r + "}";
   }
   if (!logic::is_list(v.type)) return "0";
   std::string r = cpp_type(v.type, of, owner) + "{";
@@ -1660,11 +1801,12 @@ inline bool write_file(const std::string& path, const std::string& text) {
 }
 
 /// Writes <dir>/bp_<Name>.h (the Blueprint's text, as it is, and its glue), blueprint_native_main.cpp
-/// (the calls) and blueprint_native_expected.txt (the interpreter's answers).
+/// (the calls), blueprint_native_expected.txt (the interpreter's answers) and, where a case is played
+/// on the engine itself, blueprint_native_on_engine.txt (the interpreter's answers there).
 inline bool emit(const std::string& dir, const std::vector<Case>& all, std::string* error) {
   std::string main = "// written by kern_tests --emit-native: the calls of the native Blueprint test\n"
                      "#include <cstdio>\n#include <fstream>\n#include <limits>\n#include <sstream>\n#include <string>\n\n#include \"logic_cases.h\"\n#include \"native_show.h\"\n";
-  std::string runs, expected;
+  std::string runs, expected, on_engine, on_engine_runs, on_engine_free_runs;
   for (const Case& c : all) {
     std::string text, glue, why;
     if (!logic::native_ready(c.graph, &why) || !logic::to_cpp(c.graph, c.name, text, &why) || !logic::native_glue(c.graph, c.name, glue, &why, logic::library(), {}, c.blueprints())) {
@@ -1694,6 +1836,30 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       return false;
     }
     main += "#include \"bp_" + c.name + ".h\"\n";
+    if (!c.on_engine.empty()) {
+      std::string problem;
+      on_engine += native_play_on_engine(c.graph, c.name, c.on_engine, false, problem);
+      if (!problem.empty()) {
+        if (error) *error = c.name + " on the engine itself: " + problem;
+        return false;
+      }
+      std::string list;
+      for (const std::string& run : c.on_engine) list += (list.empty() ? "\"" : ", \"") + run + "\"";
+      on_engine_runs += "  {\n    kern::logic::Graph graph;\n    kern::json::Value stored;\n    std::string problem;\n"
+                        "    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) problem = \"the graph was not read\";\n"
+                        "    on_engine += native_play_on_engine(graph, \"" + c.name + "\", {" + list + "}, true, problem);\n"
+                        "    if (!problem.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself: %s\\n\", problem.c_str()); ++failures; }\n  }\n";
+    }
+    if (!c.on_engine_free.empty()) {
+      std::string list;
+      for (const std::string& run : c.on_engine_free) list += (list.empty() ? "\"" : ", \"") + run + "\"";
+      on_engine_free_runs += "  {\n    kern::logic::Graph graph;\n    kern::json::Value stored;\n    std::string problem, clocks;\n"
+                             "    if (!kern::json::parse(kGraph_" + c.name + ", stored) || !kern::logic::graph_from_json(stored, graph)) problem = \"the graph was not read\";\n"
+                             "    const std::string apart = problem.empty() ? native_compare_on_engine(graph, \"" + c.name + "\", {" + list + "}, clocks, problem) : std::string();\n"
+                             "    if (!problem.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself: %s\\n\", problem.c_str()); ++failures; }\n"
+                             "    if (!apart.empty()) { std::printf(\"FAIL " + c.name + " on the engine itself, the class calling the engine itself:\\n     %s\", apart.c_str()); ++failures; }\n"
+                             "    if (!clocks.empty()) std::printf(\"     " + c.name + " on the engine itself - what a clock gave (EngineFunction::clock), not compared:%s\\n\", clocks.c_str());\n  }\n";
+    }
     std::string body = "static const char kGraph_" + c.name + "[] =";
     for (std::size_t at = 0; at < stored.size(); at += 8192) body += "\n    R\"KGRAPH(" + stored.substr(at, 8192) + ")KGRAPH\"";
     if (c.scenario) {
@@ -1736,7 +1902,9 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       std::size_t end = at;
       while (end < c.calls.size() && c.calls[end].function == c.calls[at].function) ++end;  // calls of one function in a row: one table
       const logic::Function& f = *c.graph.function(c.calls[at].function);
-      body += "  {\n    const struct {";
+      // (each table in a function of its own - a lambda: one function of a Blueprint with every node would be too
+      // much for one function of the compiler)
+      body += "  [&] {\n    const struct {";
       for (std::size_t i = 0; i < f.inputs.size(); ++i) body += " " + cpp_type(f.inputs[i].type, f.inputs[i].of, c.name) + " a" + std::to_string(i) + ";";
       body += " int row; } rows[] = {\n";
       for (std::size_t r = at; r < end; ++r) {
@@ -1774,7 +1942,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
       body += "}, results))) hosted += \"(no call) \";\n      hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
-      body += changed_by_name + " + hosted_variables() + \"\\n\";\n    }\n  }\n";
+      body += changed_by_name + " + hosted_variables() + \"\\n\";\n    }\n  }();\n";
       at = end;
     }
     // The calls with values from outside: the class takes them as the engine gives them - each
@@ -1802,16 +1970,17 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
         }
         direct += std::string(i ? ", " : "") + (in.ref ? "p" + k : taken);
       }
-      body += "  {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n" + places + "    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
+      body += "  [&] {\n    const std::vector<kern::logic::Value> given = {" + given + "};\n" + places + "    " + (f.outputs.empty() ? "" : "const auto out = ") + direct + ");\n    got += " + shown + " + \") ->\"";
       for (const logic::FunctionPin& o : f.outputs) body += " + \" " + o.name + "=\" + show(out." + o.name + ")";
       body += changed + " + variables() + \"\\n\";\n    std::vector<kern::logic::Value> results;\n    if (!named(inst->call(\"" + f.name + "\", given, results))) hosted += \"(no call) \";\n    hosted += " + shown + " + \") ->\"";
       for (std::size_t k = 0; k < f.outputs.size(); ++k)
         body += " + \" " + f.outputs[k].name + "=\" + native_show(results.size() > " + std::to_string(k) + " ? results[" + std::to_string(k) + "] : kern::logic::Value())";
-      body += changed_by_name + " + hosted_variables() + \"\\n\";\n  }\n";
+      body += changed_by_name + " + hosted_variables() + \"\\n\";\n  }();\n";
     }
     runs += body + "}\n\n";
   }
-  main += "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
+  main += "\n// (the engine is linked in with its app runtime, which needs a factory)\nkern::App* kern_create_app() { return nullptr; }\n"
+          "\ntemplate <class T> static std::string show(const T& v) { return native_show(kern::logic::to_value(v)); }\n\n"
           "// A call by name that reached its function: the class's glue says when the function begins and when it has\n"
           "// returned (logic::native_probe) - once each, the begin first. (A function that calls one of another\n"
           "// Blueprint by name: that call begins and returns inside it.)\n"
@@ -1825,7 +1994,7 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
           "    const std::string x = a < got.size() ? got.substr(a, ae == std::string::npos ? ae : ae - a) : \"(nothing)\", y = b < expected.size() ? expected.substr(b, be == std::string::npos ? be : be - b) : \"(nothing)\";\n"
           "    if (x != y) { std::printf(\"FAIL %s: %s\\n     the interpreter: %s\\n\", what, x.c_str(), y.c_str()); ++shown; }\n"
           "    a = ae == std::string::npos ? got.size() : ae + 1;\n    b = be == std::string::npos ? expected.size() : be + 1;\n  }\n  return 1;\n}\n\n" + runs;
-  main += "int main(int argc, char** argv) {\n  if (argc < 2) { std::fprintf(stderr, \"usage: blueprint_native_test <blueprint_native_expected.txt>\\n\"); return 2; }\n"
+  main += "int main(int argc, char** argv) {\n  if (argc < 2) { std::fprintf(stderr, \"usage: blueprint_native_test <blueprint_native_expected.txt> [<blueprint_native_on_engine.txt>]\\n\"); return 2; }\n"
           "  std::ifstream in(argv[1]);\n  std::stringstream want;\n  want << in.rdbuf();\n  std::string got, hosted;\n"
           "  kern::logic::native_probe = [](bool begins) {\n    g_running += begins ? 1 : -1;\n    g_out_of_turn += g_running < 0 ? 1 : 0;\n    ++(begins ? g_begun : g_returned);\n  };\n";
   std::size_t count = 0, calls = 0;
@@ -1839,9 +2008,17 @@ inline bool emit(const std::string& dir, const std::vector<Case>& all, std::stri
           "  failures += differs(hosted, expected, \"its class behind logic::Instance\");\n"
           "  if (g_begun < g_named || g_returned != g_begun || g_running != 0 || g_out_of_turn || g_named == 0) {\n"
           "    std::printf(\"FAIL the glue says when a function runs: %ld calls by name, begun %ld, returned %ld, %ld out of turn\\n\", g_named, g_begun, g_returned, g_out_of_turn);\n    ++failures;\n  }\n";
+  if (!on_engine_runs.empty())
+    main += "  // the cases played on the engine itself: the class calls the engine's functions itself (kern/logic/engine_direct.h)\n"
+            "  {\n    if (argc < 3) { std::fprintf(stderr, \"blueprint_native_test: the interpreter's answers on the engine itself are missing (blueprint_native_on_engine.txt)\\n\"); return 2; }\n"
+            "    std::ifstream engine_in(argv[2]);\n    std::stringstream engine_want;\n    engine_want << engine_in.rdbuf();\n    std::string on_engine;\n" + on_engine_runs +
+            "    failures += differs(on_engine, engine_want.str(), \"the class calling the engine itself\");\n  }\n";
+  if (!on_engine_free_runs.empty())
+    main += "  // ... and the free functions, three times here: through the door, as the class, through the door again\n" + on_engine_free_runs;
   main += "  std::printf(\"%s blueprint_native_test (" + std::to_string(count) + " Blueprints as their C++, " + std::to_string(calls) +
           " calls on the class and by name through logic::Instance)\\n\", failures ? \"FAIL\" : \"ok  \");\n  return failures ? 1 : 0;\n}\n";
-  if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected)) {
+  if (!write_file(dir + "/blueprint_native_main.cpp", main) || !write_file(dir + "/blueprint_native_expected.txt", expected) ||
+      (!on_engine.empty() && !write_file(dir + "/blueprint_native_on_engine.txt", on_engine))) {
     if (error) *error = "cannot write into " + dir;
     return false;
   }

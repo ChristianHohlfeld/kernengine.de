@@ -5,14 +5,17 @@
 #include <cstdio>
 
 #include "city_jobs.h"
+#include "kern/core/map.h"
 #include "kern/core/base.h"
 #include "kern/core/jobs.h"
 #include "kern/geo/earcut.h"
-#include <unordered_set>
 
 namespace sc {
 
 namespace {
+
+/// The map features of a tile that is not loaded: none.
+const MapFeatures kNoFeatures{};
 
 kern::BuildingStyle konstanz_style() {
   // world_city_buildings.mjs WALLS / ROOFS (sRGB) and the cornice mix with #f4efe4 (0.45)
@@ -80,52 +83,6 @@ void put_footprint(kern::FootprintStream& fs, const MapFeatures::Building& b, Ve
 
 }  // namespace
 
-struct CityStream::Tile {
-  enum class State : u8 { requested, decoding, terrain_wait, building, roads, areas, collision, ready, failed } state = State::requested;
-  TileKey key;
-  u32 tries = 0;       // failed requests so far
-  f64 retry_ms = 0;    // when a failed tile is asked for again
-  bool procedural = false;
-  std::vector<u8> bytes;
-  mvt::Decoder decoder;
-  MapFeatures features;
-  kern::FootprintStream footprints;
-  kern::RoadStream roads;
-  kern::BuildingBuilder buildings;
-  kern::RoadBuilder road_builder;
-  std::vector<u32> meshes;
-  kern::physics::Body body;
-  std::size_t collide_next = 0, upload_next = 0;
-  u32 colliders = 0, triangles = 0;
-  Vec2 center;
-  // terrain: road and area meshes are re-laid when the ground under them changes (craters, water)
-  kern::Vec4 bounds{-1e9f, -1e9f, 1e9f, 1e9f};
-  std::vector<u32> lay_meshes, old_lay;
-  bool relay = false, relay_again = false;
-  Vec2 roads_at{1e9f, 1e9f};  // where the streets were last laid around (REBUILD_MOVE_M 260)
-  // the buildings' centres, and the buildings by chunk cell (160 m): the drawn city is made of
-  // cells - each wanted cell is extruded once, off the frame, and stays until it is far behind
-  std::vector<Vec2> cent;
-  std::unordered_map<u64, std::vector<u32>> cell_items;
-  std::unordered_set<u64> want_cells;                     // the cells to be drawn now (select_cells)
-  std::unordered_map<u64, std::vector<u32>> cell_old;     // meshes a finished job replaces (go when its uploads are done)
-  bool cell_uploading = false;
-  // jobs off the frame thread (city_jobs.h): the tile's decoding, the drawn buildings' extrusion
-  u32 tile_job = 0, build_job = 0;
-  // destruction: the building chunk meshes by chunk cell; damaged cells are rebuilt alone
-  std::unordered_map<u64, std::vector<u32>> cell_ids;
-  std::unordered_set<u64> dirty_cells;
-  std::vector<u64> job_cells;
-  u32 cell_job = 0;
-  std::vector<u8> built_bytes;        // the kBuildings job's output, read one chunk per step
-  std::size_t built_at = 0;
-  bool prepared = false;
-  // interiors (M3 life): one building left out, the collision rebuilt beside the old body
-  i32 skip = -1;
-  kern::physics::Body old_body;
-  bool recollide = false;
-};
-
 CityStream::CityStream() = default;
 CityStream::~CityStream() = default;
 
@@ -160,10 +117,16 @@ void CityStream::clear() {
 }
 
 void CityStream::remove(Tile& t) {
-  if (r_)
-    for (const std::vector<u32>* list : {&t.meshes, &t.lay_meshes, &t.old_lay})
-      for (u32 id : *list) r_->remove(id);
-  for (u32* j : {&t.tile_job, &t.build_job, &t.cell_job}) if (*j) { kern::jobs::cancel(*j); *j = 0; }
+  if (r_) {
+    auto drop = [&](const std::vector<u32>& list) { for (u32 id : list) r_->remove(id); };
+    drop(t.meshes);
+    drop(t.lay_meshes);
+    drop(t.old_lay);
+  }
+  auto cancel = [](u32& job) { if (job) { kern::jobs::cancel(job); job = 0; } };
+  cancel(t.tile_job);
+  cancel(t.build_job);
+  cancel(t.cell_job);
   t.cell_ids.clear();
   t.dirty_cells.clear();
   t.job_cells.clear();
@@ -186,11 +149,6 @@ void CityStream::remove(Tile& t) {
     if (l.tile == t.key.hash()) l.alive = false;
 }
 
-CityStream::Tile* CityStream::tile(const TileKey& k) {
-  auto it = tiles_.find(k.hash());
-  return it == tiles_.end() ? nullptr : it->second.get();
-}
-
 void CityStream::request_around(Vec3 focus, i32 ring) {
   if (offline_) return;
   f64 lon, lat;
@@ -200,9 +158,9 @@ void CityStream::request_around(Vec3 focus, i32 ring) {
   std::vector<std::pair<i32, TileKey>> want;
   for (i32 dy = -ring; dy <= ring; ++dy)
     for (i32 dx = -ring; dx <= ring; ++dx) want.push_back({dx * dx + dy * dy, TileKey{c.z, c.x + dx, c.y + dy}});
-  std::sort(want.begin(), want.end(), [](const auto& a, const auto& b) { return a.first < b.first; });
+  std::stable_sort(want.begin(), want.end(), [](const std::pair<i32, TileKey>& a, const std::pair<i32, TileKey>& b) { return a.first < b.first; });
   for (const auto& [d, k] : want) {
-    if (tile(k)) continue;
+    if (tiles_.find(k.hash()) != tiles_.end()) continue;
     auto t = std::make_unique<Tile>();
     t->key = k;
     f64 lo, la, x, y;
@@ -262,24 +220,26 @@ std::string CityStream::take_requests() {
   return s + "]";
 }
 
-void CityStream::provide(const TileKey& key, const u8* bytes, std::size_t length) {
-  Tile* t = tile(key);
-  if (!t || t->state != Tile::State::requested) return;
+void CityStream::provide(const TileKey& key, kern::Span<const u8> bytes) {
+  auto it = tiles_.find(key.hash());
+  if (it == tiles_.end() || it->second->state != Tile::State::requested) return;
+  Tile& t = *it->second;
   if (key == origin_tile_ && ms_.t_data < 0) ms_.t_data = kern::now_ms() - start_ms_;
   // decoded off the frame (a Web Worker / thread): the frame only takes the finished features
-  t->tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes, length));
-  t->state = Tile::State::decoding;
+  t.tile_job = kern::jobs::submit(cityjobs::kTile, cityjobs::tile_input(key, proj_.lon0, proj_.lat0, bytes));
+  t.state = Tile::State::decoding;
 }
 
 void CityStream::fail(const TileKey& key) {
-  Tile* t = tile(key);
-  if (!t) return;
+  auto it = tiles_.find(key.hash());
+  if (it == tiles_.end()) return;
+  Tile& t = *it->second;
   // asked again (a lost request is no hole in the city): after 2 s, 4 s, ... 20 s
-  t->state = Tile::State::failed;
-  ++t->tries;
-  t->retry_ms = kern::now_ms() + std::min(20000.0, 2000.0 * t->tries);
+  t.state = Tile::State::failed;
+  ++t.tries;
+  t.retry_ms = kern::now_ms() + std::min(20000.0, 2000.0 * t.tries);
   // Nothing came for the player's own start tile, three times: build the stand-in town instead.
-  if (key == origin_tile_ && real_tiles_ == 0 && t->tries >= 3) go_offline();
+  if (key == origin_tile_ && real_tiles_ == 0 && t.tries >= 3) go_offline();
 }
 
 void CityStream::go_offline() {
@@ -295,6 +255,7 @@ void CityStream::go_offline() {
   auto t = std::make_unique<Tile>();
   t->procedural = true;
   t->key = TileKey{0, -1, -1};
+  t->bounds = {-1e9f, -1e9f, 1e9f, 1e9f};  // the stand-in town has no square: it is everywhere
   if (training_offline) training_level(t->features);  // training_test_level_v2.mjs
   else procedural_city(0, 0, 760, 20261029, t->features);
   furnish(t->features, t->bounds, {});
@@ -304,11 +265,16 @@ void CityStream::go_offline() {
   tiles_[t->key.hash()] = std::move(t);
 }
 
-void CityStream::furniture(std::vector<Furniture>& out) const {
+void CityStream::furniture(std::vector<u64>& out) const {
   out.clear();
   for (const auto& [k, t] : tiles_)
-    if (t->prepared) out.push_back({k, &t->features.trees, &t->features.lamps});
-  std::sort(out.begin(), out.end(), [](const Furniture& a, const Furniture& b) { return a.tile < b.tile; });
+    if (t->prepared) out.push_back(k);
+  std::stable_sort(out.begin(), out.end());
+}
+
+const MapFeatures& CityStream::features(u64 tile) const {
+  const auto it = tiles_.find(tile);
+  return it != tiles_.end() ? it->second->features : kNoFeatures;
 }
 
 bool CityStream::ready_at(Vec3 p) const {
@@ -344,10 +310,12 @@ void CityStream::finish_features(Tile& t) {
   // and tracks, its width + 3.4 m of pavements): the ground of this tile is final with them, and
   // the houses, the streets and everything else are put on it.
   {
-    std::vector<Terrain::RoadLine> lines;
-    for (const MapFeatures::Road& r : t.features.roads)
-      if (!road_is_water(r.cls) && r.cls != RoadClass::path && r.cls != RoadClass::track) lines.push_back({&r.points, road_width(r.cls) + 3.4f});
-    terrain_.set_corridors(t.key.hash(), t.bounds, lines);
+    std::vector<f32> widths(t.features.roads.size());
+    for (std::size_t i = 0; i < widths.size(); ++i) {
+      const MapFeatures::Road& r = t.features.roads[i];
+      if (!road_is_water(r.cls) && r.cls != RoadClass::path && r.cls != RoadClass::track) widths[i] = road_width(r.cls) + 3.4f;
+    }
+    terrain_.set_corridors(t.key.hash(), t.bounds, t.features.roads, widths);
   }
   // Footprint and road streams for the engine's builders, lanes for the traffic.
   t.cent.clear();
@@ -419,35 +387,35 @@ void CityStream::select_cells(Vec3 focus, bool force) {
     const f32 t = ab2 > 1 ? clampf(((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / ab2, 0, 1) : 0;
     return std::hypot(p.x - a.x - ab.x * t, p.y - a.y - ab.y * t);
   };
-  struct Pick { f32 d; Tile* t; u64 cell; u32 n; };
+  struct Pick { f32 d; u32 tile; u64 cell; u32 n; };  // (tile: its place among tiles_)
   std::vector<Pick> picks;
-  for (auto& [k, tp] : tiles_) {
-    Tile& t = *tp;
+  for (auto it = tiles_.begin(); it != tiles_.end(); ++it) {
+    const Tile& t = *it->second;
     if (!t.prepared) continue;
     for (const auto& [cell, items] : t.cell_items) {
       const i32 cx = static_cast<i32>(static_cast<u32>(cell >> 32)), cy = static_cast<i32>(static_cast<u32>(cell));
       const f32 d = way_distance({(static_cast<f32>(cx) + 0.5f) * kChunk, (static_cast<f32>(cy) + 0.5f) * kChunk});
-      if (d <= kR + kKeep) picks.push_back({d, &t, cell, static_cast<u32>(items.size())});
+      if (d <= kR + kKeep) picks.push_back({d, static_cast<u32>(it - tiles_.begin()), cell, static_cast<u32>(items.size())});
     }
   }
-  std::sort(picks.begin(), picks.end(), [](const Pick& x, const Pick& y) { return x.d < y.d || (x.d == y.d && x.cell < y.cell); });
+  std::stable_sort(picks.begin(), picks.end(), [](const Pick& x, const Pick& y) { return x.d < y.d || (x.d == y.d && x.cell < y.cell); });
   for (auto& [k, tp] : tiles_) tp->want_cells.clear();
   u32 total = 0;
   f32 reach = kR;
   for (const Pick& p : picks) {
     if (p.d > kR) break;
     if (total >= building_budget && p.d > 240) { reach = p.d; break; }  // (what is next to the player is always drawn)
-    p.t->want_cells.insert(p.cell);
+    (tiles_.begin() + p.tile)->second->want_cells.insert(p.cell);
     total += p.n;
   }
-  for (const Pick& p : picks) {
-    Tile& t = *p.t;
+  auto settle = [&](Tile& t, const Pick& p) {
     const bool want = t.want_cells.count(p.cell) != 0, built = t.cell_ids.count(p.cell) != 0;
     if (want && !built) t.dirty_cells.insert(p.cell);
     if (!want && !built) t.dirty_cells.erase(p.cell);
     // a built cell stays while it is near the drawn radius (no flicker at its edge)
     if (!want && built && p.d > reach + kKeep * 0.5f && !t.cell_job && !t.cell_uploading) drop_cell(t, p.cell);
-  }
+  };
+  for (const Pick& p : picks) settle(*(tiles_.begin() + p.tile)->second, p);
   // cells beyond every radius (the player was put somewhere else): gone
   for (auto& [k, tp] : tiles_) {
     Tile& t = *tp;
@@ -479,10 +447,11 @@ void CityStream::upload(Tile& t, kern::GeoChunk& chunk, const kern::Material& ma
   const u32 id = r_->allocate_id();
   ++upload_count_;
   upload_vertices_ += chunk.mesh.vertex_count();
-  kern::MeshInput in = chunk.mesh.as_input(walls ? 0 : kern::kMaxExtensionAttributes);
-  in.material = material;
-  in.pick_bvh = false;  // hits are Box3D rays (the collision set); no picking BVH to build per chunk
-  if (!r_->upsert(id, in)) { r_->release_id(id); return; }
+  kern::MeshLook look;
+  look.material = material;
+  look.extra_slot = walls ? 0 : kern::kMaxExtensionAttributes;
+  look.pick_bvh = false;  // hits are Box3D rays (the collision set); no picking BVH to build per chunk
+  if (!kern::upsert(*r_, id, chunk.mesh, look)) { r_->release_id(id); return; }
   t.meshes.push_back(id);
   if (walls) t.cell_ids[cell_key(chunk.x, chunk.y)].push_back(id);
   t.triangles += chunk.mesh.triangle_count();
@@ -551,7 +520,7 @@ void CityStream::update_collision(Vec3 focus, f64 deadline) {
         if (d2 <= 340.0f * 340.0f) all.push_back({d2, k, i});
       }
     }
-    std::sort(all.begin(), all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; });
+    std::stable_sort(all.begin(), all.end(), [](const Pick& a, const Pick& b) { return a.d2 < b.d2; });
     const std::size_t cap = 480 + 320 * extra_foci.size();
     if (all.size() > cap) all.resize(cap);
     n.list.clear();
@@ -685,7 +654,7 @@ void CityStream::damage_list(std::vector<DamageRec>& out) const {
   out.clear();
   out.reserve(damage_.size());
   for (const auto& [seed, d] : damage_) out.push_back({seed, d.height, d.leveled});
-  std::sort(out.begin(), out.end(), [](const DamageRec& a, const DamageRec& b) { return a.seed < b.seed; });
+  std::stable_sort(out.begin(), out.end(), [](const DamageRec& a, const DamageRec& b) { return a.seed < b.seed; });
 }
 
 bool CityStream::damage_of(u32 seed, DamageRec& out) const {
@@ -697,13 +666,14 @@ bool CityStream::damage_of(u32 seed, DamageRec& out) const {
 
 bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
   if (list.empty()) return false;
-  std::unordered_map<u32, const DamageRec*> want;
+  kern::Map<u32, u32> want;  // seed -> the place of its record in list (the last one of the seed)
   bool changed = false;
-  for (const DamageRec& r : list) {
+  for (u32 i = 0; i < list.size(); ++i) {
+    const DamageRec& r = list[i];
     if (!(r.height >= 0) || !std::isfinite(r.height)) continue;
     auto it = damage_.find(r.seed);
     if (it != damage_.end() && it->second.height <= r.height + 0.01f && (it->second.leveled || !r.leveled)) continue;  // ours is as low already
-    want[r.seed] = &r;
+    want[r.seed] = i;
   }
   if (want.empty()) return false;
   damage_quiet_ = !log;
@@ -715,17 +685,19 @@ bool CityStream::merge_damage(const std::vector<DamageRec>& list, bool log) {
       auto w = want.find(t.features.buildings[i].seed);
       if (w == want.end()) continue;
       const MapFeatures::Building& b = t.features.buildings[i];
-      if (damage_building(k, i, b.base + w->second->height, w->second->leveled)) changed = true;
+      const DamageRec& r = list[w->second];
+      if (damage_building(k, i, b.base + r.height, r.leveled)) changed = true;
     }
   }
   // the rest (not loaded here): kept for when the tile comes (prepare applies damage_)
-  for (auto& [seed, r] : want) {
+  for (const auto& [seed, at] : want) {
+    const DamageRec& r = list[at];
     auto it = damage_.find(seed);
     if (it == damage_.end()) {
-      damage_[seed] = Damage{r->height, r->leveled};
-    } else if (r->height < it->second.height - 0.01f || (r->leveled && !it->second.leveled)) {
-      it->second.height = std::fmin(it->second.height, r->height);
-      it->second.leveled = it->second.leveled || r->leveled;
+      damage_[seed] = Damage{r.height, r.leveled};
+    } else if (r.height < it->second.height - 0.01f || (r.leveled && !it->second.leveled)) {
+      it->second.height = std::fmin(it->second.height, r.height);
+      it->second.leveled = it->second.leveled || r.leveled;
     } else {
       continue;
     }
@@ -762,7 +734,7 @@ void CityStream::begin_cells(Tile& t) {
     const i32 cx = static_cast<i32>(static_cast<u32>(c >> 32)), cy = static_cast<i32>(static_cast<u32>(c));
     order.push_back({std::hypot((static_cast<f32>(cx) + 0.5f) * kChunk - focus_.x, (static_cast<f32>(cy) + 0.5f) * kChunk - focus_.y), c});
   }
-  std::sort(order.begin(), order.end());
+  std::stable_sort(order.begin(), order.end(), [](const std::pair<f32, u64>& a, const std::pair<f32, u64>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
   if (order.size() > 6) order.resize(6);
   kern::FootprintStream fs;
   std::vector<Vec2> thin;
@@ -975,7 +947,7 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   // Nearest unfinished tile first.
   std::vector<Tile*> order;
   for (auto& [k, t] : tiles_) order.push_back(t.get());
-  std::sort(order.begin(), order.end(), [&](Tile* a, Tile* b) {
+  std::stable_sort(order.begin(), order.end(), [&](Tile* a, Tile* b) {
     const f32 da = (a->center.x - focus.x) * (a->center.x - focus.x) + (a->center.y - focus.y) * (a->center.y - focus.y);
     const f32 db = (b->center.x - focus.x) * (b->center.x - focus.x) + (b->center.y - focus.y) * (b->center.y - focus.y);
     return da < db;
@@ -1057,23 +1029,19 @@ void CityStream::walls_near(Vec2 p, f32 r, std::vector<Wall>& out) const {
   }
 }
 
-bool CityStream::building_at(Vec2 p, std::vector<Vec2>* ring_out, f32* base, f32* top, u32* seed) const {
+bool CityStream::building_at(Vec2 p) const {
   for (const auto& [k, tp] : tiles_) {
     const Tile& t = *tp;
     if (t.state != Tile::State::ready) continue;
     if (p.x < t.bounds.x - 200 || p.x > t.bounds.z + 200 || p.y < t.bounds.y - 200 || p.y > t.bounds.w + 200) continue;
     for (const MapFeatures::Building& b : t.features.buildings) {
       if (b.rings.empty() || b.rings[0].size() < 3) continue;
-      const auto& ring = b.rings[0];
+      const std::vector<Vec2>& ring = b.rings[0];
       if (std::fabs(ring[0].x - p.x) > 150 || std::fabs(ring[0].y - p.y) > 150) continue;
       bool inside = false;
       for (std::size_t i = 0, j = ring.size() - 1; i < ring.size(); j = i++)
         if ((ring[i].y > p.y) != (ring[j].y > p.y) && p.x < (ring[j].x - ring[i].x) * (p.y - ring[i].y) / (ring[j].y - ring[i].y) + ring[i].x) inside = !inside;
       if (!inside) continue;
-      if (ring_out) *ring_out = ring;
-      if (base) *base = b.base;
-      if (top) *top = b.top;
-      if (seed) *seed = b.seed;
       return true;
     }
   }
@@ -1112,16 +1080,16 @@ void CityStream::buildings_near(Vec2 p, f32 radius, std::vector<BuildingRef>& ou
       f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
       for (Vec2 q : b.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
       if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k, static_cast<u32>(i), &b});
+      out.push_back({k, static_cast<u32>(i)});
     }
   }
 }
 
-void CityStream::ready_features(std::vector<const MapFeatures*>& out) const {
+void CityStream::ready_tiles(std::vector<u64>& out) const {
   for (const auto& [k, t] : tiles_)
     // a tile being re-synced keeps its features (the map and the town must not lose its houses
     // while the meshes are rebuilt: they flickered on the minimap)
-    if (t->prepared) out.push_back(&t->features);
+    if (t->prepared) out.push_back(k);
 }
 
 void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaRef>& out) const {
@@ -1133,7 +1101,7 @@ void CityStream::areas_near(Vec2 p, f32 radius, AreaKind kind, std::vector<AreaR
       f32 x0 = 1e9f, y0 = 1e9f, x1 = -1e9f, y1 = -1e9f;
       for (Vec2 q : a.rings[0]) { x0 = std::fmin(x0, q.x); y0 = std::fmin(y0, q.y); x1 = std::fmax(x1, q.x); y1 = std::fmax(y1, q.y); }
       if (p.x < x0 - radius || p.x > x1 + radius || p.y < y0 - radius || p.y > y1 + radius) continue;
-      out.push_back({k * 65536 + i, &a});
+      out.push_back({k * 65536 + i, k, static_cast<u32>(i)});
     }
   }
 }

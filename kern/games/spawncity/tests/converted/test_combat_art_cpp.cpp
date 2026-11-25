@@ -18,10 +18,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -34,6 +34,14 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Vec4 {
+  f32 x = 0, y = 0, z = 0, w = 0;
+  constexpr Vec4() = default;
+  constexpr Vec4(f32 x_, f32 y_, f32 z_, f32 w_) : x(x_), y(y_), z(z_), w(w_) {}
+  
+  
+  constexpr bool operator==(const Vec4& o) const { return x == o.x && y == o.y && z == o.z && w == o.w; }
+};
 struct Quat {
   f32 x = 0, y = 0, z = 0, w = 1;
   static Quat axis_angle(Vec3 axis, f32 radians) {
@@ -66,10 +74,10 @@ struct Mat4 {
 
   Mat4 operator*(const Mat4& b) const {
     Mat4 r;
-    for (int c = 0; c < 4; ++c) {
-      const f32 b0 = converted::at(b.m, 4 * c), b1 = converted::at(b.m, 4 * c + 1), b2 = converted::at(b.m, 4 * c + 2), b3 = converted::at(b.m, 4 * c + 3);
-      for (int k = 0; k < 4; ++k)
-        converted::at(r.m, 4 * c + k) = converted::at(m, k) * b0 + converted::at(m, 4 + k) * b1 + converted::at(m, 8 + k) * b2 + converted::at(m, 12 + k) * b3;
+    for (int c = 0; c < 4; converted::pre_inc(c)) {
+      const f32 b0 = converted::at(b.m, converted::times(4, c)), b1 = converted::at(b.m, converted::plus(converted::times(4, c), 1)), b2 = converted::at(b.m, converted::plus(converted::times(4, c), 2)), b3 = converted::at(b.m, converted::plus(converted::times(4, c), 3));
+      for (int k = 0; k < 4; converted::pre_inc(k))
+        converted::at(r.m, converted::plus(converted::times(4, c), k)) = converted::at(m, k) * b0 + converted::at(m, converted::plus(4, k)) * b1 + converted::at(m, converted::plus(8, k)) * b2 + converted::at(m, converted::plus(12, k)) * b3;
     }
     return r;
   }
@@ -86,8 +94,8 @@ struct Mat4 {
 
 
 
-  static Mat4 translate(Vec3 t) { Mat4 r; converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; return r; }
-  static Mat4 scale(Vec3 s) { Mat4 r; converted::at(r.m, 0) = s.x; converted::at(r.m, 5) = s.y; converted::at(r.m, 10) = s.z; return r; }
+  static Mat4 translate(Vec3 t) { Mat4 r; r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; return r; }
+  static Mat4 scale(Vec3 s) { Mat4 r; r.m[0] = s.x; r.m[5] = s.y; r.m[10] = s.z; return r; }
 
   /// Translation * rotation * scale.
   static Mat4 trs(Vec3 t, Quat q, Vec3 s) {
@@ -95,10 +103,10 @@ struct Mat4 {
     const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
     const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
     Mat4 r;
-    converted::at(r.m, 0) = (1 - yy - zz) * s.x; converted::at(r.m, 1) = (xy + wz) * s.x; converted::at(r.m, 2) = (xz - wy) * s.x; converted::at(r.m, 3) = 0;
-    converted::at(r.m, 4) = (xy - wz) * s.y; converted::at(r.m, 5) = (1 - xx - zz) * s.y; converted::at(r.m, 6) = (yz + wx) * s.y; converted::at(r.m, 7) = 0;
-    converted::at(r.m, 8) = (xz + wy) * s.z; converted::at(r.m, 9) = (yz - wx) * s.z; converted::at(r.m, 10) = (1 - xx - yy) * s.z; converted::at(r.m, 11) = 0;
-    converted::at(r.m, 12) = t.x; converted::at(r.m, 13) = t.y; converted::at(r.m, 14) = t.z; converted::at(r.m, 15) = 1;
+    r.m[0] = (1 - yy - zz) * s.x; r.m[1] = (xy + wz) * s.x; r.m[2] = (xz - wy) * s.x; r.m[3] = 0;
+    r.m[4] = (xy - wz) * s.y; r.m[5] = (1 - xx - zz) * s.y; r.m[6] = (yz + wx) * s.y; r.m[7] = 0;
+    r.m[8] = (xz + wy) * s.z; r.m[9] = (yz - wx) * s.z; r.m[10] = (1 - xx - yy) * s.z; r.m[11] = 0;
+    r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; r.m[15] = 1;
     return r;
   }
 
@@ -137,20 +145,119 @@ struct Mat4 {
 
 
 
+  /// The same, where nobody asks whether it is one.
+  
+
+
+
 };
-struct Material : converted::EngineObject {
+struct Bvh;
+constexpr u32 kMaxExtensionAttributes = 2;
+constexpr u32 kMaxMaterialParams = 8;
+enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct Material {
+  Vec4 color{1, 1, 1, 1};
+  AlphaMode alpha = AlphaMode::opaque;
+  f32 alpha_cutoff = 0.5;
+  f32 roughness = 1.0;
+  f32 metalness = 0.0;
+  Vec3 emissive{0, 0, 0};      // linear HDR colour added after lighting (feeds bloom)
+  bool unlit = false;
+  bool double_sided = false;
+  bool cast_shadow = true;
+  bool frustum_culled = true;
+  bool viewmodel = false;      // first-person layer: drawn last after a depth clear
+  bool linear_colors = false;  // vertex colours are linear (skip the sRGB decode)
+  bool lines = false;          // line list (pairs of vertices), always unlit, never casts shadows or is picked
+  /// Parameters owned by shader extensions (see ShaderExtension::material_keys).
+  i32 params[kMaxMaterialParams] = {};
+
+  
 };
-enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
-struct Shape { u64 id = 0; };
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MeshData {
+  std::vector<f32> positions, normals, colors, uvs;
+  std::vector<f32> extra;  // optional per-vertex stream (extra_size floats each)
+  u32 extra_size = 0;
+  std::vector<u32> indices;
+
+  
+  
+  
+
+
+  
+
+
+
+
+
+  
+  
+
+
+  /// Borrowed MeshInput view (geometry only; material etc. stay default).
+  
+};
+struct Renderer;
+struct MeshLook {
+  Material material;
+  u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
+  u32 texture = 0;      // GPU texture handle (0 = none)
+  bool visible = true;
+  u32 layers = 1;       // view layers this mesh belongs to (RenderParams::layers)
+  bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
+};
+struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+namespace physics { struct Shape { u64 id = 0; bool operator==(const Shape& o) const { return id == o.id; } }; }
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 constexpr f32 kPi = 3.14159265358979323846;
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+struct Program : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct UniformCache : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SunShadowMap : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BloomPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct AmbientOcclusionPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Renderer;
+struct ShaderExtension : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  unsigned int allocate_id() const;
+  void release_id(const unsigned int& id) const;
   bool set_visible(const unsigned int& id, const bool& visible) const;
+  bool update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed = nullptr) const;
 };
 struct CombatArt {
  public:
   enum Shape : u8 { box, sphere, cylinder, cone, glow_box, glow_sphere, smoke, fade_sphere, fade_ring, kShapes };
-  
+  bool init(Renderer& r);
   void begin();
   /// One primitive: unit box (1 m, centred), sphere (diameter 1), cylinder / cone (diameter 1,
   /// height 1 from z = 0 up), scaled by `m`; glow shapes are unlit (tint = HDR colour).
@@ -160,7 +267,7 @@ struct CombatArt {
   void put(Shape s, const Mat4& m, Vec3 tint, f32 alpha);
   /// A glowing bar from `a` to `b` (tracers).
   void beam(Vec3 a, Vec3 b, f32 width, Vec3 tint);
-  
+  void end();
 
   // models (frames as in SpawnCity: heli / jet forward +Y, tank / gun forward +X, Z up)
   void heli(const Mat4& m, f32 rotor, bool wreck);
@@ -177,11 +284,55 @@ struct CombatArt {
   Renderer* r_ = nullptr;
   Part parts_[kShapes];
 };
+namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData sphere(const double& radius, const unsigned int& segments = 24, const unsigned int& rings = 16, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData torus(const double& major, const double& minor, const unsigned int& segments = 24, const unsigned int& tube_segments = 8, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData cone(const double& radius, const double& height, const unsigned int& segments = 16, const Vec3& color = {1, 1, 1}); }
 Mat4 rot(Vec3 axis, f32 a) { return Mat4::trs({}, Quat::axis_angle(axis, a), {1, 1, 1}); }
 Mat4 at(Vec3 p) { return Mat4::translate(p); }
 Mat4 sc3(f32 x, f32 y, f32 z) { return Mat4::scale({x, y, z}); }
 const Vec3 kOlive{0.29, 0.34, 0.2}, kDark{0.13, 0.15, 0.11}, kGlass{0.1, 0.13, 0.16}, kSteel{0.16, 0.17, 0.18}, kSand{0.71, 0.61, 0.42};
 const Vec3 kJetMetal{0.36, 0.39, 0.42}, kJetDark{0.16, 0.18, 0.21};
+bool CombatArt::init(Renderer& r) {
+  r_ = &r;
+  const Vec3 white{1, 1, 1};
+  MeshData meshes[kShapes] = {primitives::box({1, 1, 1}, white),  primitives::sphere(0.5, 14, 10, white), primitives::cylinder(0.5, 1, 14, white),
+                                    primitives::cone(0.5, 1, 14, white), primitives::box({1, 1, 1}, white),      primitives::sphere(0.5, 12, 8, white),
+                                    primitives::sphere(0.5, 10, 7, white),  primitives::sphere(0.5, 12, 8, white),
+                                    primitives::torus(0.8, 0.2, 24, 6, white)};
+  for (int i = 0; i < kShapes; converted::pre_inc(i)) {
+    Material m;
+    m.roughness = 0.7;
+    m.metalness = 0.25;
+    if (i == glow_box || i == glow_sphere) {
+      m.emissive = {1, 1, 1};
+      m.unlit = true;
+      m.cast_shadow = false;
+    }
+    if (i == fade_sphere || i == fade_ring) {
+      m.emissive = {1, 1, 1};
+      m.unlit = true;
+      m.cast_shadow = false;
+      m.double_sided = true;
+      m.alpha = AlphaMode::blend;
+    }
+    if (i == smoke) {
+      m.roughness = 1;
+      m.metalness = 0;
+      m.cast_shadow = false;
+    }
+    Part& p = converted::at(parts_, i);
+    p.id = r.allocate_id();
+    MeshLook look;
+    look.material = m;
+    look.extra_slot = kMaxExtensionAttributes;
+    look.visible = false;
+    const Mat4 parked = Mat4::translate({0, 0, -1000});
+    if (!upsert(r, p.id, converted::at(meshes, i), look, Span<const f32>(parked.m, 16))) { r.release_id(p.id); p.id = 0; return false; }
+  }
+  return true;
+}
 void CombatArt::begin() {
   for (Part& p : parts_) { p.transforms.clear(); p.tints.clear(); }
 }
@@ -197,12 +348,20 @@ void CombatArt::put(Shape s, const Mat4& m, Vec3 tint, f32 alpha) {
 }
 void CombatArt::beam(Vec3 a, Vec3 b, f32 width, Vec3 tint) {
   const Vec3 d = b - a;
-  const f32 l = length(d);
+  const f32 l = converted::wide::length(d);
   if (l < 0.05) return;
   const Vec3 n = d * (1.0 / l);
-  const Vec3 axis = cross(Vec3{0, 0, 1}, n);
+  const Vec3 axis = converted::wide::cross(Vec3{0, 0, 1}, n);
   const f32 ang = kern::math::acos(clampf(n.z, -1, 1));
-  put(glow_box, at((a + b) * 0.5) * rot(normalize(axis, {1, 0, 0}), ang) * sc3(width, width, l), tint);
+  put(glow_box, at((a + b) * 0.5) * rot(converted::wide::normalize(axis, {1, 0, 0}), ang) * sc3(width, width, l), tint);
+}
+void CombatArt::end() {
+  for (Part& p : parts_) {
+    if (!p.id) continue;
+    if (p.transforms.empty()) { r_->set_visible(p.id, false); continue; }
+    r_->update_instances(p.id, Span<const f32>(p.transforms.data(), p.transforms.size()), Span<const f32>(p.tints.data(), p.tints.size()));
+    r_->set_visible(p.id, true);
+  }
 }
 void CombatArt::heli(const Mat4& m, f32 rotor, bool wreck) {
   // military_response.mjs buildHeli: capsule body 4.2 m, glass nose, tail boom, fin, stub wings
@@ -246,7 +405,7 @@ void CombatArt::flak(Vec3 p, f32 base_yaw, f32 yaw, f32 pitch, bool dead, bool f
   // 2.3 m barrels with muzzle brakes, magazines, muzzle flash.
   const f32 k = dead ? 0.35 : 1.0;
   const Mat4 base = at(p) * rot({0, 0, 1}, base_yaw);
-  for (int i = 0; i < 14; ++i) {
+  for (int i = 0; i < 14; converted::pre_inc(i)) {
     if (i == 3 || i == 4) continue;
     const f32 a = static_cast<f32>(i) / 14 * 2 * kPi;
     const Mat4 bag = base * at({kern::math::cos(a) * 2.6, kern::math::sin(a) * 2.6, 0.3}) * rot({0, 0, 1}, a + kPi / 2) * sc3(1.2, 0.56, 0.5);
@@ -299,14 +458,14 @@ void CombatArt::gate(Vec3 c, f32 yaw, f32 w, f32 h, Vec3 color) {
 
 [[maybe_unused]] static Mat4 draw_kern__Mat4(converted::Draw& draw) {
   Mat4 s{};
-  for (auto& e : s.m) e = draw.number();
+  converted::fill_array(s.m, [&]() -> double { return draw.number(); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(std::vector<double>(std::begin(s.m), std::end(s.m)))}); }
-[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return got.rows && got.rows->size() == 1 && same(std::vector<double>(std::begin(want.m), std::end(want.m)), (*got.rows)[0]); }
-[[maybe_unused]] static bool defined(const Mat4& s) { return defined(std::vector<double>(std::begin(s.m), std::end(s.m))); }
-[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(std::vector<double>(std::begin(s.m), std::end(s.m))) + "}"; }
-[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); for (std::size_t k = 0; k < items.size() && k < std::size(s.m); ++k) s.m[k] = items[k]; } }
+[[maybe_unused]] static converted::Value arg(const Mat4& s) { return converted::Value::structure({arg(converted::array_list(s.m))}); }
+[[maybe_unused]] static bool same(const Mat4& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::array_list(want.m), (*got.rows)[0]), ".m"); }
+[[maybe_unused]] static bool defined(const Mat4& s) { return defined(converted::array_list(s.m)); }
+[[maybe_unused]] static std::string text(const Mat4& s) { return std::string("{") + text(converted::array_list(s.m)) + "}"; }
+[[maybe_unused]] static void take(Mat4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[0]); converted::array_from(s.m, items); } }
 [[maybe_unused]] static CombatArt::Part draw_CombatArt__Part(converted::Draw& draw) {
   CombatArt::Part s{};
   s.id = static_cast<unsigned int>(draw.below(40));
@@ -315,248 +474,432 @@ void CombatArt::gate(Vec3 c, f32 yaw, f32 w, f32 h, Vec3 color) {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const CombatArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints)}); }
-[[maybe_unused]] static bool same(const CombatArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]); }
+[[maybe_unused]] static bool same(const CombatArt::Part& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.transforms, (*got.rows)[1]), ".transforms") && converted::at_place(same(want.tints, (*got.rows)[2]), ".tints"); }
 [[maybe_unused]] static bool defined(const CombatArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints); }
 [[maybe_unused]] static std::string text(const CombatArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + "}"; }
 [[maybe_unused]] static void take(CombatArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); }
 [[maybe_unused]] static CombatArt draw_CombatArt(converted::Draw& draw) {
   CombatArt s{};
   s.r_ = converted::engine_object<Renderer>(1 + draw.below(6));
-  for (auto& e : s.parts_) e = draw_CombatArt__Part(draw);
+  converted::fill_array(s.parts_, [&]() -> CombatArt::Part { return draw_CombatArt__Part(draw); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const CombatArt& s) { return converted::Value::structure({arg(s.r_), arg(std::vector<CombatArt::Part>(std::begin(s.parts_), std::end(s.parts_)))}); }
-[[maybe_unused]] static bool same(const CombatArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.r_, (*got.rows)[0]) && same(std::vector<CombatArt::Part>(std::begin(want.parts_), std::end(want.parts_)), (*got.rows)[1]); }
-[[maybe_unused]] static bool defined(const CombatArt& s) { return defined(s.r_) && defined(std::vector<CombatArt::Part>(std::begin(s.parts_), std::end(s.parts_))); }
-[[maybe_unused]] static std::string text(const CombatArt& s) { return std::string("{") + text(s.r_) + ", " + text(std::vector<CombatArt::Part>(std::begin(s.parts_), std::end(s.parts_))) + "}"; }
-[[maybe_unused]] static void take(CombatArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); { std::vector<CombatArt::Part> items; converted::take_as<std::vector<CombatArt::Part>>(items, (*v.rows)[1]); for (std::size_t k = 0; k < items.size() && k < std::size(s.parts_); ++k) s.parts_[k] = items[k]; } }
-inline bool Renderer::set_visible(const unsigned int& id, const bool& visible) const { const std::vector<converted::Value> out = converted::engine_call("engine.renderer.set_visible", {arg(*this), arg(id), arg(visible)}); bool result{}; converted::take_as<bool>(result, out[0]); return result; }
+[[maybe_unused]] static converted::Value arg(const CombatArt& s) { return converted::Value::structure({arg(s.r_), arg(converted::array_list(s.parts_))}); }
+[[maybe_unused]] static bool same(const CombatArt& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.r_, (*got.rows)[0]), ".r_") && converted::at_place(same(converted::array_list(want.parts_), (*got.rows)[1]), ".parts_"); }
+[[maybe_unused]] static bool defined(const CombatArt& s) { return defined(s.r_) && defined(converted::array_list(s.parts_)); }
+[[maybe_unused]] static std::string text(const CombatArt& s) { return std::string("{") + text(s.r_) + ", " + text(converted::array_list(s.parts_)) + "}"; }
+[[maybe_unused]] static void take(CombatArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<Renderer*>(s.r_, (*v.rows)[0]); { std::vector<CombatArt::Part> items; converted::take_as<std::vector<CombatArt::Part>>(items, (*v.rows)[1]); converted::array_from(s.parts_, items); } }
+[[maybe_unused]] static MeshData draw_kern__MeshData(converted::Draw& draw) {
+  MeshData s{};
+  s.positions = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.normals = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.colors = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.uvs = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.extra_size = static_cast<unsigned int>(draw.below(40));
+  s.indices = draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MeshData& s) { return converted::Value::structure({arg(s.positions), arg(s.normals), arg(s.colors), arg(s.uvs), arg(s.extra), arg(s.extra_size), arg(s.indices)}); }
+[[maybe_unused]] static bool same(const MeshData& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.positions, (*got.rows)[0]), ".positions") && converted::at_place(same(want.normals, (*got.rows)[1]), ".normals") && converted::at_place(same(want.colors, (*got.rows)[2]), ".colors") && converted::at_place(same(want.uvs, (*got.rows)[3]), ".uvs") && converted::at_place(same(want.extra, (*got.rows)[4]), ".extra") && converted::at_place(same(want.extra_size, (*got.rows)[5]), ".extra_size") && converted::at_place(same(want.indices, (*got.rows)[6]), ".indices"); }
+[[maybe_unused]] static bool defined(const MeshData& s) { return defined(s.positions) && defined(s.normals) && defined(s.colors) && defined(s.uvs) && defined(s.extra) && defined(s.extra_size) && defined(s.indices); }
+[[maybe_unused]] static std::string text(const MeshData& s) { return std::string("{") + text(s.positions) + ", " + text(s.normals) + ", " + text(s.colors) + ", " + text(s.uvs) + ", " + text(s.extra) + ", " + text(s.extra_size) + ", " + text(s.indices) + "}"; }
+[[maybe_unused]] static void take(MeshData& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<std::vector<double>>(s.positions, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.normals, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.colors, (*v.rows)[2]); converted::take_as<std::vector<double>>(s.uvs, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.extra, (*v.rows)[4]); converted::take_as<unsigned int>(s.extra_size, (*v.rows)[5]); converted::take_as<std::vector<unsigned int>>(s.indices, (*v.rows)[6]); }
+[[maybe_unused]] static Vec4 draw_kern__Vec4(converted::Draw& draw) {
+  if (draw.flag()) return Vec4(draw.number(), draw.number(), draw.number(), draw.number());
+  Vec4 s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Vec4& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const Vec4& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
+[[maybe_unused]] static bool defined(const Vec4& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Vec4& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Vec4& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+[[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
+  Material s{};
+  s.color = draw_kern__Vec4(draw);
+  s.alpha = converted::enum_value<AlphaMode>(draw.below(3));
+  s.alpha_cutoff = draw.number();
+  s.roughness = draw.number();
+  s.metalness = draw.number();
+  s.emissive = draw.vector();
+  s.unlit = draw.flag();
+  s.double_sided = draw.flag();
+  s.cast_shadow = draw.flag();
+  s.frustum_culled = draw.flag();
+  s.viewmodel = draw.flag();
+  s.linear_colors = draw.flag();
+  s.lines = draw.flag();
+  converted::fill_array(s.params, [&]() -> int { return static_cast<int>(draw.whole()); });
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
+[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
+[[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
+[[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
+[[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
+[[maybe_unused]] static MeshLook draw_kern__MeshLook(converted::Draw& draw) {
+  MeshLook s{};
+  s.material = draw_kern__Material(draw);
+  s.extra_slot = static_cast<unsigned int>(draw.below(40));
+  s.texture = static_cast<unsigned int>(draw.below(40));
+  s.visible = draw.flag();
+  s.layers = static_cast<unsigned int>(draw.below(40));
+  s.pick_bvh = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
+[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
+[[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
+[[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
+[[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
+inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
+inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
+inline bool Renderer::set_visible(const unsigned int& id, const bool& visible) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_visible", {converted::value_of(*this), converted::value_of(id), converted::value_of(visible)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline bool Renderer::update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.update_instances", {converted::value_of(*this), converted::value_of(id), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); if (changed) converted::take_as<bool>(*changed, kern_out[1]); return kern_result; }
+namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.box", {converted::value_of(size), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+namespace primitives { inline MeshData sphere(const double& radius, const unsigned int& segments, const unsigned int& rings, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.sphere", {converted::value_of(radius), converted::value_of(segments), converted::value_of(rings), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cylinder", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+namespace primitives { inline MeshData cone(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cone", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+namespace primitives { inline MeshData torus(const double& major, const double& minor, const unsigned int& segments, const unsigned int& tube_segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.torus", {converted::value_of(major), converted::value_of(minor), converted::value_of(segments), converted::value_of(tube_segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+struct Out_CombatArt_init { CombatArt Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_CombatArt_init& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_CombatArt_init& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_CombatArt_init& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_combat_art_cpp) {
   converted::Blueprint bp("combat_art_cpp");
   {  // rot
     converted::Tally tally("rot");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0, [[maybe_unused]] double a1) { return converted::counted([&] { return converted_combat_art_cpp::rot(std::move(a0), std::move(a1)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0, [[maybe_unused]] double& a1) { return converted::counted([&] { return converted_combat_art_cpp::rot(std::move(a0), std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
-      const double a1 = draw.number();
+      Vec3 a0 = draw.vector();
+      double a1 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // at
     converted::Tally tally("at");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_combat_art_cpp::at(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0) { return converted::counted([&] { return converted_combat_art_cpp::at(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
+      Vec3 a0 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // sc3
     converted::Tally tally("sc3");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] double a0, [[maybe_unused]] double a1, [[maybe_unused]] double a2) { return converted::counted([&] { return converted_combat_art_cpp::sc3(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] double& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return converted_combat_art_cpp::sc3(std::move(a0), std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const double a0 = draw.number();
-      const double a1 = draw.number();
-      const double a2 = draw.number();
+      double a0 = draw.number();
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CombatArt::init
+    converted::Tally tally("CombatArt_init");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] Renderer& a1) { auto r = converted::counted([&] { return a0.init(a1); }); return Out_CombatArt_init{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      CombatArt a0 = draw_CombatArt(draw);
+      Renderer& a1 = *converted::engine_object<Renderer>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
   {  // CombatArt::begin
     converted::Tally tally("CombatArt_begin");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0) { converted::counted([&] { return a0.begin(); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0) { converted::counted([&] { return a0.begin(); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
+      CombatArt a0 = draw_CombatArt(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::put
     converted::Tally tally("CombatArt_put");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] CombatArt::Shape a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3) { converted::counted([&] { return a0.put(std::move(a1), a2, std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] CombatArt::Shape& a1, [[maybe_unused]] Mat4& a2, [[maybe_unused]] Vec3& a3) { converted::counted([&] { return a0.put(std::move(a1), a2, std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const CombatArt::Shape a1 = static_cast<CombatArt::Shape>(draw.below(10));
-      const Mat4 a2 = draw_kern__Mat4(draw);
-      const Vec3 a3 = draw.vector();
+      CombatArt a0 = draw_CombatArt(draw);
+      CombatArt::Shape a1 = converted::enum_value<CombatArt::Shape>(draw.below(10));
+      Mat4 a2 = draw_kern__Mat4(draw);
+      Vec3 a3 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a2), arg(a1), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::put
     converted::Tally tally("CombatArt_put_2");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] CombatArt::Shape a1, [[maybe_unused]] Mat4 a2, [[maybe_unused]] Vec3 a3, [[maybe_unused]] double a4) { converted::counted([&] { return a0.put(std::move(a1), a2, std::move(a3), std::move(a4)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] CombatArt::Shape& a1, [[maybe_unused]] Mat4& a2, [[maybe_unused]] Vec3& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return a0.put(std::move(a1), a2, std::move(a3), std::move(a4)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const CombatArt::Shape a1 = static_cast<CombatArt::Shape>(draw.below(10));
-      const Mat4 a2 = draw_kern__Mat4(draw);
-      const Vec3 a3 = draw.vector();
-      const double a4 = draw.number();
+      CombatArt a0 = draw_CombatArt(draw);
+      CombatArt::Shape a1 = converted::enum_value<CombatArt::Shape>(draw.below(10));
+      Mat4 a2 = draw_kern__Mat4(draw);
+      Vec3 a3 = draw.vector();
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a2), arg(a1), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::beam
     converted::Tally tally("CombatArt_beam");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] Vec3 a2, [[maybe_unused]] double a3, [[maybe_unused]] Vec3 a4) { converted::counted([&] { return a0.beam(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] double& a3, [[maybe_unused]] Vec3& a4) { converted::counted([&] { return a0.beam(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const Vec3 a1 = draw.vector();
-      const Vec3 a2 = draw.vector();
-      const double a3 = draw.number();
-      const Vec3 a4 = draw.vector();
+      CombatArt a0 = draw_CombatArt(draw);
+      Vec3 a1 = draw.vector();
+      Vec3 a2 = draw.vector();
+      double a3 = draw.number();
+      Vec3 a4 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // CombatArt::end
+    converted::Tally tally("CombatArt_end");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] CombatArt& a0) { converted::counted([&] { return a0.end(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      CombatArt a0 = draw_CombatArt(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::heli
     converted::Tally tally("CombatArt_heli");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.heli(a1, std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] double& a2, [[maybe_unused]] bool& a3) { converted::counted([&] { return a0.heli(a1, std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const Mat4 a1 = draw_kern__Mat4(draw);
-      const double a2 = draw.number();
-      const bool a3 = draw.flag();
+      CombatArt a0 = draw_CombatArt(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      double a2 = draw.number();
+      bool a3 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::tank
     converted::Tally tally("CombatArt_tank");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Mat4 a1, [[maybe_unused]] double a2, [[maybe_unused]] bool a3) { converted::counted([&] { return a0.tank(a1, std::move(a2), std::move(a3)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] Mat4& a1, [[maybe_unused]] double& a2, [[maybe_unused]] bool& a3) { converted::counted([&] { return a0.tank(a1, std::move(a2), std::move(a3)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const Mat4 a1 = draw_kern__Mat4(draw);
-      const double a2 = draw.number();
-      const bool a3 = draw.flag();
+      CombatArt a0 = draw_CombatArt(draw);
+      Mat4 a1 = draw_kern__Mat4(draw);
+      double a2 = draw.number();
+      bool a3 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::flak
     converted::Tally tally("CombatArt_flak");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] bool a5, [[maybe_unused]] bool a6) { converted::counted([&] { return a0.flak(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] bool& a5, [[maybe_unused]] bool& a6) { converted::counted([&] { return a0.flak(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5), std::move(a6)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const Vec3 a1 = draw.vector();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
-      const double a4 = draw.number();
-      const bool a5 = draw.flag();
-      const bool a6 = draw.flag();
+      CombatArt a0 = draw_CombatArt(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      bool a5 = draw.flag();
+      bool a6 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5, a6);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5), arg(a6)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5) + ", " + text(a6); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::fighter
     converted::Tally tally("CombatArt_fighter");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2) { converted::counted([&] { return a0.fighter(std::move(a1), std::move(a2)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.fighter(std::move(a1), std::move(a2)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const Vec3 a1 = draw.vector();
-      const double a2 = draw.number();
+      CombatArt a0 = draw_CombatArt(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // CombatArt::gate
     converted::Tally tally("CombatArt_gate");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] CombatArt a0, [[maybe_unused]] Vec3 a1, [[maybe_unused]] double a2, [[maybe_unused]] double a3, [[maybe_unused]] double a4, [[maybe_unused]] Vec3 a5) { converted::counted([&] { return a0.gate(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return a0; };
+    const auto run = [&]([[maybe_unused]] CombatArt& a0, [[maybe_unused]] Vec3& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3, [[maybe_unused]] double& a4, [[maybe_unused]] Vec3& a5) { converted::counted([&] { return a0.gate(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return std::move(a0); };
     for (int i = 0; tally.more(i); ++i) {
-      const CombatArt a0 = draw_CombatArt(draw);
-      const Vec3 a1 = draw.vector();
-      const double a2 = draw.number();
-      const double a3 = draw.number();
-      const double a4 = draw.number();
-      const Vec3 a5 = draw.vector();
+      CombatArt a0 = draw_CombatArt(draw);
+      Vec3 a1 = draw.vector();
+      double a2 = draw.number();
+      double a3 = draw.number();
+      double a4 = draw.number();
+      Vec3 a5 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2, a3, a4, a5);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2) + ", " + text(a3) + ", " + text(a4) + ", " + text(a5); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

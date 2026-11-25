@@ -17,10 +17,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -33,46 +33,53 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Code {
+namespace qr { struct Code {
   i32 version = 0, size = 0;
   std::vector<u8> modules;  // size * size, 1 = dark, row major
-  bool dark(i32 x, i32 y) const { return x >= 0 && y >= 0 && x < size && y < size && converted::at(modules, static_cast<std::size_t>(y * size + x)); }
-};
+  bool dark(i32 x, i32 y) const { return x >= 0 && y >= 0 && x < size && y < size && converted::at(modules, static_cast<std::size_t>(converted::plus(converted::times(y, size), x))); }
+}; }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static Code draw_qr__Code(converted::Draw& draw) {
-  Code s{};
+[[maybe_unused]] static qr::Code draw_qr__Code(converted::Draw& draw) {
+  qr::Code s{};
   s.version = static_cast<int>(draw.whole());
   s.size = static_cast<int>(draw.whole());
   s.modules = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const Code& s) { return converted::Value::structure({arg(s.version), arg(s.size), arg(s.modules)}); }
-[[maybe_unused]] static bool same(const Code& want, const converted::Value& got) { return got.rows && got.rows->size() == 3 && same(want.version, (*got.rows)[0]) && same(want.size, (*got.rows)[1]) && same(want.modules, (*got.rows)[2]); }
-[[maybe_unused]] static bool defined(const Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
-[[maybe_unused]] static std::string text(const Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
-[[maybe_unused]] static void take(Code& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.version, (*v.rows)[0]); converted::take_as<int>(s.size, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.modules, (*v.rows)[2]); }
+namespace qr { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const qr::Code& s) { return converted::Value::structure({arg(s.version), arg(s.size), arg(s.modules)}); }
+[[maybe_unused]] static bool same(const qr::Code& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.version, (*got.rows)[0]), ".version") && converted::at_place(same(want.size, (*got.rows)[1]), ".size") && converted::at_place(same(want.modules, (*got.rows)[2]), ".modules"); }
+[[maybe_unused]] static bool defined(const qr::Code& s) { return defined(s.version) && defined(s.size) && defined(s.modules); }
+[[maybe_unused]] static std::string text(const qr::Code& s) { return std::string("{") + text(s.version) + ", " + text(s.size) + ", " + text(s.modules) + "}"; }
+[[maybe_unused]] static void take(qr::Code& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<int>(s.version, (*v.rows)[0]); converted::take_as<int>(s.size, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.modules, (*v.rows)[2]); }
+}
 
 SC_TEST(converted_qr_code) {
   converted::Blueprint bp("qr_code");
   {  // Code::dark
     converted::Tally tally("Code_dark");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Code a0, [[maybe_unused]] int a1, [[maybe_unused]] int a2) { return converted::counted([&] { return a0.dark(std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] qr::Code& a0, [[maybe_unused]] int& a1, [[maybe_unused]] int& a2) { return converted::counted([&] { return a0.dark(std::move(a1), std::move(a2)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Code a0 = draw_qr__Code(draw);
-      const int a1 = static_cast<int>(draw.whole());
-      const int a2 = static_cast<int>(draw.whole());
+      qr::Code a0 = draw_qr__Code(draw);
+      int a1 = static_cast<int>(draw.whole());
+      int a2 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

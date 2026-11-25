@@ -21,14 +21,15 @@
 
 namespace sc::combat {
 
-/// The running Blueprints of the actors "Military", "Zombies", "Sandbox", "Fun" and "Race" (the
-/// game binds them once its world has started; tests bind the ones they run). False when a table
-/// is not as the game needs it.
-bool bind_military(kern::logic::Instance* blueprint);
-bool bind_zombies(kern::logic::Instance* blueprint);
-bool bind_sandbox(kern::logic::Instance* blueprint);
-bool bind_fun(kern::logic::Instance* blueprint);
-bool bind_race(kern::logic::Instance* blueprint);
+/// Bind the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run) - the Blueprints of the actors "Military", "Zombies", "Sandbox", "Fun" and
+/// "Race", each found by its name at every call - and take their numbers and tables. False when the
+/// actor has no Blueprint that runs there or a table is not as the game needs it.
+bool bind_military(kern::logic::Runtime& logic);
+bool bind_zombies(kern::logic::Runtime& logic);
+bool bind_sandbox(kern::logic::Runtime& logic);
+bool bind_fun(kern::logic::Runtime& logic);
+bool bind_race(kern::logic::Runtime& logic);
 
 // ---------------------------------------------------------------- military_response.mjs
 extern f32 kTriggerHeat, kTriggerHoldS, kTriggerExtremeHeat, kAlertS, kReinforceS, kFirstReinforceS;
@@ -101,11 +102,11 @@ struct ZombieRounds {
 
 // ---------------------------------------------------------------- sandbox_game.mjs
 enum class EnemyType : u8 { cop, swat, heavy };
-struct EnemySpec { const char* name; f32 hp, speed, range, shot_s; i32 burst; f32 dmg, acc; i32 score; f32 scale; Vec3 color, stripe; };
+struct EnemySpec { std::string name; f32 hp, speed, range, shot_s; i32 burst; f32 dmg, acc; i32 score; f32 scale; Vec3 color, stripe; };
 const EnemySpec& enemy_spec(EnemyType t);
 extern f32 kEnemySpawnS, kComboS;
 /// Which enemy comes at `stars` (r: a random number).
-bool choose_enemy(i32 stars, f32 r, i32 heavies, EnemyType& out);
+EnemyType choose_enemy(i32 stars, f32 r, i32 heavies);
 f32 enemy_hit_chance(const EnemySpec& s, f32 d, f32 moving);
 /// How many enemies are up at `stars`.
 i32 enemy_budget(i32 stars);
@@ -120,7 +121,7 @@ struct Chaos {
 // ---------------------------------------------------------------- gameplay_fun_logic.mjs
 extern f32 kFunComboS, kOverdriveS;
 extern i32 kMomentumTarget;
-struct Contract { const char* id; const char* name; const char* hint; i32 target, reward; };
+struct Contract { std::string id, name, hint; i32 target, reward; };
 extern i32 kContracts;  // (rows of the Blueprint's table Contracts)
 const Contract& contract(i32 index);
 enum class FunEvent : u8 { tick, world_kill_person, world_kill_car, world_kill_bus, world_kill_player, police_kill, emp, escape, damage, drone_destroyed, player_death, cycle_contract };
@@ -142,7 +143,7 @@ struct Fun {
 // ---------------------------------------------------------------- race_track.mjs
 extern i32 kRaceLaps, kGates;
 extern f32 kCourseScale;
-struct Gate { const char* name; Vec3 center; f32 width, height; bool start; };
+struct Gate { std::string name; Vec3 center; f32 width, height; bool start; };
 const Gate& gate(i32 i);
 /// Gate frame: race-forward normal (towards the next gate) and the horizontal opening axis.
 void gate_axes(i32 i, Vec2& normal, Vec2& right);

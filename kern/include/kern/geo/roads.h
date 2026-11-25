@@ -34,7 +34,7 @@ struct RoadOptions {
 ///   width, flags (1 = curb, 2 = marking), surface_color, marking_color, point_count, x0, y0, ...
 class RoadBuilder {
  public:
-  bool begin(const f64* stream, std::size_t length, const RoadOptions& options, HeightSampler heights);
+  bool begin(const f64* stream, Count<1> length, const RoadOptions& options, HeightSampler heights);
   bool step(f64 budget_ms);
   bool done() const { return done_; }
   bool failed() const { return failed_; }
@@ -63,7 +63,7 @@ class RoadBuilder {
 class RoadStream {
  public:
   RoadStream() { data_.push_back(0); }
-  void road(const Vec2* points, u32 count, f64 width, bool curb, u32 surface_color, i32 marking_color = -1) {
+  void road(const Vec2* points, Count<1> count, f64 width, bool curb, u32 surface_color, i32 marking_color = -1) {
     data_[0] += 1;
     data_.insert(data_.end(), {width, static_cast<f64>((curb ? 1 : 0) | (marking_color >= 0 ? 2 : 0)), static_cast<f64>(surface_color),
                                static_cast<f64>(marking_color >= 0 ? marking_color : 0), static_cast<f64>(count)});

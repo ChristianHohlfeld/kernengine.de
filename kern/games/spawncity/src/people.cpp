@@ -173,8 +173,8 @@ void People::apply_snapshot(const std::vector<NetPerson>& list, f32 now) {
     Person& p = people_[static_cast<std::size_t>(at)];
     if (p.seed != n.seed) { p.seed = n.seed; dress(p); p.pos = n.pos; }
     if (p.state == State::down) continue;
-    if (host_down) { kill(p, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0}, false, now, false); continue; }
-    if ((n.flags & 1) && now >= p.knocked_until) { knock(p, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0.5f}, now); continue; }
+    if (host_down) { kill(at, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0}, false, now, false); continue; }
+    if ((n.flags & 1) && now >= p.knocked_until) { knock(at, Vec3{std::cos(n.yaw), std::sin(n.yaw), 0.5f}, now); continue; }
     p.net_to = n.pos;
     p.net_at = n.at;
     p.v = n.v;
@@ -193,9 +193,9 @@ void People::apply_snapshot(const std::vector<NetPerson>& list, f32 now) {
   }
 }
 
-void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
+void People::spawn(const PeopleView& view, const CityStream& city, Rng& rng, f32 now) {
   if (puppets_) return;  // MP client: the host's citizens
-  const std::vector<Lane>& lanes = view.city->lanes();
+  const std::vector<Lane>& lanes = city.lanes();
   if (lanes.empty()) return;
   u32 alive = count(Kind::citizen, false);
   const f32 near = alive < budget_ / 2 ? 12.0f : 70.0f;  // the first fill may start close by
@@ -231,16 +231,21 @@ void People::spawn(const PeopleView& view, Rng& rng, f32 now) {
     const f32 d = near_any(view, at);
     const Vec3 around = view.foci.empty() || (attempt % (view.foci.size() + 1)) == 0 ? view.focus : view.foci[attempt % (view.foci.size() + 1) - 1];
     if (d < near || dist2d(at, around) > show_) continue;
-    if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
+    if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) {
       p.side = -p.side;  // the other pavement, else closer to the kerb
       route_point(p, lanes, at, heading);
-      if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) {
+      if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) {
         p.off = L.width * 0.5f + 0.5f;
         route_point(p, lanes, at, heading);
-        if (inside_building(*view.physics, at, view.city->ground_height(at.x, at.y))) continue;
+        if (inside_building(*view.physics, at, city.ground_height(at.x, at.y))) continue;
       }
     }
-    if (view.can_spawn && !view.can_spawn(at)) continue;  // nobody may see them appear
+    if (view.spawn_watched) {  // nobody may see them appear
+      // (whether buildings hide the point is the Blueprint's own question to the world)
+      const bool unseen = spawn::can_spawn(view.spawn_viewers, at, view.spawn_far_entry, view.spawn_height);
+      ++(unseen ? spawns_allowed_ : spawns_denied_);
+      if (!unseen) continue;
+    }
     const u32 seed = id;
     p.seed = seed;
     p.pos = at;
@@ -287,7 +292,8 @@ void People::frighten(Vec3 at, f32 radius, f32 now, f32 strength) {
   }
 }
 
-void People::kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car) {
+void People::kill(i32 i, Vec3 from_dir, bool by_player, f32 now, bool hit_by_car) {
+  Person& p = people_[static_cast<std::size_t>(i)];
   if (p.state == State::down || p.state == State::gone) return;
   const Vec3 at = p.pos;
   const bool officer = p.kind == Kind::officer;
@@ -297,8 +303,8 @@ void People::kill(Person& p, Vec3 from_dir, bool by_player, f32 now, bool hit_by
   p.v = 0;
   const f32 l = std::hypot(from_dir.x, from_dir.y);
   p.fall_dir = l > 1e-3f ? Vec3{from_dir.x / l, from_dir.y / l, 0} : Vec3{std::cos(p.yaw), std::sin(p.yaw), 0};
-  deaths_.push_back({static_cast<i32>(&p - people_.data()), p.kind, by_player, last_head_});
-  falls_.push_back({static_cast<i32>(&p - people_.data()), from_dir, hit_by_car, false});  // ragdoll (M3 life)
+  deaths_.push_back({i, p.kind, by_player, last_head_});
+  falls_.push_back({i, from_dir, hit_by_car, false});  // ragdoll (M3 life)
   // Soldiers and zombies are no crime (military_response.mjs, zombie_nights.mjs); a sandbox
   // enemy down counts as "police-kill" severity 1 (sandbox_game.mjs killEnemy).
   if (by_player && (p.kind == Kind::citizen || officer)) {
@@ -315,7 +321,7 @@ void People::mate_hurt(i32 index, u32 seed, f32 damage, HurtBy by, Vec3 push, f3
   if (p.kind != Kind::citizen || p.seed != seed || p.state == State::down || p.state == State::gone || now < p.knocked_until) return;
   p.hp -= damage;
   p.hurt_at = now;
-  if (p.hp <= 0) { kill(p, push, false, now, by == HurtBy::vehicle); return; }
+  if (p.hp <= 0) { kill(index, push, false, now, by == HurtBy::vehicle); return; }
   if (by == HurtBy::vehicle) {
     falls_.push_back({index, push, true, true});
     p.knocked_until = now + 6;
@@ -324,7 +330,7 @@ void People::mate_hurt(i32 index, u32 seed, f32 damage, HurtBy by, Vec3 push, f3
     return;
   }
   if (by == HurtBy::blow && p.hp > 35) p.v = 0;  // a blow he takes standing: a stagger
-  else knock(p, push, now);
+  else knock(index, push, now);
   frighten(p.pos, 3, now, 1.6f);
 }
 
@@ -364,16 +370,16 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
       // world_procedural_population.mjs punch(): hp - damage; dead at 0, down at 35, else a stagger
       const f32 k = std::fmax(0.5f, melee_ns / 30);
       p.hp -= damage;
-      if (p.hp <= 0) kill(p, dir, by_player, now, false);
-      else if (p.hp <= 35) knock(p, flat * (2 * k) + Vec3{0, 0, 0.9f}, now);
+      if (p.hp <= 0) kill(best, dir, by_player, now, false);
+      else if (p.hp <= 35) knock(best, flat * (2 * k) + Vec3{0, 0, 0.9f}, now);
       else { const f32 step = std::fmin(0.6f, 0.22f * k); p.pos = p.pos + flat * step; p.v = 0; }
     } else {
       // gameplay_final_runtime_v2.mjs: weaponDamage 55 (default), sniper 200; headshots SMG 165,
       // Glock / sniper 999 (Kern's damage 13 / 26 / 95 tells the gun)
       const f32 dmg = head ? (damage >= 26 ? 999.0f : 165.0f) : (damage >= 90 ? 200.0f : 55.0f);
       p.hp -= dmg;
-      if (p.hp <= 0) kill(p, dir, by_player, now, false);
-      else knock(p, flat * 2.5f + Vec3{0, 0, 1.4f}, now);
+      if (p.hp <= 0) kill(best, dir, by_player, now, false);
+      else knock(best, flat * 2.5f + Vec3{0, 0, 1.4f}, now);
     }
     if (p.state != State::down) {
       if (by_player) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
@@ -399,7 +405,7 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
     return best;
   }
   p.hp -= dealt;
-  if (p.hp <= 0) kill(p, dir, by_player, now, false);
+  if (p.hp <= 0) kill(best, dir, by_player, now, false);
   else {
     if (by_player && p.kind == Kind::citizen) reports_.push_back({wanted::Crime::person_hit, p.pos, true});
     if (p.kind == Kind::citizen) frighten(p.pos, 3, now, 1.6f);
@@ -408,7 +414,8 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
 }
 
 void People::blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now) {
-  for (Person& p : people_) {
+  for (std::size_t i = 0; i < people_.size(); ++i) {
+    Person& p = people_[i];
     if (p.state == State::down || p.state == State::gone || p.remote) continue;  // (a mate's unit: his machine runs the blast on it)
     const f32 d = kern::length(p.pos + Vec3{0, 0, 0.9f} - at);
     if (d >= radius) continue;
@@ -418,8 +425,8 @@ void People::blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now) {
       // hit (55): the first knocks down, the next kills; lying there it takes nothing
       if (t * t * (3 - 2 * t) <= 0.22f || now < p.knocked_until) continue;
       p.hp -= 55;
-      if (p.hp <= 0) kill(p, p.pos - at, by_player, now, false);
-      else knock(p, p.pos - at, now);
+      if (p.hp <= 0) kill(static_cast<i32>(i), p.pos - at, by_player, now, false);
+      else knock(static_cast<i32>(i), p.pos - at, now);
       continue;
     }
     if (p.kind == Kind::officer) {
@@ -429,13 +436,13 @@ void People::blast(Vec3 at, f32 radius, f32 damage, bool by_player, f32 now) {
       if (d2 < r) p.hp -= 100 * (1 - d2 / r) * 1.6f + 20;
     } else
       p.hp -= damage * t * t * (3 - 2 * t);
-    if (p.hp <= 0) kill(p, p.pos - at, by_player, now, false);
+    if (p.hp <= 0) kill(static_cast<i32>(i), p.pos - at, by_player, now, false);
   }
   frighten(at, radius * 2.5f, now, 1.6f);
 }
 
-void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, Rng& rng) {
-  const std::vector<Lane>& lanes = view.city->lanes();
+void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng) {
+  const std::vector<Lane>& lanes = city.lanes();
   const kern::physics::World& w = *view.physics;
   if (p.state == State::flee) {
     if (now < p.flee_until) {
@@ -542,10 +549,12 @@ void People::walk(Person& p, f32 dt, f32 now, const PeopleView& view, Rng& rng) 
   }
 }
 
-void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
-  if (!view.physics || !view.city) return;
+void People::update(f32 dt, f32 now, const PeopleView& view, const CityStream& city, Rng& rng) {
+  spawns_allowed_ = spawns_denied_ = 0;
+  if (!view.physics) return;
   if (dt <= 0) return;
-  for (Person& p : people_) {
+  for (std::size_t i = 0; i < people_.size(); ++i) {
+    Person& p = people_[i];
     if (p.state == State::gone) continue;
     if (p.state == State::down) {
       if (now - p.down_at > kBodySeconds || near_any(view, p.pos) > hide_) p.state = State::gone;
@@ -563,11 +572,11 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       p.pos.y += d.y * k;
     } else if (p.kind == Kind::citizen) {
       if (near_any(view, p.pos) > hide_) { p.state = State::gone; continue; }
-      if (p.state != State::fight) walk(p, dt, now, view, rng);
+      if (p.state != State::fight) walk(p, dt, now, view, city, rng);
     }
     p.phase += p.v * dt * 3.4f;
     // On the terrain (terrain.h): everybody stands on the ground's surface.
-    p.pos.z = view.city->ground_height(p.pos.x, p.pos.y);
+    p.pos.z = city.ground_height(p.pos.x, p.pos.y);
     if (p.remote) continue;  // a mate's unit stands where he has it: nothing here throws it
     // Vehicles: knocked down by anything driving into them (SpawnCity: person-hit / person).
     for (const VehicleView& v : view.vehicles) {
@@ -584,7 +593,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       if (std::fabs(local.x) > v.half.x + 0.32f || std::fabs(local.y) > v.half.y + 0.32f) continue;  // people_impacts.mjs PAD
       const f32 damage = std::fmin(260.0f, std::fmax(6.0f, (speed - 1.5f) * 8.5f));  // people_impacts.mjs
       p.hp -= damage;
-      if (p.hp <= 0) kill(p, v.velocity, v.player, now, true);
+      if (p.hp <= 0) kill(static_cast<i32>(i), v.velocity, v.player, now, true);
       else {
         // Thrown aside as a ragdoll that gets up again (people_impacts.mjs: the car's momentum,
         // sideways 1.4 + 0.12 v, up 1.2 + 0.16 v, at most 15 m/s).
@@ -592,7 +601,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
         Vec3 push = Vec3{v.velocity.x, v.velocity.y, 0} * 1.05f + v.rotation.rotate({0, sd, 0}) * (1.4f + speed * 0.12f) + Vec3{0, 0, 1.2f + speed * 0.16f};
         const f32 pl = kern::length(push);
         if (pl > 15) push = push * (15 / pl);
-        falls_.push_back({static_cast<i32>(&p - people_.data()), push, true, true});
+        falls_.push_back({static_cast<i32>(i), push, true, true});
         p.knocked_until = now + 6;
         p.v = 0;
         if (v.player && p.kind == Kind::citizen && puppets_ && p.net >= 0) hurts_.push_back({static_cast<u8>(p.net), p.seed, damage, HurtBy::vehicle, push});  // the host's citizen under our car
@@ -602,7 +611,7 @@ void People::update(f32 dt, f32 now, const PeopleView& view, Rng& rng) {
       break;
     }
   }
-  spawn(view, rng, now);
+  spawn(view, city, rng, now);
 }
 
 }  // namespace sc

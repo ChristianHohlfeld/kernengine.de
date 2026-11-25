@@ -149,9 +149,13 @@ class Renderer {
   bool delete_texture(u32 texture);
 
   // ---- scene state ----
-  Camera camera;
-  Lighting lighting;
-  SkyState sky;
+  /// The camera the frame is drawn from, the lighting and the sky: read, and set as a whole.
+  const Camera& camera() const { return camera_; }
+  void set_camera(const Camera& camera) { camera_ = camera; }
+  const Lighting& lighting() const { return lighting_; }
+  void set_lighting(const Lighting& lighting) { lighting_ = lighting; }
+  const SkyState& sky() const { return sky_; }
+  void set_sky(const SkyState& sky) { sky_ = sky; }
   bool set_point_lights(const PointLights& lights);
   const PointLights& point_lights() const { return point_lights_; }
   bool set_shadows(const ShadowOptions* options);  // nullptr disables
@@ -194,6 +198,9 @@ class Renderer {
   const std::vector<const ExtensionAttribute*>& extension_attributes() const { return extension_attributes_; }
 
  private:
+  Camera camera_;
+  Lighting lighting_;
+  SkyState sky_;
   struct Texture {
     u32 handle = 0;
     bool external = false, alive = false;

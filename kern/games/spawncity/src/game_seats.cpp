@@ -21,17 +21,18 @@ bool Game::gaps_ride_car() const { return gaps_ && gaps_->riding && gaps_->ride_
 
 bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
   if (!gaps_ || !gaps_->riding) return false;
-  const net::Remote* r = net_.remote(gaps_->ride_owner);
-  if (!r) return false;
-  if (r->state.mode == net::PlayerMode::jet || r->state.mode == net::PlayerMode::car) { p = r->shown; q = r->shown_rotation; return true; }
-  if (r->state.flags & net::kJetOut) { p = r->state.jet_pos; q = r->state.jet_rot; return true; }
+  const i32 at = net_.remote_index(gaps_->ride_owner);
+  if (at < 0) return false;
+  const net::Remote& r = net_.remotes()[static_cast<std::size_t>(at)];
+  if (r.state.mode == net::PlayerMode::jet || r.state.mode == net::PlayerMode::car) { p = r.shown; q = r.shown_rotation; return true; }
+  if (r.state.flags & net::kJetOut) { p = r.state.jet_pos; q = r.state.jet_rot; return true; }
   return false;
 }
 
 // nearestRemoteBoardable: a mate's landed jet or his car standing (nearly) still, he at the wheel
 // (his pilot seat in the table), within reach - -1 for none. The hint, the touch button and the
 // press all ask this one.
-i32 Game::gaps_boardable(f32* dist) const {
+i32 Game::gaps_boardable(f32& dist) const {
   if (!gaps_ || !net_.active() || mode_ != Mode::foot || player_dead_ || gaps_->riding) return -1;
   const Vec3 me = matrix_of(soldier_).translation();
   i32 best = -1;
@@ -45,8 +46,13 @@ i32 Game::gaps_boardable(f32* dist) const {
     const f32 d = std::hypot(r.shown.x - me.x, r.shown.y - me.y);
     if (d < (car ? 5.5f : kBoardM) && d < bd) { bd = d; best = r.state.slot; }
   }
-  if (dist) *dist = bd;
+  dist = bd;
   return best;
+}
+
+i32 Game::gaps_boardable() const {
+  f32 dist = 0;
+  return gaps_boardable(dist);
 }
 
 bool Game::gaps_seat_press() {
@@ -56,7 +62,7 @@ bool Game::gaps_seat_press() {
   if (mode_ != Mode::foot || player_dead_ || g.seat_pending_until > world_->sim_time()) return false;
   const Vec3 me = matrix_of(soldier_).translation();
   f32 bd = kBoardM;
-  const i32 best = gaps_boardable(&bd);
+  const i32 best = gaps_boardable(bd);
   if (best < 0) return false;
   if (jet_placed_ && mode_ == Mode::foot) {
     // our own (empty) jet clearly nearer: that one; a manned one of his right there: ride along
@@ -78,8 +84,8 @@ void Game::gaps_leave_ride() {
   g.riding = false;
   g.ride_car = false;
   if (!have) { p = matrix_of(soldier_).translation(); q = Quat{}; }
-  const net::Remote* rr = net_.remote(g.ride_owner);
-  const bool in_car = rr && rr->state.mode == net::PlayerMode::car;
+  const i32 owner_at = net_.remote_index(g.ride_owner);
+  const bool in_car = owner_at >= 0 && net_.remotes()[static_cast<std::size_t>(owner_at)].state.mode == net::PlayerMode::car;
   const Vec3 nose = in_car ? q.rotate({1, 0, 0}) : q.rotate({0, 1, 0});
   const f32 h = std::atan2(nose.y, nose.x), agl = p.z - city_.ground_height(p.x, p.y);
   if (in_car) {
@@ -131,9 +137,14 @@ void Game::gaps_seats_update(f32 dt) {
       // beginPassenger: the claim came back - still next to the jet?
       g.seat_pending_until = -1;
       g.ride_owner = row.owner;
-      const net::Remote* r = net_.remote(row.owner);
+      const i32 owner_at = net_.remote_index(row.owner);
       const Vec3 me = matrix_of(soldier_).translation();
-      if (!r || mode_ != Mode::foot || std::hypot(r->shown.x - me.x, r->shown.y - me.y) > kBoardM + 3) {
+      if (owner_at < 0) {
+        net_.seat_request(false, row.owner, seats::Seat::passenger);
+        return;
+      }
+      const net::Remote& r = net_.remotes()[static_cast<std::size_t>(owner_at)];
+      if (mode_ != Mode::foot || std::hypot(r.shown.x - me.x, r.shown.y - me.y) > kBoardM + 3) {
         net_.seat_request(false, row.owner, seats::Seat::passenger);
         return;
       }
@@ -142,9 +153,9 @@ void Game::gaps_seats_update(f32 dt) {
       // in a car the passenger stays himself: standing in the seat's place (his head and arms over
       // the roof, as out of a sunroof) with his own weapons - he can shoot, the others see him; in
       // a jet he sits under the canopy and only rides
-      g.ride_car = r->state.mode == net::PlayerMode::car;
+      g.ride_car = r.state.mode == net::PlayerMode::car;
       if (!g.ride_car) hide_soldier();
-      toast_ = r->state.mode == net::PlayerMode::car ? "Beifahrer" : "Mitflieger";
+      toast_ = r.state.mode == net::PlayerMode::car ? "Beifahrer" : "Mitflieger";
       toast_age_ = 0;
     } else if (now > g.seat_pending_until) {
       g.seat_pending_until = -1;
@@ -161,9 +172,9 @@ void Game::gaps_seats_update(f32 dt) {
         // carried along: on the road in the passenger's place, at the car's speed (the car is the
         // mate's - drawn here, no body of ours to stand in)
         const Vec3 seat = p + q.rotate({0.04f, -0.36f, 0});
-        const net::Remote* rr = net_.remote(g.ride_owner);
+        const i32 owner_at = net_.remote_index(g.ride_owner);
         world_->teleport(soldier_, {seat.x, seat.y, city_.ground_height(seat.x, seat.y) + 0.73f});
-        world_->set_actor_velocity(soldier_, rr ? rr->state.velocity : Vec3{});
+        world_->set_actor_velocity(soldier_, owner_at >= 0 ? net_.remotes()[static_cast<std::size_t>(owner_at)].state.velocity : Vec3{});
       }
     }
     // the pilot got out (his seat row is gone) or his jet went quiet: out we go
@@ -176,8 +187,8 @@ bool Game::gaps_ride_camera(kern::Camera& c) {
   Vec3 p;
   Quat q;
   if (!gaps_ride_pose(p, q)) return false;
-  const net::Remote* r = gaps_ ? net_.remote(gaps_->ride_owner) : nullptr;
-  if (r && r->state.mode == net::PlayerMode::car) {
+  const i32 owner_at = gaps_ ? net_.remote_index(gaps_->ride_owner) : -1;
+  if (owner_at >= 0 && net_.remotes()[static_cast<std::size_t>(owner_at)].state.mode == net::PlayerMode::car) {
     // the passenger seat: right of the driver (the car's frame: x forward, y left), looking ahead
     c.eye = p + q.rotate({0.04f, -0.36f, 0.7f});
     c.target = c.eye + q.rotate({1, 0, 0}) * 10.0f;

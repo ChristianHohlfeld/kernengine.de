@@ -37,7 +37,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "List", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "Callback", "callback", "loop", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -70,24 +70,47 @@ const char* cpp_type(PinType t) {
     case PinType::vector: return "Vector";
     case PinType::text: return "Text";
     case PinType::actor: return "Actor";
+    case PinType::int64: return "Int64";
     case PinType::boolean_list: return "List<Bool>";
     case PinType::integer_list: return "List<Int>";
     case PinType::number_list: return "List<Float>";
     case PinType::vector_list: return "List<Vector>";
     case PinType::text_list: return "List<Text>";
     case PinType::actor_list: return "List<Actor>";
+    case PinType::int64_list: return "List<Int64>";
     default: return "void";
   }
+}
+/// An Int of a fixed width as the notation writes it: "u32" is U32.
+std::string width_cpp(std::string_view of) { return of.empty() ? std::string() : std::string(1, static_cast<char>(of[0] - 'a' + 'A')) + std::string(of.substr(1)); }
+/// The width a C++ name of one names (U32: "u32"; none: empty).
+std::string width_of_cpp(std::string_view name) {
+  for (std::string_view w : kWidthNames)
+    if (name == width_cpp(w)) return std::string(w);
+  return {};
 }
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
+  if (t.type == PinType::callback) {  // (Callback<Float(Float, Float)>, Callback<void(Int)>)
+    const TypeRef r = callback_result(t);
+    std::string s = "Callback<" + (r.type == PinType::exec ? std::string("void") : cpp_type(r)) + "(";
+    const std::vector<TypeRef> in = callback_inputs(t);
+    for (std::size_t k = 0; k < in.size(); ++k) s += (k ? ", " : "") + cpp_type(in[k]);
+    return s + ")>";
+  }
+  // (a map, a set: Map<Int, List<Weapon>>, Set<Text>)
+  if (t.type == PinType::map) return "Map<" + cpp_type(key_type(t)) + ", " + cpp_type(value_type(t)) + ">";
+  if (t.type == PinType::set) return "Set<" + cpp_type(key_type(t)) + ">";
+  // (a list of a fixed length, as a place is declared: Fixed<Float, 16>)
+  if (t.count && is_list(t.type)) return "Fixed<" + cpp_type(TypeRef{element_of(t.type), t.of}) + ", " + std::to_string(t.count) + ">";
+  if (has_width(t)) return is_list(t.type) ? "List<" + width_cpp(t.of) + ">" : width_cpp(t.of);  // (an Int of a fixed width: U32, List<U8>)
   if (element_of(t.type) != PinType::enumeration && element_of(t.type) != PinType::structure) return cpp_type(t.type);
   return is_list(t.type) ? "List<" + t.of + ">" : t.of;
 }
 /// A value type by its name (a list is List<that>).
 bool type_of_cpp(std::string_view name, PinType& out) {
-  for (PinType t : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor})
+  for (PinType t : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::int64})
     if (name == cpp_type(t)) { out = t; return true; }
   return false;
 }
@@ -159,6 +182,11 @@ std::string literal(const Value& v) {
     case PinType::vector: return "Vector{" + f32_text(v.v.x) + ", " + f32_text(v.v.y) + ", " + f32_text(v.v.z) + "}";
     case PinType::text: return text_literal(v.s);
     case PinType::actor: return "Actor{" + std::to_string(v.a) + "}";
+    case PinType::int64: {  // its bits: Int64{0x1f}
+      char b[24];
+      std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i)));
+      return std::string("Int64{") + b + "}";
+    }
     default: break;
   }
   if (!is_list(v.type)) return "0";
@@ -170,17 +198,46 @@ std::string literal(const Value& v) {
 /// A value as the notation writes it, where it may be an enum's or a struct's: `of` says which,
 /// `g` has its declaration - Mode::Open, List<Mode>{Mode::Closed, Mode::Open}; a struct with
 /// every field, in their order: Weapon{"Knife", Kind::Melee, 25.0}.
-std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth = 0) {
+std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth = 0);
+/// The same for what a place is declared as: a list of a fixed length is written with its type,
+/// Fixed<Float, 3>{0.0, 0.0, 1.0} - its entries up to the last that is not the zero of their type
+/// (logic::said): what it does not say is zero, as in C++ - a buffer of 24000 zeros is
+/// Fixed<Float, 24000>{}.
+std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std::size_t depth = 0) {
+  if (is_keyed(declared.type)) return literal(v, declared.of, g, depth);
+  if (!declared.count || !is_list(declared.type) || v.type != declared.type) return literal(v, declared.of, g, depth);
+  const TypeRef item{element_of(declared.type), declared.of};
+  std::string r = cpp_type(declared) + "{";
+  for (std::size_t k = 0, entries = said(v, declared, g); k < entries; ++k) r += (k ? ", " : "") + literal(v.item(k), item, g, depth);
+  return r + "}";
+}
+std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
+  if (v.type == PinType::callback) return cpp_type(TypeRef{PinType::callback, of}) + "{}";  // (unbound: what a place of one holds until it is set)
+  if (is_keyed(v.type)) {
+    // a map: Map<Int, Float>{{1, 2.5}, {3, 4.0}} - its entries in their order; a set: Set<Int>{1, 3}
+    const TypeRef t{v.type, of}, key = key_type(t), value = v.type == PinType::map ? value_type(t) : TypeRef{};
+    std::string r = cpp_type(t) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) {
+      const std::string kt = literal(key_value(v.keyed().key_at(k), key.type), key, g, depth);
+      r += (k ? ", " : "") + (v.type == PinType::map ? "{" + kt + ", " + literal(v.keyed().value_at(k), value, g, depth) + "}" : kt);
+    }
+    return r + "}";
+  }
   if (element_of(v.type) == PinType::structure) {
     const StructType* s = depth < g.structs.size() ? g.structure(of) : nullptr;  // (a struct holds structs declared above it: no deeper than there are structs)
     auto one = [&](const Value& x) {
       std::string r = of + "{";
-      for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + literal(field_of(x, *s, k, g), s->fields[k].type.of, g, depth + 1);
+      for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + literal(field_of(x, *s, k, g), s->fields[k].type, g, depth + 1);
       return r + "}";
     };
     if (v.type == PinType::structure) return one(v);
     std::string r = "List<" + of + ">{";
     for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + one(v.item(k));
+    return r + "}";
+  }
+  if (v.type == PinType::integer_list && width_bits(of) != 0) {  // (a list of Ints of a fixed width: List<U8>{1, 255})
+    std::string r = cpp_type(TypeRef{v.type, of}) + "{";
+    for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + literal(v.item(k));
     return r + "}";
   }
   if (element_of(v.type) != PinType::enumeration) return literal(v);
@@ -194,12 +251,18 @@ std::string literal(const Value& v, const std::string& of, const Graph& g, std::
 /// The settings of a node as they stand behind its function's name: <"smooth">. A setting that
 /// names a variable is not among them - the variable itself is the call's first value.
 /// A setting that names a type is that type: logic_select<Float>, list_make<Text, "2">.
-std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
+/// A setting that names a function of the Blueprint is that member function: &Board::Before, and
+/// nullptr where it names none (`cls`: the name of the Blueprint's class in the text).
+std::string settings_of(const NodeDef& def, const Node& n, const Graph& g, const std::string& cls = {}) {
   std::string r;
   for (std::size_t k = 0; k < def.params.size(); ++k) {
     const ParamDef& pd = def.params[k];
     if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
     const std::string value = n.param(pd.key, pd.def);
+    if (pd.kind == ParamDef::Kind::function) {
+      r += (r.empty() ? "<" : ", ") + (value.empty() ? std::string("nullptr") : "&" + cls + "::" + value);
+      continue;
+    }
     // (a struct and one of its fields are one setting, as C++ names a field: &Weapon::Name)
     if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def.params.size() && def.params[k + 1].kind == ParamDef::Kind::field) {
       r += (r.empty() ? "<&" : ", &") + value + "::" + n.param(def.params[k + 1].key, def.params[k + 1].def);
@@ -212,6 +275,14 @@ std::string settings_of(const NodeDef& def, const Node& n, const Graph& g) {
   return r.empty() ? r : r + ">";
 }
 /// Does a node of this kind name a place (a variable and a path from it: ParamDef::Kind::path)?
+/// Does the node run a function of the Blueprint that a setting names (Sort List's Order)? Its call
+/// then begins with the object the function runs on: list_sort<&Board::Before>(*this, Scores).
+bool runs_function(const NodeDef& def, const Node& n) {
+  if (def.type.rfind("func.", 0) == 0) return false;   // (a call is written as the function's own call)
+  for (const ParamDef& pd : def.params)
+    if (pd.kind == ParamDef::Kind::function && !n.param(pd.key, pd.def).empty()) return true;
+  return false;
+}
 bool names_place(const NodeDef& def) {
   for (const ParamDef& pd : def.params)
     if (pd.kind == ParamDef::Kind::path) return true;
@@ -267,6 +338,8 @@ struct Info {
   bool guard = false;        // a Branch whose True path always returns: its False path is written after it
   int place = kNowhere;      // the body (context) its text stands in
   bool member = false;       // it has a member n<id>: outputs read elsewhere, or memory
+  int local_in = -1;         // a step of a function whose n<id> is a local of the function's method: the entry
+  bool kept() const { return member || local_in >= 0; }  // it has its n<id> (a member or a local)
 };
 
 /// An exec output a list of statements leaves through: wired to `target`, or to nothing (-1). kOn:
@@ -285,6 +358,10 @@ struct Shape {
   int detached = kNowhere;
   std::string error;
   u32 error_node = 0;
+
+  /// The calls that give a function that may run handlers an entry of a list of any length (places_ok): call node ->
+  /// (the reference input's prefix, the entries of its path in such a list, by their place) - the Writer checks them (held).
+  std::map<int, std::vector<std::pair<std::string, std::vector<std::size_t>>>> held_calls;
 
   Shape(const Graph& graph, const Library& library) : g(graph), lib(library) {}
 
@@ -504,7 +581,61 @@ struct Shape {
       for (const auto& r : x.readers)
         if (at(r.first).place != x.place) x.member = true;
     }
+    locals();
     return rules();
+  }
+
+  /// What a step of a function gives - and what a loop of it keeps while it runs - is the call's
+  /// own: a local of the function's method, as a value in C++ is, where every step that reads it
+  /// stands on the function's own path after it (in the same call, nothing reads it before the
+  /// step gave it). Else it stays a member: a value read in another body, after a wait, or where
+  /// the step may not have run in this call (what the step gave in an earlier call).
+  void locals() {
+    for (int i : by_id) {
+      Info& x = at(i);
+      if (x.pure || x.event || x.place < 0 || ctx[static_cast<std::size_t>(x.place)].first != kCallable) continue;
+      if (!(x.member && (!x.def->memory || x.def->loop))) continue;
+      const int e = ctx[static_cast<std::size_t>(x.place)].second;
+      if (e < 0 || at(e).def->type != "func.entry") continue;
+      // the steps that read it, through the values that pass it on
+      std::vector<int> users, todo;
+      std::vector<u8> seen(n.size(), 0);
+      bool here = true;
+      for (const auto& r : x.readers) todo.push_back(r.first);
+      while (here && !todo.empty()) {
+        const int y = todo.back();
+        todo.pop_back();
+        if (seen[static_cast<std::size_t>(y)]) continue;
+        seen[static_cast<std::size_t>(y)] = 1;
+        if (at(y).place != x.place || y == i) here = false;
+        else if (at(y).pure) for (const auto& r : at(y).readers) todo.push_back(r.first);
+        else users.push_back(y);
+      }
+      if (!here) continue;
+      // from the function's entry on, the paths that do not pass the step reach none of them (a loop gives
+      // its values in its body: what follows Completed may read what it gave in an earlier call - a loop
+      // that made no pass in this one)
+      const bool loop = x.def->loop;
+      std::vector<u8> reach(n.size(), 0);
+      std::vector<int> walk{e};
+      reach[static_cast<std::size_t>(e)] = 1;
+      while (!walk.empty()) {
+        const int y = walk.back();
+        walk.pop_back();
+        for (std::size_t k = 0; k < at(y).dst.size(); ++k) {
+          const int t = at(y).dst[k].first;
+          if (y == i && k == 0) continue;  // (its body: only through the loop)
+          if (t < 0 || (t == i && !loop) || reach[static_cast<std::size_t>(t)] || at(t).place != x.place) continue;
+          reach[static_cast<std::size_t>(t)] = 1;
+          walk.push_back(t);
+        }
+      }
+      bool after = true;
+      for (int u : users) after = after && !reach[static_cast<std::size_t>(u)];
+      if (!after) continue;
+      x.member = false;
+      x.local_in = e;
+    }
   }
 
   /// Values: no circles; a value with memory (Random) is read by one input, and so is everything
@@ -593,7 +724,8 @@ struct Shape {
     return true;
   }
 
-  /// Functions: none runs again while it runs (it has one set of values, not one per call), and
+  /// Functions: one may call itself, directly or through others, as a step (each call has its own
+  /// values - not one read as a value: a value has no circles), and
   /// one that is read as a value only computes - how often and in which order values are read
   /// then makes no difference.
   bool functions_ok() {
@@ -634,31 +766,52 @@ struct Shape {
         for (const auto& next : next_steps(x)) todo.push_back(next);
       }
     }
-    // a function that calls itself, directly or through others
-    std::vector<u8> mark(count, 0);
-    for (std::size_t start = 0; start < count; ++start) {
-      if (mark[start]) continue;
-      std::vector<std::pair<int, std::size_t>> stack{{static_cast<int>(start), 0}};
-      mark[start] = 1;
-      while (!stack.empty()) {
-        const std::size_t f = static_cast<std::size_t>(stack.back().first);
-        if (stack.back().second < calls[f].size()) {
-          const auto [callee, node] = calls[f][stack.back().second++];
-          if (mark[static_cast<std::size_t>(callee)] == 1) {
-            const std::string& a = g.functions[f].name;
-            const std::string& b = g.functions[static_cast<std::size_t>(callee)].name;
-            return fail("function \"" + b + "\" calls itself" + (a == b ? std::string() : " (through \"" + a + "\")") +
-                            ": a function does not run again while it runs - repeat steps with a loop",
-                        node);
+    // Functions that call themselves, directly or through others: a call like any other, each
+    // with its own values (in the class a method's parameters and locals; in the interpreter and
+    // the JIT a frame of its own, at most Runtime::kCallsDeep calls one in another). The circles
+    // (strongly connected parts of the calls; Tarjan's way, without recursion):
+    std::vector<int> circle(count, -1), index(count, -1), low(count, 0);
+    {
+      std::vector<int> held;
+      std::vector<u8> on(count, 0);
+      int next = 0, circles = 0;
+      for (std::size_t start = 0; start < count; ++start) {
+        if (index[start] >= 0) continue;
+        std::vector<std::pair<std::size_t, std::size_t>> walk{{start, 0}};
+        index[start] = low[start] = next++;
+        held.push_back(static_cast<int>(start));
+        on[start] = 1;
+        while (!walk.empty()) {
+          const std::size_t f = walk.back().first;
+          if (walk.back().second < calls[f].size()) {
+            const std::size_t c = static_cast<std::size_t>(calls[f][walk.back().second++].first);
+            if (index[c] < 0) {
+              index[c] = low[c] = next++;
+              held.push_back(static_cast<int>(c));
+              on[c] = 1;
+              walk.push_back({c, 0});
+            } else if (on[c]) {
+              low[f] = std::min(low[f], index[c]);
+            }
+            continue;
           }
-          if (mark[static_cast<std::size_t>(callee)] == 0) {
-            mark[static_cast<std::size_t>(callee)] = 1;
-            stack.push_back({callee, 0});
+          walk.pop_back();
+          if (!walk.empty()) low[walk.back().first] = std::min(low[walk.back().first], low[f]);
+          if (low[f] != index[f]) continue;
+          std::vector<int> part;
+          for (int x = -1; x != static_cast<int>(f);) {
+            x = held.back();
+            held.pop_back();
+            on[static_cast<std::size_t>(x)] = 0;
+            part.push_back(x);
           }
-          continue;
+          bool self = false;
+          for (const auto& c : calls[f]) self = self || c.first == static_cast<int>(f);
+          if (part.size() > 1 || self) {
+            for (int x : part) circle[static_cast<std::size_t>(x)] = circles;
+            ++circles;
+          }
         }
-        mark[f] = 2;
-        stack.pop_back();
       }
     }
     // the inputs by reference come first: an input by value is written with its default, and in
@@ -695,6 +848,28 @@ struct Shape {
           return fail(because[f] + ": " + title(x) + (d.latent ? " waits" : " changes something") + ". Call the function as a step instead (My Blueprint: untick Pure)", x);
       }
     }
+    // In a circle: a function read as a value would read itself - a value has no circles (call it
+    // as a step); and what its steps give stays on its own path (a member of the class would be
+    // one for all its calls: Shape::locals).
+    for (std::size_t f = 0; f < count; ++f) {
+      if (circle[f] < 0) continue;
+      const std::string through = [&] {
+        for (const auto& [c, node] : calls[f])
+          if (circle[static_cast<std::size_t>(c)] == circle[f] && c != static_cast<int>(f)) return " (through \"" + g.functions[static_cast<std::size_t>(c)].name + "\")";
+        return std::string();
+      }();
+      if (value[f]) {
+        int node = -1;
+        for (int i : by_id)
+          if (at(i).def->type == "func.pure" && at(i).node->param("function") == g.functions[f].name) node = i;
+        return fail("function \"" + g.functions[f].name + "\" calls itself" + through + " and is read as a value: a value does not read itself - call it as a step (My Blueprint: untick Pure)", node);
+      }
+      for (int x : steps[f])
+        if (at(x).member && (!at(x).def->memory || at(x).def->loop))
+          return fail("function \"" + g.functions[f].name + "\" calls itself" + through + ", so every call has its own values: what " + title(x) +
+                          " gives is read where it may not have run in this call, or outside the function's path after it",
+                      x);
+    }
     return places_ok(steps, calls);
   }
 
@@ -717,7 +892,10 @@ struct Shape {
     // (Reserve changes nothing one can read - but in the class the list moves: what a function holds of it would be gone)
     auto writes_place = [](const std::string& t) {
       return t == "var.set" || t == "var.take" || t == "list.add" || t == "list.insert" || t == "list.remove_at" || t == "list.remove" || t == "list.clear" || t == "list.resize" ||
-             t == "list.append" || t == "list.insert_list" || t == "list.reserve";
+             t == "list.append" || t == "list.insert_list" || t == "list.reserve" || t == "list.sort" || t == "list.copy_bytes" || t == "text.set_code" ||
+             // (a map's or a set's steps put entries in or take them out - and move the others: a map's values are its entries)
+             t == "map.set" || t == "map.add" || t == "map.remove" || t == "map.remove_at" || t == "map.clear" || t == "map.reserve" ||
+             t == "set.add" || t == "set.remove" || t == "set.remove_at" || t == "set.clear" || t == "set.reserve";
     };
     // what a call's function does, as the caller sees it: a write through one of its reference
     // inputs is a write at the place the call gave that input
@@ -743,7 +921,7 @@ struct Shape {
       }
       return seen;
     };
-    // (callees first: no function calls itself, functions_ok has seen to that)
+    // (callees first - where functions call each other in a circle, the rounds below see to the rest)
     std::vector<u8> done(count, 0);
     std::vector<std::size_t> order;
     for (std::size_t start = 0; start < count; ++start) {
@@ -764,6 +942,10 @@ struct Shape {
         stack.pop_back();
       }
     }
+    // what each function does itself, then with what its calls do - again and again where
+    // functions call each other in a circle, until nothing new comes (a path through a value's
+    // fields and entries is as long as its type is deep: it ends)
+    std::vector<std::vector<Write>> own(count);
     for (std::size_t f : order) {
       for (int x : steps[f]) {
         const std::string& t = at(x).def->type;
@@ -774,13 +956,34 @@ struct Shape {
         w.kind = g.root_of(*at(x).node, named);
         w.root = at(x).node->param("variable");
         if (w.kind == Graph::Root::none || !path_steps(at(x).node->param("path"), w.path)) continue;
-        w.resizes = t != "var.set" && t != "var.take";  // (a Take puts the zero where something stood, like a Set)
+        // (a Take puts the zero where something stood, like a Set; Sort puts other items there, Copy Bytes other bytes)
+        w.resizes = t != "var.set" && t != "var.take" && t != "list.sort" && t != "list.copy_bytes" && t != "text.set_code";
         w.node = x;
-        writes[f].push_back(std::move(w));
+        own[f].push_back(std::move(w));
       }
-      for (const auto& [callee, call] : calls[f]) {
-        for (Write& w : through(static_cast<std::size_t>(callee), call)) writes[f].push_back(std::move(w));
-        if (raises[static_cast<std::size_t>(callee)] >= 0 && raises[f] < 0) raises[f] = call;
+    }
+    auto key = [](const Write& w) {
+      std::string k = std::to_string(static_cast<int>(w.kind)) + (w.resizes ? "+" : "=") + w.root;
+      for (const std::string& s : w.path) k += "\x1f" + s;
+      return k;
+    };
+    for (bool changed = true; changed;) {
+      changed = false;
+      for (std::size_t f : order) {
+        std::vector<Write> now = own[f];
+        for (const auto& [callee, call] : calls[f]) {
+          for (Write& w : through(static_cast<std::size_t>(callee), call)) now.push_back(std::move(w));
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && raises[f] < 0) {
+            raises[f] = call;
+            changed = true;
+          }
+        }
+        std::set<std::string> seen;
+        std::vector<Write> once;
+        for (Write& w : now)
+          if (seen.insert(key(w)).second) once.push_back(std::move(w));
+        if (once.size() != writes[f].size()) changed = true;
+        writes[f] = std::move(once);
       }
     }
     // every call - in a function, in an event -: the places it holds against what its function does
@@ -804,10 +1007,35 @@ struct Shape {
           if (std::find(held.begin(), held.end(), std::string()) == held.end()) continue;  // (no entry of a list on the way: nothing to hold)
           const std::string place = root + at(call).node->param(prefix + "path");
           (void)kind;
-          if (raises[static_cast<std::size_t>(callee)] >= 0)
+          // (an entry of a list of a fixed length stays where it is whatever runs: nothing changes how long that
+          // list is - TypeRef::count. Only an entry of a list of any length, of a map, of an owned value can be gone
+          // after a handler)
+          std::vector<std::size_t> lists;  // (the entries on the way that are in such a list, by their place in the path)
+          bool known = true;
+          std::size_t entry = 0;
+          TypeRef along{named.type, named.of, named.count};
+          for (const std::string& step : held) {
+            if (step.empty()) {
+              if (!is_list(along.type) && along.type != PinType::map) { known = false; break; }
+              if (along.type == PinType::map || along.count == 0) lists.push_back(entry);
+              along = along.type == PinType::map ? value_type(along) : TypeRef{element_of(along.type), along.of};
+              ++entry;
+              continue;
+            }
+            const StructType* s = along.type == PinType::structure ? g.structure(along.of) : nullptr;
+            const int k = s ? s->field(step) : -1;
+            if (k < 0) { known = false; break; }
+            along = s->fields[static_cast<std::size_t>(k)].type;
+          }
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && (!known || (!lists.empty() && at(call).def->type != "func.call")))
             return fail(title(call) + " gives " + fn.name + " the place " + place + " - an entry of a list -, and " + fn.name + " may run handlers while it holds it (" +
-                            title(raises[static_cast<std::size_t>(callee)]) + "): they could change how long the list is. Give it the entry's index instead, or the value",
+                            title(raises[static_cast<std::size_t>(callee)]) + "): " + (known ? "a value read so cannot be checked - call it as a step" : "what the place goes through is not known") +
+                            ". Give it the entry's index instead, or the value",
                         call);
+          // A handler may change how long such a list is while the function holds the entry - in C++ the reference would
+          // then go nowhere (undefined). The call is checked: the lists keep their length (and, in the class, where their
+          // entries are), or the run stops there with an error (held / Runtime::held_lost - docs/blueprint_cpp.md).
+          if (raises[static_cast<std::size_t>(callee)] >= 0 && !lists.empty()) held_calls[call].push_back({prefix, lists});
           for (const Write& w : during) {
             if (w.kind != kind || w.root != root || w.path.size() > held.size() || !std::equal(w.path.begin(), w.path.end(), held.begin())) continue;
             // (the write stands at or above the place that is held: does it reach a list the place goes through?)
@@ -969,7 +1197,7 @@ struct Shape {
     for (int i : by_id) {
       const Info& x = at(i);
       const std::string& t = x.def->type;
-      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure" || t == "func.call_on")
+      if (t == "func.entry" || t == "func.return" || t == "func.call" || t == "func.pure" || t == "func.call_on" || t == "func.callback")
         if (!function_of(i)) return fail(title(i) + " names a function that is not there", i);
       bool names_variable = false;
       for (const ParamDef& pd : x.def->params) names_variable = names_variable || pd.kind == ParamDef::Kind::variable;
@@ -990,7 +1218,7 @@ struct Shape {
                             "runs - not after a wait (Delay), not in an event or another function, and paths that meet before it must all come from one Branch or Switch",
                         i);
         }
-      } else if (const std::string scope = x.node->param("scope"); !scope.empty() && (t == "func.call" || t == "func.pure")) {
+      } else if (const std::string scope = x.node->param("scope"); !scope.empty() && (t == "func.call" || t == "func.pure" || t == "func.callback")) {
         // A call that names places of a function - its local variables, its inputs - stands on a
         // path of that function, like a node of one of its local variables.
         const int where = place_of(i);
@@ -1036,7 +1264,7 @@ struct Shape {
       for (int k : x.data_out) {
         const std::string& id = x.out[static_cast<std::size_t>(k)].id;
         PinType type;
-        if (id.empty() || !is_start(id[0]) || cpp_keyword(id) || type_of_cpp(id, type) || !std::all_of(id.begin(), id.end(), is_part))
+        if (id.empty() || !is_start(id[0]) || cpp_keyword(id) || type_of_cpp(id, type) || !width_of_cpp(id).empty() || !std::all_of(id.begin(), id.end(), is_part))
           return fail(title(i) + ": the output \"" + id + "\" has no name C++ can write", i);
       }
     }
@@ -1060,17 +1288,19 @@ struct Writer {
   std::string id(int x) { return std::to_string(at(x).node->id); }
 
   /// The name of a node's function with its settings: flow_tween<"smooth">.
-  std::string callee(int x) { return node_name(at(x).def->type) + settings_of(*at(x).def, *at(x).node, s.g); }
+  std::string callee(int x) { return node_name(at(x).def->type) + settings_of(*at(x).def, *at(x).node, s.g, cls_); }
+  std::string cls_;  // the name of the Blueprint's class in the text (write)
 
   std::string literal_of(int x, int k) {
     const Info& X = at(x);
     const PinDef& p = X.in[static_cast<std::size_t>(k)];
     const json::Value* typed = X.node->value(p.id);
-    return literal(Value::from_json(typed ? *typed : p.def, p.type, s.g, p.of), p.of, s.g);
+    // (a value for a list of a fixed length is written with its type - Fixed<Float, 3>{...}, as for a place)
+    return literal(Value::from_json(typed ? *typed : p.def, p.type, s.g, p.of), TypeRef{p.type, p.of, p.count}, s.g);
   }
 
   /// What input `k` of `x` is given, as an expression standing in the body `c`.
-  std::string value(int x, int k, int c) {
+  std::string value(int x, int k, int c, bool convert = true) {
     const auto [from, o] = at(x).src[static_cast<std::size_t>(k)];
     if (from < 0) return literal_of(x, k);
     const PinDef pin = at(from).out[static_cast<std::size_t>(o)];
@@ -1086,7 +1316,25 @@ struct Writer {
       e = "n" + id(from) + "." + pin.id;
     }
     const PinType want = at(x).in[static_cast<std::size_t>(k)].type;
-    return pin.type == want ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
+    return pin.type == want || !convert ? e : std::string("kern::to<") + cpp_type(want) + ">(" + e + ")";
+  }
+  /// The types of the formula `x` in a Blueprint's C++ (docs/blueprint_cpp.md, "Formeln"): input i is an
+  /// Int where Formula::int_input(i) holds and its wire comes from an Int, else a Float; the result is an
+  /// Int where every input is and Formula::whole_result() holds - and, its root being +, - or *
+  /// (result_sum), where every input that reads it is an Int. Returns whether the result is an Int.
+  bool formula_types(int x, const Formula& f, std::vector<char>& ints) {
+    ints.assign(f.inputs().size(), 0);
+    bool all = !ints.empty();
+    for (std::size_t i = 0; i < at(x).data_in.size() && i < ints.size(); ++i) {
+      const auto [from, o] = at(x).src[static_cast<std::size_t>(at(x).data_in[i])];
+      ints[i] = from >= 0 && at(from).out[static_cast<std::size_t>(o)].type == PinType::integer && f.int_input(i);
+      all = all && ints[i];
+    }
+    if (!all || !f.whole_result()) return false;
+    if (f.result_sum())
+      for (const auto& [reader, input] : at(x).readers)
+        if (at(reader).in[static_cast<std::size_t>(input)].type != PinType::integer) return false;
+    return true;
   }
 
   /// The place a node names, as C++ writes it: its variable and from there its path - a field
@@ -1111,6 +1359,34 @@ struct Writer {
       r += "[" + index + "]";
       ++entry;
     }
+    return r;
+  }
+  /// The lists a call holds an entry of (Shape::held_calls), outermost first: each as the place it is, up to the
+  /// entry - "Cars, Cars[n4.index].Wheels" (none: "").
+  std::string held_lists(int x, int c) {
+    auto it = s.held_calls.find(x);
+    if (it == s.held_calls.end()) return {};
+    std::string r;
+    const std::size_t named = order.size();   // (the call names its nodes where it stands: the lists name them again)
+    for (const auto& [prefix, lists] : it->second) {
+      std::string place = at(x).node->param(prefix + "variable");
+      std::vector<std::string> steps;
+      if (!path_steps(at(x).node->param(prefix + "path"), steps)) continue;
+      std::size_t entry = 0;
+      for (const std::string& step : steps) {
+        if (!step.empty()) {
+          place += "." + step;
+          continue;
+        }
+        if (std::find(lists.begin(), lists.end(), entry) != lists.end()) r += (r.empty() ? "" : ", ") + place;
+        int pin = -1;
+        for (int k : at(x).data_in)
+          if (at(x).in[static_cast<std::size_t>(k)].id == prefix + path_pin(entry)) pin = k;
+        place += "[" + (pin >= 0 ? value(x, pin, c) : std::string("0")) + "]";
+        ++entry;
+      }
+    }
+    order.resize(named);
     return r;
   }
   /// What a call gives its function's inputs, in their order: a value for an input by value,
@@ -1300,6 +1576,27 @@ struct Writer {
     }
     return reads == 1 && !needed_after(entry, name)[static_cast<std::size_t>(x)];
   }
+  /// Does the value `x` (a node that takes its first input over: NodeDef::takes_first) take over
+  /// the variable its first input reads? Where the one step that reads `x` sets that same
+  /// variable, as a whole, to what `x` gives - `O = text_append(std::move(O), x, "")`: nothing
+  /// reads the old value after `x` has it (the step sets it anew at once; what `x`'s other inputs
+  /// read is read before - and an input that is O itself is O as it was, text_append sees to it).
+  bool taken_first(int x, int k) {
+    const Info& X = at(x);
+    if (!X.def->takes_first || X.named || X.data_in.empty() || X.data_in[0] != k) return false;
+    const int got = X.src[static_cast<std::size_t>(k)].first;
+    if (got < 0 || at(got).named || at(got).def->type != "var.get" || !at(got).node->param("path").empty()) return false;
+    int reader = -1, readers = 0, got_readers = 0;
+    for (int i = 0; i < static_cast<int>(s.n.size()); ++i)
+      for (const auto& from : at(i).src) {
+        if (from.first == x) reader = i, ++readers;
+        if (from.first == got) ++got_readers;
+      }
+    if (readers != 1 || got_readers != 1) return false;
+    const Info& Y = at(reader);
+    return !Y.pure && Y.def->type == "var.set" && Y.node->param("path").empty() && Y.node->param("variable") == at(got).node->param("variable") &&
+           Y.node->param("scope") == at(got).node->param("scope");
+  }
   /// Is what the input `k` of the step `x` reads needed by nothing once `x` has it? Then the text
   /// hands it over - std::move(Points), as C++ writes it (the graph has nothing to say for it:
   /// the wire is the same wire):
@@ -1311,7 +1608,8 @@ struct Writer {
   /// nothing over.
   bool hands_over(int x, int k) {
     const Info& X = at(x);
-    if (X.pure || X.event || X.form == Form::loop_while) return false;
+    if (X.pure) return taken_first(x, k);
+    if (X.event || X.form == Form::loop_while) return false;
     return last_use(x, k) || from_step_before(x, k);
   }
   /// What input `k` of the step `x` is given: its value, handed over where `hands_over` says so.
@@ -1363,13 +1661,24 @@ struct Writer {
       const std::string args = call_args(x, c);
       return at(x).node->param("function") + "(" + args + ")";
     }
+    if (t == "func.callback") {
+      // callback<&Terrain_lib::height_at>(self): the function, by its class, and the place its first input binds
+      const std::string fn = at(x).node->param("function");
+      const Function* f = s.g.function(fn);
+      const std::string place = f && !f->inputs.empty() && f->inputs[0].ref ? place_text(x, c, ref_key(f->inputs[0].name, "")) : std::string();
+      return "callback<&" + (fn.find("::") != std::string::npos ? fn : cls_ + "::" + fn) + ">(" + place + ")";
+    }
     if (t == "math.formula") {
       const std::string text = at(x).node->param("formula", "a + b");
       const Formula& f = Formula::cached(text);
+      // (Int inputs where they are read as whole numbers and come from Ints, an Int where the value is one - the same value, docs/blueprint_cpp.md "Formeln")
+      std::vector<char> ints;
+      const bool whole = formula_types(x, f, ints);
       std::string lambda = "[](";
-      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += (i ? ", Float " : "Float ") + f.inputs()[i];
-      lambda += ") -> Float { return " + f.cpp() + "; }";
-      const std::string args = inputs(x, c, {lambda});
+      for (std::size_t i = 0; i < f.inputs().size(); ++i) lambda += std::string(i ? ", " : "") + (ints[i] ? "Int " : "Float ") + f.inputs()[i];
+      lambda += std::string(") -> ") + (whole ? "Int " : "Float ") + "{ return " + f.cpp() + "; }";
+      std::string args = lambda;
+      for (std::size_t i = 0; i < at(x).data_in.size(); ++i) args += ", " + value(x, at(x).data_in[i], c, i >= ints.size() || !ints[i]);
       return "kern::formula(" + args + ")";
     }
     std::vector<std::string> head;
@@ -1445,8 +1754,9 @@ struct Writer {
   /// the variable it changes, then what its inputs are given.
   std::string call(int x, int entry, int c, bool definition) {
     std::vector<std::string> head;
-    if (at(x).member) head.push_back("n" + id(x));
+    if (at(x).kept()) head.push_back("n" + id(x));
     if (at(x).exec_in.size() >= 2) head.push_back(definition ? std::string("entry") : text_literal(at(x).in[static_cast<std::size_t>(entry)].id));
+    if (runs_function(*at(x).def, *at(x).node)) head.push_back("*this");
     if (names_place(*at(x).def)) head.push_back(place_text(x, c));
     else
       for (std::string& v : variables_of(*at(x).def, *at(x).node)) head.push_back(std::move(v));
@@ -1581,18 +1891,23 @@ struct Writer {
       // or, when what the node gives is read: n5.value = (Heat = value);
       const std::string where = place_text(x, c);
       const std::string set = where + (t == "var.set" ? " = " + given(x, X.data_in.front(), c) : " += " + value(x, X.data_in.front(), c));
-      line(ind, X.member ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
+      line(ind, X.kept() ? "n" + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out.front())].id + " = (" + set + ");" : set + ";");
       return 0;
     }
     if (t == "func.call") {
+      // (a call that holds an entry of a list of any length while its function may run handlers - Shape::held_calls:
+      // const kern::logic::Held held_12(Cars, Cars[n4.index].Wheels); Car_step(Cars[n4.index].Wheels[0]); held_after(held_12);)
+      const std::string lists = held_lists(x, c);
+      if (!lists.empty()) line(ind, "const kern::logic::Held held_" + id(x) + "(" + lists + ");");
       const std::string args = call_args(x, c);
-      line(ind, (X.member ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
+      line(ind, (X.kept() ? "n" + id(x) + " = " : std::string()) + X.node->param("function") + "(" + args + ");");
+      if (!lists.empty()) line(ind, "held_after(held_" + id(x) + ");");
       return 0;
     }
     if (t == "func.call_on") {
       // func_call_on<"Fn">(target, kern::out(n7.a, n7.b), values...);   (kern::out(): nothing reads what it gave)
       std::string args = value(x, X.data_in.front(), c) + ", kern::out(";
-      if (X.member)
+      if (X.kept())
         for (std::size_t k = 0; k < X.data_out.size(); ++k) args += (k ? ", n" : "n") + id(x) + "." + X.out[static_cast<std::size_t>(X.data_out[k])].id;
       args += ")";
       for (std::size_t k = 1; k < X.data_in.size(); ++k) args += ", " + value(x, X.data_in[k], c);
@@ -1641,6 +1956,9 @@ struct Writer {
       for (int k : at(e).data_out) names += (names.empty() ? "" : ", ") + at(e).out[static_cast<std::size_t>(k)].id;
       line(ind, "n" + id(e) + " = {" + names + "};");
     }
+    // (what its steps give and its loops keep, where only its own path reads it: the call's own)
+    for (int i : s.by_id)
+      if (at(i).local_in == e) line(ind, member_text(at(i), s.g));
     named_values(at(e).place, ind);
     return at(e).exec_out.empty() ? false : follow(e, 0, at(e).place, ind);
   }
@@ -1657,6 +1975,7 @@ struct Writer {
   void write(const std::string& name, bool layout = true) {
     const Graph& g = s.g;
     const std::string type = struct_name(g, name);
+    cls_ = type;
     out += "// Kern Blueprint, C++ notation 1: this text and the graph in Kern Studio are one thing in two\n";
     out += "// notations, each read from the other without loss (kern/docs/blueprint_cpp.md).\n";
     out += "#include \"kern/logic/blueprint.h\"\n\n";
@@ -1687,7 +2006,7 @@ struct Writer {
         if (!st.from.empty()) continue;
         doc(1, st.help);
         line(1, std::string(st.project ? "KERN_PROJECT_STRUCT(" : "KERN_STRUCT(") + st.name + ") {");
-        for (const StructField& f : st.fields) line(2, cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + ";");
+        for (const StructField& f : st.fields) line(2, cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type, g), f.type, g) + ";");
         line(1, "};");
       }
     }
@@ -1696,7 +2015,7 @@ struct Writer {
       for (const Variable& v : g.variables) {
         if (!v.from.empty()) continue;  // (a constant of a library, in the one graph a Blueprint is with it: the library's text has it)
         doc(1, v.help);
-        line(1, std::string(v.constant ? "KERN_CONST " : "") + cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g) + ";");
+        line(1, std::string(v.constant ? "KERN_CONST " : "") + cpp_type(declared(v)) + " " + v.name + " = " + literal(Value::from_json(v.value, declared(v), g), declared(v), g) + ";");
       }
     }
     if (!g.machines.empty()) {
@@ -1737,7 +2056,7 @@ struct Writer {
         first = false;
         if (!f.outputs.empty()) {
           std::string members;
-          for (const FunctionPin& p : f.outputs) members += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+          for (const FunctionPin& p : f.outputs) members += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
           line(1, "struct " + f.name + "Result { " + members + "};");
         }
         doc(1, f.help);
@@ -1745,16 +2064,16 @@ struct Writer {
         // (an input by value has its default; a reference is the place the call names: Car& car, const Car& car)
         for (const FunctionPin& p : f.inputs)
           args += (args.empty() ? "" : ", ") +
-                  (p.ref ? std::string(p.constant ? "const " : "") + cpp_type(TypeRef{p.type, p.of}) + "& " + p.name
-                         : cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g));
+                  (p.ref ? std::string(p.constant ? "const " : "") + cpp_type(declared(p)) + "& " + p.name
+                         : cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g));
         if (f.external) {
           // (a function of another Blueprint: what it looks like - it is called on an actor)
-          line(1, "KERN_EXTERN " + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
+          line(1, (f.remote.empty() ? std::string("KERN_EXTERN ") : "KERN_EXTERN_AS(" + text_literal(f.remote) + ") ") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ");");
           continue;
         }
         line(1, std::string(f.pure ? "KERN_PURE " : "") + (f.outputs.empty() ? std::string("void") : f.name + "Result") + " " + f.name + "(" + args + ") {");
         // (its local variables: every call starts with them as they stand here)
-        for (const FunctionPin& l : f.locals) line(2, cpp_type(TypeRef{l.type, l.of}) + " " + l.name + " = " + literal(Value::from_json(l.value, l.type, g, l.of), l.of, g) + ";");
+        for (const FunctionPin& l : f.locals) line(2, cpp_type(declared(l)) + " " + l.name + " = " + literal(Value::from_json(l.value, declared(l), g), declared(l), g) + ";");
         // (a path that ends without a Return gives the outputs' defaults)
         if (!body(e, 2) && !f.outputs.empty()) line(2, "return {};");
         line(1, "}");
@@ -1830,8 +2149,8 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
-const char* const kTypes = "a type (Bool, Int, Float, Vector, Text, Actor, an enum or a struct of the Blueprint, or List<one of them>) expected, not ";
-const char* const kListTypes = "List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>";
+const char* const kTypes = "a type (Bool, Int, U8 ... I32, Float, Vector, Text, Actor, Int64, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
+const char* const kListTypes = "List<Bool>, List<Int>, List<U8> ... List<I32>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>";
 
 struct Tok {
   enum Kind : u8 { id, number, text, punct, doc, end } kind = end;
@@ -1855,6 +2174,7 @@ struct Reader {
   struct MemberDecl {
     bool memory = false, result = false;
     std::string result_of;
+    std::string local;  // declared in this function's body (a local of its method), not in the class
     std::vector<std::pair<std::string, TypeRef>> fields;
     std::size_t tok = 0;
   };
@@ -1894,11 +2214,14 @@ struct Reader {
     bool cast = false;
     PinType to = PinType::number;
     std::string of;     // a value written out: of which enum (when it is an enum's)
+    u32 count = 0;      // a value written out: a list of a fixed length (Fixed<T, N>{...}), N
     std::size_t tok = 0;
     bool root = false;  // the expression is one new value node (what a name can be given to)
     std::size_t moved = 0;  // std::move(value): the token it stands at, plus one
   };
   struct DataWire { int to; std::string in; Src from; };
+  std::set<std::pair<int, std::string>> int_inputs;  // (the Int inputs of formulas: (node, input) - Ints, as they are)
+  std::vector<int> int_sums;  // (the formulas that give an Int by +, - or *: read only by Ints)
   struct ExecWire { int from; std::string out; int to; u32 to_id; std::string in; std::size_t tok; };
   /// An exec output that waits for its wire. node < 0 (kGone): a path that has ended in the graph
   /// where C++ would go on with the next statement (after a wait, a Sequence, go<id>()).
@@ -2133,9 +2456,17 @@ struct Reader {
   /// A literal: true, 12, -0.5, "text", Vector{x, y, z}, Actor{n}. False (nothing read): none here.
   /// A value written out. `of`: which enum or struct it is of, when it is one's value (or a list
   /// of them).
-  bool literal_here(Value& v, std::string* of = nullptr) {
+  bool literal_here(Value& v, std::string* of = nullptr, u32* count = nullptr) {
     const Tok& t = peek();
     if (of) of->clear();
+    if (t.kind == Tok::id && t.s == "Callback" && is("<", 1)) {
+      // Callback<Float(Float, Float)>{}: unbound - the one Callback a text writes out
+      TypeRef c;
+      if (!type_here(c) || !expect("{", "(an unbound Callback is " + cpp_type(c) + "{})") || !expect("}")) return true;
+      v = Value::zero(PinType::callback);
+      if (of) *of = c.of;
+      return true;
+    }
     if (t.kind == Tok::id && is("{", 1) && g.structure(t.s)) {
       // Weapon{"Knife", Kind::Melee, 25.0}: a value for every field, in their order
       const StructType s = *g.structure(t.s);
@@ -2194,6 +2525,42 @@ struct Reader {
       v = Value::vector(Vec3{static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(z)});
       return true;
     }
+    if (t.kind == Tok::id && t.s == "Int64" && is("{", 1)) {
+      // Int64{0x1f}: its 64 bits (written as hex, read as any whole number C++ writes)
+      p += 2;
+      if (peek().kind != Tok::number || peek().real) {
+        fail(p, "an Int64 is written with its bits: Int64{0x1f}");
+        return true;
+      }
+      v = Value::int64(std::strtoull(toks[p++].s.c_str(), nullptr, 0));
+      expect("}");
+      return true;
+    }
+    if (t.kind == Tok::id && (t.s == "Map" || t.s == "Set") && is("<", 1)) {
+      // Map<Int, Float>{{1, 2.5}, {3, 4.0}}, Set<Int>{1, 3}: the entries in their order
+      TypeRef keyed;
+      if (!type_here(keyed)) return true;
+      if (!expect("{", "(a map written out is " + cpp_type(keyed) + "{...})")) return true;
+      const TypeRef key = key_type(keyed), value = keyed.type == PinType::map ? value_type(keyed) : TypeRef{};
+      v = Value::zero(keyed.type);
+      while (!is("}")) {
+        const bool pair = keyed.type == PinType::map;
+        if (pair && !expect("{", "(an entry of a map is {key, value})")) return true;
+        Value k, x;
+        if (!typed_literal(key, k, "a key")) return true;
+        if (pair && (!expect(",") || !typed_literal(value, x, "a value") || !expect("}"))) return true;
+        const MapKey mk = key_of(k);
+        if (v.keyed().contains(mk)) {
+          fail(p, "the key " + literal(k, key, g) + " is said twice");
+          return true;
+        }
+        v.own_entries().try_emplace(mk, std::move(x));
+        if (!accept(",")) break;
+      }
+      if (!expect("}")) return true;
+      if (of) *of = keyed.of;
+      return true;
+    }
     if (t.kind == Tok::id && t.s == "Actor" && is("{", 1)) {
       p += 2;
       i64 a = 0;
@@ -2202,23 +2569,39 @@ struct Reader {
       v = Value::actor(static_cast<ActorRef>(a));
       return true;
     }
-    if (t.kind == Tok::id && t.s == "List" && is("<", 1)) {
-      // List<Float>{1.0, 2.5}
+    if (t.kind == Tok::id && (t.s == "List" || t.s == "Fixed") && is("<", 1)) {
+      // List<Float>{1.0, 2.5} - and a list of a fixed length: Fixed<Float, 3>{1.0, 2.5} (what it
+      // does not say is the zero of its entries, as in C++; it says no more than it has)
       TypeRef list;
+      const std::size_t at = p;
       if (!type_here(list)) return true;
       if (!expect("{", "(a list written out is " + cpp_type(list) + "{...})")) return true;
       json::Value items = json::Value::array();
       std::vector<Value> structs;
+      std::size_t said = 0;
       while (!is("}")) {
         Value item;
         if (!typed_literal({element_of(list.type), list.of}, item, "a list's item")) return true;
         if (list.type == PinType::structure_list) structs.push_back(std::move(item));
         else items.push(item.to_json());
+        ++said;
         if (!accept(",")) break;
       }
       if (!expect("}")) return true;
+      if (list.count && said > list.count) {
+        fail(at, cpp_type(list) + " has " + std::to_string(list.count) + " entries: this says " + std::to_string(said));
+        return true;
+      }
       v = list.type == PinType::structure_list ? Value::structures(std::move(structs)) : Value::from_json(items, list.type);
+      if (list.count && !count) {
+        // (a value on its way through a pin is a list: only a place is declared with a length - and an
+        // input whose type has one, Reader::bind)
+        fail(at, "a list of a fixed length is what a place is declared as - a value written out is " + cpp_type(TypeRef{list.type, list.of}) + "{...}");
+        return true;
+      }
+      if (list.count) v = fitted(std::move(v), list, g);
       if (of) *of = list.of;
+      if (count) *count = list.count;
       return true;
     }
     return false;
@@ -2228,11 +2611,24 @@ struct Reader {
     const std::size_t at = p;
     Value v;
     std::string of;
-    if (!literal_here(v, &of)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
+    u32 count = 0;
+    if (!literal_here(v, &of, &count)) return fail(p, what + ": a value of type " + cpp_type(want) + " expected, not " + shown(peek()));
     if (failed()) return false;
     if (v.type == PinType::integer && want.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
-    if (v.type != want.type || of != want.of)
-      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of}) + ", but " + cpp_type(want) + " is needed (like " + literal(zero_of(want, g), want.of, g) + ")");
+    if (v.type == PinType::integer && want.type == PinType::integer && has_width(want) && of.empty()) {
+      // (an Int of a fixed width: a whole number it holds - C++ would store another there)
+      if (wrapped(v.i, want.of) != v.i) return fail(at, what + ": " + std::to_string(v.i) + " is no " + cpp_type(want) + " (it would hold " + std::to_string(wrapped(v.i, want.of)) + ")");
+      of = want.of;
+    }
+    if (want.count && !count && v.type == want.type && of == want.of) {
+      // A list written out, for a place of a fixed length: the place's entries (C++ takes it the same
+      // way; the text of the graph says Fixed<Float, 3>{...}). It says no more than the place has.
+      if (v.size() > want.count) return fail(at, what + ": " + cpp_type(want) + " has " + std::to_string(want.count) + " entries: this says " + std::to_string(v.size()));
+      v = fitted(std::move(v), want, g);
+      count = want.count;
+    }
+    if (v.type != want.type || of != want.of || count != want.count)
+      return fail(at, what + ": this is " + cpp_type(TypeRef{v.type, of, count}) + ", but " + cpp_type(want) + " is needed (like " + literal(zero_of(want, g), want, g) + ")");
     out = v;
     return true;
   }
@@ -2243,21 +2639,70 @@ struct Reader {
     t = {};
     if (peek().kind != Tok::id) return false;
     if (type_of_cpp(peek().s, t.type)) { ++p; return true; }
+    if (std::string w = width_of_cpp(peek().s); !w.empty()) {  // (an Int of a fixed width: U8 ... I32)
+      t = {PinType::integer, std::move(w)};
+      ++p;
+      return true;
+    }
     if (g.enumeration(peek().s) || g.structure(peek().s)) {
       t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
       t.of = toks[p++].s;
       return true;
     }
-    if (is("List") && is("<", 1)) {
-      // List<Float>: a list of values of one type
+    if (is("Callback") && is("<", 1)) {
+      // Callback<Float(Float, Float)>: a function of a library the engine calls (Make Callback), its signature -
+      // what it gives (void: nothing) and what it is handed: Bools, Ints, Floats, Vectors, Int64s
+      const std::size_t at = p;
+      p += 2;
+      TypeRef r{PinType::exec, {}};
+      if (!accept("void") && (!type_here(r) || !callback_type_ok(r.type) || r.count)) return fail(at + 2, "a Callback gives a Bool, an Int, a Float, a Vector, an Int64 or nothing: Callback<Float(Float, Float)>, Callback<void(Int)>");
+      if (!expect("(")) return false;
+      std::vector<TypeRef> in;
+      while (!is(")")) {
+        if (!in.empty() && !expect(",")) return false;
+        TypeRef a;
+        if (!type_here(a) || !callback_type_ok(a.type) || a.count) return fail(p, "the engine hands a Callback Bools, Ints, Floats, Vectors and Int64s");
+        in.push_back(a);
+      }
+      ++p;
+      t = {PinType::callback, callback_of(r, in)};
+      return expect(">");
+    }
+    if ((is("Map") || is("Set")) && is("<", 1)) {
+      // Map<Int, Float>: values under keys; Set<Int>: keys - in the order the keys came. A key is a
+      // Bool, an Int, an Int64, an enum's value or a Text; a value any type but a map or a set.
+      const bool map = is("Map");
+      const std::size_t at = p;
+      p += 2;
+      TypeRef key, value;
+      if (!type_here(key) || !key_type_ok(key.type) || key.count || has_width(key)) return fail(at + 2, "the keys of a map or a set are Bool, Int, Int64, Text or an enum");
+      if (map) {
+        if (!expect(",")) return false;
+        if (!type_here(value) || is_keyed(value.type) || value.count)
+          return fail(p, "the values of a map are a type a variable can be, but no map, set or list of a fixed length");
+      }
+      t = {map ? PinType::map : PinType::set, keyed_of(key, map ? &value : nullptr)};
+      return expect(">");
+    }
+    if ((is("List") || is("Fixed")) && is("<", 1)) {
+      // List<Float>: a list of values of one type. Fixed<Float, 16>: one of a fixed length - what a
+      // place is declared as (a variable, a field, an input, an output, a local variable).
+      const bool fixed = is("Fixed");
       const Tok inner = peek(2);
       PinType item = PinType::number;
-      const bool value = inner.kind == Tok::id && type_of_cpp(inner.s, item);
+      const std::string width = inner.kind == Tok::id ? width_of_cpp(inner.s) : std::string();
+      const bool value = inner.kind == Tok::id && (type_of_cpp(inner.s, item) || !width.empty());
       const bool of_enum = inner.kind == Tok::id && g.enumeration(inner.s), of_struct = inner.kind == Tok::id && g.structure(inner.s);
-      if ((!value && !of_enum && !of_struct) || !is(">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
+      if ((!value && !of_enum && !of_struct) || !is(fixed ? "," : ">", 3)) return fail(p + 2, shown(inner) + " is no type a list holds: a list is " + kListTypes);
       p += 4;
-      t = value ? TypeRef{list_of(item), {}} : TypeRef{of_enum ? PinType::enumeration_list : PinType::structure_list, inner.s};
-      return true;
+      t = !width.empty() ? TypeRef{PinType::integer_list, width} : value ? TypeRef{list_of(item), {}} : TypeRef{of_enum ? PinType::enumeration_list : PinType::structure_list, inner.s};
+      if (!fixed) return true;
+      const Tok length = peek();
+      const u64 entries = length.kind == Tok::number && !length.real ? std::strtoull(length.s.c_str(), nullptr, 10) : 0;
+      if (entries < 1 || entries > kLongestFixed) return fail(p, "a list of a fixed length has 1 to " + std::to_string(kLongestFixed) + " entries: Fixed<Float, 16>");
+      ++p;
+      t.count = static_cast<u32>(entries);
+      return expect(">");
     }
     return false;
   }
@@ -2368,11 +2813,25 @@ struct Reader {
       TypeRef t;
       if (accept("&")) {
         // &Weapon::Name   a struct and one of its fields: two settings in one
+        // &Board::Before  a function of this Blueprint (its class): one setting, the function's name
         std::string owner, field;
         if (!word(owner, "a struct") || !expect("::") || !word(field, "a field of " + owner)) return false;
+        if (owner == name) {
+          out.push_back(std::move(field));
+          if (types) types->push_back(false);
+          if (!accept(",")) break;
+          continue;
+        }
         out.push_back(std::move(owner));
         out.push_back(std::move(field));
         if (types) { types->push_back(true); types->push_back(false); }
+        if (!accept(",")) break;
+        continue;
+      }
+      if (peek().kind == Tok::id && peek().s == "nullptr") {
+        ++p;  // (a setting that names no function)
+        out.emplace_back();
+        if (types) types->push_back(false);
         if (!accept(",")) break;
         continue;
       }
@@ -2392,6 +2851,7 @@ struct Reader {
   bool declarations() {
     std::string docs;
     bool has_docs = false, pure = false, external = false, has_event = false;
+    std::string remote;  // (KERN_EXTERN_AS: the name the other Blueprint has the function under)
     Item event;
     auto take_docs = [&] {
       std::string r = has_docs ? docs : std::string();
@@ -2443,7 +2903,7 @@ struct Reader {
         while (!is("}")) {
           StructField f;
           // (a field is of a type declared above the struct: the struct itself is none of them)
-          const Tok named = is("List") && is("<", 1) ? peek(2) : peek();
+          const Tok named = (is("List") || is("Fixed")) && is("<", 1) ? peek(2) : peek();
           if (named.kind == Tok::id && named.s == s.name) return fail(p, "the struct " + s.name + " cannot contain itself: a field is of a type declared above the struct");
           if (!type_here(f.type))
             return fail(p, "the struct " + s.name + ": " + shown(peek()) + " is no type here: a field is Bool, Int, Float, Vector, Text, Actor, an enum or a struct declared above this one, or a List of one of them");
@@ -2453,7 +2913,7 @@ struct Reader {
           Value init = zero_of(f.type, g);
           if (accept("=") && !typed_literal(f.type, init, s.name + "." + f.name)) return false;
           if (!expect(";")) return false;
-          f.value = init.to_json(g, f.type.of);
+          f.value = init.to_json(g, f.type);
           s.fields.push_back(std::move(f));
         }
         if (s.fields.empty()) return fail(p, "a struct has fields: KERN_STRUCT(" + s.name + ") { Float Field = 0.0; };");
@@ -2473,12 +2933,13 @@ struct Reader {
         v.constant = constant;
         v.type = type.type;
         v.of = type.of;
+        v.count = type.count;
         if (!word(v.name, "the variable's name")) return false;
         Value init = zero_of(type, g);
         if (accept("=") && !typed_literal(type, init, v.name)) return false;
         if (!expect(";")) return false;
         if (g.variable(v.name)) return fail(at + 1, "the variable " + v.name + " is declared twice");
-        v.value = init.to_json(g, type.of);
+        v.value = init.to_json(g, type);
         v.help = take_docs();
         g.variables.push_back(std::move(v));
         continue;
@@ -2552,6 +3013,13 @@ struct Reader {
         external = true;
         continue;
       }
+      if (accept("KERN_EXTERN_AS")) {
+        // KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);   (the name the other Blueprint has it under)
+        if (!expect("(") || !string(remote, "the name the other Blueprint has the function under") || !expect(")")) return false;
+        if (remote.empty()) return fail(p, "KERN_EXTERN_AS names the function of the other Blueprint: KERN_EXTERN_AS(\"Update\")");
+        external = true;
+        continue;
+      }
       if (t.kind != Tok::id) return fail(p, shown(t) + " is not part of a Blueprint");
       // void name(...) {   <Function>Result name(...) {   <Function>Result n<id>;
       std::string ret = toks[p++].s, fn;
@@ -2600,6 +3068,8 @@ struct Reader {
         f.name = fn;
         f.pure = pure;
         f.external = external;
+        f.remote = std::move(remote);
+        remote.clear();
         if (pure && external) return fail(at, "a function of another Blueprint is called as a step: KERN_EXTERN, not KERN_PURE");
         if (g.function(fn)) return fail(at + 1, "the function " + fn + " is declared twice");
         if (ret != "void") {
@@ -2607,7 +3077,8 @@ struct Reader {
           auto r = results.find(fn);
           if (r == results.end()) return fail(at, "struct " + ret + " { ... }; must be declared above the function");
           for (std::size_t k = 0; k < r->second.first.size(); ++k)
-            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(g, r->second.first[k].second.of), r->second.first[k].second.of});
+            f.outputs.push_back({r->second.first[k].first, r->second.first[k].second.type, r->second.second[k].to_json(g, r->second.first[k].second), r->second.first[k].second.of,
+                                 r->second.first[k].second.count});
         }
         while (!is(")")) {
           FunctionPin in;
@@ -2616,13 +3087,14 @@ struct Reader {
           if (!type_here(in_type)) return fail(p, kTypes + shown(peek()));
           in.type = in_type.type;
           in.of = in_type.of;
+          in.count = in_type.count;
           in.ref = accept("&");
           if (in.constant && !in.ref) return fail(p, "a const input is a reference: const " + cpp_type(in_type) + "& name (an input by value is " + cpp_type(in_type) + " name = value)");
           if (!word(in.name, "the input's name")) return false;
           Value v = zero_of(in_type, g);
           if (in.ref && is("=")) return fail(p, in.name + " is a reference: the call names its place, it has no default");
           if (accept("=") && !typed_literal(in_type, v, in.name)) return false;
-          in.value = v.to_json(g, in.of);
+          in.value = v.to_json(g, in_type);
           f.inputs.push_back(std::move(in));
           if (!accept(",")) break;
         }
@@ -2645,10 +3117,11 @@ struct Reader {
       if (it.kind == Item::function) {
         // Type Name = value;   its local variables, at the top of its body
         Function& f = g.functions.back();
-        for (TypeRef type; ((is("List") && is("<", 1)) || (peek(1).kind == Tok::id && (is("=", 2) || is(";", 2)))) && type_here(type);) {
+        for (TypeRef type; (((is("List") || is("Fixed") || is("Map") || is("Set") || is("Callback")) && is("<", 1)) || (peek(1).kind == Tok::id && !numbered(peek(1).s, "n") && (is("=", 2) || is(";", 2)))) && type_here(type);) {
           FunctionPin l;
           l.type = type.type;
           l.of = type.of;
+          l.count = type.count;
           const std::size_t where = p;
           if (!word(l.name, "the local variable's name")) return false;
           if (f.local(l.name)) return fail(where, "the function " + f.name + " has the local variable " + l.name + " twice");
@@ -2657,10 +3130,34 @@ struct Reader {
           Value init = zero_of(type, g);
           if (accept("=") && !typed_literal(type, init, l.name)) return false;
           if (!expect(";")) return false;
-          l.value = init.to_json(g, type.of);
+          l.value = init.to_json(g, type);
           f.locals.push_back(std::move(l));
         }
         if (failed()) return false;
+        // FnResult n12;   struct { Float value = 0.0; } n13;   struct : kern::Node<14> { Int index = 0; } n14;
+        // what its steps give and its loops keep, the call's own (Writer::body)
+        for (;;) {
+          MemberDecl d;
+          d.local = f.name;
+          u32 base = 0;
+          if (peek().kind == Tok::id && peek(1).kind == Tok::id && numbered(peek(1).s, "n") && is(";", 2)) {
+            const std::size_t at_type = p;
+            const std::string ret = toks[p++].s;
+            if (ret.size() <= 6 || ret.substr(ret.size() - 6) != "Result") return fail(at_type, "\"" + ret + "\" is no type here: what a called function gave is <Function>Result n<id>;");
+            d.result = true;
+            d.result_of = ret.substr(0, ret.size() - 6);
+            if (!member_name(std::move(d), 0)) return false;
+            continue;
+          }
+          if (is("kern") && is("::", 1) && is("Node", 2)) {
+            if (!node_base(d.memory, base) || !member_name(std::move(d), base)) return false;
+            continue;
+          }
+          if (!(is("struct") && (is("{", 1) || is(":", 1)))) break;
+          ++p;
+          if (accept(":") && !node_base(d.memory, base)) return false;
+          if (!expect("{") || !fields(d.fields, nullptr, "what a node gives") || !member_name(std::move(d), base)) return false;
+        }
       }
       it.open = p;
       items.push_back(std::move(it));
@@ -2680,11 +3177,11 @@ struct Reader {
   /// body it is, or a variable of the Blueprint (Graph::Root).
   Graph::Root root_here(const std::string& name, Variable& out) const {
     if (const FunctionPin* l = scope.function ? scope.function->local(name) : nullptr) {
-      out = Variable{l->name, l->type, l->value, {}, l->of};
+      out = Variable{l->name, l->type, l->value, {}, l->of, l->count};
       return Graph::Root::local;
     }
     if (const FunctionPin* in = scope.function ? scope.function->input(name) : nullptr) {
-      out = Variable{in->name, in->type, in->value, {}, in->of};
+      out = Variable{in->name, in->type, in->value, {}, in->of, in->count};
       return !in->ref ? Graph::Root::input : in->constant ? Graph::Root::constant_reference : Graph::Root::reference;
     }
     const Variable* v = g.variable(name);
@@ -2775,6 +3272,7 @@ struct Reader {
       std::size_t q = 1;
       if (peek(q).kind == Tok::id && numbered(peek(q).s, "n") && is(",", q + 1)) q += 2;                        // (its member)
       if ((peek(q).kind == Tok::text || (peek(q).kind == Tok::id && peek(q).s == "entry")) && is(",", q + 1)) q += 2;  // (its exec input)
+      if (is("*", q) && peek(q + 1).kind == Tok::id && peek(q + 1).s == "this" && is(",", q + 2)) q += 3;          // (the object its function runs on: runs_function)
       for (std::size_t k = 0; k < variables; ++k, q += 2) {
         Variable named;
         if (peek(q).kind != Tok::id || !variable_here(peek(q).s, named)) {
@@ -2846,8 +3344,8 @@ struct Reader {
     std::size_t where = tok + 1;  // (the token of the step)
     for (const std::string& step : steps) {
       if (step.empty()) {
-        if (!is_list(at.type)) return fail(where, name + " is " + cpp_type(at) + ": it has no entries");
-        at.type = element_of(at.type);
+        if (!is_list(at.type) && at.type != PinType::map) return fail(where, name + " is " + cpp_type(at) + ": it has no entries");
+        at = at.type == PinType::map ? value_type(at) : TypeRef{element_of(at.type), at.of};  // (of a map: the value at its place)
         name += "[]";
         int depth = 0;
         for (;; ++where) {
@@ -2906,7 +3404,7 @@ struct Reader {
     std::vector<int> r;
     const Made& m = made[static_cast<std::size_t>(node)];
     const bool place = names_place(*m.def);  // (the indices of its path stand in the place, not among its values)
-    const bool call = m.def->type == "func.call" || m.def->type == "func.pure";  // (so do those of the places a call names: "<input>.path0")
+    const bool call = m.def->type == "func.call" || m.def->type == "func.pure" || m.def->type == "func.callback";  // (so do those of the places a call names: "<input>.path0")
     for (std::size_t k = 0; k < m.in.size(); ++k)
       if (m.in[k].type != PinType::exec && !(place && is_path_pin(m.in[k].id)) && !(call && m.in[k].id.find('.') != std::string::npos)) r.push_back(static_cast<int>(k));
     return r;
@@ -2934,10 +3432,20 @@ struct Reader {
     if (src.cast) return fail(src.tok, "a value written out needs no kern::to: write the " + cpp_type(want) + " itself");
     Value v = src.value;
     if (v.type == PinType::integer && pin.type == PinType::number) v = Value::number(static_cast<f64>(v.i));
-    if (v.type != pin.type || src.of != pin.of)
+    // (a list of a fixed length says its length: the input's - Fixed<fc_PT1, 3>{...} for a field of three)
+    if (src.count && !pin.count)
+      return fail(src.tok, "a list of a fixed length is what a place is declared as - a value written out is " + cpp_type(TypeRef{v.type, src.of}) + "{...}");
+    if (src.count && src.count != pin.count)
+      return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(TypeRef{pin.type, pin.of, pin.count}) + ", this is " +
+                               cpp_type(TypeRef{v.type, src.of, src.count}));
+    // (what flows into a pin is an Int: one of a fixed width is the place's - the place holds its low bits)
+    const bool any_int = v.type == PinType::integer && pin.type == PinType::integer && src.of.empty() && has_width(pin.type, pin.of);
+    // (an input of a list of Ints of any width: a list written out is a List<Int>{...} - kAnyWidth)
+    const bool any_list = v.type == PinType::integer_list && pin.of == kAnyWidth && src.of.empty();
+    if (v.type != pin.type || (src.of != pin.of && !any_int && !any_list))
       return fail(src.tok, "\"" + pin.id + "\" of " + node_name(m.def->type) + " is " + cpp_type(want) + ", this is " + cpp_type(TypeRef{v.type, src.of}) + " (a " + cpp_type(want) + " looks like " +
                                literal(zero_of(want, g), pin.of, g) + ")");
-    m.node.set_value(pin.id, v.to_json(g, pin.of));
+    m.node.set_value(pin.id, v.to_json(g, TypeRef{pin.type, any_list ? std::string() : pin.of}));
     return true;
   }
   /// Wires the exec outputs `from` to the exec input `in` of `node` ("": its first), or of the step go<id>.
@@ -3011,7 +3519,7 @@ struct Reader {
     s.tok = p;
     if (failed()) return s;
     Value v;
-    if (literal_here(v, &s.of)) {
+    if (literal_here(v, &s.of, &s.count)) {
       s.literal = true;
       s.value = v;
       return s;
@@ -3038,6 +3546,7 @@ struct Reader {
         TypeRef to;
         if (!expect("<")) return s;
         if (!type_here(to)) { fail(p, "kern::to<Type>: a type expected, not " + shown(peek())); return s; }
+        if (has_width(to)) { fail(p - 1, "a wire converts to an Int, the place holds its low bits: kern::to<Int>, not kern::to<" + cpp_type(to) + ">"); return s; }
         if (!expect(">") || !expect("(")) return s;
         Src inner = value();
         if (failed() || !expect(")")) return s;
@@ -3087,6 +3596,41 @@ struct Reader {
           s.pin = pd.id;
           return s;
         }
+    }
+    if (t.s == "callback" && is("<")) {
+      // callback<&Lib::fn>(place): Make Callback - a function of a library the engine calls; the place binds its
+      // first input where that is a const reference
+      p += 1;
+      std::string owner, fn, more;
+      if (!expect("&", "(callback<&Library::function>(place))") || !word(owner, "a library")) return s;
+      if (const std::size_t at = owner.find("::"); at != std::string::npos) {  // (a name with its library, read as one: Ground::height)
+        fn = owner.substr(at + 2);
+        owner = owner.substr(0, at);
+      } else if (!expect("::") || !word(fn, "a function of " + owner)) {
+        return s;
+      }
+      while (accept("::")) {
+        if (!word(more, "a function")) return s;
+        fn += "::" + more;
+      }
+      const std::string fname = owner == name ? fn : owner + "::" + fn;
+      const Function* f = g.function(fname);
+      if (!f) { fail(s.tok, "callback<&" + owner + "::" + fn + ">: no such function"); return s; }
+      if (!expect(">") || !is("(")) { expect("("); return s; }
+      std::vector<std::pair<std::string, std::string>> params{{"function", fname}};
+      const bool bound = !f->inputs.empty() && f->inputs[0].ref;
+      if (bound && !ref_places(*f, 1, params)) return s;
+      ++p;
+      const int node = make("func.callback", s.tok, std::move(params));
+      if (node < 0) return s;
+      if (bound) {
+        ++p;  // (the variable's name)
+        if (!place_rest(node, ref_key(f->inputs[0].name, ""))) return s;
+      }
+      if (!expect(")", "(a Callback binds one place: callback<&" + owner + "::" + fn + ">(" + (bound ? f->inputs[0].name : std::string()) + "))")) return s;
+      s.node = node;
+      s.root = true;
+      return s;
     }
     if (const Function* f = g.function(t.s)) {
       const std::string fname = f->name;
@@ -3143,13 +3687,24 @@ struct Reader {
     s.tok = tok;
     std::vector<std::string> names;
     if (!expect("(") || !expect("[") || !expect("]") || !expect("(")) return s;
+    // (each input a Float or - where Formula::int_input holds - an Int, the result a Float or - where every input is an Int
+    // and Formula::whole_result holds - an Int: docs/blueprint_cpp.md "Formeln")
+    std::vector<char> ints;
     while (!is(")")) {
       std::string nm;
-      if (!expect("Float", "(a formula's inputs are Float)") || !word(nm, "the input's name")) return s;
+      const bool int_in = is("Int");
+      if (!int_in && !is("Float")) { expect("Float", "(an input of a formula is Float, or Int where it is read as a whole number)"); return s; }
+      ++p;
+      if (!word(nm, "the input's name")) return s;
       names.push_back(nm);
+      ints.push_back(int_in);
       if (!accept(",")) break;
     }
-    if (!expect(")") || !expect("->") || !expect("Float") || !expect("{") || !expect("return")) return s;
+    if (!expect(")") || !expect("->")) return s;
+    const bool whole = is("Int");
+    if (!whole && !expect("Float", "(a formula gives a Float, or an Int where its value is a whole number)")) return s;
+    if (whole) ++p;
+    if (!expect("{") || !expect("return")) return s;
     const std::size_t from = peek().begin;
     int depth = 0;
     while (peek().kind != Tok::end && !(depth == 0 && (is(";") || is("}")))) {
@@ -3169,12 +3724,36 @@ struct Reader {
       fail(tok, "the formula reads (" + want + "): the lambda's parameters are exactly these, in this order");
       return s;
     }
+    for (std::size_t i = 0; i < ints.size(); ++i)
+      if (ints[i] && !f.int_input(i)) {
+        fail(body_tok, "the input " + names[i] + " is an Int only where the formula reads it as a whole number: as an argument of band, bor, bxor, shl, shr, wrap32, wrap32s "
+                       "or mul32, as a side of a comparison whose other side is an input, a number or one of those, or through +, - and * between them - "
+                       "here it is read otherwise (by /, %, ^, a function, ! or ?:): Float " + names[i]);
+        return s;
+      }
+    if (whole && std::find(ints.begin(), ints.end(), 0) != ints.end()) { fail(tok, "a formula with a Float input gives a Float: -> Float"); return s; }
+    if (whole && !f.whole_result()) {
+      fail(body_tok, "-> Int is a formula whose value is a whole number: band, bor, bxor, shl, shr, wrap32, wrap32s or mul32, or +, - and * of inputs, numbers and those - "
+                     "this one gives a Float: -> Float");
+      return s;
+    }
     const int node = make("math.formula", tok, {{"formula", f.text()}});
     if (node < 0) return s;
     Args a{*this};
     a.first = false;  // (the lambda was the first argument)
+    const std::size_t wires_before = data_wires.size();
     if (!args_of(node, a, "this formula")) return s;
     if (!expect(")", "(one value per input of the formula)")) return s;
+    // (every Int input a wire from an Int - what the graph has where the text says Int)
+    // (count the wires into this formula only: an argument may make wires of its own - p[kern::to<Int>(...)])
+    for (std::size_t i = 0; i < ints.size(); ++i) {
+      if (!ints[i]) continue;
+      bool wired = false;
+      for (std::size_t w = wires_before; w < data_wires.size(); ++w) wired = wired || (data_wires[w].to == node && data_wires[w].in == names[i]);
+      if (!wired) { fail(tok, "an Int input of a formula is an Int that is read (no number written out): Float " + names[i]); return s; }
+      int_inputs.insert({node, names[i]});
+    }
+    if (whole && f.result_sum()) int_sums.push_back(node);
     s.node = node;
     s.root = true;
     return s;
@@ -3193,7 +3772,16 @@ struct Reader {
   /// The arguments of a step in front of its values: its member n<id>, the exec input it is
   /// entered through when it has several, then the variable it changes. `entry`: that input
   /// ("": the first).
-  bool head(int node, Args& a, std::string& entry) { return member_and_entry(node, a, entry) && variable_args(node, a); }
+  bool head(int node, Args& a, std::string& entry) { return member_and_entry(node, a, entry) && object_arg(node, a) && variable_args(node, a); }
+  /// `*this` - the object the function a setting names runs on (runs_function), where the node has one.
+  bool object_arg(int node, Args& a) {
+    const Made& m = made[static_cast<std::size_t>(node)];
+    if (!runs_function(*m.def, m.node)) return true;
+    if (!a.more() || !is("*") || peek(1).kind != Tok::id || peek(1).s != "this")
+      return fail(p, node_name(m.def->type) + ": its function runs on the Blueprint's object, which comes first: *this");
+    p += 2;
+    return true;
+  }
   bool member_and_entry(int node, Args& a, std::string& entry) {
     const Made& m = made[static_cast<std::size_t>(node)];
     if (!member_arg(node, a)) return false;
@@ -3319,6 +3907,21 @@ struct Reader {
   Ends statement(Ends in) {
     const std::size_t at = p;
     const Tok t = peek();
+    // the check around a call that holds an entry of a list of any length while its function may run handlers
+    // (Writer::held_lists): it follows from the graph and is read as nothing -
+    // const kern::logic::Held held_12(Cars, ...);  ...  held_after(held_12);
+    const bool held_name = peek(6).kind == Tok::id && peek(6).s.rfind("held_", 0) == 0;
+    if (is("const") && is("kern", 1) && is("::", 2) && is("logic", 3) && is("::", 4) && is("Held", 5) && held_name && is("(", 7)) {
+      p += 8;
+      for (int depth = 1; depth > 0 && peek().kind != Tok::end; ++p) depth += is("(") ? 1 : is(")") ? -1 : 0;
+      expect(";");
+      return in;
+    }
+    if (is("held_after") && is("(", 1) && peek(2).kind == Tok::id && peek(2).s.rfind("held_", 0) == 0 && is(")", 3)) {
+      p += 4;
+      expect(";");
+      return in;
+    }
     if (accept("return")) {
       scope.first = false;
       if (!scope.function) {
@@ -4140,12 +4743,25 @@ struct Reader {
       for (const PinDef& pd : to.in) if (pd.id == w.in) in = &pd;
       if (!in) continue;
       const TypeRef to_type{in->type, in->of}, from_type{out_pin->type, out_pin->of};
-      const std::string need = cpp_type(to_type), have = cpp_type(from_type);
+      const std::string need = cpp_type(TypeRef{to_type.type, to_type.type == PinType::integer ? std::string() : to_type.of}), have = cpp_type(from_type);
+      // (an Int is an Int, whatever width the place it comes from or goes to has: the place holds its low bits)
+      // (an input that reads a list of Ints of any width takes each as it is: kAnyWidth)
+      const bool same = from_type == to_type || (from_type.type == PinType::integer && to_type.type == PinType::integer) ||
+                        (to_type.of == kAnyWidth && fits(from_type, to_type));
+      if (std::find(int_sums.begin(), int_sums.end(), from) != int_sums.end() && to_type.type != PinType::integer)
+        return fail(w.from.tok, "this formula gives an Int by +, - or *, and this reads it as " + need + " (past Int's ends the two differ): the formula is -> Float");
+      if (int_inputs.count({w.to, w.in})) {
+        // (an Int into the Float input of the formula - the wire's own conversion, which the class does not write)
+        if (w.from.cast) return fail(w.from.tok, "an Int input of a formula is an Int as it is: no kern::to");
+        if (from_type.type != PinType::integer) return fail(w.from.tok, "this is " + have + ", the input of the formula is an Int");
+        g.links.push_back({f.node.id, out_pin->id, to.node.id, in->id});
+        continue;
+      }
       if (w.from.cast) {
-        if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (from_type == to_type ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
-        if (from_type == to_type) return fail(w.from.tok, "the value is " + need + " already: no kern::to");
+        if (w.from.to != in->type) return fail(w.from.tok, "this input is " + need + (same ? ", and so is the value: no kern::to" : ": kern::to<" + need + ">(...)"));
+        if (same) return fail(w.from.tok, "the value is " + (from_type == to_type ? need : "an Int") + " already: no kern::to");
         if (!fits(from_type, to_type)) return fail(w.from.tok, "a " + have + " cannot become a " + need);
-      } else if (!(from_type == to_type)) {
+      } else if (!same) {
         if (!fits(from_type, to_type)) return fail(w.from.tok, "this is " + have + ", the input is " + need + ": the two do not convert");
         return fail(w.from.tok, "this is " + have + ", the input is " + need + ": write kern::to<" + need + ">(...)");
       }
@@ -4219,10 +4835,15 @@ struct Reader {
         for (int k : x.data_out) names += (names.empty() ? "" : ", ") + x.out[static_cast<std::size_t>(k)].id;
         return fail(m.tok, "its values are read outside its own method: the method begins with " + nid + " = {" + names + "};");
       }
-      if (!x.member && decl == members.end()) continue;
+      if (!x.kept() && decl == members.end()) continue;
       const std::string want = Writer::member_text(x, g);
-      if (decl == members.end()) return fail(m.tok, nid + " is not declared: " + want);
+      const std::string fn = x.local_in >= 0 ? shape.at(x.local_in).node->param("function") : std::string();
+      if (decl == members.end()) return fail(m.tok, nid + " is not declared: " + want + (fn.empty() ? "" : " (at the top of the body of " + fn + ")"));
       const MemberDecl& d = decl->second;
+      // (one that is the call's own may also be a member of the class, as texts had it before: the same Blueprint)
+      if (!d.local.empty() && d.local != fn)
+        return fail(d.tok, nid + (fn.empty() ? " is read outside the path of " + d.local + " after it, or where it may not have run in this call: it is a member of the class - " + want
+                                              : " belongs to the function " + fn + ": " + want + " at the top of its body"));
       bool same = d.memory == (x.def->memory && !x.event) && d.result == (x.def->type == "func.call");
       if (d.result) same = same && d.result_of == x.node->param("function");
       else {
@@ -4258,26 +4879,26 @@ std::vector<std::pair<std::string, std::string>> described(const Graph& g, const
   add("the number of structs", std::to_string(g.structs.size()));
   for (std::size_t i = 0; i < g.structs.size(); ++i) {
     std::string fields;
-    for (const StructField& f : g.structs[i].fields) fields += cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type.type, g, f.type.of), f.type.of, g) + "; ";
+    for (const StructField& f : g.structs[i].fields) fields += cpp_type(f.type) + " " + f.name + " = " + literal(Value::from_json(f.value, f.type, g), f.type, g) + "; ";
     add("struct " + std::to_string(i + 1), g.structs[i].name + " { " + fields + "}");
     add("the description of struct " + std::to_string(i + 1), g.structs[i].help);
   }
   add("the number of variables", std::to_string(g.variables.size()));
   for (std::size_t i = 0; i < g.variables.size(); ++i) {
     const Variable& v = g.variables[i];
-    add("variable " + std::to_string(i + 1), cpp_type(TypeRef{v.type, v.of}) + " " + v.name + " = " + literal(Value::from_json(v.value, v.type, g, v.of), v.of, g));
+    add("variable " + std::to_string(i + 1), cpp_type(declared(v)) + " " + v.name + " = " + literal(Value::from_json(v.value, declared(v), g), declared(v), g));
     add("the description of variable " + std::to_string(i + 1), v.help);
   }
   add("the number of functions", std::to_string(g.functions.size()));
   for (std::size_t i = 0; i < g.functions.size(); ++i) {
     const Function& f = g.functions[i];
     std::string sig = f.name + (f.pure ? " (pure)" : "") + (f.external ? " (of another Blueprint)" : "") + " (";
-    for (const FunctionPin& p : f.inputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+    for (const FunctionPin& p : f.inputs) sig += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
     sig += ") -> (";
-    for (const FunctionPin& p : f.outputs) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+    for (const FunctionPin& p : f.outputs) sig += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
     sig += ")";
     if (!f.locals.empty()) sig += " with the local variables (";
-    for (const FunctionPin& p : f.locals) sig += cpp_type(TypeRef{p.type, p.of}) + " " + p.name + " = " + literal(Value::from_json(p.value, p.type, g, p.of), p.of, g) + "; ";
+    for (const FunctionPin& p : f.locals) sig += cpp_type(declared(p)) + " " + p.name + " = " + literal(Value::from_json(p.value, declared(p), g), declared(p), g) + "; ";
     add("function " + std::to_string(i + 1), sig + (f.locals.empty() ? "" : ")"));
     add("the description of function " + std::to_string(i + 1), f.help);
   }
@@ -4490,7 +5111,11 @@ std::vector<std::pair<std::string, std::string>> cpp_names(Graph& g, const Libra
       for (FunctionPin& p : pins) {
         const std::string old = p.name;
         const bool ok = cpp_name_ok(old) && !node_names.count(old) && old != "exec" && old != "then";
-        const std::string name = unique(ok ? old : better(old), [&](const std::string& x) { return used.count(x) || (inputs && taken.count(x)); });
+        // (a function held from a library has the library's pins: they are named there, among the library's names - an input of
+        // its that has the name of one of THIS Blueprint's variables stays as it is, as the reader lets it ("has the name of a
+        // variable or a function" is asked of a Blueprint's own functions). Renamed here, the Blueprint held another function
+        // than its library has: link() refused it as stale, and the Blueprint ran in the interpreter instead of as its class.)
+        const std::string name = unique(ok ? old : better(old), [&](const std::string& x) { return used.count(x) || (inputs && f.from.empty() && taken.count(x)); });
         used.insert(name);
         if (name == old) continue;
         // the pin on the function's nodes: the entry gives the inputs, the Return takes the outputs, the calls both
@@ -4536,7 +5161,8 @@ bool native_ready(const Graph& g, std::string* why, const Library& lib) {
   return true;
 }
 
-bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, std::string_view space, const Blueprints& all) {
+bool native_glue(const Graph& g, const std::string& name, std::string& out, std::string* error, const Library& lib, std::string_view space, const Blueprints& all,
+                 bool held_only) {
   // (the class from anywhere: ::Name, or ::space::Name)
   const std::string rooted = "::" + (space.empty() ? std::string() : std::string(space) + "::") + name;
   std::string why;
@@ -4550,21 +5176,41 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       case PinType::integer: return "kern::i64";
       case PinType::number: return "kern::f64";
       case PinType::vector: return "kern::Vec3";
-      case PinType::text: return "std::string";
+      case PinType::text: return "kern::logic::Text";
       case PinType::boolean_list: return "kern::List<bool>";
       case PinType::integer_list: return "kern::List<kern::logic::Whole>";
       case PinType::number_list: return "kern::List<kern::f64>";
       case PinType::vector_list: return "kern::List<kern::Vec3>";
-      case PinType::text_list: return "kern::List<std::string>";
+      case PinType::text_list: return "kern::List<kern::logic::Text>";
       case PinType::actor_list: return "kern::List<kern::logic::ActorHandle>";
+      case PinType::int64: return "kern::logic::Int64";
+      case PinType::int64_list: return "kern::List<kern::logic::Int64>";
       default: return "kern::logic::ActorHandle";
     }
   };
   // (an enum and a struct are the class's own: <Class>::Mode)
-  auto type = [&](PinType t, const std::string& of) -> std::string {
+  // (`owner`: how the class is named where the type is written - by its name in its namespace, from anywhere `rooted`)
+  std::function<std::string(PinType, const std::string&, const std::string&)> type_in = [&](PinType t, const std::string& of, const std::string& owner) -> std::string {
+    // (in a map or a set an Int is the class's: kern::logic::Whole, as in its lists)
+    // (an Int of a width as the value of a map: kern::logic::Sized<kern::u8>, as in a List<U8>)
+    auto inner = [&](const TypeRef& x) {
+      if (x.type == PinType::integer) return has_width(x) ? "kern::logic::Sized<kern::" + x.of + ">" : std::string("kern::logic::Whole");
+      return type_in(x.type, x.of, owner);
+    };
+    if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
+    if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
+    if (t == PinType::callback) {  // (kern::logic::Callback<kern::f64(kern::f64, kern::f64)>)
+      const TypeRef r = callback_result({t, of});
+      std::string c = "kern::logic::Callback<" + (r.type == PinType::exec ? std::string("void") : inner(r)) + "(";
+      const std::vector<TypeRef> in = callback_inputs({t, of});
+      for (std::size_t k = 0; k < in.size(); ++k) c += (k ? ", " : "") + inner(in[k]);
+      return c + ")>";
+    }
+    if (t == PinType::integer_list && width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
     if (element_of(t) != PinType::enumeration && element_of(t) != PinType::structure) return builtin(t);
-    return is_list(t) ? "kern::List<" + name + "::" + of + ">" : name + "::" + of;
+    return is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
   };
+  auto type = [&](PinType t, const std::string& of) { return type_in(t, of, name); };
   // (the notation's literal, outside the class: with the types' own names)
   std::function<std::string(const Value&, const std::string&)> spelled = [&](const Value& v, const std::string& of) -> std::string {
     if (v.type == PinType::enumeration) return name + "::" + literal(v, of, g);
@@ -4574,9 +5220,19 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       for (std::size_t k = 0; s && k < s->fields.size(); ++k) r += (k ? ", " : "") + spelled(field_of(v, *s, k, g), s->fields[k].type.of);
       return r + "}";
     }
+    if (is_keyed(v.type)) {
+      const TypeRef t{v.type, of}, key = key_type(t), val = v.type == PinType::map ? value_type(t) : TypeRef{};
+      std::string r = type(v.type, of) + "{";
+      for (std::size_t k = 0, n = v.size(); k < n; ++k) {
+        const std::string kt = spelled(key_value(v.keyed().key_at(k), key.type), key.of);
+        r += (k ? ", " : "") + (v.type == PinType::map ? "{" + kt + ", " + spelled(v.keyed().value_at(k), val.of) + "}" : kt);
+      }
+      return r + "}";
+    }
     const std::string text = literal(v);
     if (v.type == PinType::vector) return "kern::Vec3" + text.substr(6);
     if (v.type == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);
+    if (v.type == PinType::int64) return "kern::logic::" + text;   // (outside the class: Int64{0x1f} with its namespace)
     if (!is_list(v.type)) return text;
     std::string r = type(v.type, of) + "{";
     for (std::size_t k = 0, n = v.size(); k < n; ++k) r += (k ? ", " : "") + spelled(v.item(k), of);
@@ -4591,6 +5247,8 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     if (!st.from.empty()) continue;  // (a struct of a library is the library's type: its glue says how it is held)
     const std::string full = rooted + "::" + st.name;
     auto held = [&](const StructField& f) -> std::string {
+      if (is_keyed(f.type.type) || f.type.type == PinType::callback) return type_in(f.type.type, f.type.of, rooted);
+      if (is_list(f.type.type) && has_width(f.type)) return type_in(f.type.type, f.type.of, rooted);  // (a List<U8> ...: its items of that width)
       if (element_of(f.type.type) != PinType::enumeration && element_of(f.type.type) != PinType::structure) return builtin(f.type.type);
       return is_list(f.type.type) ? "kern::List<" + rooted + "::" + f.type.of + ">" : rooted + "::" + f.type.of;
     };
@@ -4615,6 +5273,10 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
   if (!structs.empty())
     structs = (space.empty() ? std::string() : "}  // namespace " + std::string(space) + "\n") + "namespace kern::logic::detail {\n" + structs + "}  // namespace kern::logic::detail\n" +
               (space.empty() ? std::string() : "namespace " + std::string(space) + " {\n");
+  if (held_only) {
+    out = structs;
+    return true;
+  }
   char hash[40];
   // (a Blueprint that uses libraries is registered as what runs: the one graph it is with them)
   Graph whole;
@@ -4680,8 +5342,9 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
                   "    using kern::logic::native_out;\n    (void)entry;\n" +
                   events +
                   "  }\n"
-                  "  bool call(std::string_view function, const std::vector<kern::logic::Value>& args, std::vector<kern::logic::Value>& results) override {\n"
+                  "  bool call(std::string_view function, std::span<const kern::logic::Value> args, kern::logic::Results& results) override {\n"
                   "    using kern::logic::native_arg;\n    using kern::logic::to_value;\n    (void)args;\n    results.clear();\n";
+  std::string kept;   // (the reference inputs of the calls by name: members - see below)
   for (const Function& f : g.functions) {
     if (f.external || !f.from.empty()) continue;  // (a function of another Blueprint, or of a library: nothing of it is here to call by name)
     // (a reference input: called by name it is a variable of the call that starts as the argument;
@@ -4690,12 +5353,21 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     // so that a host can measure the function's own work (logic::native_probe) -, then what it gave
     // is handed back. An input by value is moved in: the function gets it without a copy.
     std::string call = "self." + f.name + "(", places, changed;
+    bool busy = false;
     for (std::size_t k = 0; k < f.inputs.size(); ++k) {
       const std::string at = std::to_string(k);
       if (f.inputs[k].ref) {
         // (a variable of exactly the type the function takes: its reference binds to it)
+        // (it stays after the call, as the interpreter's variable of the call does, until the function is called by
+        // name again: what the call bound to it - a Callback it gave back - reads it there, not a place that ended)
         const std::string held = "kern::logic::NativeParam<&" + name + "::" + f.name + ", " + at + ">";
-        places += "      " + held + " place" + at + " = native_arg<" + held + ">(args, " + at + ", " + held + "{});\n";
+        const std::string member = "place_" + f.name + "_" + at;
+        // (a call by name inside such a call of the same function - the engine calls it again from within -: its own,
+        // as the interpreter keeps the outer call's variables)
+        kept += "  " + held + " " + member + "{};\n";
+        places += "      " + held + " inner" + at + "{};\n      auto& place" + at + " = busy_" + f.name + " ? inner" + at + " : " + member + ";\n      place" + at +
+                  " = native_arg<" + held + ">(args, " + at + ", " + held + "{});\n";
+        busy = true;
         if (!f.inputs[k].constant) changed += "      results.push_back(to_value(place" + at + "));\n";
       } else {
         const std::string held = type(f.inputs[k].type, f.inputs[k].of);
@@ -4704,6 +5376,11 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       call += std::string(k ? ", " : "") + (f.inputs[k].ref ? "place" + at : "std::move(in" + at + ")");
     }
     call += ")";
+    if (busy) {
+      kept += "  bool busy_" + f.name + " = false;\n";
+      places += "      const bool was_busy = busy_" + f.name + ";\n      busy_" + f.name + " = true;\n";
+      changed += "      busy_" + f.name + " = was_busy;\n";
+    }
     s += "    if (function == \"" + f.name + "\") {\n" + places + "      kern::logic::native_call(true);\n";
     if (f.outputs.empty()) {
       s += "      " + call + ";\n      kern::logic::native_call(false);\n";
@@ -4714,7 +5391,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     }
     s += changed + "      return true;\n    }\n";
   }
-  s += "    return false;\n  }\n"
+  s += "    return false;\n  }\n" + kept +
        "  bool get(std::string_view variable, kern::logic::Value& out) const override {\n    (void)out;\n";
   for (const Variable& v : g.variables) s += "    if (variable == \"" + v.name + "\") { out = kern::logic::to_value(self." + v.name + "); return true; }\n";
   s += "    return false;\n  }\n"

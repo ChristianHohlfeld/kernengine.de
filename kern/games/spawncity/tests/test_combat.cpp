@@ -9,11 +9,11 @@ using namespace sc::combat;
 namespace {
 /// The five rule actors of the level, bound for a test.
 struct CombatBlueprints {
-  sc::RuleBlueprint military{"Military", [](kern::logic::Instance* i) { sc::combat::bind_military(i); }};
-  sc::RuleBlueprint zombies{"Zombies", [](kern::logic::Instance* i) { sc::combat::bind_zombies(i); }};
-  sc::RuleBlueprint sandbox{"Sandbox", [](kern::logic::Instance* i) { sc::combat::bind_sandbox(i); }};
-  sc::RuleBlueprint fun{"Fun", [](kern::logic::Instance* i) { sc::combat::bind_fun(i); }};
-  sc::RuleBlueprint race{"Race", [](kern::logic::Instance* i) { sc::combat::bind_race(i); }};
+  sc::RuleBlueprint military{"Military", &sc::combat::bind_military};
+  sc::RuleBlueprint zombies{"Zombies", &sc::combat::bind_zombies};
+  sc::RuleBlueprint sandbox{"Sandbox", &sc::combat::bind_sandbox};
+  sc::RuleBlueprint fun{"Fun", &sc::combat::bind_fun};
+  sc::RuleBlueprint race{"Race", &sc::combat::bind_race};
 };
 }  // namespace
 
@@ -23,8 +23,8 @@ SC_TEST(combat_military_escalation) {
     SC_CHECK(bp->inst && bp->problems.empty() && !bp->inst->disabled(), "a combat rule Blueprint of the level compiles and runs: %s", bp->problems.c_str());
     SC_CHECK(bp->inst && std::string(bp->inst->tier()) == "native C++", "it runs as its C++ class");
   }
-  SC_CHECK(sc::combat::bind_military(rules.military.inst) && sc::combat::bind_zombies(rules.zombies.inst) && sc::combat::bind_sandbox(rules.sandbox.inst) &&
-               sc::combat::bind_fun(rules.fun.inst) && sc::combat::bind_race(rules.race.inst),
+  SC_CHECK(sc::combat::bind_military(rules.military.rt) && sc::combat::bind_zombies(rules.zombies.rt) && sc::combat::bind_sandbox(rules.sandbox.rt) &&
+               sc::combat::bind_fun(rules.fun.rt) && sc::combat::bind_race(rules.race.rt),
            "the game reads their tables");
   MilitaryClock m;
   SC_CHECK(m.update(0, 5, 40) == MilEvent::none, "five stars just reached: no army yet");
@@ -112,10 +112,9 @@ SC_TEST(combat_chaos_combo) {
   SC_CHECK(c.score == 250 + 500 + 750 && c.combo == 3, "combo within 3.2 s (%d)", c.score);
   c.award(100, 10);
   SC_CHECK(c.combo == 1, "combo lapses");
-  EnemyType t;
-  choose_enemy(4, 0.1f, 0, t);
+  EnemyType t = choose_enemy(4, 0.1f, 0);
   SC_CHECK(t == EnemyType::heavy, "four stars: a heavy now and then");
-  choose_enemy(1, 0.3f, 0, t);
+  t = choose_enemy(1, 0.3f, 0);
   SC_CHECK(t == EnemyType::cop, "one star: cops");
 }
 

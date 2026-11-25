@@ -488,6 +488,9 @@ sie **auf einem Actor** auf.
 - Aufrufe über Blueprints hinweg dürfen im Kreis gehen (A ruft B, B ruft A, eine Funktion sich
   selbst auf ihrem eigenen Actor): Jeder Aufruf hat seine eigenen Parameter und lokalen Variablen.
   Tiefer als 64 ineinander geht es nicht – der Aufruf entfällt dann und wird gemeldet.
+- **Ob er einen hat:** der Wert-Knoten **Has Blueprint** (unter *Functions*) sagt, ob Target – ohne
+  Target das Level – einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt): den, den Call on
+  Actor und Get Variable on Actor dann erreichen.
 
 ### Typen des Projekts (Aufzählungen und Strukturen, die mehrere Blueprints haben)
 
@@ -701,7 +704,7 @@ Compile-Fehler mit Stelle und Grund.
 |---|---|
 | Operatoren | `+ - * / %`, `^` (Potenz), Vorzeichen `-`, `!` |
 | Vergleiche | `< <= > >= == !=` ergeben 1 oder 0; `&&`, `||`; `a ? b : c` |
-| Funktionen | `min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log lerp(a, b, t)` |
+| Funktionen | `min max clamp(x, lo, hi) abs sign floor ceil round trunc sqrt pow(x, y) exp log lerp(a, b, t)`; `copysign(x, s)`: der Betrag von x mit dem Vorzeichen von s, auch dem von −0 (`copysign(1, -0)` ist −1) |
 | Winkel | `sin cos tan asin acos atan atan2(y, x)` in Radiant; `rad(grad)`, `deg(radiant)`; `pi` |
 | Ganze Zahlen, wie eine Maschine sie hat | Bits: `band(a, b)`, `bor(a, b)`, `bxor(a, b)`, `shl(a, n)`, `shr(a, n)`; 32 Bit: `wrap32(x)` (was eine vorzeichenlose 32-Bit-Zahl davon hält: 0 … 4294967295), `wrap32s(x)` (mit Vorzeichen), `mul32(a, b)` (das Produkt, wie 32 Bit es halten) – für Hashes und Paketformate; `single(x)`: die Zahl, wie eine 32-Bit-Kommazahl sie hält (was die Komponente eines Vektors ist) |
 

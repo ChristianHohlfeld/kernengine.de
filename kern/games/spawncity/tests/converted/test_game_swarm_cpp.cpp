@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,8 +35,9 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class FunEvent : u8 { tick, world_kill_person, world_kill_car, world_kill_bus, world_kill_player, police_kill, emp, escape, damage, drone_destroyed, player_death, cycle_contract };
+namespace combat { enum class FunEvent : u8 { tick, world_kill_person, world_kill_car, world_kill_bus, world_kill_player, police_kill, emp, escape, damage, drone_destroyed, player_death, cycle_contract }; }
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+namespace net { enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy }; }
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -44,15 +45,14 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
-enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy };
 struct PoliceDrone {
   bool active = false, sees = false, emp = false, retreating = false;
   Vec3 pos, vel, target, retreat_goal;
   f32 hp = 100, yaw = 0, next_sensor = 0, next_shot = 0, sight_since = 0, destroyed_until = -1, retreat_until = -1, distance = 0, roof = 0, roof_at = -1;
   u32 shots = 0, serial = 0;
 };
-bool is_person(SwarmKind k) { return k == SwarmKind::zombie || k == SwarmKind::soldier || k == SwarmKind::officer || k == SwarmKind::enemy; }
-bool falls(SwarmKind k) { return k == SwarmKind::officer || k == SwarmKind::enemy; }
+bool is_person(net::SwarmKind k) { return k == net::SwarmKind::zombie || k == net::SwarmKind::soldier || k == net::SwarmKind::officer || k == net::SwarmKind::enemy; }
+bool falls(net::SwarmKind k) { return k == net::SwarmKind::officer || k == net::SwarmKind::enemy; }
 u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 1); }
 #undef private
 #undef protected
@@ -83,7 +83,7 @@ u16 drone_id(const PoliceDrone& d) { return static_cast<u16>(d.serial % 65535 + 
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const PoliceDrone& s) { return converted::Value::structure({arg(s.active), arg(s.sees), arg(s.emp), arg(s.retreating), arg(s.pos), arg(s.vel), arg(s.target), arg(s.retreat_goal), arg(s.hp), arg(s.yaw), arg(s.next_sensor), arg(s.next_shot), arg(s.sight_since), arg(s.destroyed_until), arg(s.retreat_until), arg(s.distance), arg(s.roof), arg(s.roof_at), arg(s.shots), arg(s.serial)}); }
-[[maybe_unused]] static bool same(const PoliceDrone& want, const converted::Value& got) { return got.rows && got.rows->size() == 20 && same(want.active, (*got.rows)[0]) && same(want.sees, (*got.rows)[1]) && same(want.emp, (*got.rows)[2]) && same(want.retreating, (*got.rows)[3]) && same(want.pos, (*got.rows)[4]) && same(want.vel, (*got.rows)[5]) && same(want.target, (*got.rows)[6]) && same(want.retreat_goal, (*got.rows)[7]) && same(want.hp, (*got.rows)[8]) && same(want.yaw, (*got.rows)[9]) && same(want.next_sensor, (*got.rows)[10]) && same(want.next_shot, (*got.rows)[11]) && same(want.sight_since, (*got.rows)[12]) && same(want.destroyed_until, (*got.rows)[13]) && same(want.retreat_until, (*got.rows)[14]) && same(want.distance, (*got.rows)[15]) && same(want.roof, (*got.rows)[16]) && same(want.roof_at, (*got.rows)[17]) && same(want.shots, (*got.rows)[18]) && same(want.serial, (*got.rows)[19]); }
+[[maybe_unused]] static bool same(const PoliceDrone& want, const converted::Value& got) { return converted::rows_of(got, 20) && converted::at_place(same(want.active, (*got.rows)[0]), ".active") && converted::at_place(same(want.sees, (*got.rows)[1]), ".sees") && converted::at_place(same(want.emp, (*got.rows)[2]), ".emp") && converted::at_place(same(want.retreating, (*got.rows)[3]), ".retreating") && converted::at_place(same(want.pos, (*got.rows)[4]), ".pos") && converted::at_place(same(want.vel, (*got.rows)[5]), ".vel") && converted::at_place(same(want.target, (*got.rows)[6]), ".target") && converted::at_place(same(want.retreat_goal, (*got.rows)[7]), ".retreat_goal") && converted::at_place(same(want.hp, (*got.rows)[8]), ".hp") && converted::at_place(same(want.yaw, (*got.rows)[9]), ".yaw") && converted::at_place(same(want.next_sensor, (*got.rows)[10]), ".next_sensor") && converted::at_place(same(want.next_shot, (*got.rows)[11]), ".next_shot") && converted::at_place(same(want.sight_since, (*got.rows)[12]), ".sight_since") && converted::at_place(same(want.destroyed_until, (*got.rows)[13]), ".destroyed_until") && converted::at_place(same(want.retreat_until, (*got.rows)[14]), ".retreat_until") && converted::at_place(same(want.distance, (*got.rows)[15]), ".distance") && converted::at_place(same(want.roof, (*got.rows)[16]), ".roof") && converted::at_place(same(want.roof_at, (*got.rows)[17]), ".roof_at") && converted::at_place(same(want.shots, (*got.rows)[18]), ".shots") && converted::at_place(same(want.serial, (*got.rows)[19]), ".serial"); }
 [[maybe_unused]] static bool defined(const PoliceDrone& s) { return defined(s.active) && defined(s.sees) && defined(s.emp) && defined(s.retreating) && defined(s.pos) && defined(s.vel) && defined(s.target) && defined(s.retreat_goal) && defined(s.hp) && defined(s.yaw) && defined(s.next_sensor) && defined(s.next_shot) && defined(s.sight_since) && defined(s.destroyed_until) && defined(s.retreat_until) && defined(s.distance) && defined(s.roof) && defined(s.roof_at) && defined(s.shots) && defined(s.serial); }
 [[maybe_unused]] static std::string text(const PoliceDrone& s) { return std::string("{") + text(s.active) + ", " + text(s.sees) + ", " + text(s.emp) + ", " + text(s.retreating) + ", " + text(s.pos) + ", " + text(s.vel) + ", " + text(s.target) + ", " + text(s.retreat_goal) + ", " + text(s.hp) + ", " + text(s.yaw) + ", " + text(s.next_sensor) + ", " + text(s.next_shot) + ", " + text(s.sight_since) + ", " + text(s.destroyed_until) + ", " + text(s.retreat_until) + ", " + text(s.distance) + ", " + text(s.roof) + ", " + text(s.roof_at) + ", " + text(s.shots) + ", " + text(s.serial) + "}"; }
 [[maybe_unused]] static void take(PoliceDrone& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 20) return; converted::take_as<bool>(s.active, (*v.rows)[0]); converted::take_as<bool>(s.sees, (*v.rows)[1]); converted::take_as<bool>(s.emp, (*v.rows)[2]); converted::take_as<bool>(s.retreating, (*v.rows)[3]); converted::take_as<Vec3>(s.pos, (*v.rows)[4]); converted::take_as<Vec3>(s.vel, (*v.rows)[5]); converted::take_as<Vec3>(s.target, (*v.rows)[6]); converted::take_as<Vec3>(s.retreat_goal, (*v.rows)[7]); converted::take_as<double>(s.hp, (*v.rows)[8]); converted::take_as<double>(s.yaw, (*v.rows)[9]); converted::take_as<double>(s.next_sensor, (*v.rows)[10]); converted::take_as<double>(s.next_shot, (*v.rows)[11]); converted::take_as<double>(s.sight_since, (*v.rows)[12]); converted::take_as<double>(s.destroyed_until, (*v.rows)[13]); converted::take_as<double>(s.retreat_until, (*v.rows)[14]); converted::take_as<double>(s.distance, (*v.rows)[15]); converted::take_as<double>(s.roof, (*v.rows)[16]); converted::take_as<double>(s.roof_at, (*v.rows)[17]); converted::take_as<unsigned int>(s.shots, (*v.rows)[18]); converted::take_as<unsigned int>(s.serial, (*v.rows)[19]); }
@@ -93,49 +93,64 @@ SC_TEST(converted_game_swarm_cpp) {
   {  // is_person
     converted::Tally tally("is_person");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted::counted([&] { return converted_game_swarm_cpp::is_person(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] net::SwarmKind& a0) { return converted::counted([&] { return converted_game_swarm_cpp::is_person(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const SwarmKind a0 = static_cast<SwarmKind>(draw.below(8));
+      net::SwarmKind a0 = converted::enum_value<net::SwarmKind>(draw.below(8));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // falls
     converted::Tally tally("falls");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] SwarmKind a0) { return converted::counted([&] { return converted_game_swarm_cpp::falls(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] net::SwarmKind& a0) { return converted::counted([&] { return converted_game_swarm_cpp::falls(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const SwarmKind a0 = static_cast<SwarmKind>(draw.below(8));
+      net::SwarmKind a0 = converted::enum_value<net::SwarmKind>(draw.below(8));
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // drone_id
     converted::Tally tally("drone_id");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] PoliceDrone a0) { return converted::counted([&] { return converted_game_swarm_cpp::drone_id(a0); }); };
+    const auto run = [&]([[maybe_unused]] PoliceDrone& a0) { return converted::counted([&] { return converted_game_swarm_cpp::drone_id(a0); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const PoliceDrone a0 = draw_PoliceDrone(draw);
+      PoliceDrone a0 = draw_PoliceDrone(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

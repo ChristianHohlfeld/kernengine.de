@@ -11,6 +11,7 @@
 #include "gl_stub.h"
 #include "kern/kern.h"
 #include "kern/physics/physics.h"
+#include "kern/core/jobs.h"
 #include "kern/core/json.h"
 #include "kern/game/demos.h"
 #include "kern/audio/synth.h"
@@ -27,7 +28,10 @@
 #include "kern/studio/studio.h"
 #include "kern/net/client_server.h"
 #include "kern/game/net_game.h"
+#include "kern/logic/actor_blueprint.h"
+#include "kern/logic/blueprint.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/engine_host.h"
 #include "blueprint_native.h"
 #include "game_cases.h"
 #include "kern/logic/nodes.h"
@@ -35,6 +39,7 @@
 #include "../src/game/soldier_models.h"
 
 #include <algorithm>
+#include <bit>
 #include <memory>
 
 using namespace kern;
@@ -113,13 +118,13 @@ TEST(math_matrices) {
 TEST(math_camera) {
   const Vec3 eye{10, -5, 4}, target{0, 3, 1};
   bool ok = false;
-  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, &ok);
+  const Mat4 view = Mat4::look_at(eye, target, {0, 0, 1}, ok);
   CHECK(ok);
   const Mat4 vp = Mat4::perspective(1.0f, 1.6f, 0.1f, 500.0f) * view;
   const Vec4 c = vp.transform({target, 1});
   CHECK_NEAR(c.x / c.w, 0.0f, 1e-5f);
   CHECK_NEAR(c.y / c.w, 0.0f, 1e-5f);
-  Mat4::look_at(eye, eye, {0, 0, 1}, &ok);
+  Mat4::look_at(eye, eye, {0, 0, 1}, ok);
   CHECK(!ok);
   const Frustum f = Frustum::from_matrix(vp);
   CHECK(f.sphere_visible({target, 1}));
@@ -221,6 +226,16 @@ TEST(weld_and_hash) {
   CHECK(soup.indices.size() == 36);
   CHECK(s.bytes_after < s.bytes_before);
   CHECK(content_hash(soup) != hash);
+  // a soup whose streams do not have one entry per vertex is not read past its ends: it stays as it is
+  for (int cut = 0; cut < 4; ++cut) {
+    MeshData bad;
+    for (u32 i : cube.indices) bad.push(Vec3::load(&cube.positions[i * 3]), Vec3::load(&cube.normals[i * 3]), {1, 1, 1}, {0, 0});
+    std::vector<f32>* streams[4] = {&bad.normals, &bad.colors, &bad.uvs, &bad.positions};
+    streams[cut]->resize(cut == 3 ? streams[cut]->size() - 1 : 1);
+    const u32 before = content_hash(bad);
+    const WeldStats w = weld(bad);
+    CHECK(!w.indexed && w.unique_vertices == 0 && bad.indices.empty() && content_hash(bad) == before);
+  }
   MeshData a = primitives::box({1, 1, 1}), b = primitives::box({1, 1, 1});
   CHECK(content_hash(a) == content_hash(b));
   b.positions[0] += 1e-3f;
@@ -373,8 +388,12 @@ TEST(renderer_frame) {
   in.material = Material{};
   in.material.viewmodel = true;
   CHECK(r.upsert(gun, in));
-  r.camera.eye = {0, 10, 5};
-  r.camera.target = {0, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 10, 5};
+    cam.target = {0, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   const u64 uniforms_before = g_gl.uniform_calls;
   CHECK(r.render({}, s));
@@ -432,8 +451,12 @@ TEST(renderer_lines_and_layers) {
   li.material.lines = true;
   li.layers = 1;
   CHECK(r.upsert(lines, li));
-  r.camera.eye = {0, 12, 4};
-  r.camera.target = {2, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 12, 4};
+    cam.target = {2, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   RenderParams p;
   p.layers = 1;
@@ -453,7 +476,7 @@ TEST(renderer_lines_and_layers) {
   PickHit hit;
   PickQuery q;
   q.layers = 2;
-  const Ray to_a{r.camera.eye, normalize(Vec3{0, 0, 0} - r.camera.eye)};
+  const Ray to_a{r.camera().eye, normalize(Vec3{0, 0, 0} - r.camera().eye)};
   CHECK(!r.pick_ray(to_a, q, hit) || hit.mesh == b);
   q.layers = 1;
   CHECK(r.pick_ray(to_a, q, hit));
@@ -622,8 +645,12 @@ TEST(renderer_instance_updates) {
   MeshInput in = input_of(boxd);
   in.transforms = Span<const f32>(t.data(), t.size());
   CHECK(r.upsert(a, in));
-  r.camera.eye = {0, 10, 5};
-  r.camera.target = {0, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 10, 5};
+    cam.target = {0, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   CHECK(r.render({}, s));
   CHECK(r.render({}, s) && s.shadow_reused);
@@ -676,8 +703,12 @@ TEST(renderer_mirrored_instances) {
   in.transforms = Span<const f32>(mirror.m, 16);
   CHECK(r.upsert(a, in));
   CHECK(r.mesh(a)->mirror == 1 && r.mesh(a)->cull_mode() == 2);
-  r.camera.eye = {0, 10, 5};
-  r.camera.target = {0, 0, 0};
+  {
+    Camera cam = r.camera();
+    cam.eye = {0, 10, 5};
+    cam.target = {0, 0, 0};
+    r.set_camera(cam);
+  }
   RenderStats s;
   const u64 front = g_gl.cull_front;
   CHECK(r.render({}, s));
@@ -1171,13 +1202,17 @@ TEST(renderer_orthographic_camera) {
   const MeshData box = primitives::box({2, 2, 2});
   const u32 id = r.allocate_id();
   CHECK(r.upsert(id, input_of(box)));
-  r.camera.orthographic = true;
-  r.camera.ortho_height = 10;
-  r.camera.eye = {0, 0, 50};
-  r.camera.target = {0, 0, 0};
-  r.camera.up = {0, 1, 0};
-  r.camera.near = 0.1f;
-  r.camera.far = 200;
+  {
+    Camera cam = r.camera();
+    cam.orthographic = true;
+    cam.ortho_height = 10;
+    cam.eye = {0, 0, 50};
+    cam.target = {0, 0, 0};
+    cam.up = {0, 1, 0};
+    cam.near = 0.1f;
+    cam.far = 200;
+    r.set_camera(cam);
+  }
   RenderStats s;
   CHECK(r.render({}, s));
   CHECK(s.draw_calls == 1);
@@ -1192,7 +1227,11 @@ TEST(renderer_orthographic_camera) {
   CHECK(r.pick(200, 100, {}, hit));
   CHECK(hit.mesh == id);
   CHECK(!r.pick(390, 100, {}, hit));
-  r.camera.ortho_height = 0;
+  {
+    Camera cam = r.camera();
+    cam.ortho_height = 0;
+    r.set_camera(cam);
+  }
   CHECK(!r.render({}, s));  // invalid projection is rejected
   r.shutdown();
 }
@@ -1395,7 +1434,7 @@ TEST(game_world_presentation) {
   l.world.time_of_day = 0.5f;
   f.world->sync(l);
   CHECK(f.world->apply_lighting({0, 0, 10}) < 0.01f);
-  CHECK(f.renderer.lighting.sun_direction.z > 0.9f);
+  CHECK(f.renderer.lighting().sun_direction.z > 0.9f);
   l.world.time_of_day = 0.0f;
   f.world->sync(l);
   CHECK(f.world->apply_lighting({0, 0, 10}) > 0.99f);
@@ -2000,6 +2039,12 @@ TEST(logic_formulas) {
   CHECK(value("min(3, 4) + max(3, 4) + clamp(9, 0, 5) + abs(-2) + sign(-3)") == 13);
   CHECK(value("floor(2.7) + ceil(2.1) + round(2.5) + trunc(-2.7)") == 6 && value("sqrt(16) + sqrt(-4) + log(-1)") == 4);
   CHECK(value("lerp(10, 20, 0.25)") == 12.5);
+  // copysign: the size of one with the sign bit of the other - also of -0 (where sign() says 0)
+  CHECK(value("copysign(2, -1)") == -2 && value("copysign(-2, 1)") == 2 && value("copysign(1, -0)") == -1 && value("copysign(1, 0)") == 1 && value("sign(-0)") == 0);
+  CHECK(std::signbit(value("copysign(0, -5)")) && !std::signbit(value("copysign(-0, 5)")));
+  // remainder: IEEE 754's - x - n * y, n the whole number nearest x / y (of two, the even one); by 0 it is 0
+  CHECK(value("remainder(370, 360)") == 10 && value("remainder(190, 360)") == -170 && value("remainder(180, 360)") == 180 && value("remainder(540, 360)") == -180);
+  CHECK(value("remainder(-190, 360)") == 170 && value("remainder(5.5, 2)") == -0.5 && value("remainder(7, 0)") == 0 && std::signbit(value("remainder(-720, 360)")));
   // whole numbers as a machine has them: bits, and arithmetic that wraps around at 32 bit
   CHECK(value("band(12, 10)") == 8 && value("bor(12, 10)") == 14 && value("bxor(12, 10)") == 6 && value("band(-1, 255)") == 255);
   CHECK(value("shl(1, 31)") == 2147483648.0 && value("shr(256, 4)") == 16 && value("shr(-16, 2)") == -4 && value("shl(1, 64)") == 0);
@@ -2077,6 +2122,92 @@ TEST(logic_formulas) {
   const logic::Graph bad = logic_graph(R"({"nodes":[{"id":1,"type":"math.formula","params":{"formula":"1 +"}}]})");
   bool said = false;
   for (const logic::Issue& i : logic::check(bad)) said |= i.error && i.node == 1 && i.text.find("ends too early") != std::string::npos;
+  CHECK(said);
+}
+
+TEST(logic_bytes_of_struct) {
+  // the layout: the size, then each field's number and where it begins
+  const logic::bytes::Layout l = logic::bytes::layout("20: u32@0 u16@4 u16@6 i16@8 i16@10 i16@12 u16@14 u16@16 u16@18");
+  CHECK(l.error == nullptr && l.size == 20 && l.count == 9 && l.fields[3].code == logic::bytes::Code::i16 && l.fields[3].at == 8);
+  for (const char* bad : {"", "20", "20 u32@0", "0: u8@0", "70000: u8@0", "4: u24@0", "4: u32", "4: u32@1", "4: u16@0 u16@1", "4:"})
+    CHECK(logic::bytes::layout(bad).error != nullptr);
+  // a frame of a wire protocol (NAV1): its bytes as C++ lays them out, and back
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  const logic::Graph g = logic_graph(R"({"structs":[{"name":"Frame","fields":[{"name":"Magic","type":"int","value":1447121230},{"name":"Seq","type":"int","value":513},
+      {"name":"Vx","type":"int","value":-3},{"name":"On","type":"bool","value":true},{"name":"Speed","type":"float","value":0.1},{"name":"Key","type":"int64","value":"18364758544493064720"}]}],
+    "variables":[{"name":"B","type":"int_list","of":"u8","value":[]},{"name":"Back","type":"struct","of":"Frame","value":{}}],
+    "nodes":[{"id":1,"type":"event.custom","params":{"name":"Go"}},{"id":2,"type":"var.set","params":{"variable":"B"}},
+      {"id":3,"type":"struct.bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},{"id":4,"type":"struct.make","params":{"struct":"Frame"}},
+      {"id":5,"type":"var.set","params":{"variable":"Back"}},{"id":6,"type":"struct.of_bytes","params":{"struct":"Frame","layout":"24: u32@0 u16@4 i16@6 bool@8 f32@9 u64@16"}},
+      {"id":7,"type":"var.get","params":{"variable":"B"}}],
+    "links":[[1,"then",2,"exec"],[4,"value",3,"value"],[3,"bytes",2,"value"],[2,"then",5,"exec"],[7,"value",6,"bytes"],[6,"value",5,"value"]]})");
+  CHECK(no_errors(logic::check(g)));
+  logic::Instance* inst = rt.add(g, 0, "Level");
+  rt.begin();
+  rt.call("Go");
+  const std::vector<i64> want = {78, 81, 65, 86, 1, 2, 253, 255, 1, 205, 204, 204, 61, 0, 0, 0, 16, 50, 84, 118, 152, 186, 220, 254};
+  CHECK(inst->get("B").items<i64>() == want);
+  const logic::Value back = inst->get("Back");
+  CHECK(back.field(0) && back.field(0)->as_int() == 1447121230 && back.field(1)->as_int() == 513 && back.field(2)->as_int() == -3 && back.field(3)->as_bool());
+  CHECK(back.field(4) && back.field(4)->as_number() == static_cast<f64>(0.1f) && static_cast<u64>(back.field(5)->i) == 0xfedcba9876543210ull);
+  // what does not suit the struct is an error of the graph
+  const logic::Graph wrong = logic_graph(R"({"structs":[{"name":"P","fields":[{"name":"A","type":"float","value":0}]}],
+    "nodes":[{"id":1,"type":"struct.bytes","params":{"struct":"P","layout":"4: i32@0"}}]})");
+  bool said = false;
+  for (const logic::Issue& i : logic::check(wrong)) said |= i.error && i.node == 1 && i.text.find("does not suit") != std::string::npos;
+  CHECK(said);
+}
+
+TEST(logic_copy_bytes) {
+  // Copy Bytes is std::memcpy between lists of numbers: what it makes of them is what memcpy makes
+  // of the same numbers in C++ - floats into bytes, bytes into floats and whole numbers (the last
+  // written in part), an Int64 into bytes beyond their end, a list into itself (as memmove).
+  using logic::bytes::Code;
+  const f32 floats[3] = {0.1f, -2.5f, 1e30f};
+  u8 raw[12] = {7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7};
+  std::memcpy(raw + 1, floats, 10);
+  std::vector<i64> bytes(12, 7);
+  const std::vector<f64> held = {static_cast<f64>(floats[0]), static_cast<f64>(floats[1]), static_cast<f64>(floats[2])};
+  logic::bytes::copy(bytes.data(), bytes.size(), Code::u8, 1, held.data(), held.size(), Code::f32, 0, 10);
+  for (int k = 0; k < 12; ++k) CHECK(bytes[static_cast<std::size_t>(k)] == raw[k]);
+  // back: 6 bytes from the second on into floats (the second float keeps its upper two bytes)
+  f32 back[2] = {9.0f, 9.0f};
+  std::memcpy(back, raw + 2, 6);
+  std::vector<f64> into = {9.0, 9.0};
+  logic::bytes::copy(into.data(), into.size(), Code::f32, 0, bytes.data(), bytes.size(), Code::u8, 2, 6);
+  CHECK(std::bit_cast<u32>(static_cast<f32>(into[0])) == std::bit_cast<u32>(back[0]) && std::bit_cast<u32>(static_cast<f32>(into[1])) == std::bit_cast<u32>(back[1]));
+  // into whole numbers of 16 bits with a sign, and of 32 without
+  i16 shorts[3] = {1, 2, 3};
+  std::memcpy(shorts, raw + 1, 5);
+  std::vector<i64> whole = {1, 2, 3};
+  logic::bytes::copy(whole.data(), whole.size(), Code::i16, 0, bytes.data(), bytes.size(), Code::u8, 1, 5);
+  for (int k = 0; k < 3; ++k) CHECK(whole[static_cast<std::size_t>(k)] == shorts[k]);
+  // an Int64 into bytes: what is beyond the list is not written, what is before it is not either
+  const u64 big = 0xfedcba9876543210ull;
+  std::vector<i64> short_bytes(5, 0);
+  const std::vector<logic::Int64> wide = {logic::Int64(big)};
+  logic::bytes::copy(short_bytes.data(), short_bytes.size(), Code::u8, -2, wide.data(), wide.size(), Code::u64, 0, 8);
+  for (int k = 0; k < 5; ++k) CHECK(static_cast<u64>(short_bytes[static_cast<std::size_t>(k)]) == ((big >> (8 * (k + 2))) & 0xffu));
+  // no bytes: nothing; a list into itself, up and down (as memmove)
+  std::vector<i64> self = {1, 2, 3, 4};
+  logic::bytes::copy(self.data(), self.size(), Code::u32, 0, self.data(), self.size(), Code::u32, 0, 0);
+  CHECK((self == std::vector<i64>{1, 2, 3, 4}));
+  u32 moved[4] = {1, 2, 3, 4};
+  std::memmove(moved + 1, moved, 8);
+  std::vector<i64> down = {1, 2, 3, 4};
+  logic::bytes::copy(down.data(), down.size(), Code::u32, 1, down.data(), down.size(), Code::u32, 0, 8);
+  for (int k = 0; k < 4; ++k) CHECK(down[static_cast<std::size_t>(k)] == moved[k]);
+  u32 moved_back[4] = {1, 2, 3, 4};
+  std::memmove(moved_back, moved_back + 1, 12);
+  std::vector<i64> back_down = {1, 2, 3, 4};
+  logic::bytes::copy(back_down.data(), back_down.size(), Code::u32, 0, back_down.data(), back_down.size(), Code::u32, 1, 12);
+  for (int k = 0; k < 4; ++k) CHECK(back_down[static_cast<std::size_t>(k)] == moved_back[k]);
+  // the node on a graph: the list's numbers suit its setting, or the check says so
+  const logic::Graph wrong = logic_graph(R"({"variables":[{"name":"G","type":"float_list","value":[]}],
+    "nodes":[{"id":1,"type":"list.copy_bytes","params":{"variable":"G","code":"i32","from_code":"u8"}}]})");
+  bool said = false;
+  for (const logic::Issue& i : logic::check(wrong)) said |= i.error && i.node == 1 && i.text.find("are not i32") != std::string::npos;
   CHECK(said);
 }
 
@@ -2163,6 +2294,199 @@ TEST(logic_local_variables) {
   CHECK(error.find("line 7") != std::string::npos);
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  Float L = 0.0;\n  void F() {\n    Float L = 1.0;\n  }\n};\n", none, nullptr, &error));
   CHECK(error.find("local variable L") != std::string::npos);
+}
+
+TEST(logic_end_play) {
+  // End Play runs once when play stops (Runtime::end) or the actor is taken out (remove) - after it began, in
+  // every stage the same; as C++ notation: KERN_EVENT(onN, event_end).
+  const char* text = R"kn(
+struct Ends : kern::Blueprint {
+  Int Began = 0;
+  Int Ended = 0;
+
+  KERN_EVENT(on1, event_begin)
+  void on1() {
+    Began += 1;
+  }
+
+  KERN_EVENT(on2, event_end)
+  void on2() {
+    Ended = kern::to<Int>(math_add(kern::to<Float>(Began), 10.0));
+  }
+};
+)kn";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  std::string again;
+  CHECK(logic::to_cpp(g, "Ends", again, &error) && again.find("KERN_EVENT(on2, event_end)") != std::string::npos);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* a = rt.add(g, 7, "A");
+    logic::Instance* b = rt.add(g, 8, "B");
+    logic::Instance* late = rt.add(g, 9, "Late");
+    CHECK(a && b && late);
+    if (!a || !b || !late) continue;
+    rt.begin();
+    rt.remove(9);   // (it began: its End Play runs as it goes)
+    CHECK(a->get("Ended").i == 0 && b->get("Ended").i == 0);
+    rt.end();
+    CHECK(a->get("Ended").i == 11 && b->get("Ended").i == 11);
+    a->set("Ended", logic::Value::integer(0));
+    rt.end();   // (once)
+    CHECK(a->get("Ended").i == 0);
+    logic::Instance* fresh = rt.add(g, 10, "Fresh");
+    rt.end();   // (it never began: no End Play)
+    CHECK(fresh && fresh->get("Ended").i == 0 && fresh->get("Began").i == 0);
+  }
+}
+
+TEST(logic_call_on_actor_by_its_name) {
+  // A function of another Blueprint named here otherwise (KERN_EXTERN_AS): Call on Actor calls it by the
+  // name that Blueprint has it under - two actors' "Stars" that look different, each named by its actor.
+  const char* level_text = R"kn(
+struct Level : kern::Blueprint {
+  struct StarsResult { Int stars = -1; };
+  StarsResult Stars(Int base = 1) {
+    return {kern::to<Int>(math_add(kern::to<Float>(base), 10.0))};
+  }
+};
+)kn";
+  const char* caller_text = R"kn(
+struct Caller : kern::Blueprint {
+  Int Got = 0;
+
+  struct Level_StarsResult { Int stars = 3; };
+  /// (of the Level, called on it)
+  KERN_EXTERN_AS("Stars") Level_StarsResult Level_Stars(Int base = 1);
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Level_Stars">(Actor{0}, kern::out(n2.stars), kern::to<Int>(value));
+    Got = n2.stars;
+  }
+
+  struct { Int stars = 0; } n2;
+};
+)kn";
+  logic::Graph level, caller;
+  std::string error;
+  CHECK(logic::from_cpp(level_text, level, nullptr, &error) && logic::from_cpp(caller_text, caller, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(caller.function("Level_Stars") && caller.function("Level_Stars")->external && caller.function("Level_Stars")->remote == "Stars");
+  CHECK(no_errors(logic::check(caller)));
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(caller), back) && back == caller);
+  std::string text;
+  CHECK(logic::to_cpp(caller, "Caller", text, &error) && text.find("  KERN_EXTERN_AS(\"Stars\") Level_StarsResult Level_Stars(Int base = 1);\n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == caller);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* lv = rt.add(level, 0, "Level");
+    logic::Instance* c = rt.add(caller, 7, "Caller");
+    CHECK(lv && c);
+    if (!lv || !c) continue;
+    rt.begin();
+    rt.call("Ask", 7, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("Got").i == 14);
+  }
+  // (a name of another Blueprint's function is only for a function of another Blueprint)
+  logic::Graph bad = level;
+  bad.functions[0].remote = "Other";
+  CHECK(!logic::graph_from_json(logic::graph_to_json(bad), back));
+}
+
+TEST(logic_actor_find_by_the_host) {
+  // Find Actor by Name asks the host (logic::Host::find_actor) - in the interpreter, with the JIT and in a
+  // Blueprint's class alike. A host without a world that names actors of its own: two instances of one
+  // Blueprint by their names, and Call on Actor and Get Variable on Actor reach each of them.
+  CHECK(game::logic_nodes_registered());
+  const char* guard_text = R"kn(
+struct Guard : kern::Blueprint {
+  Float Speed = 1.0;
+
+  struct TwiceResult { Float out = 0.0; };
+  TwiceResult Twice(Float x = 0.0) {
+    return {math_add(math_mul(x, 2.0), Speed)};
+  }
+};
+)kn";
+  const char* asker_text = R"kn(
+struct Asker : kern::Blueprint {
+  Float GotA = 0.0;
+  Float GotB = 0.0;
+  Float SpeedA = 0.0;
+  Float SpeedB = 0.0;
+  Float Nobody = 0.0;
+
+  struct TwiceResult { Float out = -1.0; };
+  KERN_EXTERN TwiceResult Twice(Float x = 0.0);
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Twice">(actor_find("A"), kern::out(n2.out), 10.0);
+    GotA = n2.out;
+    func_call_on<"Twice">(actor_find("B"), kern::out(n4.out), 10.0);
+    GotB = n4.out;
+    SpeedA = func_get_on<"Speed", Float>(actor_find("A"));
+    SpeedB = func_get_on<"Speed", Float>(actor_find("B"));
+    Nobody = func_get_on<"Speed", Float>(actor_find("C"));
+  }
+
+  struct { Float out = 0.0; } n2;
+  struct { Float out = 0.0; } n4;
+};
+)kn";
+  struct NamingHost : FakeLogicHost {
+    logic::ActorRef find_actor(std::string_view name) override { return name == "A" ? 7 : name == "B" ? 8 : 0; }
+  };
+  logic::Graph guard, asker;
+  std::string error;
+  CHECK(logic::from_cpp(guard_text, guard, nullptr, &error));
+  CHECK(logic::from_cpp(asker_text, asker, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(guard)) && no_errors(logic::check(asker)));
+  for (bool jit : {false, true}) {
+    NamingHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::Instance* a = rt.add(guard, 7, "Guard A");
+    logic::Instance* b = rt.add(guard, 8, "Guard B");
+    logic::Instance* asking = rt.add(asker, 9, "Asker");
+    CHECK(a && b && asking);
+    if (!a || !b || !asking) continue;
+    rt.begin();
+    CHECK(a->set("Speed", logic::Value::number(3)) && b->set("Speed", logic::Value::number(5)));
+    rt.call("Ask", 9);
+    CHECK_NEAR(asking->get("GotA").as_number(), 23.0, 1e-12);
+    CHECK_NEAR(asking->get("GotB").as_number(), 25.0, 1e-12);
+    CHECK_NEAR(asking->get("SpeedA").as_number(), 3.0, 1e-12);
+    CHECK_NEAR(asking->get("SpeedB").as_number(), 5.0, 1e-12);
+    // a name the host does not know: no actor - the Level's Blueprint, and there is none (the zero)
+    CHECK_NEAR(asking->get("Nobody").as_number(), 0.0, 1e-12);
+    CHECK(host.errors.empty());
+  }
+  // ... and a host that names none (the default): no actor, no call reaches a Guard
+  {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    logic::Instance* a = rt.add(guard, 7, "Guard A");
+    logic::Instance* asking = rt.add(asker, 9, "Asker");
+    CHECK(a && asking);
+    if (a && asking) {
+      rt.begin();
+      rt.call("Ask", 9);
+      CHECK_NEAR(asking->get("GotA").as_number(), -1.0, 1e-12);
+      CHECK_NEAR(asking->get("SpeedA").as_number(), 0.0, 1e-12);
+    }
+  }
 }
 
 TEST(logic_call_on_actor) {
@@ -2296,6 +2620,208 @@ struct Cop : kern::Blueprint {
   CHECK(!logic::from_cpp("struct B : kern::Blueprint {\n  struct FResult { Float a = 0.0; Float b = 0.0; };\n  KERN_EXTERN FResult F();\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n"
                          "    func_call_on<\"F\">(Actor{0}, kern::out(n2.b, n2.a));\n  }\n  struct { Float a = 0.0; Float b = 0.0; } n2;\n};\n", none, nullptr, &error));
   CHECK(error.find("in their order") != std::string::npos);
+}
+
+TEST(logic_actor_blueprint_from_cpp) {
+  // The program's C++ calls a Blueprint of an actor (kern::logic::ActorBlueprint) the one way a Blueprint
+  // does (Call on Actor, Get Variable on Actor, Has Blueprint): bound to the logic, it finds the actor by
+  // its name at every call, and the runtime's one way decides the rest - a target without a Blueprint
+  // that runs, the Level for a name nobody has, how deep calls nest, a Blueprint in the middle of a call.
+  CHECK(game::logic_nodes_registered());
+  const char* rules_text = R"kn(
+struct Rules : kern::Blueprint {
+  Float Speed = 2.5;
+  Int Laps = 3;
+  Text Name = "fast";
+  Int Depth = 0;
+
+  struct TwiceResult { Float out = 0.0; Int laps = 0; };
+  TwiceResult Twice(Float x = 0.0) {
+    Laps += 1;
+    return {math_add(math_mul(x, 2.0), Speed), Laps};
+  }
+
+  struct KeepResult { Int kept = 0; };
+  KeepResult Keep(Int n = 0) {
+    Int Mine = 0;
+    Mine = n;
+    debug_print("keep", false);
+    return {Mine};
+  }
+
+  struct KeepOnResult { Int kept = 0; };
+  KeepOnResult KeepOn(Int n = 0) {
+    Int Mine = 0;
+    Mine = n;
+    if (math_compare<">">(kern::to<Float>(n), 0.0)) {
+      func_call_on<"KeepOn">(actor_find("Rules"), kern::out(n30.kept), 0);
+    }
+    return {Mine};
+  }
+
+  void Forever() {
+    debug_print("again", false);
+  }
+
+  void Deeper() {
+    Depth += 1;
+    func_call_on<"Deeper">(actor_find("Rules"), kern::out());
+  }
+
+  struct { Int kept = 0; } n30;
+};
+)kn";
+  const char* level_text = R"kn(
+struct Level : kern::Blueprint {
+  struct TwiceResult { Float out = 0.0; Int laps = 0; };
+  TwiceResult Twice(Float x = 0.0) {
+    return {math_mul(x, 3.0), 0};
+  }
+};
+)kn";
+  const char* caller_text = R"kn(
+struct Caller : kern::Blueprint {
+  Float Got = 0.0;
+  Int GotLaps = 0;
+  Float AtLevel = 0.0;
+  Float Speed = 0.0;
+  Float LapsRead = 0.0;
+  Float Nobody = 0.0;
+  Float Wrong = 0.0;
+  Text Name = "";
+  Bool Has = false;
+  Bool HasLost = false;
+
+  struct TwiceResult { Float out = 0.0; Int laps = 0; };
+  KERN_EXTERN TwiceResult Twice(Float x = 0.0);
+
+  KERN_EVENT(on1, event_custom<"Ask">)
+  void on1(Actor actor, Float value, Text text) {
+    func_call_on<"Twice">(actor_find("Rules"), kern::out(n2.out, n2.laps), value);
+    Got = n2.out;
+    GotLaps = n2.laps;
+    func_call_on<"Twice">(actor_find("Lost"), kern::out(n3.out, n3.laps), value);
+    AtLevel = n3.out;
+    Speed = func_get_on<"Speed", Float>(actor_find("Rules"));
+    LapsRead = func_get_on<"Laps", Float>(actor_find("Rules"));
+    Nobody = func_get_on<"Missing", Float>(actor_find("Rules"));
+    Wrong = func_get_on<"Name", Float>(actor_find("Rules"));
+    Name = func_get_on<"Name", Text>(actor_find("Rules"));
+    Has = func_has_blueprint(actor_find("Rules"));
+    HasLost = func_has_blueprint(actor_find("Lost"));
+  }
+
+  struct { Float out = 0.0; Int laps = 0; } n2;
+  struct { Float out = 0.0; Int laps = 0; } n3;
+};
+)kn";
+  struct CallingHost : FakeLogicHost {
+    logic::ActorRef rules_id = 7;
+    logic::ActorBlueprint* rules = nullptr;
+    int again = 0;
+    bool keep_once = false;
+    i64 inner = -1;
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Rules" ? rules_id : name == "Caller" ? 9 : 0; }
+    void print(const std::string& text, bool screen) override {
+      FakeLogicHost::print(text, screen);
+      if (!rules) return;
+      if (text == "again") {
+        ++again;
+        rules->call("Forever", std::tie());
+      } else if (text == "keep" && keep_once) {
+        keep_once = false;
+        i64 k = -1;
+        rules->call("Keep", std::tie(k), i64{0});
+        inner = k;
+      }
+    }
+  };
+  logic::Graph rules_g, level_g, caller_g, broken = logic_graph(R"({"variables":[{"name":"Speed","type":"float","value":7}],"nodes":[{"id":1,"type":"no.such.node"}],"links":[]})");
+  std::string error;
+  CHECK(logic::from_cpp(rules_text, rules_g, nullptr, &error));
+  CHECK(logic::from_cpp(level_text, level_g, nullptr, &error));
+  CHECK(logic::from_cpp(caller_text, caller_g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(no_errors(logic::check(rules_g)) && no_errors(logic::check(level_g)) && no_errors(logic::check(caller_g)));
+  // Has Blueprint as C++ and back: the same Blueprint
+  std::string text;
+  CHECK(logic::to_cpp(caller_g, "Caller", text, &error) && text.find("    Has = func_has_blueprint(actor_find(\"Rules\"));\n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(text, read, nullptr, &error) && read == caller_g);
+  CHECK(logic::native_ready(caller_g, &error));
+  for (bool jit : {false, true}) {
+    CallingHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    logic::ActorBlueprint rules{"Rules"}, lost{"Lost"};
+    // unbound: the zeros
+    CHECK(rules.number("Twice", 1.0) == 0 && rules.get<f64>("Speed") == 0 && !rules.flag("Twice", 1.0));
+    logic::Instance* r = rt.add(rules_g, 7, "Rules");
+    logic::Instance* c = rt.add(caller_g, 9, "Caller");
+    CHECK(r && c && !r->disabled() && !c->disabled());
+    if (!r || !c) continue;
+    rt.begin();
+    // bound: Has Blueprint - of the actor, and of a name nobody has: the Level, which has none yet
+    CHECK(rules.bind(rt) && !lost.bind(rt));
+    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("Has").b && !c->get("HasLost").b);
+    // the call: what the Blueprint gives and does, in both forms
+    CHECK_NEAR(c->get("Got").as_number(), 10.5, 1e-12);
+    CHECK(c->get("GotLaps").i == 4);
+    f64 out = 0;
+    i64 laps = 0;
+    rules.call("Twice", std::tie(out, laps), 4.0);
+    CHECK(out == 10.5 && laps == 5 && r->get("Laps").i == 5);
+    // ... an output as the type of its place: a whole number as a decimal one, and back
+    rules.call("Twice", std::tie(laps, out), 4.0);
+    CHECK(laps == 10 && out == 6);
+    // a name nobody has is no actor: the Level - without a Blueprint, the declared defaults, the zeros
+    CHECK(c->get("AtLevel").as_number() == 0 && lost.number("Twice", 4.0) == 0);
+    // the variables: as their reader reads them - a whole number as a decimal one, a text as none (the zero)
+    CHECK(c->get("Speed").as_number() == 2.5 && rules.get<f64>("Speed") == 2.5);
+    CHECK(c->get("LapsRead").as_number() == 4 && rules.get<f64>("Laps") == 6);
+    CHECK(c->get("Nobody").as_number() == 0 && rules.get<f64>("Missing") == 0);
+    CHECK(c->get("Wrong").as_number() == 0 && rules.get<f64>("Name") == 0);
+    CHECK(c->get("Name").as_text() == "fast" && rules.get<std::string>("Name") == "fast" && rules.get<i64>("Speed") == 2);
+    // a Blueprint in the middle of a call of the function: the call it is in has its own values back
+    host.rules = &rules;
+    host.keep_once = true;
+    i64 kept = -1;
+    rules.call("Keep", std::tie(kept), i64{5});
+    CHECK(kept == 5 && host.inner == 0);
+    std::vector<logic::Value> got;
+    CHECK(r->call("KeepOn", {logic::Value::integer(6)}, got) && got.size() == 1 && got[0].i == 6);
+    // calls nest at most 64 deep, the same from C++ and from a node: then the call is left out and reported
+    const std::size_t before = host.errors.size();
+    rules.call("Forever", std::tie());
+    CHECK(host.again == 64 && host.errors.size() == before + 1);
+    CHECK(host.errors.back().find("the program's C++: calls on other Blueprints nest more than 64 deep - the call of Forever") != std::string::npos);
+    rules.call("Deeper", std::tie());
+    CHECK(r->get("Depth").i == 64 && host.errors.size() == before + 2);
+    CHECK(host.errors.back().find("Rules: calls on other Blueprints nest more than 64 deep - the call of Deeper") != std::string::npos);
+    host.rules = nullptr;
+    // the Level's Blueprint: what a name nobody has reaches
+    logic::Instance* lv = rt.add(level_g, 0, "Level");
+    CHECK(lv && lost.bind(rt) && lost.number("Twice", 4.0) == 12);
+    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("AtLevel").as_number() == 12 && c->get("HasLost").b);
+    // by its name, at every call: the actor's Blueprint taken out and one with errors put in its place -
+    // nothing runs there (the defaults; Has Blueprint is false) ...
+    rt.remove(7);
+    logic::Instance* bad = rt.add(broken, 7, "Rules");
+    CHECK(bad && bad->disabled() && !rules.bind(rt));
+    CHECK(rules.number("Twice", 1.0) == 0 && rules.get<f64>("Speed") == 7);  // (its variables are there to read: Get Variable on Actor)
+    rt.call("Ask", 9, {{"actor", logic::Value::actor(0)}, {"value", logic::Value::number(4)}, {"text", logic::Value::text("")}});
+    CHECK(c->get("Got").as_number() == 0 && !c->get("Has").b && c->get("Speed").as_number() == 7);
+    // ... a new one: reached as it is, without binding again; and another actor of the name: that one
+    rt.remove(7);
+    logic::Instance* fresh = rt.add(rules_g, 7, "Rules");
+    logic::Instance* other = rt.add(rules_g, 8, "Other rules");
+    CHECK(fresh && other && other->set("Speed", logic::Value::number(9)));
+    CHECK(rules.number("Twice", 1.0) == 4.5 && fresh->get("Laps").i == 4 && rules.get<f64>("Speed") == 2.5);
+    host.rules_id = 8;
+    CHECK(rules.get<f64>("Speed") == 9 && rules.number("Twice", 1.0) == 11 && other->get("Laps").i == 4);
+  }
 }
 
 TEST(logic_functions) {
@@ -2835,6 +3361,98 @@ TEST(game_logic_graphs_drive_the_world) {
   CHECK(!props.empty());  // the door's moves (a body-less actor) replicate as transform changes
 }
 
+// Parse Float / Parse Int / Scan Text read as C reads (logic::scan, nodes.h): against the C library of
+// the machine the tests run on - glibc - on texts made of the pieces numbers are made of. (%b, C23's
+// binary, is read the same way; the sanitizer's interceptor of sscanf does not know it, so it is not here.)
+TEST(logic_scan_like_c) {
+  u64 st = 88172645463325252ull;
+  auto rnd = [&] {
+    st ^= st << 13;
+    st ^= st >> 7;
+    st ^= st << 17;
+    return st;
+  };
+  static const char* const bits[] = {"0", "1", "9", "00", "0x", "0X", "x", "e", "E", "p", "+", "-", ".", " ", "\t", "\n", "a", "f", "b", "B", "inf", "INF", "infinity", "nan", "NaN",
+                                     "(", ")", "(12)", "(0x7f)", "_", ",", "123456789", "4294967296", "18446744073709551616", "9223372036854775808", "1e308", "1e-330",
+                                     "0x1p-1074", "2.5", "z", "%", "08", "0b101", "1.2.3", "0x.", "0x1.8p3", "3e+", "1e-45", "3.4028235e38", "A-B"};
+  static const char* const formats[] = {"%f", "%lf", "%d", "%i", "%u", "%x", "%o", "%lld", "%llu", "%hhd", "%hu", "%f %f", "%d %d %d", "%f%s", "%lf,%lf", "%3f%15s", "%2d%d",
+                                        "look set %f %f", "x%f", "%15s %f", " %31s %f %f %f %f", "%lf %lf %95[^\n]", "%15[a-z]%n%d", "%*d %d", "%%%d", "%llu %llu",
+                                        "%4[^,],%15s", "%i%n", "%2x%15s", "%1f%15s", "%e%g", "%a", "%zd %jd %td", "%15[]a]%15s", "%15[^]]%15s"};
+  std::size_t checked = 0, differ = 0;
+  for (int round = 0; round < 20000; ++round) {
+    std::string in;
+    for (int i = static_cast<int>(rnd() % 7); i > 0; --i) in += bits[rnd() % (sizeof bits / sizeof *bits)];
+    char* end = nullptr;
+    const f64 d = std::strtod(in.c_str(), &end);
+    const logic::scan::Real r = logic::scan::real(in, false);
+    differ += std::memcmp(&d, &r.value, 8) != 0 || static_cast<std::size_t>(end - in.c_str()) != r.end;
+    const f64 f = std::strtof(in.c_str(), &end);
+    const logic::scan::Real rf = logic::scan::real(in, true);
+    differ += std::memcmp(&f, &rf.value, 8) != 0 || static_cast<std::size_t>(end - in.c_str()) != rf.end;
+    for (int base : {0, 2, 10, 16, 36}) {
+      const long long l = std::strtoll(in.c_str(), &end, base);
+      const logic::scan::Whole w = logic::scan::whole(in, base, true);
+      differ += static_cast<u64>(l) != w.bits || static_cast<std::size_t>(end - in.c_str()) != w.end;
+      const unsigned long long u = std::strtoull(in.c_str(), &end, base);
+      const logic::scan::Whole wu = logic::scan::whole(in, base, false);
+      differ += u != wu.bits || static_cast<std::size_t>(end - in.c_str()) != wu.end;
+    }
+    checked += 12;
+    // sscanf: every value C writes (each starts as 0, a word as "mark") against the slots
+    const char* fmt = formats[rnd() % (sizeof formats / sizeof *formats)];
+    logic::scan::Plan plan;
+    CHECK(logic::scan::plan(fmt, &plan, nullptr));
+    std::vector<logic::scan::Spec> specs;
+    for (std::size_t at = 0; fmt[at];) {
+      if (fmt[at++] != '%') continue;
+      logic::scan::Spec sp;
+      logic::scan::read_spec(fmt, at, sp, nullptr);
+      if (logic::scan::gives(sp)) specs.push_back(sp);
+    }
+    union Held {
+      int i;
+      unsigned u;
+      long long q;
+      double d;
+      float f;
+      signed char c;
+      short h;
+      char s[128];
+    };
+    std::vector<Held> c(16);
+    for (Held& h : c) std::memset(&h, 0, sizeof h);
+    std::vector<logic::scan::Slot> slots(plan.count);
+    for (std::size_t k = 0; k < plan.count; ++k) {
+      slots[k].kind = plan.kinds[k];
+      if (plan.kinds[k] == logic::scan::Kind::text) slots[k].text = "mark", std::strcpy(c[k].s, "mark");
+    }
+    const int got = std::sscanf(in.c_str(), fmt, &c[0], &c[1], &c[2], &c[3], &c[4], &c[5], &c[6], &c[7], &c[8], &c[9], &c[10], &c[11], &c[12], &c[13], &c[14], &c[15]);
+    bool same = got == logic::scan::run(in, fmt, slots.data(), slots.size());
+    for (std::size_t k = 0; k < plan.count && same; ++k) {
+      const logic::scan::Spec& sp = specs[k];
+      const bool is_signed = sp.conv == 'd' || sp.conv == 'i' || sp.conv == 'n';
+      switch (plan.kinds[k]) {
+        case logic::scan::Kind::number: {
+          const f64 v = sp.size == 'l' ? c[k].d : static_cast<f64>(c[k].f);
+          same = std::memcmp(&v, &slots[k].number, 8) == 0;
+          break;
+        }
+        case logic::scan::Kind::text: same = slots[k].text == c[k].s; break;
+        case logic::scan::Kind::whole64: same = static_cast<u64>(c[k].q) == slots[k].bits; break;
+        case logic::scan::Kind::whole:
+          same = (sp.size == 'H'   ? (is_signed ? static_cast<i64>(c[k].c) : static_cast<i64>(static_cast<u8>(c[k].c)))
+                  : sp.size == 'h' ? (is_signed ? static_cast<i64>(c[k].h) : static_cast<i64>(static_cast<u16>(c[k].h)))
+                                   : (is_signed ? static_cast<i64>(c[k].i) : static_cast<i64>(c[k].u))) == slots[k].whole;
+          break;
+      }
+    }
+    if (!same && differ < 5) std::printf("scan: \"%s\" with \"%s\" reads otherwise than sscanf\n", in.c_str(), fmt);
+    differ += !same;
+    ++checked;
+  }
+  CHECK(checked > 200000 && differ == 0);
+}
+
 TEST(logic_tier_cases_interpreter) {
   for (const logic_cases::Case& c : logic_cases::cases()) {
     logic_cases::Host host;
@@ -2857,6 +3475,81 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("Gate").as_int() == 3);   // opened after the first 3 calls
       CHECK(inst->get("Flips").as_int() == 303);
     }
+    if (std::string(c.name) == "list_sort") {
+      // every Go adds four scores and sorts them all: the y's (most kills) first, then the z's (fewer
+      // deaths), then x and w as they were added - stable: w is the last; Times and Names in order
+      const logic::Value scores = inst->get("Scores");
+      const std::string shown = inst->get("Shown").as_text();
+      CHECK(scores.size() > 4 && scores.item(0).field(0)->as_text() == "y" && scores.item(scores.size() - 1).field(0)->as_text() == "w" &&
+            scores.item(scores.size() - 2).field(0)->as_text() == "x");
+      CHECK(shown.size() > 2 && shown[0] == 'y' && shown.find("[1, 1, 2, 3.5]") != std::string::npos && inst->get("Names").as_text() == "[a, b, c]");
+    }
+    if (std::string(c.name) == "lists_equal") {
+      // A and B the same until Go adds to B; the texts against a list made on the spot (the same, then another
+      // last item); an empty list against an input nothing is wired to
+      CHECK(inst->get("Same").as_bool() && !inst->get("After").as_bool() && inst->get("SameWords").as_bool() && !inst->get("Other").as_bool() && inst->get("Empty").as_bool());
+      CHECK(inst->get("B").as_text() == "[1, 2, 3, 0, 2, 4, 5, 5, 1]");
+    }
+    if (std::string(c.name) == "lists_equal_structs") {
+      // the same lists; a number of a struct in a list in an item, a field's struct, a shorter list; a NaN deep inside
+      CHECK(inst->get("Same").as_bool() && !inst->get("Deep").as_bool() && !inst->get("Short").as_bool() && !inst->get("Field").as_bool());
+      CHECK(!inst->get("NanSelf").as_bool() && inst->get("N").size() == 6 && std::isnan(inst->get("N").item(0).field(1)->field(1)->as_number()));
+    }
+    if (std::string(c.name) == "text_format") {
+      // the last Go: value 1, no text - as snprintf writes it ("%s" of three bytes at most: "abc")
+      char want[64];
+      std::snprintf(want, sizeof want, "%02d:%06.3f|%s|%5.1f|%x|%c|100%%%s", 1, 1.0, "", 1.0, 1, 65, "abc");
+      CHECK(inst->get("Shown").as_text() == want);
+    }
+    if (std::string(c.name) == "text_scan") {
+      // what std::string and the C library give for the same texts
+      const std::string hello = "hello world";
+      float f = 0;
+      long long q = 0;
+      char word[32] = "x", rest[96] = "y";
+      const int n = std::sscanf(" 2.5 -7 word rest of it", "%f %lld %31s %95[^\n]", &f, &q, word, rest);
+      int five = 5;
+      const int none = std::sscanf("", "x%d", &five);
+      char* end = nullptr;
+      const char* number = "x 1e-3y";
+      const double d = std::strtod(number + 1, &end);
+      std::string replaced = hello;
+      replaced.replace(0, 5, "HELLO");
+      std::string inserted = "ac";
+      inserted.insert(1, "b");
+      std::string erased = "settings reset";
+      erased.erase(8);
+      char want[512];
+      std::snprintf(want, sizeof want, "%d|%d|%d|%d|%d|%d|%d|%s|%s|%s|%s|%.17g|%d|%.9g|%d %.9g %d %s|%s|%d|%d", static_cast<int>(hello.find("o", 5)), static_cast<int>(hello.rfind("o")),
+                    static_cast<int>(std::string("key=value;x").find_first_of("=;", 4)), static_cast<int>(std::string("trim   ").find_last_not_of(" ")),
+                    static_cast<int>(std::strtoll("  -0x1Fz", nullptr, 0)), static_cast<int>(std::string("a/b/c").find_last_of("/", 2)),
+                    static_cast<int>(std::string("  x").find_first_not_of(" ")), hello.substr(6).c_str(), replaced.c_str(), inserted.c_str(), erased.c_str(), d,
+                    static_cast<int>(end - number), static_cast<double>(std::strtof("0.1", nullptr)), n, static_cast<double>(f), static_cast<int>(q), word, rest,
+                    static_cast<int>(static_cast<u32>(std::strtoull("-1", nullptr, 10))), none);
+      {
+        char w[8] = "", set[16] = "";
+        signed char hh = 0;
+        unsigned short hu = 0;
+        unsigned long long llu = 0;
+        unsigned x = 0, o = 0;
+        int nread = 0, i = 0;
+        float g = 0;
+        const int got = std::sscanf("  name -129 70000 18446744073709551615 0x1Fg 9 a b,0b101 1.25%017 rest", " %7s %hhd %hu %llu %x%n %*d %15[^,],%i %3f%%%o", w, &hh, &hu, &llu, &x, &nread,
+                                    set, &i, &g, &o);
+        char more[256];
+        std::snprintf(more, sizeof more, "|%s %d %d %d %d %s %d %.9g %d|%llu", w, hh, hu, x, nread, set, i, static_cast<double>(g), got, llu);
+        std::strncat(want, more, sizeof want - std::strlen(want) - 1);
+      }
+      {
+        // the bytes of "A\u00e4" put in after the first of [1, 2], "hi" appended; three of them from the second on
+        // as a text; "r" three times; and the three flags of Starts With, Ends With, Text Less
+        const std::string bytes = "[1, 65, 195, 164, 2, 104, 105]";
+        const std::string part = std::string("rrr") + "\x41\xc3\xa4" + "|111" + bytes;
+        std::strncat(want, part.c_str(), sizeof want - std::strlen(want) - 1);
+      }
+      if (inst->get("Shown").as_text() != want) std::printf("text_scan: %s\n    want: %s\n", inst->get("Shown").as_text().c_str(), want);
+      CHECK(inst->get("Shown").as_text() == want);
+    }
     if (std::string(c.name) == "while_nested") {
       CHECK(inst->get("I").as_int() == 7);
       CHECK(inst->get("Total").as_number() == 6.0 * (1 + 2 + 3 + 4 + 5 + 6 + 7));
@@ -2875,6 +3568,11 @@ TEST(logic_tier_cases_interpreter) {
       CHECK(inst->get("DeepCount").as_int() == 63 && r.find("events nest more than") != std::string::npos && !inst->disabled());
       CHECK(inst->get("Tail").as_int() == 630);  // every handler's ten open steps ran when the levels below were over
     }
+    if (std::string(c.name) == "recursion_direct") CHECK(inst->get("R").as_int() == 55 + 144 + 377 + 610 + 610 + 89 && inst->get("Count").as_int() == 2 + 14 + 62 + 126 + 126 + 6 && !inst->disabled());
+    if (std::string(c.name) == "recursion_through") CHECK(inst->get("Trail").as_number() == 614664 && inst->get("Hops").as_int() == 17 && !inst->disabled());
+    if (std::string(c.name) == "recursion_deep") CHECK(inst->get("Depth").as_int() == 5000 && !inst->disabled());
+    if (std::string(c.name) == "recursion_endless")
+      CHECK(inst->get("Steps").as_int() == logic::Runtime::kCallsDeep && inst->disabled() && r.find("function calls nest") != std::string::npos);
     if (std::string(c.name) == "whole_numbers") {
       const i64 top = std::numeric_limits<i64>::max();
       CHECK(inst->get("Big").as_int() == top && inst->get("Shown").as_text() == "9223372036854775807");  // doubled 70 times: Int's end, not past it
@@ -2952,7 +3650,7 @@ TEST(logic_structs) {
   PinType named = PinType::exec;
   CHECK(logic::pin_type_from_name("struct", named) && named == PinType::structure && logic::pin_type_from_name("struct_list", named) && named == PinType::structure_list);
   CHECK(logic::is_list(PinType::structure_list) && logic::element_of(PinType::structure_list) == PinType::structure && logic::list_of(PinType::structure) == PinType::structure_list);
-  CHECK(logic::kValueTypes == 8 && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
+  CHECK(logic::kValueTypes == 9 && !logic::is_list(PinType::structure) && logic::element_of(PinType::enumeration_list) == PinType::enumeration && logic::list_of(PinType::boolean) == PinType::boolean_list);
   // It becomes nothing but itself - no number, no text - and nothing becomes it: Break gives its fields ...
   for (PinType other : {PinType::boolean, PinType::integer, PinType::number, PinType::vector, PinType::text, PinType::actor, PinType::enumeration, PinType::number_list, PinType::enumeration_list}) {
     CHECK(!logic::convertible(PinType::structure, other) && !logic::convertible(other, PinType::structure));
@@ -3218,11 +3916,17 @@ static logic::Graph every_node_graph(bool wired) {
                       {"VT", PinType::text, ""},           {"VA", PinType::actor, ""},            {"LB", PinType::boolean_list, ""},   {"LI", PinType::integer_list, ""},
                       {"LF", PinType::number_list, ""},    {"LV", PinType::vector_list, ""},      {"LT", PinType::text_list, ""},      {"LA", PinType::actor_list, ""},
                       {"VE", PinType::enumeration, "EM"},  {"LE", PinType::enumeration_list, "EM"}, {"VS", PinType::structure, "SM"},  {"LS", PinType::structure_list, "SM"},
-                      {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}};
+                      {"VN", PinType::structure, "SI"},    {"LN", PinType::structure_list, "SI"}, {"VX", PinType::int64, ""},        {"LX", PinType::int64_list, ""},
+                      // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
+                      {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"},
+                      // (bytes - Bytes of Text, Bytes of S: a List<U8>)
+                      {"L8", PinType::integer_list, "u8"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
   g.structs.push_back({"SM", {}, "A struct that holds one.\n\nIts second paragraph."});
+  // (a struct of numbers: what the bytes of a value are of - in the layout the nodes say by default, "4: i32@0")
+  g.structs.push_back({"SB", {{"Bits", {PinType::integer, ""}, json::Value(7)}}, "A struct of one number."});
   {
     json::Value in = json::Value::object(), numbers = json::Value::array(), places = json::Value::array(), at = json::Value::array();
     in.set("N", 5);
@@ -3246,20 +3950,31 @@ static logic::Graph every_node_graph(bool wired) {
     const logic::Value inner = logic::Value::structure({logic::Value::integer(-7), logic::Value::text("x \"y\"\n")});
     if (logic::element_of(t) == PinType::structure) {
       const logic::Value one = of == "SI" ? inner
+                               : of == "SB" ? logic::Value::structure({logic::Value::integer(-123456)})
                                           : logic::Value::structure({logic::Value::number(2.625), logic::Value::enumeration(2), inner, logic::Value::of(std::vector<f64>{0.25}),
                                                                      logic::Value::structures({inner, logic::zero_of({PinType::structure, "SI"}, g)}), logic::Value::boolean(false),
                                                                      logic::Value::vector({1, -2, 3.5f}), logic::Value::actor(3), logic::Value::enumerations({2, 0})});
       return t == PinType::structure ? one : logic::Value::structures({one, logic::zero_of({PinType::structure, of}, g)});
     }
+    if (t == PinType::map || t == PinType::set) {
+      // (entries whose keys are not in their own order: the order they came in is kept)
+      logic::Value keyed = logic::Value::zero(t);
+      const logic::TypeRef key = logic::key_type({t, of});
+      for (i64 k : {9, -7, 0}) keyed.own_entries().try_emplace(logic::key_of(logic::key_value({k, ""}, key.type)), t == PinType::map ? logic::Value::number(2.625 * static_cast<f64>(k)) : logic::Value{});
+      return keyed;
+    }
     switch (t) {
       case PinType::boolean: return logic::Value::boolean(true);
+      case PinType::int64: return logic::Value::int64(0xfffffffffffffff9ull);
+      case PinType::int64_list: return logic::Value::of(std::vector<logic::Int64>{logic::Int64{0x8000000000000001ull}, logic::Int64{0}, logic::Int64{9007199254740993ull}});
       case PinType::integer: return logic::Value::integer(-7);
       case PinType::number: return logic::Value::number(2.625);
       case PinType::vector: return logic::Value::vector({1, -2, 3.5f});
       case PinType::text: return logic::Value::text("a \"b\" \\ c\n\td \x01 \xc3\xa4");
       case PinType::actor: return logic::Value::actor(3);
       case PinType::boolean_list: return logic::Value::of(std::vector<bool>{true, false, true});
-      case PinType::integer_list: return logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993});
+      case PinType::integer_list:  // (of a width: numbers it holds - a List<U8> holds no -7)
+        return of.empty() ? logic::Value::of(std::vector<i64>{-7, 0, 9007199254740993}) : logic::Value::of(std::vector<i64>{7, 0, 127});
       case PinType::number_list: return logic::Value::of(std::vector<f64>{2.625, -1e300});
       case PinType::vector_list: return logic::Value::of(std::vector<Vec3>{{1, -2, 3.5f}, {0, 0, 0}});
       case PinType::text_list: return logic::Value::of(std::vector<std::string>{"a \"b\"", "", "c\n"});
@@ -3271,7 +3986,7 @@ static logic::Graph every_node_graph(bool wired) {
   // (list variables that start with items, a list a function takes and one it gives)
   for (logic::Variable& v : g.variables)
     if (v.type == PinType::integer_list || v.type == PinType::text_list || v.type == PinType::vector_list || logic::element_of(v.type) == PinType::enumeration ||
-        logic::element_of(v.type) == PinType::structure)
+        logic::element_of(v.type) == PinType::structure || v.type == PinType::int64_list || logic::is_keyed(v.type))
       v.value = other_than_default(v.type, v.of).to_json(g, v.of);
   logic::Function fn;
   fn.name = "Fn";
@@ -3343,14 +4058,16 @@ static logic::Graph every_node_graph(bool wired) {
   for (const std::string& type : types) {
     const logic::NodeDef* def = lib.find(type);
     if (type == "func.entry" || type == "func.return") continue;
+    if (type == "func.callback") continue;  // (it names a function of a library: a Blueprint of its own uses one - logic_callbacks)
     // (the engine's functions name the engine's structs: a Blueprint of their own declares those and calls
     // every one of them - the case Engine of blueprint_native.h, read from its text and written again)
     if (logic::engine_function(type)) continue;
     std::vector<std::pair<std::string, std::string>> params;
     for (const logic::ParamDef& pd : def->params) {
       using K = logic::ParamDef::Kind;
-      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? "SM" : pd.kind == K::variable ? (type.rfind("list.", 0) == 0 ? "LT" : "VF") :
-                                    pd.kind == K::field ? "In" : pd.kind == K::function ? (def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
+      // (Copy Bytes on a list of whole numbers: its default numbers are bytes, u8; Insert Text Bytes takes only such a list)
+      params.push_back({pd.key, pd.kind == K::type && pd.enums_only ? "EM" : pd.kind == K::type && pd.structs_only ? (type.rfind("struct.bytes", 0) == 0 || type.rfind("struct.of_bytes", 0) == 0 ? "SB" : "SM") : pd.kind == K::variable ? (type == "list.copy_bytes" || type == "list.insert_text" ? "LI" : type == "text.set_code" ? "VT" : type.rfind("list.", 0) == 0 ? "LT" : type.rfind("map.", 0) == 0 ? "VM" : type.rfind("set.", 0) == 0 ? "VQ" : "VF") :
+                                    pd.kind == K::field ? "In" : pd.kind == K::function ? (pd.optional ? pd.def : def->kind == logic::NodeKind::pure ? "Calc" : "Fn") : pd.kind == K::machine ? "State Machine" :
                                     pd.kind == K::state ? "Idle" : pd.def});
     }
     const u32 id = add(type, params);
@@ -3442,6 +4159,103 @@ TEST(logic_notation_every_node_type) {
   for (const char* ok : {"Heat", "max_stars", "a1", "Go", "n", "on", "it", "x_y"}) CHECK(logic::cpp_name_ok(ok));
   for (const char* no : {"", "1a", "my var", "class", "float", "Float", "Text", "loop", "entry", "n12", "go3", "on7", "it1", "machine2", "n007", "a__b", "_Big", "kern", "kern_x", "ä"})
     CHECK(!logic::cpp_name_ok(no));
+}
+
+TEST(logic_notation_values_of_a_call) {
+  // What a step of a function gives, and what its loop keeps while it runs, is the call's own: a
+  // local of the method, where only the function's own path after it reads it. Read before the
+  // step (a loop's earlier pass) or in an event: a member, as before. The reader also takes such a
+  // value as a member (texts of before); declared in the wrong body, it is refused.
+  const std::string text =
+      "struct Calls : kern::Blueprint {\n"
+      "  // ---- variables ----\n"
+      "  Float Total = 0.0;\n"
+      "  Float Last = 0.0;\n"
+      "\n"
+      "  // ---- functions ----\n"
+      "  struct HalfResult { Float h = 0.0; };\n"
+      "  HalfResult Half(Float x = 0.0) {\n"
+      "    return {math_div(x, 2.0)};\n"
+      "  }\n"
+      "\n"
+      "  struct SumResult { Float s = 0.0; };\n"
+      "  SumResult Sum(Int n = 0) {\n"
+      "    Float Acc = 0.0;\n"
+      "    struct : kern::Node<11> { Int index = 0; } n11;\n"
+      "    HalfResult n12;\n"
+      "    for (auto it11 = flow_for(n11, 1, n); it11.next();) {\n"
+      "      Last = n13.h;\n"
+      "      n12 = Half(kern::to<Float>(n11.index));\n"
+      "      Acc = math_add(Acc, n12.h);\n"
+      "      n13 = Half(Acc);\n"
+      "    }\n"
+      "    return {Acc};\n"
+      "  }\n"
+      "\n"
+      "  // ---- events ----\n"
+      "  KERN_EVENT(on1, event_custom<\"Go\">)\n"
+      "  void on1(Actor actor, Float value, Text text) {\n"
+      "    n2 = Sum(kern::to<Int>(value));\n"
+      "    Total = n2.s;\n"
+      "  }\n"
+      "\n"
+      "  // ---- what nodes give and keep ----\n"
+      "  SumResult n2;\n"
+      "  HalfResult n13;\n"
+      "};\n";
+  auto strip = [](const std::string& s) {  // (the struct alone: without the head and the layout)
+    const std::size_t from = s.find("struct Calls"), at = s.find("\nKERN_LAYOUT(");
+    return from == std::string::npos || at == std::string::npos ? s : s.substr(from, at - from);
+  };
+  logic::Graph g;
+  std::string name, error, again;
+  const bool read = logic::from_cpp(text, g, &name, &error);
+  if (!read) std::printf("%s\n", error.c_str());
+  CHECK(read && logic::to_cpp(g, name, again, &error));
+  if (strip(again) != text) std::printf("%s\n", again.c_str());
+  CHECK(strip(again) == text);
+  // the same Blueprint with n12 and n11 as members (as texts had them before)
+  std::string before = text;
+  auto cut = [&](const std::string& what) { const std::size_t at = before.find(what); CHECK(at != std::string::npos); if (at != std::string::npos) before.erase(at, what.size()); };
+  cut("    HalfResult n12;\n");
+  cut("    struct : kern::Node<11> { Int index = 0; } n11;\n");
+  before.insert(before.rfind("};"), "  HalfResult n12;\n  struct : kern::Node<11> { Int index = 0; } n11;\n");
+  logic::Graph old;
+  CHECK(logic::from_cpp(before, old, &name, &error) && logic::same_blueprint(old, g));
+  // a value an earlier pass of the loop reads (n13), or one an event reads (n2), is no local of Sum
+  for (const char* member : {"  HalfResult n13;\n", "  SumResult n2;\n"}) {
+    std::string wrong = text;
+    const std::size_t at = wrong.find(member);
+    wrong.erase(at, std::strlen(member));
+    wrong.insert(wrong.find("    for (auto it11"), std::string("  ") + member);
+    logic::Graph bad;
+    CHECK(!logic::from_cpp(wrong, bad, &name, &error) && error.find("it is a member of the class") != std::string::npos);
+  }
+}
+
+TEST(logic_recursion_rules) {
+  // A function may call itself, directly or through others, as a step. Read as a value it would
+  // read itself (a value has no circles); and in a circle what its steps give stays on its path.
+  auto refused = [](const char* text, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool read = logic::from_cpp(text, g, nullptr, &error);
+    if (read || error.find(why) == std::string::npos) std::printf("%s\n", error.c_str());
+    return !read && error.find(why) != std::string::npos;
+  };
+  CHECK(refused("struct P : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  KERN_PURE HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      return {Half(math_div(x, 2.0)).h};\n    }\n    return {x};\n  }\n};\n",
+                "calls itself and is read as a value"));
+  CHECK(refused("struct Q : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n"
+                "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n    }\n    Seen = n5.h;\n    return {x};\n  }\n\n"
+                "  // ---- what nodes give and keep ----\n  HalfResult n5;\n};\n",
+                "calls itself, so every call has its own values"));
+  logic::Graph ok;
+  std::string error;
+  CHECK(logic::from_cpp("struct R : kern::Blueprint {\n  struct HalfResult { Float h = 0.0; };\n  HalfResult Half(Float x = 0.0) {\n    HalfResult n5;\n"
+                        "    if (math_compare<\">\">(x, 1.0)) {\n      n5 = Half(math_div(x, 2.0));\n      return {n5.h};\n    }\n    return {x};\n  }\n};\n",
+                        ok, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
 }
 
 TEST(logic_notation_reads_what_a_person_writes) {
@@ -3751,7 +4565,7 @@ TEST(logic_native_blueprints) {
     f64 heat = 1;
     void attach(const logic::BlueprintWorld&) override {}
     void run(int, int) override {}
-    bool call(std::string_view function, const std::vector<logic::Value>& args, std::vector<logic::Value>& results) override {
+    bool call(std::string_view function, std::span<const logic::Value> args, logic::Results& results) override {
       results.clear();
       if (function != "Twice") return false;
       results = {logic::Value::number(2 * (args.empty() ? 0.0 : args[0].as_number()) + heat)};
@@ -3831,7 +4645,7 @@ TEST(logic_native_blueprints) {
   CHECK(logic::native_glue(logic_graph(R"({"variables":[{"name":"A","type":"float","value":0}],
       "nodes":[{"id":7,"type":"var.set","params":{"variable":"A"}},{"id":5,"type":"event.custom","params":{"name":"Hit"}}],"links":[[5,"then",7,"exec"],[5,"value",7,"value"]]})"), "X", glue, &why));
   CHECK(glue.find("case 1: self.on5(native_out<kern::logic::ActorHandle>(*self.kern_world.instance, 1, 1), native_out<kern::f64>(*self.kern_world.instance, 1, 2), "
-                  "native_out<std::string>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
+                  "native_out<kern::logic::Text>(*self.kern_world.instance, 1, 3)); break;  // Event Hit") != std::string::npos);
 }
 
 TEST(game_blueprints_as_classes) {
@@ -3909,6 +4723,638 @@ TEST(game_blueprints_as_classes) {
     const std::string then = robot.text.substr(driven, sat - driven);
     if (then.find("State=\"Logic\"") == std::string::npos || then.find(" Looks=0") != std::string::npos) std::printf("%s", then.substr(0, 400).c_str());
     CHECK(then.find("State=\"Logic\"") != std::string::npos && then.find(" Looks=0") == std::string::npos && then.find("Fallen=false") != std::string::npos);
+  }
+}
+
+TEST(logic_fixed_widths) {
+  // An Int place of a fixed width (U8 ... I32): what flows is an Int, the place holds its low
+  // bits as C++ stores them - in every tier, at every place (a variable, a field, an input, an
+  // output, a local variable), by Set, Add to Variable, a call and from outside.
+  const std::string text =
+      "struct B : kern::Blueprint {\n"
+      "  KERN_STRUCT(P) {\n    U16 a = 65535;\n  };\n"
+      "  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n  I32 Big = 0;\n  Int Plain = 0;\n  P Pt = P{65535};\n"
+      "  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x) {\n    I16 Here = 0;\n    Here = x;\n    return {Here};\n  }\n"
+      "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n"
+      "    Small = 300;\n    Signed = kern::to<Int>(value);\n    Big = Hash;\n    Pt.a = kern::to<Int>(value);\n    Small += 220;\n    Hash += -4000000001;\n  }\n};\n";
+  logic::Graph g, back;
+  std::string error, written, twice;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  CHECK(g.variable("Small") && g.variable("Small")->type == logic::PinType::integer && g.variable("Small")->of == "u8" && g.structure("P") && g.structure("P")->fields[0].type.of == "u16");
+  for (const logic::Issue& i : logic::check(g))
+    if (i.error) { std::printf("check: %s\n", i.text.c_str()); CHECK(false); }
+  CHECK(logic::to_cpp(g, "B", written, &error, logic::library(), false));
+  CHECK(written.find("  U8 Small = 250;\n  I8 Signed = -3;\n  U32 Hash = 4000000000;\n") != std::string::npos && written.find("  struct TwiceResult { U8 r = 0; };\n  TwiceResult Twice(I16 x = 0) {\n    I16 Here = 0;\n") != std::string::npos);
+  CHECK(logic::from_cpp(written, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == written);
+  if (twice != written) std::printf("%s\n---\n%s\n", written.c_str(), twice.c_str());
+  CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+  CHECK(logic::type_label({logic::PinType::integer, "u32"}) == "U32" && logic::type_text({logic::PinType::integer, "i16"}) == "i16");
+  logic::TypeRef named;
+  CHECK(logic::type_from_text("u8", g, named) && named.type == logic::PinType::integer && named.of == "u8" && !logic::type_from_text("map<u8>float", g, named));
+  // the ends of every width, and Ints beyond them: static_cast<u32>(x), two's complement for a signed width
+  CHECK(logic::wrapped(256, "u8") == 0 && logic::wrapped(-1, "u8") == 255 && logic::wrapped(128, "i8") == -128 && logic::wrapped(-129, "i8") == 127);
+  CHECK(logic::wrapped(65536 + 7, "u16") == 7 && logic::wrapped(32768, "i16") == -32768 && logic::wrapped(i64{1} << 32, "u32") == 0 && logic::wrapped(-1, "u32") == 4294967295);
+  CHECK(logic::wrapped(i64{2147483648}, "i32") == -2147483648LL && logic::wrapped(9223372036854775807LL, "u32") == 4294967295 && logic::wrapped(-9223372036854775807LL, "i32") == 1);
+  CHECK(logic::wrapped((i64{1} << 53) + 2, "u32") == 2 && logic::wrapped(-(i64{1} << 53), "i16") == 0 && logic::wrapped(5, "") == 5);
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    rt.begin();
+    rt.call("Go", 0, {{"value", logic::Value::number(200.7)}});
+    CHECK(host.errors.empty());
+    CHECK(inst->get("Small").i == 8 && inst->get("Signed").i == -56 && inst->get("Big").i == -294967296 && inst->get("Pt").field(0)->i == 200);  // (300 -> 44, + 220 -> 8)
+    CHECK(inst->get("Hash").i == 4294967295);  // (4000000000 - 4000000001)
+    CHECK(inst->set("Small", logic::Value::integer(-1)) && inst->get("Small").i == 255 && inst->set("Signed", logic::Value::number(1e30)) && inst->get("Signed").i == -1);
+    std::vector<logic::Value> results;
+    CHECK(inst->call("Twice", {logic::Value::integer(65537 + 255)}, results) && results.size() == 1 && results[0].i == 0);  // (65792 as I16 is 256, as U8 0)
+    CHECK(inst->call("Twice", {logic::Value::integer(40000)}, results) && results.size() == 1 && results[0].i == 64);  // (40000 as I16 is -25536, as U8 64)
+  }
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph h;
+    std::string e;
+    const bool is_read = logic::from_cpp("struct B : kern::Blueprint {\n" + body + "};\n", h, nullptr, &e);
+    for (const logic::Issue& i : is_read ? logic::check(h) : std::vector<logic::Issue>())
+      if (i.error) e += " | " + i.text;
+    const bool right = e.find(why) != std::string::npos;
+    if (!right) std::printf("expected \"%s\", got: %s\n", why, e.empty() ? "(nothing is wrong with it)" : e.c_str());
+    return right;
+  };
+  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = kern::to<I8>(value);\n  }\n", "kern::to<Int>, not kern::to<I8>"));
+  CHECK(says("  I8 Bad = 0;\n  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n    Bad = value;\n  }\n", "this is Float, the input is Int: write kern::to<Int>(...)"));
+  CHECK(says("  U8 Bad = 256;\n", "256 is no U8 (it would hold 0)"));
+  CHECK(says("  I8 Bad = -129;\n", "-129 is no I8"));
+  CHECK(says("  Map<U8, Int> Bad = Map<U8, Int>{};\n", "the keys of a map or a set are"));
+  // (a map's values may be of a width - the map is the place -, its defaults hold values of it; a list of a fixed length is no value of a map)
+  {
+    logic::Graph h;
+    std::string e;
+    CHECK(logic::from_cpp("struct B : kern::Blueprint {\n  Map<Int, U32> Good = Map<Int, U32>{{1, 4294967295}};\n  Map<Int, List<U8>> Bytes = Map<Int, List<U8>>{{2, List<U8>{0, 255}}};\n};\n", h, nullptr, &e));
+    for (const logic::Issue& i : logic::check(h)) CHECK(!i.error);
+    // (a map from outside: its values as the map holds them - 2^32 + 7 as a U32 is 7, 256 in a List<U8> is 0)
+    const logic::TypeRef good = logic::declared(h.variables[0]), bytes = logic::declared(h.variables[1]);
+    logic::Value a = logic::Value::zero(logic::PinType::map), b = logic::Value::zero(logic::PinType::map);
+    a.own_entries().try_emplace(logic::key_of(logic::Value::integer(1)), logic::Value::integer(4294967303));
+    b.own_entries().try_emplace(logic::key_of(logic::Value::integer(2)), logic::Value::from_json([] { json::Value l = json::Value::array(); l.push(json::Value(256.0)); l.push(json::Value(1.0)); return l; }(), logic::PinType::integer_list));
+    const logic::Value a2 = logic::from_outside(a, good, h), b2 = logic::from_outside(b, bytes, h);
+    CHECK(a2.keyed().value_at(0).i == 7 && b2.keyed().value_at(0).item(0).i == 0 && b2.keyed().value_at(0).item(1).i == 1);
+    CHECK(a.keyed().value_at(0).i == 4294967303);  // (the map given stays as it was)
+  }
+  CHECK(says("  Map<Int, U8> Bad = Map<Int, U8>{{1, 256}};\n", "a value: 256 is no U8"));
+  CHECK(says("  Map<Int, List<I8>> Bad = Map<Int, List<I8>>{{1, List<I8>{128}}};\n", "a list's item: 128 is no I8"));
+  CHECK(says("  Map<Int, Fixed<Int, 2>> Bad = Map<Int, Fixed<Int, 2>>{};\n", "no map, set or list of a fixed length"));
+  // a list of Ints of a fixed width: its default holds its values; a list of another width (or of Int) is another type; Copy Bytes
+  // writes numbers of its width into it; a field of a width has its own width in a layout
+  CHECK(says("  List<U8> Bad = List<U8>{1, 256};\n", "a list's item: 256 is no U8"));
+  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_append(W, B);\n  }\n",
+             "this is List<U8>, the input is List<Int>: the two do not convert"));
+  CHECK(says("  List<U8> B = List<U8>{};\n  List<Int> W = List<Int>{};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    list_copy_bytes<\"u32\", \"u8\">(B, 0, W, 0, 4);\n  }\n",
+             "its numbers are u8, not u32"));
+  CHECK(says("  KERN_STRUCT(H) {\n    U8 a = 0;\n  };\n  List<U16> B = List<U16>{};\n  H Hh = H{0};\n  KERN_EVENT(on1, event_begin)\n  void on1() {\n    Hh = struct_of_bytes<H, \"2: u16@0\">(B, 0);\n  }\n",
+             "its own width"));
+  {
+    // ... and a graph that says it wrong
+    logic::Graph h;
+    h.variables.push_back({"W", logic::PinType::integer, json::Value(70000.0), {}, "u16"});
+    h.variables.push_back({"X", logic::PinType::integer, json::Value(-1.0), {}, "u32"});
+    std::string all;
+    for (const logic::Issue& i : logic::check(h)) all += i.text + "\n";
+    CHECK(all.find("variable \"W\" is U16, its default 70000 is none of its values (0 .. 65535)") != std::string::npos && all.find("variable \"X\"") != std::string::npos);
+  }
+  {
+    // Lists of a width hold and give what std::vector<u8>, <int8_t>, <uint32_t> hold and give - the same steps in C++ give these numbers
+    // (and the case fixed_width_lists runs as a class and in the JIT against this interpreter)
+    for (const logic_cases::Case& c : logic_cases::cases()) {
+      if (std::string(c.name) != "fixed_width_lists") continue;
+      logic_cases::Host lh;
+      logic::Runtime lr(lh);
+      lr.native = false;
+      logic::Instance* li = lr.add(logic_cases::parse(c), 0, "l");
+      lr.begin();
+      CHECK(li->get("W").as_text() ==
+            "[3, 0, -1, 6, 7, 2, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 6, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 128, 127, 0, 0, 0, 254, -2, -61, -65, 122, 0, 0, -1, "
+            "-1, 0, -1, 127, -128, 0, -1, -128, 127, -1, 1, 0, 127, 20]");
+    }
+  }
+}
+
+TEST(logic_fixed_lists) {
+  // A place can be declared as a list of a fixed length - Fixed<Float, 3>, std::array in a
+  // Blueprint's C++: a variable, a field, an input, an output, a local variable. What flows
+  // through a pin stays a list; the place keeps its length.
+  const std::string head = "struct B : kern::Blueprint {\n  KERN_STRUCT(Mat) {\n    Fixed<Float, 4> m = Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0};\n  };\n"
+                           "  Fixed<Float, 3> Axis = Fixed<Float, 3>{1.0, 2.0, 3.0};\n  List<Float> Any = List<Float>{};\n  Mat Now = Mat{Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0}};\n";
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }\n"; };
+  auto read = [&](const std::string& body, logic::Graph& g, std::string& error) { return logic::from_cpp(head + body + "};\n", g, nullptr, &error); };
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool is_read = read(body, g, error);
+    if (is_read) error = logic::cpp_problem(g);
+    for (const logic::Issue& i : is_read ? logic::check(g) : std::vector<logic::Issue>())
+      if (i.error) error += " | " + i.text;
+    const bool right = error.find(why) != std::string::npos;
+    if (!right) std::printf("expected \"%s\", got: %s\n", why, error.empty() ? "(nothing is wrong with it)" : error.c_str());
+    return right;
+  };
+  {
+    // the text and the graph: the declaration with its length, the default up to its last entry
+    // that is not zero - in the text and in JSON (a buffer of 24000 zeros says nothing)
+    logic::Graph g, back;
+    std::string error, text, twice;
+    CHECK(read("  Fixed<Float, 24000> Echo = Fixed<Float, 24000>{};\n  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{0.0, 0.0, 0.0}; };\n  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n"
+               "    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n    Pair[0] = v[0];\n    into[1] = seen[2];\n    return {v};\n  }\n" + in_event("    Axis[1] = value;\n    Any = Axis;\n    Axis = Any;\n    Now.m[3] = Axis[0];\n    Echo[23999] = value;"),
+               g, error));
+    if (!error.empty()) std::printf("%s\n", error.c_str());
+    CHECK(g.variable("Axis") && g.variable("Axis")->count == 3 && g.variable("Axis")->type == logic::PinType::number_list && g.variable("Any")->count == 0);
+    CHECK(g.structure("Mat") && g.structure("Mat")->fields[0].type.count == 4);
+    const logic::Function* give = g.function("Give");
+    CHECK(give && give->input("v")->count == 3 && give->input("seen")->count == 3 && give->input("into")->ref && give->outputs[0].count == 3 && give->locals[0].count == 2);
+    CHECK(json::stringify(give->input("v")->value) == "[1]" && json::stringify(give->locals[0].value) == "[]" && json::stringify(give->outputs[0].value) == "[]");  // (what a default does not say is zero)
+    CHECK(g.variable("Echo") && g.variable("Echo")->count == 24000 && json::stringify(g.variable("Echo")->value) == "[]" && json::stringify(g.structure("Mat")->fields[0].value) == "[1,0,0,1]");
+    {
+      // (said: up to the last entry that is not exactly zero - -0.0 is said, a struct at its defaults is not)
+      const logic::TypeRef three{logic::PinType::number_list, {}, 3};
+      CHECK(logic::said(logic::Value::of(std::vector<f64>{0, 2, 0}), three, g) == 2 && logic::said(logic::Value::of(std::vector<f64>{0, 0, -0.0}), three, g) == 3);
+      CHECK(logic::said(logic::Value::of(std::vector<f64>{0, 2, 0}), {logic::PinType::number_list, {}, 0}, g) == 3 && logic::said(logic::Value::of(std::vector<f64>{}), three, g) == 0);
+      const logic::TypeRef mats{logic::PinType::structure_list, "Mat", 2};
+      const logic::Value plain = logic::zero_of({logic::PinType::structure, "Mat"}, g);
+      CHECK(logic::said(logic::fitted(logic::Value::structures({}), mats, g), mats, g) == 0 && logic::said(logic::Value::structures({plain, plain}), mats, g) == 0);
+      CHECK(json::stringify(logic::zero_of(mats, g).to_json(g, mats)) == "[]" && logic::Value::from_json(json::Value::array(), mats, g).size() == 2);
+    }
+    CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
+    // (the text says an entry up to the last that is not zero - what it does not say is zero, as in C++)
+    CHECK(text.find("  GiveResult Give(const Fixed<Float, 3>& seen, Fixed<Float, 3>& into, Fixed<Float, 3> v = Fixed<Float, 3>{1.0}) {\n    Fixed<Float, 2> Pair = Fixed<Float, 2>{};\n") != std::string::npos);
+    CHECK(text.find("  Fixed<Float, 3> Axis = Fixed<Float, 3>{1.0, 2.0, 3.0};\n") != std::string::npos && text.find("    Fixed<Float, 4> m = Fixed<Float, 4>{1.0, 0.0, 0.0, 1.0};\n") != std::string::npos);
+    CHECK(text.find("  Fixed<Float, 24000> Echo = Fixed<Float, 24000>{};\n") != std::string::npos && text.find("  struct GiveResult { Fixed<Float, 3> v = Fixed<Float, 3>{}; };\n") != std::string::npos);
+    CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
+    CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+    std::string difference;
+    logic::Graph other = g;
+    other.variables[0].count = 4;
+    CHECK(!logic::same_blueprint(g, other, &difference));
+    for (const logic::Issue& i : logic::check(g)) CHECK(!i.error);
+    // every tier keeps the length: a longer list is cut, a shorter one filled up
+    for (bool jit : {false, true}) {
+      FakeLogicHost host;
+      logic::Runtime rt(host);
+      rt.jit = jit;
+      rt.native = false;
+      logic::Instance* inst = rt.add(g, 0, "Level");
+      rt.begin();
+      rt.call("Go", 0, {{"value", logic::Value::number(7)}});
+      CHECK(inst->get("Axis").as_text() == "[1, 7, 3]" && inst->get("Any").as_text() == "[1, 7, 3]" && inst->get("Now").field(0)->size() == 4 && host.errors.empty());
+      CHECK(inst->get("Echo").size() == 24000 && inst->get("Echo").item(23999).as_number() == 7 && inst->get("Echo").item(0).as_number() == 0);
+      CHECK(inst->set("Axis", logic::Value::of(std::vector<f64>{5, 6})) && inst->get("Axis").as_text() == "[5, 6, 0]");
+      CHECK(inst->set("Axis", logic::Value::of(std::vector<f64>{1, 2, 3, 4, 5})) && inst->get("Axis").as_text() == "[1, 2, 3]");
+      std::vector<logic::Value> results;
+      CHECK(inst->call("Give", {logic::Value::of(std::vector<f64>{1}), logic::Value::of(std::vector<f64>{}), logic::Value::of(std::vector<f64>{9, 8, 7, 6})}, results));
+      CHECK(results.size() == 2 && results[0].as_text() == "[9, 8, 7]" && results[1].as_text() == "[0, 0, 0]");  // (what it gives, and what it made of the reference)
+    }
+  }
+  // what the notation refuses - with the reason
+  CHECK(says(in_event("    list_add(Axis, 1.0);"), "\"Axis\" is a list of a fixed length (3)"));
+  CHECK(says(in_event("    list_clear(Now.m);"), "is a list of a fixed length (4)"));
+  CHECK(says(in_event("    list_resize(Axis, 5, 0.0);"), "is a list of a fixed length (3)"));
+  CHECK(says("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
+  CHECK(says("  Fixed<Float, 0> None = Fixed<Float, 0>{};\n", "a list of a fixed length has 1 to 65536 entries"));
+  CHECK(says("  Fixed<Float, 2> Two = List<Float>{1.0, 2.0, 3.0};\n", "Fixed<Float, 2> has 2 entries: this says 3"));
+  {
+    // (a list written out for a place of a fixed length is that place's entries - as C++ takes it; the text of the graph says Fixed)
+    logic::Graph g;
+    std::string error, text;
+    CHECK(read("  Fixed<Float, 2> Two = List<Float>{1.5};\n  Mat Other = Mat{List<Float>{2.0, 3.0}};\n", g, error) && logic::to_cpp(g, "B", text, &error, logic::library(), false));
+    CHECK(text.find("  Fixed<Float, 2> Two = Fixed<Float, 2>{1.5};\n  Mat Other = Mat{Fixed<Float, 4>{2.0, 3.0}};\n") != std::string::npos);
+  }
+  CHECK(says("  List<Float> Two = Fixed<Float, 2>{1.0, 2.0};\n", "this is Fixed<Float, 2>, but List<Float> is needed"));
+  CHECK(says(in_event("    Any = Fixed<Float, 2>{1.0, 2.0};"), "a list of a fixed length is what a place is declared as"));
+  CHECK(says("  void Fill(List<Float>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list, but Axis is float_list[3] - a reference is the place itself, nothing converts"));
+  CHECK(says("  void Fill(Fixed<Float, 4>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Axis);"), "is float_list[4], but Axis is float_list[3]"));
+  CHECK(says("  void Fill(Fixed<Float, 3>& list) {\n    list[0] = 1.0;\n  }\n" + in_event("    Fill(Any);"), "is float_list[3], but Any is float_list"));
+  {
+    // ... and a graph that says it wrong
+    logic::Graph g;
+    g.variables.push_back({"N", logic::PinType::number, json::Value(0.0), {}, {}, 3});
+    json::Value two = json::Value::array();
+    two.push(1.0);
+    two.push(2.0);
+    g.variables.push_back({"L", logic::PinType::number_list, two, {}, {}, 3});
+    g.variables.push_back({"Big", logic::PinType::number_list, json::Value::array(), {}, {}, logic::kLongestFixed + 1});
+    std::string all;
+    for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
+    CHECK(all.find("variable \"N\" has a fixed length (3), but is float: a length is a list's") != std::string::npos);
+    CHECK(all.find("variable \"L\"") == std::string::npos);  // (a default says no more than the list has: what it does not say is zero)
+    CHECK(all.find("variable \"Big\" is a list of " + std::to_string(logic::kLongestFixed + 1) + " entries") != std::string::npos);
+    json::Value four = two;
+    four.push(3.0);
+    four.push(4.0);
+    g.variables[1].value = four;
+    all.clear();
+    for (const logic::Issue& i : logic::check(g)) all += i.text + "\n";
+    CHECK(all.find("variable \"L\" is a list of 3 entries, its default has 4") != std::string::npos);
+  }
+}
+
+// A Blueprint as its C++ class, for the test below: texts written out in the program.
+namespace text_of_the_program {
+inline constexpr char kTitle[] = "the title of this Blueprint, longer than a small text";
+inline constexpr char kName[] = "a name that is longer than fifteen characters";
+struct B : kern::Blueprint {
+  KERN_ENUM(Mode, Closed, Open);
+  KERN_STRUCT(Spec) { Text Name = kName; Float Mass = 1.0; };
+  KERN_STRUCT(Part) { Vector At = Vector{0.0, 0.0, 0.0}; List<Float> Loads = List<Float>{}; };
+  KERN_STRUCT(Rig) { Text Name = ""; Part Core = Part{Vector{0.0, 0.0, 0.0}, List<Float>{}}; List<Part> Parts = List<Part>{}; };
+  Text Title = kTitle;
+  Spec Car = Spec{kName, 2.0};
+  struct NameResult { Text out = ""; };
+  NameResult Name() { return {kTitle}; }
+  struct SpecResult { Spec out = Spec{kName, 1.0}; };
+  SpecResult GetSpec() { return {Car}; }
+};
+}  // namespace text_of_the_program
+
+TEST(logic_text_of_the_program) {
+  // `Text` in a Blueprint's class (logic::Text): a text written out in the program is referred
+  // to - its characters are the program's, nothing is copied and no memory is asked for, however
+  // often the value is handed on (a const char* to a literal in C++). A text made while running
+  // holds its characters itself, as a std::string does.
+  using logic::Text;
+  using namespace text_of_the_program;
+  auto of_program = [](const Text& t, const char* written) { return t.view().data() == written; };
+  B b;
+  CHECK(of_program(b.Title, kTitle) && of_program(b.Car.Name, kName) && b.Title.size() == sizeof kTitle - 1);
+  const auto name = b.Name();
+  const auto spec = b.GetSpec();
+  Text copy = b.Title;
+  Text moved = std::move(copy);
+  const B::Spec made = B::struct_make<B::Spec>(kName, 3.0);
+  const auto list = B::list_make<Text, "2">(kTitle, b.Title);
+  CHECK(of_program(name.out, kTitle) && of_program(spec.out.Name, kName) && of_program(moved, kTitle) && of_program(made.Name, kName) && of_program(list[0], kTitle) && of_program(list[1], kTitle));
+  CHECK(B::text_equal(b.Title, kTitle) && !B::text_equal(b.Title, kName) && B::text_contains(b.Title, "longer than") && B::text_length(b.Title) == static_cast<i64>(sizeof kTitle - 1));
+  CHECK(of_program(B::value_text(b.Title), kTitle));
+  // (the name of an enum's value is the program's too: referred to, where the class holds the names)
+  CHECK(B::enum_name<B::Mode>(B::Mode::Open) == "Open" && B::enum_name<B::Mode>(B::Mode::Open).view().data() == B::kern_enum_values<B::Mode>()[1].data());
+  CHECK(B::enum_name<B::Mode>(static_cast<B::Mode>(7)).empty() && B::enum_from_name<B::Mode>("Open").found && !B::enum_from_name<B::Mode>(b.Title).found);
+
+  // a text made while running: its own characters
+  const Text joined = B::text_append(b.Title, " / ", name.out);
+  CHECK(joined == Text(std::string(kTitle) + " / " + kTitle) && !of_program(joined, kTitle));
+  Text held = joined;
+  CHECK(held == joined && held.view().data() != joined.view().data());
+  held = kName;  // held -> the program's
+  CHECK(of_program(held, kName));
+  held = joined;  // the program's -> held
+  CHECK(held == joined && held.view().data() != joined.view().data());
+  Text& same = held;
+  held = same;  // itself
+  CHECK(held == joined);
+  Text other = std::string("made at run time, also longer than fifteen");
+  held = other;  // held -> held
+  CHECK(held == other && !(held == joined));
+  held = std::move(other);
+  CHECK(held == "made at run time, also longer than fifteen");
+  const Text none;
+  CHECK(none.empty() && none == "" && (none <=> held) < 0 && (held <=> none) > 0 && B::text_append("a", "b", "c") == "abc");
+  held = none;
+  CHECK(held.empty());
+
+  // as values of the interpreter and back; a list of texts; everything prints
+  const kern::List<Text> names{"x", kName, "z"};
+  CHECK(B::list_find<Text>(names, "z") == 2 && B::list_contains<Text>(names, kName) && B::list_get<Text>(names, 7) == "");
+  CHECK(B::list_equal<Text>(names, names) && B::list_equal<Text>(names, kern::List<Text>{"x", kName, "z"}) && !B::list_equal<Text>(names, kern::List<Text>{"x", kName}) &&
+        !B::list_equal<Text>(names, kern::List<Text>{"x", kName, "y"}) && B::list_equal<Text>(kern::List<Text>{}, kern::List<Text>{}));
+  // Lists Equal of structs: field by field, as C++'s == of a struct that compares each of its fields - a NaN in
+  // one equals nothing, not even itself; a struct with a struct, a list of numbers and a list of structs as
+  // fields is compared through all of them. (In the interpreter, the JIT and the class against each other:
+  // the tier case lists_equal_structs.)
+  {
+    const kern::List<B::Spec> specs{B::Spec{kName, 2.0}, B::Spec{"x", 3.0}}, nan_specs{B::Spec{kName, std::nan("")}};
+    CHECK(B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.0}}) && !B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"x", 3.5}}) &&
+          !B::list_equal<B::Spec>(specs, kern::List<B::Spec>{B::Spec{kName, 2.0}, B::Spec{"y", 3.0}}) && !B::list_equal<B::Spec>(nan_specs, nan_specs));
+    auto rig = [](Text name, f32 x, f64 load, f64 inner) {
+      return B::Rig{name, B::Part{B::Vector{x, 1.0, 2.0}, B::List<B::Float>{load, 2.0}}, B::List<B::Part>{B::Part{B::Vector{0.0, 0.0, 1.0}, B::List<B::Float>{inner}}, B::Part{}}};
+    };
+    const kern::List<B::Rig> rigs{rig("a", 1.0, 0.5, 3.0), rig(kName, -0.0, 1.5, 4.0)};
+    CHECK(B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.5, 3.0), rig(kName, 0.0, 1.5, 4.0)}));  // (-0 == 0, as C++ says)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.5, 3.0), rig(kName, -0.0, 1.5, 4.5)}));  // (a number in a list in a struct in a list)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.75, 3.0), rig(kName, -0.0, 1.5, 4.0)}));  // (a list in the struct field)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 2.0, 0.5, 3.0), rig(kName, -0.0, 1.5, 4.0)}));  // (the vector in the struct field)
+    CHECK(!B::list_equal<B::Rig>(rigs, kern::List<B::Rig>{rig("a", 1.0, 0.5, 3.0)}) && B::list_equal<B::Rig>(kern::List<B::Rig>{}, kern::List<B::Rig>{}));
+    const kern::List<B::Rig> deep_nan{rig("n", 1.0, 0.5, std::nan(""))};
+    CHECK(!B::list_equal<B::Rig>(deep_nan, deep_nan) && !(deep_nan[0] == deep_nan[0]) && rigs[1] == rig(kName, -0.0, 1.5, 4.0));
+  }
+  const logic::Value v = logic::to_value(names);
+  CHECK(v.type == logic::PinType::text_list && v.size() == 3 && v.item(1).as_text() == kName);
+  const kern::List<Text> back = logic::from_value<kern::List<Text>>(v);
+  CHECK(back.size() == 3 && back[1] == names[1] && logic::to_value(b.Title).as_text() == kTitle && logic::from_value<Text>(logic::Value::text("t")) == "t");
+  CHECK(kern::to<Text>(1.5) == "1.5" && kern::to<Text>(true) == "true" && kern::to<Text>(Text("t")) == "t");
+  const kern::Fixed<Text, 2> pair{"only one"};
+  CHECK(pair[0] == "only one" && pair[1] == "" && pair[5] == "");
+  Text set;
+  logic::native_set(set, logic::Value::number(2.5));
+  CHECK(set == "2.5");
+}
+
+TEST(kern_map_keeps_the_order_its_keys_came) {
+  // kern::Map and kern::Set against the plainest thing that does the same: a vector of entries and
+  // a search through it - thousands of random steps (put in, take out by key and by place, clear,
+  // reserve, copy, move), and after every one the same entries in the same order.
+  u64 state = 0x9e3779b97f4a7c15ull;
+  auto next = [&] {
+    state ^= state << 13, state ^= state >> 7, state ^= state << 17;
+    return state;
+  };
+  for (int round = 0; round < 40; ++round) {
+    kern::Map<i64, i64> map;
+    kern::Set<std::string> set;
+    std::vector<std::pair<i64, i64>> want;
+    std::vector<std::string> want_keys;
+    const i64 keys = 1 + static_cast<i64>(next() % 300);  // (few keys: many come again)
+    auto at = [&](i64 k) { for (std::size_t i = 0; i < want.size(); ++i) if (want[i].first == k) return static_cast<i64>(i); return i64{-1}; };
+    auto at_key = [&](const std::string& k) { for (std::size_t i = 0; i < want_keys.size(); ++i) if (want_keys[i] == k) return static_cast<i64>(i); return i64{-1}; };
+    bool same = true;
+    for (int step = 0; step < 2000 && same; ++step) {
+      const i64 k = static_cast<i64>(next() % static_cast<u64>(keys)) - keys / 2;
+      const std::string word = "k" + std::to_string(k);
+      switch (next() % 10) {
+        case 0: case 1: case 2: {  // insert_or_assign / Set: new at the end, else the value changes
+          const i64 v = static_cast<i64>(next() % 1000);
+          const auto [it, fresh] = map.insert_or_assign(k, v);
+          const i64 i = at(k);
+          same = same && fresh == (i < 0) && it->second == v;
+          if (i < 0) want.push_back({k, v});
+          else want[static_cast<std::size_t>(i)].second = v;
+          break;
+        }
+        case 3: {  // try_emplace / Add: nothing changes when the key is there
+          const auto [it, fresh] = map.try_emplace(k, 5);
+          const i64 i = at(k);
+          same = same && fresh == (i < 0) && it->first == k;
+          if (i < 0) want.push_back({k, 5});
+          break;
+        }
+        case 4: {  // erase by key: the others keep their order
+          const i64 i = at(k);
+          same = same && map.erase(k) == (i < 0 ? 0u : 1u);
+          if (i >= 0) want.erase(want.begin() + i);
+          break;
+        }
+        case 5: {  // erase by place
+          if (want.empty()) break;
+          const std::size_t i = static_cast<std::size_t>(next() % want.size());
+          map.erase_at(i);
+          want.erase(want.begin() + static_cast<std::ptrdiff_t>(i));
+          break;
+        }
+        case 6: {  // [] makes the entry with the zero
+          map[k] += 1;
+          const i64 i = at(k);
+          if (i < 0) want.push_back({k, 1});
+          else want[static_cast<std::size_t>(i)].second += 1;
+          break;
+        }
+        case 7: {  // a set: insert and erase
+          const i64 i = at_key(word);
+          if (next() % 2) {
+            same = same && set.insert(word).second == (i < 0);
+            if (i < 0) want_keys.push_back(word);
+          } else {
+            same = same && set.erase(word) == (i < 0 ? 0u : 1u);
+            if (i >= 0) want_keys.erase(want_keys.begin() + i);
+          }
+          break;
+        }
+        case 8: {  // copies and moves keep the entries and find them
+          if (next() % 2) { kern::Map<i64, i64> copy = map; map = std::move(copy); }
+          else { kern::Set<std::string> copy(set); set = copy; }
+          if (next() % 50 == 0) map.reserve(static_cast<std::size_t>(next() % 1000));
+          break;
+        }
+        default:
+          if (next() % 40 == 0) { map.clear(); want.clear(); }
+          if (next() % 40 == 0) { set.clear(); want_keys.clear(); }
+          break;
+      }
+      // the same entries in the same order - and every key found where it stands
+      same = same && map.size() == want.size() && set.size() == want_keys.size();
+      for (std::size_t i = 0; same && i < want.size(); ++i)
+        same = map.key_at(i) == want[i].first && map.value_at(i) == want[i].second && map.index_of(want[i].first) == i && map.find(want[i].first) == map.begin() + i;
+      for (std::size_t i = 0; same && i < want_keys.size(); ++i) same = set.key_at(i) == want_keys[i] && set.index_of(want_keys[i]) == i && set.contains(want_keys[i]);
+      same = same && map.contains(k) == (at(k) >= 0) && set.contains(word) == (at_key(word) >= 0);
+      same = same && (at(keys + 1) < 0 && !map.contains(keys + 1) && map.find(keys + 1) == map.end());
+    }
+    CHECK(same);
+    // going through it is the order the keys came, on every machine
+    std::size_t i = 0;
+    for (const auto& [k, v] : map) {
+      CHECK(k == want[i].first && v == want[i].second);
+      ++i;
+    }
+  }
+  // a key that comes again after it was taken out goes to the end
+  kern::Map<std::string, int> m{{"a", 1}, {"b", 2}, {"c", 3}};
+  m.erase("a");
+  m["a"] = 4;
+  CHECK(m.key_at(0) == "b" && m.key_at(1) == "c" && m.key_at(2) == "a" && m.value_at(2) == 4);
+  // (a key said twice in what makes the map: the first - as std::unordered_map takes it)
+  kern::Map<int, int> twice{{1, 1}, {2, 2}, {1, 3}};
+  CHECK(twice.size() == 2 && twice.key_at(0) == 1 && twice.value_at(0) == 1);
+  CHECK((kern::Map<int, int>{{1, 2}} == kern::Map<int, int>{{1, 2}}) && !(kern::Map<int, int>{{1, 2}, {3, 4}} == kern::Map<int, int>{{3, 4}, {1, 2}}));
+}
+
+TEST(logic_int64_is_u64_and_i64) {
+  // Every Int64 node against what u64 and i64 of C++ do - with random bits (and the edges: 0, 1,
+  // -1, the smallest and the largest i64); where C++ leaves it open, the node's own answer.
+  using P = logic::PureNodes;
+  using I = logic::Int64;
+  u64 state = 0x2545f4914f6cdd1dull;
+  auto next = [&] {
+    state ^= state << 13, state ^= state >> 7, state ^= state << 17;
+    return state;
+  };
+  const u64 edges[] = {0, 1, ~u64{0}, u64{1} << 63, (u64{1} << 63) - 1, 2, 63, 64, 0xffffffffull, 0x100000000ull};
+  auto draw = [&] { return next() % 4 == 0 ? edges[next() % (sizeof edges / sizeof edges[0])] : next() >> (next() % 64); };
+  bool same = true;
+  for (int k = 0; k < 20000 && same; ++k) {
+    const u64 a = draw(), b = draw();
+    const i64 sa = static_cast<i64>(a), sb = static_cast<i64>(b);
+    const i64 by = static_cast<i64>(next() % 200) - 50;
+    const unsigned sh = static_cast<unsigned>(static_cast<u64>(by) & 63);
+    same = same && P::int64_add(I(a), I(b)).bits == a + b && P::int64_sub(I(a), I(b)).bits == a - b && P::int64_mul(I(a), I(b)).bits == a * b;
+    same = same && P::int64_div_unsigned(I(a), I(b)).bits == (b ? a / b : 0) && P::int64_rem_unsigned(I(a), I(b)).bits == (b ? a % b : 0);
+    if (sb != 0 && !(sb == -1 && sa == std::numeric_limits<i64>::min()))
+      same = same && P::int64_div(I(a), I(b)).bits == static_cast<u64>(sa / sb) && P::int64_rem(I(a), I(b)).bits == static_cast<u64>(sa % sb);
+    same = same && P::int64_and(I(a), I(b)).bits == (a & b) && P::int64_or(I(a), I(b)).bits == (a | b) && P::int64_xor(I(a), I(b)).bits == (a ^ b) && P::int64_not(I(a)).bits == ~a;
+    same = same && P::int64_shift_left(I(a), by).bits == (a << sh) && P::int64_shift_right_unsigned(I(a), by).bits == (a >> sh) && P::int64_shift_right(I(a), by).bits == static_cast<u64>(sa >> sh);
+    same = same && P::int64_rotate_left(I(a), by).bits == std::rotl(a, static_cast<int>(sh)) && P::int64_rotate_right(I(a), by).bits == std::rotr(a, static_cast<int>(sh));
+    same = same && P::int64_equal(I(a), I(b)) == (a == b) && P::int64_less(I(a), I(b)) == (sa < sb) && P::int64_less_unsigned(I(a), I(b)) == (a < b);
+    same = same && P::int64_high(I(a)) == static_cast<i64>(a >> 32) && P::int64_low(I(a)) == static_cast<i64>(a & 0xffffffffull) && P::int64_of_halves(P::int64_high(I(a)), P::int64_low(I(a))).bits == a;
+    same = same && P::int64_count_ones(I(a)) == std::popcount(a) && P::int64_leading_zeros(I(a)) == std::countl_zero(a) && P::int64_trailing_zeros(I(a)) == std::countr_zero(a);
+    same = same && P::int64_bits_of_float(P::int64_float_of_bits(I(a))).bits == a;  // (a no-number's bits too)
+    // 32 bits: std::bit_cast of a float, both ways - of every pattern, also the no-numbers (their sign and payload) and the subnormals
+    const u32 w = static_cast<u32>(a);
+    const bool no_number = (w & 0x7f800000u) == 0x7f800000u && (w & 0x007fffffu) != 0;
+    // (a no-number a Float holds is quiet - as a float that becomes a double is: its 32 bits again with the quiet bit)
+    same = same && P::math_bits_of_float32(P::math_float32_of_bits(static_cast<i64>(w))) == static_cast<i64>(no_number ? w | 0x00400000u : w);
+    same = same && P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(a))).bits == P::int64_bits_of_float(P::math_float32_of_bits(static_cast<i64>(w))).bits;  // (the last 32 bits)
+    if (!no_number)
+      same = same && P::math_float32_of_bits(static_cast<i64>(w)) == static_cast<f64>(std::bit_cast<f32>(w)) && P::math_bits_of_float32(static_cast<f64>(std::bit_cast<f32>(w))) == static_cast<i64>(w);
+    same = same && P::int64_of_text(P::int64_text(I(a))).bits == a && P::int64_of_text(P::int64_text_signed(I(a))).bits == a && P::int64_of_text("0x" + P::int64_text_hex(I(a))).bits == a;
+    same = same && P::int64_text(I(a)) == std::to_string(a) && P::int64_text_signed(I(a)) == std::to_string(sa);
+    same = same && P::int64_to_float(I(a)) == static_cast<f64>(sa) && P::int64_to_float_unsigned(I(a)) == static_cast<f64>(a) && P::int64_to_int(I(a)) == logic::normal(sa);
+    const f64 x = static_cast<f64>(sa) * 0.75;
+    same = same && P::int64_of_float(x).bits == static_cast<u64>(static_cast<i64>(x));
+    if (!same) std::printf("Int64: %llx %llx by %lld\n", static_cast<unsigned long long>(a), static_cast<unsigned long long>(b), static_cast<long long>(by));
+  }
+  CHECK(same);
+  // what C++ leaves open, defined: by 0, the smallest i64 by -1, Floats beyond the ends and no number, texts that are none
+  const u64 min = u64{1} << 63;
+  CHECK(P::int64_div(I(5), I(0)).bits == 0 && P::int64_rem(I(5), I(0)).bits == 0 && P::int64_div_unsigned(I(5), I(0)).bits == 0 && P::int64_rem_unsigned(I(5), I(0)).bits == 0);
+  CHECK(P::int64_div(I(min), I(~u64{0})).bits == min && P::int64_rem(I(min), I(~u64{0})).bits == 0);
+  CHECK(P::int64_of_float(1e30).bits == static_cast<u64>(std::numeric_limits<i64>::max()) && P::int64_of_float(-1e30).bits == min && P::int64_of_float(std::nan("")).bits == 0);
+  CHECK(P::int64_of_float(-9223372036854775808.0).bits == min && P::int64_of_float(9223372036854775808.0).bits == static_cast<u64>(std::numeric_limits<i64>::max()));
+  CHECK(P::int64_of_float_unsigned(-1).bits == 0 && P::int64_of_float_unsigned(1e30).bits == ~u64{0} && P::int64_of_float_unsigned(3.75).bits == 3 && P::int64_of_float_unsigned(std::nan("")).bits == 0);
+  CHECK(P::int64_of_text("").bits == 0 && P::int64_of_text("zz").bits == 0 && P::int64_of_text("18446744073709551616").bits == 0 && P::int64_of_text("-5").bits == ~u64{0} - 4);
+  CHECK(P::int64_of_text("0x1F").bits == 31 && P::int64_text_hex(I(255)) == "ff" && P::int64_of_int(-1).bits == ~u64{0} && P::int64_to_int_unsigned(I(7)) == 7);
+  // the value of the language: its bits, as JSON a text of their u64, as a literal Int64{0x...}
+  const logic::Value v = logic::Value::int64(~u64{0});
+  CHECK(json::stringify(v.to_json()) == "\"18446744073709551615\"" && logic::Value::from_json(v.to_json(), logic::PinType::int64).i == v.i && v.as_text() == "18446744073709551615");
+  CHECK(logic::Value::from_json(json::Value(5.0), logic::PinType::int64).i == 5 && logic::Value::from_json(json::Value("0x10"), logic::PinType::int64).i == 16);
+  CHECK(!logic::convertible(logic::PinType::int64, logic::PinType::number) && !logic::convertible(logic::PinType::integer, logic::PinType::int64) && !logic::convertible(logic::PinType::int64, logic::PinType::text));
+  CHECK(logic::list_of(logic::PinType::int64) == logic::PinType::int64_list && logic::element_of(logic::PinType::int64_list) == logic::PinType::int64 && logic::is_list(logic::PinType::int64_list));
+  CHECK(!logic::is_list(logic::PinType::map) && !logic::is_list(logic::PinType::set) && logic::is_keyed(logic::PinType::map) && std::string(logic::pin_type_name(logic::PinType::int64_list)) == "int64_list");
+}
+
+TEST(logic_maps_and_sets) {
+  // Maps and sets of a Blueprint: types, values, JSON, the text, the check - and that a call that
+  // holds an entry of a map keeps it where it is.
+  const std::string head = "struct B : kern::Blueprint {\n  KERN_ENUM(Kind, A, B, C);\n  KERN_STRUCT(Cell) {\n    Int Count = 0;\n    List<Text> Tags = List<Text>{};\n  };\n"
+                           "  Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};\n  Map<Text, Cell> Cells = Map<Text, Cell>{};\n  Map<Kind, List<Float>> Lists = Map<Kind, List<Float>>{};\n"
+                           "  Set<Int64> Seen = Set<Int64>{Int64{0x5}};\n  Map<Int64, Text> Big = Map<Int64, Text>{{Int64{0xffffffffffffffff}, \"max\"}};\n  Float Got = 0.0;\n  Int N = 0;\n";
+  auto in_event = [](const std::string& lines) { return "  KERN_EVENT(on1, event_custom<\"Go\">)\n  void on1(Actor actor, Float value, Text text) {\n" + lines + "\n  }\n"; };
+  auto read = [&](const std::string& body, logic::Graph& g, std::string& error) { return logic::from_cpp(head + body + "};\n", g, nullptr, &error); };
+  auto says = [&](const std::string& body, const char* why) {
+    logic::Graph g;
+    std::string error;
+    const bool is_read = read(body, g, error);
+    if (is_read) error = logic::cpp_problem(g);
+    for (const logic::Issue& i : is_read ? logic::check(g) : std::vector<logic::Issue>())
+      if (i.error) error += " | " + i.text;
+    const bool right = error.find(why) != std::string::npos;
+    if (!right) std::printf("expected \"%s\", got: %s\n", why, error.empty() ? "(nothing is wrong with it)" : error.c_str());
+    return right;
+  };
+  {
+    // the types and what TypeRef::of says of them
+    const logic::TypeRef cells{logic::PinType::map, "text>struct:Cell"}, seen{logic::PinType::set, "int64"};
+    CHECK(logic::key_type(cells).type == logic::PinType::text && logic::value_type(cells).type == logic::PinType::structure && logic::value_type(cells).of == "Cell");
+    CHECK(logic::key_type(seen).type == logic::PinType::int64 && logic::value_type(seen).type == logic::PinType::exec);
+    const logic::TypeRef kind{logic::PinType::enumeration, "Kind"}, floats{logic::PinType::number_list, {}};
+    CHECK(logic::keyed_of(kind, &floats) == "enum:Kind>float_list" && logic::keyed_of(kind, nullptr) == "enum:Kind");
+    CHECK(logic::type_text(cells) == "map<text>struct:Cell>" && logic::type_label(cells) == "Map of Text to Cell" && logic::type_label(seen) == "Set of Int64");
+    CHECK(logic::key_type_ok(logic::PinType::int64) && !logic::key_type_ok(logic::PinType::number) && !logic::key_type_ok(logic::PinType::vector) && !logic::key_type_ok(logic::PinType::map));
+    CHECK(logic::fits(cells, cells) && !logic::fits(cells, {logic::PinType::map, "text>struct:Other"}) && !logic::fits(seen, {logic::PinType::set, "int"}));
+  }
+  {
+    // the text and the graph: every node, a value of a map as a place, literals of each kind of key
+    logic::Graph g, back;
+    std::string error, text, twice;
+    CHECK(read(in_event("    map_set(Scores, 7, value);\n    map_add(Cells, \"a\");\n    Cells[0].Count += 1;\n    list_add(Cells[0].Tags, text);\n"
+                        "    map_set(Lists, Kind::B, list_make<Float, \"2\">(value, 2.5));\n    set_add(Seen, Int64{0x10000000000000});\n    map_set(Big, Int64{0x20000000000001}, \"far\");\n"
+                        "    Got = map_find<Int, Float>(Scores, 7).value;\n    N = map_length<Int, Float>(Scores);\n    map_remove(Scores, 3);\n    set_remove_at(Seen, 0);"),
+               g, error));
+    if (!error.empty()) std::printf("%s\n", error.c_str());
+    for (const logic::Issue& i : logic::check(g)) {
+      if (i.error) std::printf("%s\n", i.text.c_str());
+      CHECK(!i.error);
+    }
+    CHECK(g.variable("Scores") && g.variable("Scores")->type == logic::PinType::map && g.variable("Scores")->of == "int>float" && json::stringify(g.variable("Scores")->value) == "[[3,1.5],[1,2]]");
+    CHECK(g.variable("Seen") && g.variable("Seen")->type == logic::PinType::set && g.variable("Seen")->of == "int64" && json::stringify(g.variable("Seen")->value) == "[\"5\"]");
+    CHECK(g.variable("Big") && json::stringify(g.variable("Big")->value) == "[[\"18446744073709551615\",\"max\"]]" && g.variable("Lists")->of == "enum:Kind>float_list");
+    CHECK(logic::to_cpp(g, "B", text, &error, logic::library(), false));
+    CHECK(text.find("  Map<Int, Float> Scores = Map<Int, Float>{{3, 1.5}, {1, 2.0}};\n") != std::string::npos && text.find("  Set<Int64> Seen = Set<Int64>{Int64{0x5}};\n") != std::string::npos);
+    CHECK(text.find("  Map<Kind, List<Float>> Lists = Map<Kind, List<Float>>{};\n") != std::string::npos && text.find("Int64{0xffffffffffffffff}") != std::string::npos);
+    CHECK(logic::from_cpp(text, back, nullptr, &error) && logic::to_cpp(back, "B", twice, &error, logic::library(), false) && twice == text);
+    CHECK(logic::graph_from_json(logic::graph_to_json(g), back) && back == g);
+    // every tier the same: the order the keys came, an entry taken out of the middle
+    for (bool jit : {false, true}) {
+      FakeLogicHost host;
+      logic::Runtime rt(host);
+      rt.jit = jit;
+      rt.native = false;
+      logic::Instance* inst = rt.add(g, 0, "Level");
+      rt.begin();
+      rt.call("Go", 0, {{"value", logic::Value::number(4.5)}, {"text", logic::Value::text("t")}});
+      const logic::Value scores = inst->get("Scores"), cells_now = inst->get("Cells"), seen_now = inst->get("Seen");
+      CHECK(scores.size() == 2 && scores.keyed().key_at(0).i == 1 && scores.keyed().key_at(1).i == 7 && scores.keyed().value_at(1).as_number() == 4.5);
+      CHECK(inst->get("Got").as_number() == 4.5 && inst->get("N").as_int() == 3 && host.errors.empty());
+      CHECK(cells_now.size() == 1 && cells_now.keyed().key_at(0).s == "a" && cells_now.keyed().value_at(0).field(0)->as_int() == 1 && cells_now.keyed().value_at(0).field(1)->size() == 1);
+      CHECK(seen_now.size() == 1 && static_cast<u64>(seen_now.keyed().key_at(0).i) == 0x10000000000000ull);
+      const logic::Value big = inst->get("Big");
+      CHECK(big.size() == 2 && static_cast<u64>(big.keyed().key_at(0).i) == ~u64{0} && static_cast<u64>(big.keyed().key_at(1).i) == 0x20000000000001ull && big.keyed().value_at(1).as_text() == "far");
+    }
+  }
+  {
+    // a map's value at its place: what stands there, and beside the map an entry of its own
+    logic::Graph g;
+    std::string error;
+    CHECK(read(in_event("    map_add(Cells, \"a\");\n    Cells[5].Count += 1;\n    N = struct_break<Cell>(Cells[0]).Count;"), g, error));
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.native = false;
+    logic::Instance* inst = rt.add(g, 0, "Level");
+    rt.begin();
+    rt.call("Go", 0, {{"value", logic::Value::number(1)}});
+    CHECK(inst->get("Cells").size() == 1 && inst->get("N").as_int() == 0 && host.errors.empty());
+  }
+  // what the notation and the check refuse - with the reason
+  CHECK(says("  Map<Float, Int> Wrong = Map<Float, Int>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
+  CHECK(says("  Set<Vector> Wrong = Set<Vector>{};\n", "the keys of a map or a set are Bool, Int, Int64, Text or an enum"));
+  CHECK(says("  Map<Int, Map<Int, Float>> Wrong = Map<Int, Map<Int, Float>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<Int, Fixed<Float, 3>> Wrong = Map<Int, Fixed<Float, 3>>{};\n", "the values of a map are a type a variable can be, but no map, set or list of a fixed length"));
+  CHECK(says("  Map<Int, Float> Twice = Map<Int, Float>{{1, 2.0}, {1, 3.0}};\n", "the key 1 is said twice"));
+  CHECK(says(in_event("    map_add(Scores, 2);\n    list_add(Scores, 1.0);"), "Scores"));
+  CHECK(says("  void Touch(Cell& c) {\n    map_add(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    map_add(Cells, \"a\");\n    Touch(Cells[0]);"), "an entry that is held stays where it is"));
+  CHECK(says("  void Touch(Cell& c) {\n    map_remove(Cells, \"b\");\n    c.Count += 1;\n  }\n" + in_event("    Touch(Cells[0]);"), "an entry that is held stays where it is"));
+  {
+    // ... and a graph that says it wrong: a key of a Float, a map in a map, a map with a fixed length
+    auto issues = [](logic::Graph g) {
+      std::string all;
+      for (const logic::Issue& i : logic::check(g)) all += i.error ? i.text + " | " : "";
+      return all;
+    };
+    logic::Graph g;
+    g.variables.push_back({"M", logic::PinType::map, json::Value::array(), {}, "float>int"});
+    CHECK(issues(g).find("variable \"M\" is map<float>int>, which this Blueprint cannot have") != std::string::npos);
+    g.variables[0].of = "int>map:int>float";
+    CHECK(issues(g).find("which this Blueprint cannot have") != std::string::npos);
+    g.variables[0].of = "int>float";
+    g.variables[0].count = 3;
+    CHECK(issues(g).find("variable \"M\" has a fixed length (3), but is map<int>float>: a length is a list's") != std::string::npos);
+    g.variables[0].count = 0;
+    g.variables[0].of = "enum:Nope>int";
+    CHECK(issues(g).find("which this Blueprint cannot have") != std::string::npos);
+    // (in a file: a type it cannot have is no graph)
+    logic::Graph none;
+    json::Value j;
+    CHECK(json::parse(R"({"variables":[{"name":"M","type":"map","of":"float>int","value":[]}],"nodes":[],"links":[]})", j) && !logic::graph_from_json(j, none));
+  }
+  {
+    // JSON: [[key, value], ...] in the order of the entries; a key said again: the first
+    logic::Graph g;
+    const logic::TypeRef scores{logic::PinType::map, "int>float"}, words{logic::PinType::set, "text"};
+    json::Value j;
+    CHECK(json::parse("[[2, 1.5], [1, 3], [2, 9], 7]", j));
+    const logic::Value m = logic::Value::from_json(j, scores, g);
+    CHECK(m.size() == 2 && m.keyed().key_at(0).i == 2 && m.keyed().value_at(0).as_number() == 1.5 && m.keyed().key_at(1).i == 1);
+    CHECK(json::stringify(m.to_json(g, scores)) == "[[2,1.5],[1,3]]");
+    CHECK(json::parse("[\"b\", \"a\", \"b\"]", j));
+    const logic::Value s = logic::Value::from_json(j, words, g);
+    CHECK(s.size() == 2 && s.keyed().key_at(0).s == "b" && json::stringify(s.to_json(g, words)) == "[\"b\",\"a\"]");
+    CHECK(logic::Value::from_json(m.to_json(g, scores), scores, g) == m && !(m == s));
   }
 }
 
@@ -4046,6 +5492,24 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused(in_event("    Name = \"a\\qb\";"), "a text cannot contain \\q");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a + b; }, 1.0);"), "the lambda's parameters are exactly these");
   refused(in_event("    Heat = kern::formula([](Float a) -> Float { return a +; }, 1.0);"), "the formula:");
+  // (Int inputs only where Formula::int_input holds, an Int result only where Formula::whole_result holds and - by +, - or * -
+  // everything that reads it is an Int; every Int input a wire from an Int as it is)
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return kern::math::div(a, 2.0); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(-a + 1.0, 3.0); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::wrap32(a * kern::math::sqrt(2.0)); }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Float { return a < 3.0 ? a : 1.0; }, Count));"), "the input a is an Int only where");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return a < 3.0; }, Count));"), "-> Int is a formula whose value is a whole number");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 1.0) + 2.0; }, Count));"), "-> Int is a formula whose value is a whole number");
+  refused(in_event("    Heat = kern::formula([](Int a) -> Int { return a + 1.0; }, Count);"), "this formula gives an Int by +, - or *, and this reads it as Float");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a, Float b) -> Int { return kern::math::band(a, b); }, Count, Heat));"), "a formula with a Float input gives a Float: -> Float");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, Heat));"), "the input of the formula is an Int");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, kern::to<Float>(Count)));"), "an Int as it is: no kern::to");
+  refused(in_event("    Count = kern::to<Int>(kern::formula([](Int a) -> Int { return kern::math::band(a, 3.0); }, 5));"), "no number written out");
+  // (a list of a fixed length written out on an input says the input's length: Fixed<Float, 3> for a field of three)
+  for (const char* wrong : {"Fixed<Float, 4>{1.5}", "Fixed<Float, 2>{1.5}"})
+    refused("  KERN_STRUCT(Trio) { Fixed<Float, 3> m = Fixed<Float, 3>{}; Int k = 0; };\n  Trio P = Trio{Fixed<Float, 3>{}, 0};\n" +
+                in_event(std::string("    P = struct_make<Trio>(") + wrong + ", 7);"),
+            "\"m\" of struct_make is Fixed<Float, 3>, this is Fixed<Float, ");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 1.0; } n1;\n  void Unused() {"), "starts empty");
   refused(in_event("    Heat = value;\n  }\n  struct { Float value = 0.0; } n77;\n  void Unused() {"), "n77 names no node");
   refused("  Float Heat = 1.0;", "the variable Heat is declared twice");
@@ -4055,7 +5519,7 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   refused("  List<Float> Other = List<Int>{1};", "this is List<Int>, but List<Float> is needed (like List<Float>{})");
   refused("  List<Float> Other = List<Float>{1.0, \"a\"};", "a list's item: this is Text, but Float is needed");
   refused("  List<Float> Other = 1.0;", "this is Float, but List<Float> is needed");
-  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
+  refused("  List<Double> Other;", "\"Double\" is no type a list holds: a list is List<Bool>, List<Int>, List<U8> ... List<I32>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>", "line 5, column 8:");
   refused("  List<List<Float>> Other;", "\"List\" is no type a list holds");
   refused("  List<Float> Other = List<Float>;", "a list written out is List<Float>{...}");
   refused("  List<Float> Items = List<Float>{};\n" + in_event("    list_add(1.0);"), "list_add changes a variable: that variable is its first value - list_add(Variable, ...) - not \"1.0\"");
@@ -4208,7 +5672,37 @@ TEST(logic_notation_refuses_with_place_and_reason) {
     CHECK(says(bump + "  void Clear(Car& car) {\n    list_clear(car.Marks);\n  }\n  void Both(Car& car) {\n    Clear(car);\n  }\n  void Mark(Float& mark, Car& car) {\n    Both(car);\n    mark += 1.0;\n  }\n" +
                    in_event("    Mark(Mine.Marks[0], Mine);"),
                "while Mark holds it, the length of Mine.Marks is changed"));
-    CHECK(says("  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n" + in_event("    Shout(Cars[0]);"), "may run handlers while it holds it"));
+    // an entry of a list of any length given to a function that may run handlers: the call is checked - logic::Held
+    // around it in the text and the class, the lengths in the interpreter (Runtime::held_lost) -, and the text reads back
+    // as the same Blueprint (the check follows from the graph)
+    auto held_text = [&](const std::string& body) {
+      logic::Graph g, again;
+      std::string error, text, difference;
+      if (!logic::from_cpp("struct B : kern::Blueprint {\n  Float Heat = 0.0;\n  Int Count = 0;\n" + car + body + "\n};\n", g, nullptr, &error)) return "not read: " + error;
+      if (!logic::check(g).empty() || !logic::cpp_problem(g).empty()) return "not checked: " + logic::cpp_problem(g);
+      if (!logic::to_cpp(g, "B", text, &error)) return "not written: " + error;
+      if (!logic::from_cpp(text, again, nullptr, &error)) return "not read again: " + error;
+      if (!logic::same_blueprint(g, again, &difference)) return "not the same: " + difference;
+      return text;
+    };
+    const std::string shouts = "  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n";
+    CHECK(wrong(shouts + in_event("    Shout(Cars[0]);")).empty());
+    {
+      const std::string text = held_text(shouts + in_event("    Shout(Cars[0]);"));
+      CHECK(text.find("const kern::logic::Held held_") != std::string::npos && text.find("(Cars);\n") != std::string::npos && text.find("held_after(held_") != std::string::npos);
+      if (text.find("held_after(held_") == std::string::npos) std::printf("%s\n", text.c_str());
+      // (a function that runs no handlers: no check)
+      CHECK(held_text(bump + in_event("    Bump(Cars[0].Speed, 1.0);")).find("Held") == std::string::npos);
+    }
+    // (an entry of a list of a fixed length stays where it is whatever the handlers do: nothing changes how long
+    // that list is - but an entry of a list of any length inside it can go)
+    const std::string shout = "  Fixed<Car, 2> Two = List<Car>{};\n  void Shout(Car& car) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, car.Speed, \"\");\n  }\n"
+                              "  void Hum(Float& mark) {\n    flow_call<\"Go\">(Actor{0}, Actor{0}, mark, \"\");\n  }\n";
+    CHECK(wrong(shout + in_event("    Shout(Two[1]);\n    Hum(Two[0].Speed);")).empty());
+    CHECK(wrong(shout + in_event("    Hum(Two[1].Marks[0]);")).empty());
+    CHECK(held_text(shout + in_event("    Hum(Two[1].Marks[0]);")).find("(Two[1].Marks);") != std::string::npos);
+    // (a function read as a value cannot be checked around: it may not hold such an entry while it runs handlers - there is none
+    // that runs them, a pure function only computes)
     // ... and what is fine: the list itself, another list, a field of the entry, a variable that is no entry
     CHECK(wrong("  void Grow(List<Car>& cars, Car& car) {\n    car.Speed = 1.0;\n    list_add(car.Marks, 2.0);\n  }\n  void More(List<Float>& marks) {\n    list_add(marks, 1.0);\n  }\n" +
                 in_event("    Grow(Cars, Mine);\n    More(Cars[0].Marks);\n    More(Mine.Marks);"))
@@ -4266,6 +5760,92 @@ TEST(logic_notation_refuses_with_place_and_reason) {
   CHECK(logic::from_cpp("struct A : kern::Blueprint {\n};\n", g, nullptr, &error) && g.empty());
 }
 
+TEST(logic_callbacks) {
+  // A Callback: a function of a library as a value only the engine calls (Make Callback) - its first input bound to a
+  // place, read where it stands when the engine calls; unbound once the Blueprint that made it has ended.
+  const char* ground =
+      "struct Ground : virtual kern::Library {\n  // ---- types ----\n  KERN_STRUCT(Field) {\n    Float Base = 1.0;\n    Float Slope = 0.5;\n  };\n\n  // ---- functions ----\n"
+      "  struct heightResult { Float h = 0.0; };\n"
+      "  KERN_PURE heightResult height(const Field& f, Float x = 0.0, Float y = 0.0) {\n    return {kern::formula([](Float b, Float s, Float x, Float y) -> Float { return b + s * x + y; }, f.Base, f.Slope, x, y)};\n  }\n\n"
+      "  struct loudResult { Float h = 0.0; };\n"
+      "  loudResult loud(const Field& f, Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {f.Base};\n  }\n};\n";
+  const char* site =
+      "struct Site : virtual kern::Blueprint, virtual Ground {\n  // ---- variables ----\n"
+      "  Field Here = Field{2.0, 0.5};\n  Callback<Float(Float, Float)> Kept = Callback<Float(Float, Float)>{};\n\n  // ---- functions ----\n"
+      "  void Make() {\n    Kept = callback<&Ground::height>(Here);\n  }\n\n"
+      "  struct MadeResult { Callback<Float(Float, Float)> c = Callback<Float(Float, Float)>{}; };\n"
+      "  KERN_PURE MadeResult Made() {\n    return {callback<&Ground::height>(Here)};\n  }\n};\n";
+  std::map<std::string, logic::Graph> project;
+  const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
+    auto it = project.find(std::string(name));
+    return it == project.end() ? nullptr : &it->second;
+  };
+  auto read = [&](const char* name, const std::string& text) {
+    std::string error;
+    logic::Graph g;
+    if (!logic::from_cpp(text, g, nullptr, &error, logic::library(), all)) return error;
+    for (const logic::Issue& i : logic::check(g)) if (i.error) error += i.text + "\n";
+    if (!error.empty()) return error;
+    project[name] = std::move(g);
+    return std::string();
+  };
+  const std::string g1 = read("Ground", ground), g2 = read("Site", site);
+  CHECK(g1.empty() && g2.empty());
+  if (!g1.empty() || !g2.empty()) std::printf("%s%s", g1.c_str(), g2.c_str());
+  const logic::TypeRef type{logic::PinType::callback, "float(float,float)"};
+  // the text, the graph and the document: one thing
+  for (const char* name : {"Ground", "Site"}) {
+    std::string text, error;
+    logic::Graph back, stored;
+    CHECK(logic::to_cpp(project[name], name, text, &error, logic::library(), false));
+    CHECK(logic::from_cpp(text, back, nullptr, &error, logic::library(), all) && back == project[name]);
+    if (!(back == project[name])) std::printf("%s is written as:\n%s\n%s\n", name, text.c_str(), error.c_str());
+    CHECK(logic::graph_from_json(logic::graph_to_json(project[name]), stored) && stored == project[name]);
+    CHECK(logic::cpp_problem(project[name]).empty());
+  }
+  CHECK(logic::type_label(type) == "Callback of Float(Float, Float)" && logic::type_text(type) == "callback<float(float,float)>");
+  for (bool jit : {false, true}) {
+    FakeLogicHost host;
+    logic::Runtime rt(host);
+    rt.jit = jit;
+    rt.native = false;
+    rt.blueprints = all;
+    logic::Instance* inst = rt.add(project["Site"], 0, "Site");
+    rt.begin();
+    std::vector<logic::Value> out;
+    logic::Value r;
+    CHECK(!logic::call_back(inst->get("Kept"), type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.type == logic::PinType::number && r.n == 0);
+    CHECK(inst->call("Make", {}, out) && host.errors.empty());
+    const logic::Value kept = inst->get("Kept");
+    // 2 + 0.5 * 1 + 3: the place as it is when the engine calls
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 5.5);
+    CHECK(inst->set("Here", logic::Value::structure({logic::Value::number(10), logic::Value::number(2)})));
+    CHECK(logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 15);
+    CHECK(inst->call("Made", {}, out) && out.size() == 1 && out[0].type == logic::PinType::callback && logic::call_back(out[0], type, std::vector<logic::Value>{logic::Value::number(0), logic::Value::number(0)}, r) && r.n == 10);
+    rt.remove(0);
+    rt.clear();
+    CHECK(!logic::call_back(kept, type, std::vector<logic::Value>{logic::Value::number(1), logic::Value::number(3)}, r) && r.n == 0);  // (its Blueprint has ended: unbound)
+  }
+  // what is no Callback
+  auto says = [&](const std::string& got, const char* why) {
+    if (got.find(why) == std::string::npos) std::printf("expected \"%s\", got: %s\n", why, got.empty() ? "(nothing wrong)" : got.c_str());
+    return got.find(why) != std::string::npos;
+  };
+  // a loop keeps where it is only while it runs (set anew whenever it starts): a Callback's function may have one
+  {
+    const std::string loops = read("Loops", "struct Loops : virtual kern::Library {\n  struct stepsResult { Float h = 0.0; };\n  stepsResult steps(Float x = 0.0) {\n"
+                                            "    for (auto it1 = flow_for(n1, 0, 2); it1.next();) {\n      if (math_compare<\">\">(kern::to<Float>(n1.index), x)) {\n        return {1.0};\n      }\n    }\n"
+                                            "    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n"
+                                            "    return {callback<&Loops::steps>()};\n  }\n\n  struct : kern::Node<1> { Int index = 0; } n1;\n};\n");
+    CHECK(loops.empty());
+    if (!loops.empty()) std::printf("Loops: %s", loops.c_str());
+  }
+  CHECK(says(read("Bad1", "struct Bad1 : virtual kern::Blueprint, virtual Ground {\n  Callback<Float(Float)> K = Callback<Float(Float)>{};\n\n  void Make() {\n    K = callback<&Ground::loud>(Here);\n  }\n};\n"), "Here"));
+  CHECK(says(read("Bad2", "struct Bad2 : virtual kern::Library {\n  struct loudResult { Float h = 0.0; };\n  loudResult loud(Float x = 0.0) {\n    debug_print(\"x\", false);\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad2::loud>()};\n  }\n};\n"), "needs the world"));
+  CHECK(says(read("Bad4", "struct Bad4 : virtual kern::Blueprint, virtual Ground {\n  List<Field> Fields = List<Field>{Field{1.0, 0.5}};\n  Callback<Float(Float, Float)> K = Callback<Float(Float, Float)>{};\n\n  void Make() {\n    K = callback<&Ground::height>(Fields[0]);\n  }\n};\n"), "an entry of a list"));
+  CHECK(says(read("Bad3", "struct Bad3 : kern::Blueprint {\n  Float Seen = 0.0;\n\n  struct fResult { Float r = 0.0; };\n  KERN_PURE fResult f(Float x = 0.0) {\n    return {x};\n  }\n\n  struct mResult { Callback<Float(Float)> c = Callback<Float(Float)>{}; };\n  KERN_PURE mResult m() {\n    return {callback<&Bad3::f>()};\n  }\n};\n"), "a Callback names a function of a library"));
+}
+
 TEST(logic_libraries) {
   // A library is a Blueprint that keeps nothing: types and functions. A Blueprint that uses it
   // has its types and calls its functions directly - Wheels::skid(Spare[at], by); -, also with
@@ -4284,9 +5864,8 @@ TEST(logic_libraries) {
       "struct Garage : virtual kern::Blueprint, virtual Wheels {\n  // ---- variables ----\n"
       "  List<Wheel> Spare = List<Wheel>{Wheel{0.5, Side::Front, List<Float>{}}};\n  Float Seen = 0.0;\n\n  // ---- functions ----\n"
       "  struct RunResult { Float slip = 0.0; Int marks = 0; Side at = Side::Front; };\n"
-      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
-      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n\n"
-      "  // ---- what nodes give and keep ----\n  Wheels::twiceResult n5;\n};\n";
+      "  RunResult Run(Int at = 0, Float by = 1.0) {\n    Wheels::twiceResult n5;\n    Wheels::skid(Spare[at], by);\n    n5 = Wheels::twice(Spare[at]);\n    Seen = n5.slip;\n"
+      "    return {Wheels::wear(Spare[at]).slip, Wheels::wear(Spare[at]).marks, Spare[at].At};\n  }\n};\n";
   std::map<std::string, logic::Graph> project;
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
     auto it = project.find(std::string(name));
@@ -4604,11 +6183,11 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
       CHECK(!i.error);
     }
   };
-  // a function does not run again while it runs: not by calling itself, not through another one
-  problem(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
+  // a function calls itself as a step - its own values in every call (that this one never ends is
+  // the scenario's, not the graph's: logic_cases recursion_endless) - but not as a value
+  fine(R"({"functions":[{"name":"Fact","inputs":[{"name":"n","type":"int","value":1}],"outputs":[{"name":"r","type":"float","value":7}]}],
             "nodes":[{"id":20,"type":"func.entry","params":{"function":"Fact"}},{"id":21,"type":"func.call","params":{"function":"Fact"}},{"id":22,"type":"func.return","params":{"function":"Fact"}}],
-            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})",
-          "function \"Fact\" calls itself:", 21);
+            "links":[[20,"then",21,"exec"],[20,"n",21,"n"],[21,"then",22,"exec"],[21,"r",22,"r"]]})");
   problem(R"({"functions":[{"name":"F","inputs":[],"outputs":[{"name":"r","type":"float","value":0}]},{"name":"G","pure":true,"inputs":[],"outputs":[{"name":"r","type":"float","value":0}]}],
             "nodes":[{"id":1,"type":"func.entry","params":{"function":"F"}},{"id":2,"type":"func.pure","params":{"function":"G"}},{"id":3,"type":"func.return","params":{"function":"F"}},
               {"id":4,"type":"func.entry","params":{"function":"G"}},{"id":5,"type":"func.call","params":{"function":"F"}},{"id":6,"type":"func.return","params":{"function":"G"}}],
@@ -4699,6 +6278,21 @@ TEST(logic_notation_rules_are_errors_of_the_graph) {
                    {"id":4,"type":"struct.break","params":{"struct":"S"}},{"id":5,"type":"struct.make","params":{"struct":"In"},"values":{"A":3}},
                    {"id":6,"type":"struct.set_field","params":{"variable":"V","field":"value"}}],
           "links":[[1,"then",2,"exec"],[1,"s",4,"value"],[5,"value",2,"value"],[2,"then",6,"exec"],[4,"value",6,"value"],[6,"then",3,"exec"],[4,"L",3,"all"],[2,"value",3,"one"]]})");
+  // A function held from a library has the library's pins: an input of its that has the name of one of this
+  // Blueprint's variables stays (the library named it; link() compares the held function with the library's -
+  // renamed, the Blueprint was stale and ran in the interpreter). The Blueprint's own function is renamed as before.
+  {
+    json::Value held;
+    logic::Graph g;
+    CHECK(json::parse(R"({"uses":["lib"],"variables":[{"name":"pad","type":"float","value":0}],
+            "functions":[{"name":"lib::hit","from":"lib","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]},
+              {"name":"own","inputs":[{"name":"pad","type":"float","value":0}],"outputs":[{"name":"Result","type":"float","value":0}]}],
+            "nodes":[],"links":[]})", held) &&
+          logic::graph_from_json(held, g));
+    const auto renamed = logic::cpp_names(g);
+    CHECK(renamed.size() == 1 && renamed[0].first == "own.pad" && renamed[0].second == "own.pad2");
+    CHECK(g.functions.size() == 2 && g.functions[0].name == "lib::hit" && g.functions[0].inputs[0].name == "pad" && g.functions[1].inputs[0].name == "pad2");
+  }
   // Levels from before these rules: their names are made C++ names when they are loaded, and
   // everything that uses them follows.
   {
@@ -5031,6 +6625,543 @@ std::vector<f32> sine(u32 rate, f32 seconds, f32 hz, f32 amp = 0.5f) {
 }
 }  // namespace
 
+// The engine's nodes on the engine itself (kern/logic/engine_host.h): every node of the table has its
+// call in a build that links every part of the engine, and a call is the real function - what it gives
+// and writes is what the C++ function gives and writes, bit for bit, and the room the table gives what
+// the engine writes through a pointer is the room the engine needs.
+TEST(engine_calls_every_node) {
+  int missing = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions())
+    if (!logic::engine_call(f.type)) {
+      if (++missing <= 5) std::printf("  no call of %s\n", f.type);
+    }
+  CHECK(missing == 0);
+  // every object a make node makes without inputs is made and ended through the table
+  logic::EngineObjects objects;
+  int made = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions()) {
+    const std::string type = f.type;
+    if (type.size() < 5 || type.compare(type.size() - 5, 5, ".make") != 0 || !f.inputs.empty()) continue;
+    std::vector<logic::Value> out{logic::Value::zero(logic::PinType::integer)};
+    CHECK(logic::call_engine(objects, f.type, {}, out));
+    CHECK(out[0].i > 0);
+    std::vector<logic::Value> none;
+    CHECK(logic::call_engine(objects, type.substr(0, type.size() - 5) + ".release", {out[0]}, none));
+    // (once ended, the handle names nothing: a second release fails)
+    CHECK(!logic::call_engine(objects, type.substr(0, type.size() - 5) + ".release", {out[0]}, none));
+    ++made;
+  }
+  CHECK(made > 10);
+  CHECK(objects.size() == 0);
+}
+
+namespace {
+void job_double(kern::Span<const u8> in, std::vector<u8>& out) {
+  out.assign(in.begin(), in.end());
+  out.insert(out.end(), in.begin(), in.end());
+}
+}  // namespace
+KERN_JOB(61, job_double);
+
+TEST(jobs_reset_begins_again) {
+  // after reset the jobs are as when the program starts: none waits, none is done, the next is numbered 1 - with the
+  // threads and without (it waits for what they run); what is defined and the switch stay
+  for (const bool threaded : {false, true}) {
+    jobs::set_threads(threaded);
+    const u32 a = jobs::submit(61, {1, 2});
+    jobs::submit(61, {3});
+    if (!threaded) jobs::pump(1000);
+    jobs::reset();
+    CHECK(jobs::pending() == 0);
+    CHECK(jobs::threads() == threaded);
+    std::vector<u8> out;
+    CHECK(!jobs::take(a, out));   // (forgotten, done or not)
+    jobs::set_threads(false);
+    const u32 b = jobs::submit(61, {7});
+    CHECK(b == 1);
+    jobs::pump(1000);
+    CHECK(jobs::take(b, out) && out == std::vector<u8>({7, 7}));
+    jobs::reset();
+  }
+  jobs::set_threads(true);
+}
+
+TEST(engine_stand_in_fixed_length) {
+  using logic::Value;
+  // a field that is an array of C++ (`f32 m[16]` of Mat4) has as many entries in the form - and so in every answer of
+  // the stand-in - as C++ holds: 16, not 0 to 2 (a list of any length)
+  const logic::EngineFunction* f = logic::engine_function("engine.game_world.actor_matrix");
+  CHECK(f && f->outputs.size() == 2 && std::string(f->outputs[1].shape) == "{[16n]}");
+  logic::EngineStandIn s;
+  for (i64 id = 0; id < 8; ++id) {
+    std::vector<Value> out(2);
+    CHECK(s.engine("engine.game_world.actor_matrix", {Value::integer(1), Value::integer(id), Value::zero(logic::PinType::structure)}, out));
+    CHECK(out.size() == 2 && out[1].rows && out[1].rows->size() == 1 && (*out[1].rows)[0].list &&
+          std::get<std::vector<f64>>(*(*out[1].rows)[0].list).size() == 16);
+  }
+}
+
+TEST(engine_stand_in_makes_an_object) {
+  using logic::Value;
+  // a maker gives the handle of the object it made - a constructor of C++ always makes one: the form `h`, and the
+  // stand-in never answers the handle 0 (which names none: `std::make_unique<SoundBank>(...)` is never empty)
+  int makers = 0;
+  for (const logic::EngineFunction& f : logic::engine_functions()) {
+    const std::string type = f.type;
+    // (a maker: "engine.<class>.make", the n-th of a class "....make_<n>")
+    const std::size_t at = type.rfind(".make");
+    if (at == std::string::npos) continue;
+    const std::string rest = type.substr(at + 5);
+    if (!rest.empty() && (rest[0] != '_' || rest.size() < 2 || rest.find_first_not_of("0123456789", 1) != std::string::npos)) continue;
+    CHECK(f.outputs.size() == 1 && std::string(f.outputs[0].shape) == "h");
+    logic::EngineStandIn s;
+    for (int k = 0; k < 16; ++k) {
+      std::vector<Value> in;
+      for (const logic::EnginePin& p : f.inputs) in.push_back(Value::zero(p.type));
+      if (!in.empty() && in[0].type == logic::PinType::integer) in[0] = Value::integer(k);
+      std::vector<Value> out{Value::zero(logic::PinType::integer)};
+      CHECK(s.engine(type, in, out) && out.size() == 1 && out[0].as_int() > 0);
+    }
+    ++makers;
+  }
+  CHECK(makers > 10);
+}
+
+TEST(engine_stand_in_one_or_none) {
+  using logic::Value;
+  // what may be there or not (`std::optional<Message> Client::receive`, the std::optional components of a level's actor)
+  // is a list of no entry or one in the form - `[?item]` - and so in every answer of the stand-in: never two
+  const logic::EngineFunction* f = logic::engine_function("engine.client.receive");
+  CHECK(f && f->outputs.size() == 1 && std::string(f->outputs[0].shape).starts_with("[?{"));
+  logic::EngineStandIn s;
+  bool none = false, one = false;
+  for (i64 channel = 0; channel < 40; ++channel) {
+    std::vector<Value> out(1);
+    CHECK(s.engine("engine.client.receive", {Value::integer(1), Value::integer(channel)}, out));
+    CHECK(out.size() == 1 && out[0].type == logic::PinType::structure_list && out[0].size() <= 1);
+    (out[0].size() == 0 ? none : one) = true;
+  }
+  CHECK(none && one);
+}
+
+TEST(engine_calls_mixer_is_the_mixer) {
+  using logic::Value;
+  // what the engine writes through `out` is 2 numbers a frame: the table says so
+  const logic::EngineFunction* render = logic::engine_function("engine.mixer.render");
+  CHECK(render && render->outputs.size() == 1 && std::string(render->outputs[0].count) == "frames" && render->outputs[0].per == 2);
+  // the same steps through the nodes and on a mixer of C++: the same numbers, bit for bit
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.mixer.make", {}, out));
+  const Value mixer = out[0];
+  out = {Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(objects, "engine.mixer.init", {mixer, Value::integer(48000), Value::integer(16)}, out) && out[0].b);
+  const std::vector<f32> tone = sine(48000, 0.25f, 440);
+  std::vector<f64> samples(tone.begin(), tone.end());
+  out = {Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.mixer.adopt_clip", {mixer, Value::of(samples), Value::integer(1), Value::text("tone"), Value::boolean(false)}, out));
+  const Value clip = out[0];
+  out = {Value::zero(logic::PinType::int64)};
+  CHECK(logic::call_engine(objects, "engine.mixer.play", {mixer, clip, Value::zero(logic::PinType::structure)}, out));
+  out = {Value::zero(logic::PinType::number_list)};
+  CHECK(logic::call_engine(objects, "engine.mixer.render", {mixer, Value::integer(300)}, out));
+  const std::vector<f64>& got = out[0].items<f64>();
+  CHECK(got.size() == 600);
+
+  audio::Mixer m;
+  CHECK(m.init(48000, 16));
+  const audio::ClipId c = m.adopt_clip(tone, 1, "tone");
+  CHECK(static_cast<i64>(c) == clip.i);
+  m.play(c, audio::PlayParams{});
+  std::vector<f32> want(600);
+  m.render(want.data(), 300);
+  bool same = got.size() == want.size();
+  for (std::size_t k = 0; same && k < want.size(); ++k) same = std::bit_cast<u64>(got[k]) == std::bit_cast<u64>(static_cast<f64>(want[k]));
+  CHECK(same);
+  bool sounds = false;
+  for (f32 x : want) sounds |= x != 0;
+  CHECK(sounds);
+  std::vector<Value> none;
+  CHECK(logic::call_engine(objects, "engine.mixer.release", {mixer}, none));
+  // a handle of no mixer: the call fails and says so
+  out = {Value::zero(logic::PinType::number_list)};
+  CHECK(!logic::call_engine(objects, "engine.mixer.render", {mixer, Value::integer(4)}, out));
+  CHECK(objects.error.find("mixer") != std::string::npos);
+  // the room behind what the engine writes: writing past the count is caught
+  logic::engine_values::Written<f32> room(4);
+  room.data()[3] = 1;
+  CHECK(room.kept(objects, "out") && room.room.size() == 4);
+  logic::engine_values::Written<f32> past(4);
+  past.data()[4] = 1;
+  CHECK(!past.kept(objects, "out"));
+}
+
+// A test's host makes what a handle names where it has nothing yet - the same object on every side it
+// compares (engine_make_default: as C++ makes it without arguments, at that handle).
+TEST(engine_calls_default_objects) {
+  logic::EngineObjects a, b;
+  a.on_missing(logic::engine_make_default);
+  b.on_missing(logic::engine_make_default);
+  for (logic::EngineObjects* o : {&a, &b}) {
+    std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+    CHECK(logic::call_engine(*o, "engine.mixer.init", {logic::Value::integer(5), logic::Value::integer(44100), logic::Value::integer(8)}, out) && out[0].b);
+    out = {logic::Value::zero(logic::PinType::integer)};
+    CHECK(logic::call_engine(*o, "engine.mixer.sample_rate", {logic::Value::integer(5)}, out));
+    CHECK(out[0].i == 44100);
+  }
+  CHECK(a.size() == 1 && b.size() == 1);
+}
+
+TEST(engine_calls_default_objects_made_with) {
+  // a class whose constructor takes other objects of the engine (Client(Transport&, config, salt), GameWorld(Renderer&))
+  // is made for a handle with them - made the same way, without a handle; the release ends them all (ASan: nothing left)
+  logic::EngineObjects o;
+  o.on_missing(logic::engine_make_default);
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out) && !out[0].b);
+  out = {logic::Value::zero(logic::PinType::boolean), logic::Value::zero(logic::PinType::structure)};
+  CHECK(logic::call_engine(o, "engine.game_world.actor_matrix", {logic::Value::integer(4), logic::Value::integer(1), logic::Value::zero(logic::PinType::structure)}, out) && !out[0].b);
+  CHECK(o.size() == 2);   // (the transport and the renderer have no handle)
+  out.clear();
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  // a handle it has no object of names one as C++ makes it - releasing it ends that one (nothing is left)
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(9)}, out) && o.size() == 1);
+  o.clear();
+  CHECK(o.size() == 0);
+  // without a maker (a host that keeps its own objects) a handle without an object is not released
+  logic::EngineObjects host;
+  CHECK(!logic::call_engine(host, "engine.client.release", {logic::Value::integer(9)}, out) && host.error.find("Client") != std::string::npos);
+}
+
+TEST(engine_calls_default_objects_by_class) {
+  // a test's handles are numbers kept by class (the stand-in's objects): where the same number names an object
+  // of one class and is then asked for as another, the second is made beside the first - neither replaces nor
+  // loses the other, and each ends with the objects (ASan: nothing left)
+  logic::EngineObjects o;
+  o.on_missing(logic::engine_make_default);
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.mixer.init", {logic::Value::integer(3), logic::Value::integer(44100), logic::Value::integer(8)}, out) && out[0].b);
+  out = {logic::Value::zero(logic::PinType::boolean)};
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out) && !out[0].b);
+  CHECK(o.size() == 2);
+  out = {logic::Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(3)}, out) && out[0].i == 44100);
+  out.clear();
+  CHECK(logic::call_engine(o, "engine.client.release", {logic::Value::integer(3)}, out) && o.size() == 1);
+  out = {logic::Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(o, "engine.mixer.sample_rate", {logic::Value::integer(3)}, out) && out[0].i == 44100);
+  CHECK(logic::call_engine(o, "engine.client.connected", {logic::Value::integer(3)}, out = {logic::Value::zero(logic::PinType::boolean)}));
+  CHECK(o.size() == 2);
+  o.clear();
+  CHECK(o.size() == 0);
+}
+
+}  // namespace
+
+// A Blueprint's class calls the functions of the engine's nodes itself where its host gives it the engine's
+// objects (kern/logic/engine_direct.h): typed, without a value of the interpreter and without the host's
+// door. The class below is written as a Blueprint's text is; how its structs are held as values says, as
+// the glue of a Blueprint's class does (logic::native_glue), Held<> - the door needs it, the calls the class
+// makes itself do not.
+namespace engine_probe {
+
+struct Probe : kern::Blueprint {
+  KERN_ENUM(audio_Bus, master, music, sfx, ambience, ui, voice, count);
+  KERN_ENUM(audio_Rolloff, inverse, linear, exponential);
+  KERN_ENUM(game_Shape, box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh);
+  KERN_ENUM(physics_Surface, none, cloth, tpu, floor_);
+  KERN_STRUCT(Quat) { Float x = 0.0; Float y = 0.0; Float z = 0.0; Float w = 1.0; };
+  KERN_STRUCT(Mat4) { Fixed<Float, 16> m = Fixed<Float, 16>{1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0}; };
+  KERN_STRUCT(Sphere) { Vector center = Vector{0.0, 0.0, 0.0}; Float radius = -1.0; };
+  KERN_STRUCT(MeshData) { List<Float> positions = List<Float>{}; List<Float> normals = List<Float>{}; List<Float> colors = List<Float>{}; List<Float> uvs = List<Float>{}; List<Float> extra = List<Float>{}; Int extra_size = 0; List<Int> indices = List<Int>{}; };
+  KERN_STRUCT(audio_PlayParams) { Float volume = 1.0; Float pitch = 1.0; Float pan = 0.0; Bool the_loop = false; audio_Bus bus = audio_Bus::sfx; Float fade_in = 0.0; Float start = 0.0; Int priority = 0; Bool spatial = false; Vector position = Vector{0.0, 0.0, 0.0}; Vector velocity = Vector{0.0, 0.0, 0.0}; Float min_distance = 1.0; Float max_distance = 50.0; audio_Rolloff rolloff = audio_Rolloff::inverse; Float spread = 0.0; Float doppler = 1.0; };
+  KERN_STRUCT(game_Transform) { Vector position = Vector{0.0, 0.0, 0.0}; Vector rotation = Vector{0.0, 0.0, 0.0}; Vector scale = Vector{1.0, 1.0, 1.0}; };
+  KERN_STRUCT(physics_Pose) { Vector position = Vector{0.0, 0.0, 0.0}; Quat rotation = Quat{0.0, 0.0, 0.0, 1.0}; };
+
+  // what the calls are given
+  List<Float> Samples = List<Float>{};
+  audio_PlayParams Params = audio_PlayParams{};
+  game_Transform Placed = game_Transform{Vector{1.0, 2.0, 3.0}, Vector{10.0, 20.0, 30.0}, Vector{1.0, 1.5, 2.0}};
+  // what they gave
+  Int Mixer = 0;
+  Bool Ready = false;
+  Int Clip = 0;
+  Int64 Voice = Int64{0x0};
+  List<Float> Sound = List<Float>{};
+  Int Rate = 0;
+  Int Clips = 0;
+  List<Float> Gone = List<Float>{1.0};
+  Quat Turned = Quat{};
+  Vector Angles = Vector{0.0, 0.0, 0.0};
+  Mat4 Matrix = Mat4{};
+  game_Transform Back = game_Transform{};
+  Bool Parsed = false;
+  game_Shape Shape = game_Shape::box;
+  Bool Unparsed = true;
+  game_Shape Kept = game_Shape::box;
+  Text Name = "";
+  MeshData Box = MeshData{};
+  Sphere Ball = Sphere{};
+  Float Friction = 0.0;
+  physics_Pose Frame = physics_Pose{};
+  Text Hex = "";
+  Bool HexOk = false;
+  Vector Color = Vector{0.0, 0.0, 0.0};
+  Bool Known = false;
+
+  struct { Int result = 0; } n1;
+  struct { Bool result = false; } n2;
+  struct { Int result = 0; } n3;
+  struct { Int64 result = Int64{0x0}; } n4;
+  struct { List<Float> out = List<Float>{}; } n5;
+  struct { Bool result = false; game_Shape out = game_Shape::box; } n7;
+  struct { Bool result = false; Vector out = Vector{0.0, 0.0, 0.0}; } n8;
+
+  void Sounds();
+  void Numbers();
+  std::string shown() const;
+};
+
+/// How a struct of the class is held as a value, field by field (what logic::native_glue writes for a
+/// Blueprint's class): `M` its fields in their order.
+template <class S, auto... M> struct HeldBy {
+  static constexpr logic::PinType type = logic::PinType::structure;
+  static bool is(const logic::Value& v) {
+    if (v.type != type || v.fields() != sizeof...(M)) return false;
+    std::size_t k = 0;
+    return (logic::is_value<std::remove_cvref_t<decltype(std::declval<S&>().*M)>>(*v.field(k++)) && ...);
+  }
+  static S from(const logic::Value& v) {
+    S s{};
+    if (!is(v)) return s;
+    std::size_t k = 0;
+    ((s.*M = logic::from_value<std::remove_cvref_t<decltype(s.*M)>>(*v.field(k++))), ...);
+    return s;
+  }
+  static logic::Value to(const S& s) { return logic::Value::structure({logic::to_value(s.*M)...}); }
+};
+
+inline bool counting = false;  // the allocator counts (below)
+inline long asks = 0;
+
+}  // namespace engine_probe
+
+namespace kern::logic::detail {
+using engine_probe::HeldBy;
+using engine_probe::Probe;
+template <> struct Held<Probe::Quat> : HeldBy<Probe::Quat, &Probe::Quat::x, &Probe::Quat::y, &Probe::Quat::z, &Probe::Quat::w> {};
+template <> struct Held<Probe::Mat4> : HeldBy<Probe::Mat4, &Probe::Mat4::m> {};
+template <> struct Held<Probe::Sphere> : HeldBy<Probe::Sphere, &Probe::Sphere::center, &Probe::Sphere::radius> {};
+template <>
+struct Held<Probe::MeshData> : HeldBy<Probe::MeshData, &Probe::MeshData::positions, &Probe::MeshData::normals, &Probe::MeshData::colors, &Probe::MeshData::uvs, &Probe::MeshData::extra,
+                                      &Probe::MeshData::extra_size, &Probe::MeshData::indices> {};
+template <>
+struct Held<Probe::audio_PlayParams>
+    : HeldBy<Probe::audio_PlayParams, &Probe::audio_PlayParams::volume, &Probe::audio_PlayParams::pitch, &Probe::audio_PlayParams::pan, &Probe::audio_PlayParams::the_loop,
+             &Probe::audio_PlayParams::bus, &Probe::audio_PlayParams::fade_in, &Probe::audio_PlayParams::start, &Probe::audio_PlayParams::priority, &Probe::audio_PlayParams::spatial,
+             &Probe::audio_PlayParams::position, &Probe::audio_PlayParams::velocity, &Probe::audio_PlayParams::min_distance, &Probe::audio_PlayParams::max_distance,
+             &Probe::audio_PlayParams::rolloff, &Probe::audio_PlayParams::spread, &Probe::audio_PlayParams::doppler> {};
+template <> struct Held<Probe::game_Transform> : HeldBy<Probe::game_Transform, &Probe::game_Transform::position, &Probe::game_Transform::rotation, &Probe::game_Transform::scale> {};
+template <> struct Held<Probe::physics_Pose> : HeldBy<Probe::physics_Pose, &Probe::physics_Pose::position, &Probe::physics_Pose::rotation> {};
+}  // namespace kern::logic::detail
+
+namespace engine_probe {
+
+// A mixer: made, set up, given a clip, played and rendered - handles, a list the engine takes, a text, a
+// struct, what the engine writes through a pointer; then ended, and asked once more (that call fails).
+inline void Probe::Sounds() {
+  engine_mixer_make(n1);
+  Mixer = n1.result;
+  engine_mixer_init(n2, Mixer, 48000, 16);
+  Ready = n2.result;
+  engine_mixer_adopt_clip(n3, Mixer, Samples, 1, "tone", false);
+  Clip = n3.result;
+  engine_mixer_play(n4, Mixer, Clip, Params);
+  Voice = n4.result;
+  engine_mixer_render(n5, Mixer, 300);
+  Sound = n5.out;
+  Rate = engine_mixer_sample_rate(Mixer);
+  Clips = engine_mixer_clip_count(Mixer);
+  engine_mixer_release(Mixer);
+  engine_mixer_render(n5, Mixer, 4);
+  Gone = n5.out;
+}
+// Functions that only compute: vectors, structs in and out (one in another, a list of a fixed length),
+// enums in and out, a parameter the function writes through, texts, a struct of lists, a list with its count.
+inline void Probe::Numbers() {
+  Turned = engine_game_euler_to_quat(Vector{10.0, 20.0, 30.0});
+  Angles = engine_game_quat_to_euler(Turned);
+  Matrix = engine_game_transform_matrix(Placed);
+  Back = engine_game_matrix_transform(Matrix);
+  engine_game_parse_shape(n7, "cone", game_Shape::box);
+  Parsed = n7.result;
+  Shape = n7.out;
+  engine_game_parse_shape(n7, "no shape", game_Shape::torus);
+  Unparsed = n7.result;
+  Kept = n7.out;
+  Name = engine_game_shape_name(game_Shape::torus);
+  Box = engine_primitives_box(Vector{1.0, 2.0, 3.0}, Vector{0.5, 0.25, 1.0});
+  Ball = engine_bounding_sphere(Box.positions, Int(static_cast<i64>(Box.positions.size() / 3)));
+  Friction = engine_physics_surface_friction(physics_Surface::cloth, physics_Surface::tpu);
+  Frame = engine_physics_frame_from_axis(Vector{1.0, 2.0, 3.0}, Vector{0.0, 0.0, 1.0}, true);
+  Hex = engine_game_hex_color(Vector{1.0, 0.5, 0.0});
+  engine_game_parse_hex_color(n8, "#336699", Vector{0.0, 0.0, 0.0});
+  HexOk = n8.result;
+  Color = n8.out;
+  Known = engine_game_motion_name_ok("idle");
+}
+inline std::string Probe::shown() const {
+  std::string s;
+  const auto put = [&](const char* name, const auto& v) { s += std::string(name) + "=" + logic::engine_shown(logic::to_value(v)) + "\n"; };
+  put("Mixer", Mixer), put("Ready", Ready), put("Clip", Clip), put("Voice", Voice), put("Sound", Sound), put("Rate", Rate), put("Clips", Clips), put("Gone", Gone);
+  put("Turned", Turned), put("Angles", Angles), put("Matrix", Matrix), put("Back", Back), put("Parsed", Parsed), put("Shape", Shape), put("Unparsed", Unparsed), put("Kept", Kept);
+  put("Name", Name), put("Box", Box), put("Ball", Ball), put("Friction", Friction), put("Frame", Frame), put("Hex", Hex), put("HexOk", HexOk), put("Color", Color), put("Known", Known);
+  return s;
+}
+
+}  // namespace engine_probe
+
+// The allocator says every piece of memory it is asked for while a test counts (engine_probe::counting):
+// with the sanitizers, their allocator through its hook; without them, operator new itself.
+#if defined(__SANITIZE_ADDRESS__)
+// (the sanitizers' own interface - sanitizer/allocator_interface.h, where a compiler brings that header)
+extern "C" int __sanitizer_install_malloc_and_free_hooks(void (*asked)(const volatile void*, std::size_t), void (*given_back)(const volatile void*));
+static void probe_asked_for_memory(const volatile void*, std::size_t) { engine_probe::asks += engine_probe::counting ? 1 : 0; }
+static void probe_gave_memory_back(const volatile void*) {}
+static void probe_count_memory() {
+  static const int installed = __sanitizer_install_malloc_and_free_hooks(probe_asked_for_memory, probe_gave_memory_back);
+  (void)installed;
+}
+#else
+void* operator new(std::size_t size) {
+  engine_probe::asks += engine_probe::counting ? 1 : 0;
+  if (void* p = std::malloc(size ? size : 1)) return p;
+  std::abort();
+}
+void* operator new[](std::size_t size) { return operator new(size); }
+void operator delete(void* p) noexcept { std::free(p); }
+void operator delete[](void* p) noexcept { std::free(p); }
+void operator delete(void* p, std::size_t) noexcept { std::free(p); }
+void operator delete[](void* p, std::size_t) noexcept { std::free(p); }
+static void probe_count_memory() {}
+#endif
+
+namespace {
+
+/// How often `work` asks for memory.
+template <class Work> long memory_asked_by(Work&& work) {
+  probe_count_memory();
+  engine_probe::asks = 0;
+  engine_probe::counting = true;
+  work();
+  engine_probe::counting = false;
+  return engine_probe::asks;
+}
+
+// The class calls the engine itself and does what the door does: the same class once with a host that
+// gives it the engine's objects and once with one that has only its door - every value the calls gave is
+// the same, bit for bit, and so is what the host is told of the call that fails; and what the mixer wrote
+// is what a mixer of C++ writes.
+TEST(engine_calls_class_calls_the_engine_itself) {
+  const std::vector<f32> tone = sine(48000, 0.25f, 440);
+  NativeEngineHost itself, door;
+  itself.direct = true;
+  engine_probe::Probe a, b;
+  a.kern_world.host = &itself;
+  a.kern_world.engine = itself.engine_objects();
+  b.kern_world.host = &door;
+  CHECK(a.kern_world.engine == &itself.objects && !b.kern_world.engine && !door.engine_objects());
+  for (engine_probe::Probe* p : {&a, &b}) {
+    for (f32 x : tone) p->Samples.push_back(static_cast<f64>(x));
+    p->Sounds();
+    p->Numbers();
+  }
+  CHECK(itself.door == 0);  // (not one call through the door)
+  CHECK(door.door == 23);   // (every call of the two functions)
+  const std::string got = a.shown(), want = b.shown();
+  CHECK(got == want);
+  if (got != want) std::printf("the class itself:\n%s\nthrough the door:\n%s\n", got.c_str(), want.c_str());
+  CHECK(itself.told == door.told);
+  CHECK(itself.told == " !engine.mixer.render: no object of the engine of its class at the input mixer");
+  CHECK(itself.objects.size() == 0 && door.objects.size() == 0);
+  // ... and it is the engine: the values C++ gets from the same functions
+  CHECK(a.Mixer == 1 && a.Ready && a.Rate == 48000 && a.Clips == 1 && a.Gone.empty());
+  audio::Mixer m;
+  CHECK(m.init(48000, 16));
+  const audio::ClipId c = m.adopt_clip(tone, 1, "tone");
+  CHECK(static_cast<i64>(c) == static_cast<i64>(a.Clip));
+  CHECK(static_cast<u64>(m.play(c, audio::PlayParams{})) == a.Voice.bits);
+  std::vector<f32> wrote(600);
+  m.render(wrote.data(), 300);
+  bool same = a.Sound.size() == wrote.size(), sounds = false;
+  for (std::size_t k = 0; same && k < wrote.size(); ++k) same = std::bit_cast<u64>(a.Sound[k]) == std::bit_cast<u64>(static_cast<f64>(wrote[k]));
+  for (f32 x : wrote) sounds |= x != 0;
+  CHECK(same && sounds);
+  const Quat q = game::euler_to_quat(Vec3(10, 20, 30));
+  CHECK(std::bit_cast<u64>(a.Turned.x) == std::bit_cast<u64>(static_cast<f64>(q.x)) && std::bit_cast<u64>(a.Turned.w) == std::bit_cast<u64>(static_cast<f64>(q.w)));
+  const Mat4 placed = game::transform_matrix(game::Transform{Vec3(1, 2, 3), Vec3(10, 20, 30), Vec3(1, 1.5f, 2)});
+  bool matrix = true;
+  for (std::size_t k = 0; k < 16; ++k) matrix = matrix && std::bit_cast<u64>(a.Matrix.m[k]) == std::bit_cast<u64>(static_cast<f64>(placed.m[k]));
+  CHECK(matrix);
+  CHECK(a.Parsed && a.Shape == engine_probe::Probe::game_Shape::cone && !a.Unparsed && a.Name == logic::Text("torus"));
+  const MeshData box = primitives::box(Vec3(1, 2, 3), Vec3(0.5f, 0.25f, 1));
+  CHECK(a.Box.positions.size() == box.positions.size() && a.Box.indices.size() == box.indices.size() && !box.positions.empty());
+  CHECK(std::bit_cast<u64>(a.Friction) == std::bit_cast<u64>(static_cast<f64>(physics::surface_friction(physics::Surface::cloth, physics::Surface::tpu))));
+}
+
+// What a call the class makes itself costs: where the function of the engine asks for no memory, the call
+// asks for none - nothing is packed into a value, no list of values is made, no name is looked up. (The
+// same calls through the door ask for memory every time.)
+TEST(engine_calls_class_asks_for_no_memory) {
+  NativeEngineHost itself, door;
+  itself.direct = true;
+  engine_probe::Probe a, b;
+  a.kern_world.host = &itself;
+  a.kern_world.engine = itself.engine_objects();
+  b.kern_world.host = &door;
+  bool known = false;
+  f32 friction = 0;
+  Quat q;
+  Vec3 angles;
+  Mat4 matrix;
+  game::Transform back;
+  physics::Pose frame;
+  const game::Transform placed{Vec3(1, 2, 3), Vec3(10, 20, 30), Vec3(1, 1.5f, 2)};
+  // the functions of the engine themselves ask for none
+  CHECK(memory_asked_by([&] {
+          q = game::euler_to_quat(Vec3(10, 20, 30));
+          angles = game::quat_to_euler(q);
+          matrix = game::transform_matrix(placed);
+          back = game::matrix_transform(matrix);
+          friction = physics::surface_friction(physics::Surface::cloth, physics::Surface::tpu);
+          frame = physics::frame_from_axis(Vec3(1, 2, 3), Vec3(0, 0, 1), true);
+          known = game::motion_name_ok("idle");
+        }) == 0);
+  (void)known, (void)friction, (void)angles, (void)back, (void)frame;
+  for (engine_probe::Probe* p : {&a, &b}) {
+    p->engine_mixer_make(p->n1);
+    p->Mixer = p->n1.result;
+    p->engine_mixer_init(p->n2, p->Mixer, 48000, 16);
+  }
+  const auto calls = [](engine_probe::Probe& p) {
+    p.Rate = p.engine_mixer_sample_rate(p.Mixer);            // an object of the engine by its handle
+    p.Clips = p.engine_mixer_clip_count(p.Mixer);
+    p.Turned = p.engine_game_euler_to_quat(kern::Vec3(10, 20, 30));  // a struct the engine gives
+    p.Angles = p.engine_game_quat_to_euler(p.Turned);        // ... and takes
+    p.Matrix = p.engine_game_transform_matrix(p.Placed);     // a list of a fixed length in a struct
+    p.Back = p.engine_game_matrix_transform(p.Matrix);
+    p.Friction = p.engine_physics_surface_friction(engine_probe::Probe::physics_Surface::cloth, engine_probe::Probe::physics_Surface::tpu);  // enums
+    p.Frame = p.engine_physics_frame_from_axis(kern::Vec3(1, 2, 3), kern::Vec3(0, 0, 1), true);  // a struct in a struct
+    p.Known = p.engine_game_motion_name_ok("idle");          // a text written out in the program
+  };
+  const long by_itself = memory_asked_by([&] { calls(a); });
+  const long through_door = memory_asked_by([&] { calls(b); });
+  CHECK(by_itself == 0);
+  CHECK(through_door > 0);
+  if (by_itself != 0) std::printf("the class asked for memory %ld times in calls of the engine it made itself\n", by_itself);
+  CHECK(itself.door == 0 && a.Rate == 48000 && b.Rate == 48000 && a.shown() == b.shown());
+}
+
 TEST(audio_mixer_panning_and_limits) {
   audio::Mixer m;
   CHECK(!m.ready());
@@ -5118,8 +7249,10 @@ TEST(audio_mixer_resampling_and_stereo) {
   // Stereo clips keep their channels.
   std::vector<f32> st(48000 * 2);
   for (u32 i = 0; i < 48000; ++i) { st[i * 2] = 0.5f * std::sin(2 * kPi * 300 * i / 48000.0f); st[i * 2 + 1] = 0; }
-  const audio::ClipId sc = m.create_clip(st.data(), 48000, 2, 48000, "stereo");
-  CHECK(sc != 0 && m.clip_info(sc)->channels == 2);
+  const audio::ClipId sc = m.create_clip(st.data(), static_cast<u32>(st.size()), 2, 48000, "stereo");
+  CHECK(sc != 0 && m.clip_info(sc)->channels == 2 && m.clip_info(sc)->frames == 48000);
+  // The count says the samples it reads; one that is no whole number of frames is refused.
+  CHECK(m.create_clip(st.data(), 3, 2, 48000, "odd") == 0);
   m.play(sc, {});
   Rendered r = render_mixer(m, 9600);
   CHECK(r.rms_l > 0.1f && r.rms_r < 0.01f);
@@ -10141,7 +12274,36 @@ TEST(studio_logic_lists) {
     ++steps;
     bare |= it["params"]["variable"].as_string().empty();
   }
-  CHECK(add_to && !bare && steps == 18 && entries == 2);  // (nine steps and the Set of an entry for each of the two list variables)
+  CHECK(add_to && !bare && steps == 21 && entries == 2);  // (ten steps and the Set of an entry for each of the two list variables; Copy Bytes for the list of numbers)
+  {
+    // A list of a fixed length: the command says its length ("count"); its default has that many entries,
+    // the palette offers its Get and the Set of an entry - no step that would change its length (Copy Bytes
+    // writes its numbers where they stand).
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Axis","type":"float_list","count":3})")["ok"].as_bool());
+    CHECK(variable("Axis")["count"].as_number() == 3 && variable("Axis")["value"].size() == 3);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Axis","value":[1,2,3,4,5]})")["ok"].as_bool() && variable("Axis")["value"].size() == 3 && variable("Axis")["value"][2].as_number() == 3);
+    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float","count":3})")["ok"].as_bool());
+    CHECK(!f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Bad","type":"float_list","count":70000})")["ok"].as_bool());
+    pal = f.cmd(R"({"cmd":"logicPalette","query":"axis"})");
+    bool get = false, set_entry = false, step = false, copy = false;
+    for (const json::Value& it : pal["items"].items()) {
+      if (it["params"]["variable"].as_string() != "Axis") continue;
+      get |= it["type"].as_string() == "var.get";
+      set_entry |= it["type"].as_string() == "var.set" && it["params"]["path"].as_string() == "[]";
+      step |= it["type"].as_string().rfind("list.", 0) == 0 && it["type"].as_string() != "list.copy_bytes";
+      copy |= it["type"].as_string() == "list.copy_bytes";
+    }
+    CHECK(get && set_entry && !step && copy);
+    // (another length keeps what fits; the same type without a length is a list of any length again)
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list","count":2})")["ok"].as_bool() && variable("Axis")["value"].size() == 2 && variable("Axis")["value"][1].as_number() == 2);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Axis","type":"float_list"})")["ok"].as_bool() && !variable("Axis").has("count") && variable("Axis")["value"].size() == 2);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"Axis"})")["ok"].as_bool());
+    // (a default says its entries up to the last that is not zero; the place has them all - also as a list of any length, or of numbers of another kind)
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Pad","type":"float_list","count":3})")["ok"].as_bool() && f.cmd(R"({"cmd":"logicVariable","op":"value","name":"Pad","value":[4]})")["ok"].as_bool());
+    CHECK(variable("Pad")["value"].size() == 3 && variable("Pad")["value"][0].as_number() == 4 && json::stringify(f.s->level().logic.variable("Pad")->value) == "[4]");
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"type","name":"Pad","type":"int_list"})")["ok"].as_bool() && variable("Pad")["value"].size() == 3 && variable("Pad")["value"][0].as_number() == 4);
+    CHECK(f.cmd(R"({"cmd":"logicVariable","op":"remove","name":"Pad"})")["ok"].as_bool());
+  }
   // From the pin of Get Names: the nodes for a list, in its type; nothing a list does not go into.
   auto added = [&](const char* type, const char* params = "{}") {
     json::Value add = json::Value::object(), p;
@@ -10612,6 +12774,10 @@ TEST(studio_logic_structs) {
   CHECK(offered(pal, "struct.break", "struct", "Weapon") && offered(pal, "logic.select", "type", "Weapon") && offered(pal, "value.reroute", "type", "Weapon") && offered(pal, "var.set", "variable", "Held"));
   CHECK(offered(pal, "list.contains", "type", "Weapon") && offered(pal, "list.add", "variable", "Rack") && !offered(pal, "struct.break", "struct", "Aim") && !offered(pal, "struct.make") && !offered(pal, "var.set", "variable", "Last"));
   CHECK(!offered(pal, "math.add") && !offered(pal, "debug.print"));
+  // from a list of a struct's type: the list nodes of that type, Lists Equal among them
+  from.set("node", added("var.get", R"({"variable":"Rack"})"));
+  pal = cmd({{"cmd", "logicPalette"}, {"query", ""}, {"from", from}});
+  CHECK(offered(pal, "list.equal", "type", "Weapon") && offered(pal, "list.contains", "type", "Weapon") && offered(pal, "list.length", "type", "Weapon"));
 
   auto pin = [&](u32 node, const char* id, bool output) {
     const json::Value st = f.s->state();
@@ -11688,6 +13854,11 @@ TEST(app_input_and_args) {
   in.key(Key::a, true);
   in.set_focus(false);
   CHECK(!in.down(Key::a));
+  // a key past the last one (Key::count, or any value of the type beyond it) is never down, and keeping it changes nothing
+  for (Key past : {Key::count, static_cast<Key>(200)}) {
+    in.key(past, true);
+    CHECK(!in.down(past) && !in.pressed(past) && !in.released(past));
+  }
   in.touch(7, 0, {10, 10});
   in.touch(8, 0, {20, 20});
   CHECK(in.touch_count() == 2);

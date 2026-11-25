@@ -6,7 +6,7 @@ bool screen_ray(const Camera& camera, f32 x, f32 y, f32 width, f32 height, Ray& 
   if (!(width > 0 && height > 0) || !std::isfinite(x) || !std::isfinite(y)) return fail("invalid viewport coordinates");
   if (!camera_valid(camera)) return fail("invalid camera");
   bool ok = false;
-  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, &ok);
+  const Mat4 view = Mat4::look_at(camera.eye, camera.target, camera.up, ok);
   if (!ok) return fail("degenerate camera direction/up");
   const Mat4 vp = projection_matrix(camera, width / height) * view;
   f64 inv[16];

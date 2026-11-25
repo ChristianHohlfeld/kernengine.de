@@ -116,9 +116,10 @@ class Mixer {
   bool ready() const { return rate_ != 0; }
 
   // ---- clips ----
-  /// Copies `frames` frames of `channels` interleaved samples at `rate` and resamples
-  /// them to the mixer rate. Returns 0 (and sets last_error) for invalid input.
-  ClipId create_clip(const f32* samples, u32 frames, u32 channels, u32 rate, std::string name);
+  /// Copies `samples` interleaved samples of `channels` channels at `rate` (samples / channels
+  /// frames) and resamples them to the mixer rate. Returns 0 (and sets last_error) for invalid
+  /// input - also a sample count that is no whole number of frames.
+  ClipId create_clip(const f32* data, Count<1> samples, u32 channels, u32 rate, std::string name);
   /// Takes samples already at the mixer rate (synthesised sounds).
   ClipId adopt_clip(std::vector<f32> samples, u32 channels, std::string name, bool loopable = false);
   bool destroy_clip(ClipId clip);  // stops its voices
@@ -153,8 +154,8 @@ class Mixer {
   void set_reverb(f32 room_size, f32 damping, f32 wet);
 
   // ---- output ----
-  /// Mixes `frames` frames of interleaved stereo into `out`.
-  void render(f32* out, u32 frames);
+  /// Mixes `frames` frames of interleaved stereo into `out`: 2 numbers a frame, left then right.
+  void render(f32* out, Count<2> frames);
   const Stats& stats() const { return stats_; }
 
  private:

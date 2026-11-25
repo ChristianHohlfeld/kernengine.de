@@ -162,6 +162,7 @@ void Game::spawn_heli(Vec3 target) {
     p.z = city_.ground_height(p.x, p.y) + 95;
     if (!spawn_unseen(p, 6)) continue;
     Heli h;
+    h.hp = kHeliHp;
     h.p = p;
     h.orbit = a;
     h.yaw = std::atan2(target.y - p.y, target.x - p.x) - kPi / 2;
@@ -185,6 +186,7 @@ bool Game::spawn_tank(Vec3 target) {
     const f32 d = dist2d(p, target);
     if (d < 170 || d > 300 || !spawn_unseen(p, 2)) continue;
     Tank t;
+    t.hp = kTankHp;
     t.p = p;
     const f32 now = world_->sim_time();
     t.next_shell = now + 6;
@@ -465,7 +467,7 @@ void Game::update_military(f32 dt) {
   bool drone, air;
   const bool have = combat_target(tp, tv, drone, air) && mode_ != Mode::jet;  // a pilot in the jet is out of their reach
   if (have) {
-    switch (C.military.update(now, wanted_.stars(), wanted_.heat(), C.military_enabled)) {
+    switch (C.military.update(now, wanted::stars(), wanted::heat(), C.military_enabled)) {
       case MilEvent::alert: combat_banner("MILITAER ALARMIERT"); break;
       case MilEvent::cancelled: combat_banner("MILITAER-ALARM AUFGEHOBEN"); break;
       case MilEvent::start:
@@ -569,6 +571,7 @@ void Game::update_flak(f32 dt) {
           }
           if (!open) continue;
           FlakGun g;
+          g.hp = kFlakHp;
           g.cx = cx + dx;
           g.cy = cy + dy;
           g.p = {x, y, city_.ground_height(x, y)};

@@ -273,11 +273,13 @@ class OrbRun final : public App {
   Span<ShaderExtension* const> extensions() override { return {extensions_, 1}; }
 
   bool start(Engine& engine) override {
-    Renderer& r = engine.renderer;
+    Renderer& r = engine.renderer();
     screen_width_ = engine.width();
     launch_time_ = engine.arg_number("time", 0.455);  // ?time=0.6 starts at night
-    r.camera.fov = 65 * kPi / 180;
-    r.camera.far = 2500;
+    Camera camera = r.camera();
+    camera.fov = 65 * kPi / 180;
+    camera.far = 2500;
+    r.set_camera(camera);
     // Static meshes that never change between runs.
     ground_ = r.allocate_id();
     MeshData ground = primitives::plane(3000, 3000, {0.19f, 0.27f, 0.15f});
@@ -290,8 +292,8 @@ class OrbRun final : public App {
   }
 
   void update(Engine& engine, const Frame& frame) override {
-    Renderer& r = engine.renderer;
-    Input& in = engine.input;
+    Renderer& r = engine.renderer();
+    Input& in = engine.input();
     const f32 dt = frame.dt;
     if (in.pressed(Key::enter)) new_run(engine, rng_.next());
     if (in.pressed(Key::n)) fast_time_ = !fast_time_;
@@ -335,7 +337,7 @@ class OrbRun final : public App {
   }
 
   bool new_run(Engine& engine, u32 seed) {
-    Renderer& r = engine.renderer;
+    Renderer& r = engine.renderer();
     rng_ = Rng(seed);
     for (u32 id : run_meshes_) r.remove(id);
     run_meshes_.clear();
@@ -559,7 +561,7 @@ class OrbRun final : public App {
     const Vec3 moon = normalize({-sun.x, 0.3f, max_of(0.35f, -sun.z)});
     const f32 night = smoothstep(0.06f, -0.16f, sun.z);
     const f32 dusk = clamp(1 - std::fabs(sun.z) * 4, 0.0f, 1.0f) * (1 - night * 0.6f);
-    Lighting& l = r.lighting;
+    Lighting l = r.lighting();
     const Vec3 day_sun{2.8f, 2.47f, 2.11f}, dusk_sun{2.3f, 1.25f, 0.62f}, moon_light{0.16f, 0.2f, 0.32f};
     l.sun_direction = sun.z > -0.04f ? sun : moon;
     l.sun_color = mix3(mix3(day_sun, dusk_sun, dusk), moon_light, night);
@@ -571,9 +573,12 @@ class OrbRun final : public App {
     l.env_zenith = mix3({0.05f, 0.2f, 0.62f}, {0.012f, 0.022f, 0.06f}, night);
     l.env_horizon = mix3({0.52f, 0.66f, 0.86f}, {0.05f, 0.075f, 0.13f}, night);
     l.exposure = 1.0f + 0.35f * night;
-    r.sky.sun = sun;
-    r.sky.moon = moon;
-    r.sky.night = night;
+    r.set_lighting(l);
+    SkyState sky = r.sky();
+    sky.sun = sun;
+    sky.moon = moon;
+    sky.night = night;
+    r.set_sky(sky);
     windows_.night = night;
     night_ = night;
   }
@@ -588,9 +593,11 @@ class OrbRun final : public App {
     camera_eye_ = damp3(camera_eye_, desired, 4.5f, dt);
     Vec3 eye = camera_eye_;
     if (shake_ > 0.01f) eye += Vec3{rng_.range(-1, 1), rng_.range(-1, 1), rng_.range(-1, 1)} * shake_ * 0.35f;
-    r.camera.eye = eye;
-    r.camera.target = car + forward * 5 + Vec3{0, 0, 1.2f};
-    r.camera.fov = (62 + clamp(speed - 30, 0.0f, 30.0f) * 0.35f) * kPi / 180;
+    Camera camera = r.camera();
+    camera.eye = eye;
+    camera.target = car + forward * 5 + Vec3{0, 0, 1.2f};
+    camera.fov = (62 + clamp(speed - 30, 0.0f, 30.0f) * 0.35f) * kPi / 180;
+    r.set_camera(camera);
   }
 
   // ---- per-frame GPU data ----
@@ -620,7 +627,7 @@ class OrbRun final : public App {
     sync_instanced(r, orbs_id_, orb_mesh_, orb_material(), scratch_, {});
 
     // Sparks: the engine's particle system (sorted, camera-facing, one draw).
-    particles_.tick(now_ms_, r.camera.eye);
+    particles_.tick(now_ms_, r.camera().eye);
 
     // Traffic.
     scratch_.clear();

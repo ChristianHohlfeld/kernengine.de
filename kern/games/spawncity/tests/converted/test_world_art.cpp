@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,9 +35,12 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh };
+struct Renderer;
+namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
+struct Renderer;
 struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 struct WorldArt {
  public:
@@ -80,7 +83,7 @@ struct WorldArt {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const WorldArt::Part& s) { return converted::Value::structure({arg(s.id), arg(s.transforms), arg(s.tints), arg(s.tinted)}); }
-[[maybe_unused]] static bool same(const WorldArt::Part& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.id, (*got.rows)[0]) && same(want.transforms, (*got.rows)[1]) && same(want.tints, (*got.rows)[2]) && same(want.tinted, (*got.rows)[3]); }
+[[maybe_unused]] static bool same(const WorldArt::Part& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.transforms, (*got.rows)[1]), ".transforms") && converted::at_place(same(want.tints, (*got.rows)[2]), ".tints") && converted::at_place(same(want.tinted, (*got.rows)[3]), ".tinted"); }
 [[maybe_unused]] static bool defined(const WorldArt::Part& s) { return defined(s.id) && defined(s.transforms) && defined(s.tints) && defined(s.tinted); }
 [[maybe_unused]] static std::string text(const WorldArt::Part& s) { return std::string("{") + text(s.id) + ", " + text(s.transforms) + ", " + text(s.tints) + ", " + text(s.tinted) + "}"; }
 [[maybe_unused]] static void take(WorldArt::Part& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.transforms, (*v.rows)[1]); converted::take_as<std::vector<double>>(s.tints, (*v.rows)[2]); converted::take_as<bool>(s.tinted, (*v.rows)[3]); }
@@ -95,12 +98,12 @@ struct WorldArt {
   return s;
 }
 [[maybe_unused]] static converted::Value arg(const WorldArt& s) { return converted::Value::structure({arg(s.cube), arg(s.sphere), arg(s.cylinder), arg(s.glow), arg(s.r_), arg(s.parts_)}); }
-[[maybe_unused]] static bool same(const WorldArt& want, const converted::Value& got) { return got.rows && got.rows->size() == 6 && same(want.cube, (*got.rows)[0]) && same(want.sphere, (*got.rows)[1]) && same(want.cylinder, (*got.rows)[2]) && same(want.glow, (*got.rows)[3]) && same(want.r_, (*got.rows)[4]) && same(want.parts_, (*got.rows)[5]); }
+[[maybe_unused]] static bool same(const WorldArt& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.cube, (*got.rows)[0]), ".cube") && converted::at_place(same(want.sphere, (*got.rows)[1]), ".sphere") && converted::at_place(same(want.cylinder, (*got.rows)[2]), ".cylinder") && converted::at_place(same(want.glow, (*got.rows)[3]), ".glow") && converted::at_place(same(want.r_, (*got.rows)[4]), ".r_") && converted::at_place(same(want.parts_, (*got.rows)[5]), ".parts_"); }
 [[maybe_unused]] static bool defined(const WorldArt& s) { return defined(s.cube) && defined(s.sphere) && defined(s.cylinder) && defined(s.glow) && defined(s.r_) && defined(s.parts_); }
 [[maybe_unused]] static std::string text(const WorldArt& s) { return std::string("{") + text(s.cube) + ", " + text(s.sphere) + ", " + text(s.cylinder) + ", " + text(s.glow) + ", " + text(s.r_) + ", " + text(s.parts_) + "}"; }
 [[maybe_unused]] static void take(WorldArt& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<unsigned int>(s.cube, (*v.rows)[0]); converted::take_as<unsigned int>(s.sphere, (*v.rows)[1]); converted::take_as<unsigned int>(s.cylinder, (*v.rows)[2]); converted::take_as<unsigned int>(s.glow, (*v.rows)[3]); converted::take_as<Renderer*>(s.r_, (*v.rows)[4]); converted::take_as<std::vector<WorldArt::Part>>(s.parts_, (*v.rows)[5]); }
 struct Out_WorldArt_renderer { WorldArt Self; Renderer* Result; };
-[[maybe_unused]] static bool same(const Out_WorldArt_renderer& want, const converted::Value& got) { return got.rows && got.rows->size() == 2 && same(want.Self, (*got.rows)[0]) && same(want.Result, (*got.rows)[1]); }
+[[maybe_unused]] static bool same(const Out_WorldArt_renderer& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_WorldArt_renderer& s) { return defined(s.Self) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_WorldArt_renderer& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
@@ -109,17 +112,22 @@ SC_TEST(converted_world_art) {
   {  // WorldArt::renderer
     converted::Tally tally("WorldArt_renderer");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] WorldArt a0) { const auto r = converted::counted([&] { return a0.renderer(); }); return Out_WorldArt_renderer{a0, r}; };
+    const auto run = [&]([[maybe_unused]] WorldArt& a0) { auto r = converted::counted([&] { return a0.renderer(); }); return Out_WorldArt_renderer{std::move(a0), std::move(r)}; };
     for (int i = 0; tally.more(i); ++i) {
-      const WorldArt a0 = draw_WorldArt(draw);
+      WorldArt a0 = draw_WorldArt(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {1, 0});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
     }
   }
 }

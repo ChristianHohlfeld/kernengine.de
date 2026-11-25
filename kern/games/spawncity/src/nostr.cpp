@@ -4,7 +4,6 @@
 #include "nostr.h"
 
 #include <cstdio>
-#include <cstring>
 #include <vector>
 
 namespace sc::nostr {
@@ -20,7 +19,7 @@ constexpr u32 kK[64] = {
     0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070, 0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5,
     0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
 inline u32 rotr(u32 x, u32 n) { return (x >> n) | (x << (32 - n)); }
-void block(u32 h[8], const u8* p) {
+void block(std::array<u32, 8>& h, const std::array<u8, 64>& p) {
   u32 w[64];
   for (int i = 0; i < 16; ++i) w[i] = (u32{p[4 * i]} << 24) | (u32{p[4 * i + 1]} << 16) | (u32{p[4 * i + 2]} << 8) | p[4 * i + 3];
   for (int i = 16; i < 64; ++i) {
@@ -35,28 +34,45 @@ void block(u32 h[8], const u8* p) {
   }
   h[0] += a; h[1] += b; h[2] += c; h[3] += d; h[4] += e; h[5] += f; h[6] += g; h[7] += k;
 }
+/// A hash in progress: the state, the block being filled and how many bytes went in. The bytes
+/// come one by one - from a list of bytes or from a text -, so nothing is copied to hash it.
+struct Hasher {
+  std::array<u32, 8> h = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+  std::array<u8, 64> chunk = {};
+  u32 filled = 0;
+  u64 length = 0;
+};
+void push(Hasher& s, u8 byte) {
+  s.chunk[s.filled] = byte;
+  s.filled += 1;
+  s.length += 1;
+  if (s.filled == 64) {
+    block(s.h, s.chunk);
+    s.filled = 0;
+  }
+}
+/// The padding (0x80, zeros, the length in bits, big endian) and the hash.
+Bytes32 finish(Hasher& s) {
+  const u64 bits = s.length * 8;
+  push(s, 0x80);
+  while (s.filled != 56) push(s, 0);
+  for (int b = 7; b >= 0; --b) push(s, static_cast<u8>(bits >> (8 * b)));
+  Bytes32 out;
+  for (int k = 0; k < 8; ++k) for (int b = 0; b < 4; ++b) out[4 * k + b] = static_cast<u8>(s.h[k] >> (24 - 8 * b));
+  return out;
+}
 }  // namespace
 
-void sha256(const u8* data, std::size_t length, u8 out[32]) {
-  u32 h[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
-  std::size_t i = 0;
-  for (; i + 64 <= length; i += 64) block(h, data + i);
-  u8 tail[128] = {};
-  const std::size_t rest = length - i;
-  std::memcpy(tail, data + i, rest);
-  tail[rest] = 0x80;
-  const std::size_t total = rest + 9 <= 64 ? 64 : 128;
-  const u64 bits = static_cast<u64>(length) * 8;
-  for (int b = 0; b < 8; ++b) tail[total - 1 - b] = static_cast<u8>(bits >> (8 * b));
-  block(h, tail);
-  if (total == 128) block(h, tail + 64);
-  for (int k = 0; k < 8; ++k) for (int b = 0; b < 4; ++b) out[4 * k + b] = static_cast<u8>(h[k] >> (24 - 8 * b));
+Bytes32 sha256(const std::vector<u8>& data) {
+  Hasher s;
+  for (u8 byte : data) push(s, byte);
+  return finish(s);
 }
 
-Bytes32 sha256(std::string_view s) {
-  Bytes32 o;
-  sha256(reinterpret_cast<const u8*>(s.data()), s.size(), o.data());
-  return o;
+Bytes32 sha256(std::string_view text) {
+  Hasher s;
+  for (char c : text) push(s, static_cast<u8>(c));
+  return finish(s);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -65,17 +81,25 @@ Bytes32 sha256(std::string_view s) {
 namespace {
 struct U256 { u32 w[8] = {}; };
 
-U256 from_be(const u8* b) {
+U256 from_be(const Bytes32& b) {
   U256 r;
   for (int i = 0; i < 8; ++i) r.w[7 - i] = (u32{b[4 * i]} << 24) | (u32{b[4 * i + 1]} << 16) | (u32{b[4 * i + 2]} << 8) | b[4 * i + 3];
   return r;
 }
-void to_be(const U256& a, u8* b) {
+Bytes32 to_be(const U256& a) {
+  Bytes32 b;
   for (int i = 0; i < 8; ++i) for (int k = 0; k < 4; ++k) b[4 * i + k] = static_cast<u8>(a.w[7 - i] >> (24 - 8 * k));
+  return b;
+}
+/// One half of a signature: its first (0) or its second (1) 32 bytes.
+Bytes32 half(const std::array<u8, 64>& sig, int which) {
+  Bytes32 b;
+  for (int i = 0; i < 32; ++i) b[i] = sig[32 * which + i];
+  return b;
 }
 U256 from_hex256(const char* s) {
-  u8 b[32];
-  from_hex(s, b, 32);
+  Bytes32 b{};
+  from_hex(s, b);
   return from_be(b);
 }
 int cmp(const U256& a, const U256& b) {
@@ -127,21 +151,18 @@ U256 reduce(const U256& a, const U256& m) {  // a < 2m for the moduli here
   return r;
 }
 
-const U256& P() { static const U256 v = from_hex256("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F"); return v; }
-const U256& N() { static const U256 v = from_hex256("FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141"); return v; }
+// (the numbers of the curve, least significant word first: from_hex256 of the hex the standard gives -
+// P = FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F, N = FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141)
+constexpr U256 kP{{0xFFFFFC2F, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF}};
+constexpr U256 kN{{0xD0364141, 0xBFD25E8C, 0xAF48A03B, 0xBAAEDCE6, 0xFFFFFFFE, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF}};
+const U256& P() { return kP; }
+const U256& N() { return kN; }
 
 // ---- secp256k1 points (Jacobian, a = 0, b = 7) ----
 struct Pt { U256 x, y, z; };  // z = 0: infinity
-const Pt& G() {
-  static const Pt g = [] {
-    Pt p;
-    p.x = from_hex256("79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798");
-    p.y = from_hex256("483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8");
-    p.z.w[0] = 1;
-    return p;
-  }();
-  return g;
-}
+// (the generator: x = 79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798, y = 483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8, z = 1)
+constexpr Pt kG{{{0x16F81798, 0x59F2815B, 0x2DCE28D9, 0x029BFCDB, 0xCE870B07, 0x55A06295, 0xF9DCBBAC, 0x79BE667E}}, {{0xFB10D4B8, 0x9C47D08F, 0xA6855419, 0xFD17B448, 0x0E1108A8, 0x5DA4FBFC, 0x26A3C465, 0x483ADA77}}, {{1}}};
+const Pt& G() { return kG; }
 U256 fm(const U256& a, const U256& b) { return mulm(a, b, P()); }
 U256 fa(const U256& a, const U256& b) { return addm(a, b, P()); }
 U256 fs(const U256& a, const U256& b) { return subm(a, b, P()); }
@@ -216,65 +237,64 @@ Bytes32 tagged(std::string_view tag, const std::vector<u8>& msg) {
   std::vector<u8> buf(t.begin(), t.end());
   buf.insert(buf.end(), t.begin(), t.end());
   buf.insert(buf.end(), msg.begin(), msg.end());
-  Bytes32 o;
-  sha256(buf.data(), buf.size(), o.data());
-  return o;
+  return sha256(buf);
 }
-void append(std::vector<u8>& v, const u8* b, std::size_t n) { v.insert(v.end(), b, b + n); }
+void append(std::vector<u8>& v, const Bytes32& b) { v.insert(v.end(), b.begin(), b.end()); }
 }  // namespace
 
 bool public_key(const Bytes32& secret, Bytes32& out) {
-  const U256 d = from_be(secret.data());
+  const U256 d = from_be(secret);
   if (is_zero(d) || cmp(d, N()) >= 0) return false;
   U256 x, y;
   if (!affine(mul_pt(G(), d), x, y)) return false;
-  to_be(x, out.data());
+  out = to_be(x);
   return true;
 }
 
 bool sign(const Bytes32& secret, const Bytes32& message, const Bytes32& aux, std::array<u8, 64>& sig) {
-  U256 d = from_be(secret.data());
+  U256 d = from_be(secret);
   if (is_zero(d) || cmp(d, N()) >= 0) return false;
   U256 px, py;
   if (!affine(mul_pt(G(), d), px, py)) return false;
   if (py.w[0] & 1) d = subm(U256{}, d, N());
-  u8 pxb[32], db[32];
-  to_be(px, pxb);
-  to_be(d, db);
+  const Bytes32 pxb = to_be(px), db = to_be(d);
   const Bytes32 ah = tagged("BIP0340/aux", std::vector<u8>(aux.begin(), aux.end()));
   std::vector<u8> m;
   for (int i = 0; i < 32; ++i) m.push_back(db[i] ^ ah[i]);
-  append(m, pxb, 32);
-  append(m, message.data(), 32);
+  append(m, pxb);
+  append(m, message);
   const Bytes32 rand = tagged("BIP0340/nonce", m);
-  U256 k = reduce(from_be(rand.data()), N());
+  U256 k = reduce(from_be(rand), N());
   if (is_zero(k)) return false;
   U256 rx, ry;
   if (!affine(mul_pt(G(), k), rx, ry)) return false;
   if (ry.w[0] & 1) k = subm(U256{}, k, N());
-  u8 rxb[32];
-  to_be(rx, rxb);
+  const Bytes32 rxb = to_be(rx);
   std::vector<u8> c;
-  append(c, rxb, 32);
-  append(c, pxb, 32);
-  append(c, message.data(), 32);
-  const U256 e = reduce(from_be(tagged("BIP0340/challenge", c).data()), N());
+  append(c, rxb);
+  append(c, pxb);
+  append(c, message);
+  const U256 e = reduce(from_be(tagged("BIP0340/challenge", c)), N());
   const U256 s = addm(k, mulm(e, d, N()), N());
-  std::memcpy(sig.data(), rxb, 32);
-  to_be(s, sig.data() + 32);
-  return verify(Bytes32{[&] { Bytes32 b; std::memcpy(b.data(), pxb, 32); return b; }()}, message, sig);
+  const Bytes32 sb = to_be(s);
+  for (int i = 0; i < 32; ++i) {
+    sig[i] = rxb[i];
+    sig[32 + i] = sb[i];
+  }
+  return verify(pxb, message, sig);
 }
 
 bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 64>& sig) {
   Pt p;
-  if (!lift_x(from_be(pubkey.data()), p)) return false;
-  const U256 r = from_be(sig.data()), s = from_be(sig.data() + 32);
+  if (!lift_x(from_be(pubkey), p)) return false;
+  const Bytes32 rb = half(sig, 0);
+  const U256 r = from_be(rb), s = from_be(half(sig, 1));
   if (cmp(r, P()) >= 0 || cmp(s, N()) >= 0) return false;
   std::vector<u8> c;
-  append(c, sig.data(), 32);
-  append(c, pubkey.data(), 32);
-  append(c, message.data(), 32);
-  const U256 e = reduce(from_be(tagged("BIP0340/challenge", c).data()), N());
+  append(c, rb);
+  append(c, pubkey);
+  append(c, message);
+  const U256 e = reduce(from_be(tagged("BIP0340/challenge", c)), N());
   // R = sG - eP
   Pt ep = mul_pt(p, e);
   ep.y = fs(U256{}, ep.y);
@@ -283,14 +303,28 @@ bool verify(const Bytes32& pubkey, const Bytes32& message, const std::array<u8, 
   return (y.w[0] & 1) == 0 && cmp(x, r) == 0;
 }
 
-std::string hex(const u8* data, std::size_t n) {
-  static const char* d = "0123456789abcdef";
+namespace {
+constexpr char kHexDigits[] = "0123456789abcdef";
+void hex_of(std::string& o, u8 byte) {
+  o += kHexDigits[byte >> 4];
+  o += kHexDigits[byte & 15];
+}
+}  // namespace
+
+std::string hex(const Bytes32& data) {
   std::string o;
-  for (std::size_t i = 0; i < n; ++i) { o += d[data[i] >> 4]; o += d[data[i] & 15]; }
+  for (u8 byte : data) hex_of(o, byte);
   return o;
 }
 
-bool from_hex(std::string_view s, u8* out, std::size_t n) {
+std::string hex(const std::array<u8, 64>& data) {
+  std::string o;
+  for (u8 byte : data) hex_of(o, byte);
+  return o;
+}
+
+bool from_hex(std::string_view s, Bytes32& out) {
+  const std::size_t n = out.size();
   if (s.size() != 2 * n) return false;
   auto v = [](char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; };
   for (std::size_t i = 0; i < n; ++i) {
@@ -323,7 +357,7 @@ std::string escape(std::string_view s) {
 bool event_json(const Bytes32& secret, const Bytes32& aux, i64 created_at, u32 kind, std::string_view tags, std::string_view content, std::string& out) {
   Bytes32 pk;
   if (!public_key(secret, pk)) return false;
-  const std::string pkh = hex(pk.data(), 32), body = escape(content);
+  const std::string pkh = hex(pk), body = escape(content);
   char head[96];
   std::snprintf(head, sizeof head, "[0,\"%s\",%lld,%u,", pkh.c_str(), static_cast<long long>(created_at), kind);
   const std::string ser = std::string(head) + std::string(tags) + ",\"" + body + "\"]";
@@ -332,7 +366,7 @@ bool event_json(const Bytes32& secret, const Bytes32& aux, i64 created_at, u32 k
   if (!sign(secret, id, aux, sig)) return false;
   char num[64];
   std::snprintf(num, sizeof num, ",\"created_at\":%lld,\"kind\":%u,\"tags\":", static_cast<long long>(created_at), kind);
-  out = "{\"id\":\"" + hex(id.data(), 32) + "\",\"pubkey\":\"" + pkh + "\"" + num + std::string(tags) + ",\"content\":\"" + body + "\",\"sig\":\"" + hex(sig.data(), 64) + "\"}";
+  out = "{\"id\":\"" + hex(id) + "\",\"pubkey\":\"" + pkh + "\"" + num + std::string(tags) + ",\"content\":\"" + body + "\",\"sig\":\"" + hex(sig) + "\"}";
   return true;
 }
 

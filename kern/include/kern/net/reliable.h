@@ -113,8 +113,8 @@ class Endpoint {
   void reset();
   u16 next_sequence() const { return sequence_; }
   /// Sends a payload (fragmented when needed). Returns its sequence.
-  u16 send_packet(const u8* payload, int bytes);
-  void receive_packet(const u8* packet, int bytes);
+  u16 send_packet(const u8* payload, Count<1> bytes);
+  void receive_packet(const u8* packet, Count<1> bytes);
   /// Sequences of our packets the remote side has acked since the last clear_acks().
   const std::vector<u16>& acks() const { return acks_; }
   void clear_acks() { acks_.clear(); }

@@ -114,7 +114,7 @@ Das Ergebnis `PickHit` enthält Mesh-Id, Instanz, Dreieck, Distanz, Trefferpunkt
 
 ```cpp
 PickHit hit;
-if (engine.renderer.pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
+if (engine.renderer().pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
   // examples/hello: die angeklickte Kiste rot färben
   tints_[hit.instance * 4 + 0] = 1.0f; tints_[hit.instance * 4 + 1] = 0.25f; tints_[hit.instance * 4 + 2] = 0.2f;
 }

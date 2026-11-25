@@ -15,21 +15,30 @@ namespace {
 
 enum Code : u8 {
   kConst, kInput, kAdd, kSub, kMul, kDiv, kMod, kPow, kNeg, kNot, kLt, kLe, kGt, kGe, kEq, kNe, kAnd, kOr, kSelect,
-  kMin, kMax, kClamp, kAbs, kSign, kFloor, kCeil, kRound, kTrunc, kSqrt, kExp, kLog,
+  kMin, kMax, kClamp, kAbs, kSign, kCopysign, kFloor, kCeil, kRound, kTrunc, kSqrt, kExp, kLog,
   kSin, kCos, kTan, kAsin, kAcos, kAtan, kAtan2, kRad, kDeg, kLerp,
-  kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32, kSingle,
+  kBand, kBor, kBxor, kShl, kShr, kWrap32, kWrap32s, kMul32, kSingle, kRemainder,
 };
 
-struct Fn { const char* name; Code code; u8 args; };
+// whole: what the function gives is a whole number for any numbers it is given, and it takes them as
+// whole numbers (cut toward zero, kern::math::bits_of) - a formula made of such functions can be a
+// formula of whole numbers in a Blueprint's C++ (Formula::whole)
+struct Fn { const char* name; Code code; u8 args; bool whole = false; };
 constexpr Fn kFunctions[] = {
     {"min", kMin, 2},     {"max", kMax, 2},     {"clamp", kClamp, 3}, {"abs", kAbs, 1},     {"sign", kSign, 1},   {"floor", kFloor, 1}, {"ceil", kCeil, 1},
     {"round", kRound, 1}, {"trunc", kTrunc, 1}, {"sqrt", kSqrt, 1},   {"pow", kPow, 2},     {"exp", kExp, 1},     {"log", kLog, 1},     {"sin", kSin, 1},
     {"cos", kCos, 1},     {"tan", kTan, 1},     {"asin", kAsin, 1},   {"acos", kAcos, 1},   {"atan", kAtan, 1},   {"atan2", kAtan2, 2}, {"rad", kRad, 1},
-    {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},
+    {"deg", kDeg, 1},     {"lerp", kLerp, 3},   {"div", kDiv, 2},     {"mod", kMod, 2},     {"copysign", kCopysign, 2},
+    {"remainder", kRemainder, 2},
     // whole numbers as a machine has them: their bits, and arithmetic that wraps around at 32 bit
-    {"band", kBand, 2},   {"bor", kBor, 2},     {"bxor", kBxor, 2},   {"shl", kShl, 2},     {"shr", kShr, 2},     {"wrap32", kWrap32, 1}, {"wrap32s", kWrap32s, 1},
-    {"mul32", kMul32, 2}, {"single", kSingle, 1},
+    {"band", kBand, 2, true}, {"bor", kBor, 2, true}, {"bxor", kBxor, 2, true}, {"shl", kShl, 2, true}, {"shr", kShr, 2, true},
+    {"wrap32", kWrap32, 1, true}, {"wrap32s", kWrap32s, 1, true}, {"mul32", kMul32, 2, true}, {"single", kSingle, 1},
 };
+// The operators that are whole where what they are given is (an Int, what a whole function gives, a
+// number written out, or another of them): +, - and *. In a formula of whole numbers the class works
+// them out as whole numbers where that is the same as the double the formula's arithmetic gives, and
+// through that double anywhere else (logic::Sum, nodes.h) - so they can stand between whole functions.
+constexpr Code kWholeOperators[] = {kAdd, kSub, kMul};
 constexpr f64 kPi = math::pi;
 constexpr int kMaxStack = 48;
 
@@ -335,6 +344,69 @@ std::string Formula::print(int t, int outer, bool cpp) const {
   return mine < outer && !call_form ? "(" + s + ")" : s;
 }
 
+namespace {
+bool whole_fn(u8 code) {
+  for (const Fn& x : kFunctions) if (x.code == code) return x.whole;
+  return false;
+}
+bool whole_op(u8 code) {
+  for (Code x : kWholeOperators) if (x == code) return true;
+  return false;
+}
+bool comparison(u8 code) { return code == kLt || code == kLe || code == kGt || code == kGe || code == kEq || code == kNe; }
+}  // namespace
+
+bool Formula::whole_operand(int t) const {
+  const Term& n = tree_[static_cast<std::size_t>(t)];
+  if (n.code == kInput || n.code == kConst || whole_fn(n.code)) return true;
+  if (!whole_op(n.code)) return false;
+  return whole_operand(n.a) && whole_operand(n.b);
+}
+
+bool Formula::int_input(std::size_t k) const {
+  if (!ok() || k >= inputs_.size()) return false;
+  std::vector<int> parent(tree_.size(), -1);
+  for (std::size_t t = 0; t < tree_.size(); ++t)
+    for (int child : {tree_[t].a, tree_[t].b, tree_[t].c})
+      if (child >= 0) parent[static_cast<std::size_t>(child)] = static_cast<int>(t);
+  // (where a value of whole numbers - the input, or +, - or * it is given to - is read)
+  auto read_whole = [&](int at) {
+    for (bool first = true;; first = false) {
+      const int up = parent[static_cast<std::size_t>(at)];
+      if (up < 0) return !first;  // (the formula's value: +, - or *; the input itself is no formula of it)
+      const Term& p = tree_[static_cast<std::size_t>(up)];
+      if (whole_fn(p.code)) return true;
+      if (comparison(p.code)) return whole_operand(p.a == at ? p.b : p.a);
+      if (!whole_op(p.code) || !whole_operand(up)) return false;
+      at = up;
+    }
+  };
+  bool read = false;
+  for (std::size_t t = 0; t < tree_.size(); ++t) {
+    if (tree_[t].code != kInput || tree_[t].index != k) continue;
+    if (!read_whole(static_cast<int>(t))) return false;
+    read = true;
+  }
+  return read;
+}
+
+bool Formula::whole_result() const {
+  if (!ok() || inputs_.empty()) return false;
+  const u8 root = tree_[static_cast<std::size_t>(root_)].code;
+  // (+, - or * is an Int where an input stands in it - an Int, logic::Sum in the class; between numbers and whole functions
+  // alone it is the double those give)
+  auto holds_input = [&](auto&& self, int t) -> bool {
+    const Term& n = tree_[static_cast<std::size_t>(t)];
+    return n.code == kInput || (whole_op(n.code) && (self(self, n.a) || self(self, n.b)));
+  };
+  if (!whole_fn(root) && !(whole_op(root) && whole_operand(root_) && holds_input(holds_input, root_))) return false;
+  for (std::size_t k = 0; k < inputs_.size(); ++k)
+    if (!int_input(k)) return false;
+  return true;
+}
+
+bool Formula::result_sum() const { return ok() && whole_op(tree_[static_cast<std::size_t>(root_)].code); }
+
 std::string Formula::text() const { return ok() ? print(root_, 0, false) : std::string(); }
 std::string Formula::cpp() const { return ok() ? print(root_, 0, true) : std::string("0.0"); }
 
@@ -385,6 +457,7 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kClamp: r = math::clamp(a, b, c); break;
       case kAbs: r = math::abs(a); break;
       case kSign: r = math::sign(a); break;
+      case kCopysign: r = math::copysign(a, b); break;
       case kFloor: r = math::floor(a); break;
       case kCeil: r = math::ceil(a); break;
       case kRound: r = math::round(a); break;
@@ -411,6 +484,7 @@ f64 Formula::evaluate(const f64* values, std::size_t count) const {
       case kWrap32s: r = math::wrap32s(a); break;
       case kMul32: r = math::mul32(a, b); break;
       case kSingle: r = math::single(a); break;
+      case kRemainder: r = math::remainder(a, b); break;
     }
     st[n++] = r;
   }

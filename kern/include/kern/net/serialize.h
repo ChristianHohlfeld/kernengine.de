@@ -45,7 +45,7 @@ class BitWriter {
   BitWriter(void* data, int bytes);  // bytes must be a multiple of 4
   void write_bits(u32 value, int bits);
   void write_align();
-  void write_bytes(const u8* data, int bytes);
+  void write_bytes(const u8* data, Count<1> bytes);
   void flush();
   int align_bits() const { return (8 - bits_written_ % 8) % 8; }
   int bits_written() const { return bits_written_; }
@@ -67,7 +67,7 @@ class BitReader {
   bool would_overflow(int bits) const { return bits_read_ + bits > num_bits_; }
   u32 read_bits(int bits);
   bool read_align();  // false when the padding bits are not zero
-  void read_bytes(u8* data, int bytes);
+  void read_bytes(u8* data, Count<1> bytes);
   int align_bits() const { return (8 - bits_read_ % 8) % 8; }
   int bits_read() const { return bits_read_; }
   int bits_remaining() const { return num_bits_ - bits_read_; }
@@ -90,7 +90,7 @@ class WriteStream {
   WriteStream(void* buffer, int bytes) : w_(buffer, bytes) {}
   bool serialize_integer(i32 value, i32 min, i32 max);
   bool serialize_bits(u32 value, int bits);
-  bool serialize_bytes(const u8* data, int bytes);
+  bool serialize_bytes(const u8* data, Count<1> bytes);
   bool serialize_align();
   bool serialize_check(u32 magic);  // debug marker, costs 32 bits
   void flush() { w_.flush(); }
@@ -109,7 +109,7 @@ class ReadStream {
   ReadStream(const void* buffer, int bytes) : r_(buffer, bytes) {}
   bool serialize_integer(i32& value, i32 min, i32 max);
   bool serialize_bits(u32& value, int bits);
-  bool serialize_bytes(u8* data, int bytes);
+  bool serialize_bytes(u8* data, Count<1> bytes);
   bool serialize_align();
   bool serialize_check(u32 magic);
   int bits_processed() const { return r_.bits_read(); }
@@ -127,7 +127,7 @@ class MeasureStream {
   static constexpr bool kWriting = false, kReading = false, kMeasuring = true;
   bool serialize_integer(i32, i32 min, i32 max) { bits_ += bits_required(0, static_cast<u32>(max - min)); return true; }
   bool serialize_bits(u32, int bits) { bits_ += bits; return true; }
-  bool serialize_bytes(const u8*, int bytes) { serialize_align(); bits_ += bytes * 8; return true; }
+  bool serialize_bytes(const u8*, Count<1> bytes) { serialize_align(); bits_ += static_cast<int>(static_cast<u32>(bytes)) * 8; return true; }
   bool serialize_align() { bits_ += 7; return true; }
   bool serialize_check(u32) { serialize_align(); bits_ += 32; return true; }
   int bits_processed() const { return bits_; }

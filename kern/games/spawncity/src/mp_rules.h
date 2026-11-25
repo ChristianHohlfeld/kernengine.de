@@ -28,9 +28,10 @@
 
 namespace sc::mp {
 
-/// The running Blueprint of the actor "Multiplayer" (the game binds it once its world has
-/// started; tests bind the one they run).
-void bind(kern::logic::Instance* blueprint);
+/// Binds the rules to the logic the level's Blueprints run in (the game once its world has started,
+/// tests the one they run) - the Blueprint of the actor "Multiplayer", found by its name at every
+/// call - and takes its numbers. True: the actor has a Blueprint that runs there.
+bool bind(kern::logic::Runtime& logic);
 
 // ---- pose timeline (vs_pose_sync.mjs) ----------------------------------------------------------
 constexpr f64 kInterpolationDelayMs = 90;    // VS_POSE_INTERPOLATION_DELAY_MS
@@ -112,6 +113,11 @@ f32 blast_damage(f32 damage);
 // RespawnRadiusMin and RespawnRadiusMax.
 extern f64 kSpawnProtectMs, kRegenDelayMs, kRegenTickMs, kRespawnCooldownMs;
 extern f32 kRegenHpPerS, kRespawnRadiusMin, kRespawnRadiusMax;
+/// The Blueprint's SpawnProtectMs, BallotMs and VoiceRadius as they stand in it, read at every call: for
+/// code that keeps no state of the game (the session, net_session.cpp).
+f64 spawn_protect_ms();
+f64 ballot_ms();
+f32 voice_radius();
 
 /// What the authority decides for a damage request (authorityHit).
 enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down };
@@ -166,7 +172,8 @@ struct Ballot {
 bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now_ms);
 /// One vote; returns the ballot's status after it. `did`: what this vote did - the same, or
 /// ignored for somebody who is not asked or has voted.
-Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms, Ballot::Status* did = nullptr);
+Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms, Ballot::Status& did);
+Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms);
 /// A ballot is over without a result: it ran out, or the roster is no longer the one that was asked.
 bool ballot_stale(const Ballot& b, const std::vector<u8>& current_members, f64 now_ms);
 std::string ballot_name(Ballot::Status s);
@@ -189,7 +196,7 @@ class VoiceStream {
   /// A decoded frame (8 kHz) at gain `gain`; frames older than the last sequence number are dropped.
   bool push(u32 seq, const std::vector<u8>& mulaw, f32 gain);
   /// Adds `frames` stereo frames at `rate` into `out` (interleaved). Returns true while playing.
-  bool render(f32* out, u32 frames, u32 rate);
+  bool render(std::vector<f32>& out, u32 frames, u32 rate);
   bool speaking() const { return !queue_.empty(); }
   void reset() { queue_.clear(); have_seq_ = false; lead_ = 0; }
 
@@ -206,7 +213,7 @@ class VoiceStream {
 /// (proximity_voice.mjs onAudio), cut into 640-sample frames.
 class VoiceCapture {
  public:
-  void push(const f32* samples, u32 count, u32 rate);
+  void push(kern::Span<const f32> samples, u32 rate);
   bool take(std::vector<u8>& frame);
   void clear() { pending_.clear(); frames_.clear(); phase_ = 0; }
 

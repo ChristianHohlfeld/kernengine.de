@@ -54,7 +54,8 @@ void BitWriter::write_align() {
   if (r) write_bits(0, r);
 }
 
-void BitWriter::write_bytes(const u8* data, int bytes) {
+void BitWriter::write_bytes(const u8* data, Count<1> count) {
+  const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
   write_align();
   for (int i = 0; i < bytes; ++i) write_bits(data[i], 8);
 }
@@ -105,7 +106,8 @@ bool BitReader::read_align() {
   return read_bits(r) == 0;
 }
 
-void BitReader::read_bytes(u8* data, int bytes) {
+void BitReader::read_bytes(u8* data, Count<1> count) {
+  const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
   for (int i = 0; i < bytes; ++i) data[i] = static_cast<u8>(read_bits(8));
 }
 
@@ -124,7 +126,8 @@ bool WriteStream::serialize_bits(u32 value, int bits) {
   return !w_.overflow();
 }
 
-bool WriteStream::serialize_bytes(const u8* data, int bytes) {
+bool WriteStream::serialize_bytes(const u8* data, Count<1> count) {
+  const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
   if (bytes < 0) return false;
   w_.write_bytes(data, bytes);
   return !w_.overflow();
@@ -158,7 +161,8 @@ bool ReadStream::serialize_bits(u32& value, int bits) {
   return true;
 }
 
-bool ReadStream::serialize_bytes(u8* data, int bytes) {
+bool ReadStream::serialize_bytes(u8* data, Count<1> count) {
+  const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
   if (bytes < 0 || !r_.read_align() || r_.would_overflow(bytes * 8)) return false;
   r_.read_bytes(data, bytes);
   return true;

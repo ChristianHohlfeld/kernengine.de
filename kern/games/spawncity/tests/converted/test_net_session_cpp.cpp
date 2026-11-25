@@ -8,8 +8,8 @@
 #include <type_traits>
 #include <vector>
 #include <algorithm>
-#include <cstring>
 #include "../../src/net_session.h"
+#include "../../src/wire.h"
 #include "../converted.h"
 
 namespace converted_net_session_cpp {
@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,11 +35,65 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
-struct Whole64 {
-  u32 high = 0;
-  u32 low = 0;
+struct Quat {
+  f32 x = 0, y = 0, z = 0, w = 1;
+  static Quat axis_angle(Vec3 axis, f32 radians) {
+    const Vec3 a = normalize(axis);
+    const f32 s = kern::math::sin(radians * 0.5);
+    return {a.x * s, a.y * s, a.z * s, kern::math::cos(radians * 0.5)};
+  }
+  
+
+
+
+  Vec3 rotate(Vec3 v) const {
+    const Vec3 q{x, y, z};
+    const Vec3 t = cross(q, v) * 2.0;
+    return v + t * w + cross(q, t);
+  }
 };
-struct EndpointConfig {
+enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+constexpr f32 kPi = 3.14159265358979323846;
+inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
+inline f32 wrap_pi(f32 a) {
+  while (a > kPi) a -= 2 * kPi;
+  while (a < -kPi) a += 2 * kPi;
+  return a;
+}
+inline Quat qnormalize(Quat q) {
+  const f32 l = kern::math::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  return l > 1e-9 ? Quat{q.x / l, q.y / l, q.z / l, q.w / l} : Quat{};
+}
+inline Quat yaw_quat(f32 yaw) { return Quat::axis_angle({0, 0, 1}, yaw); }
+struct BitWriter : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitReader : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct WriteStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ReadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MeasureStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace net { struct EndpointConfig {
   int max_packet_size = 16 * 1024;     // payload bytes (before fragmentation)
   int fragment_above = 1024;           // bigger packets are fragmented
   int fragment_size = 1024;
@@ -52,9 +106,12 @@ struct EndpointConfig {
   f32 packet_loss_smoothing = 0.1;
   f32 bandwidth_smoothing = 0.1;
   int packet_header_size = 28;         // IPv4 + UDP for bandwidth estimates
+}; }
+struct Endpoint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-enum class ChannelType : u8 { reliable_ordered, unreliable_unordered };
-struct ChannelConfig {
+namespace net { enum class ChannelType : u8 { reliable_ordered, unreliable_unordered }; }
+namespace net { struct ChannelConfig {
   ChannelType type = ChannelType::reliable_ordered;
   int send_queue_size = 1024;            // messages (reliable: window)
   int receive_queue_size = 1024;
@@ -64,20 +121,41 @@ struct ChannelConfig {
   int block_threshold = 512;             // reliable: bigger messages go as blocks
   int block_fragment_size = 1024;
   f32 resend_time = 0.1;                // seconds (at least; RTT * 1.25 when known)
-};
-struct ConnectionConfig {
+}; }
+namespace net { struct ConnectionConfig {
   std::vector<ChannelConfig> channels{ChannelConfig{}, ChannelConfig{ChannelType::unreliable_unordered}};
   int max_packet_size = 8 * 1024;        // message payload per packet
   int max_message_types = 256;
   EndpointConfig endpoint;
-};
+}; }
+namespace net { struct Message {
+  u16 id = 0;                            // reliable: sequence within the channel
+  u16 type = 0;
+  std::vector<u8> data;
+}; }
 struct Connection : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
+namespace net { struct Address {
+  u64 id = 0;  // 0 = none
+  
+  bool operator==(const Address&) const = default;
+}; }
 struct Transport : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-struct HostTransport : converted::EngineObject {
+struct Simulator : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-struct ClientServerConfig {
+struct LoopbackNetwork : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct HostTransport : public Transport {
+  using Transport::Transport;
+  void set_address(const net::Address& a) const;
+  void advance_time(const double& time) const;
+};
+namespace net { struct ClientServerConfig {
   u64 protocol_id = 0x4b45524e30303031ull;  // "KERN0001": different games / versions do not talk
   int max_clients = 16;
   f64 timeout = 6;                           // seconds without packets
@@ -85,41 +163,1742 @@ struct ClientServerConfig {
   f64 connect_timeout = 6;
   f64 keepalive_interval = 0.1;              // payload packets go out at least this often
   ConnectionConfig connection;
-};
+}; }
+namespace net { enum class ClientState : i8 {
+  denied = -3,          // server full
+  timed_out = -2,
+  error = -1,           // connection error (desync, bad packets)
+  disconnected = 0,
+  connecting = 1,       // sending requests
+  challenged = 2,       // sending responses
+  connected = 3,
+}; }
 struct Client : converted::EngineObject {
+  Client() = default;
   void disconnect() const;
+  ~Client();
+  Client(Transport& transport, const net::ClientServerConfig& config, const u64& salt_seed);
+  bool connected() const;
+  bool send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
+  net::ClientState state() const;
+  void connect(const net::Address& server, const double& time) const;
+  void advance_time(const double& time) const;
+  void receive_packets() const;
+  std::optional<net::Message> receive(const int& channel) const;
+  void send_packets() const;
+  Client(const Client&) = default;
+  Client(Client&&) = default;
+  Client& operator=(const Client&) = default;
+  Client& operator=(Client&& o) noexcept;
 };
 struct Server : converted::EngineObject {
+  Server() = default;
+  void stop() const;
+  ~Server();
+  Server(Transport& transport, const net::ClientServerConfig& config, const u64& salt_seed);
+  void start(const int& max_clients) const;
+  bool running() const;
+  int max_clients() const;
+  bool client_connected(const int& index) const;
+  bool send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
+  void advance_time(const double& time) const;
+  void receive_packets() const;
+  std::vector<std::pair<int, bool>> take_events() const;
+  std::optional<net::Message> receive(const int& client, const int& channel) const;
+  void send_packets() const;
+  int connected_clients() const;
+  Server(const Server&) = default;
+  Server(Server&&) = default;
+  Server& operator=(const Server&) = default;
+  Server& operator=(Server&& o) noexcept;
 };
-enum class PacketType : u8 { request = 1, denied, challenge, response, keepalive, payload, disconnect };
-enum class PinType : u8 {
-  exec, boolean, integer, number, vector, text, actor, enumeration, structure,
-  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, count
+namespace net { enum class PacketType : u8 { request = 1, denied, challenge, response, keepalive, payload, disconnect }; }
+struct KeyIndex : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
-namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; }
-constexpr u32 kMaxPlayers = 9;
-namespace Turn { enum class Dir : u8 { none, left, right, u_turn }; }
-ClientServerConfig config() {
-  ClientServerConfig c;
+namespace json { enum class Type : u8 { null, boolean, number, string, array, object }; }
+struct Value : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { enum class PinType : u8 {
+  exec, boolean, integer, number, vector, text, actor, enumeration, structure, int64,
+  boolean_list, integer_list, number_list, vector_list, text_list, actor_list, enumeration_list, structure_list, int64_list,
+  map, set,
+  /// A function of a library that only the engine calls (Make Callback; TypeRef::of: its signature).
+  callback, count
+}; }
+struct EngineValue;
+struct Callable : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct EngineValue : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Variable : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct StructField : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FunctionPin : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+struct Formula : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace ParamDef { enum class Kind : u8 { text, choice, variable, event, machine, state, key, sound, tag, integer, function, type, field, scope, path }; } }
+struct Context;
+struct Library : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Host : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Instance : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Context : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace seats { constexpr u8 kNone = 253; }
+namespace seats { enum class Seat : u8 { pilot = 0, passenger = 1 }; }
+namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pilot, already_seated, seat_occupied, no_pilot, not_occupant }; }
+namespace seats { struct Row { u8 owner = kNone, pilot = kNone, passenger = kNone; }; }
+namespace seats { struct Table {
+ public:
+  Result claim(u8 owner, u8 player, Seat seat);
+  Result release(u8 owner, u8 player, Seat seat);
+  /// A player left: his jet's row goes, his passenger seat elsewhere is freed. True: changed.
+  bool drop(u8 player);
+  /// The row of `owner`'s jet (all kNone when nobody sits in it).
+  
+  /// Where `player` sits: the row (owner) and the seat; false when he sits nowhere.
+  
+  const std::vector<Row>& rows() const { return rows_; }
+  u32 revision() const { return revision_; }
+  /// Replace with the authority's snapshot (validated like JetSeatTable.load).
+  bool load(u32 revision, const std::vector<Row>& rows);
+  
+
+ private:
+  std::vector<Row> rows_;
+  u32 revision_ = 0;
+}; }
+namespace mp { constexpr f64 kInterpolationDelayMs = 90; }
+namespace mp { constexpr f32 kTeleportM = 35; }
+namespace mp { constexpr u32 kMaxSnapshots = 18; }
+namespace mp { struct PoseTimeline {
+ public:
+  void reset() { snaps_.clear(); offsets_.clear(); lags_.clear(); have_offset_ = false; delay_ = kInterpolationDelayMs; }
+  /// `has_v`: the sender's velocity is known (it is blended 70/30 with the measured one).
+  bool push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source_ms, f64 received_ms);
+  
+  
+  Vec3 last_position() const { return snaps_.empty() ? Vec3{} : converted::back(snaps_).p; }
+  
+  
+
+ private:
+  struct Snap { Vec3 p; Quat q; Vec3 v; f64 received, source; };
+  std::vector<Snap> snaps_;
+  std::vector<f64> offsets_;
+  f64 offset_ = 0, delay_ = kInterpolationDelayMs;
+  std::vector<f64> lags_;  // how late each snapshot came over the fastest one (the jitter)
+  bool have_offset_ = false;
+}; }
+namespace mp { struct NavTimeline {
+ public:
+  void reset() { snaps_.clear(); }
+  bool push(Vec3 p, f32 heading, u8 mode, f64 at_ms);
+  
+
+ private:
+  struct Snap { Vec3 p; f32 heading; u8 mode; f64 at; };
+  std::vector<Snap> snaps_;
+}; }
+namespace mp { constexpr u32 kMaxPlayers = 9; }
+namespace mp { u32 hash_id(const std::string& id); }
+namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& sorted_ids); }
+namespace mp { u32 color_of(const std::string& id); }
+namespace mp { enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion }; }
+namespace mp { f64 spawn_protect_ms(); }
+namespace mp { f64 ballot_ms(); }
+namespace mp { f32 voice_radius(); }
+namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
+namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now_ms, f64 protected_until_ms, f32 target_hp); }
+namespace mp { struct Score { u8 slot = 0; u16 kills = 0, deaths = 0; }; }
+namespace mp { struct Scoreboard {
+ public:
+  void clear() { rows_.clear(); }
+  void ensure(u8 slot);
+  void remove(u8 slot);
+  /// A death: the victim's deaths +1, the killer's kills +1 (not for an accident or suicide).
+  void died(u8 victim, i32 by);
+  const std::vector<Score>& rows() const { return rows_; }
+  void set(const std::vector<Score>& rows) { rows_ = rows; }
+  
+  /// Sorted as the board shows them: most kills first, then fewest deaths.
+  
+
+ private:
+  std::vector<Score> rows_;
+}; }
+namespace mp { bool group_spawn_center(const std::vector<Vec2>& points, Vec2& out, f32 link_m = 65); }
+namespace mp { struct Ballot {
+  u32 id = 0;
+  u8 key = 0;            // 0: friendly fire (the only game rule, world_options.mjs)
+  bool value = false;
+  u8 host = 0;
+  std::vector<u8> members, yes;
+  f64 expires_ms = 0;
+  /// (the Blueprint's enum BallotStatus, in its order; ignored: what a vote did that changed
+  /// nothing; invalid: no ballot)
+  enum class Status : u8 { pending, approved, rejected, cancelled, ignored, invalid } status = Status::pending;
+}; }
+namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now_ms); }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms, Ballot::Status& did); }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms); }
+namespace mp { bool ballot_stale(const Ballot& b, const std::vector<u8>& current_members, f64 now_ms); }
+namespace mp { struct VoiceStream {
+ public:
+  /// A decoded frame (8 kHz) at gain `gain`; frames older than the last sequence number are dropped.
+  
+  /// Adds `frames` stereo frames at `rate` into `out` (interleaved). Returns true while playing.
+  
+  
+  
+
+ private:
+  struct Chunk { std::vector<f32> pcm; f32 gain; };
+  std::vector<Chunk> queue_;
+  f64 pos_ = 0;          // position in the front chunk (8 kHz samples)
+  f64 lead_ = 0;         // silence still to play before the front chunk (8 kHz samples)
+  u32 last_seq_ = 0;
+  bool have_seq_ = false;
+}; }
+namespace mp { namespace Turn { enum class Dir : u8 { none, left, right, u_turn }; } }
+namespace net { enum class PlayerMode : u8 { foot, drone, car, jet, parachute }; }
+namespace net { constexpr u8 kHost = 255; }
+namespace net { constexpr u8 kNobody = 254; }
+namespace net { enum PlayerFlag : u16 {
+  kDead = 1, kArmed = 2, kBus = 4, kGearDown = 8, kPoliceCar = 16,
+  kDroneOut = 32,     // the drone is out (drone_* holds it unless it is the active body)
+  kJetOut = 64,       // the jet is placed (jet_* holds it unless it is the active body)
+  kProtected = 128,   // spawn protection
+  kTalking = 256,     // the microphone is live
+  kCockpit = 512,
+  kJetpack = 1024,    // the jetpack burns (jetpack_audio.mjs: the others hear it in 3-D; game_equipment.cpp)
+  kPassenger = 2048,  // rides in a mate's jet (jet_mode.mjs passenger): not drawn on foot
+  kSeated = 4096,     // a car's passenger: seated in the mate's car (drawn and hit there, his weapon out)
+}; }
+namespace net { struct PlayerState {
+  u8 slot = 0;
+  PlayerMode mode = PlayerMode::foot;
+  u8 color = 0;           // car colour index
+  u16 flags = 0;
+  u32 t_ms = 0;           // the sender's clock (pose timeline)
+  Vec3 position, velocity;  // the active body
+  Quat rotation;
+  Vec3 avatar;            // the person's feet (on foot, or the drone pilot)
+  f32 avatar_yaw = 0;
+  Vec3 drone_pos, jet_pos;  // parked craft
+  Quat drone_rot, jet_rot;
+  f32 yaw = 0, pitch = 0, speed = 0;
+  f32 health = 100;       // 0..100
+  f32 thrust = 0;         // jet 0..1
+  u8 stars = 0, weapon = 0;
+  f32 day = -1;           // time of day 0..1 (day_night_sync.mjs: clients follow the host's)
+  // his hands (body-relative to his feet, cm; VR: where the controllers are) and his blows:
+  // bit 0 the hands are real (VR), bit 1 the right hand jabs, bit 2 the left, bit 3 a knife slash
+  i8 hand[6] = {0, 0, 0, 0, 0, 0};
+  u8 hands = 0;
+  u8 car = 255;           // the traffic car he drives (its index on his machine; 255 none) - the host's world leaves it to him
+}; }
+namespace net { struct Fx {
+  // cow_death: p where, dir impulse / 600 kg (cows.mjs sendDeath); push: p the velocity change,
+  // dir.x the target's slot, a damage (player_push.mjs) - M3 life
+  // lamp: street_lamps.mjs sendBreak (p foot, dir x/y + state); strike / flyover: fighter_jets.mjs
+  // (p mark, a alt, dir.x offset); mil_tracer / mil_shell: military_response.mjs (p from, dir to) - sc-m3-gaps
+  // npc_death: world_procedural_population.mjs "npc-death" (p where, dir.x / dir.y the person's id, 16 bits each)
+  enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee };
+  u8 kind = shot, owner = 0;
+  Vec3 p, dir;
+  f32 a = 0;              // shot: speed; explosion: radius
+}; }
+namespace net { struct Hit {
+  u8 target = 0, by = kNobody, weapon = 0, zone = 0;
+  f32 damage = 0;
+  Vec3 from;
+}; }
+namespace net { struct Kill { u8 victim = 0, by = kNobody, weapon = 0, zone = 0; }; }
+namespace net { struct PingEvent { u8 owner = 0; bool on = false; Vec3 p; u32 color = 0; }; }
+namespace net { struct VoiceFrame { u8 from = 0; u32 seq = 0; bool everywhere = false; std::vector<u8> data; }; }
+namespace net { struct Remote {
+  PlayerState state;
+  mp::PoseTimeline body, person;
+  mp::NavTimeline nav;
+  Vec3 shown, person_shown;   // presented positions (timeline samples)
+  Quat shown_rotation;
+  f64 received_ms = -1e18;    // local time of the latest pose
+  f32 phase = 0;              // gait
+  f32 shown_hp = 100;
+  mp::VoiceStream voice;
+  f64 speaking_until = 0;
+}; }
+namespace net { enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy }; }
+namespace net { constexpr std::size_t kSwarmPerMessage = 64; }
+namespace net { constexpr std::size_t kSwarmMaxUnits = 127 * kSwarmPerMessage; }
+namespace net { struct SwarmUnit {
+  u16 id = 0;
+  SwarmKind kind = SwarmKind::zombie;
+  u8 flags = 0;     // zombie: attacking; heli: going down; tank: wreck; soldier: 0 idle 1 aim 2 run 3 walk; the others: SwarmFlag
+  Vec3 p;
+  f32 yaw = 0, aux = 0;
+}; }
+namespace net { struct Swarm { u8 owner = 0; std::vector<SwarmUnit> units; }; }
+namespace net { struct SwarmHit { u8 from = 0, to = 0; u16 id = 0; SwarmKind kind = SwarmKind::zombie; f32 damage = 0; }; }
+namespace net { struct Session {
+ public:
+  
+  
+  bool host(u64 self, f64 lon, f64 lat);
+  bool join(u64 self, u64 server);
+  void stop();
+  
+  
+  bool connected() const;
+  /// lan_vs.mjs getAuthorityId: a client whose host is gone (the connection dropped, or the host
+  /// silent for 6 s after we were in). The session then goes on under the successor.
+  bool host_lost() const;
+  /// Who takes over: the lowest slot left among the players we still hear (us included) - every
+  /// client computes the same.
+  u8 successor() const;
+  bool origin(f64& lon, f64& lat) const;
+  /// Host: the city moves (a new start place) - every client rebases to it.
+  void set_origin(f64 lon, f64 lat);
+  
+
+  // ---- host page ----
+  
+  
+
+  /// Per frame: networking; `me` is this player's state (sent at 30 Hz).
+  void update(f64 time, f32 dt, const PlayerState& me, bool send_pose = true);
+
+  // ---- outgoing ----
+  void send_fx(Fx f);
+  /// Our units, all kinds in one snapshot; the others draw and shoot them. More than one message
+  /// carries (64) go as numbered parts: a receiver hands on only a snapshot whose every part came,
+  /// so a unit is never missing from a list that is shown. False: more than kSwarmMaxUnits (refused,
+  /// counted in send_refused).
+  bool send_swarm(const std::vector<SwarmUnit>& units);
+  void send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage);
+  /// The host's world (traffic, people: game_worldsync.cpp) to every client, unreliable.
+  void send_world(const std::vector<u8>& blob);
+  /// The host's world as one client must see it (what is around him: game_worldsync.cpp).
+  void send_world_to(u8 slot, const std::vector<u8>& blob);
+  /// A shot / blast of ours that reached player `target` (the authority judges it).
+  void request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from);
+  /// We went down (by kNobody: an accident).
+  void report_death(u8 by, u8 weapon, u8 zone);
+  void report_respawn();
+  void send_ping(bool on, Vec3 p, u32 color);
+  void send_voice(u32 seq, bool everywhere, const std::vector<u8>& mulaw);
+  /// Ask for a rule change (friendly fire); the host starts the vote.
+  bool propose_rule(bool friendly_fire);
+  bool vote(bool approve);
+  /// Jet seats (jet_seat_coordinator.mjs): ask the authority to claim / release a seat in
+  /// `owner`'s jet (alone the table is local). The answer arrives with the table.
+  void seat_request(bool claim, u8 owner, seats::Seat seat);
+  
+  
+
+  // ---- incoming (since the last call) ----
+  
+  
+  
+  
+  
+  
+  
+  /// Destruction sync: client -> host, host -> all / one; incoming with the sender's slot.
+  struct Blob { u8 from = 0; std::vector<u8> data; };
+  void destroy_to_host(const std::vector<u8>& blob);
+  void destroy_to_all(const std::vector<u8>& blob, bool reliable);
+  void destroy_to(u8 slot, const std::vector<u8>& blob);
+  
+  /// The town's state and what is done to it (game_townsync.cpp, town_sync.h), reliable: a client's
+  /// hits on the host's cars and passers-by and his changes to the host; the host's state to all / one.
+  void town_to_host(const std::vector<u8>& blob);
+  void town_to_all(const std::vector<u8>& blob);
+  void town_to(u8 slot, const std::vector<u8>& blob);
+  
+  /// Thrown things (game_toss.cpp): the thrower's machine streams their bodies; the host relays.
+  void send_toss(const std::vector<u8>& blob);
+  
+  /// Rounds in flight (game_projsync.cpp): the shooter's machine streams them; the host relays.
+  void send_proj(const std::vector<u8>& blob);
+  
+  
+  
+  /// A spawn anchor from the host for this (joining) player.
+  
+
+  
+  
+  /// The place of the player in `slot` among remotes(), -1: no such player here.
+  i32 remote_index(u8 slot) const;
+  /// The participants (sorted slots, ourselves included) and their colours (vs_multiplayer.mjs).
+  std::vector<u8> roster() const;
+  u32 color_of(u8 slot) const;
+  /// "P1".."P9": the player's place in the roster.
+  u32 index_of(u8 slot) const;
+  
+  
+  
+  /// The host's WORLD switches (who lives in the city, the player abilities): one bit per world.*
+  /// option, the host's apply to everybody (server authority). Host: set them (sent on a change and
+  /// with the rules every 4 s); client: whether they have arrived and what they are.
+  void set_world_rules(u16 mask);
+  
+  bool protected_now(u8 slot, f64 now_ms) const;
+  f64 now_ms() const { return time_ * 1000; }
+  /// The vote everybody sees: text, and whether our answer is missing.
+  
+  
+  std::string status() const;
+  
+  /// How often this client asked the host to let it in (1: it got in at the first try).
+  
+  /// Messages the transport did not take (too large, queue full): must stay 0.
+  
+
+ private:
+  enum class Role : u8 { none, host, client };
+  void on_pose(const PlayerState& s);
+  void dispatch(u8 from, u16 type, const std::vector<u8>& data);  // host: from a client (or ourselves)
+  void deliver(u16 type, const std::vector<u8>& data);           // a message from the host to us
+  void to_client(u8 slot, int channel, u16 type, const std::vector<u8>& data);
+  void to_all(int channel, u16 type, const std::vector<u8>& data, u8 except);
+  void to_host(int channel, u16 type, const std::vector<u8>& data);
+  void judge(u8 shooter, const Hit& h);
+  void begin_ballot(bool value);
+  void finish_ballot(mp::Ballot::Status s);
+  void send_rules();
+  void send_scores();
+  void send_anchor(u8 slot);
+  void send_seats();
+  void judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat);
+  Vec3 focus_of(u8 slot) const;
+  f32 hp_of(u8 slot) const;
+
+  Role role_ = Role::none;
+  HostTransport transport_;
+  std::unique_ptr<Server> server_;
+  std::unique_ptr<Client> client_;
+  net::Address server_addr_;
+  std::vector<Remote> remotes_;
+  std::vector<Hit> hits_, confirms_;
+  std::vector<Kill> kills_;
+  std::vector<Fx> fx_;
+  std::vector<Swarm> swarms_;
+  std::vector<SwarmHit> swarm_hits_;
+  std::vector<std::vector<u8>> world_;
+  std::vector<PingEvent> pings_;
+  std::vector<VoiceFrame> voice_;
+  std::vector<u8> pending_anchor_;  // host: clients waiting for their anchor (first pose)
+  f64 lon_ = 0, lat_ = 0, time_ = 0, send_clock_ = 0, scores_clock_ = 0, rules_clock_ = 0;
+  bool have_origin_ = false, connect_pending_ = false, anchor_ready_ = false, ever_in_ = false;
+  static constexpr f64 kReconnectS = 1.0;  // a client that is not in asks again this often
+  f64 connect_at_ = 0;                      // when the client last asked the host
+  u32 connects_ = 0;                        // how often it asked (1: it got in at once)
+  f64 in_since_ = 0;
+  std::vector<u8> mates_;  // the clients we last heard while the host was there (successor())
+  Vec3 anchor_;
+  u8 self_slot_ = kHost;
+  PlayerState me_;
+  mp::Scoreboard scores_;
+  bool friendly_fire_ = false;
+  std::vector<Blob> destroy_, toss_, proj_, town_;
+  // a player's swarm snapshot while its parts come in (swarm_part)
+  struct SwarmParts { u8 owner = 0, serial = 0; u64 have[2] = {0, 0}; int last = -1; std::vector<SwarmUnit> units; };
+  std::vector<SwarmParts> swarm_parts_;
+  u8 swarm_serial_ = 0;
+  void swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units);
+  u16 world_rules_ = 0;
+  bool have_world_rules_ = false;  // world_options.mjs friendlyFire: def false, the first player decides
+  std::vector<std::pair<u8, f64>> protected_;  // slot, until (ms)
+  mp::Ballot ballot_, remote_ballot_;
+  u32 ballot_serial_ = 0;
+  std::string vote_text_ = "Aenderungen nur einstimmig";
+  u32 sent_poses_ = 0;
+  u32 send_refused_ = 0, refused_said_ = 0;
+  void refused(u16 type, std::size_t bytes);
+  seats::Table seats_;
+  f64 seats_clock_ = 0;
+}; }
+namespace net { std::vector<u8> pack(const PlayerState& s); }
+namespace net { bool unpack(const std::vector<u8>& b, std::size_t& at, PlayerState& s); }
+namespace wire { struct I8 { i8 v = 0; }; }
+namespace wire { struct U16 { u16 v = 0; }; }
+namespace wire { struct I16 { i16 v = 0; }; }
+namespace wire { struct U32 { u32 v = 0; }; }
+namespace wire { struct F32 { f32 v = 0; }; }
+namespace wire { struct F64 { f64 v = 0; }; }
+namespace wire { struct V3 { f32 x = 0, y = 0, z = 0; }; }
+namespace wire { struct Q4 { f32 x = 0, y = 0, z = 0, w = 0; }; }
+namespace wire { inline std::array<u8, 4> f32_bytes(f32 v) { return converted::layout::bytes_of<4>(F32{v}, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.v); }); } }
+namespace wire { inline void put_u8(std::vector<u8>& b, u8 v) { b.push_back(v); } }
+namespace wire { inline void put_i8(std::vector<u8>& b, i8 v) {
+  const std::array<u8, 1> x = std::bit_cast<std::array<u8, 1>>(I8{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_u16(std::vector<u8>& b, u16 v) {
+  const std::array<u8, 2> x = std::bit_cast<std::array<u8, 2>>(U16{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_i16(std::vector<u8>& b, i16 v) {
+  const std::array<u8, 2> x = std::bit_cast<std::array<u8, 2>>(I16{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_u32(std::vector<u8>& b, u32 v) {
+  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_f32(std::vector<u8>& b, f32 v) {
+  const std::array<u8, 4> x = f32_bytes(v);
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_f64(std::vector<u8>& b, f64 v) {
+  const std::array<u8, 8> x = std::bit_cast<std::array<u8, 8>>(F64{v});
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_vec3(std::vector<u8>& b, Vec3 v) {
+  const std::array<u8, 12> x = converted::layout::bytes_of<12>(V3{v.x, v.y, v.z}, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.x); converted::layout::single_to(o_ + 4, v_.y); converted::layout::single_to(o_ + 8, v_.z); });
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_quat(std::vector<u8>& b, Quat q) {
+  const std::array<u8, 16> x = converted::layout::bytes_of<16>(Q4{q.x, q.y, q.z, q.w}, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.x); converted::layout::single_to(o_ + 4, v_.y); converted::layout::single_to(o_ + 8, v_.z); converted::layout::single_to(o_ + 12, v_.w); });
+  b.insert(b.end(), x.begin(), x.end());
+} }
+namespace wire { inline void put_bytes(std::vector<u8>& b, const std::vector<u8>& v) {
+  put_u16(b, static_cast<u16>(v.size()));
+  b.insert(b.end(), v.begin(), v.end());
+} }
+namespace wire { struct Reader {
+  std::size_t at = 0;
+  bool ok = true;
+
+  u8 get_u8(const std::vector<u8>& b) {
+    if (converted::plus(at, 1) > b.size()) { ok = false; return 0; }
+    const u8 v = converted::at(b, at);
+    converted::plus_to(at, 1);
+    return v;
+  }
+  i8 get_i8(const std::vector<u8>& b) {
+    if (converted::plus(at, 1) > b.size()) { ok = false; return 0; }
+    I8 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 1);
+    return x.v;
+  }
+  u16 get_u16(const std::vector<u8>& b) {
+    if (converted::plus(at, 2) > b.size()) { ok = false; return 0; }
+    U16 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 2);
+    return x.v;
+  }
+  i16 get_i16(const std::vector<u8>& b) {
+    if (converted::plus(at, 2) > b.size()) { ok = false; return 0; }
+    I16 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 2);
+    return x.v;
+  }
+  u32 get_u32(const std::vector<u8>& b) {
+    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
+    U32 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 4);
+    return x.v;
+  }
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  
+
+
+
+
+
+
+  f32 get_f32(const std::vector<u8>& b) {
+    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
+    F32 x;
+    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.v, p_ + 0); });
+    converted::plus_to(at, 4);
+    return x.v;
+  }
+  f64 get_f64(const std::vector<u8>& b) {
+    if (converted::plus(at, 8) > b.size()) { ok = false; return 0; }
+    F64 x;
+    std::memcpy(&x, b.data() + at, sizeof x);
+    converted::plus_to(at, 8);
+    return x.v;
+  }
+  Vec3 get_vec3(const std::vector<u8>& b) {
+    if (converted::plus(at, 12) > b.size()) { ok = false; return {}; }
+    V3 x;
+    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.x, p_ + 0); converted::layout::single_from(v_.y, p_ + 4); converted::layout::single_from(v_.z, p_ + 8); });
+    converted::plus_to(at, 12);
+    return {x.x, x.y, x.z};
+  }
+  Quat get_quat(const std::vector<u8>& b) {
+    if (converted::plus(at, 16) > b.size()) { ok = false; return {}; }
+    Q4 x;
+    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.x, p_ + 0); converted::layout::single_from(v_.y, p_ + 4); converted::layout::single_from(v_.z, p_ + 8); converted::layout::single_from(v_.w, p_ + 12); });
+    converted::plus_to(at, 16);
+    return {x.x, x.y, x.z, x.w};
+  }
+  /// A list of bytes (put_bytes): empty where it is not all there.
+  std::vector<u8> get_bytes(const std::vector<u8>& b) {
+    const u16 n = get_u16(b);
+    if (!ok || converted::plus(at, n) > b.size()) { ok = false; return {}; }
+    std::vector<u8> v(b.begin() + static_cast<std::ptrdiff_t>(at), b.begin() + static_cast<std::ptrdiff_t>(converted::plus(at, n)));
+    converted::plus_to(at, n);
+    return v;
+  }
+  /// Every number was there, and the message has no more.
+  
+}; }
+namespace net { enum : u16 {
+  kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
+  kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
+  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30, kProjMsg = 31, kTownMsg = 32,
+}; }
+namespace mp { void Scoreboard::ensure(u8 slot) {
+  for (const Score& s : rows_) if (s.slot == slot) return;
+  rows_.push_back({slot, 0, 0});
+} }
+namespace mp { void Scoreboard::remove(u8 slot) { converted::erase(rows_, std::remove_if(rows_.begin(), rows_.end(), [&](const Score& s) { return s.slot == slot; }), rows_.end()); } }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
+namespace seats { bool Table::drop(u8 player) {
+  std::vector<Row> rows;
+  bool changed = false;
+  seats::jet_seats_cpp_local::g_rules.call("Drop", std::tie(rows, changed), rows_, player);
+  if (!changed) return false;
+  rows_ = rows;
+  ++revision_;
+  return true;
+} }
+namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
+namespace mp { bool ballot_stale(const Ballot& b, const std::vector<u8>& current, f64 now) { return mp::mp_rules_cpp_local::g_rules.flag("Stale", b, current, now); } }
+namespace seats { bool Table::load(u32 revision, const std::vector<Row>& rows) {
+  if (!seats::jet_seats_cpp_local::g_rules.flag("Valid", rows)) return false;
+  rows_ = rows;
+  revision_ = revision;
+  return true;
+} }
+namespace mp { f64 ballot_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("BallotMs"); } }
+namespace mp { namespace mp_rules_cpp_local { f64 fmin2(f64 a, f64 b) { return a < b ? a : b; } } }
+namespace mp { namespace mp_rules_cpp_local { f64 clampd(f64 v, f64 lo, f64 hi) { return v < lo ? lo : (v > hi ? hi : v); } } }
+namespace mp { bool PoseTimeline::push(Vec3 p, Quat q, Vec3 v, bool has_v, f64 source, f64 received) {
+  if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) return false;
+  q = qnormalize(q);
+  if (!snaps_.empty()) {
+    const Snap& prev = converted::back(snaps_);
+    if (received <= prev.received || source <= prev.source) return false;
+  }
+  // Measured velocity from the last snapshot, blended with the sender's (blendVelocity).
+  Vec3 measured;
+  bool has_measured = false;
+  if (!snaps_.empty()) {
+    const f64 dt = (source - converted::back(snaps_).source) / 1000;
+    if (dt > 0.001 && dt < 1) { measured = (p - converted::back(snaps_).p) * static_cast<f32>(1 / dt); has_measured = true; }
+  }
+  Vec3 target = has_v && has_measured ? v * 0.7 + measured * 0.3 : has_v ? v : has_measured ? measured : Vec3{};
+  Vec3 vel = snaps_.empty() ? target : converted::back(snaps_).v + (target - converted::back(snaps_).v) * 0.35;
+  // Clock offset: the floor of (received - source) over the window, rising slowly (8 %).
+  offsets_.push_back(received - source);
+  while (offsets_.size() > kMaxSnapshots) converted::erase(offsets_, offsets_.begin());
+  const f64 floor = *std::min_element(offsets_.begin(), offsets_.end());
+  if (!have_offset_) { offset_ = floor; have_offset_ = true; }
+  else if (floor < offset_) offset_ = floor;
+  else offset_ += mp::mp_rules_cpp_local::fmin2(1, (floor - offset_) * 0.08);
+  // the jitter buffer: the latest snapshots' lateness over the fastest (offset_), the gap between
+  // two snapshots; the delay covers the latest of them (no snapshot missing when it is due)
+  lags_.push_back(std::max(0.0, received - source - offset_));
+  while (lags_.size() > kMaxSnapshots) converted::erase(lags_, lags_.begin());
+  const f64 late = *std::max_element(lags_.begin(), lags_.end());
+  const f64 gap = snaps_.empty() ? 33 : std::min(250.0, source - converted::back(snaps_).source);
+  const f64 want = mp::mp_rules_cpp_local::clampd(late + gap + 15, kInterpolationDelayMs, 320);
+  delay_ += want > delay_ ? std::min(want - delay_, 40.0) : std::max(want - delay_, -3.0);
+  snaps_.push_back({p, q, vel, received, source});
+  while (snaps_.size() > kMaxSnapshots) converted::erase(snaps_, snaps_.begin());
+  return true;
+} }
+namespace mp { bool NavTimeline::push(Vec3 p, f32 heading, u8 mode, f64 at) {
+  if (!snaps_.empty() && at <= converted::back(snaps_).at) return false;
+  if (!snaps_.empty() && (converted::back(snaps_).mode != mode || converted::wide::length(converted::back(snaps_).p - p) > kTeleportM)) reset();
+  snaps_.push_back({p, wrap_pi(heading), mode, at});
+  while (snaps_.size() > 10) converted::erase(snaps_, snaps_.begin());
+  return true;
+} }
+namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
+namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
+namespace mp { bool group_spawn_center(const std::vector<Vec2>& pts, Vec2& out, f32 link) {
+  if (pts.empty()) return false;
+  std::vector<bool> seen(converted::count(pts.size()), false);
+  std::vector<Vec2> best;
+  for (std::size_t i = 0; i < pts.size(); converted::pre_inc(i)) {
+    if (converted::at(seen, i)) continue;
+    std::vector<std::size_t> queue{i};
+    converted::at(seen, i) = true;
+    std::vector<Vec2> comp;
+    for (std::size_t k = 0; k < queue.size(); converted::pre_inc(k)) {
+      const Vec2 a = converted::at(pts, converted::at(queue, k));
+      comp.push_back(a);
+      for (std::size_t b = 0; b < pts.size(); converted::pre_inc(b))
+        if (!converted::at(seen, b) && hypot_bp(a.x - converted::at(pts, b).x, a.y - converted::at(pts, b).y) <= link) { converted::at(seen, b) = true; queue.push_back(b); }
+    }
+    if (comp.size() > best.size()) best = comp;
+  }
+  // Medoid: stays on an actual player, not at an empty centroid across buildings.
+  f32 score = 1e30;
+  for (const Vec2& p : best) {
+    f32 d = 0;
+    for (const Vec2& q : best) d += hypot_bp(p.x - q.x, p.y - q.y);
+    if (d < score) { score = d; out = p; }
+  }
+  return true;
+} }
+namespace mp { void Scoreboard::died(u8 victim, i32 by) {
+  ensure(victim);
+  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
+  if (by >= 0 && by != victim) {
+    ensure(static_cast<u8>(by));
+    for (Score& s : rows_) if (s.slot == by) ++s.kills;
+  }
+} }
+namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
+namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
+namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
+  std::stable_sort(members.begin(), members.end());
+  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
+} } }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
+  mp::mp_rules_cpp_local::roster(current);
+  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
+  return b.status;
+} }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
+  Ballot::Status did = b.status;
+  return cast_vote(b, voter, approve, std::move(current), now, did);
+} }
+namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
+  mp::mp_rules_cpp_local::roster(members);
+  bool created = false;
+  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
+  return created;
+} }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
+  HitVerdict verdict = HitVerdict::applied;
+  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
+  return verdict;
+} }
+namespace mp { u32 hash_id(const std::string& id) {
+  u32 h = 2166136261u;
+  for (unsigned char c : id) { h ^= c; h *= 16777619u; }
+  return h;
+} }
+namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
+  std::vector<u32> numbers;  // (each id's hash: a whole number the Blueprint takes as it is)
+  for (const std::string& id : ids) numbers.push_back(hash_id(id));
+  std::vector<u32> out;
+  mp::mp_rules_cpp_local::g_rules.call("ColorSlots", std::tie(out), numbers);
+  return out;
+} }
+namespace mp { u32 color_of(const std::string& id) {
+  const std::vector<u32> one = assign_colors({id});
+  return one.empty() ? 0 : converted::at(one, 0);
+} }
+namespace net { constexpr f64 kSeatsEvery = 1.5; }
+namespace net { enum : int { kReliable = 0, kUnreliable = 1 }; }
+namespace net { constexpr f64 kSendInterval = 0.033; }
+namespace net { constexpr f64 kQuietS = 6; }
+namespace net { constexpr f64 kScoresEvery = 2; }
+namespace net { constexpr f64 kRulesEvery = 4; }
+namespace net { net::ClientServerConfig config() {
+  net::ClientServerConfig c;
   c.protocol_id = 0x53504157534e3032ull;  // "SPAWSN02": SpawnCity sessions only
-  c.max_clients = kMaxPlayers - 1;
-  ChannelConfig reliable;
-  reliable.type = ChannelType::reliable_ordered;
-  ChannelConfig unreliable;
-  unreliable.type = ChannelType::unreliable_unordered;
+  c.max_clients = mp::kMaxPlayers - 1;
+  net::ChannelConfig reliable;
+  reliable.type = net::ChannelType::reliable_ordered;
+  net::ChannelConfig unreliable;
+  unreliable.type = net::ChannelType::unreliable_unordered;
   unreliable.max_message_size = 1200;
   c.connection.channels = {reliable, unreliable};
   c.connection.max_packet_size = 1300;
   return c;
-}
-bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) && std::fabs(v.x) < 1e6 && std::fabs(v.y) < 1e6 && std::fabs(v.z) < 1e5; }
+} }
+namespace net { bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) && std::fabs(v.x) < 1e6 && std::fabs(v.y) < 1e6 && std::fabs(v.z) < 1e5; } }
+namespace net { std::vector<u8> pack_swarm(u8 owner, u8 serial, u8 part, bool last, const std::vector<SwarmUnit>& units, std::size_t from, std::size_t n) {
+  std::vector<u8> w;
+  wire::put_u8(w, owner);
+  wire::put_u8(w, serial);
+  wire::put_u8(w, static_cast<u8>(part | (last ? 0x80 : 0)));
+  wire::put_u8(w, static_cast<u8>(n));
+  for (std::size_t i = 0; i < n; converted::pre_inc(i)) {
+    const SwarmUnit& u = converted::at(units, converted::plus(from, i));
+    const auto q16 = [](f32 v, f32 k) { return static_cast<std::int16_t>(std::clamp(std::lround(v * k), -32767L, 32767L)); };
+    wire::put_u16(w, u.id);
+    wire::put_u8(w, static_cast<u8>(u.kind));
+    wire::put_u8(w, u.flags);
+    wire::put_f32(w, u.p.x);
+    wire::put_f32(w, u.p.y);
+    wire::put_i16(w, q16(u.p.z, 10));
+    wire::put_i16(w, q16(u.yaw, 100));
+    wire::put_i16(w, q16(u.aux, 100));
+  }
+  return w;
+} }
+namespace net { bool unpack_swarm(const std::vector<u8>& b, u8& owner, u8& serial, u8& part, bool& last, std::vector<SwarmUnit>& units) {
+  wire::Reader r;
+  owner = r.get_u8(b);
+  serial = r.get_u8(b);
+  const u8 pt = r.get_u8(b);
+  part = pt & 0x7f;
+  last = pt & 0x80;
+  const u8 n = r.get_u8(b);
+  units.clear();
+  if (n > kSwarmPerMessage) return false;
+  for (u8 i = 0; i < n && r.ok; ++i) {
+    SwarmUnit u;
+    u.id = r.get_u16(b);
+    const u8 k = r.get_u8(b);
+    u.flags = r.get_u8(b);
+    u.p.x = r.get_f32(b);
+    u.p.y = r.get_f32(b);
+    u.p.z = r.get_i16(b) / 10.0;
+    u.yaw = r.get_i16(b) / 100.0;
+    u.aux = r.get_i16(b) / 100.0;
+    if (!r.ok || k > static_cast<u8>(SwarmKind::kLast) || !sane(u.p) || !std::isfinite(u.yaw) || !std::isfinite(u.aux)) return false;
+    u.kind = static_cast<SwarmKind>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 7}, k));
+    units.push_back(u);
+  }
+  return r.ok;
+} }
+namespace net { std::vector<u8> pack_swarm_hit(const SwarmHit& h) {
+  std::vector<u8> w;
+  wire::put_u8(w, h.from);
+  wire::put_u8(w, h.to);
+  wire::put_u16(w, h.id);
+  wire::put_u8(w, static_cast<u8>(h.kind));
+  wire::put_f32(w, h.damage);
+  return w;
+} }
+namespace net { bool unpack_swarm_hit(const std::vector<u8>& b, SwarmHit& h) {
+  wire::Reader r;
+  h.from = r.get_u8(b); h.to = r.get_u8(b); h.id = r.get_u16(b);
+  const u8 k = r.get_u8(b);
+  h.damage = r.get_f32(b);
+  h.kind = static_cast<SwarmKind>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 7}, k));
+  return r.ok && k <= static_cast<u8>(SwarmKind::kLast) && std::isfinite(h.damage) && h.damage > 0 && h.damage < 1e4;
+} }
+namespace net { std::vector<u8> pack_hit(const Hit& h) {
+  std::vector<u8> w;
+  wire::put_u8(w, h.target);
+  wire::put_u8(w, h.by);
+  wire::put_u8(w, h.weapon);
+  wire::put_u8(w, h.zone);
+  wire::put_f32(w, h.damage);
+  wire::put_vec3(w, h.from);
+  return w;
+} }
+namespace net { bool unpack_hit(const std::vector<u8>& b, Hit& h) {
+  wire::Reader r;
+  h.target = r.get_u8(b); h.by = r.get_u8(b); h.weapon = r.get_u8(b); h.zone = r.get_u8(b); h.damage = r.get_f32(b); h.from = r.get_vec3(b);
+  return r.ok && std::isfinite(h.damage) && h.damage > 0 && h.damage <= 100 && sane(h.from);
+} }
+namespace net { std::vector<u8> pack_fx(const Fx& f) {
+  std::vector<u8> w;
+  wire::put_u8(w, f.kind);
+  wire::put_u8(w, f.owner);
+  wire::put_vec3(w, f.p);
+  wire::put_vec3(w, f.dir);
+  wire::put_f32(w, f.a);
+  return w;
+} }
+namespace net { bool unpack_fx(const std::vector<u8>& b, Fx& f) {
+  wire::Reader r;
+  f.kind = r.get_u8(b); f.owner = r.get_u8(b); f.p = r.get_vec3(b); f.dir = r.get_vec3(b); f.a = r.get_f32(b);
+  return r.ok && f.kind <= Fx::kLast && sane(f.p) && sane(f.dir) && std::isfinite(f.a);
+} }
+namespace net { std::vector<u8> pack(const PlayerState& s) {
+  std::vector<u8> w;
+  wire::put_u8(w, s.slot);
+  wire::put_u8(w, static_cast<u8>(s.mode));
+  wire::put_u8(w, s.color);
+  wire::put_u16(w, s.flags);
+  wire::put_u32(w, s.t_ms);
+  wire::put_vec3(w, s.position);
+  wire::put_vec3(w, s.velocity);
+  wire::put_quat(w, s.rotation);
+  wire::put_vec3(w, s.avatar);
+  wire::put_f32(w, s.avatar_yaw);
+  if (s.flags & kDroneOut) { wire::put_vec3(w, s.drone_pos); wire::put_quat(w, s.drone_rot); }
+  if (s.flags & kJetOut) { wire::put_vec3(w, s.jet_pos); wire::put_quat(w, s.jet_rot); }
+  wire::put_f32(w, s.yaw);
+  wire::put_f32(w, s.pitch);
+  wire::put_f32(w, s.speed);
+  wire::put_f32(w, s.health);
+  wire::put_f32(w, s.thrust);
+  wire::put_u8(w, s.stars);
+  wire::put_u8(w, s.weapon);
+  wire::put_f32(w, s.day);
+  wire::put_u8(w, s.car);
+  for (i8 v : s.hand) wire::put_i8(w, v);
+  wire::put_u8(w, s.hands);
+  return w;
+} }
+namespace net { bool unpack(const std::vector<u8>& b, std::size_t& at, PlayerState& s) {
+  wire::Reader r{at};
+  s.slot = r.get_u8(b);
+  const u8 mode = r.get_u8(b);
+  s.color = r.get_u8(b); s.flags = r.get_u16(b); s.t_ms = r.get_u32(b);
+  s.position = r.get_vec3(b); s.velocity = r.get_vec3(b); s.rotation = r.get_quat(b); s.avatar = r.get_vec3(b); s.avatar_yaw = r.get_f32(b);
+  if (s.flags & kDroneOut) { s.drone_pos = r.get_vec3(b); s.drone_rot = r.get_quat(b); }
+  if (s.flags & kJetOut) { s.jet_pos = r.get_vec3(b); s.jet_rot = r.get_quat(b); }
+  s.yaw = r.get_f32(b); s.pitch = r.get_f32(b); s.speed = r.get_f32(b); s.health = r.get_f32(b); s.thrust = r.get_f32(b); s.stars = r.get_u8(b); s.weapon = r.get_u8(b); s.day = r.get_f32(b); s.car = r.get_u8(b);
+  for (i8& v : s.hand) v = r.get_i8(b);
+  s.hands = r.get_u8(b);
+  if (!r.ok || mode > static_cast<u8>(PlayerMode::parachute) || !sane(s.position) || !sane(s.velocity) || !sane(s.avatar) || !std::isfinite(s.health)) return false;
+  s.mode = static_cast<PlayerMode>(converted::among({0, 1, 2, 3, 4}, mode));
+  s.health = clampf(s.health, 0, 100);
+  at = r.at;
+  return true;
+} }
+namespace net { bool Session::host(u64 self, f64 lon, f64 lat) {
+  stop();
+  transport_.set_address({self});
+  server_ = std::make_unique<Server>(transport_, config(), self ^ 0x9e3779b97f4a7c15ull);
+  converted::present(server_)->start(mp::kMaxPlayers - 1);
+  role_ = Role::host;
+  self_slot_ = kHost;
+  lon_ = lon;
+  lat_ = lat;
+  have_origin_ = true;
+  scores_.clear();
+  scores_.ensure(kHost);
+  return true;
+} }
+namespace net { bool Session::join(u64 self, u64 server) {
+  stop();
+  transport_.set_address({self});
+  client_ = std::make_unique<Client>(transport_, config(), self ^ 0x2545f4914f6cdd1dull);
+  server_addr_ = {server};
+  connect_pending_ = true;
+  role_ = Role::client;
+  have_origin_ = false;
+  ever_in_ = false;
+  scores_.clear();
+  return true;
+} }
+namespace net { void Session::stop() {
+  if (client_) converted::present(client_)->disconnect();
+  if (server_) converted::present(server_)->stop();
+  client_.reset();
+  server_.reset();
+  remotes_.clear();
+  swarm_parts_.clear();
+  protected_.clear();
+  ballot_ = remote_ballot_ = mp::Ballot{};
+  role_ = Role::none;
+  ever_in_ = false;
+  mates_.clear();
+  have_world_rules_ = false;  // a new session: the new host's switches
+} }
+namespace net { bool Session::connected() const {
+  if (role_ == Role::host) return server_ && converted::present(server_)->running();
+  return client_ && converted::present(client_)->connected() && have_origin_;
+} }
+namespace net { bool Session::host_lost() const {
+  if (role_ != Role::client || !ever_in_) return false;
+  if (!client_ || !converted::present(client_)->connected()) return true;
+  return now_ms() - in_since_ > kQuietS * 1000 + 2000 && remote_index(kHost) < 0;
+} }
+namespace net { u8 Session::successor() const {
+  // from who was there while the host still was (by now the others may have gone quiet as well)
+  u8 best = self_slot_;
+  for (u8 s : mates_)
+    if (s != kHost && s < best) best = s;
+  return best;
+} }
+namespace net { void Session::set_origin(f64 lon, f64 lat) {
+  if (role_ != Role::host) return;
+  lon_ = lon;
+  lat_ = lat;
+  have_origin_ = true;
+  std::vector<u8> w;
+  wire::put_f64(w, lon_);
+  wire::put_f64(w, lat_);
+  to_all(kReliable, kOriginMsg, w, kHost);
+} }
+namespace net { bool Session::origin(f64& lon, f64& lat) const {
+  if (!have_origin_) return false;
+  lon = lon_;
+  lat = lat_;
+  return true;
+} }
+namespace net { i32 Session::remote_index(u8 slot) const {
+  for (std::size_t i = 0; i < remotes_.size(); converted::pre_inc(i)) if (converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
+  return -1;
+} }
+namespace net { std::vector<u8> Session::roster() const {
+  std::vector<u8> r{self_slot_};
+  for (const Remote& x : remotes_) r.push_back(x.state.slot);
+  std::stable_sort(r.begin(), r.end());
+  converted::erase(r, std::unique(r.begin(), r.end()), r.end());
+  return r;
+} }
+namespace net { u32 Session::color_of(u8 slot) const {
+  const std::vector<u8> r = roster();
+  std::vector<std::string> ids;
+  for (u8 s : r) ids.push_back(std::to_string(s));
+  const std::vector<u32> c = mp::assign_colors(ids);
+  for (std::size_t i = 0; i < r.size(); converted::pre_inc(i)) if (converted::at(r, i) == slot) return converted::at(c, i);
+  return mp::color_of(std::to_string(slot));
+} }
+namespace net { u32 Session::index_of(u8 slot) const {
+  // The host is P1 (the oldest), then the clients in slot order.
+  std::vector<u8> r = roster();
+  std::stable_partition(r.begin(), r.end(), [](u8 s) { return s == kHost; });
+  for (std::size_t i = 0; i < r.size(); converted::pre_inc(i)) if (converted::at(r, i) == slot) return static_cast<u32>(converted::plus(i, 1));
+  return 0;
+} }
+namespace net { bool Session::protected_now(u8 slot, f64 now) const {
+  for (const auto& [s, until] : protected_) if (s == slot && now < until) return true;
+  return false;
+} }
+namespace net { Vec3 Session::focus_of(u8 slot) const {
+  if (slot == self_slot_) return me_.mode == PlayerMode::foot || me_.mode == PlayerMode::drone ? me_.avatar : me_.position;
+  const i32 at = remote_index(slot);
+  if (at < 0) return {};
+  const Remote& r = converted::at(remotes_, static_cast<std::size_t>(at));
+  return r.state.mode == PlayerMode::foot || r.state.mode == PlayerMode::drone ? r.person_shown : r.shown;
+} }
+namespace net { f32 Session::hp_of(u8 slot) const {
+  if (slot == self_slot_) return me_.flags & kDead ? 0 : me_.health;
+  const i32 at = remote_index(slot);
+  if (at < 0) return 0;
+  const Remote& r = converted::at(remotes_, static_cast<std::size_t>(at));
+  return r.state.flags & kDead ? 0 : r.state.health;
+} }
+namespace net { void Session::refused(u16 type, std::size_t bytes) {
+  ++send_refused_;
+  if (refused_said_ < 8) { ++refused_said_; std::fprintf(stderr, "[spawncity net] message type %u (%zu bytes) was not sent\n", static_cast<unsigned>(type), bytes); }
+} }
+namespace net { void Session::to_client(u8 slot, int ch, u16 type, const std::vector<u8>& data) {
+  if (role_ == Role::host && server_ && slot < converted::present(server_)->max_clients() && converted::present(server_)->client_connected(slot))
+    if (!converted::present(server_)->send(slot, ch, type, data)) refused(type, data.size());
+} }
+namespace net { void Session::to_all(int ch, u16 type, const std::vector<u8>& data, u8 except) {
+  if (role_ != Role::host || !server_) return;
+  for (int c = 0; c < converted::present(server_)->max_clients(); converted::pre_inc(c))
+    if (c != except && converted::present(server_)->client_connected(c))
+      if (!converted::present(server_)->send(c, ch, type, data)) refused(type, data.size());
+} }
+namespace net { void Session::to_host(int ch, u16 type, const std::vector<u8>& data) {
+  if (role_ == Role::host) dispatch(kHost, type, data);
+  else if (client_ && converted::present(client_)->connected()) converted::present(client_)->send(ch, type, data);
+} }
+namespace net { void Session::send_fx(Fx f) {
+  if (role_ == Role::none) return;
+  f.owner = self_slot_;
+  to_host(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f));
+} }
+namespace net { bool Session::send_swarm(const std::vector<SwarmUnit>& units) {
+  if (role_ == Role::none) return true;
+  if (units.size() > kSwarmMaxUnits) { refused(kSwarmMsg, converted::times(units.size(), 18)); return false; }
+  // every unit goes: 64 a message, the parts numbered, the last one marked (an empty list is one
+  // empty part - "I have none" is a snapshot too)
+  ++swarm_serial_;
+  const std::size_t parts = std::max<std::size_t>(1, converted::quot((converted::minus(converted::plus(units.size(), kSwarmPerMessage), 1)), kSwarmPerMessage));
+  for (std::size_t k = 0; k < parts; converted::pre_inc(k)) {
+    const std::size_t from = converted::times(k, kSwarmPerMessage), n = std::min(kSwarmPerMessage, converted::minus(units.size(), from));
+    to_host(kUnreliable, kSwarmMsg, pack_swarm(self_slot_, swarm_serial_, static_cast<u8>(k), converted::plus(k, 1) == parts, units, from, n));
+  }
+  return true;
+} }
+namespace net { void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units) {
+  i32 at = -1;
+  for (std::size_t i = 0; i < swarm_parts_.size(); converted::pre_inc(i)) if (converted::at(swarm_parts_, i).owner == owner) at = static_cast<i32>(i);
+  if (at < 0) {
+    swarm_parts_.push_back({});
+    at = converted::minus(static_cast<i32>(swarm_parts_.size()), 1);
+    converted::at(swarm_parts_, static_cast<std::size_t>(at)).owner = owner;
+    converted::at(swarm_parts_, static_cast<std::size_t>(at)).serial = static_cast<u8>(converted::minus(serial, 1));
+  }
+  SwarmParts& p = converted::at(swarm_parts_, static_cast<std::size_t>(at));
+  if (p.serial != serial) {
+    if (static_cast<i8>(converted::minus(serial, p.serial)) < 0) return;  // a part of an older snapshot, late
+    p = SwarmParts{};
+    p.owner = owner;
+    p.serial = serial;
+  }
+  const u64 mark = converted::shl_bits(u64{1}, (part & 63));
+  if (converted::at(p.have, part >> 6) & mark) return;  // (twice)
+  converted::at(p.have, part >> 6) |= mark;
+  p.units.insert(p.units.end(), units.begin(), units.end());
+  if (last) p.last = part;
+  if (p.last < 0) return;
+  for (int k = 0; k <= p.last; converted::pre_inc(k)) if (!(converted::at(p.have, k >> 6) & (converted::shl_bits(u64{1}, (k & 63))))) return;
+  swarms_.push_back({owner, std::move(p.units)});
+  p.units.clear();
+  p.last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)
+} }
+namespace net { void Session::town_to_host(const std::vector<u8>& blob) {
+  if (role_ == Role::client && client_ && converted::present(client_)->connected() && !converted::present(client_)->send(kReliable, kTownMsg, blob)) refused(kTownMsg, blob.size());
+} }
+namespace net { void Session::town_to_all(const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_all(kReliable, kTownMsg, blob, kHost);
+} }
+namespace net { void Session::town_to(u8 slot, const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_client(slot, kReliable, kTownMsg, blob);
+} }
+namespace net { void Session::send_world(const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_all(kUnreliable, kWorldMsg, blob, kHost);
+} }
+namespace net { void Session::send_world_to(u8 slot, const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_client(slot, kUnreliable, kWorldMsg, blob);
+} }
+namespace net { void Session::send_proj(const std::vector<u8>& blob) {
+  if (role_ == Role::client && client_ && converted::present(client_)->connected()) converted::present(client_)->send(kUnreliable, kProjMsg, blob);
+  else if (role_ == Role::host) {
+    std::vector<u8> w;
+    wire::put_u8(w, self_slot_);
+    wire::put_bytes(w, blob);
+    to_all(kUnreliable, kProjMsg, w, kHost);
+  }
+} }
+namespace net { void Session::send_toss(const std::vector<u8>& blob) {
+  if (role_ == Role::client && client_ && converted::present(client_)->connected()) converted::present(client_)->send(kUnreliable, kTossMsg, blob);
+  else if (role_ == Role::host) {
+    std::vector<u8> w;
+    wire::put_u8(w, self_slot_);
+    wire::put_bytes(w, blob);
+    to_all(kUnreliable, kTossMsg, w, kHost);
+  }
+} }
+namespace net { void Session::destroy_to_host(const std::vector<u8>& blob) {
+  if (role_ == Role::client && client_ && converted::present(client_)->connected()) converted::present(client_)->send(kReliable, kDestroyMsg, blob);
+} }
+namespace net { void Session::destroy_to_all(const std::vector<u8>& blob, bool reliable) {
+  if (role_ == Role::host) to_all(reliable ? kReliable : kUnreliable, kDestroyMsg, blob, kHost);
+} }
+namespace net { void Session::destroy_to(u8 slot, const std::vector<u8>& blob) {
+  if (role_ == Role::host) to_client(slot, kReliable, kDestroyMsg, blob);
+} }
+namespace net { void Session::send_swarm_hit(u8 to, u16 id, SwarmKind kind, f32 damage) {
+  if (role_ == Role::none) return;
+  SwarmHit h{self_slot_, to, id, kind, damage};
+  to_host(kReliable, kSwarmHitMsg, pack_swarm_hit(h));
+} }
+namespace net { void Session::request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from) {
+  if (role_ == Role::none || damage < 1) return;
+  Hit h{target, self_slot_, weapon, zone, clampf(std::round(damage), 1, 100), from};
+  to_host(kReliable, kHitReq, pack_hit(h));
+} }
+namespace net { void Session::report_death(u8 by, u8 weapon, u8 zone) {
+  if (role_ == Role::none) return;
+  std::vector<u8> w;
+  wire::put_u8(w, by);
+  wire::put_u8(w, weapon);
+  wire::put_u8(w, zone);
+  to_host(kReliable, kDeath, w);
+} }
+namespace net { void Session::report_respawn() { if (role_ != Role::none) to_host(kReliable, kRespawn, {}); } }
+namespace net { void Session::send_ping(bool on, Vec3 p, u32 color) {
+  if (role_ == Role::none) return;
+  std::vector<u8> w;
+  wire::put_u8(w, self_slot_);
+  wire::put_u8(w, static_cast<u8>(on));
+  wire::put_vec3(w, p);
+  wire::put_u32(w, color);
+  to_host(kReliable, kPingMsg, w);
+} }
+namespace net { void Session::send_voice(u32 seq, bool all, const std::vector<u8>& d) {
+  if (role_ == Role::none || remotes_.empty()) return;
+  std::vector<u8> w;
+  wire::put_u8(w, self_slot_);
+  wire::put_u32(w, seq);
+  wire::put_u8(w, static_cast<u8>(all));
+  wire::put_bytes(w, d);
+  to_host(kUnreliable, kVoice, w);
+} }
+namespace net { bool Session::propose_rule(bool ff) {
+  if (role_ == Role::none || roster().size() < 2 || ff == friendly_fire_) return false;
+  std::vector<u8> w;
+  wire::put_u8(w, static_cast<u8>(0));
+  wire::put_u8(w, static_cast<u8>(ff));
+  to_host(kReliable, kPropose, w);
+  return true;
+} }
+namespace net { bool Session::vote(bool approve) {
+  if (!remote_ballot_.id || role_ != Role::client) return false;
+  std::vector<u8> w;
+  wire::put_u32(w, remote_ballot_.id);
+  wire::put_u8(w, static_cast<u8>(approve));
+  to_host(kReliable, kVote, w);
+  vote_text_ = approve ? "JA gesendet" : "NEIN gesendet";
+  remote_ballot_ = mp::Ballot{};
+  return true;
+} }
+namespace net { void Session::judge(u8 shooter, const Hit& req) {
+  const std::vector<u8> r = roster();
+  const bool target_known = std::find(r.begin(), r.end(), req.target) != r.end(), shooter_known = std::find(r.begin(), r.end(), shooter) != r.end();
+  f64 until = 0;
+  for (const auto& [s, u] : protected_) if (s == req.target) until = u;
+  const mp::HitVerdict v = mp::judge_hit(target_known, shooter_known, req.target == shooter, friendly_fire_, now_ms(), until, hp_of(req.target));
+  if (v != mp::HitVerdict::applied) return;
+  Hit h = req;
+  h.by = shooter;
+  const std::vector<u8> bytes = pack_hit(h);
+  if (h.target == self_slot_) hits_.push_back(h);
+  else to_client(h.target, kReliable, kHitMsg, bytes);
+  if (shooter != h.target) {
+    if (shooter == self_slot_) confirms_.push_back(h);
+    else to_client(shooter, kReliable, kConfirm, bytes);
+  }
+} }
+namespace net { void Session::send_scores() {
+  std::vector<u8> w;
+  wire::put_u8(w, static_cast<u8>(scores_.rows().size()));
+  for (const mp::Score& s : scores_.rows()) { wire::put_u8(w, s.slot); wire::put_u16(w, s.kills); wire::put_u16(w, s.deaths); }
+  to_all(kReliable, kScores, w, kNobody);
+} }
+namespace net { void Session::send_rules() {
+  std::vector<u8> w;
+  wire::put_u8(w, static_cast<u8>(friendly_fire_));
+  if (have_world_rules_) wire::put_u16(w, world_rules_);
+  to_all(kReliable, kRules, w, kNobody);
+} }
+namespace net { void Session::set_world_rules(u16 mask) {
+  if (role_ == Role::client) return;
+  const bool changed = !have_world_rules_ || mask != world_rules_;
+  world_rules_ = mask;
+  have_world_rules_ = true;
+  if (changed && role_ == Role::host) send_rules();
+} }
+namespace net { void Session::send_anchor(u8 slot) {
+  // The largest fresh group in the shared frame; dead or quiet players do not pull.
+  std::vector<Vec2> pts;
+  const Vec3 mine = focus_of(self_slot_);
+  if (!(me_.flags & kDead)) pts.push_back({mine.x, mine.y});
+  for (const Remote& r : remotes_)
+    if (r.state.slot != slot && !(r.state.flags & kDead) && now_ms() - r.received_ms < 3500) { const Vec3 p = focus_of(r.state.slot); pts.push_back({p.x, p.y}); }
+  Vec2 c{mine.x, mine.y};
+  mp::group_spawn_center(pts, c);
+  std::vector<u8> w;
+  wire::put_vec3(w, Vec3{c.x, c.y, mine.z});
+  to_client(slot, kReliable, kAnchor, w);
+} }
+namespace net { void Session::begin_ballot(bool value) {
+  if (role_ != Role::host || ballot_.id || value == friendly_fire_) return;
+  if (!mp::create_ballot(ballot_, ++ballot_serial_, 0, value, self_slot_, roster(), now_ms())) return;
+  std::vector<u8> w;
+  wire::put_u32(w, ballot_.id);
+  wire::put_u8(w, ballot_.key);
+  wire::put_u8(w, static_cast<u8>(value));
+  wire::put_u8(w, static_cast<u8>(ballot_.members.size()));
+  for (u8 m : ballot_.members) wire::put_u8(w, m);
+  to_all(kReliable, kBallotMsg, w, kNobody);
+  char t[96];
+  std::snprintf(t, sizeof t, "FRIENDLY FIRE: %s - Abstimmung 1/%zu", value ? "EIN" : "AUS", ballot_.members.size());
+  vote_text_ = t;
+} }
+namespace net { void Session::finish_ballot(mp::Ballot::Status s) {
+  const u8 result = s == mp::Ballot::Status::approved ? 1 : s == mp::Ballot::Status::rejected ? 2 : 3;
+  if (s == mp::Ballot::Status::approved) { friendly_fire_ = ballot_.value; send_rules(); }
+  std::vector<u8> w;
+  wire::put_u32(w, ballot_.id);
+  wire::put_u8(w, result);
+  to_all(kReliable, kBallotResult, w, kNobody);
+  vote_text_ = result == 1 ? "Einstimmig angenommen" : result == 2 ? "Abgelehnt" : "Abstimmung abgelaufen / Spielerwechsel";
+  ballot_ = mp::Ballot{};
+} }
+namespace net { void Session::seat_request(bool claim, u8 owner, seats::Seat seat) {
+  // no session: single-player runs locally; the host judges its own requests at once
+  if (role_ == Role::none) { const u8 me = self_slot_; claim ? seats_.claim(owner, me, seat) : seats_.release(owner, me, seat); return; }
+  if (role_ == Role::host) { judge_seat(self_slot_, claim, owner, seat); return; }
+  std::vector<u8> w;
+  wire::put_u8(w, static_cast<u8>(claim));
+  wire::put_u8(w, owner);
+  wire::put_u8(w, static_cast<u8>(seat));
+  to_host(kReliable, kSeatReq, w);
+} }
+namespace net { void Session::judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat) {
+  const seats::Result r = claim ? seats_.claim(owner, from, seat) : seats_.release(owner, from, seat);
+  if (r == seats::Result::ok) send_seats();
+} }
+namespace net { void Session::send_seats() {
+  if (role_ != Role::host) return;
+  std::vector<u8> w;
+  wire::put_u32(w, seats_.revision());
+  wire::put_u8(w, static_cast<u8>(seats_.rows().size()));
+  for (const seats::Row& r : seats_.rows()) { wire::put_u8(w, r.owner); wire::put_u8(w, r.pilot); wire::put_u8(w, r.passenger); }
+  to_all(kReliable, kSeatState, w, kNobody);
+} }
+namespace net { void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
+  switch (type) {
+    case kDestroyMsg: { if (role_ == Role::host && destroy_.size() < 64) destroy_.push_back({from, d}); return; }
+    case kTownMsg: { if (role_ == Role::host && from != self_slot_ && town_.size() < 512) town_.push_back({from, d}); return; }
+    case kProjMsg: {  // a client's rounds in flight: drawn here, and on to the others
+      if (role_ != Role::host) return;
+      if (proj_.size() < 64) proj_.push_back({from, d});
+      std::vector<u8> w;
+      wire::put_u8(w, from);
+      wire::put_bytes(w, d);
+      to_all(kUnreliable, kProjMsg, w, from);
+      return;
+    }
+    case kTossMsg: {  // a client's thrown things: ours to drive, and on to the others
+      if (role_ != Role::host) return;
+      if (toss_.size() < 64) toss_.push_back({from, d});
+      std::vector<u8> w;
+      wire::put_u8(w, from);
+      wire::put_bytes(w, d);
+      to_all(kUnreliable, kTossMsg, w, from);
+      return;
+    }
+    case kSeatReq: {
+      wire::Reader r;
+      const u8 claim = r.get_u8(d), owner = r.get_u8(d), seat = r.get_u8(d);
+      if (r.ok && seat <= 1) judge_seat(from, claim != 0, owner, static_cast<seats::Seat>(converted::among({0, 1}, seat)));
+      return;
+    }
+    case kFxMsg: {
+      Fx f;
+      if (!unpack_fx(d, f)) return;
+      f.owner = from;
+      if (from != self_slot_) fx_.push_back(f);
+      to_all(f.kind == Fx::shot ? kUnreliable : kReliable, kFxMsg, pack_fx(f), from);
+      return;
+    }
+    case kSwarmMsg: {
+      // the host passes a player's units on to everybody else (the owner is who sent them)
+      u8 owner, serial, part;
+      bool last;
+      std::vector<SwarmUnit> units;
+      if (!unpack_swarm(d, owner, serial, part, last, units)) return;
+      to_all(kUnreliable, kSwarmMsg, pack_swarm(from, serial, part, last, units, 0, units.size()), from);
+      if (from != self_slot_) swarm_part(from, serial, part, last, units);
+      return;
+    }
+    case kSwarmHitMsg: {
+      SwarmHit h;
+      if (!unpack_swarm_hit(d, h)) return;
+      h.from = from;
+      if (h.to == self_slot_) swarm_hits_.push_back(h);
+      else if (h.to != kHost) to_client(h.to, kReliable, kSwarmHitMsg, pack_swarm_hit(h));
+      return;
+    }
+    case kHitReq: {
+      Hit h;
+      if (unpack_hit(d, h)) judge(from, h);
+      return;
+    }
+    case kDeath: {
+      wire::Reader r;
+      Kill k{from, r.get_u8(d), r.get_u8(d), r.get_u8(d)};
+      if (!r.ok) return;
+      const std::vector<u8> ro = roster();
+      if (std::find(ro.begin(), ro.end(), k.by) == ro.end()) k.by = kNobody;
+      scores_.died(k.victim, k.by == kNobody ? -1 : k.by);
+      kills_.push_back(k);
+      std::vector<u8> w;
+      wire::put_u8(w, k.victim);
+      wire::put_u8(w, k.by);
+      wire::put_u8(w, k.weapon);
+      wire::put_u8(w, k.zone);
+      to_all(kReliable, kKillMsg, w, kNobody);
+      send_scores();
+      return;
+    }
+    case kRespawn: {
+      const f64 protect_ms = mp::spawn_protect_ms();
+      const f64 until = now_ms() + protect_ms;
+      bool found = false;
+      for (auto& [s, u] : protected_) if (s == from) { u = until; found = true; }
+      if (!found) protected_.push_back({from, until});
+      std::vector<u8> w;
+      wire::put_u8(w, from);
+      wire::put_f32(w, static_cast<f32>(protect_ms));
+      to_all(kReliable, kProtect, w, kNobody);
+      return;
+    }
+    case kPingMsg: {
+      wire::Reader r;
+      r.get_u8(d);
+      PingEvent p{from, r.get_u8(d) != 0, r.get_vec3(d), r.get_u32(d)};
+      if (!r.ok || !sane(p.p)) return;
+      if (from != self_slot_) pings_.push_back(p);
+      std::vector<u8> w;
+      wire::put_u8(w, from);
+      wire::put_u8(w, static_cast<u8>(p.on));
+      wire::put_vec3(w, p.p);
+      wire::put_u32(w, p.color);
+      to_all(kReliable, kPingMsg, w, from);
+      return;
+    }
+    case kVoice: {
+      wire::Reader r;
+      r.get_u8(d);
+      VoiceFrame v{from, r.get_u32(d), r.get_u8(d) != 0, r.get_bytes(d)};
+      if (!r.ok || v.data.size() < 4 || v.data.size() > 800) return;
+      // Only mates in range hear it (proximity_voice.mjs transmit), unless "everywhere".
+      const Vec3 at = focus_of(from);
+      const f32 radius = mp::voice_radius();
+      if (from != self_slot_ && (v.everywhere || converted::wide::length(focus_of(self_slot_) - at) <= radius)) voice_.push_back(v);
+      std::vector<u8> bytes;
+      wire::put_u8(bytes, from);
+      wire::put_u32(bytes, v.seq);
+      wire::put_u8(bytes, static_cast<u8>(v.everywhere));
+      wire::put_bytes(bytes, v.data);
+      for (const Remote& x : remotes_)
+        if (x.state.slot != from && (v.everywhere || converted::wide::length(focus_of(x.state.slot) - at) <= radius)) to_client(x.state.slot, kUnreliable, kVoice, bytes);
+      return;
+    }
+    case kPropose: {
+      wire::Reader r;
+      r.get_u8(d);
+      const bool value = r.get_u8(d) != 0;
+      if (r.ok) begin_ballot(value);
+      return;
+    }
+    case kVote: {
+      wire::Reader r;
+      const u32 id = r.get_u32(d);
+      const bool yes = r.get_u8(d) != 0;
+      if (!r.ok || !ballot_.id || id != ballot_.id) return;
+      const mp::Ballot::Status s = mp::cast_vote(ballot_, from, yes, roster(), now_ms());
+      if (s == mp::Ballot::Status::pending) {
+        char t[96];
+        std::snprintf(t, sizeof t, "FRIENDLY FIRE: %zu/%zu JA", ballot_.yes.size(), ballot_.members.size());
+        vote_text_ = t;
+      } else {
+        finish_ballot(s);
+      }
+      return;
+    }
+    default: return;
+  }
+} }
+namespace net { void Session::deliver(u16 type, const std::vector<u8>& d) {
+  wire::Reader r;
+  switch (type) {
+    case kOriginMsg: {
+      const f64 lon = r.get_f64(d), lat = r.get_f64(d);
+      if (r.ok && role_ == Role::client && std::isfinite(lon) && std::isfinite(lat) && std::fabs(lat) <= 85 && std::fabs(lon) <= 180) { lon_ = lon; lat_ = lat; have_origin_ = true; }
+      return;
+    }
+    case kWelcome: {
+      self_slot_ = r.get_u8(d);
+      lon_ = r.get_f64(d);
+      lat_ = r.get_f64(d);
+      friendly_fire_ = r.get_u8(d) != 0;
+      if (r.ok) have_origin_ = true;
+      return;
+    }
+    case kPoseRelay: {
+      PlayerState s;
+      std::size_t at = 0;
+      if (unpack(d, at, s)) on_pose(s);
+      return;
+    }
+    case kFxMsg: { Fx f; if (unpack_fx(d, f) && f.owner != self_slot_) fx_.push_back(f); return; }
+    case kSwarmMsg: {
+      u8 owner, serial, part;
+      bool last;
+      std::vector<SwarmUnit> units;
+      if (unpack_swarm(d, owner, serial, part, last, units) && owner != self_slot_) swarm_part(owner, serial, part, last, units);
+      return;
+    }
+    case kSwarmHitMsg: { SwarmHit h; if (unpack_swarm_hit(d, h) && h.to == self_slot_) swarm_hits_.push_back(h); return; }
+    case kWorldMsg: { if (world_.size() < 8) world_.push_back(d); return; }
+    case kDestroyMsg: { if (role_ == Role::client && destroy_.size() < 64) destroy_.push_back({kHost, d}); return; }
+    case kTownMsg: { if (role_ == Role::client && town_.size() < 512) town_.push_back({kHost, d}); return; }
+    case kProjMsg: {  // (relayed: the shooter's slot first)
+      if (role_ != Role::client) return;
+      const u8 from = r.get_u8(d);
+      std::vector<u8> body = r.get_bytes(d);
+      if (r.ok && from != self_slot_ && proj_.size() < 64) proj_.push_back({from, std::move(body)});
+      return;
+    }
+    case kTossMsg: {  // (relayed: the thrower's slot first)
+      if (role_ != Role::client) return;
+      const u8 from = r.get_u8(d);
+      std::vector<u8> body = r.get_bytes(d);
+      if (r.ok && from != self_slot_ && toss_.size() < 64) toss_.push_back({from, std::move(body)});
+      return;
+    }
+    case kSeatState: {
+      const u32 rev = r.get_u32(d);
+      const u8 n = r.get_u8(d);
+      std::vector<seats::Row> rows;
+      for (u8 i = 0; i < n && r.ok; ++i) { seats::Row q; q.owner = r.get_u8(d); q.pilot = r.get_u8(d); q.passenger = r.get_u8(d); rows.push_back(q); }
+      if (r.ok) seats_.load(rev, rows);
+      return;
+    }
+    case kHitMsg: { Hit h; if (unpack_hit(d, h) && h.target == self_slot_) hits_.push_back(h); return; }
+    case kConfirm: { Hit h; if (unpack_hit(d, h)) confirms_.push_back(h); return; }
+    case kKillMsg: { Kill k{r.get_u8(d), r.get_u8(d), r.get_u8(d), r.get_u8(d)}; if (r.ok) kills_.push_back(k); return; }
+    case kScores: {
+      const u8 n = r.get_u8(d);
+      std::vector<mp::Score> rows;
+      for (u8 i = 0; i < n && r.ok; ++i) { mp::Score s; s.slot = r.get_u8(d); s.kills = r.get_u16(d); s.deaths = r.get_u16(d); rows.push_back(s); }
+      if (r.ok) scores_.set(rows);
+      return;
+    }
+    case kProtect: {
+      const u8 slot = r.get_u8(d);
+      const f32 ms = r.get_f32(d);
+      if (!r.ok) return;
+      bool found = false;
+      for (auto& [s, u] : protected_) if (s == slot) { u = now_ms() + ms; found = true; }
+      if (!found) protected_.push_back({slot, now_ms() + ms});
+      return;
+    }
+    case kAnchor: { const Vec3 p = r.get_vec3(d); if (r.ok && sane(p)) { anchor_ = p; anchor_ready_ = true; } return; }
+    case kPingMsg: {
+      PingEvent p{r.get_u8(d), r.get_u8(d) != 0, r.get_vec3(d), r.get_u32(d)};
+      if (r.ok && p.owner != self_slot_ && sane(p.p)) pings_.push_back(p);
+      return;
+    }
+    case kVoice: {
+      VoiceFrame v{r.get_u8(d), r.get_u32(d), r.get_u8(d) != 0, r.get_bytes(d)};
+      if (r.ok && v.from != self_slot_ && v.data.size() >= 4 && v.data.size() <= 800) voice_.push_back(v);
+      return;
+    }
+    case kRules: {
+      const u8 ff = r.get_u8(d);
+      if (!r.ok) return;
+      friendly_fire_ = ff != 0;
+      if (role_ == Role::client) { const u16 m = r.get_u16(d); if (r.ok) { world_rules_ = m; have_world_rules_ = true; } }
+      return;
+    }
+    case kBallotMsg: {
+      mp::Ballot b;
+      b.id = r.get_u32(d); b.key = r.get_u8(d); b.value = r.get_u8(d) != 0;
+      const u8 n = r.get_u8(d);
+      for (u8 i = 0; i < n && r.ok; ++i) b.members.push_back(r.get_u8(d));
+      if (!r.ok || b.members != roster()) return;  // a different roster: the vote is not ours
+      b.expires_ms = now_ms() + mp::ballot_ms();
+      remote_ballot_ = b;
+      vote_text_ = std::string("FRIENDLY FIRE: ") + (b.value ? "EIN" : "AUS") + "? Deine Stimme fehlt";
+      return;
+    }
+    case kBallotResult: {
+      r.get_u32(d);
+      const u8 res = r.get_u8(d);
+      remote_ballot_ = mp::Ballot{};
+      vote_text_ = res == 1 ? "Angenommen" : res == 2 ? "Abgelehnt" : "Abstimmung abgebrochen";
+      return;
+    }
+    case kLeft: {
+      const u8 slot = r.get_u8(d);
+      converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& x) { return x.state.slot == slot; }), remotes_.end());
+      std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });
+      return;
+    }
+    default: return;
+  }
+} }
+namespace net { void Session::on_pose(const PlayerState& s) {
+  if (s.slot == self_slot_) return;
+  const f64 now = now_ms();
+  // the remote of this slot: its place in remotes_ (the last one of the slot), a new one at the end if none
+  std::size_t at = remotes_.size();
+  for (std::size_t i = 0; i < remotes_.size(); converted::pre_inc(i)) if (converted::at(remotes_, i).state.slot == s.slot) at = i;
+  if (at == remotes_.size()) {
+    remotes_.emplace_back();
+    Remote& added = converted::at(remotes_, at);
+    added.shown = s.position;
+    added.shown_rotation = s.rotation;
+    added.person_shown = s.avatar;
+    if (role_ == Role::host) { scores_.ensure(s.slot); send_scores(); }
+  }
+  Remote& r = converted::at(remotes_, at);
+  // A mode change or a jump (respawn, new vehicle) starts the timelines over.
+  if (r.state.mode != s.mode || converted::wide::length(r.body.last_position() - s.position) > mp::kTeleportM) r.body.reset();
+  if (converted::wide::length(r.person.last_position() - s.avatar) > mp::kTeleportM) r.person.reset();
+  r.state = s;
+  r.received_ms = now;
+  r.body.push(s.position, s.rotation, s.velocity, true, s.t_ms, now);
+  r.person.push(s.avatar, yaw_quat(s.avatar_yaw), {}, false, s.t_ms, now);
+  if (s.mode == PlayerMode::car || s.mode == PlayerMode::jet) {
+    const Vec3 fwd = s.rotation.rotate(s.mode == PlayerMode::jet ? Vec3{0, 1, 0} : Vec3{1, 0, 0});
+    r.nav.push(s.position, kern::math::atan2(fwd.x, fwd.y), static_cast<u8>(s.mode), now);
+  } else {
+    r.nav.reset();
+  }
+} }
+namespace net { void Session::update(f64 time, f32 dt, const PlayerState& me, bool send_pose) {
+  (void)dt;
+  if (role_ == Role::none) return;
+  time_ = time;
+  me_ = me;
+  me_.slot = self_slot_;
+  me_.t_ms = static_cast<u32>(converted::fits<unsigned int>(time * 1000));
+  if (protected_now(self_slot_, now_ms())) me_.flags |= kProtected;
+  transport_.advance_time(time);
+  const bool tick = time - send_clock_ >= kSendInterval;
+  if (tick) send_clock_ = time;
+  if (role_ == Role::host) {
+    converted::present(server_)->advance_time(time);
+    converted::present(server_)->receive_packets();
+    for (const auto& [index, up] : converted::present(server_)->take_events()) {
+      const u8 slot = static_cast<u8>(index);
+      if (up) {
+        // Welcome: the slot, the map origin (everybody streams the same city) and the rules.
+        std::vector<u8> w;
+        wire::put_u8(w, slot);
+        wire::put_f64(w, lon_);
+        wire::put_f64(w, lat_);
+        wire::put_u8(w, static_cast<u8>(friendly_fire_));
+        converted::present(server_)->send(index, kReliable, kWelcome, w);
+        pending_anchor_.push_back(slot);
+        scores_.ensure(slot);
+        send_scores();
+        if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);  // the roster changed
+      } else {
+        converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return r.state.slot == slot; }), remotes_.end());
+        std::erase_if(swarm_parts_, [&](const SwarmParts& p) { return p.owner == slot; });  // (the slot's next player starts his own serials)
+        scores_.remove(slot);
+        if (seats_.drop(slot)) send_seats();  // a player who leaves loses his seats
+        std::vector<u8> w;
+        wire::put_u8(w, slot);
+        to_all(kReliable, kLeft, w, kNobody);
+        send_scores();
+        if (ballot_.id) finish_ballot(mp::Ballot::Status::cancelled);
+      }
+    }
+    for (int c = 0; c < converted::present(server_)->max_clients(); converted::pre_inc(c)) {
+      if (!converted::present(server_)->client_connected(c)) continue;
+      for (int ch : {kReliable, kUnreliable})
+        while (auto m = converted::present(server_)->receive(c, ch)) {
+          if (converted::present(m)->type == kPose) {
+            std::size_t at = 0;
+            PlayerState s;
+            if (unpack(converted::present(m)->data, at, s)) {
+              s.slot = static_cast<u8>(c);
+              if (protected_now(s.slot, now_ms())) s.flags |= kProtected;
+              on_pose(s);
+              // Relay at once (no extra 33 ms): the others' timelines run on the sender's clock.
+              to_all(kUnreliable, kPoseRelay, pack(s), static_cast<u8>(c));
+            }
+          } else {
+            dispatch(static_cast<u8>(c), converted::present(m)->type, converted::present(m)->data);
+          }
+        }
+    }
+    // A joining player gets his anchor once his first pose is in (the group is known then).
+    for (std::size_t i = 0; i < pending_anchor_.size();)
+      if (remote_index(converted::at(pending_anchor_, i)) >= 0) { send_anchor(converted::at(pending_anchor_, i)); converted::erase(pending_anchor_, pending_anchor_.begin() + static_cast<std::ptrdiff_t>(i)); }
+      else converted::pre_inc(i);
+    if (tick && send_pose) { to_all(kUnreliable, kPoseRelay, pack(me_), kNobody); ++sent_poses_; }
+    if (time - scores_clock_ > kScoresEvery) { scores_clock_ = time; send_scores(); }
+    if (time - rules_clock_ > kRulesEvery) { rules_clock_ = time; send_rules(); }
+    if (time - seats_clock_ > kSeatsEvery) { seats_clock_ = time; send_seats(); }
+    if (ballot_.id && mp::ballot_stale(ballot_, roster(), now_ms())) finish_ballot(mp::Ballot::Status::cancelled);
+    converted::present(server_)->send_packets();
+  } else {
+    // A client whose way to the host broke - it never came about in time, or the host went quiet
+    // (a tab in the background, a phone that loads) - asks again, once a second, as the original's
+    // peers say hello every second (mqtt_data_relay.mjs HELLO_MS): it does not stay outside for good.
+    if (!connect_pending_ && converted::present(client_)->state() < net::ClientState::disconnected && time - connect_at_ >= kReconnectS) connect_pending_ = true;
+    if (connect_pending_) { converted::present(client_)->connect(server_addr_, time); connect_pending_ = false; connect_at_ = time; ++connects_; }
+    converted::present(client_)->advance_time(time);
+    converted::present(client_)->receive_packets();
+    for (int ch : {kReliable, kUnreliable})
+      while (auto m = converted::present(client_)->receive(ch)) deliver(converted::present(m)->type, converted::present(m)->data);
+    if (converted::present(client_)->connected() && have_origin_ && !ever_in_) { ever_in_ = true; in_since_ = now_ms(); }
+    if (converted::present(client_)->connected() && remote_index(kHost) >= 0) {
+      mates_.clear();
+      for (const Remote& r : remotes_) if (r.state.slot != kHost) mates_.push_back(r.state.slot);
+    }
+    if (converted::present(client_)->connected() && have_origin_ && tick && send_pose) { converted::present(client_)->send(kUnreliable, kPose, pack(me_)); ++sent_poses_; }
+    if (remote_ballot_.id && now_ms() >= remote_ballot_.expires_ms) { remote_ballot_ = mp::Ballot{}; vote_text_ = "Abstimmung abgelaufen"; }
+    converted::present(client_)->send_packets();
+  }
+  converted::erase(protected_, std::remove_if(protected_.begin(), protected_.end(), [&](const std::pair<u8, f64>& p) { return now_ms() > p.second; }), protected_.end());
+  // Players who went quiet are gone.
+  converted::erase(remotes_, std::remove_if(remotes_.begin(), remotes_.end(), [&](const Remote& r) { return now_ms() - r.received_ms > kQuietS * 1000; }), remotes_.end());
+} }
+namespace net { std::string Session::status() const {
+  if (role_ == Role::none) return "";
+  char b[96];
+  if (role_ == Role::host) std::snprintf(b, sizeof b, "Host - %d Spieler", converted::plus(1, (server_ ? converted::present(server_)->connected_clients() : 0)));
+  else std::snprintf(b, sizeof b, "%s - %zu weitere Spieler", connected() ? "Verbunden" : "Verbinde ...", remotes_.size());
+  return b;
+} }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
-[[maybe_unused]] static ChannelConfig draw_kern__net__ChannelConfig(converted::Draw& draw) {
-  ChannelConfig s{};
-  s.type = static_cast<ChannelType>(draw.below(2));
+[[maybe_unused]] static net::ChannelConfig draw_kern__net__ChannelConfig(converted::Draw& draw) {
+  net::ChannelConfig s{};
+  s.type = converted::enum_value<net::ChannelType>(draw.below(2));
   s.send_queue_size = static_cast<int>(draw.whole());
   s.receive_queue_size = static_cast<int>(draw.whole());
   s.max_messages_per_packet = static_cast<int>(draw.whole());
@@ -130,13 +1909,15 @@ bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfi
   s.resend_time = draw.number();
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ChannelConfig& s) { return converted::Value::structure({arg(s.type), arg(s.send_queue_size), arg(s.receive_queue_size), arg(s.max_messages_per_packet), arg(s.packet_budget), arg(s.max_message_size), arg(s.block_threshold), arg(s.block_fragment_size), arg(s.resend_time)}); }
-[[maybe_unused]] static bool same(const ChannelConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 9 && same(want.type, (*got.rows)[0]) && same(want.send_queue_size, (*got.rows)[1]) && same(want.receive_queue_size, (*got.rows)[2]) && same(want.max_messages_per_packet, (*got.rows)[3]) && same(want.packet_budget, (*got.rows)[4]) && same(want.max_message_size, (*got.rows)[5]) && same(want.block_threshold, (*got.rows)[6]) && same(want.block_fragment_size, (*got.rows)[7]) && same(want.resend_time, (*got.rows)[8]); }
-[[maybe_unused]] static bool defined(const ChannelConfig& s) { return defined(s.type) && defined(s.send_queue_size) && defined(s.receive_queue_size) && defined(s.max_messages_per_packet) && defined(s.packet_budget) && defined(s.max_message_size) && defined(s.block_threshold) && defined(s.block_fragment_size) && defined(s.resend_time); }
-[[maybe_unused]] static std::string text(const ChannelConfig& s) { return std::string("{") + text(s.type) + ", " + text(s.send_queue_size) + ", " + text(s.receive_queue_size) + ", " + text(s.max_messages_per_packet) + ", " + text(s.packet_budget) + ", " + text(s.max_message_size) + ", " + text(s.block_threshold) + ", " + text(s.block_fragment_size) + ", " + text(s.resend_time) + "}"; }
-[[maybe_unused]] static void take(ChannelConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<ChannelType>(s.type, (*v.rows)[0]); converted::take_as<int>(s.send_queue_size, (*v.rows)[1]); converted::take_as<int>(s.receive_queue_size, (*v.rows)[2]); converted::take_as<int>(s.max_messages_per_packet, (*v.rows)[3]); converted::take_as<int>(s.packet_budget, (*v.rows)[4]); converted::take_as<int>(s.max_message_size, (*v.rows)[5]); converted::take_as<int>(s.block_threshold, (*v.rows)[6]); converted::take_as<int>(s.block_fragment_size, (*v.rows)[7]); converted::take_as<double>(s.resend_time, (*v.rows)[8]); }
-[[maybe_unused]] static EndpointConfig draw_kern__net__EndpointConfig(converted::Draw& draw) {
-  EndpointConfig s{};
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::ChannelConfig& s) { return converted::Value::structure({arg(s.type), arg(s.send_queue_size), arg(s.receive_queue_size), arg(s.max_messages_per_packet), arg(s.packet_budget), arg(s.max_message_size), arg(s.block_threshold), arg(s.block_fragment_size), arg(s.resend_time)}); }
+[[maybe_unused]] static bool same(const net::ChannelConfig& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.type, (*got.rows)[0]), ".type") && converted::at_place(same(want.send_queue_size, (*got.rows)[1]), ".send_queue_size") && converted::at_place(same(want.receive_queue_size, (*got.rows)[2]), ".receive_queue_size") && converted::at_place(same(want.max_messages_per_packet, (*got.rows)[3]), ".max_messages_per_packet") && converted::at_place(same(want.packet_budget, (*got.rows)[4]), ".packet_budget") && converted::at_place(same(want.max_message_size, (*got.rows)[5]), ".max_message_size") && converted::at_place(same(want.block_threshold, (*got.rows)[6]), ".block_threshold") && converted::at_place(same(want.block_fragment_size, (*got.rows)[7]), ".block_fragment_size") && converted::at_place(same(want.resend_time, (*got.rows)[8]), ".resend_time"); }
+[[maybe_unused]] static bool defined(const net::ChannelConfig& s) { return defined(s.type) && defined(s.send_queue_size) && defined(s.receive_queue_size) && defined(s.max_messages_per_packet) && defined(s.packet_budget) && defined(s.max_message_size) && defined(s.block_threshold) && defined(s.block_fragment_size) && defined(s.resend_time); }
+[[maybe_unused]] static std::string text(const net::ChannelConfig& s) { return std::string("{") + text(s.type) + ", " + text(s.send_queue_size) + ", " + text(s.receive_queue_size) + ", " + text(s.max_messages_per_packet) + ", " + text(s.packet_budget) + ", " + text(s.max_message_size) + ", " + text(s.block_threshold) + ", " + text(s.block_fragment_size) + ", " + text(s.resend_time) + "}"; }
+[[maybe_unused]] static void take(net::ChannelConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<net::ChannelType>(s.type, (*v.rows)[0]); converted::take_as<int>(s.send_queue_size, (*v.rows)[1]); converted::take_as<int>(s.receive_queue_size, (*v.rows)[2]); converted::take_as<int>(s.max_messages_per_packet, (*v.rows)[3]); converted::take_as<int>(s.packet_budget, (*v.rows)[4]); converted::take_as<int>(s.max_message_size, (*v.rows)[5]); converted::take_as<int>(s.block_threshold, (*v.rows)[6]); converted::take_as<int>(s.block_fragment_size, (*v.rows)[7]); converted::take_as<double>(s.resend_time, (*v.rows)[8]); }
+}
+[[maybe_unused]] static net::EndpointConfig draw_kern__net__EndpointConfig(converted::Draw& draw) {
+  net::EndpointConfig s{};
   s.max_packet_size = static_cast<int>(draw.whole());
   s.fragment_above = static_cast<int>(draw.whole());
   s.fragment_size = static_cast<int>(draw.whole());
@@ -151,26 +1932,30 @@ bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfi
   s.packet_header_size = static_cast<int>(draw.whole());
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const EndpointConfig& s) { return converted::Value::structure({arg(s.max_packet_size), arg(s.fragment_above), arg(s.fragment_size), arg(s.max_fragments), arg(s.ack_buffer_size), arg(s.sent_packets_buffer_size), arg(s.received_packets_buffer_size), arg(s.fragment_reassembly_buffer_size), arg(s.rtt_smoothing), arg(s.packet_loss_smoothing), arg(s.bandwidth_smoothing), arg(s.packet_header_size)}); }
-[[maybe_unused]] static bool same(const EndpointConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 12 && same(want.max_packet_size, (*got.rows)[0]) && same(want.fragment_above, (*got.rows)[1]) && same(want.fragment_size, (*got.rows)[2]) && same(want.max_fragments, (*got.rows)[3]) && same(want.ack_buffer_size, (*got.rows)[4]) && same(want.sent_packets_buffer_size, (*got.rows)[5]) && same(want.received_packets_buffer_size, (*got.rows)[6]) && same(want.fragment_reassembly_buffer_size, (*got.rows)[7]) && same(want.rtt_smoothing, (*got.rows)[8]) && same(want.packet_loss_smoothing, (*got.rows)[9]) && same(want.bandwidth_smoothing, (*got.rows)[10]) && same(want.packet_header_size, (*got.rows)[11]); }
-[[maybe_unused]] static bool defined(const EndpointConfig& s) { return defined(s.max_packet_size) && defined(s.fragment_above) && defined(s.fragment_size) && defined(s.max_fragments) && defined(s.ack_buffer_size) && defined(s.sent_packets_buffer_size) && defined(s.received_packets_buffer_size) && defined(s.fragment_reassembly_buffer_size) && defined(s.rtt_smoothing) && defined(s.packet_loss_smoothing) && defined(s.bandwidth_smoothing) && defined(s.packet_header_size); }
-[[maybe_unused]] static std::string text(const EndpointConfig& s) { return std::string("{") + text(s.max_packet_size) + ", " + text(s.fragment_above) + ", " + text(s.fragment_size) + ", " + text(s.max_fragments) + ", " + text(s.ack_buffer_size) + ", " + text(s.sent_packets_buffer_size) + ", " + text(s.received_packets_buffer_size) + ", " + text(s.fragment_reassembly_buffer_size) + ", " + text(s.rtt_smoothing) + ", " + text(s.packet_loss_smoothing) + ", " + text(s.bandwidth_smoothing) + ", " + text(s.packet_header_size) + "}"; }
-[[maybe_unused]] static void take(EndpointConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<int>(s.max_packet_size, (*v.rows)[0]); converted::take_as<int>(s.fragment_above, (*v.rows)[1]); converted::take_as<int>(s.fragment_size, (*v.rows)[2]); converted::take_as<int>(s.max_fragments, (*v.rows)[3]); converted::take_as<int>(s.ack_buffer_size, (*v.rows)[4]); converted::take_as<int>(s.sent_packets_buffer_size, (*v.rows)[5]); converted::take_as<int>(s.received_packets_buffer_size, (*v.rows)[6]); converted::take_as<int>(s.fragment_reassembly_buffer_size, (*v.rows)[7]); converted::take_as<double>(s.rtt_smoothing, (*v.rows)[8]); converted::take_as<double>(s.packet_loss_smoothing, (*v.rows)[9]); converted::take_as<double>(s.bandwidth_smoothing, (*v.rows)[10]); converted::take_as<int>(s.packet_header_size, (*v.rows)[11]); }
-[[maybe_unused]] static ConnectionConfig draw_kern__net__ConnectionConfig(converted::Draw& draw) {
-  ConnectionConfig s{};
-  s.channels = draw_list(draw, [&]() -> ChannelConfig { return draw_kern__net__ChannelConfig(draw); });
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::EndpointConfig& s) { return converted::Value::structure({arg(s.max_packet_size), arg(s.fragment_above), arg(s.fragment_size), arg(s.max_fragments), arg(s.ack_buffer_size), arg(s.sent_packets_buffer_size), arg(s.received_packets_buffer_size), arg(s.fragment_reassembly_buffer_size), arg(s.rtt_smoothing), arg(s.packet_loss_smoothing), arg(s.bandwidth_smoothing), arg(s.packet_header_size)}); }
+[[maybe_unused]] static bool same(const net::EndpointConfig& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.max_packet_size, (*got.rows)[0]), ".max_packet_size") && converted::at_place(same(want.fragment_above, (*got.rows)[1]), ".fragment_above") && converted::at_place(same(want.fragment_size, (*got.rows)[2]), ".fragment_size") && converted::at_place(same(want.max_fragments, (*got.rows)[3]), ".max_fragments") && converted::at_place(same(want.ack_buffer_size, (*got.rows)[4]), ".ack_buffer_size") && converted::at_place(same(want.sent_packets_buffer_size, (*got.rows)[5]), ".sent_packets_buffer_size") && converted::at_place(same(want.received_packets_buffer_size, (*got.rows)[6]), ".received_packets_buffer_size") && converted::at_place(same(want.fragment_reassembly_buffer_size, (*got.rows)[7]), ".fragment_reassembly_buffer_size") && converted::at_place(same(want.rtt_smoothing, (*got.rows)[8]), ".rtt_smoothing") && converted::at_place(same(want.packet_loss_smoothing, (*got.rows)[9]), ".packet_loss_smoothing") && converted::at_place(same(want.bandwidth_smoothing, (*got.rows)[10]), ".bandwidth_smoothing") && converted::at_place(same(want.packet_header_size, (*got.rows)[11]), ".packet_header_size"); }
+[[maybe_unused]] static bool defined(const net::EndpointConfig& s) { return defined(s.max_packet_size) && defined(s.fragment_above) && defined(s.fragment_size) && defined(s.max_fragments) && defined(s.ack_buffer_size) && defined(s.sent_packets_buffer_size) && defined(s.received_packets_buffer_size) && defined(s.fragment_reassembly_buffer_size) && defined(s.rtt_smoothing) && defined(s.packet_loss_smoothing) && defined(s.bandwidth_smoothing) && defined(s.packet_header_size); }
+[[maybe_unused]] static std::string text(const net::EndpointConfig& s) { return std::string("{") + text(s.max_packet_size) + ", " + text(s.fragment_above) + ", " + text(s.fragment_size) + ", " + text(s.max_fragments) + ", " + text(s.ack_buffer_size) + ", " + text(s.sent_packets_buffer_size) + ", " + text(s.received_packets_buffer_size) + ", " + text(s.fragment_reassembly_buffer_size) + ", " + text(s.rtt_smoothing) + ", " + text(s.packet_loss_smoothing) + ", " + text(s.bandwidth_smoothing) + ", " + text(s.packet_header_size) + "}"; }
+[[maybe_unused]] static void take(net::EndpointConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<int>(s.max_packet_size, (*v.rows)[0]); converted::take_as<int>(s.fragment_above, (*v.rows)[1]); converted::take_as<int>(s.fragment_size, (*v.rows)[2]); converted::take_as<int>(s.max_fragments, (*v.rows)[3]); converted::take_as<int>(s.ack_buffer_size, (*v.rows)[4]); converted::take_as<int>(s.sent_packets_buffer_size, (*v.rows)[5]); converted::take_as<int>(s.received_packets_buffer_size, (*v.rows)[6]); converted::take_as<int>(s.fragment_reassembly_buffer_size, (*v.rows)[7]); converted::take_as<double>(s.rtt_smoothing, (*v.rows)[8]); converted::take_as<double>(s.packet_loss_smoothing, (*v.rows)[9]); converted::take_as<double>(s.bandwidth_smoothing, (*v.rows)[10]); converted::take_as<int>(s.packet_header_size, (*v.rows)[11]); }
+}
+[[maybe_unused]] static net::ConnectionConfig draw_kern__net__ConnectionConfig(converted::Draw& draw) {
+  net::ConnectionConfig s{};
+  s.channels = draw_list(draw, [&]() -> net::ChannelConfig { return draw_kern__net__ChannelConfig(draw); });
   s.max_packet_size = static_cast<int>(draw.whole());
   s.max_message_types = static_cast<int>(draw.whole());
   s.endpoint = draw_kern__net__EndpointConfig(draw);
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ConnectionConfig& s) { return converted::Value::structure({arg(s.channels), arg(s.max_packet_size), arg(s.max_message_types), arg(s.endpoint)}); }
-[[maybe_unused]] static bool same(const ConnectionConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 4 && same(want.channels, (*got.rows)[0]) && same(want.max_packet_size, (*got.rows)[1]) && same(want.max_message_types, (*got.rows)[2]) && same(want.endpoint, (*got.rows)[3]); }
-[[maybe_unused]] static bool defined(const ConnectionConfig& s) { return defined(s.channels) && defined(s.max_packet_size) && defined(s.max_message_types) && defined(s.endpoint); }
-[[maybe_unused]] static std::string text(const ConnectionConfig& s) { return std::string("{") + text(s.channels) + ", " + text(s.max_packet_size) + ", " + text(s.max_message_types) + ", " + text(s.endpoint) + "}"; }
-[[maybe_unused]] static void take(ConnectionConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<ChannelConfig>>(s.channels, (*v.rows)[0]); converted::take_as<int>(s.max_packet_size, (*v.rows)[1]); converted::take_as<int>(s.max_message_types, (*v.rows)[2]); converted::take_as<EndpointConfig>(s.endpoint, (*v.rows)[3]); }
-[[maybe_unused]] static ClientServerConfig draw_kern__net__ClientServerConfig(converted::Draw& draw) {
-  ClientServerConfig s{};
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::ConnectionConfig& s) { return converted::Value::structure({arg(s.channels), arg(s.max_packet_size), arg(s.max_message_types), arg(s.endpoint)}); }
+[[maybe_unused]] static bool same(const net::ConnectionConfig& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.channels, (*got.rows)[0]), ".channels") && converted::at_place(same(want.max_packet_size, (*got.rows)[1]), ".max_packet_size") && converted::at_place(same(want.max_message_types, (*got.rows)[2]), ".max_message_types") && converted::at_place(same(want.endpoint, (*got.rows)[3]), ".endpoint"); }
+[[maybe_unused]] static bool defined(const net::ConnectionConfig& s) { return defined(s.channels) && defined(s.max_packet_size) && defined(s.max_message_types) && defined(s.endpoint); }
+[[maybe_unused]] static std::string text(const net::ConnectionConfig& s) { return std::string("{") + text(s.channels) + ", " + text(s.max_packet_size) + ", " + text(s.max_message_types) + ", " + text(s.endpoint) + "}"; }
+[[maybe_unused]] static void take(net::ConnectionConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<std::vector<net::ChannelConfig>>(s.channels, (*v.rows)[0]); converted::take_as<int>(s.max_packet_size, (*v.rows)[1]); converted::take_as<int>(s.max_message_types, (*v.rows)[2]); converted::take_as<net::EndpointConfig>(s.endpoint, (*v.rows)[3]); }
+}
+[[maybe_unused]] static net::ClientServerConfig draw_kern__net__ClientServerConfig(converted::Draw& draw) {
+  net::ClientServerConfig s{};
   s.protocol_id = static_cast<u64>(draw.bits());
   s.max_clients = static_cast<int>(draw.whole());
   s.timeout = draw.number();
@@ -180,44 +1965,2085 @@ bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfi
   s.connection = draw_kern__net__ConnectionConfig(draw);
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const ClientServerConfig& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.protocol_id)), arg(s.max_clients), arg(s.timeout), arg(s.request_interval), arg(s.connect_timeout), arg(s.keepalive_interval), arg(s.connection)}); }
-[[maybe_unused]] static bool same(const ClientServerConfig& want, const converted::Value& got) { return got.rows && got.rows->size() == 7 && same(converted::shaped<converted::Whole>(want.protocol_id), (*got.rows)[0]) && same(want.max_clients, (*got.rows)[1]) && same(want.timeout, (*got.rows)[2]) && same(want.request_interval, (*got.rows)[3]) && same(want.connect_timeout, (*got.rows)[4]) && same(want.keepalive_interval, (*got.rows)[5]) && same(want.connection, (*got.rows)[6]); }
-[[maybe_unused]] static bool defined(const ClientServerConfig& s) { return defined(converted::shaped<converted::Whole>(s.protocol_id)) && defined(s.max_clients) && defined(s.timeout) && defined(s.request_interval) && defined(s.connect_timeout) && defined(s.keepalive_interval) && defined(s.connection); }
-[[maybe_unused]] static std::string text(const ClientServerConfig& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.protocol_id)) + ", " + text(s.max_clients) + ", " + text(s.timeout) + ", " + text(s.request_interval) + ", " + text(s.connect_timeout) + ", " + text(s.keepalive_interval) + ", " + text(s.connection) + "}"; }
-[[maybe_unused]] static void take(ClientServerConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<converted::Whole>(s.protocol_id, (*v.rows)[0]); converted::take_as<int>(s.max_clients, (*v.rows)[1]); converted::take_as<double>(s.timeout, (*v.rows)[2]); converted::take_as<double>(s.request_interval, (*v.rows)[3]); converted::take_as<double>(s.connect_timeout, (*v.rows)[4]); converted::take_as<double>(s.keepalive_interval, (*v.rows)[5]); converted::take_as<ConnectionConfig>(s.connection, (*v.rows)[6]); }
-inline void Client::disconnect() const { const std::vector<converted::Value> out = converted::engine_call("engine.client.disconnect", {arg(*this)}); }
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::ClientServerConfig& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.protocol_id)), arg(s.max_clients), arg(s.timeout), arg(s.request_interval), arg(s.connect_timeout), arg(s.keepalive_interval), arg(s.connection)}); }
+[[maybe_unused]] static bool same(const net::ClientServerConfig& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(converted::shaped<converted::Whole>(want.protocol_id), (*got.rows)[0]), ".protocol_id") && converted::at_place(same(want.max_clients, (*got.rows)[1]), ".max_clients") && converted::at_place(same(want.timeout, (*got.rows)[2]), ".timeout") && converted::at_place(same(want.request_interval, (*got.rows)[3]), ".request_interval") && converted::at_place(same(want.connect_timeout, (*got.rows)[4]), ".connect_timeout") && converted::at_place(same(want.keepalive_interval, (*got.rows)[5]), ".keepalive_interval") && converted::at_place(same(want.connection, (*got.rows)[6]), ".connection"); }
+[[maybe_unused]] static bool defined(const net::ClientServerConfig& s) { return defined(converted::shaped<converted::Whole>(s.protocol_id)) && defined(s.max_clients) && defined(s.timeout) && defined(s.request_interval) && defined(s.connect_timeout) && defined(s.keepalive_interval) && defined(s.connection); }
+[[maybe_unused]] static std::string text(const net::ClientServerConfig& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.protocol_id)) + ", " + text(s.max_clients) + ", " + text(s.timeout) + ", " + text(s.request_interval) + ", " + text(s.connect_timeout) + ", " + text(s.keepalive_interval) + ", " + text(s.connection) + "}"; }
+[[maybe_unused]] static void take(net::ClientServerConfig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<converted::Whole>(s.protocol_id, (*v.rows)[0]); converted::take_as<int>(s.max_clients, (*v.rows)[1]); converted::take_as<double>(s.timeout, (*v.rows)[2]); converted::take_as<double>(s.request_interval, (*v.rows)[3]); converted::take_as<double>(s.connect_timeout, (*v.rows)[4]); converted::take_as<double>(s.keepalive_interval, (*v.rows)[5]); converted::take_as<net::ConnectionConfig>(s.connection, (*v.rows)[6]); }
+}
+[[maybe_unused]] static net::SwarmUnit draw_net__SwarmUnit(converted::Draw& draw) {
+  net::SwarmUnit s{};
+  s.id = static_cast<unsigned short>(draw.below(40));
+  s.kind = converted::enum_value<net::SwarmKind>(draw.below(8));
+  s.flags = static_cast<unsigned char>(draw.below(40));
+  s.p = draw.vector();
+  s.yaw = draw.number();
+  s.aux = draw.number();
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::SwarmUnit& s) { return converted::Value::structure({arg(s.id), arg(s.kind), arg(s.flags), arg(s.p), arg(s.yaw), arg(s.aux)}); }
+[[maybe_unused]] static bool same(const net::SwarmUnit& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.kind, (*got.rows)[1]), ".kind") && converted::at_place(same(want.flags, (*got.rows)[2]), ".flags") && converted::at_place(same(want.p, (*got.rows)[3]), ".p") && converted::at_place(same(want.yaw, (*got.rows)[4]), ".yaw") && converted::at_place(same(want.aux, (*got.rows)[5]), ".aux"); }
+[[maybe_unused]] static bool defined(const net::SwarmUnit& s) { return defined(s.id) && defined(s.kind) && defined(s.flags) && defined(s.p) && defined(s.yaw) && defined(s.aux); }
+[[maybe_unused]] static std::string text(const net::SwarmUnit& s) { return std::string("{") + text(s.id) + ", " + text(s.kind) + ", " + text(s.flags) + ", " + text(s.p) + ", " + text(s.yaw) + ", " + text(s.aux) + "}"; }
+[[maybe_unused]] static void take(net::SwarmUnit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<unsigned short>(s.id, (*v.rows)[0]); converted::take_as<net::SwarmKind>(s.kind, (*v.rows)[1]); converted::take_as<unsigned char>(s.flags, (*v.rows)[2]); converted::take_as<Vec3>(s.p, (*v.rows)[3]); converted::take_as<double>(s.yaw, (*v.rows)[4]); converted::take_as<double>(s.aux, (*v.rows)[5]); }
+}
+[[maybe_unused]] static net::SwarmHit draw_net__SwarmHit(converted::Draw& draw) {
+  net::SwarmHit s{};
+  s.from = static_cast<unsigned char>(draw.below(40));
+  s.to = static_cast<unsigned char>(draw.below(40));
+  s.id = static_cast<unsigned short>(draw.below(40));
+  s.kind = converted::enum_value<net::SwarmKind>(draw.below(8));
+  s.damage = draw.number();
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::SwarmHit& s) { return converted::Value::structure({arg(s.from), arg(s.to), arg(s.id), arg(s.kind), arg(s.damage)}); }
+[[maybe_unused]] static bool same(const net::SwarmHit& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.from, (*got.rows)[0]), ".from") && converted::at_place(same(want.to, (*got.rows)[1]), ".to") && converted::at_place(same(want.id, (*got.rows)[2]), ".id") && converted::at_place(same(want.kind, (*got.rows)[3]), ".kind") && converted::at_place(same(want.damage, (*got.rows)[4]), ".damage"); }
+[[maybe_unused]] static bool defined(const net::SwarmHit& s) { return defined(s.from) && defined(s.to) && defined(s.id) && defined(s.kind) && defined(s.damage); }
+[[maybe_unused]] static std::string text(const net::SwarmHit& s) { return std::string("{") + text(s.from) + ", " + text(s.to) + ", " + text(s.id) + ", " + text(s.kind) + ", " + text(s.damage) + "}"; }
+[[maybe_unused]] static void take(net::SwarmHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.from, (*v.rows)[0]); converted::take_as<unsigned char>(s.to, (*v.rows)[1]); converted::take_as<unsigned short>(s.id, (*v.rows)[2]); converted::take_as<net::SwarmKind>(s.kind, (*v.rows)[3]); converted::take_as<double>(s.damage, (*v.rows)[4]); }
+}
+[[maybe_unused]] static net::Hit draw_net__Hit(converted::Draw& draw) {
+  net::Hit s{};
+  s.target = static_cast<unsigned char>(draw.below(40));
+  s.by = static_cast<unsigned char>(draw.below(40));
+  s.weapon = static_cast<unsigned char>(draw.below(40));
+  s.zone = static_cast<unsigned char>(draw.below(40));
+  s.damage = draw.number();
+  s.from = draw.vector();
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Hit& s) { return converted::Value::structure({arg(s.target), arg(s.by), arg(s.weapon), arg(s.zone), arg(s.damage), arg(s.from)}); }
+[[maybe_unused]] static bool same(const net::Hit& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.target, (*got.rows)[0]), ".target") && converted::at_place(same(want.by, (*got.rows)[1]), ".by") && converted::at_place(same(want.weapon, (*got.rows)[2]), ".weapon") && converted::at_place(same(want.zone, (*got.rows)[3]), ".zone") && converted::at_place(same(want.damage, (*got.rows)[4]), ".damage") && converted::at_place(same(want.from, (*got.rows)[5]), ".from"); }
+[[maybe_unused]] static bool defined(const net::Hit& s) { return defined(s.target) && defined(s.by) && defined(s.weapon) && defined(s.zone) && defined(s.damage) && defined(s.from); }
+[[maybe_unused]] static std::string text(const net::Hit& s) { return std::string("{") + text(s.target) + ", " + text(s.by) + ", " + text(s.weapon) + ", " + text(s.zone) + ", " + text(s.damage) + ", " + text(s.from) + "}"; }
+[[maybe_unused]] static void take(net::Hit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<unsigned char>(s.target, (*v.rows)[0]); converted::take_as<unsigned char>(s.by, (*v.rows)[1]); converted::take_as<unsigned char>(s.weapon, (*v.rows)[2]); converted::take_as<unsigned char>(s.zone, (*v.rows)[3]); converted::take_as<double>(s.damage, (*v.rows)[4]); converted::take_as<Vec3>(s.from, (*v.rows)[5]); }
+}
+[[maybe_unused]] static net::Fx draw_net__Fx(converted::Draw& draw) {
+  net::Fx s{};
+  s.kind = static_cast<unsigned char>(draw.below(40));
+  s.owner = static_cast<unsigned char>(draw.below(40));
+  s.p = draw.vector();
+  s.dir = draw.vector();
+  s.a = draw.number();
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Fx& s) { return converted::Value::structure({arg(s.kind), arg(s.owner), arg(s.p), arg(s.dir), arg(s.a)}); }
+[[maybe_unused]] static bool same(const net::Fx& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.owner, (*got.rows)[1]), ".owner") && converted::at_place(same(want.p, (*got.rows)[2]), ".p") && converted::at_place(same(want.dir, (*got.rows)[3]), ".dir") && converted::at_place(same(want.a, (*got.rows)[4]), ".a"); }
+[[maybe_unused]] static bool defined(const net::Fx& s) { return defined(s.kind) && defined(s.owner) && defined(s.p) && defined(s.dir) && defined(s.a); }
+[[maybe_unused]] static std::string text(const net::Fx& s) { return std::string("{") + text(s.kind) + ", " + text(s.owner) + ", " + text(s.p) + ", " + text(s.dir) + ", " + text(s.a) + "}"; }
+[[maybe_unused]] static void take(net::Fx& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.kind, (*v.rows)[0]); converted::take_as<unsigned char>(s.owner, (*v.rows)[1]); converted::take_as<Vec3>(s.p, (*v.rows)[2]); converted::take_as<Vec3>(s.dir, (*v.rows)[3]); converted::take_as<double>(s.a, (*v.rows)[4]); }
+}
+[[maybe_unused]] static Quat draw_kern__Quat(converted::Draw& draw) {
+  Quat s{};
+  s.x = draw.number();
+  s.y = draw.number();
+  s.z = draw.number();
+  s.w = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Quat& s) { return converted::Value::structure({arg(s.x), arg(s.y), arg(s.z), arg(s.w)}); }
+[[maybe_unused]] static bool same(const Quat& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.x, (*got.rows)[0]), ".x") && converted::at_place(same(want.y, (*got.rows)[1]), ".y") && converted::at_place(same(want.z, (*got.rows)[2]), ".z") && converted::at_place(same(want.w, (*got.rows)[3]), ".w"); }
+[[maybe_unused]] static bool defined(const Quat& s) { return defined(s.x) && defined(s.y) && defined(s.z) && defined(s.w); }
+[[maybe_unused]] static std::string text(const Quat& s) { return std::string("{") + text(s.x) + ", " + text(s.y) + ", " + text(s.z) + ", " + text(s.w) + "}"; }
+[[maybe_unused]] static void take(Quat& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<double>(s.x, (*v.rows)[0]); converted::take_as<double>(s.y, (*v.rows)[1]); converted::take_as<double>(s.z, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); }
+[[maybe_unused]] static net::PlayerState draw_net__PlayerState(converted::Draw& draw) {
+  net::PlayerState s{};
+  s.slot = static_cast<unsigned char>(draw.below(40));
+  s.mode = converted::enum_value<net::PlayerMode>(draw.below(5));
+  s.color = static_cast<unsigned char>(draw.below(40));
+  s.flags = static_cast<unsigned short>(draw.below(40));
+  s.t_ms = static_cast<unsigned int>(draw.below(40));
+  s.position = draw.vector();
+  s.velocity = draw.vector();
+  s.rotation = draw_kern__Quat(draw);
+  s.avatar = draw.vector();
+  s.avatar_yaw = draw.number();
+  s.drone_pos = draw.vector();
+  s.jet_pos = draw.vector();
+  s.drone_rot = draw_kern__Quat(draw);
+  s.jet_rot = draw_kern__Quat(draw);
+  s.yaw = draw.number();
+  s.pitch = draw.number();
+  s.speed = draw.number();
+  s.health = draw.number();
+  s.thrust = draw.number();
+  s.stars = static_cast<unsigned char>(draw.below(40));
+  s.weapon = static_cast<unsigned char>(draw.below(40));
+  s.day = draw.number();
+  converted::fill_array(s.hand, [&]() -> signed char { return static_cast<signed char>(draw.whole()); });
+  s.hands = static_cast<unsigned char>(draw.below(40));
+  s.car = static_cast<unsigned char>(draw.below(40));
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::PlayerState& s) { return converted::Value::structure({arg(s.slot), arg(s.mode), arg(s.color), arg(s.flags), arg(s.t_ms), arg(s.position), arg(s.velocity), arg(s.rotation), arg(s.avatar), arg(s.avatar_yaw), arg(s.drone_pos), arg(s.jet_pos), arg(s.drone_rot), arg(s.jet_rot), arg(s.yaw), arg(s.pitch), arg(s.speed), arg(s.health), arg(s.thrust), arg(s.stars), arg(s.weapon), arg(s.day), arg(converted::array_list(s.hand)), arg(s.hands), arg(s.car)}); }
+[[maybe_unused]] static bool same(const net::PlayerState& want, const converted::Value& got) { return converted::rows_of(got, 25) && converted::at_place(same(want.slot, (*got.rows)[0]), ".slot") && converted::at_place(same(want.mode, (*got.rows)[1]), ".mode") && converted::at_place(same(want.color, (*got.rows)[2]), ".color") && converted::at_place(same(want.flags, (*got.rows)[3]), ".flags") && converted::at_place(same(want.t_ms, (*got.rows)[4]), ".t_ms") && converted::at_place(same(want.position, (*got.rows)[5]), ".position") && converted::at_place(same(want.velocity, (*got.rows)[6]), ".velocity") && converted::at_place(same(want.rotation, (*got.rows)[7]), ".rotation") && converted::at_place(same(want.avatar, (*got.rows)[8]), ".avatar") && converted::at_place(same(want.avatar_yaw, (*got.rows)[9]), ".avatar_yaw") && converted::at_place(same(want.drone_pos, (*got.rows)[10]), ".drone_pos") && converted::at_place(same(want.jet_pos, (*got.rows)[11]), ".jet_pos") && converted::at_place(same(want.drone_rot, (*got.rows)[12]), ".drone_rot") && converted::at_place(same(want.jet_rot, (*got.rows)[13]), ".jet_rot") && converted::at_place(same(want.yaw, (*got.rows)[14]), ".yaw") && converted::at_place(same(want.pitch, (*got.rows)[15]), ".pitch") && converted::at_place(same(want.speed, (*got.rows)[16]), ".speed") && converted::at_place(same(want.health, (*got.rows)[17]), ".health") && converted::at_place(same(want.thrust, (*got.rows)[18]), ".thrust") && converted::at_place(same(want.stars, (*got.rows)[19]), ".stars") && converted::at_place(same(want.weapon, (*got.rows)[20]), ".weapon") && converted::at_place(same(want.day, (*got.rows)[21]), ".day") && converted::at_place(same(converted::array_list(want.hand), (*got.rows)[22]), ".hand") && converted::at_place(same(want.hands, (*got.rows)[23]), ".hands") && converted::at_place(same(want.car, (*got.rows)[24]), ".car"); }
+[[maybe_unused]] static bool defined(const net::PlayerState& s) { return defined(s.slot) && defined(s.mode) && defined(s.color) && defined(s.flags) && defined(s.t_ms) && defined(s.position) && defined(s.velocity) && defined(s.rotation) && defined(s.avatar) && defined(s.avatar_yaw) && defined(s.drone_pos) && defined(s.jet_pos) && defined(s.drone_rot) && defined(s.jet_rot) && defined(s.yaw) && defined(s.pitch) && defined(s.speed) && defined(s.health) && defined(s.thrust) && defined(s.stars) && defined(s.weapon) && defined(s.day) && defined(converted::array_list(s.hand)) && defined(s.hands) && defined(s.car); }
+[[maybe_unused]] static std::string text(const net::PlayerState& s) { return std::string("{") + text(s.slot) + ", " + text(s.mode) + ", " + text(s.color) + ", " + text(s.flags) + ", " + text(s.t_ms) + ", " + text(s.position) + ", " + text(s.velocity) + ", " + text(s.rotation) + ", " + text(s.avatar) + ", " + text(s.avatar_yaw) + ", " + text(s.drone_pos) + ", " + text(s.jet_pos) + ", " + text(s.drone_rot) + ", " + text(s.jet_rot) + ", " + text(s.yaw) + ", " + text(s.pitch) + ", " + text(s.speed) + ", " + text(s.health) + ", " + text(s.thrust) + ", " + text(s.stars) + ", " + text(s.weapon) + ", " + text(s.day) + ", " + text(converted::array_list(s.hand)) + ", " + text(s.hands) + ", " + text(s.car) + "}"; }
+[[maybe_unused]] static void take(net::PlayerState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 25) return; converted::take_as<unsigned char>(s.slot, (*v.rows)[0]); converted::take_as<net::PlayerMode>(s.mode, (*v.rows)[1]); converted::take_as<unsigned char>(s.color, (*v.rows)[2]); converted::take_as<unsigned short>(s.flags, (*v.rows)[3]); converted::take_as<unsigned int>(s.t_ms, (*v.rows)[4]); converted::take_as<Vec3>(s.position, (*v.rows)[5]); converted::take_as<Vec3>(s.velocity, (*v.rows)[6]); converted::take_as<Quat>(s.rotation, (*v.rows)[7]); converted::take_as<Vec3>(s.avatar, (*v.rows)[8]); converted::take_as<double>(s.avatar_yaw, (*v.rows)[9]); converted::take_as<Vec3>(s.drone_pos, (*v.rows)[10]); converted::take_as<Vec3>(s.jet_pos, (*v.rows)[11]); converted::take_as<Quat>(s.drone_rot, (*v.rows)[12]); converted::take_as<Quat>(s.jet_rot, (*v.rows)[13]); converted::take_as<double>(s.yaw, (*v.rows)[14]); converted::take_as<double>(s.pitch, (*v.rows)[15]); converted::take_as<double>(s.speed, (*v.rows)[16]); converted::take_as<double>(s.health, (*v.rows)[17]); converted::take_as<double>(s.thrust, (*v.rows)[18]); converted::take_as<unsigned char>(s.stars, (*v.rows)[19]); converted::take_as<unsigned char>(s.weapon, (*v.rows)[20]); converted::take_as<double>(s.day, (*v.rows)[21]); { std::vector<signed char> items; converted::take_as<std::vector<signed char>>(items, (*v.rows)[22]); converted::array_from(s.hand, items); } converted::take_as<unsigned char>(s.hands, (*v.rows)[23]); converted::take_as<unsigned char>(s.car, (*v.rows)[24]); }
+}
+[[maybe_unused]] static net::Address draw_kern__net__Address(converted::Draw& draw) {
+  net::Address s{};
+  s.id = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Address& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.id))}); }
+[[maybe_unused]] static bool same(const net::Address& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(converted::shaped<converted::Whole>(want.id), (*got.rows)[0]), ".id"); }
+[[maybe_unused]] static bool defined(const net::Address& s) { return defined(converted::shaped<converted::Whole>(s.id)); }
+[[maybe_unused]] static std::string text(const net::Address& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.id)) + "}"; }
+[[maybe_unused]] static void take(net::Address& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<converted::Whole>(s.id, (*v.rows)[0]); }
+}
+[[maybe_unused]] static mp::PoseTimeline::Snap draw_mp__PoseTimeline__Snap(converted::Draw& draw) {
+  mp::PoseTimeline::Snap s{};
+  s.p = draw.vector();
+  s.q = draw_kern__Quat(draw);
+  s.v = draw.vector();
+  s.received = draw.number();
+  s.source = draw.number();
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::PoseTimeline::Snap& s) { return converted::Value::structure({arg(s.p), arg(s.q), arg(s.v), arg(s.received), arg(s.source)}); }
+[[maybe_unused]] static bool same(const mp::PoseTimeline::Snap& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.q, (*got.rows)[1]), ".q") && converted::at_place(same(want.v, (*got.rows)[2]), ".v") && converted::at_place(same(want.received, (*got.rows)[3]), ".received") && converted::at_place(same(want.source, (*got.rows)[4]), ".source"); }
+[[maybe_unused]] static bool defined(const mp::PoseTimeline::Snap& s) { return defined(s.p) && defined(s.q) && defined(s.v) && defined(s.received) && defined(s.source); }
+[[maybe_unused]] static std::string text(const mp::PoseTimeline::Snap& s) { return std::string("{") + text(s.p) + ", " + text(s.q) + ", " + text(s.v) + ", " + text(s.received) + ", " + text(s.source) + "}"; }
+[[maybe_unused]] static void take(mp::PoseTimeline::Snap& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<Quat>(s.q, (*v.rows)[1]); converted::take_as<Vec3>(s.v, (*v.rows)[2]); converted::take_as<double>(s.received, (*v.rows)[3]); converted::take_as<double>(s.source, (*v.rows)[4]); }
+}
+[[maybe_unused]] static mp::PoseTimeline draw_mp__PoseTimeline(converted::Draw& draw) {
+  mp::PoseTimeline s{};
+  s.snaps_ = draw_list(draw, [&]() -> mp::PoseTimeline::Snap { return draw_mp__PoseTimeline__Snap(draw); });
+  s.offsets_ = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.offset_ = draw.number();
+  s.delay_ = draw.number();
+  s.lags_ = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.have_offset_ = draw.flag();
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::PoseTimeline& s) { return converted::Value::structure({arg(s.snaps_), arg(s.offsets_), arg(s.offset_), arg(s.delay_), arg(s.lags_), arg(s.have_offset_)}); }
+[[maybe_unused]] static bool same(const mp::PoseTimeline& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.snaps_, (*got.rows)[0]), ".snaps_") && converted::at_place(same(want.offsets_, (*got.rows)[1]), ".offsets_") && converted::at_place(same(want.offset_, (*got.rows)[2]), ".offset_") && converted::at_place(same(want.delay_, (*got.rows)[3]), ".delay_") && converted::at_place(same(want.lags_, (*got.rows)[4]), ".lags_") && converted::at_place(same(want.have_offset_, (*got.rows)[5]), ".have_offset_"); }
+[[maybe_unused]] static bool defined(const mp::PoseTimeline& s) { return defined(s.snaps_) && defined(s.offsets_) && defined(s.offset_) && defined(s.delay_) && defined(s.lags_) && defined(s.have_offset_); }
+[[maybe_unused]] static std::string text(const mp::PoseTimeline& s) { return std::string("{") + text(s.snaps_) + ", " + text(s.offsets_) + ", " + text(s.offset_) + ", " + text(s.delay_) + ", " + text(s.lags_) + ", " + text(s.have_offset_) + "}"; }
+[[maybe_unused]] static void take(mp::PoseTimeline& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<std::vector<mp::PoseTimeline::Snap>>(s.snaps_, (*v.rows)[0]); converted::take_as<std::vector<double>>(s.offsets_, (*v.rows)[1]); converted::take_as<double>(s.offset_, (*v.rows)[2]); converted::take_as<double>(s.delay_, (*v.rows)[3]); converted::take_as<std::vector<double>>(s.lags_, (*v.rows)[4]); converted::take_as<bool>(s.have_offset_, (*v.rows)[5]); }
+}
+[[maybe_unused]] static mp::NavTimeline::Snap draw_mp__NavTimeline__Snap(converted::Draw& draw) {
+  mp::NavTimeline::Snap s{};
+  s.p = draw.vector();
+  s.heading = draw.number();
+  s.mode = static_cast<unsigned char>(draw.below(40));
+  s.at = draw.number();
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::NavTimeline::Snap& s) { return converted::Value::structure({arg(s.p), arg(s.heading), arg(s.mode), arg(s.at)}); }
+[[maybe_unused]] static bool same(const mp::NavTimeline::Snap& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.p, (*got.rows)[0]), ".p") && converted::at_place(same(want.heading, (*got.rows)[1]), ".heading") && converted::at_place(same(want.mode, (*got.rows)[2]), ".mode") && converted::at_place(same(want.at, (*got.rows)[3]), ".at"); }
+[[maybe_unused]] static bool defined(const mp::NavTimeline::Snap& s) { return defined(s.p) && defined(s.heading) && defined(s.mode) && defined(s.at); }
+[[maybe_unused]] static std::string text(const mp::NavTimeline::Snap& s) { return std::string("{") + text(s.p) + ", " + text(s.heading) + ", " + text(s.mode) + ", " + text(s.at) + "}"; }
+[[maybe_unused]] static void take(mp::NavTimeline::Snap& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.p, (*v.rows)[0]); converted::take_as<double>(s.heading, (*v.rows)[1]); converted::take_as<unsigned char>(s.mode, (*v.rows)[2]); converted::take_as<double>(s.at, (*v.rows)[3]); }
+}
+[[maybe_unused]] static mp::NavTimeline draw_mp__NavTimeline(converted::Draw& draw) {
+  mp::NavTimeline s{};
+  s.snaps_ = draw_list(draw, [&]() -> mp::NavTimeline::Snap { return draw_mp__NavTimeline__Snap(draw); });
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::NavTimeline& s) { return converted::Value::structure({arg(s.snaps_)}); }
+[[maybe_unused]] static bool same(const mp::NavTimeline& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.snaps_, (*got.rows)[0]), ".snaps_"); }
+[[maybe_unused]] static bool defined(const mp::NavTimeline& s) { return defined(s.snaps_); }
+[[maybe_unused]] static std::string text(const mp::NavTimeline& s) { return std::string("{") + text(s.snaps_) + "}"; }
+[[maybe_unused]] static void take(mp::NavTimeline& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<mp::NavTimeline::Snap>>(s.snaps_, (*v.rows)[0]); }
+}
+[[maybe_unused]] static mp::VoiceStream::Chunk draw_mp__VoiceStream__Chunk(converted::Draw& draw) {
+  mp::VoiceStream::Chunk s{};
+  s.pcm = draw_list(draw, [&]() -> double { return draw.number(); });
+  s.gain = draw.number();
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::VoiceStream::Chunk& s) { return converted::Value::structure({arg(s.pcm), arg(s.gain)}); }
+[[maybe_unused]] static bool same(const mp::VoiceStream::Chunk& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.pcm, (*got.rows)[0]), ".pcm") && converted::at_place(same(want.gain, (*got.rows)[1]), ".gain"); }
+[[maybe_unused]] static bool defined(const mp::VoiceStream::Chunk& s) { return defined(s.pcm) && defined(s.gain); }
+[[maybe_unused]] static std::string text(const mp::VoiceStream::Chunk& s) { return std::string("{") + text(s.pcm) + ", " + text(s.gain) + "}"; }
+[[maybe_unused]] static void take(mp::VoiceStream::Chunk& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<double>>(s.pcm, (*v.rows)[0]); converted::take_as<double>(s.gain, (*v.rows)[1]); }
+}
+[[maybe_unused]] static mp::VoiceStream draw_mp__VoiceStream(converted::Draw& draw) {
+  mp::VoiceStream s{};
+  s.queue_ = draw_list(draw, [&]() -> mp::VoiceStream::Chunk { return draw_mp__VoiceStream__Chunk(draw); });
+  s.pos_ = draw.number();
+  s.lead_ = draw.number();
+  s.last_seq_ = static_cast<unsigned int>(draw.below(40));
+  s.have_seq_ = draw.flag();
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::VoiceStream& s) { return converted::Value::structure({arg(s.queue_), arg(s.pos_), arg(s.lead_), arg(s.last_seq_), arg(s.have_seq_)}); }
+[[maybe_unused]] static bool same(const mp::VoiceStream& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.queue_, (*got.rows)[0]), ".queue_") && converted::at_place(same(want.pos_, (*got.rows)[1]), ".pos_") && converted::at_place(same(want.lead_, (*got.rows)[2]), ".lead_") && converted::at_place(same(want.last_seq_, (*got.rows)[3]), ".last_seq_") && converted::at_place(same(want.have_seq_, (*got.rows)[4]), ".have_seq_"); }
+[[maybe_unused]] static bool defined(const mp::VoiceStream& s) { return defined(s.queue_) && defined(s.pos_) && defined(s.lead_) && defined(s.last_seq_) && defined(s.have_seq_); }
+[[maybe_unused]] static std::string text(const mp::VoiceStream& s) { return std::string("{") + text(s.queue_) + ", " + text(s.pos_) + ", " + text(s.lead_) + ", " + text(s.last_seq_) + ", " + text(s.have_seq_) + "}"; }
+[[maybe_unused]] static void take(mp::VoiceStream& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::vector<mp::VoiceStream::Chunk>>(s.queue_, (*v.rows)[0]); converted::take_as<double>(s.pos_, (*v.rows)[1]); converted::take_as<double>(s.lead_, (*v.rows)[2]); converted::take_as<unsigned int>(s.last_seq_, (*v.rows)[3]); converted::take_as<bool>(s.have_seq_, (*v.rows)[4]); }
+}
+[[maybe_unused]] static net::Remote draw_net__Remote(converted::Draw& draw) {
+  net::Remote s{};
+  s.state = draw_net__PlayerState(draw);
+  s.body = draw_mp__PoseTimeline(draw);
+  s.person = draw_mp__PoseTimeline(draw);
+  s.nav = draw_mp__NavTimeline(draw);
+  s.shown = draw.vector();
+  s.person_shown = draw.vector();
+  s.shown_rotation = draw_kern__Quat(draw);
+  s.received_ms = draw.number();
+  s.phase = draw.number();
+  s.shown_hp = draw.number();
+  s.voice = draw_mp__VoiceStream(draw);
+  s.speaking_until = draw.number();
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Remote& s) { return converted::Value::structure({arg(s.state), arg(s.body), arg(s.person), arg(s.nav), arg(s.shown), arg(s.person_shown), arg(s.shown_rotation), arg(s.received_ms), arg(s.phase), arg(s.shown_hp), arg(s.voice), arg(s.speaking_until)}); }
+[[maybe_unused]] static bool same(const net::Remote& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.state, (*got.rows)[0]), ".state") && converted::at_place(same(want.body, (*got.rows)[1]), ".body") && converted::at_place(same(want.person, (*got.rows)[2]), ".person") && converted::at_place(same(want.nav, (*got.rows)[3]), ".nav") && converted::at_place(same(want.shown, (*got.rows)[4]), ".shown") && converted::at_place(same(want.person_shown, (*got.rows)[5]), ".person_shown") && converted::at_place(same(want.shown_rotation, (*got.rows)[6]), ".shown_rotation") && converted::at_place(same(want.received_ms, (*got.rows)[7]), ".received_ms") && converted::at_place(same(want.phase, (*got.rows)[8]), ".phase") && converted::at_place(same(want.shown_hp, (*got.rows)[9]), ".shown_hp") && converted::at_place(same(want.voice, (*got.rows)[10]), ".voice") && converted::at_place(same(want.speaking_until, (*got.rows)[11]), ".speaking_until"); }
+[[maybe_unused]] static bool defined(const net::Remote& s) { return defined(s.state) && defined(s.body) && defined(s.person) && defined(s.nav) && defined(s.shown) && defined(s.person_shown) && defined(s.shown_rotation) && defined(s.received_ms) && defined(s.phase) && defined(s.shown_hp) && defined(s.voice) && defined(s.speaking_until); }
+[[maybe_unused]] static std::string text(const net::Remote& s) { return std::string("{") + text(s.state) + ", " + text(s.body) + ", " + text(s.person) + ", " + text(s.nav) + ", " + text(s.shown) + ", " + text(s.person_shown) + ", " + text(s.shown_rotation) + ", " + text(s.received_ms) + ", " + text(s.phase) + ", " + text(s.shown_hp) + ", " + text(s.voice) + ", " + text(s.speaking_until) + "}"; }
+[[maybe_unused]] static void take(net::Remote& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<net::PlayerState>(s.state, (*v.rows)[0]); converted::take_as<mp::PoseTimeline>(s.body, (*v.rows)[1]); converted::take_as<mp::PoseTimeline>(s.person, (*v.rows)[2]); converted::take_as<mp::NavTimeline>(s.nav, (*v.rows)[3]); converted::take_as<Vec3>(s.shown, (*v.rows)[4]); converted::take_as<Vec3>(s.person_shown, (*v.rows)[5]); converted::take_as<Quat>(s.shown_rotation, (*v.rows)[6]); converted::take_as<double>(s.received_ms, (*v.rows)[7]); converted::take_as<double>(s.phase, (*v.rows)[8]); converted::take_as<double>(s.shown_hp, (*v.rows)[9]); converted::take_as<mp::VoiceStream>(s.voice, (*v.rows)[10]); converted::take_as<double>(s.speaking_until, (*v.rows)[11]); }
+}
+[[maybe_unused]] static net::Kill draw_net__Kill(converted::Draw& draw) {
+  net::Kill s{};
+  s.victim = static_cast<unsigned char>(draw.below(40));
+  s.by = static_cast<unsigned char>(draw.below(40));
+  s.weapon = static_cast<unsigned char>(draw.below(40));
+  s.zone = static_cast<unsigned char>(draw.below(40));
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Kill& s) { return converted::Value::structure({arg(s.victim), arg(s.by), arg(s.weapon), arg(s.zone)}); }
+[[maybe_unused]] static bool same(const net::Kill& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.victim, (*got.rows)[0]), ".victim") && converted::at_place(same(want.by, (*got.rows)[1]), ".by") && converted::at_place(same(want.weapon, (*got.rows)[2]), ".weapon") && converted::at_place(same(want.zone, (*got.rows)[3]), ".zone"); }
+[[maybe_unused]] static bool defined(const net::Kill& s) { return defined(s.victim) && defined(s.by) && defined(s.weapon) && defined(s.zone); }
+[[maybe_unused]] static std::string text(const net::Kill& s) { return std::string("{") + text(s.victim) + ", " + text(s.by) + ", " + text(s.weapon) + ", " + text(s.zone) + "}"; }
+[[maybe_unused]] static void take(net::Kill& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned char>(s.victim, (*v.rows)[0]); converted::take_as<unsigned char>(s.by, (*v.rows)[1]); converted::take_as<unsigned char>(s.weapon, (*v.rows)[2]); converted::take_as<unsigned char>(s.zone, (*v.rows)[3]); }
+}
+[[maybe_unused]] static net::Swarm draw_net__Swarm(converted::Draw& draw) {
+  net::Swarm s{};
+  s.owner = static_cast<unsigned char>(draw.below(40));
+  s.units = draw_list(draw, [&]() -> net::SwarmUnit { return draw_net__SwarmUnit(draw); });
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Swarm& s) { return converted::Value::structure({arg(s.owner), arg(s.units)}); }
+[[maybe_unused]] static bool same(const net::Swarm& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.units, (*got.rows)[1]), ".units"); }
+[[maybe_unused]] static bool defined(const net::Swarm& s) { return defined(s.owner) && defined(s.units); }
+[[maybe_unused]] static std::string text(const net::Swarm& s) { return std::string("{") + text(s.owner) + ", " + text(s.units) + "}"; }
+[[maybe_unused]] static void take(net::Swarm& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<std::vector<net::SwarmUnit>>(s.units, (*v.rows)[1]); }
+}
+[[maybe_unused]] static net::PingEvent draw_net__PingEvent(converted::Draw& draw) {
+  net::PingEvent s{};
+  s.owner = static_cast<unsigned char>(draw.below(40));
+  s.on = draw.flag();
+  s.p = draw.vector();
+  s.color = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::PingEvent& s) { return converted::Value::structure({arg(s.owner), arg(s.on), arg(s.p), arg(s.color)}); }
+[[maybe_unused]] static bool same(const net::PingEvent& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.on, (*got.rows)[1]), ".on") && converted::at_place(same(want.p, (*got.rows)[2]), ".p") && converted::at_place(same(want.color, (*got.rows)[3]), ".color"); }
+[[maybe_unused]] static bool defined(const net::PingEvent& s) { return defined(s.owner) && defined(s.on) && defined(s.p) && defined(s.color); }
+[[maybe_unused]] static std::string text(const net::PingEvent& s) { return std::string("{") + text(s.owner) + ", " + text(s.on) + ", " + text(s.p) + ", " + text(s.color) + "}"; }
+[[maybe_unused]] static void take(net::PingEvent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<bool>(s.on, (*v.rows)[1]); converted::take_as<Vec3>(s.p, (*v.rows)[2]); converted::take_as<unsigned int>(s.color, (*v.rows)[3]); }
+}
+[[maybe_unused]] static net::VoiceFrame draw_net__VoiceFrame(converted::Draw& draw) {
+  net::VoiceFrame s{};
+  s.from = static_cast<unsigned char>(draw.below(40));
+  s.seq = static_cast<unsigned int>(draw.below(40));
+  s.everywhere = draw.flag();
+  s.data = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::VoiceFrame& s) { return converted::Value::structure({arg(s.from), arg(s.seq), arg(s.everywhere), arg(s.data)}); }
+[[maybe_unused]] static bool same(const net::VoiceFrame& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.from, (*got.rows)[0]), ".from") && converted::at_place(same(want.seq, (*got.rows)[1]), ".seq") && converted::at_place(same(want.everywhere, (*got.rows)[2]), ".everywhere") && converted::at_place(same(want.data, (*got.rows)[3]), ".data"); }
+[[maybe_unused]] static bool defined(const net::VoiceFrame& s) { return defined(s.from) && defined(s.seq) && defined(s.everywhere) && defined(s.data); }
+[[maybe_unused]] static std::string text(const net::VoiceFrame& s) { return std::string("{") + text(s.from) + ", " + text(s.seq) + ", " + text(s.everywhere) + ", " + text(s.data) + "}"; }
+[[maybe_unused]] static void take(net::VoiceFrame& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned char>(s.from, (*v.rows)[0]); converted::take_as<unsigned int>(s.seq, (*v.rows)[1]); converted::take_as<bool>(s.everywhere, (*v.rows)[2]); converted::take_as<std::vector<unsigned char>>(s.data, (*v.rows)[3]); }
+}
+[[maybe_unused]] static mp::Score draw_mp__Score(converted::Draw& draw) {
+  mp::Score s{};
+  s.slot = static_cast<unsigned char>(draw.below(40));
+  s.kills = static_cast<unsigned short>(draw.below(40));
+  s.deaths = static_cast<unsigned short>(draw.below(40));
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::Score& s) { return converted::Value::structure({arg(s.slot), arg(s.kills), arg(s.deaths)}); }
+[[maybe_unused]] static bool same(const mp::Score& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.slot, (*got.rows)[0]), ".slot") && converted::at_place(same(want.kills, (*got.rows)[1]), ".kills") && converted::at_place(same(want.deaths, (*got.rows)[2]), ".deaths"); }
+[[maybe_unused]] static bool defined(const mp::Score& s) { return defined(s.slot) && defined(s.kills) && defined(s.deaths); }
+[[maybe_unused]] static std::string text(const mp::Score& s) { return std::string("{") + text(s.slot) + ", " + text(s.kills) + ", " + text(s.deaths) + "}"; }
+[[maybe_unused]] static void take(mp::Score& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.slot, (*v.rows)[0]); converted::take_as<unsigned short>(s.kills, (*v.rows)[1]); converted::take_as<unsigned short>(s.deaths, (*v.rows)[2]); }
+}
+[[maybe_unused]] static mp::Scoreboard draw_mp__Scoreboard(converted::Draw& draw) {
+  mp::Scoreboard s{};
+  s.rows_ = draw_list(draw, [&]() -> mp::Score { return draw_mp__Score(draw); });
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::Scoreboard& s) { return converted::Value::structure({arg(s.rows_)}); }
+[[maybe_unused]] static bool same(const mp::Scoreboard& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.rows_, (*got.rows)[0]), ".rows_"); }
+[[maybe_unused]] static bool defined(const mp::Scoreboard& s) { return defined(s.rows_); }
+[[maybe_unused]] static std::string text(const mp::Scoreboard& s) { return std::string("{") + text(s.rows_) + "}"; }
+[[maybe_unused]] static void take(mp::Scoreboard& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<std::vector<mp::Score>>(s.rows_, (*v.rows)[0]); }
+}
+[[maybe_unused]] static net::Session::Blob draw_net__Session__Blob(converted::Draw& draw) {
+  net::Session::Blob s{};
+  s.from = static_cast<unsigned char>(draw.below(40));
+  s.data = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Session::Blob& s) { return converted::Value::structure({arg(s.from), arg(s.data)}); }
+[[maybe_unused]] static bool same(const net::Session::Blob& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.from, (*got.rows)[0]), ".from") && converted::at_place(same(want.data, (*got.rows)[1]), ".data"); }
+[[maybe_unused]] static bool defined(const net::Session::Blob& s) { return defined(s.from) && defined(s.data); }
+[[maybe_unused]] static std::string text(const net::Session::Blob& s) { return std::string("{") + text(s.from) + ", " + text(s.data) + "}"; }
+[[maybe_unused]] static void take(net::Session::Blob& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<unsigned char>(s.from, (*v.rows)[0]); converted::take_as<std::vector<unsigned char>>(s.data, (*v.rows)[1]); }
+}
+[[maybe_unused]] static net::Session::SwarmParts draw_net__Session__SwarmParts(converted::Draw& draw) {
+  net::Session::SwarmParts s{};
+  s.owner = static_cast<unsigned char>(draw.below(40));
+  s.serial = static_cast<unsigned char>(draw.below(40));
+  converted::fill_array(s.have, [&]() -> u64 { return static_cast<u64>(draw.bits()); });
+  s.last = static_cast<int>(draw.whole());
+  s.units = draw_list(draw, [&]() -> net::SwarmUnit { return draw_net__SwarmUnit(draw); });
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Session::SwarmParts& s) { return converted::Value::structure({arg(s.owner), arg(s.serial), arg(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.have))), arg(s.last), arg(s.units)}); }
+[[maybe_unused]] static bool same(const net::Session::SwarmParts& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.serial, (*got.rows)[1]), ".serial") && converted::at_place(same(converted::shaped<std::vector<converted::Whole>>(converted::array_list(want.have)), (*got.rows)[2]), ".have") && converted::at_place(same(want.last, (*got.rows)[3]), ".last") && converted::at_place(same(want.units, (*got.rows)[4]), ".units"); }
+[[maybe_unused]] static bool defined(const net::Session::SwarmParts& s) { return defined(s.owner) && defined(s.serial) && defined(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.have))) && defined(s.last) && defined(s.units); }
+[[maybe_unused]] static std::string text(const net::Session::SwarmParts& s) { return std::string("{") + text(s.owner) + ", " + text(s.serial) + ", " + text(converted::shaped<std::vector<converted::Whole>>(converted::array_list(s.have))) + ", " + text(s.last) + ", " + text(s.units) + "}"; }
+[[maybe_unused]] static void take(net::Session::SwarmParts& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<unsigned char>(s.serial, (*v.rows)[1]); { std::vector<u64> items; converted::take_as<std::vector<converted::Whole>>(items, (*v.rows)[2]); converted::array_from(s.have, items); } converted::take_as<int>(s.last, (*v.rows)[3]); converted::take_as<std::vector<net::SwarmUnit>>(s.units, (*v.rows)[4]); }
+}
+[[maybe_unused]] static mp::Ballot draw_mp__Ballot(converted::Draw& draw) {
+  mp::Ballot s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.key = static_cast<unsigned char>(draw.below(40));
+  s.value = draw.flag();
+  s.host = static_cast<unsigned char>(draw.below(40));
+  s.members = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  s.yes = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  s.expires_ms = draw.number();
+  s.status = converted::enum_value<mp::Ballot::Status>(draw.below(6));
+  return s;
+}
+namespace mp { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const mp::Ballot& s) { return converted::Value::structure({arg(s.id), arg(s.key), arg(s.value), arg(s.host), arg(s.members), arg(s.yes), arg(s.expires_ms), arg(s.status)}); }
+[[maybe_unused]] static bool same(const mp::Ballot& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.key, (*got.rows)[1]), ".key") && converted::at_place(same(want.value, (*got.rows)[2]), ".value") && converted::at_place(same(want.host, (*got.rows)[3]), ".host") && converted::at_place(same(want.members, (*got.rows)[4]), ".members") && converted::at_place(same(want.yes, (*got.rows)[5]), ".yes") && converted::at_place(same(want.expires_ms, (*got.rows)[6]), ".expires_ms") && converted::at_place(same(want.status, (*got.rows)[7]), ".status"); }
+[[maybe_unused]] static bool defined(const mp::Ballot& s) { return defined(s.id) && defined(s.key) && defined(s.value) && defined(s.host) && defined(s.members) && defined(s.yes) && defined(s.expires_ms) && defined(s.status); }
+[[maybe_unused]] static std::string text(const mp::Ballot& s) { return std::string("{") + text(s.id) + ", " + text(s.key) + ", " + text(s.value) + ", " + text(s.host) + ", " + text(s.members) + ", " + text(s.yes) + ", " + text(s.expires_ms) + ", " + text(s.status) + "}"; }
+[[maybe_unused]] static void take(mp::Ballot& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<unsigned char>(s.key, (*v.rows)[1]); converted::take_as<bool>(s.value, (*v.rows)[2]); converted::take_as<unsigned char>(s.host, (*v.rows)[3]); converted::take_as<std::vector<unsigned char>>(s.members, (*v.rows)[4]); converted::take_as<std::vector<unsigned char>>(s.yes, (*v.rows)[5]); converted::take_as<double>(s.expires_ms, (*v.rows)[6]); converted::take_as<mp::Ballot::Status>(s.status, (*v.rows)[7]); }
+}
+[[maybe_unused]] static seats::Row draw_seats__Row(converted::Draw& draw) {
+  seats::Row s{};
+  s.owner = static_cast<unsigned char>(draw.below(40));
+  s.pilot = static_cast<unsigned char>(draw.below(40));
+  s.passenger = static_cast<unsigned char>(draw.below(40));
+  return s;
+}
+namespace seats { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const seats::Row& s) { return converted::Value::structure({arg(s.owner), arg(s.pilot), arg(s.passenger)}); }
+[[maybe_unused]] static bool same(const seats::Row& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.owner, (*got.rows)[0]), ".owner") && converted::at_place(same(want.pilot, (*got.rows)[1]), ".pilot") && converted::at_place(same(want.passenger, (*got.rows)[2]), ".passenger"); }
+[[maybe_unused]] static bool defined(const seats::Row& s) { return defined(s.owner) && defined(s.pilot) && defined(s.passenger); }
+[[maybe_unused]] static std::string text(const seats::Row& s) { return std::string("{") + text(s.owner) + ", " + text(s.pilot) + ", " + text(s.passenger) + "}"; }
+[[maybe_unused]] static void take(seats::Row& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned char>(s.owner, (*v.rows)[0]); converted::take_as<unsigned char>(s.pilot, (*v.rows)[1]); converted::take_as<unsigned char>(s.passenger, (*v.rows)[2]); }
+}
+[[maybe_unused]] static seats::Table draw_seats__Table(converted::Draw& draw) {
+  seats::Table s{};
+  s.rows_ = draw_list(draw, [&]() -> seats::Row { return draw_seats__Row(draw); });
+  s.revision_ = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+namespace seats { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const seats::Table& s) { return converted::Value::structure({arg(s.rows_), arg(s.revision_)}); }
+[[maybe_unused]] static bool same(const seats::Table& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.rows_, (*got.rows)[0]), ".rows_") && converted::at_place(same(want.revision_, (*got.rows)[1]), ".revision_"); }
+[[maybe_unused]] static bool defined(const seats::Table& s) { return defined(s.rows_) && defined(s.revision_); }
+[[maybe_unused]] static std::string text(const seats::Table& s) { return std::string("{") + text(s.rows_) + ", " + text(s.revision_) + "}"; }
+[[maybe_unused]] static void take(seats::Table& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<std::vector<seats::Row>>(s.rows_, (*v.rows)[0]); converted::take_as<unsigned int>(s.revision_, (*v.rows)[1]); }
+}
+[[maybe_unused]] static net::Session draw_net__Session(converted::Draw& draw) {
+  net::Session s{};
+  s.role_ = converted::enum_value<net::Session::Role>(draw.below(3));
+  s.transport_ = converted::owned(*converted::engine_object<HostTransport>(1 + draw.below(6)));
+  s.server_ = std::make_unique<Server>(converted::owned(*converted::engine_object<Server>(1 + draw.below(6))));
+  s.client_ = std::make_unique<Client>(converted::owned(*converted::engine_object<Client>(1 + draw.below(6))));
+  s.server_addr_ = draw_kern__net__Address(draw);
+  s.remotes_ = draw_list(draw, [&]() -> net::Remote { return draw_net__Remote(draw); });
+  s.hits_ = draw_list(draw, [&]() -> net::Hit { return draw_net__Hit(draw); });
+  s.confirms_ = draw_list(draw, [&]() -> net::Hit { return draw_net__Hit(draw); });
+  s.kills_ = draw_list(draw, [&]() -> net::Kill { return draw_net__Kill(draw); });
+  s.fx_ = draw_list(draw, [&]() -> net::Fx { return draw_net__Fx(draw); });
+  s.swarms_ = draw_list(draw, [&]() -> net::Swarm { return draw_net__Swarm(draw); });
+  s.swarm_hits_ = draw_list(draw, [&]() -> net::SwarmHit { return draw_net__SwarmHit(draw); });
+  s.world_ = draw_list(draw, [&]() -> std::vector<unsigned char> { return draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); }); });
+  s.pings_ = draw_list(draw, [&]() -> net::PingEvent { return draw_net__PingEvent(draw); });
+  s.voice_ = draw_list(draw, [&]() -> net::VoiceFrame { return draw_net__VoiceFrame(draw); });
+  s.pending_anchor_ = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  s.lon_ = draw.number();
+  s.lat_ = draw.number();
+  s.time_ = draw.number();
+  s.send_clock_ = draw.number();
+  s.scores_clock_ = draw.number();
+  s.rules_clock_ = draw.number();
+  s.have_origin_ = draw.flag();
+  s.connect_pending_ = draw.flag();
+  s.anchor_ready_ = draw.flag();
+  s.ever_in_ = draw.flag();
+  s.connect_at_ = draw.number();
+  s.connects_ = static_cast<unsigned int>(draw.below(40));
+  s.in_since_ = draw.number();
+  s.mates_ = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  s.anchor_ = draw.vector();
+  s.self_slot_ = static_cast<unsigned char>(draw.below(40));
+  s.me_ = draw_net__PlayerState(draw);
+  s.scores_ = draw_mp__Scoreboard(draw);
+  s.friendly_fire_ = draw.flag();
+  s.destroy_ = draw_list(draw, [&]() -> net::Session::Blob { return draw_net__Session__Blob(draw); });
+  s.toss_ = draw_list(draw, [&]() -> net::Session::Blob { return draw_net__Session__Blob(draw); });
+  s.proj_ = draw_list(draw, [&]() -> net::Session::Blob { return draw_net__Session__Blob(draw); });
+  s.town_ = draw_list(draw, [&]() -> net::Session::Blob { return draw_net__Session__Blob(draw); });
+  s.swarm_parts_ = draw_list(draw, [&]() -> net::Session::SwarmParts { return draw_net__Session__SwarmParts(draw); });
+  s.swarm_serial_ = static_cast<unsigned char>(draw.below(40));
+  s.world_rules_ = static_cast<unsigned short>(draw.below(40));
+  s.have_world_rules_ = draw.flag();
+  s.protected_ = draw_list(draw, [&]() -> std::pair<unsigned char, double> { return std::pair<unsigned char, double>(static_cast<unsigned char>(draw.below(40)), draw.number()); });
+  s.ballot_ = draw_mp__Ballot(draw);
+  s.remote_ballot_ = draw_mp__Ballot(draw);
+  s.ballot_serial_ = static_cast<unsigned int>(draw.below(40));
+  s.vote_text_ = draw.word();
+  s.sent_poses_ = static_cast<unsigned int>(draw.below(40));
+  s.send_refused_ = static_cast<unsigned int>(draw.below(40));
+  s.refused_said_ = static_cast<unsigned int>(draw.below(40));
+  s.seats_ = draw_seats__Table(draw);
+  s.seats_clock_ = draw.number();
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Session& s) { return converted::Value::structure({arg(s.role_), arg(s.transport_), arg(s.server_), arg(s.client_), arg(s.server_addr_), arg(s.remotes_), arg(s.hits_), arg(s.confirms_), arg(s.kills_), arg(s.fx_), arg(s.swarms_), arg(s.swarm_hits_), arg(s.world_), arg(s.pings_), arg(s.voice_), arg(s.pending_anchor_), arg(s.lon_), arg(s.lat_), arg(s.time_), arg(s.send_clock_), arg(s.scores_clock_), arg(s.rules_clock_), arg(s.have_origin_), arg(s.connect_pending_), arg(s.anchor_ready_), arg(s.ever_in_), arg(s.connect_at_), arg(s.connects_), arg(s.in_since_), arg(s.mates_), arg(s.anchor_), arg(s.self_slot_), arg(s.me_), arg(s.scores_), arg(s.friendly_fire_), arg(s.destroy_), arg(s.toss_), arg(s.proj_), arg(s.town_), arg(s.swarm_parts_), arg(s.swarm_serial_), arg(s.world_rules_), arg(s.have_world_rules_), arg(s.protected_), arg(s.ballot_), arg(s.remote_ballot_), arg(s.ballot_serial_), arg(s.vote_text_), arg(s.sent_poses_), arg(s.send_refused_), arg(s.refused_said_), arg(s.seats_), arg(s.seats_clock_)}); }
+[[maybe_unused]] static bool same(const net::Session& want, const converted::Value& got) { return converted::rows_of(got, 53) && converted::at_place(same(want.role_, (*got.rows)[0]), ".role_") && converted::at_place(same(want.transport_, (*got.rows)[1]), ".transport_") && converted::at_place(same(want.server_, (*got.rows)[2]), ".server_") && converted::at_place(same(want.client_, (*got.rows)[3]), ".client_") && converted::at_place(same(want.server_addr_, (*got.rows)[4]), ".server_addr_") && converted::at_place(same(want.remotes_, (*got.rows)[5]), ".remotes_") && converted::at_place(same(want.hits_, (*got.rows)[6]), ".hits_") && converted::at_place(same(want.confirms_, (*got.rows)[7]), ".confirms_") && converted::at_place(same(want.kills_, (*got.rows)[8]), ".kills_") && converted::at_place(same(want.fx_, (*got.rows)[9]), ".fx_") && converted::at_place(same(want.swarms_, (*got.rows)[10]), ".swarms_") && converted::at_place(same(want.swarm_hits_, (*got.rows)[11]), ".swarm_hits_") && converted::at_place(same(want.world_, (*got.rows)[12]), ".world_") && converted::at_place(same(want.pings_, (*got.rows)[13]), ".pings_") && converted::at_place(same(want.voice_, (*got.rows)[14]), ".voice_") && converted::at_place(same(want.pending_anchor_, (*got.rows)[15]), ".pending_anchor_") && converted::at_place(same(want.lon_, (*got.rows)[16]), ".lon_") && converted::at_place(same(want.lat_, (*got.rows)[17]), ".lat_") && converted::at_place(same(want.time_, (*got.rows)[18]), ".time_") && converted::at_place(same(want.send_clock_, (*got.rows)[19]), ".send_clock_") && converted::at_place(same(want.scores_clock_, (*got.rows)[20]), ".scores_clock_") && converted::at_place(same(want.rules_clock_, (*got.rows)[21]), ".rules_clock_") && converted::at_place(same(want.have_origin_, (*got.rows)[22]), ".have_origin_") && converted::at_place(same(want.connect_pending_, (*got.rows)[23]), ".connect_pending_") && converted::at_place(same(want.anchor_ready_, (*got.rows)[24]), ".anchor_ready_") && converted::at_place(same(want.ever_in_, (*got.rows)[25]), ".ever_in_") && converted::at_place(same(want.connect_at_, (*got.rows)[26]), ".connect_at_") && converted::at_place(same(want.connects_, (*got.rows)[27]), ".connects_") && converted::at_place(same(want.in_since_, (*got.rows)[28]), ".in_since_") && converted::at_place(same(want.mates_, (*got.rows)[29]), ".mates_") && converted::at_place(same(want.anchor_, (*got.rows)[30]), ".anchor_") && converted::at_place(same(want.self_slot_, (*got.rows)[31]), ".self_slot_") && converted::at_place(same(want.me_, (*got.rows)[32]), ".me_") && converted::at_place(same(want.scores_, (*got.rows)[33]), ".scores_") && converted::at_place(same(want.friendly_fire_, (*got.rows)[34]), ".friendly_fire_") && converted::at_place(same(want.destroy_, (*got.rows)[35]), ".destroy_") && converted::at_place(same(want.toss_, (*got.rows)[36]), ".toss_") && converted::at_place(same(want.proj_, (*got.rows)[37]), ".proj_") && converted::at_place(same(want.town_, (*got.rows)[38]), ".town_") && converted::at_place(same(want.swarm_parts_, (*got.rows)[39]), ".swarm_parts_") && converted::at_place(same(want.swarm_serial_, (*got.rows)[40]), ".swarm_serial_") && converted::at_place(same(want.world_rules_, (*got.rows)[41]), ".world_rules_") && converted::at_place(same(want.have_world_rules_, (*got.rows)[42]), ".have_world_rules_") && converted::at_place(same(want.protected_, (*got.rows)[43]), ".protected_") && converted::at_place(same(want.ballot_, (*got.rows)[44]), ".ballot_") && converted::at_place(same(want.remote_ballot_, (*got.rows)[45]), ".remote_ballot_") && converted::at_place(same(want.ballot_serial_, (*got.rows)[46]), ".ballot_serial_") && converted::at_place(same(want.vote_text_, (*got.rows)[47]), ".vote_text_") && converted::at_place(same(want.sent_poses_, (*got.rows)[48]), ".sent_poses_") && converted::at_place(same(want.send_refused_, (*got.rows)[49]), ".send_refused_") && converted::at_place(same(want.refused_said_, (*got.rows)[50]), ".refused_said_") && converted::at_place(same(want.seats_, (*got.rows)[51]), ".seats_") && converted::at_place(same(want.seats_clock_, (*got.rows)[52]), ".seats_clock_"); }
+[[maybe_unused]] static bool defined(const net::Session& s) { return defined(s.role_) && defined(s.transport_) && defined(s.server_) && defined(s.client_) && defined(s.server_addr_) && defined(s.remotes_) && defined(s.hits_) && defined(s.confirms_) && defined(s.kills_) && defined(s.fx_) && defined(s.swarms_) && defined(s.swarm_hits_) && defined(s.world_) && defined(s.pings_) && defined(s.voice_) && defined(s.pending_anchor_) && defined(s.lon_) && defined(s.lat_) && defined(s.time_) && defined(s.send_clock_) && defined(s.scores_clock_) && defined(s.rules_clock_) && defined(s.have_origin_) && defined(s.connect_pending_) && defined(s.anchor_ready_) && defined(s.ever_in_) && defined(s.connect_at_) && defined(s.connects_) && defined(s.in_since_) && defined(s.mates_) && defined(s.anchor_) && defined(s.self_slot_) && defined(s.me_) && defined(s.scores_) && defined(s.friendly_fire_) && defined(s.destroy_) && defined(s.toss_) && defined(s.proj_) && defined(s.town_) && defined(s.swarm_parts_) && defined(s.swarm_serial_) && defined(s.world_rules_) && defined(s.have_world_rules_) && defined(s.protected_) && defined(s.ballot_) && defined(s.remote_ballot_) && defined(s.ballot_serial_) && defined(s.vote_text_) && defined(s.sent_poses_) && defined(s.send_refused_) && defined(s.refused_said_) && defined(s.seats_) && defined(s.seats_clock_); }
+[[maybe_unused]] static std::string text(const net::Session& s) { return std::string("{") + text(s.role_) + ", " + text(s.transport_) + ", " + text(s.server_) + ", " + text(s.client_) + ", " + text(s.server_addr_) + ", " + text(s.remotes_) + ", " + text(s.hits_) + ", " + text(s.confirms_) + ", " + text(s.kills_) + ", " + text(s.fx_) + ", " + text(s.swarms_) + ", " + text(s.swarm_hits_) + ", " + text(s.world_) + ", " + text(s.pings_) + ", " + text(s.voice_) + ", " + text(s.pending_anchor_) + ", " + text(s.lon_) + ", " + text(s.lat_) + ", " + text(s.time_) + ", " + text(s.send_clock_) + ", " + text(s.scores_clock_) + ", " + text(s.rules_clock_) + ", " + text(s.have_origin_) + ", " + text(s.connect_pending_) + ", " + text(s.anchor_ready_) + ", " + text(s.ever_in_) + ", " + text(s.connect_at_) + ", " + text(s.connects_) + ", " + text(s.in_since_) + ", " + text(s.mates_) + ", " + text(s.anchor_) + ", " + text(s.self_slot_) + ", " + text(s.me_) + ", " + text(s.scores_) + ", " + text(s.friendly_fire_) + ", " + text(s.destroy_) + ", " + text(s.toss_) + ", " + text(s.proj_) + ", " + text(s.town_) + ", " + text(s.swarm_parts_) + ", " + text(s.swarm_serial_) + ", " + text(s.world_rules_) + ", " + text(s.have_world_rules_) + ", " + text(s.protected_) + ", " + text(s.ballot_) + ", " + text(s.remote_ballot_) + ", " + text(s.ballot_serial_) + ", " + text(s.vote_text_) + ", " + text(s.sent_poses_) + ", " + text(s.send_refused_) + ", " + text(s.refused_said_) + ", " + text(s.seats_) + ", " + text(s.seats_clock_) + "}"; }
+[[maybe_unused]] static void take(net::Session& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 53) return; converted::take_as<net::Session::Role>(s.role_, (*v.rows)[0]); converted::take_as<HostTransport>(s.transport_, (*v.rows)[1]); converted::take_as<std::unique_ptr<Server>>(s.server_, (*v.rows)[2]); converted::take_as<std::unique_ptr<Client>>(s.client_, (*v.rows)[3]); converted::take_as<net::Address>(s.server_addr_, (*v.rows)[4]); converted::take_as<std::vector<net::Remote>>(s.remotes_, (*v.rows)[5]); converted::take_as<std::vector<net::Hit>>(s.hits_, (*v.rows)[6]); converted::take_as<std::vector<net::Hit>>(s.confirms_, (*v.rows)[7]); converted::take_as<std::vector<net::Kill>>(s.kills_, (*v.rows)[8]); converted::take_as<std::vector<net::Fx>>(s.fx_, (*v.rows)[9]); converted::take_as<std::vector<net::Swarm>>(s.swarms_, (*v.rows)[10]); converted::take_as<std::vector<net::SwarmHit>>(s.swarm_hits_, (*v.rows)[11]); converted::take_as<std::vector<std::vector<unsigned char>>>(s.world_, (*v.rows)[12]); converted::take_as<std::vector<net::PingEvent>>(s.pings_, (*v.rows)[13]); converted::take_as<std::vector<net::VoiceFrame>>(s.voice_, (*v.rows)[14]); converted::take_as<std::vector<unsigned char>>(s.pending_anchor_, (*v.rows)[15]); converted::take_as<double>(s.lon_, (*v.rows)[16]); converted::take_as<double>(s.lat_, (*v.rows)[17]); converted::take_as<double>(s.time_, (*v.rows)[18]); converted::take_as<double>(s.send_clock_, (*v.rows)[19]); converted::take_as<double>(s.scores_clock_, (*v.rows)[20]); converted::take_as<double>(s.rules_clock_, (*v.rows)[21]); converted::take_as<bool>(s.have_origin_, (*v.rows)[22]); converted::take_as<bool>(s.connect_pending_, (*v.rows)[23]); converted::take_as<bool>(s.anchor_ready_, (*v.rows)[24]); converted::take_as<bool>(s.ever_in_, (*v.rows)[25]); converted::take_as<double>(s.connect_at_, (*v.rows)[26]); converted::take_as<unsigned int>(s.connects_, (*v.rows)[27]); converted::take_as<double>(s.in_since_, (*v.rows)[28]); converted::take_as<std::vector<unsigned char>>(s.mates_, (*v.rows)[29]); converted::take_as<Vec3>(s.anchor_, (*v.rows)[30]); converted::take_as<unsigned char>(s.self_slot_, (*v.rows)[31]); converted::take_as<net::PlayerState>(s.me_, (*v.rows)[32]); converted::take_as<mp::Scoreboard>(s.scores_, (*v.rows)[33]); converted::take_as<bool>(s.friendly_fire_, (*v.rows)[34]); converted::take_as<std::vector<net::Session::Blob>>(s.destroy_, (*v.rows)[35]); converted::take_as<std::vector<net::Session::Blob>>(s.toss_, (*v.rows)[36]); converted::take_as<std::vector<net::Session::Blob>>(s.proj_, (*v.rows)[37]); converted::take_as<std::vector<net::Session::Blob>>(s.town_, (*v.rows)[38]); converted::take_as<std::vector<net::Session::SwarmParts>>(s.swarm_parts_, (*v.rows)[39]); converted::take_as<unsigned char>(s.swarm_serial_, (*v.rows)[40]); converted::take_as<unsigned short>(s.world_rules_, (*v.rows)[41]); converted::take_as<bool>(s.have_world_rules_, (*v.rows)[42]); converted::take_as<std::vector<std::pair<unsigned char, double>>>(s.protected_, (*v.rows)[43]); converted::take_as<mp::Ballot>(s.ballot_, (*v.rows)[44]); converted::take_as<mp::Ballot>(s.remote_ballot_, (*v.rows)[45]); converted::take_as<unsigned int>(s.ballot_serial_, (*v.rows)[46]); converted::take_as<std::string>(s.vote_text_, (*v.rows)[47]); converted::take_as<unsigned int>(s.sent_poses_, (*v.rows)[48]); converted::take_as<unsigned int>(s.send_refused_, (*v.rows)[49]); converted::take_as<unsigned int>(s.refused_said_, (*v.rows)[50]); converted::take_as<seats::Table>(s.seats_, (*v.rows)[51]); converted::take_as<double>(s.seats_clock_, (*v.rows)[52]); }
+}
+[[maybe_unused]] static const bool converted_numbers_kern__net__ClientState = converted::number_enum<net::ClientState>({-3, -2, -1, 0, 1, 2, 3});
+[[maybe_unused]] static net::Message draw_kern__net__Message(converted::Draw& draw) {
+  net::Message s{};
+  s.id = static_cast<unsigned short>(draw.below(40));
+  s.type = static_cast<unsigned short>(draw.below(40));
+  s.data = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+  return s;
+}
+namespace net { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const net::Message& s) { return converted::Value::structure({arg(s.id), arg(s.type), arg(s.data)}); }
+[[maybe_unused]] static bool same(const net::Message& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.type, (*got.rows)[1]), ".type") && converted::at_place(same(want.data, (*got.rows)[2]), ".data"); }
+[[maybe_unused]] static bool defined(const net::Message& s) { return defined(s.id) && defined(s.type) && defined(s.data); }
+[[maybe_unused]] static std::string text(const net::Message& s) { return std::string("{") + text(s.id) + ", " + text(s.type) + ", " + text(s.data) + "}"; }
+[[maybe_unused]] static void take(net::Message& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned short>(s.id, (*v.rows)[0]); converted::take_as<unsigned short>(s.type, (*v.rows)[1]); converted::take_as<std::vector<unsigned char>>(s.data, (*v.rows)[2]); }
+}
+inline void Client::disconnect() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.disconnect", {converted::value_of(*this)}); }
+inline Client::~Client() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.client.release", {converted::value_of(*this)}); }
+inline Client::Client(Transport& transport, const net::ClientServerConfig& config, const u64& salt_seed) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.make", {converted::value_of(transport), converted::value_of(config), converted::value_of(converted::shaped<converted::Whole>(salt_seed))}); converted::take_made(*this, kern_out[0]); }
+inline bool Client::connected() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connected", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline bool Client::send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.send", {converted::value_of(*this), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline net::ClientState Client::state() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.state", {converted::value_of(*this)}); net::ClientState kern_result = converted::quiet<net::ClientState>(); converted::take_as<net::ClientState>(kern_result, kern_out[0]); return kern_result; }
+inline void Client::connect(const net::Address& server, const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connect", {converted::value_of(*this), converted::value_of(server), converted::value_of(time)}); }
+inline void Client::advance_time(const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.advance_time", {converted::value_of(*this), converted::value_of(time)}); }
+inline void Client::receive_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.receive_packets", {converted::value_of(*this)}); }
+inline std::optional<net::Message> Client::receive(const int& channel) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.receive", {converted::value_of(*this), converted::value_of(channel)}); std::optional<net::Message> kern_result = converted::quiet<std::optional<net::Message>>(); converted::take_as<std::optional<net::Message>>(kern_result, kern_out[0]); return kern_result; }
+inline void Client::send_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.send_packets", {converted::value_of(*this)}); }
+inline Client& Client::operator=(Client&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.client.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
+inline void HostTransport::set_address(const net::Address& a) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.host_transport.set_address", {converted::value_of(*this), converted::value_of(a)}); }
+inline void HostTransport::advance_time(const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.host_transport.advance_time", {converted::value_of(*this), converted::value_of(time)}); }
+inline void Server::stop() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.stop", {converted::value_of(*this)}); }
+inline Server::~Server() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.server.release", {converted::value_of(*this)}); }
+inline Server::Server(Transport& transport, const net::ClientServerConfig& config, const u64& salt_seed) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.make", {converted::value_of(transport), converted::value_of(config), converted::value_of(converted::shaped<converted::Whole>(salt_seed))}); converted::take_made(*this, kern_out[0]); }
+inline void Server::start(const int& max_clients) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.start", {converted::value_of(*this), converted::value_of(max_clients)}); }
+inline bool Server::running() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.running", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline int Server::max_clients() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.max_clients", {converted::value_of(*this)}); int kern_result = converted::quiet<int>(); converted::take_as<int>(kern_result, kern_out[0]); return kern_result; }
+inline bool Server::client_connected(const int& index) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.client_connected", {converted::value_of(*this), converted::value_of(index)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline bool Server::send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.send", {converted::value_of(*this), converted::value_of(client), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline void Server::advance_time(const double& time) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.advance_time", {converted::value_of(*this), converted::value_of(time)}); }
+inline void Server::receive_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.receive_packets", {converted::value_of(*this)}); }
+inline std::vector<std::pair<int, bool>> Server::take_events() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.take_events", {converted::value_of(*this)}); std::vector<std::pair<int, bool>> kern_result = converted::quiet<std::vector<std::pair<int, bool>>>(); converted::take_as<std::vector<std::pair<int, bool>>>(kern_result, kern_out[0]); return kern_result; }
+inline std::optional<net::Message> Server::receive(const int& client, const int& channel) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.receive", {converted::value_of(*this), converted::value_of(client), converted::value_of(channel)}); std::optional<net::Message> kern_result = converted::quiet<std::optional<net::Message>>(); converted::take_as<std::optional<net::Message>>(kern_result, kern_out[0]); return kern_result; }
+inline void Server::send_packets() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.send_packets", {converted::value_of(*this)}); }
+inline int Server::connected_clients() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.connected_clients", {converted::value_of(*this)}); int kern_result = converted::quiet<int>(); converted::take_as<int>(kern_result, kern_out[0]); return kern_result; }
+inline Server& Server::operator=(Server&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.server.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
+struct Out_unpack_swarm { bool Result; unsigned char owner; unsigned char serial; unsigned char part; bool last; std::vector<net::SwarmUnit> units; };
+[[maybe_unused]] static bool same(const Out_unpack_swarm& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.owner, (*got.rows)[1]), ".owner") && converted::at_place(same(want.serial, (*got.rows)[2]), ".serial") && converted::at_place(same(want.part, (*got.rows)[3]), ".part") && converted::at_place(same(want.last, (*got.rows)[4]), ".last") && converted::at_place(same(want.units, (*got.rows)[5]), ".units"); }
+[[maybe_unused]] static bool defined(const Out_unpack_swarm& s) { return defined(s.Result) && defined(s.owner) && defined(s.serial) && defined(s.part) && defined(s.last) && defined(s.units); }
+[[maybe_unused]] static std::string text(const Out_unpack_swarm& s) { return std::string("{") + text(s.Result) + ", " + text(s.owner) + ", " + text(s.serial) + ", " + text(s.part) + ", " + text(s.last) + ", " + text(s.units) + "}"; }
+struct Out_unpack_swarm_hit { bool Result; net::SwarmHit h; };
+[[maybe_unused]] static bool same(const Out_unpack_swarm_hit& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.h, (*got.rows)[1]), ".h"); }
+[[maybe_unused]] static bool defined(const Out_unpack_swarm_hit& s) { return defined(s.Result) && defined(s.h); }
+[[maybe_unused]] static std::string text(const Out_unpack_swarm_hit& s) { return std::string("{") + text(s.Result) + ", " + text(s.h) + "}"; }
+struct Out_unpack_hit { bool Result; net::Hit h; };
+[[maybe_unused]] static bool same(const Out_unpack_hit& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.h, (*got.rows)[1]), ".h"); }
+[[maybe_unused]] static bool defined(const Out_unpack_hit& s) { return defined(s.Result) && defined(s.h); }
+[[maybe_unused]] static std::string text(const Out_unpack_hit& s) { return std::string("{") + text(s.Result) + ", " + text(s.h) + "}"; }
+struct Out_unpack_fx { bool Result; net::Fx f; };
+[[maybe_unused]] static bool same(const Out_unpack_fx& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.f, (*got.rows)[1]), ".f"); }
+[[maybe_unused]] static bool defined(const Out_unpack_fx& s) { return defined(s.Result) && defined(s.f); }
+[[maybe_unused]] static std::string text(const Out_unpack_fx& s) { return std::string("{") + text(s.Result) + ", " + text(s.f) + "}"; }
+struct Out_unpack { bool Result; unsigned long at; net::PlayerState s; };
+[[maybe_unused]] static bool same(const Out_unpack& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.at, (*got.rows)[1]), ".at") && converted::at_place(same(want.s, (*got.rows)[2]), ".s"); }
+[[maybe_unused]] static bool defined(const Out_unpack& s) { return defined(s.Result) && defined(s.at) && defined(s.s); }
+[[maybe_unused]] static std::string text(const Out_unpack& s) { return std::string("{") + text(s.Result) + ", " + text(s.at) + ", " + text(s.s) + "}"; }
+struct Out_Session_host { net::Session Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Session_host& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_Session_host& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Session_host& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Session_join { net::Session Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Session_join& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_Session_join& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Session_join& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Session_origin { bool Result; double lon; double lat; };
+[[maybe_unused]] static bool same(const Out_Session_origin& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.lon, (*got.rows)[1]), ".lon") && converted::at_place(same(want.lat, (*got.rows)[2]), ".lat"); }
+[[maybe_unused]] static bool defined(const Out_Session_origin& s) { return defined(s.Result) && defined(s.lon) && defined(s.lat); }
+[[maybe_unused]] static std::string text(const Out_Session_origin& s) { return std::string("{") + text(s.Result) + ", " + text(s.lon) + ", " + text(s.lat) + "}"; }
+struct Out_Session_swarm_part { net::Session Self; std::vector<net::SwarmUnit> units; };
+[[maybe_unused]] static bool same(const Out_Session_swarm_part& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.units, (*got.rows)[1]), ".units"); }
+[[maybe_unused]] static bool defined(const Out_Session_swarm_part& s) { return defined(s.Self) && defined(s.units); }
+[[maybe_unused]] static std::string text(const Out_Session_swarm_part& s) { return std::string("{") + text(s.Self) + ", " + text(s.units) + "}"; }
+struct Out_Session_send_swarm { net::Session Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Session_send_swarm& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_Session_send_swarm& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Session_send_swarm& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Session_propose_rule { net::Session Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Session_propose_rule& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_Session_propose_rule& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Session_propose_rule& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
+struct Out_Session_vote { net::Session Self; bool Result; };
+[[maybe_unused]] static bool same(const Out_Session_vote& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Self, (*got.rows)[0]), ".Self") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
+[[maybe_unused]] static bool defined(const Out_Session_vote& s) { return defined(s.Self) && defined(s.Result); }
+[[maybe_unused]] static std::string text(const Out_Session_vote& s) { return std::string("{") + text(s.Self) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_net_session_cpp) {
-  converted::Blueprint bp("net_session_cpp");
+  converted::Blueprint bp("net_session_cpp", {"JetSeats", "Multiplayer"});
+  seats::jet_seats_cpp_local::g_rules.bind(bp.source_logic());
+  mp::mp_rules_cpp_local::g_rules.bind(bp.source_logic());
   {  // config
     converted::Tally tally("config");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]() { return converted::counted([&] { return converted_net_session_cpp::config(); }); };
+    const auto run = [&]() { return converted::counted([&] { return converted_net_session_cpp::net::config(); }); };
     for (int i = 0; tally.more(i); ++i) {
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run();
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {}, want, watch.left(), [&] { return std::string(); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
   {  // sane
     converted::Tally tally("sane");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Vec3 a0) { return converted::counted([&] { return converted_net_session_cpp::sane(std::move(a0)); }); };
+    const auto run = [&]([[maybe_unused]] Vec3& a0) { return converted::counted([&] { return converted_net_session_cpp::net::sane(std::move(a0)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Vec3 a0 = draw.vector();
+      Vec3 a0 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0)}, want, watch.left(), [&] { return text(a0); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // pack_swarm
+    converted::Tally tally("pack_swarm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] unsigned char& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] bool& a3, [[maybe_unused]] std::vector<net::SwarmUnit>& a4, [[maybe_unused]] unsigned long& a5, [[maybe_unused]] unsigned long& a6) { return converted::counted([&] { return converted_net_session_cpp::net::pack_swarm(std::move(a0), std::move(a1), std::move(a2), std::move(a3), a4, std::move(a5), std::move(a6)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      unsigned char a0 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a2 = static_cast<unsigned char>(draw.below(40));
+      bool a3 = draw.flag();
+      std::vector<net::SwarmUnit> a4 = draw_list(draw, [&]() -> net::SwarmUnit { return draw_net__SwarmUnit(draw); });
+      unsigned long a5 = static_cast<unsigned long>(draw.below(40));
+      unsigned long a6 = static_cast<unsigned long>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a4), arg(a0), arg(a1), arg(a2), arg(a3), arg(a5), arg(a6)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5, a6))> held([&] { return run(a0, a1, a2, a3, a4, a5, a6); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack_swarm
+    converted::Tally tally("unpack_swarm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] unsigned char& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] std::vector<net::SwarmUnit>& a5) { auto r = converted::counted([&] { return converted_net_session_cpp::net::unpack_swarm(a0, a1, a2, a3, a4, a5); }); return Out_unpack_swarm{std::move(r), std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a2 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
+      bool a4 = draw.flag();
+      std::vector<net::SwarmUnit> a5 = draw_list(draw, [&]() -> net::SwarmUnit { return draw_net__SwarmUnit(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2, 3, 4, 5});
+    }
+  }
+  {  // pack_swarm_hit
+    converted::Tally tally("pack_swarm_hit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::SwarmHit& a0) { return converted::counted([&] { return converted_net_session_cpp::net::pack_swarm_hit(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::SwarmHit a0 = draw_net__SwarmHit(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack_swarm_hit
+    converted::Tally tally("unpack_swarm_hit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] net::SwarmHit& a1) { auto r = converted::counted([&] { return converted_net_session_cpp::net::unpack_swarm_hit(a0, a1); }); return Out_unpack_swarm_hit{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      net::SwarmHit a1 = draw_net__SwarmHit(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // pack_hit
+    converted::Tally tally("pack_hit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Hit& a0) { return converted::counted([&] { return converted_net_session_cpp::net::pack_hit(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Hit a0 = draw_net__Hit(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack_hit
+    converted::Tally tally("unpack_hit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] net::Hit& a1) { auto r = converted::counted([&] { return converted_net_session_cpp::net::unpack_hit(a0, a1); }); return Out_unpack_hit{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      net::Hit a1 = draw_net__Hit(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // pack_fx
+    converted::Tally tally("pack_fx");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Fx& a0) { return converted::counted([&] { return converted_net_session_cpp::net::pack_fx(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Fx a0 = draw_net__Fx(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack_fx
+    converted::Tally tally("unpack_fx");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] net::Fx& a1) { auto r = converted::counted([&] { return converted_net_session_cpp::net::unpack_fx(a0, a1); }); return Out_unpack_fx{std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      net::Fx a1 = draw_net__Fx(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // pack
+    converted::Tally tally("pack");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::PlayerState& a0) { return converted::counted([&] { return converted_net_session_cpp::net::pack(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::PlayerState a0 = draw_net__PlayerState(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // unpack
+    converted::Tally tally("unpack");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::vector<unsigned char>& a0, [[maybe_unused]] unsigned long& a1, [[maybe_unused]] net::PlayerState& a2) { auto r = converted::counted([&] { return converted_net_session_cpp::net::unpack(a0, a1, a2); }); return Out_unpack{std::move(r), std::move(a1), std::move(a2)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      std::vector<unsigned char> a0 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      unsigned long a1 = static_cast<unsigned long>(draw.below(40));
+      net::PlayerState a2 = draw_net__PlayerState(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
+    }
+  }
+  {  // Session::stop
+    converted::Tally tally("Session_stop");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.stop(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::host
+    converted::Tally tally("Session_host");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] u64& a1, [[maybe_unused]] double& a2, [[maybe_unused]] double& a3) { auto r = converted::counted([&] { return a0.host(std::move(a1), std::move(a2), std::move(a3)); }); return Out_Session_host{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      double a2 = draw.number();
+      double a3 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<converted::Whole>(a1)), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Session::join
+    converted::Tally tally("Session_join");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] u64& a1, [[maybe_unused]] u64& a2) { auto r = converted::counted([&] { return a0.join(std::move(a1), std::move(a2)); }); return Out_Session_join{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      u64 a1 = static_cast<u64>(draw.bits());
+      u64 a2 = static_cast<u64>(draw.bits());
+      const std::vector<converted::Value> given = {arg(a0), arg(converted::shaped<converted::Whole>(a1)), arg(converted::shaped<converted::Whole>(a2))};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Session::connected
+    converted::Tally tally("Session_connected");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.connected(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::remote_index
+    converted::Tally tally("Session_remote_index");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return a0.remote_index(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::host_lost
+    converted::Tally tally("Session_host_lost");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.host_lost(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::successor
+    converted::Tally tally("Session_successor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.successor(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::refused
+    converted::Tally tally("Session_refused");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned short& a1, [[maybe_unused]] unsigned long& a2) { converted::counted([&] { return a0.refused(std::move(a1), std::move(a2)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned short a1 = static_cast<unsigned short>(draw.below(40));
+      unsigned long a2 = static_cast<unsigned long>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::to_all
+    converted::Tally tally("Session_to_all");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] int& a1, [[maybe_unused]] unsigned short& a2, [[maybe_unused]] std::vector<unsigned char>& a3, [[maybe_unused]] unsigned char& a4) { converted::counted([&] { return a0.to_all(std::move(a1), std::move(a2), a3, std::move(a4)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      int a1 = static_cast<int>(draw.whole());
+      unsigned short a2 = static_cast<unsigned short>(draw.below(40));
+      std::vector<unsigned char> a3 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      unsigned char a4 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::set_origin
+    converted::Tally tally("Session_set_origin");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return a0.set_origin(std::move(a1), std::move(a2)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::origin
+    converted::Tally tally("Session_origin");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2) { auto r = converted::counted([&] { return a0.origin(a1, a2); }); return Out_Session_origin{std::move(r), std::move(a1), std::move(a2)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1, 2});
+    }
+  }
+  {  // Session::roster
+    converted::Tally tally("Session_roster");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.roster(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::color_of
+    converted::Tally tally("Session_color_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return a0.color_of(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::index_of
+    converted::Tally tally("Session_index_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return a0.index_of(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::protected_now
+    converted::Tally tally("Session_protected_now");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] double& a2) { return converted::counted([&] { return a0.protected_now(std::move(a1), std::move(a2)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      double a2 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::focus_of
+    converted::Tally tally("Session_focus_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return a0.focus_of(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::hp_of
+    converted::Tally tally("Session_hp_of");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1) { return converted::counted([&] { return a0.hp_of(std::move(a1)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::to_client
+    converted::Tally tally("Session_to_client");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] int& a2, [[maybe_unused]] unsigned short& a3, [[maybe_unused]] std::vector<unsigned char>& a4) { converted::counted([&] { return a0.to_client(std::move(a1), std::move(a2), std::move(a3), a4); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      int a2 = static_cast<int>(draw.whole());
+      unsigned short a3 = static_cast<unsigned short>(draw.below(40));
+      std::vector<unsigned char> a4 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a4), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_seats
+    converted::Tally tally("Session_send_seats");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_seats(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::judge_seat
+    converted::Tally tally("Session_judge_seat");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] unsigned char& a3, [[maybe_unused]] seats::Seat& a4) { converted::counted([&] { return a0.judge_seat(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      bool a2 = draw.flag();
+      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
+      seats::Seat a4 = converted::enum_value<seats::Seat>(draw.below(2));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::swarm_part
+    converted::Tally tally("Session_swarm_part");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] unsigned char& a3, [[maybe_unused]] bool& a4, [[maybe_unused]] std::vector<net::SwarmUnit>& a5) { converted::counted([&] { return a0.swarm_part(std::move(a1), std::move(a2), std::move(a3), std::move(a4), a5); }); return Out_Session_swarm_part{std::move(a0), std::move(a5)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a2 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
+      bool a4 = draw.flag();
+      std::vector<net::SwarmUnit> a5 = draw_list(draw, [&]() -> net::SwarmUnit { return draw_net__SwarmUnit(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a5), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {0, 1});
+    }
+  }
+  {  // Session::judge
+    converted::Tally tally("Session_judge");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] net::Hit& a2) { converted::counted([&] { return a0.judge(std::move(a1), a2); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      net::Hit a2 = draw_net__Hit(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_scores
+    converted::Tally tally("Session_send_scores");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_scores(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::begin_ballot
+    converted::Tally tally("Session_begin_ballot");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1) { converted::counted([&] { return a0.begin_ballot(std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      bool a1 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_rules
+    converted::Tally tally("Session_send_rules");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.send_rules(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::finish_ballot
+    converted::Tally tally("Session_finish_ballot");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] mp::Ballot::Status& a1) { converted::counted([&] { return a0.finish_ballot(std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      mp::Ballot::Status a1 = converted::enum_value<mp::Ballot::Status>(draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::dispatch
+    converted::Tally tally("Session_dispatch");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned short& a2, [[maybe_unused]] std::vector<unsigned char>& a3) { converted::counted([&] { return a0.dispatch(std::move(a1), std::move(a2), a3); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      unsigned short a2 = static_cast<unsigned short>(draw.below(40));
+      std::vector<unsigned char> a3 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::to_host
+    converted::Tally tally("Session_to_host");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] int& a1, [[maybe_unused]] unsigned short& a2, [[maybe_unused]] std::vector<unsigned char>& a3) { converted::counted([&] { return a0.to_host(std::move(a1), std::move(a2), a3); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      int a1 = static_cast<int>(draw.whole());
+      unsigned short a2 = static_cast<unsigned short>(draw.below(40));
+      std::vector<unsigned char> a3 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_fx
+    converted::Tally tally("Session_send_fx");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] net::Fx& a1) { converted::counted([&] { return a0.send_fx(std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      net::Fx a1 = draw_net__Fx(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_swarm
+    converted::Tally tally("Session_send_swarm");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<net::SwarmUnit>& a1) { auto r = converted::counted([&] { return a0.send_swarm(a1); }); return Out_Session_send_swarm{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<net::SwarmUnit> a1 = draw_list(draw, [&]() -> net::SwarmUnit { return draw_net__SwarmUnit(draw); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Session::town_to_host
+    converted::Tally tally("Session_town_to_host");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return a0.town_to_host(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::town_to_all
+    converted::Tally tally("Session_town_to_all");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return a0.town_to_all(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::town_to
+    converted::Tally tally("Session_town_to");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] std::vector<unsigned char>& a2) { converted::counted([&] { return a0.town_to(std::move(a1), a2); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      std::vector<unsigned char> a2 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_world
+    converted::Tally tally("Session_send_world");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return a0.send_world(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_world_to
+    converted::Tally tally("Session_send_world_to");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] std::vector<unsigned char>& a2) { converted::counted([&] { return a0.send_world_to(std::move(a1), a2); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      std::vector<unsigned char> a2 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_proj
+    converted::Tally tally("Session_send_proj");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return a0.send_proj(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_toss
+    converted::Tally tally("Session_send_toss");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return a0.send_toss(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::destroy_to_host
+    converted::Tally tally("Session_destroy_to_host");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<unsigned char>& a1) { converted::counted([&] { return a0.destroy_to_host(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::destroy_to_all
+    converted::Tally tally("Session_destroy_to_all");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] std::vector<unsigned char>& a1, [[maybe_unused]] bool& a2) { converted::counted([&] { return a0.destroy_to_all(a1, std::move(a2)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      std::vector<unsigned char> a1 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      bool a2 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::destroy_to
+    converted::Tally tally("Session_destroy_to");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] std::vector<unsigned char>& a2) { converted::counted([&] { return a0.destroy_to(std::move(a1), a2); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      std::vector<unsigned char> a2 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_swarm_hit
+    converted::Tally tally("Session_send_swarm_hit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned short& a2, [[maybe_unused]] net::SwarmKind& a3, [[maybe_unused]] double& a4) { converted::counted([&] { return a0.send_swarm_hit(std::move(a1), std::move(a2), std::move(a3), std::move(a4)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      unsigned short a2 = static_cast<unsigned short>(draw.below(40));
+      net::SwarmKind a3 = converted::enum_value<net::SwarmKind>(draw.below(8));
+      double a4 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::request_hit
+    converted::Tally tally("Session_request_hit");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] double& a2, [[maybe_unused]] unsigned char& a3, [[maybe_unused]] unsigned char& a4, [[maybe_unused]] Vec3& a5) { converted::counted([&] { return a0.request_hit(std::move(a1), std::move(a2), std::move(a3), std::move(a4), std::move(a5)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      double a2 = draw.number();
+      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a4 = static_cast<unsigned char>(draw.below(40));
+      Vec3 a5 = draw.vector();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3), arg(a4), arg(a5)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::report_death
+    converted::Tally tally("Session_report_death");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] unsigned char& a3) { converted::counted([&] { return a0.report_death(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a2 = static_cast<unsigned char>(draw.below(40));
+      unsigned char a3 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::report_respawn
+    converted::Tally tally("Session_report_respawn");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { converted::counted([&] { return a0.report_respawn(); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_ping
+    converted::Tally tally("Session_send_ping");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] Vec3& a2, [[maybe_unused]] unsigned int& a3) { converted::counted([&] { return a0.send_ping(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      bool a1 = draw.flag();
+      Vec3 a2 = draw.vector();
+      unsigned int a3 = static_cast<unsigned int>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_voice
+    converted::Tally tally("Session_send_voice");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned int& a1, [[maybe_unused]] bool& a2, [[maybe_unused]] std::vector<unsigned char>& a3) { converted::counted([&] { return a0.send_voice(std::move(a1), std::move(a2), a3); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned int a1 = static_cast<unsigned int>(draw.below(40));
+      bool a2 = draw.flag();
+      std::vector<unsigned char> a3 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::propose_rule
+    converted::Tally tally("Session_propose_rule");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1) { auto r = converted::counted([&] { return a0.propose_rule(std::move(a1)); }); return Out_Session_propose_rule{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      bool a1 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Session::vote
+    converted::Tally tally("Session_vote");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1) { auto r = converted::counted([&] { return a0.vote(std::move(a1)); }); return Out_Session_vote{std::move(a0), std::move(r)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      bool a1 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0});
+    }
+  }
+  {  // Session::set_world_rules
+    converted::Tally tally("Session_set_world_rules");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned short& a1) { converted::counted([&] { return a0.set_world_rules(std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned short a1 = static_cast<unsigned short>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::send_anchor
+    converted::Tally tally("Session_send_anchor");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned char& a1) { converted::counted([&] { return a0.send_anchor(std::move(a1)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned char a1 = static_cast<unsigned char>(draw.below(40));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::seat_request
+    converted::Tally tally("Session_seat_request");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] bool& a1, [[maybe_unused]] unsigned char& a2, [[maybe_unused]] seats::Seat& a3) { converted::counted([&] { return a0.seat_request(std::move(a1), std::move(a2), std::move(a3)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      bool a1 = draw.flag();
+      unsigned char a2 = static_cast<unsigned char>(draw.below(40));
+      seats::Seat a3 = converted::enum_value<seats::Seat>(draw.below(2));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2), arg(a3)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::on_pose
+    converted::Tally tally("Session_on_pose");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] net::PlayerState& a1) { converted::counted([&] { return a0.on_pose(a1); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      net::PlayerState a1 = draw_net__PlayerState(draw);
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::deliver
+    converted::Tally tally("Session_deliver");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] unsigned short& a1, [[maybe_unused]] std::vector<unsigned char>& a2) { converted::counted([&] { return a0.deliver(std::move(a1), a2); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      unsigned short a1 = static_cast<unsigned short>(draw.below(40));
+      std::vector<unsigned char> a2 = draw_list(draw, [&]() -> unsigned char { return static_cast<unsigned char>(draw.below(40)); });
+      const std::vector<converted::Value> given = {arg(a0), arg(a2), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::update
+    converted::Tally tally("Session_update");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0, [[maybe_unused]] double& a1, [[maybe_unused]] double& a2, [[maybe_unused]] net::PlayerState& a3, [[maybe_unused]] bool& a4) { converted::counted([&] { return a0.update(std::move(a1), std::move(a2), a3, std::move(a4)); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      double a1 = draw.number();
+      double a2 = draw.number();
+      net::PlayerState a3 = draw_net__PlayerState(draw);
+      bool a4 = draw.flag();
+      const std::vector<converted::Value> given = {arg(a0), arg(a3), arg(a1), arg(a2), arg(a4)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // Session::status
+    converted::Tally tally("Session_status");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] net::Session& a0) { return converted::counted([&] { return a0.status(); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      net::Session a0 = draw_net__Session(draw);
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

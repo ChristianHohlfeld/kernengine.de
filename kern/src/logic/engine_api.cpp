@@ -2,6 +2,7 @@
 // (kern/logic/engine_api.h).
 #include "kern/logic/engine_api.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <unordered_map>
@@ -27,6 +28,7 @@ void add_engine_nodes(Library& lib) {
     d.help = f.help;
     d.keywords = f.cpp;
     d.kind = f.value ? NodeKind::pure : NodeKind::action;
+    d.world = true;  // (the engine: what a Callback's function does not ask)
     d.native = true;
     if (!f.value) {
       d.inputs.push_back({"exec", "", PinType::exec, {}});
@@ -48,6 +50,9 @@ void add_engine_nodes(Library& lib) {
 }
 
 bool Host::engine(std::string_view, const std::vector<Value>&, std::vector<Value>&) { return false; }
+ActorRef Host::find_actor(std::string_view) { return 0; }
+EngineObjects* Host::engine_objects() { return nullptr; }
+void Host::engine_failed(std::string_view) {}
 
 std::string engine_shown(const Value& v) {
   char b[128];
@@ -59,6 +64,17 @@ std::string engine_shown(const Value& v) {
     case PinType::vector: std::snprintf(b, sizeof b, "(%.9g, %.9g, %.9g)", static_cast<f64>(v.v.x), static_cast<f64>(v.v.y), static_cast<f64>(v.v.z)); return b;
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "actor %u", v.a); return b;
+    case PinType::int64: std::snprintf(b, sizeof b, "0x%llx", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;  // (its 64 bits)
+    case PinType::map:
+    case PinType::set: {  // (its entries in their order: {key: value, ...}, {key, ...} - a key's bits as the map holds them)
+      std::string s = "{";
+      const MapEntries& e = v.keyed();
+      for (std::size_t k = 0; k < e.size(); ++k) {
+        s += (k ? ", " : "") + (e.key_at(k).s.empty() ? std::to_string(e.key_at(k).i) : "\"" + e.key_at(k).s + "\"");
+        if (v.type == PinType::map) s += ": " + engine_shown(e.value_at(k));
+      }
+      return s + "}";
+    }
     case PinType::structure: {
       std::string s = "{";
       if (v.rows)
@@ -73,6 +89,14 @@ std::string engine_shown(const Value& v) {
   }
 }
 
+std::string engine_call_shown(std::string_view function, const std::vector<Value>& in) {
+  std::string call(function);
+  call += "(";
+  for (std::size_t k = 0; k < in.size(); ++k) call += (k ? ", " : "") + engine_shown(in[k]);
+  call += ")";
+  return call;
+}
+
 namespace {
 
 /// The next number of a sequence (splitmix64).
@@ -84,12 +108,14 @@ u64 next(u64& state) {
 }
 
 /// A value of a form (EnginePin::shape), read from `at` on. Numbers are eighths, so that the engine's
-/// 32-bit numbers hold them exactly; whole numbers are small enough for every whole type.
-Value answer(std::string_view shape, std::size_t& at, u64& state) {
+/// 32-bit numbers hold them exactly; whole numbers are small enough for every whole type. A list has
+/// no more than `most` entries; a list of a fixed length (`[16n]`) has exactly that many.
+Value answer(std::string_view shape, std::size_t& at, u64& state, u64 most = ~u64{0}) {
   const char c = at < shape.size() ? shape[at++] : 'n';
   switch (c) {
     case 'b': return Value::boolean(next(state) % 2 != 0);
     case 'i': return Value::integer(static_cast<i64>(next(state) % 7));
+    case 'h': return Value::integer(1 + static_cast<i64>(next(state) % 7));  // (a handle of an object made: never 0, which names none)
     case 'v': {
       Vec3 v;
       v.x = static_cast<f32>(static_cast<i64>(next(state) % 2001) - 1000) / 8.0f;
@@ -98,6 +124,12 @@ Value answer(std::string_view shape, std::size_t& at, u64& state) {
       return Value::vector(v);
     }
     case 't': return Value::text(std::string(1, static_cast<char>('a' + next(state) % 5)));
+    case 'c': {  // (a Callback the engine gives: unbound - its form is read over: c, what it gives, (what it is handed))
+      while (at < shape.size() && shape[at] != ')') ++at;
+      ++at;
+      return Value::callback(nullptr);
+    }
+    case 'l': return Value::int64(next(state));  // (an Int64: all of its 64 bits)
     case 'e': {
       i64 count = 0;
       while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') count = count * 10 + (shape[at++] - '0');
@@ -110,8 +142,15 @@ Value answer(std::string_view shape, std::size_t& at, u64& state) {
       return Value::structure(std::move(fields));
     }
     case '[': {
+      // ([N item]: a list of a fixed length - `f32 m[16]` -, exactly N entries, as C++ holds them; [?item]: what may be
+      // there or not - std::optional, std::unique_ptr of a value -, no entry or one; [item]: 0 to 2)
+      u64 fixed = 0;
+      bool sized = false;
+      while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') { fixed = fixed * 10 + static_cast<u64>(shape[at++] - '0'); sized = true; }
+      const bool maybe = !sized && at < shape.size() && shape[at] == '?';
+      if (maybe) ++at;
       const std::size_t item = at;
-      const std::size_t count = next(state) % 3;
+      const std::size_t count = static_cast<std::size_t>(sized ? fixed : std::min<u64>(next(state) % (maybe ? 2 : 3), most));
       std::vector<Value> items;
       std::size_t end = at;
       for (std::size_t k = 0; k < count; ++k) {
@@ -135,6 +174,7 @@ Value answer(std::string_view shape, std::size_t& at, u64& state) {
       if (what == 'i') { std::vector<i64> v; for (const Value& x : items) v.push_back(x.i); return Value::of(std::move(v)); }
       if (what == 'v') { std::vector<Vec3> v; for (const Value& x : items) v.push_back(x.v); return Value::of(std::move(v)); }
       if (what == 't') { std::vector<std::string> v; for (const Value& x : items) v.push_back(x.s); return Value::of(std::move(v)); }
+      if (what == 'l') { std::vector<Int64> v; for (const Value& x : items) v.push_back(Int64(static_cast<u64>(x.i))); return Value::of(std::move(v)); }
       std::vector<f64> v;
       for (const Value& x : items) v.push_back(x.n);
       return Value::of(std::move(v));
@@ -143,22 +183,79 @@ Value answer(std::string_view shape, std::size_t& at, u64& state) {
   }
 }
 
+/// The Callbacks in a value of a form (EnginePin::shape): its own, or its fields' - with their forms.
+void callbacks_in(std::string_view shape, std::size_t& at, const Value* v, std::vector<EngineStandIn::Kept>& out) {
+  const char c = at < shape.size() ? shape[at++] : 'n';
+  if (c == 'c') {
+    const std::size_t from = at - 1;
+    while (at < shape.size() && shape[at] != ')') ++at;
+    ++at;
+    if (v && v->type == PinType::callback && v->call) out.push_back({std::string(shape.substr(from, at - from)), *v});
+  } else if (c == 'e') {
+    while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') ++at;
+  } else if (c == '{') {
+    for (std::size_t k = 0; at < shape.size() && shape[at] != '}'; ++k) callbacks_in(shape, at, v ? v->field(k) : nullptr, out);
+    ++at;
+  } else if (c == '[') {
+    while (at < shape.size() && shape[at] >= '0' && shape[at] <= '9') ++at;
+    callbacks_in(shape, at, nullptr, out);  // (a list holds no Callback: its item's form is read over)
+    ++at;
+  }
+}
+/// Calls a Callback three times with inputs drawn from `state`; what it gives, written down.
+std::string called(const EngineStandIn::Kept& k, u64& state) {
+  const std::size_t open = k.shape.find('(');
+  const std::string_view gives = std::string_view(k.shape).substr(1, open - 1), takes = std::string_view(k.shape).substr(open + 1, k.shape.size() - open - 2);
+  std::string r = " ->";
+  for (int time = 0; time < 3; ++time) {
+    std::vector<Value> args;
+    for (std::size_t at = 0; at < takes.size();) args.push_back(answer(takes, at, state));
+    Value got;
+    const bool bound = k.callback.call->call(args, got);
+    r += " " + (bound && !gives.empty() ? engine_shown(got) : std::string(bound ? "()" : "unbound"));
+  }
+  return r;
+}
+
 }  // namespace
 
 bool EngineStandIn::engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out) {
   const EngineFunction* f = engine_function(function);
   if (!f) return false;
-  std::string call(function);
-  call += "(";
-  for (std::size_t k = 0; k < in.size(); ++k) call += (k ? ", " : "") + engine_shown(in[k]);
-  call += ")";
+  std::string call = engine_call_shown(function, in);
   // the answer: from the call itself, and from how many calls came before it (the engine may say
   // something else when it is asked again)
   u64 state = 1469598103934665603ull + calls.size();
   for (const char ch : call) state = (state ^ static_cast<unsigned char>(ch)) * 1099511628211ull;
-  for (std::size_t k = 0; k < f->outputs.size() && k < out.size(); ++k) {
+  // the Callbacks it is handed, and those an object it is called on was handed before: called, and what they give is
+  // part of the call and of its answer
+  std::vector<Kept> handed;
+  for (std::size_t k = 0; k < f->inputs.size() && k < in.size(); ++k) {
     std::size_t at = 0;
-    out[k] = answer(f->outputs[k].shape, at, state);
+    callbacks_in(f->inputs[k].shape, at, &in[k], handed);
+  }
+  const bool on_object = !in.empty() && in[0].type == PinType::integer && !f->inputs.empty() && f->inputs[0].type == PinType::integer;
+  std::string heard;
+  if (on_object)
+    if (auto it = kept.find(in[0].i); it != kept.end())
+      for (const auto& [which, k] : it->second) heard += called(k, state);
+  for (const Kept& k : handed) heard += called(k, state);
+  for (const char ch : heard) state = (state ^ static_cast<unsigned char>(ch)) * 1099511628211ull;
+  call += heard;
+  if (on_object) {
+    const std::string_view type(f->type);
+    if (type.size() > 8 && type.substr(type.size() - 8) == ".release") kept.erase(in[0].i);
+    else
+      for (std::size_t k = 0; k < handed.size(); ++k) kept[in[0].i][std::string(function) + "#" + std::to_string(k)] = handed[k];
+  }
+  for (std::size_t k = 0; k < f->outputs.size() && k < out.size(); ++k) {
+    // (what the engine writes through a pointer: no more entries than its count says - the room there is)
+    u64 most = ~u64{0};
+    if (f->outputs[k].count[0])
+      for (std::size_t j = 0; j < f->inputs.size() && j < in.size(); ++j)
+        if (std::strcmp(f->inputs[j].id, f->outputs[k].count) == 0) most = in[j].i > 0 ? static_cast<u64>(in[j].i) * f->outputs[k].per : 0;
+    std::size_t at = 0;
+    out[k] = answer(f->outputs[k].shape, at, state, most);
   }
   calls.push_back(std::move(call));
   return true;

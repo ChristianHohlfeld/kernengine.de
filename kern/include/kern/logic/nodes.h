@@ -5,10 +5,21 @@
 // Nothing here knows about graphs.
 #pragma once
 
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <charconv>
 #include <cmath>
+#include <compare>
+#include <concepts>
 #include <cstddef>
+#include <cstdlib>
 #include <deque>
+#include <functional>
 #include <initializer_list>
+#include <iterator>
+#include <limits>
+#include <new>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -32,17 +43,34 @@ template <std::size_t N> struct Setting {
   constexpr std::string_view view() const { return {text, N - 1}; }
 };
 
+namespace logic {
+struct Whole;
+template <char Op, class A, class B> struct Sum;
+template <class T> inline constexpr bool is_sum = false;
+template <char Op, class A, class B> inline constexpr bool is_sum<Sum<Op, A, B>> = true;
+template <class T> struct Sized;
+template <class T> inline constexpr bool is_sized = false;
+template <class T> inline constexpr bool is_sized<Sized<T>> = true;
+}  // namespace logic
+
 /// The functions of formulas (the Formula node; Formula::evaluate uses the same ones).
 namespace math {
 inline constexpr f64 pi = 3.14159265358979323846;
 inline f64 div(f64 a, f64 b) { return b != 0 ? a / b : 0; }
 inline f64 mod(f64 a, f64 b) { return b != 0 ? std::fmod(a, b) : 0; }
+/// IEEE 754's remainder: a - n * b with n the whole number nearest to a / b (of two, the even one) -
+/// std::remainder, exact (the result is always a number a double holds), so the same bits on every
+/// platform; its sign where it is 0 is a's. By 0 it gives 0, as mod.
+inline f64 remainder(f64 a, f64 b) { return b != 0 ? std::remainder(a, b) : 0; }
 inline f64 pow(f64 a, f64 b) { return dm::pow(a, b); }
 inline f64 min(f64 a, f64 b) { return min_of(a, b); }
 inline f64 max(f64 a, f64 b) { return max_of(a, b); }
 inline f64 clamp(f64 x, f64 lo, f64 hi) { return kern::clamp(x, min_of(lo, hi), max_of(lo, hi)); }
 inline f64 abs(f64 a) { return std::fabs(a); }
 inline f64 sign(f64 a) { return a > 0 ? 1 : a < 0 ? -1 : 0; }
+/// The size of `a` with the sign bit of `b` - also of -0 and of a NaN (copysign(1, -0) is -1,
+/// where sign(-0) is 0): IEEE 754's copySign, a bit operation, exact everywhere.
+inline f64 copysign(f64 a, f64 b) { return std::copysign(a, b); }
 inline f64 floor(f64 a) { return std::floor(a); }
 inline f64 ceil(f64 a) { return std::ceil(a); }
 inline f64 round(f64 a) { return std::round(a); }
@@ -67,21 +95,43 @@ inline f64 lerp(f64 a, f64 b, f64 t) { return a + (b - a) * t; }
 // the one a signed 32-bit number holds; mul32 is the product of two 32-bit numbers as 32 bits
 // hold it (their full product does not fit a formula's number exactly).
 inline i64 bits_of(f64 a) {
+  if (std::fabs(a) < 9223372036854775808.0) [[likely]] return static_cast<i64>(a);  // (one test for what is inside; not a number fails it)
   if (!(a == a)) return 0;
-  if (a >= 9223372036854775808.0) return std::numeric_limits<i64>::max();
-  if (a <= -9223372036854775808.0) return std::numeric_limits<i64>::min();
-  return static_cast<i64>(a);
+  return a > 0 ? std::numeric_limits<i64>::max() : std::numeric_limits<i64>::min();
 }
-inline f64 band(f64 a, f64 b) { return static_cast<f64>(bits_of(a) & bits_of(b)); }
-inline f64 bor(f64 a, f64 b) { return static_cast<f64>(bits_of(a) | bits_of(b)); }
-inline f64 bxor(f64 a, f64 b) { return static_cast<f64>(bits_of(a) ^ bits_of(b)); }
-inline f64 shl(f64 a, f64 n) { return n >= 0 && n < 64 ? static_cast<f64>(static_cast<i64>(static_cast<u64>(bits_of(a)) << static_cast<int>(n))) : 0; }
-inline f64 shr(f64 a, f64 n) { return n >= 0 && n < 64 ? static_cast<f64>(bits_of(a) >> static_cast<int>(n)) : (bits_of(a) < 0 ? -1 : 0); }
-inline f64 wrap32(f64 a) { return static_cast<f64>(static_cast<u32>(static_cast<u64>(bits_of(a)))); }
-inline f64 wrap32s(f64 a) { return static_cast<f64>(static_cast<i32>(static_cast<u32>(static_cast<u64>(bits_of(a))))); }
+inline i64 bits_of(const logic::Whole& a);  // (an Int: as the double it is - below, where Whole is)
+template <class T> inline i64 bits_of(logic::Sized<T> a);  // (an Int of a fixed width: the Int it is)
+/// The whole number one of these functions gives (band bor bxor shl shr wrap32 wrap32s mul32):
+/// it stands for the double static_cast<f64>(v) - that is what it is everywhere a number is
+/// asked for. Handed on to another of these functions, the number is taken as it is where that
+/// double holds it exactly (|v| <= 2^53: bits_of of the double gives v), and as bits_of of the
+/// double anywhere else: the same bits as through the double, without the way through it.
+struct Exact {
+  i64 v;
+  constexpr operator f64() const { return static_cast<f64>(v); }  // NOLINT (implicit: it is that number)
+};
+inline i64 bits_of(Exact a) {
+  constexpr i64 exact = i64{1} << 53;
+  return a.v >= -exact && a.v <= exact ? a.v : bits_of(static_cast<f64>(a.v));
+}
+/// (what these functions take: a number, or the whole number another of them gave)
+template <class T> concept Bits = std::same_as<T, Exact> || std::same_as<T, logic::Whole> || logic::is_sum<T> || logic::is_sized<T> || std::is_arithmetic_v<T>;
+template <Bits A, Bits B> inline Exact band(A a, B b) { return {bits_of(a) & bits_of(b)}; }
+template <Bits A, Bits B> inline Exact bor(A a, B b) { return {bits_of(a) | bits_of(b)}; }
+template <Bits A, Bits B> inline Exact bxor(A a, B b) { return {bits_of(a) ^ bits_of(b)}; }
+template <Bits A, Bits N> inline Exact shl(A a, N n) {
+  const f64 m = static_cast<f64>(n);
+  return {m >= 0 && m < 64 ? static_cast<i64>(static_cast<u64>(bits_of(a)) << static_cast<int>(m)) : 0};
+}
+template <Bits A, Bits N> inline Exact shr(A a, N n) {
+  const f64 m = static_cast<f64>(n);
+  return {m >= 0 && m < 64 ? bits_of(a) >> static_cast<int>(m) : (bits_of(a) < 0 ? -1 : 0)};
+}
+template <Bits A> inline Exact wrap32(A a) { return {static_cast<i64>(static_cast<u32>(static_cast<u64>(bits_of(a))))}; }
+template <Bits A> inline Exact wrap32s(A a) { return {static_cast<i64>(static_cast<i32>(static_cast<u32>(static_cast<u64>(bits_of(a)))))}; }
 /// The number as a 32-bit float holds it (a formula's single): what a vector's component is.
 inline f64 single(f64 a) { return static_cast<f64>(static_cast<f32>(a)); }
-inline f64 mul32(f64 a, f64 b) { return static_cast<f64>(static_cast<u32>(static_cast<u32>(static_cast<u64>(bits_of(a))) * static_cast<u32>(static_cast<u64>(bits_of(b))))); }
+template <Bits A, Bits B> inline Exact mul32(A a, B b) { return {static_cast<i64>(static_cast<u32>(static_cast<u32>(static_cast<u64>(bits_of(a))) * static_cast<u32>(static_cast<u64>(bits_of(b)))))}; }
 }  // namespace math
 
 namespace logic {
@@ -93,11 +143,254 @@ struct Whole {
   i64 v = 0;
   constexpr Whole() = default;
   constexpr Whole(i64 x) : v(normal(x)) {}       // NOLINT (implicit: an i64 is one)
+  /// (what a formula of whole numbers gives as an Int: the number its double holds as an Int -
+  /// whole(double(v)), which is normal(v): -> Int in a formula of whole numbers)
+  constexpr Whole(math::Exact x) : v(normal(x.v)) {}  // NOLINT
+  /// (what a formula of whole numbers whose value is +, - or * gives as an Int - -> Int: whole of the
+  /// double the formula's arithmetic gives, the whole number itself where that is exact; below, at Sum)
+  template <char Op, class A, class B> Whole(const Sum<Op, A, B>& s);  // NOLINT
   constexpr operator i64() const { return v; }   // NOLINT
   Whole& operator+=(Whole amount) {
     v = whole_add(v, amount.v);
     return *this;
   }
+  u64 hash() const { return KeyHash<i64>{}(v); }  // (a key of a Map, a Set)
+};
+}  // namespace logic
+namespace logic {
+/// `U8` ... `I32` in a Blueprint's C++: an Int place of a fixed width (logic::kWidthNames). It holds
+/// what it is given as C++ stores an integer in a T (static_cast<T>: the low bits, two's complement
+/// for a signed T) - from any whole number, an Int, another width; read, it is an Int (Whole). Adding
+/// to it (Add to Variable, `Count += 1`) adds the low bits, as C++'s += on a T stores the sum.
+template <class T> struct Sized {
+  static_assert(std::is_integral_v<T> && sizeof(T) <= 4);
+  T v = 0;
+  constexpr Sized() = default;
+  template <class I>
+    requires std::is_integral_v<I>
+  constexpr Sized(I x) : v(static_cast<T>(static_cast<u64>(static_cast<i64>(x)))) {}  // NOLINT (implicit: C++ stores it so)
+  constexpr Sized(Whole x) : v(static_cast<T>(static_cast<u64>(x.v))) {}            // NOLINT
+  template <class U> constexpr Sized(Sized<U> x) : v(static_cast<T>(static_cast<u64>(static_cast<i64>(x.v)))) {}  // NOLINT
+  constexpr Sized(math::Exact x) : Sized(Whole(x)) {}                                // NOLINT
+  template <char Op, class A, class B> Sized(const Sum<Op, A, B>& x) : Sized(Whole(x)) {}  // NOLINT
+  constexpr operator Whole() const { Whole r; r.v = static_cast<i64>(v); return r; }  // NOLINT (implicit: it is that Int)
+  // (its number, as a std::uint8_t converts to one: handed to every function of whole numbers that takes an i64)
+  constexpr operator i64() const { return static_cast<i64>(v); }  // NOLINT
+  Sized& operator+=(Whole amount) {
+    v = static_cast<T>(static_cast<u64>(static_cast<i64>(v)) + static_cast<u64>(amount.v));
+    return *this;
+  }
+  u64 hash() const { return KeyHash<i64>{}(static_cast<i64>(v)); }
+  friend constexpr bool operator==(Sized a, Sized b) { return a.v == b.v; }
+  // (compared with a whole number: as their numbers - one way, not two)
+  friend constexpr bool operator==(Sized a, Whole b) { return static_cast<i64>(a.v) == b.v; }
+  template <class U> friend constexpr bool operator==(Sized a, Sized<U> b) { return static_cast<i64>(a.v) == static_cast<i64>(b.v); }
+  template <class I>
+    requires std::is_integral_v<I>
+  friend constexpr bool operator==(Sized a, I b) { return static_cast<i64>(a.v) == static_cast<i64>(b); }
+};
+/// What a pin reads from a value it is handed (a Formula's input): an Int of a fixed width is the Int it holds,
+/// anything else is itself.
+template <class X> constexpr decltype(auto) pinned(X&& x) {
+  if constexpr (is_sized<std::remove_cvref_t<X>>) return Whole(x);
+  else return std::forward<X>(x);
+}
+}  // namespace logic
+namespace math {
+template <class T> inline i64 bits_of(logic::Sized<T> a) { return static_cast<i64>(a.v); }
+/// An Int handed to band ... mul32 (a formula of whole numbers): its bits are those of the double
+/// it is (bits_of(double(v))) - as Exact's, without the way through the double.
+inline i64 bits_of(const logic::Whole& a) { return bits_of(Exact{a.v}); }
+}  // namespace math
+namespace logic {
+/// +, - and * in a formula of whole numbers (docs/blueprint_cpp.md, "Formeln"): where one side is
+/// an Int (or such a sum) and the other an Int, what band ... mul32 give, or a number. Its value
+/// is what the formula's arithmetic of doubles gives - the two numbers as doubles (an Int and
+/// what band ... mul32 give: static_cast<f64>(v)), added, subtracted or multiplied as doubles -,
+/// worked out where it is asked for: as a number (f64) exactly that way; handed to band ...
+/// mul32 as the whole number it is, by the arithmetic of i64 where that is the same - every
+/// number in it is a whole number of at most 2^53 and so is every result on the way (then each
+/// double operation is exact: its double is that whole number) -, and else through the doubles.
+/// So it is the same value for every number, and the way through the double only where it
+/// makes a difference.
+template <class T> concept SumSide = std::same_as<T, Whole> || is_sum<T>;
+template <class T> concept SumOperand = SumSide<T> || std::same_as<T, math::Exact> || std::is_floating_point_v<T>;
+inline constexpr i64 kSumExact = i64{1} << 53;
+/// (a side as the formula's double)
+inline f64 sum_number(f64 x) { return x; }
+inline f64 sum_number(math::Exact x) { return static_cast<f64>(x.v); }
+inline f64 sum_number(Whole x) { return static_cast<f64>(x.v); }
+template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s);
+/// (a side as a whole number of at most 2^53 that its double is exactly - false where it is none)
+inline bool sum_exact(f64 x, i64& r) {
+  if (!(x >= -0x1p53 && x <= 0x1p53)) return false;  // (not a number fails it too)
+  r = static_cast<i64>(x);
+  return static_cast<f64>(r) == x;
+}
+inline bool sum_exact(math::Exact x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
+inline bool sum_exact(Whole x, i64& r) { r = x.v; return r >= -kSumExact && r <= kSumExact; }
+template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r);
+template <char Op, class A, class B> struct Sum {
+  A a;
+  B b;
+  operator f64() const {  // NOLINT (implicit: it is that number)
+    const f64 x = sum_number(a), y = sum_number(b);
+    if constexpr (Op == '+') return x + y;
+    else if constexpr (Op == '-') return x - y;
+    else return x * y;
+  }
+};
+template <char Op, class A, class B> f64 sum_number(const Sum<Op, A, B>& s) { return static_cast<f64>(s); }
+template <char Op, class A, class B> bool sum_exact(const Sum<Op, A, B>& s, i64& r) {
+  i64 x = 0, y = 0;
+  if (!sum_exact(s.a, x) || !sum_exact(s.b, y)) return false;
+  if constexpr (Op == '+') r = x + y;  // (|x|, |y| <= 2^53: no overflow)
+  else if constexpr (Op == '-') r = x - y;
+  else if (__builtin_mul_overflow(x, y, &r)) return false;
+  return r >= -kSumExact && r <= kSumExact;
+}
+/// (handed to band ... mul32: the whole number where it is exact, else bits_of of the double)
+template <char Op, class A, class B> inline i64 bits_of(const Sum<Op, A, B>& s) {
+  i64 r = 0;
+  return sum_exact(s, r) ? r : math::bits_of(static_cast<f64>(s));
+}
+/// (-> Int: every number on the way a whole number of at most 2^53 - then it is the double -, else whole(double))
+template <char Op, class A, class B> Whole::Whole(const Sum<Op, A, B>& s) {
+  i64 r = 0;
+  v = sum_exact(s, r) ? r : whole(static_cast<f64>(s));
+}
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'+', A, B> operator+(A a, B b) { return {a, b}; }
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'-', A, B> operator-(A a, B b) { return {a, b}; }
+template <SumOperand A, SumOperand B> requires(SumSide<A> || SumSide<B>) constexpr Sum<'*', A, B> operator*(A a, B b) { return {a, b}; }
+}  // namespace logic
+namespace logic {
+
+/// `Text` in a Blueprint's C++. A text written out in the program - "abc": a value typed into a
+/// pin, the default of a variable or of a field - is part of the program: a Text made of it
+/// refers to those characters. Nothing is copied and no memory is asked for, however long the
+/// text is and however often the value is handed on - as a const char* to a literal in C++. A
+/// text made while the Blueprint runs (Append, a number as a text, what the engine gives) holds
+/// its characters itself, as a std::string does.
+class Text {
+ public:
+  constexpr Text() : written_() {}
+  /// "abc": a text the program holds for good - a literal, a constant of the program. It is not
+  /// copied, so it must stay where it is. A buffer that is written to (char b[64]) is refused
+  /// here: its characters go into a std::string or a std::string_view, and those are copied.
+  template <std::size_t N> constexpr Text(const char (&written)[N]) : written_(written, N - 1), ended_(true) {}  // NOLINT (implicit: a text written out is a Text)
+  template <std::size_t N> Text(char (&)[N]) = delete;
+  Text(std::string made) : made_(std::move(made)), holds_(true) {}                                // NOLINT (implicit: a text made while running)
+  explicit Text(std::string_view copied) : made_(copied), holds_(true) {}
+  /// (one character, made where it is held - Text of Code)
+  explicit Text(std::size_t count, char c) : made_(count, c), holds_(true) {}
+  /// A text the program holds for good, by its characters - the name of an enum's value:
+  /// referred to, not copied. (Only for what stays where it is as long as the program runs.)
+  static Text of_program(std::string_view held) {
+    Text t;
+    t.written_ = held;
+    return t;
+  }
+  Text(const Text& o) : holds_(o.holds_), ended_(o.ended_) {
+    if (holds_) new (&made_) std::string(o.made_);
+    else new (&written_) std::string_view(o.written_);
+  }
+  Text(Text&& o) noexcept : holds_(o.holds_), ended_(o.ended_) {
+    if (holds_) new (&made_) std::string(std::move(o.made_));
+    else new (&written_) std::string_view(o.written_);
+  }
+  Text& operator=(const Text& o) {
+    if (this == &o) return *this;
+    if (holds_ && o.holds_) made_ = o.made_;  // (into the characters it has: std::string's own assignment)
+    else if (o.holds_) hold(std::string(o.made_));
+    else refer(o.written_, o.ended_);
+    return *this;
+  }
+  /// `O = text_append(std::move(O), x, y)` (a text handed on, set again to itself and more): what
+  /// text_append gives there, worked out where it is set - the others are appended where O's
+  /// characters are, as std::string's += does, without handing the characters on and back. Made
+  /// into a Text anywhere else, it is what text_append gives.
+  struct Appending {
+    Text& a;
+    const Text& b;
+    const Text& c;
+    operator Text() && {  // NOLINT (implicit: it is that text)
+      if (!a.holds_ || &b == &a || &c == &a) {
+        std::string made;
+        made.reserve(a.size() + b.size() + c.size());
+        made.append(a.view()).append(b.view()).append(c.view());
+        return made;
+      }
+      std::string t = std::move(a.made_);
+      t.append(b.view()).append(c.view());
+      return t;
+    }
+  };
+  Text& operator=(Appending&& x) {
+    if (&x.a == this && holds_ && &x.b != this && &x.c != this) [[likely]] {
+      add(x.b.view());
+      add(x.c.view());
+      return *this;
+    }
+    return *this = static_cast<Text>(std::move(x));
+  }
+  Text& operator=(Text&& o) noexcept {
+    if (this == &o) return *this;
+    if (holds_ && o.holds_) made_ = std::move(o.made_);
+    else if (o.holds_) hold(std::move(o.made_));
+    else refer(o.written_, o.ended_);
+    return *this;
+  }
+  constexpr ~Text() {
+    if (holds_) made_.~basic_string();
+  }
+  /// Its characters, where they are.
+  constexpr std::string_view view() const { return holds_ ? std::string_view(made_) : written_; }
+  constexpr operator std::string_view() const { return view(); }  // NOLINT (implicit: read as its characters)
+  constexpr std::size_t size() const { return view().size(); }
+  constexpr bool empty() const { return view().empty(); }
+  /// Does it hold its characters (a text made while running), or refer to the program's?
+  constexpr bool holds() const { return holds_; }
+  /// Its characters where they stand, if a 0 ends them there - a text written out in the program
+  /// ("abc"), or one made while running: what a function that takes a `const char*` reads, without
+  /// a copy. Null: nothing ends them where they are (the name of an enum's value, no text).
+  const char* ended() const { return holds_ ? made_.c_str() : ended_ ? written_.data() : nullptr; }
+  /// The std::string it holds (a text made while running), or null: what a function that takes a
+  /// `const std::string&` reads, without a copy.
+  const std::string* made() const { return holds_ ? &made_ : nullptr; }
+  /// Its characters as a std::string of their own (a copy), and handed on without one where it holds them.
+  std::string str() const& { return std::string(view()); }
+  std::string str() && { return holds_ ? std::move(made_) : std::string(written_); }
+  friend bool operator==(const Text& a, const Text& b) { return a.view() == b.view(); }
+  friend auto operator<=>(const Text& a, const Text& b) { return a.view() <=> b.view(); }
+  /// Set Code: the character at `index` becomes `c`, where it stands (a text of the program is first made the
+  /// text's own). An index outside the text changes nothing.
+  void set_at(i64 index, char c) {
+    if (index < 0 || static_cast<u64>(index) >= size()) return;
+    if (!holds_) hold(std::string(written_));
+    made_[static_cast<std::size_t>(index)] = c;
+  }
+
+ private:
+  /// (appended where its characters are - one character as std::string's += of a char adds it)
+  void add(std::string_view v) {
+    if (v.size() == 1) made_.push_back(v[0]);
+    else if (!v.empty()) made_.append(v);
+  }
+  void hold(std::string made) {
+    if (holds_) made_ = std::move(made);
+    else new (&made_) std::string(std::move(made)), holds_ = true;
+  }
+  void refer(std::string_view written, bool ended) {
+    if (holds_) made_.~basic_string(), holds_ = false;
+    new (&written_) std::string_view(written);
+    ended_ = ended;
+  }
+  union {
+    std::string_view written_;  // a text of the program: its characters there
+    std::string made_;          // a text made while running: its characters here
+  };
+  bool holds_ = false;
+  bool ended_ = false;  // (a text of the program that was written out: a 0 stands behind its characters)
 };
 
 /// What a list of a Blueprint's class holds of an item: the item - every entry of a list is an
@@ -113,7 +406,15 @@ struct Truth {
 namespace detail {
 template <class T> struct Entry { using type = T; };
 template <> struct Entry<bool> { using type = Truth; };
+template <class T> struct Sought { using type = T; };
+template <class T> struct Sought<Sized<T>> { using type = Whole; };
 }  // namespace detail
+/// What an item of a list of T is compared with (Find, Contains, Remove Item): a T - for a list of Ints
+/// of a fixed width an Int, as C++ compares a std::uint8_t with an int: the number, not what a U8 would
+/// hold of it (std::find of 256 in a std::vector<u8> finds nothing).
+template <class T> using Sought = typename detail::Sought<T>::type;
+template <class A, class B> constexpr bool equal_item(const A& a, const B& b) { return a == b; }
+template <class T> constexpr bool equal_item(const Sized<T>& a, const Whole& b) { return static_cast<i64>(a.v) == b.v; }
 
 /// Beside the lists. A place that is named beside a list (Cars[9] of two cars) is an entry of
 /// its own, with the zero of the items' type - a struct with its defaults: read, it is that
@@ -143,14 +444,14 @@ template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
   List(const Items& items) : Items(items) {}                 // NOLINT (implicit: the vector of its items is the list)
   List(Items&& items) noexcept : Items(std::move(items)) {}  // NOLINT
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   Item& operator[](I index) {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
     return beside::entry<Item>();
   }
   template <class I>
-    requires std::is_integral_v<I> || std::is_same_v<I, Whole>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
   const Item& operator[](I index) const {
     const i64 at = static_cast<i64>(index);
     if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return Items::operator[](static_cast<std::size_t>(at));
@@ -158,6 +459,82 @@ template <class T> struct List : std::vector<typename detail::Entry<T>::type> {
     return zero;
   }
 };
+
+/// A list of a fixed length in a Blueprint's C++ (Fixed<Float, 16>): what a place is declared as
+/// that always has that many entries - a variable, a field of a struct, an input, an output, a
+/// local variable. It is std::array: it lies where it stands, no memory is asked for. Its
+/// entries are read and set like a list's ([] never reaches beside it either); nothing changes
+/// its length. Given a list, it takes that list's entries - cut at its length, or filled up with
+/// the zero of its entries; where a list is needed it gives a list of its entries (a copy).
+template <class T, std::size_t N> struct Fixed {
+  using Item = typename detail::Entry<T>::type;
+  std::array<Item, N> items{};
+  Fixed() = default;
+  Fixed(std::initializer_list<Item> given) { take(given.begin(), given.size()); }                              // Fixed<Float, 3>{1.0, 2.5}
+  /// (each entry made where it stands: what Make List is given is handed over, not copied)
+  template <class... V>
+    requires(sizeof...(V) == N)
+  explicit Fixed(std::in_place_t, V&&... entries) : items{Item(std::forward<V>(entries))...} {}
+  Fixed(const std::vector<Item>& list) { take(list.data(), list.size()); }                                     // NOLINT (implicit: a list set at the place)
+  template <std::size_t M> Fixed(const Fixed<T, M>& other) { take(other.items.data(), M); }                    // NOLINT (implicit: a list of another length)
+  template <std::size_t M> Fixed(Fixed<T, M>&& other) {                                                        // NOLINT
+    for (std::size_t k = 0; k < N && k < M; ++k) items[k] = std::move(other.items[k]);
+  }
+  Fixed(const Fixed&) = default;
+  Fixed(Fixed&&) = default;
+  Fixed& operator=(const Fixed&) = default;
+  Fixed& operator=(Fixed&&) = default;
+  operator List<T>() const& { return List<T>(typename List<T>::Items(items.begin(), items.end())); }           // NOLINT (implicit: its entries as a list)
+  operator List<T>() && { return List<T>(typename List<T>::Items(std::make_move_iterator(items.begin()), std::make_move_iterator(items.end()))); }  // NOLINT
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+  Item& operator[](I index) {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
+    return beside::entry<Item>();
+  }
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+  const Item& operator[](I index) const {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < N) return items[static_cast<std::size_t>(at)];
+    static const Item zero{};
+    return zero;
+  }
+  constexpr std::size_t size() const { return N; }
+  const Item* data() const { return items.data(); }
+  auto begin() const { return items.begin(); }
+  auto end() const { return items.end(); }
+  bool operator==(const Fixed&) const = default;
+
+ private:
+  void take(const Item* from, std::size_t count) {
+    for (std::size_t k = 0; k < N && k < count; ++k) items[k] = from[k];
+  }
+};
+/// The entries of a list as a node reads them - of a List or of a Fixed, where they stand:
+/// nothing is copied (std::span).
+template <class T> struct Items {
+  using Item = typename detail::Entry<T>::type;
+  const Item* first = nullptr;
+  std::size_t count = 0;
+  Items(const std::vector<Item>& list) : first(list.data()), count(list.size()) {}                   // NOLINT (implicit: a view of the list)
+  template <std::size_t N> Items(const Fixed<T, N>& list) : first(list.data()), count(N) {}          // NOLINT
+  std::size_t size() const { return count; }
+  const Item* begin() const { return first; }
+  const Item* end() const { return first + count; }
+  /// The entry at `index`; beyond the list: the zero of its type.
+  const Item& operator[](i64 index) const {
+    if (index >= 0 && static_cast<u64>(index) < count) return first[index];
+    static const Item zero{};
+    return zero;
+  }
+};
+/// The entries of a list, whatever its items are (a node over the items of a list of Ints of each width -
+/// Text of Bytes, Copy Bytes: in C++ a function over the list's items).
+template <class T> Items<T> items_of(const List<T>& list) { return list; }
+template <class T, std::size_t N> Items<T> items_of(const Fixed<T, N>& list) { return list; }
+template <class T> Items<T> items_of(Items<T> list) { return list; }
 
 /// A value of the interpreter as the C++ type of its pin, and back. A list is the vector of its
 /// items; a list of whole numbers is a vector of i64 in the interpreter and of Whole (`Int`) in a
@@ -185,6 +562,10 @@ template <> struct Held<Whole> {
   static constexpr PinType type = PinType::integer;
   static Whole from(const Value& v) { return v.as_int(); }
 };
+template <class T> struct Held<Sized<T>> {
+  static constexpr PinType type = PinType::integer;
+  static Sized<T> from(const Value& v) { return Sized<T>(v.as_int()); }
+};
 template <> struct Held<f64> {
   static constexpr PinType type = PinType::number;
   static f64 from(const Value& v) { return v.as_number(); }
@@ -197,9 +578,17 @@ template <> struct Held<std::string> {
   static constexpr PinType type = PinType::text;
   static std::string from(const Value& v) { return v.as_text(); }
 };
+template <> struct Held<Text> {
+  static constexpr PinType type = PinType::text;
+  static Text from(const Value& v) { return Text(v.as_text()); }
+};
 template <> struct Held<ActorHandle> {
   static constexpr PinType type = PinType::actor;
   static ActorHandle from(const Value& v) { return {v.as_actor()}; }
+};
+template <> struct Held<Int64> {
+  static constexpr PinType type = PinType::int64;
+  static Int64 from(const Value& v) { return Int64(v.type == PinType::int64 ? static_cast<u64>(v.i) : 0); }
 };
 template <class T> struct Held<std::vector<T>> {
   static constexpr PinType type = list_type_of<T>();
@@ -210,6 +599,20 @@ template <> struct Held<std::vector<Whole>> {
   static std::vector<Whole> from(const Value& v) {
     const std::vector<i64>& items = v.items<i64>();
     return std::vector<Whole>(items.begin(), items.end());
+  }
+};
+template <class T> struct Held<std::vector<Sized<T>>> {
+  static constexpr PinType type = PinType::integer_list;
+  static std::vector<Sized<T>> from(const Value& v) {
+    const std::vector<i64>& items = v.items<i64>();
+    return std::vector<Sized<T>>(items.begin(), items.end());
+  }
+};
+template <> struct Held<std::vector<Text>> {
+  static constexpr PinType type = PinType::text_list;
+  static std::vector<Text> from(const Value& v) {
+    const std::vector<std::string>& items = v.items<std::string>();
+    return std::vector<Text>(items.begin(), items.end());
   }
 };
 template <> struct Held<std::vector<Truth>> {
@@ -274,21 +677,16 @@ template <NativeStruct S> struct Held<std::vector<S>> {
 template <class T> struct Held<List<T>> : Held<typename List<T>::Items> {
   static List<T> from(const Value& v) { return List<T>(Held<typename List<T>::Items>::from(v)); }
 };
+// A list of a fixed length: held as the list of its entries (a value on a pin is a list).
+template <class T, std::size_t N> struct Held<Fixed<T, N>> : Held<List<T>> {
+  static Fixed<T, N> from(const Value& v) { return Fixed<T, N>(Held<List<T>>::from(v)); }
+};
 }  // namespace detail
 template <class T> T from_value(const Value& v) { return detail::Held<T>::from(v); }
-/// What a function of the engine gives where a Blueprint's own type stands - one of its structs or
-/// enums, or a list of them: the value, read as that type where it is used (engine_nodes.gen.h).
 namespace detail {
 template <class T> inline constexpr bool is_initializer_list = false;
 template <class T> inline constexpr bool is_initializer_list<std::initializer_list<T>> = true;
 }  // namespace detail
-struct EngineValue {
-  Value v;
-  /// (Not a list written out in braces: a List is assigned as the list it is.)
-  template <class T>
-    requires(!detail::is_initializer_list<T>)
-  operator T() const { return from_value<T>(v); }
-};
 template <class T> constexpr PinType pin_type_of() { return detail::Held<T>::type; }
 /// Is `v` a value of the C++ type T as a Blueprint holds it (logic::is_value_of: of that pin
 /// type, an enum's value one of its values, a struct with a value of its type for every field)?
@@ -299,10 +697,14 @@ template <class T> bool is_value(const Value& v) {
 inline Value to_value(bool v) { return Value::boolean(v); }
 inline Value to_value(i64 v) { return Value::integer(v); }
 inline Value to_value(Whole v) { return Value::integer(v); }
+template <class T> Value to_value(Sized<T> v) { return Value::integer(static_cast<i64>(v.v)); }
 inline Value to_value(f64 v) { return Value::number(v); }
 inline Value to_value(Vec3 v) { return Value::vector(v); }
 inline Value to_value(std::string v) { return Value::text(std::move(v)); }
+inline Value to_value(const Text& v) { return Value::text(v.str()); }
+inline Value to_value(Text&& v) { return Value::text(std::move(v).str()); }
 inline Value to_value(ActorHandle v) { return Value::actor(v.id); }
+inline Value to_value(Int64 v) { return Value::int64(v.bits); }
 inline Value to_value(Value v) { return v; }  // (a struct in the interpreter)
 template <class T> Value to_value(std::vector<T> v) { return Value::of(std::move(v)); }
 template <detail::NativeStruct S> Value to_value(const S& v) { return detail::Held<S>::to(v); }
@@ -325,6 +727,14 @@ Value to_value(std::vector<E> v) {
 }
 inline Value to_value(const std::vector<Whole>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
 inline Value to_value(const std::vector<Truth>& v) { return Value::of(std::vector<bool>(v.begin(), v.end())); }
+template <class T> Value to_value(const std::vector<Sized<T>>& v) { return Value::of(std::vector<i64>(v.begin(), v.end())); }
+inline Value to_value(const std::vector<Text>& v) {
+  std::vector<std::string> items;
+  items.reserve(v.size());
+  for (const Text& item : v) items.push_back(item.str());
+  return Value::of(std::move(items));
+}
+template <class T, std::size_t N> Value to_value(const Fixed<T, N>& v) { return to_value(List<T>(v)); }  // (a list of a fixed length: its entries as a list)
 
 /// What the list nodes do, for a list of any item type - the node library and a Blueprint's C++
 /// call these. Every one is defined for every index: there is no reading or writing past a
@@ -345,6 +755,17 @@ template <class T> i64 find(const std::vector<T>& items, const std::type_identit
   return -1;
 }
 template <class T> bool contains(const std::vector<T>& items, const std::type_identity_t<T>& item) { return find(items, item) >= 0; }
+/// Do two lists hold the same items in the same order: as many, and each equal to the one at its place -
+/// the == of two std::vector of one type. (Read where they stand: comparing copies nothing.)
+template <class T> bool equal(const std::vector<T>& a, const std::vector<T>& b) {
+  if (a.size() != b.size()) return false;
+  for (std::size_t k = 0; k < a.size(); ++k) {
+    const T& x = a[k];
+    const T& y = b[k];
+    if (!(x == y)) return false;
+  }
+  return true;
+}
 /// Adds `item` at the end; its index.
 template <class T> i64 add(std::vector<T>& items, std::type_identity_t<T> item) {
   items.push_back(std::move(item));
@@ -361,12 +782,12 @@ template <class T> void remove_at(std::vector<T>& items, i64 index) {
   if (index >= 0 && static_cast<u64>(index) < items.size()) items.erase(items.begin() + static_cast<std::ptrdiff_t>(index));
 }
 /// Takes every item that equals `item` out; was there one?
-template <class T> bool remove(std::vector<T>& items, const std::type_identity_t<T>& item) {
+template <class T> bool remove(std::vector<T>& items, const Sought<T>& item) {
   std::size_t kept = 0;
   for (std::size_t k = 0; k < items.size(); ++k) {
     {
       const T& at = items[k];
-      if (at == item) continue;
+      if (equal_item(at, item)) continue;
     }
     if (kept != k) items[kept] = std::move(items[k]);
     ++kept;
@@ -376,6 +797,11 @@ template <class T> bool remove(std::vector<T>& items, const std::type_identity_t
   return removed;
 }
 template <class T> void clear(std::vector<T>& items) { items.clear(); }
+/// Sort List: the items in order - `less(a, b)`: a goes before b; without it, by their `<` -, items
+/// that are equal in that order as they stood (a stable sort: the order it gives is the one order there
+/// is, on every machine and in every tier).
+template <class T, class Less> void sort(std::vector<T>& items, Less less) { std::stable_sort(items.begin(), items.end(), less); }
+template <class T> void sort(std::vector<T>& items) { std::stable_sort(items.begin(), items.end()); }
 /// The longest list Set Length makes and Reserve makes room for: a length beyond it is this
 /// one (a length is defined for every number, like an index).
 inline constexpr i64 kLongest = i64{1} << 24;
@@ -390,8 +816,21 @@ template <class T> void resize(std::vector<T>& items, i64 length, const std::typ
 template <class T> void reserve(std::vector<T>& items, i64 count) {
   if (count > 0) items.reserve(static_cast<std::size_t>(count > kLongest ? kLongest : count));
 }
-/// Puts the items of `more`, in their order, in front of what is at `index` (before the first: at
-/// the start; past the end: at the end) - in one go. A list into itself: its items as they were.
+/// Puts `count` items from `more` on, in their order, in front of what is at `index` (before the
+/// first: at the start; past the end: at the end) - in one go. Items of the list itself: as they
+/// were.
+template <class T> void insert_items(std::vector<T>& items, i64 index, const T* more, std::size_t count) {
+  const std::ptrdiff_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? static_cast<std::ptrdiff_t>(items.size()) : static_cast<std::ptrdiff_t>(index);
+  if (count == 0) return;
+  const std::less<const T*> before;
+  if (!items.empty() && !before(more, items.data()) && before(more, items.data() + items.size())) {
+    const std::vector<T> were(more, more + count);
+    items.insert(items.begin() + at, were.begin(), were.end());
+    return;
+  }
+  items.insert(items.begin() + at, more, more + count);
+}
+/// The same with the items of another list (a list into itself: its items as they were).
 template <class T> void insert_list(std::vector<T>& items, i64 index, const std::vector<T>& more) {
   const std::ptrdiff_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? static_cast<std::ptrdiff_t>(items.size()) : static_cast<std::ptrdiff_t>(index);
   if (&more == &items) {
@@ -405,8 +844,1128 @@ template <class T> void insert_list(std::vector<T>& items, i64 index, const std:
 template <class T> void append(std::vector<T>& items, const std::vector<T>& more) { insert_list(items, static_cast<i64>(items.size()), more); }
 }  // namespace list
 
+/// A Map in a Blueprint's C++ (Map<Int, Float>, Map<Int, List<Int>> ...): kern::Map - its values
+/// under their keys, in the order the keys came. A value is a place by its entry's place in that
+/// order (Cells[i], Cells[i].Count += 1): [] never reaches beside the map - there it gives an
+/// entry of its own (beside), as a List's does. Its keys are found by the map's nodes (map::).
+template <class K, class V> struct Map : kern::Map<K, typename detail::Entry<V>::type> {
+  using Item = typename detail::Entry<V>::type;
+  using Entries = kern::Map<K, Item>;
+  using Entries::Entries;
+  Map() = default;
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+  Item& operator[](I index) {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
+    return beside::entry<Item>();
+  }
+  template <class I>
+    requires std::is_integral_v<I> || std::is_same_v<I, Whole> || is_sized<I>
+  const Item& operator[](I index) const {
+    const i64 at = static_cast<i64>(index);
+    if (at >= 0 && static_cast<std::size_t>(at) < this->size()) return this->value_at(static_cast<std::size_t>(at));
+    static const Item zero{};
+    return zero;
+  }
+};
+/// A Set in a Blueprint's C++ (Set<Int>): kern::Set - its keys in the order they came.
+template <class K> struct Set : kern::Set<K> {
+  using kern::Set<K>::Set;
+  Set() = default;
+};
+
+// A Map and a Set of a Blueprint's class as the interpreter holds them: their entries, keys and
+// values each as the value it is.
+namespace detail {
+template <class K, class V> struct Held<Map<K, V>> {
+  static constexpr PinType type = PinType::map;
+  static bool is(const Value& v) {
+    if (v.type != type) return false;
+    for (std::size_t k = 0; k < v.size(); ++k)
+      if (!is_value_of<K>(key_value(v.keyed().key_at(k), Held<K>::type)) || !is_value_of<V>(v.keyed().value_at(k))) return false;
+    return true;
+  }
+  static Map<K, V> from(const Value& v) {
+    Map<K, V> m;
+    m.reserve(v.size());
+    for (std::size_t k = 0; k < v.size(); ++k) m.try_emplace(Held<K>::from(key_value(v.keyed().key_at(k), Held<K>::type)), Held<V>::from(v.keyed().value_at(k)));
+    return m;
+  }
+  template <class T> static bool is_value_of(const Value& x) {
+    if constexpr (requires { Held<T>::is(x); }) return Held<T>::is(x);
+    else return x.type == Held<T>::type;
+  }
+};
+template <class K> struct Held<Set<K>> {
+  static constexpr PinType type = PinType::set;
+  static bool is(const Value& v) {
+    if (v.type != type) return false;
+    for (std::size_t k = 0; k < v.size(); ++k)
+      if (!Held<Map<K, bool>>::template is_value_of<K>(key_value(v.keyed().key_at(k), Held<K>::type))) return false;
+    return true;
+  }
+  static Set<K> from(const Value& v) {
+    Set<K> s;
+    s.reserve(v.size());
+    for (std::size_t k = 0; k < v.size(); ++k) s.insert(Held<K>::from(key_value(v.keyed().key_at(k), Held<K>::type)));
+    return s;
+  }
+};
+}  // namespace detail
+template <class K, class V> Value to_value(const Map<K, V>& m) {
+  Value r = Value::zero(PinType::map);
+  if (m.empty()) return r;
+  MapEntries& e = r.own_entries();
+  e.reserve(m.size());
+  for (const auto& [k, v] : m) e.try_emplace(key_of(to_value(k)), to_value(V(v)));
+  return r;
+}
+template <class K> Value to_value(const Set<K>& s) {
+  Value r = Value::zero(PinType::set);
+  if (s.empty()) return r;
+  MapEntries& e = r.own_entries();
+  e.reserve(s.size());
+  for (const K& k : s) e.try_emplace(key_of(to_value(k)));
+  return r;
+}
+
+/// A Callback in a Blueprint's C++ (Callback<Float(Float, Float)>, Make Callback: callback<&Lib::fn>(place)): a
+/// function the engine calls and the place it is bound to - two words, as a function pointer with its void* is
+/// (kern::HeightSampler). fn is a thunk that calls the library's function on that place; none: unbound (a call
+/// gives the zero of R).
+template <class S> struct Callback;
+template <class R, class... A> struct Callback<R(A...)> {
+  R (*fn)(void*, A...) = nullptr;
+  void* place = nullptr;
+  /// (bound or not - as the interpreter's value says: what it calls, a call says. A Blueprint does not compare one;
+  /// a struct that holds one is equal field by field)
+  friend bool operator==(const Callback& x, const Callback& y) { return !x.fn == !y.fn; }
+  R operator()(A... a) const {
+    if constexpr (std::is_void_v<R>) {
+      if (fn) fn(place, a...);
+    } else {
+      return fn ? fn(place, a...) : R{};
+    }
+  }
+};
+namespace detail {
+template <class S> inline constexpr bool is_callback = false;
+template <class S> inline constexpr bool is_callback<Callback<S>> = true;
+/// A Callback of a Blueprint's class as a value (the door to the engine, a stand-in in a test): calls the thunk
+/// with the values made into its C++ types.
+template <class R, class... A> struct NativeCallable final : Callable {
+  Callback<R(A...)> held;
+  explicit NativeCallable(Callback<R(A...)> c) : held(c) {}
+  static constexpr char kind = 0;
+  const void* native_kind() const override { return &kind; }
+  bool call(std::span<const Value> args, Value& result) const override { return call(args, result, std::index_sequence_for<A...>{}); }
+  template <std::size_t... I> bool call(std::span<const Value> args, Value& result, std::index_sequence<I...>) const {
+    if (!held.fn) return false;
+    if constexpr (std::is_void_v<R>) held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...);
+    else result = to_value(held.fn(held.place, (I < args.size() ? Held<A>::from(args[I].converted(Held<A>::type)) : A{})...));
+    return true;
+  }
+};
+template <class R, class... A> struct Held<Callback<R(A...)>> {
+  static constexpr PinType type = PinType::callback;
+  /// (one the class made, back as it was; one the interpreter made calls the Blueprint there - in a class it is
+  /// unbound: a Callback goes from a Blueprint to the engine, not from one tier into another)
+  static Callback<R(A...)> from(const Value& v) {
+    if (v.call && v.call->native_kind() == &NativeCallable<R, A...>::kind) return static_cast<const NativeCallable<R, A...>&>(*v.call).held;
+    return {};
+  }
+};
+}  // namespace detail
+template <class R, class... A> Value to_value(const Callback<R(A...)>& c) {
+  return Value::callback(c.fn ? std::make_shared<detail::NativeCallable<R, A...>>(c) : nullptr);
+}
+
+/// What the nodes of a map do - on a Map of a Blueprint's class and on the interpreter's entries
+/// (MapEntries) alike: the same steps on the same container.
+namespace map {
+template <class M> i64 length(const M& m) { return static_cast<i64>(m.size()); }
+template <class M> bool contains(const M& m, const typename M::key_type& key) { return m.contains(key); }
+/// The place of the key's entry in the order of the keys, -1: there is none.
+template <class M> i64 index_of(const M& m, const typename M::key_type& key) {
+  const std::size_t at = m.index_of(key);
+  return at == M::npos ? -1 : static_cast<i64>(at);
+}
+/// The key of the entry at `at`; beyond the map: the zero of the keys' type.
+template <class M> typename M::key_type key_at(const M& m, i64 at) {
+  if (at < 0 || static_cast<u64>(at) >= m.size()) return typename M::key_type{};
+  return m.key_at(static_cast<std::size_t>(at));
+}
+/// The key's value (none: the zero of the values' type): (is there one, the value, its place - -1).
+template <class M> std::tuple<bool, typename M::mapped_type, i64> find(const M& m, const typename M::key_type& key) {
+  const i64 at = index_of(m, key);
+  if (at < 0) return {false, typename M::mapped_type{}, -1};
+  return {true, m.value_at(static_cast<std::size_t>(at)), at};
+}
+/// Set: the key gets the value - a new entry at the end when there is none. (was it new, its place)
+template <class M> std::pair<bool, i64> set(M& m, const typename M::key_type& key, typename M::mapped_type value) {
+  auto [it, fresh] = m.insert_or_assign(key, std::move(value));
+  return {fresh, static_cast<i64>(it - m.begin())};
+}
+/// Add: a new entry at the end with the zero of the values' type, unless the key has one. (was it new, its place)
+template <class M> std::pair<bool, i64> add(M& m, const typename M::key_type& key) {
+  auto [it, fresh] = m.try_emplace(key);
+  return {fresh, static_cast<i64>(it - m.begin())};
+}
+/// Takes the key's entry out (the others keep their order); was there one?
+template <class M> bool remove(M& m, const typename M::key_type& key) { return m.erase(key) > 0; }
+/// Takes the entry at `at` out; beyond the map: nothing.
+template <class M> void remove_at(M& m, i64 at) {
+  if (at >= 0 && static_cast<u64>(at) < m.size()) m.erase_at(static_cast<std::size_t>(at));
+}
+template <class M> void clear(M& m) { m.clear(); }
+/// Room for `count` entries (no more than list::kLongest).
+template <class M> void reserve(M& m, i64 count) { m.reserve(count <= 0 ? 0 : count > list::kLongest ? static_cast<std::size_t>(list::kLongest) : static_cast<std::size_t>(count)); }
+}  // namespace map
+
+/// What the nodes of a set do (see map::).
+namespace set {
+template <class S> i64 length(const S& s) { return static_cast<i64>(s.size()); }
+template <class S> bool contains(const S& s, const typename S::key_type& key) { return s.contains(key); }
+template <class S> i64 index_of(const S& s, const typename S::key_type& key) {
+  const std::size_t at = s.index_of(key);
+  return at == S::npos ? -1 : static_cast<i64>(at);
+}
+template <class S> typename S::key_type key_at(const S& s, i64 at) {
+  if (at < 0 || static_cast<u64>(at) >= s.size()) return typename S::key_type{};
+  return s.key_at(static_cast<std::size_t>(at));
+}
+/// Add: the key at the end, unless it is there. (was it new, its place)
+template <class S> std::pair<bool, i64> add(S& s, const typename S::key_type& key) {
+  auto [it, fresh] = s.insert(key);
+  return {fresh, static_cast<i64>(it - s.begin())};
+}
+template <class S> bool remove(S& s, const typename S::key_type& key) { return s.erase(key) > 0; }
+template <class S> void remove_at(S& s, i64 at) {
+  if (at >= 0 && static_cast<u64>(at) < s.size()) s.erase_at(static_cast<std::size_t>(at));
+}
+template <class S> void clear(S& s) { s.clear(); }
+template <class S> void reserve(S& s, i64 count) { s.reserve(count <= 0 ? 0 : count > list::kLongest ? static_cast<std::size_t>(list::kLongest) : static_cast<std::size_t>(count)); }
+}  // namespace set
+
 /// What the enum nodes do. An enum's values have names; a value is its place among them (the
 /// first is 0). The node library and a Blueprint's C++ call these.
+/// Format Text (text.format): a text made from a format as C's printf has it and values - character
+/// for character what snprintf gives in the C locale. The format says the conversions; each takes
+/// one value, of the type it names:
+///   %d %i            Int, as a signed number   (hh h: 8 / 16 bit, none: 32 bit, l ll j z t: 64 bit)
+///   %u %x %X %o      Int, as an unsigned one   (the same widths)
+///   %c               Int, the character of that code (8 bit)
+///   %f %F %e %E %g %G Float
+///   %s               Text
+///   %%               a % sign
+/// with the flags - + space 0 #, a width and a precision as numbers (not *). Numbers are written
+/// exactly rounded (std::to_chars, which is printf's rounding: the decimal nearest the binary
+/// value, ties to even) - the same text on every machine. `most`: at most that many bytes of it
+/// (snprintf's size - 1); less than 0: all of it.
+namespace format {
+/// A value a conversion takes.
+struct Arg {
+  enum class Kind : u8 { whole, number, text } kind = Kind::whole;
+  i64 i = 0;
+  f64 f = 0;
+  std::string_view s;
+};
+inline Arg arg(i64 v) { return {Arg::Kind::whole, v, 0, {}}; }
+inline Arg arg(Whole v) { return arg(static_cast<i64>(v)); }
+template <class T> Arg arg(Sized<T> v) { return arg(static_cast<i64>(v.v)); }
+inline Arg arg(f64 v) { return {Arg::Kind::number, 0, v, {}}; }
+inline Arg arg(std::string_view v) { return {Arg::Kind::text, 0, 0, v}; }
+/// One conversion of a format.
+struct Spec {
+  bool left = false, plus = false, space = false, zero = false, alt = false;
+  int width = 0, precision = -1;  // (-1: none given)
+  int bits = 32;                  // of a whole number: 8, 16, 32 or 64
+  char conv = 0;
+};
+/// The longest precision and width a format may say (what a number can be written with in one piece).
+inline constexpr int kLongest = 512;
+/// The type of value a conversion takes.
+inline Arg::Kind kind_of(char conv) {
+  switch (conv) {
+    case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': return Arg::Kind::number;
+    case 's': return Arg::Kind::text;
+    default: return Arg::Kind::whole;
+  }
+}
+/// Reads the conversion at fmt[at] (just after its %). False: it is none this format knows - `why` says.
+inline bool read_spec(std::string_view fmt, std::size_t& at, Spec& sp, std::string* why) {
+  auto fail = [&](const char* w) {
+    if (why) *why = w;
+    return false;
+  };
+  for (; at < fmt.size(); ++at) {
+    const char c = fmt[at];
+    if (c == '-') sp.left = true;
+    else if (c == '+') sp.plus = true;
+    else if (c == ' ') sp.space = true;
+    else if (c == '0') sp.zero = true;
+    else if (c == '#') sp.alt = true;
+    else break;
+  }
+  auto number = [&](int& out) {
+    out = 0;
+    while (at < fmt.size() && fmt[at] >= '0' && fmt[at] <= '9') {
+      out = out * 10 + (fmt[at++] - '0');
+      if (out > kLongest) return false;
+    }
+    return true;
+  };
+  if (at < fmt.size() && fmt[at] == '*') return fail("a width given by a value (*) is not supported: write the width out");
+  if (!number(sp.width)) return fail("a width of more than 512");
+  if (at < fmt.size() && fmt[at] == '.') {
+    ++at;
+    if (at < fmt.size() && fmt[at] == '*') return fail("a precision given by a value (.*) is not supported: write the precision out");
+    if (!number(sp.precision)) return fail("a precision of more than 512");
+  }
+  if (at < fmt.size() && fmt[at] == 'h') {
+    sp.bits = 16;
+    if (++at < fmt.size() && fmt[at] == 'h') sp.bits = 8, ++at;
+  } else if (at < fmt.size() && (fmt[at] == 'l' || fmt[at] == 'j' || fmt[at] == 'z' || fmt[at] == 't')) {
+    sp.bits = 64;
+    if (fmt[at] == 'l' && at + 1 < fmt.size() && fmt[at + 1] == 'l') ++at;
+    ++at;
+  }
+  if (at >= fmt.size()) return fail("the format ends inside a conversion (a % without its letter)");
+  sp.conv = fmt[at++];
+  switch (sp.conv) {
+    case 'd': case 'i': case 'u': case 'x': case 'X': case 'o': case 'c': case 's':
+    case 'f': case 'F': case 'e': case 'E': case 'g': case 'G': case '%': return true;
+    default: return fail("a conversion that is not supported (d i u x X o c s f F e E g G %)");
+  }
+}
+/// The types of the values a format takes, in their order. False: the format is none - `why` says.
+inline bool kinds(std::string_view fmt, std::vector<Arg::Kind>* out, std::string* why) {
+  for (std::size_t at = 0; at < fmt.size();) {
+    if (fmt[at++] != '%') continue;
+    Spec sp;
+    if (!read_spec(fmt, at, sp, why)) return false;
+    if (sp.conv != '%' && out) out->push_back(kind_of(sp.conv));
+  }
+  return true;
+}
+/// Where the characters go: counted only (to = nullptr), or written.
+struct Sink {
+  char* to = nullptr;
+  std::size_t at = 0;
+  void put(char c) {
+    if (to) to[at] = c;
+    ++at;
+  }
+  void put(std::string_view t) {
+    for (char c : t) put(c);
+  }
+  void fill(char c, int n) {
+    for (int k = 0; k < n; ++k) put(c);
+  }
+};
+/// Writes one conversion: its sign or prefix, its digits, padded to the width.
+inline void pad(Sink& out, const Spec& sp, std::string_view sign, std::string_view digits, bool zeros) {
+  const int len = static_cast<int>(sign.size() + digits.size());
+  const int room = sp.width > len ? sp.width - len : 0;
+  if (!sp.left && !zeros) out.fill(' ', room);
+  out.put(sign);
+  if (!sp.left && zeros) out.fill('0', room);
+  out.put(digits);
+  if (sp.left) out.fill(' ', room);
+}
+inline void put_whole(Sink& out, const Spec& sp, i64 v) {
+  const bool is_signed = sp.conv == 'd' || sp.conv == 'i';
+  u64 u = 0;
+  bool negative = false;
+  if (is_signed) {
+    const i64 x = sp.bits == 8 ? static_cast<i64>(static_cast<i8>(v)) : sp.bits == 16 ? static_cast<i64>(static_cast<i16>(v)) : sp.bits == 32 ? static_cast<i64>(static_cast<i32>(v)) : v;
+    negative = x < 0;
+    u = negative ? u64{0} - static_cast<u64>(x) : static_cast<u64>(x);
+  } else {
+    u = sp.bits == 8 ? static_cast<u64>(static_cast<u8>(v)) : sp.bits == 16 ? static_cast<u64>(static_cast<u16>(v)) : sp.bits == 32 ? static_cast<u64>(static_cast<u32>(v)) : static_cast<u64>(v);
+  }
+  const unsigned base = sp.conv == 'x' || sp.conv == 'X' ? 16 : sp.conv == 'o' ? 8 : 10;
+  const char* const digit_chars = sp.conv == 'X' ? "0123456789ABCDEF" : "0123456789abcdef";
+  char buf[kLongest + 32];
+  int n = 0;
+  for (u64 x = u; x; x /= base) buf[n++] = digit_chars[x % base];
+  const int least = sp.precision < 0 ? 1 : sp.precision;
+  while (n < least) buf[n++] = '0';  // (precision 0 and the value 0: no digit at all)
+  if (sp.alt && base == 8 && (n == 0 || buf[n - 1] != '0')) buf[n++] = '0';
+  char digits[kLongest + 32];
+  for (int k = 0; k < n; ++k) digits[k] = buf[n - 1 - k];
+  std::string_view sign;
+  if (is_signed) sign = negative ? "-" : sp.plus ? "+" : sp.space ? " " : "";
+  else if (sp.alt && base == 16 && u != 0) sign = sp.conv == 'X' ? "0X" : "0x";
+  pad(out, sp, sign, {digits, static_cast<std::size_t>(n)}, sp.zero && !sp.left && sp.precision < 0);
+}
+inline void put_number(Sink& out, const Spec& sp, f64 v) {
+  const bool upper = sp.conv == 'F' || sp.conv == 'E' || sp.conv == 'G';
+  const std::string_view sign = std::signbit(v) ? "-" : sp.plus ? "+" : sp.space ? " " : "";
+  const f64 a = std::fabs(v);
+  if (!std::isfinite(a)) {
+    pad(out, sp, sign, std::isnan(a) ? (upper ? "NAN" : "nan") : (upper ? "INF" : "inf"), false);
+    return;
+  }
+  const int p = sp.precision < 0 ? 6 : sp.precision;
+  char buf[kLongest + 400];
+  char* const end = buf + sizeof buf - 2;  // (room for a point put in afterwards)
+  std::to_chars_result r{};
+  char conv = static_cast<char>(sp.conv | 0x20);  // (lower case)
+  bool strip = false;
+  if (conv == 'g') {
+    // %g: %e or %f by the exponent the number has with p significant digits (C 7.21.6.1)
+    const int sig = p == 0 ? 1 : p;
+    char e[64];
+    const std::to_chars_result er = std::to_chars(e, e + sizeof e, a, std::chars_format::scientific, sig - 1);
+    const char* ep = e;
+    while (ep < er.ptr && *ep != 'e') ++ep;
+    int x = 0;
+    {
+      const char* q = ep + 1;
+      const bool minus = q < er.ptr && *q == '-';
+      if (q < er.ptr && (*q == '-' || *q == '+')) ++q;
+      for (; q < er.ptr; ++q) x = x * 10 + (*q - '0');
+      if (minus) x = -x;
+    }
+    if (sig > x && x >= -4) r = std::to_chars(buf, end, a, std::chars_format::fixed, sig - 1 - x), conv = 'f';
+    else r = std::to_chars(buf, end, a, std::chars_format::scientific, sig - 1), conv = 'e';
+    strip = !sp.alt;
+  } else {
+    r = std::to_chars(buf, end, a, conv == 'f' ? std::chars_format::fixed : std::chars_format::scientific, p);
+  }
+  char* last = r.ptr;
+  char* mark = buf;  // (where the exponent begins, or the end)
+  while (mark < last && *mark != 'e') ++mark;
+  std::size_t mant = static_cast<std::size_t>(mark - buf);
+  bool point = false;
+  for (std::size_t k = 0; k < mant; ++k) point = point || buf[k] == '.';
+  if (strip && point) {
+    std::size_t keep = mant;
+    while (keep > 0 && buf[keep - 1] == '0') --keep;
+    if (keep > 0 && buf[keep - 1] == '.') --keep;
+    for (char* q = mark; q < last; ++q) buf[keep + static_cast<std::size_t>(q - mark)] = *q;  // (the exponent moves up)
+    last = buf + keep + static_cast<std::size_t>(last - mark);
+    mark = buf + keep;
+    mant = keep;
+  } else if (sp.alt && !point) {
+    for (char* q = last; q > mark; --q) *q = q[-1];  // (# : the point stays, also without a digit after it)
+    *mark = '.';
+    ++last;
+  }
+  if (upper)
+    for (char* q = buf; q < last; ++q)
+      if (*q == 'e') *q = 'E';
+  pad(out, sp, sign, {buf, static_cast<std::size_t>(last - buf)}, sp.zero && !sp.left);
+}
+inline void put_text(Sink& out, const Spec& sp, std::string_view s) {
+  if (sp.precision >= 0 && static_cast<std::size_t>(sp.precision) < s.size()) s = s.substr(0, static_cast<std::size_t>(sp.precision));
+  pad(out, sp, {}, s, false);
+}
+/// The format with these values, into `out` (nullptr: only counted). How many bytes it has. A value a
+/// conversion does not have: the zero of its type; a value of another type: converted as a wire does.
+inline std::size_t write(char* to, std::string_view fmt, const Arg* args, std::size_t count) {
+  Sink out{to, 0};
+  std::size_t next = 0;
+  for (std::size_t at = 0; at < fmt.size();) {
+    const char c = fmt[at++];
+    if (c != '%') {
+      out.put(c);
+      continue;
+    }
+    Spec sp;
+    if (!read_spec(fmt, at, sp, nullptr)) break;  // (a format that is none: what stands before it - the check reports it)
+    if (sp.conv == '%') {
+      out.put('%');
+      continue;
+    }
+    const Arg a = next < count ? args[next] : Arg{kind_of(sp.conv), 0, 0, {}};
+    ++next;
+    switch (kind_of(sp.conv)) {
+      case Arg::Kind::number: put_number(out, sp, a.kind == Arg::Kind::number ? a.f : static_cast<f64>(a.i)); break;
+      case Arg::Kind::text: put_text(out, sp, a.s); break;
+      case Arg::Kind::whole:
+        if (sp.conv == 'c') {
+          const char ch = static_cast<char>(static_cast<u8>(a.kind == Arg::Kind::whole ? a.i : logic::whole(a.f)));
+          pad(out, sp, {}, {&ch, 1}, false);
+        } else {
+          put_whole(out, sp, a.kind == Arg::Kind::whole ? a.i : logic::whole(a.f));
+        }
+        break;
+    }
+  }
+  return out.at;
+}
+/// The text: counted, then written in one piece (one request for memory at most, as a std::string
+/// of that length makes).
+inline std::string text_of(std::string_view fmt, const Arg* args, std::size_t count, i64 most) {
+  std::size_t n = write(nullptr, fmt, args, count);
+  std::string r(n, '\0');
+  write(r.data(), fmt, args, count);
+  if (most >= 0 && static_cast<u64>(most) < n) r.resize(static_cast<std::size_t>(most));
+  return r;
+}
+}  // namespace format
+
+/// The text nodes that read a text as C++ reads a std::string or a std::string_view - the same
+/// answers, character for character. A place in a text is an Int; where C++ gives npos (a size_t
+/// that is no place), the Int is -1 - the size_t read with its sign, as a Blueprint holds every
+/// size_t -, and a place handed in is read back the same way (-1: npos, "to the end").
+namespace texts {
+inline constexpr std::size_t npos = std::string_view::npos;
+/// An Int as the size_t C++ has there (a whole number below 0 is that size_t read with its sign).
+constexpr std::size_t place(i64 at) { return static_cast<std::size_t>(static_cast<u64>(at)); }
+/// A size_t C++ gives as the Int that holds it (npos: -1).
+constexpr i64 found(std::size_t at) { return at == npos ? -1 : static_cast<i64>(at); }
+inline i64 find(std::string_view a, std::string_view b, i64 from) { return found(a.find(b, place(from))); }
+inline i64 rfind(std::string_view a, std::string_view b, i64 from) { return found(a.rfind(b, place(from))); }
+inline i64 find_first_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_first_of(b, place(from))); }
+inline i64 find_last_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_last_of(b, place(from))); }
+inline i64 find_first_not_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_first_not_of(b, place(from))); }
+inline i64 find_last_not_of(std::string_view a, std::string_view b, i64 from) { return found(a.find_last_not_of(b, place(from))); }
+/// substr(at, count): from `at` so many characters (count beyond the end, or -1: to the end). An
+/// `at` beyond the end gives no text (C++ throws std::out_of_range there - which ends a program
+/// that has no exceptions).
+constexpr std::string_view sub(std::string_view a, i64 at, i64 count) {
+  const std::size_t p = place(at);
+  if (p > a.size()) return {};
+  return a.substr(p, place(count));
+}
+/// The ranges insert, erase and replace work on, as C++ cuts them: `at` beyond the end - C++
+/// throws std::out_of_range - changes nothing.
+inline void erase(std::string& a, i64 at, i64 count) {
+  if (place(at) <= a.size()) a.erase(place(at), place(count));
+}
+inline void insert(std::string& a, i64 at, std::string_view b) {
+  if (place(at) <= a.size()) a.insert(place(at), b);
+}
+inline void replace(std::string& a, i64 at, i64 count, std::string_view b) {
+  if (place(at) <= a.size()) a.replace(place(at), place(count), b);
+}
+/// (no longer than 2^24 characters: a length is defined for every number, as Set Length's - list::kLongest)
+inline constexpr i64 kLongest = i64{1} << 24;
+inline std::string repeat(std::string_view a, i64 count) {
+  std::string r;
+  if (count <= 0 || a.empty()) return r;
+  const i64 times = std::min(count, kLongest / static_cast<i64>(a.size()));
+  r.reserve(a.size() * static_cast<std::size_t>(times));
+  for (i64 k = 0; k < times; ++k) r.append(a);
+  return r;
+}
+/// The bytes of a text as whole numbers 0 .. 255 (each char as an unsigned char), put into a list of whole
+/// numbers in front of the entry at `index` (0: at the start; past the end: at the end) - in one go, as
+/// std::vector::insert of the text's range: what `bytes.insert(bytes.end(), text.begin(), text.end())` does.
+template <class W> void insert_bytes(std::vector<W>& items, i64 index, std::string_view text) {
+  const std::size_t at = index <= 0 ? 0 : static_cast<u64>(index) >= items.size() ? items.size() : static_cast<std::size_t>(index);
+  items.insert(items.begin() + static_cast<std::ptrdiff_t>(at), text.size(), W{});
+  for (std::size_t k = 0; k < text.size(); ++k) items[at + k] = W(static_cast<i64>(static_cast<u8>(text[k])));
+}
+template <class List> std::string of_bytes(const List& bytes, i64 at, i64 count) {
+  std::string r;
+  if (at < 0 || count <= 0 || static_cast<u64>(at) >= bytes.size()) return r;
+  const std::size_t from = static_cast<std::size_t>(at);
+  const std::size_t n = std::min(static_cast<std::size_t>(static_cast<u64>(count)), bytes.size() - from);
+  r.resize(n);
+  for (std::size_t k = 0; k < n; ++k) r[k] = static_cast<char>(static_cast<u8>(static_cast<i64>(bytes[from + k])));
+  return r;
+}
+}  // namespace texts
+
+/// Parse Float, Parse Int and Scan Text (text.parse_float, text.parse_int, text.scan): numbers and
+/// words read from a text as C reads them - strtod, strtof, strtoll, strtoull (and with them atof,
+/// atoi, atol, strtol, strtoul of a 64-bit long) and sscanf -, character for character what glibc
+/// (2.39, in the mode of C23 that C++ compiles with: "0b" in front of a binary number) reads in the C
+/// locale: the same characters read, the same value, the same count. The text is read as a C string
+/// at a place (s.c_str() + at): from `at` up to its first zero byte; an `at` beyond the text (or
+/// below 0 - in C a pointer to nowhere) reads an empty one. A finite number's value is what the C
+/// library computes from the characters read (correctly rounded, so on every machine the same);
+/// infinity, NaN and the payload of a NaN ("nan(0x7f)") are worked out here, as glibc does.
+namespace scan {
+inline constexpr int kEnd = -1;  // (no character: where C's EOF is)
+constexpr bool space(int c) { return c == ' ' || (c >= '\t' && c <= '\r'); }
+constexpr bool digit(int c) { return c >= '0' && c <= '9'; }
+constexpr int lower(int c) { return c >= 'A' && c <= 'Z' ? c + ('a' - 'A') : c; }
+constexpr bool xdigit(int c) { return digit(c) || (lower(c) >= 'a' && lower(c) <= 'f'); }
+/// A digit's value in a base up to 36 (no digit: 99).
+constexpr int digit_value(int c) { return digit(c) ? c - '0' : lower(c) >= 'a' && lower(c) <= 'z' ? lower(c) - 'a' + 10 : 99; }
+/// The C string a call reads at a place of a text.
+constexpr std::string_view c_string(std::string_view s, i64 at) {
+  if (at < 0 || static_cast<u64>(at) > s.size()) return {};
+  s.remove_prefix(static_cast<std::size_t>(at));
+  const std::size_t zero = s.find('\0');
+  return zero == std::string_view::npos ? s : s.substr(0, zero);
+}
+
+/// What strtoll / strtoull read: the 64 bits, and how many characters (0: none - no number).
+struct Whole {
+  u64 bits = 0;
+  std::size_t end = 0;
+};
+/// strtoll (is_signed) or strtoull of a C string, in a base 2..36 or 0 (by the number's own prefix:
+/// 0x hexadecimal, 0b binary - with `binary` -, 0 octal, else decimal). Beyond the range: the end of
+/// it (signed: the largest or the least i64; unsigned: all ones); unsigned, a - in front is the
+/// two's complement. Another base reads nothing (glibc: EINVAL).
+constexpr Whole whole(std::string_view s, int base, bool is_signed, bool binary = true) {
+  Whole r;
+  if (base < 0 || base == 1 || base > 36) return r;
+  auto at = [&](std::size_t k) -> int { return k < s.size() ? static_cast<unsigned char>(s[k]) : 0; };
+  std::size_t i = 0;
+  while (space(at(i))) ++i;
+  bool minus = false;
+  if (at(i) == '-' || at(i) == '+') minus = at(i) == '-', ++i;
+  std::size_t prefix = 0;  // (just after a 0x or 0b that was taken as one)
+  if (at(i) == '0') {
+    if ((base == 0 || base == 16) && lower(at(i + 1)) == 'x') i += 2, base = 16, prefix = i;
+    else if (binary && (base == 0 || base == 2) && lower(at(i + 1)) == 'b') i += 2, base = 2, prefix = i;
+    else if (base == 0) base = 8;
+  } else if (base == 0) {
+    base = 10;
+  }
+  const std::size_t first = i;
+  const u64 b = static_cast<u64>(base);
+  u64 v = 0;
+  bool over = false;
+  for (; i < s.size() && digit_value(at(i)) < base; ++i) {
+    const u64 d = static_cast<u64>(digit_value(at(i)));
+    if (v > (~u64{0} - d) / b) over = true;
+    else if (!over) v = v * b + d;
+  }
+  if (i == first) {
+    r.end = prefix ? prefix - 1 : 0;  // (a 0x or 0b with no digit after it: the 0 is the number)
+    return r;
+  }
+  r.end = i;
+  if (is_signed) {
+    const u64 top = minus ? u64{1} << 63 : (u64{1} << 63) - 1;
+    r.bits = over || v > top ? top : minus ? u64{0} - v : v;
+  } else {
+    r.bits = over ? ~u64{0} : minus ? u64{0} - v : v;
+  }
+  return r;
+}
+
+/// What strtod / strtof read: the value (a float's as a double holds it), and how many characters
+/// (0: none - no number).
+struct Real {
+  f64 value = 0;
+  std::size_t end = 0;
+};
+/// The value of a finite number written out, as the C library computes it (correctly rounded):
+/// strtof with `single`, else strtod. `subject` is all of it, with its sign.
+inline f64 finite(std::string_view subject, bool single) {
+  char held[256];
+  std::string longer;
+  const char* text = held;
+  if (subject.size() < sizeof held) {
+    for (std::size_t k = 0; k < subject.size(); ++k) held[k] = subject[k];
+    held[subject.size()] = '\0';
+  } else {
+    longer.assign(subject);
+    text = longer.c_str();
+  }
+  return single ? static_cast<f64>(std::strtof(text, nullptr)) : std::strtod(text, nullptr);
+}
+/// strtod (or strtof, `single`) of a C string: the characters C reads as a number - spaces, a sign,
+/// then decimal digits with a point and an exponent (e), hexadecimal ones after 0x (exponent p),
+/// inf, infinity, nan, nan(chars) - and its value. NaN is quiet, its payload the number in the
+/// parentheses where they hold one (glibc's way).
+inline Real real(std::string_view s, bool single) {
+  Real r;
+  auto at = [&](std::size_t k) -> int { return k < s.size() ? static_cast<unsigned char>(s[k]) : 0; };
+  auto word = [&](std::size_t k, std::string_view w) {
+    for (std::size_t j = 0; j < w.size(); ++j)
+      if (lower(at(k + j)) != w[j]) return false;
+    return true;
+  };
+  std::size_t i = 0;
+  while (space(at(i))) ++i;
+  const std::size_t subject = i;
+  bool minus = false;
+  if (at(i) == '-' || at(i) == '+') minus = at(i) == '-', ++i;
+  if (!(at(i) == '.' && digit(at(i + 1))) && !digit(at(i))) {
+    if (word(i, "inf")) {
+      r.end = i + (word(i + 3, "inity") ? 8 : 3);
+      r.value = minus ? -std::numeric_limits<f64>::infinity() : std::numeric_limits<f64>::infinity();
+      return r;
+    }
+    if (word(i, "nan")) {
+      i += 3;
+      u64 bits = single ? u64{0x7fc00000} : u64{0x7ff8000000000000};
+      if (at(i) == '(') {
+        std::size_t j = i + 1;
+        while (digit(at(j)) || (lower(at(j)) >= 'a' && lower(at(j)) <= 'z') || at(j) == '_') ++j;
+        if (at(j) == ')') {
+          const std::string_view inside = s.substr(i + 1, j - i - 1);
+          const Whole w = whole(inside, 0, false, false);
+          if (w.end == inside.size()) bits |= w.bits & (single ? u64{0x3fffff} : u64{0x7ffffffffffff});
+          i = j + 1;
+        }
+      }
+      r.end = i;
+      r.value = single ? static_cast<f64>(std::bit_cast<f32>(static_cast<u32>(bits))) : std::bit_cast<f64>(bits);
+      if (minus) r.value = -r.value;
+      return r;
+    }
+    return r;  // (no number: nothing read)
+  }
+  const bool hex = at(i) == '0' && lower(at(i + 1)) == 'x';
+  if (hex) i += 2;
+  const std::size_t digits = i;
+  while (at(i) == '0') ++i;
+  const int c = at(i);
+  const bool more = digit(c) || (hex && xdigit(c)) || (c == '.' && (!hex || i != digits || xdigit(at(i + 1)))) || (hex && i != digits && lower(c) == 'p') ||
+                    (!hex && lower(c) == 'e');
+  if (!more) {
+    // (only zeros - or a 0x with nothing after it: the 0 is the number)
+    r.end = i != digits ? i : hex ? i - 1 : 0;
+    r.value = minus ? -0.0 : 0.0;
+    return r;
+  }
+  auto is_digit = [&](int d) { return digit(d) || (hex && xdigit(d)); };
+  while (is_digit(at(i))) ++i;
+  if (at(i) == '.') {
+    ++i;
+    while (is_digit(at(i))) ++i;
+  }
+  if (lower(at(i)) == (hex ? 'p' : 'e')) {
+    std::size_t j = i + 1;
+    if (at(j) == '-' || at(j) == '+') ++j;
+    if (digit(at(j))) {
+      while (digit(at(j))) ++j;
+      i = j;
+    }
+  }
+  r.end = i;
+  r.value = finite(s.substr(subject, i - subject), single);
+  return r;
+}
+
+/// Scan Text: what sscanf reads with a format - glibc's own scanner, step for step. The format's
+/// conversions: %d %i %u %o %x %X %b (whole numbers: hh h, none - 8, 16, 32 bit - or l ll j z t q L
+/// - 64 bit), %f %F %e %E %g %G %a %A (none: a float, l: a double), %s, %[set] (a word), %n (how
+/// many characters were read), %% and * (read, not given); a width; spaces match any spaces, other
+/// characters themselves. Each conversion that gives a value has a slot: what was there before
+/// stays where the scan does not reach it (as the variable sscanf did not write keeps its value).
+enum class Kind : u8 { whole, whole64, number, text };
+struct Slot {
+  Kind kind = Kind::whole;
+  i64 whole = 0;  // whole: the number its C type holds (read as an Int)
+  u64 bits = 0;   // whole64: the 64 bits
+  f64 number = 0;
+  std::string text;
+  bool written = false;  // (the scan gave it a value)
+};
+inline constexpr std::size_t kMostSlots = 16;
+/// One conversion of a format, read at fmt[at] (just after its %).
+struct Spec {
+  bool suppress = false;
+  int width = -1;   // (-1: none)
+  int size = 0;     // 'H' hh, 'h', 0 none, 'l', 'q' ll (and L), 'j', 'z', 't'
+  char conv = 0;
+  bool not_in = false;
+  bool set[256] = {};
+};
+constexpr bool read_spec(std::string_view fmt, std::size_t& at, Spec& sp, const char** why) {
+  auto fail = [&](const char* w) {
+    if (why) *why = w;
+    return false;
+  };
+  if (at < fmt.size() && fmt[at] == '*') sp.suppress = true, ++at;
+  if (at < fmt.size() && (fmt[at] == '\'' || fmt[at] == 'I' || fmt[at] == '*')) return fail("a flag that is not supported (only * - read, not given)");
+  int width = 0;
+  bool has_width = false;
+  while (at < fmt.size() && digit(fmt[at])) {
+    width = width * 10 + (fmt[at++] - '0');
+    has_width = true;
+    if (width > 1 << 20) return fail("a width of more than 2^20");
+  }
+  if (at < fmt.size() && fmt[at] == '$') return fail("a value by its number ($) is not supported");
+  sp.width = has_width && width > 0 ? width : -1;
+  if (at < fmt.size()) {
+    const char m = fmt[at];
+    if (m == 'h' || m == 'l') {
+      sp.size = m;
+      ++at;
+      if (at < fmt.size() && fmt[at] == m) sp.size = m == 'h' ? 'H' : 'q', ++at;
+    } else if (m == 'q' || m == 'L') sp.size = m == 'L' ? 'L' : 'q', ++at;
+    else if (m == 'j' || m == 'z' || m == 't') sp.size = m, ++at;
+    else if (m == 'm') return fail("a word sscanf makes room for itself (%m) is not supported");
+  }
+  if (at >= fmt.size()) return fail("the format ends inside a conversion (a % without its letter)");
+  sp.conv = fmt[at++];
+  switch (sp.conv) {
+    case 'd': case 'i': case 'u': case 'o': case 'x': case 'X': case 'b': case 'n':
+      if (sp.size == 'L') sp.size = 'q';  // (glibc: L of a whole number is ll)
+      return true;
+    case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A':
+      if (sp.size == 'L' || sp.size == 'q') return fail("a long double (%Lf) is not supported: a Float is a double");
+      if (sp.size != 0 && sp.size != 'l') return fail("a number of a size that is no float or double");
+      return true;
+    case 's':
+      if (sp.size != 0) return fail("a word of wide characters (%ls) is not supported");
+      return true;
+    case '%':
+      return true;
+    case '[': {
+      if (sp.size != 0) return fail("a word of wide characters (%l[) is not supported");
+      if (at < fmt.size() && fmt[at] == '^') sp.not_in = true, ++at;
+      if (at < fmt.size() && (fmt[at] == ']' || fmt[at] == '-')) sp.set[static_cast<unsigned char>(fmt[at])] = true, ++at;
+      char fc = 0;
+      bool closed = false;
+      while (at < fmt.size()) {
+        fc = fmt[at++];
+        if (fc == ']') {
+          closed = true;
+          break;
+        }
+        if (fc == '-' && at < fmt.size() && fmt[at] != ']' && static_cast<unsigned char>(fmt[at - 2]) <= static_cast<unsigned char>(fmt[at])) {
+          for (int k = static_cast<unsigned char>(fmt[at - 2]); k < static_cast<unsigned char>(fmt[at]); ++k) sp.set[k] = true;
+        } else {
+          sp.set[static_cast<unsigned char>(fc)] = true;
+        }
+      }
+      if (!closed) return fail("a set of characters without its ] (%[...])");
+      return true;
+    }
+    case 'c': return fail("%c is not supported (its characters have no end): read a word with %s or %[...]");
+    default: return fail("a conversion that is not supported (d i u o x X b f F e E g G a A s [ n %)");
+  }
+}
+/// The kind of what a conversion gives (it gives none: suppressed, or %%).
+constexpr bool gives(const Spec& sp) { return !sp.suppress && sp.conv != '%'; }
+constexpr Kind kind_of(const Spec& sp) {
+  switch (sp.conv) {
+    case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A': return Kind::number;
+    case 's': case '[': return Kind::text;
+    case 'n': return sp.size == 'l' || sp.size == 'q' || sp.size == 'j' || sp.size == 'z' || sp.size == 't' ? Kind::whole64 : Kind::whole;
+    default: return sp.size == 'l' || sp.size == 'q' || sp.size == 'j' || sp.size == 'z' || sp.size == 't' ? Kind::whole64 : Kind::whole;
+  }
+}
+/// The kinds of the values a format gives, in their order. False: the format is none - `why` says.
+struct Plan {
+  std::size_t count = 0;
+  Kind kinds[kMostSlots] = {};
+};
+constexpr bool plan(std::string_view fmt, Plan* out, const char** why) {
+  Plan p;
+  for (std::size_t at = 0; at < fmt.size();) {
+    if (fmt[at++] != '%') continue;
+    Spec sp;
+    if (!read_spec(fmt, at, sp, why)) return false;
+    if (!gives(sp)) continue;
+    if (p.count == kMostSlots) {
+      if (why) *why = "more than 16 values";
+      return false;
+    }
+    p.kinds[p.count++] = kind_of(sp);
+  }
+  if (out) *out = p;
+  return true;
+}
+/// The value a whole number is stored as by a conversion of this size: C's cast of the long sscanf read.
+inline void store_whole(Slot& slot, const Spec& sp, u64 v, bool is_signed) {
+  slot.written = true;
+  if (kind_of(sp) == Kind::whole64) {
+    slot.bits = v;
+    return;
+  }
+  if (sp.size == 'H') slot.whole = is_signed ? static_cast<i64>(static_cast<i8>(v)) : static_cast<i64>(static_cast<u8>(v));
+  else if (sp.size == 'h') slot.whole = is_signed ? static_cast<i64>(static_cast<i16>(v)) : static_cast<i64>(static_cast<u16>(v));
+  else slot.whole = is_signed ? static_cast<i64>(static_cast<i32>(static_cast<u32>(v))) : static_cast<i64>(static_cast<u32>(v));
+}
+/// The characters of a number as the scanner gathers them: here, in the call's own memory - a number of
+/// more than 255 characters in a std::string.
+struct Gathered {
+  char held[256] = {};
+  std::size_t n = 0;
+  std::string more;
+  void clear() { n = 0, more.clear(); }
+  void push_back(char c) {
+    if (n < sizeof held && more.empty()) held[n++] = c;
+    else {
+      if (more.empty()) more.assign(held, n);
+      more.push_back(c);
+    }
+  }
+  std::size_t size() const { return more.empty() ? n : more.size(); }
+  bool empty() const { return size() == 0; }
+  char back() const { return more.empty() ? held[n - 1] : more.back(); }
+  char operator[](std::size_t k) const { return more.empty() ? held[k] : more[k]; }
+  operator std::string_view() const { return more.empty() ? std::string_view(held, n) : std::string_view(more); }  // NOLINT
+};
+/// sscanf(input, fmt, ...): the count it gives (-1: EOF - the input ended before the first value was
+/// read), the slots of the values it read written. `slots`: one for each value the format gives
+/// (plan), holding what was there before.
+inline i64 run(std::string_view in, std::string_view fmt, Slot* slots, std::size_t count) {
+  std::size_t pos = 0;
+  auto inchar = [&]() -> int { return pos < in.size() ? static_cast<unsigned char>(in[pos++]) : kEnd; };
+  auto unget = [&](int c) {
+    if (c != kEnd) --pos;
+  };
+  i64 done = 0;
+  std::size_t slot = 0;
+  bool skip_space = false;
+  bool input_error = false;
+  Gathered buf;  // (the characters of a number, as glibc gathers them)
+  for (std::size_t f = 0; f < fmt.size();) {
+    const char fc = fmt[f++];
+    int c = 0;
+    if (fc != '%') {
+      if (space(static_cast<unsigned char>(fc))) {
+        skip_space = true;
+        continue;
+      }
+      c = inchar();
+      if (c == kEnd) {
+        input_error = true;
+        break;
+      }
+      if (skip_space) {
+        while (space(c)) {
+          c = inchar();
+          if (c == kEnd) break;
+        }
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        skip_space = false;
+      }
+      if (c != static_cast<unsigned char>(fc)) {
+        unget(c);
+        break;
+      }
+      continue;
+    }
+    Spec sp;
+    if (!read_spec(fmt, f, sp, nullptr)) break;  // (a format that is none: what came before it - the check reports it)
+    if (skip_space || (sp.conv != '[' && sp.conv != 'n')) {
+      do c = inchar();
+      while (space(c));
+      unget(c);
+      skip_space = false;
+    }
+    Slot* out = gives(sp) && slot < count ? &slots[slot] : nullptr;
+    if (gives(sp)) ++slot;
+    int width = sp.width;
+    bool failed = false;
+    switch (sp.conv) {
+      case '%':
+        c = inchar();
+        if (c == kEnd) input_error = true;
+        else if (c != '%') unget(c), failed = true;
+        break;
+      case 'n':
+        if (out) store_whole(*out, sp, static_cast<u64>(pos), true);
+        break;
+      case 's': {
+        c = inchar();
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        std::string word;
+        do {
+          if (space(c)) {
+            unget(c);
+            break;
+          }
+          word.push_back(static_cast<char>(c));
+        } while ((width <= 0 || --width > 0) && (c = inchar()) != kEnd);
+        if (out) out->text = std::move(word), out->written = true, ++done;
+        break;
+      }
+      case '[': {
+        if (width < 0) width = std::numeric_limits<int>::max();
+        c = inchar();
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        std::string word;
+        do {
+          if (sp.set[c] == sp.not_in) {
+            unget(c);
+            break;
+          }
+          word.push_back(static_cast<char>(c));
+        } while (--width > 0 && (c = inchar()) != kEnd);
+        if (word.empty()) {
+          failed = true;
+          break;
+        }
+        if (out) out->text = std::move(word), out->written = true, ++done;
+        break;
+      }
+      case 'd': case 'i': case 'u': case 'o': case 'x': case 'X': case 'b': {
+        int base = sp.conv == 'd' || sp.conv == 'u' ? 10 : sp.conv == 'i' ? 0 : sp.conv == 'o' ? 8 : sp.conv == 'b' ? 2 : 16;
+        const bool is_signed = sp.conv == 'd' || sp.conv == 'i';
+        buf.clear();
+        c = inchar();
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        if (c == '-' || c == '+') {
+          buf.push_back(static_cast<char>(c));
+          if (width > 0) --width;
+          c = inchar();
+        }
+        if (width != 0 && c == '0') {
+          if (width > 0) --width;
+          buf.push_back('0');
+          c = inchar();
+          if (width != 0 && lower(c) == 'x') {
+            if (base == 0) base = 16;
+            if (base == 16) {
+              if (width > 0) --width;
+              c = inchar();
+            }
+          } else if (width != 0 && lower(c) == 'b') {
+            if (base == 0) base = 2;
+            if (base == 2) {
+              if (width > 0) --width;
+              c = inchar();
+            }
+          } else if (base == 0) {
+            base = 8;
+          }
+        }
+        if (base == 0) base = 10;
+        while (c != kEnd && width != 0) {
+          if (base == 16 ? !xdigit(c) : !digit(c) || c - '0' >= base) break;
+          buf.push_back(static_cast<char>(c));
+          if (width > 0) --width;
+          c = inchar();
+        }
+        unget(c);
+        if (buf.empty() || (buf.size() == 1 && (buf[0] == '+' || buf[0] == '-'))) {
+          failed = true;
+          break;
+        }
+        const Whole w = whole(std::string_view(buf), base, is_signed);
+        if (w.end == 0) {
+          failed = true;
+          break;
+        }
+        if (out) store_whole(*out, sp, w.bits, is_signed), ++done;
+        break;
+      }
+      case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': case 'a': case 'A': {
+        buf.clear();
+        c = inchar();
+        if (width > 0) --width;
+        if (c == kEnd) {
+          input_error = true;
+          break;
+        }
+        bool got_digit = false, got_dot = false, got_e = false, got_sign = false, hexa = false;
+        // (read the next character into c; false: the conversion fails)
+        auto next = [&](char want) {
+          if (width == 0 || (c = inchar()) == kEnd || lower(c) != want) return false;
+          if (width > 0) --width;
+          buf.push_back(static_cast<char>(c));
+          return true;
+        };
+        if (c == '-' || c == '+') {
+          got_sign = true;
+          buf.push_back(static_cast<char>(c));
+          if (width == 0 || (c = inchar()) == kEnd) {
+            failed = true;
+            break;
+          }
+          if (width > 0) --width;
+        }
+        bool special = false;
+        if (lower(c) == 'n') {
+          buf.push_back(static_cast<char>(c));
+          if (!next('a') || !next('n')) {
+            failed = true;
+            break;
+          }
+          special = true;
+        } else if (lower(c) == 'i') {
+          buf.push_back(static_cast<char>(c));
+          if (!next('n') || !next('f')) {
+            failed = true;
+            break;
+          }
+          if (width != 0 && (c = inchar()) != kEnd) {
+            if (lower(c) == 'i') {
+              if (width > 0) --width;
+              buf.push_back(static_cast<char>(c));
+              if (!next('n') || !next('i') || !next('t') || !next('y')) {
+                failed = true;
+                break;
+              }
+            } else {
+              unget(c);
+            }
+          }
+          special = true;
+        }
+        if (!special) {
+          char exp_char = 'e';
+          if (width != 0 && c == '0') {
+            buf.push_back('0');
+            c = inchar();
+            if (width > 0) --width;
+            if (width != 0 && lower(c) == 'x') {
+              buf.push_back(static_cast<char>(c));
+              hexa = true;
+              exp_char = 'p';
+              c = inchar();
+              if (width > 0) --width;
+            } else {
+              got_digit = true;
+            }
+          }
+          while (true) {
+            if (digit(c)) {
+              buf.push_back(static_cast<char>(c));
+              got_digit = true;
+            } else if (!got_e && hexa && xdigit(c)) {
+              buf.push_back(static_cast<char>(c));
+              got_digit = true;
+            } else if (got_e && !buf.empty() && buf.back() == exp_char && (c == '-' || c == '+')) {
+              buf.push_back(static_cast<char>(c));
+            } else if (got_digit && !got_e && lower(c) == exp_char) {
+              buf.push_back(exp_char);
+              got_e = got_dot = true;
+            } else if (!got_dot && c == '.') {
+              buf.push_back('.');
+              got_dot = true;
+            } else {
+              unget(c);
+              break;
+            }
+            if (width == 0 || (c = inchar()) == kEnd) break;
+            if (width > 0) --width;
+          }
+          if (buf.size() == (got_sign ? 1u : 0u) || (hexa && buf.size() == (got_sign ? 3u : 2u))) {
+            failed = true;
+            break;
+          }
+        }
+        const bool single = sp.size != 'l';
+        const Real got = real(std::string_view(buf), single);
+        if (got.end == 0) {
+          failed = true;
+          break;
+        }
+        if (out) out->number = got.value, out->written = true, ++done;
+        break;
+      }
+      default: failed = true; break;
+    }
+    if (input_error || failed) break;
+  }
+  if (input_error && done == 0) return -1;
+  return done;
+}
+}  // namespace scan
+
 namespace enums {
 /// `index` when it is the place of one of `count` values, else 0 (the first value).
 constexpr i64 valid(std::size_t count, i64 index) { return index >= 0 && static_cast<u64>(index) < count ? index : 0; }
@@ -570,6 +2129,213 @@ template <class S> constexpr bool equal(const S& a, const S& b) {
 }
 }  // namespace structs
 
+/// The bytes of a value (Bytes of Struct, Struct of Bytes): the object representation of a struct
+/// of numbers in the layout C++ gives it - what std::bit_cast and std::memcpy between a struct and
+/// bytes see. The layout is the node's setting, "20: u32@0 u16@4 i16@6 ...": the size in bytes,
+/// then for each field of the struct, in their order, the number C++ holds it as and where it
+/// begins. The numbers: bool, u8, i8, u16, i16, u32, i32 (a Bool's or an Int's field; an Int is
+/// cut to that many bits, as C++ converts), u64, i64 (an Int64's field), f32, f64 (a Float's). The
+/// bytes are little-endian, on every platform the same; a byte no field covers is 0. A number of
+/// the bytes is taken as C++ takes it to an unsigned char (its last 8 bits); where there are no
+/// bytes - before the list, beyond it - they are 0. A NaN keeps its sign and the upper bits of its
+/// payload and is quiet (on every platform the same - what x86 does).
+namespace bytes {
+enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 };
+struct Field {
+  Code code = Code::none;
+  u32 at = 0;
+};
+/// A layout read: the size, the fields - and, when it cannot be read, why (`error`, else nullptr).
+struct Layout {
+  std::array<Field, StructType::kMaxFields> fields{};
+  std::size_t count = 0;
+  u32 size = 0;
+  const char* error = nullptr;
+};
+inline constexpr u32 kMaxBytes = 65536;
+constexpr u32 width(Code c) {
+  switch (c) {
+    case Code::boolean: case Code::u8: case Code::i8: return 1;
+    case Code::u16: case Code::i16: return 2;
+    case Code::u32: case Code::i32: case Code::f32: return 4;
+    case Code::u64: case Code::i64: case Code::f64: return 8;
+    default: return 0;
+  }
+}
+constexpr bool whole(Code c) { return c >= Code::u8 && c <= Code::i32; }    // (an Int's field)
+constexpr bool wide(Code c) { return c == Code::u64 || c == Code::i64; }    // (an Int64's)
+constexpr bool floating(Code c) { return c == Code::f32 || c == Code::f64; }  // (a Float's)
+constexpr bool is_signed(Code c) { return c == Code::i8 || c == Code::i16 || c == Code::i32 || c == Code::i64; }
+constexpr Code code_of(std::string_view w) {
+  constexpr std::pair<std::string_view, Code> kCodes[] = {{"bool", Code::boolean}, {"u8", Code::u8},   {"i8", Code::i8},   {"u16", Code::u16},
+                                                          {"i16", Code::i16},      {"u32", Code::u32}, {"i32", Code::i32}, {"u64", Code::u64},
+                                                          {"i64", Code::i64},      {"f32", Code::f32}, {"f64", Code::f64}};
+  for (const auto& [name, code] : kCodes)
+    if (name == w) return code;
+  return Code::none;
+}
+/// The layout a setting says (constexpr: a Blueprint's class reads it when it is compiled).
+constexpr Layout layout(std::string_view s) {
+  Layout r;
+  std::size_t i = 0;
+  auto blank = [&] { while (i < s.size() && (s[i] == ' ' || s[i] == '\t' || s[i] == '\n' || s[i] == '\r')) ++i; };
+  auto number = [&](u32& out) {
+    const std::size_t from = i;
+    u64 v = 0;
+    while (i < s.size() && s[i] >= '0' && s[i] <= '9' && v <= kMaxBytes) v = v * 10 + static_cast<u64>(s[i++] - '0');
+    out = static_cast<u32>(v);
+    return i > from && v <= kMaxBytes;
+  };
+  blank();
+  if (!number(r.size) || r.size == 0) { r.error = "the layout begins with its size in bytes (1 to 65536) and a colon: \"20: u32@0 ...\""; return r; }
+  blank();
+  if (i >= s.size() || s[i] != ':') { r.error = "a colon after the size: \"20: u32@0 ...\""; return r; }
+  ++i;
+  for (blank(); i < s.size(); blank()) {
+    const std::size_t from = i;
+    while (i < s.size() && s[i] != '@' && s[i] != ' ' && s[i] != '\t' && s[i] != '\n' && s[i] != '\r') ++i;
+    const Code c = code_of(s.substr(from, i - from));
+    if (c == Code::none) { r.error = "a field is one of bool u8 i8 u16 i16 u32 i32 u64 i64 f32 f64"; return r; }
+    if (i >= s.size() || s[i] != '@') { r.error = "a field says where it begins: u16@4"; return r; }
+    ++i;
+    Field f{c, 0};
+    if (!number(f.at)) { r.error = "where a field begins is a number of bytes: u16@4"; return r; }
+    if (f.at + width(c) > r.size) { r.error = "a field reaches beyond the size"; return r; }
+    for (std::size_t k = 0; k < r.count; ++k)
+      if (f.at < r.fields[k].at + width(r.fields[k].code) && r.fields[k].at < f.at + width(c)) { r.error = "two fields share a byte"; return r; }
+    if (r.count == r.fields.size()) { r.error = "more fields than a struct has"; return r; }
+    r.fields[r.count++] = f;
+  }
+  if (r.count == 0) r.error = "a layout has a field at least";
+  return r;
+}
+/// The bits a Float is as a 32-bit float (a NaN: its sign, the upper bits of its payload, quiet).
+inline u32 single_bits(f64 x) {
+  if (x != x) {
+    const u64 b = std::bit_cast<u64>(x);
+    return (static_cast<u32>(b >> 32) & 0x80000000u) | 0x7fc00000u | static_cast<u32>((b >> 29) & 0x003fffffu);
+  }
+  return std::bit_cast<u32>(static_cast<f32>(x));
+}
+/// The Float 32 bits are as a float (a NaN: its sign, its payload in the upper bits, quiet).
+inline f64 single_value(u32 b) {
+  if ((b & 0x7f800000u) == 0x7f800000u && (b & 0x007fffffu) != 0)
+    return std::bit_cast<f64>((static_cast<u64>(b & 0x80000000u) << 32) | 0x7ff8000000000000ull | (static_cast<u64>(b & 0x003fffffu) << 29));
+  return static_cast<f64>(std::bit_cast<f32>(b));
+}
+/// The bits a field writes: of a whole number (cut by `put`), of a Float.
+inline u64 bits(Code c, f64 x) { return c == Code::f32 ? single_bits(x) : std::bit_cast<u64>(x); }
+/// The field's bits into the bytes, little-endian.
+template <class B> void put(B* out, const Field& f, u64 v) {
+  for (u32 k = 0; k < width(f.code); ++k) out[f.at + k] = B(static_cast<i64>((v >> (8 * k)) & 0xffu));
+}
+/// The field's bits from the bytes (`byte(i)`: the i-th byte, 0 .. 255), sign-extended where it is signed.
+template <class Byte> u64 take(const Field& f, Byte&& byte) {
+  u64 v = 0;
+  const u32 n = width(f.code);
+  for (u32 k = 0; k < n; ++k) v |= static_cast<u64>(byte(f.at + k)) << (8 * k);
+  if (is_signed(f.code) && n < 8 && (v >> (8 * n - 1)) & 1u) v |= ~u64{0} << (8 * n);
+  return v;
+}
+/// What a field of a struct is, for a layout: which numbers suit it (Bool: bool; Int: u8 .. i32;
+/// Int64: u64, i64; Float: f32, f64).
+constexpr bool suits(Code c, PinType t) {
+  return t == PinType::boolean ? c == Code::boolean : t == PinType::integer ? whole(c) : t == PinType::int64 ? wide(c) : t == PinType::number ? floating(c) : false;
+}
+/// The byte of a number of a list of bytes: its last 8 bits.
+inline u64 byte_of(i64 v) { return static_cast<u64>(v) & 0xffu; }
+/// The i-th byte from `from` on of `count` entries (before them, beyond them: 0).
+template <class E> u64 byte_at(const E* items, std::size_t count, i64 from, u32 i) {
+  if (from >= 0 && static_cast<u64>(from) >= count) return 0;  // (and no sum beyond the end of an i64)
+  const i64 k = from + static_cast<i64>(i);
+  return k >= 0 && static_cast<u64>(k) < count ? byte_of(static_cast<i64>(items[static_cast<std::size_t>(k)])) : 0;
+}
+
+// ---- the bytes of a list of numbers (Copy Bytes) ----
+/// Which numbers an entry of a list of this type can be held as in C++ (Copy Bytes: Int u8 .. i32,
+/// Int64 u64 i64, Float f32 f64).
+constexpr bool suits_list(Code c, PinType element) {
+  return element == PinType::integer ? whole(c) : element == PinType::int64 ? wide(c) : element == PinType::number ? floating(c) : false;
+}
+/// The bits `w` holds of a number `c` is wide - the rest 0, or 1 where `c` has a sign and its
+/// highest bit is one (as C++ reads a number of that width).
+constexpr u64 widened(Code c, u64 w) {
+  const u32 n = width(c);
+  if (n >= 8) return w;
+  w &= (u64{1} << (8 * n)) - 1;
+  if (is_signed(c) && ((w >> (8 * n - 1)) & 1u)) w |= ~u64{0} << (8 * n);
+  return w;
+}
+/// The bits of an entry as the number `c` holds it: an Int's 64 bits (of which `c` takes as many
+/// as it is wide - as C++ converts), an Int64's, a Float's as a float or a double.
+inline u64 entry_bits(Code, i64 v) { return static_cast<u64>(v); }
+inline u64 entry_bits(Code, Whole v) { return static_cast<u64>(static_cast<i64>(v)); }
+template <class T> u64 entry_bits(Code, Sized<T> v) { return static_cast<u64>(static_cast<i64>(v.v)); }
+inline u64 entry_bits(Code, Int64 v) { return v.bits; }
+inline u64 entry_bits(Code c, f64 v) { return bits(c, v); }
+/// The entry those bits of the number `c` are.
+inline void set_entry(i64& to, Code c, u64 w) { to = static_cast<i64>(widened(c, w)); }
+inline void set_entry(Whole& to, Code c, u64 w) { to = Whole(static_cast<i64>(widened(c, w))); }
+template <class T> void set_entry(Sized<T>& to, Code c, u64 w) { to = Sized<T>(static_cast<i64>(widened(c, w))); }
+inline void set_entry(Int64& to, Code, u64 w) { to = Int64(w); }
+inline void set_entry(f64& to, Code c, u64 w) { to = c == Code::f32 ? single_value(static_cast<u32>(w)) : std::bit_cast<f64>(w); }
+/// Where the numbers of a list may lie for Copy Bytes: an entry or a byte beyond every list (a list
+/// has at most 2^24 entries, of at most 8 bytes) is the same as one further out - what is beyond
+/// that is cut to it, so that no sum leaves an i64.
+inline constexpr i64 kFarBytes = i64{1} << 40;
+constexpr i64 near(i64 v) { return v < -kFarBytes ? -kFarBytes : v > kFarBytes ? kFarBytes : v; }
+/// Copy Bytes: `count` bytes of the entries of `from` (`from_count` of them, each the number `of`,
+/// little-endian), from its entry `first` on, into the entries of `to` (each the number `into`) from
+/// its entry `at` on - what std::memcpy / std::memmove between lists of numbers does. A byte the
+/// entries of `from` do not have is 0; a byte beyond `to` is not written - it keeps its length; an
+/// entry some of whose bytes are written keeps the others (of its bits as `into` holds it). The
+/// entries of `from` are read as they were before (a list into itself, as memmove). One pass over
+/// the entries written; nothing is asked for - except where a list is copied into itself as another
+/// number than it is (then its entries as they were are taken first).
+template <class D, class S> void copy(D* to, std::size_t to_count, Code into, i64 at, const S* from, std::size_t from_count, Code of, i64 first, i64 count) {
+  const i64 w = width(into), v = width(of);
+  if (w == 0 || v == 0 || count <= 0 || to_count == 0) return;
+  count = near(count);
+  const i64 d0 = near(at) * w, s0 = near(first) * v;  // (where the bytes begin in each)
+  const i64 size = static_cast<i64>(to_count) * w;
+  const i64 lo = d0 < 0 ? 0 : d0, hi = d0 + count > size ? size : d0 + count;  // (the bytes of `to` written: lo .. hi - 1)
+  if (lo >= hi) return;
+  bool same = false;  // (is `from` the list `to` itself?)
+  if constexpr (std::is_same_v<D, S>) {
+    same = !std::less<const S*>{}(from, to) && std::less<const S*>{}(from, to + to_count);
+    if (same && into != of) {
+      const std::vector<S> were(from, from + from_count);
+      copy(to, to_count, into, at, were.data(), were.size(), of, first, count);
+      return;
+    }
+  }
+  // the byte of `from` at s (its entry read once for all its bytes a pass needs)
+  i64 held_at = -1;
+  u64 held = 0;
+  auto source = [&](i64 s) -> u64 {
+    const i64 j = s >= 0 ? s / v : -((-s + v - 1) / v);
+    if (j < 0 || static_cast<u64>(j) >= from_count) return 0;
+    if (j != held_at) held = entry_bits(of, from[static_cast<std::size_t>(j)]), held_at = j;
+    return (held >> (8 * (s - j * v))) & 0xffu;
+  };
+  // (from the last entry back where the bytes move up in a list into itself - each read before it is written)
+  const bool down = d0 > s0;
+  const i64 e0 = lo / w, e1 = (hi - 1) / w;
+  for (i64 k = 0; k <= e1 - e0; ++k) {
+    const i64 e = down ? e1 - k : e0 + k;
+    D& entry = to[static_cast<std::size_t>(e)];
+    u64 bits_ = entry_bits(into, entry);
+    for (i64 b = 0; b < w; ++b) {
+      const i64 at_byte = e * w + b;
+      if (at_byte < lo || at_byte >= hi) continue;
+      bits_ = (bits_ & ~(u64{0xff} << (8 * b))) | (source(s0 + (at_byte - d0)) << (8 * b));
+    }
+    set_entry(entry, into, bits_);
+    if (same) held_at = -1;  // (the entry written may be one read next)
+  }
+}
+}  // namespace bytes
+
 /// A whole number written as text, as settings hold them ("3", " 12"): leading blanks, a sign,
 /// digits; anything else ends it. Empty or no digits: `fallback`.
 constexpr int setting_int(std::string_view s, int fallback) {
@@ -614,7 +2380,7 @@ template <class C, class R, class... A> std::tuple<std::remove_cvref_t<A>...> pa
 /// NativeParam<&Door::Tune, 0>. What holds a reference input for a call by name - a variable of
 /// exactly the class's type, so the function's reference binds to it (logic::native_glue).
 template <auto Function, std::size_t K> using NativeParam = std::tuple_element_t<K, decltype(detail::params_of(Function))>;
-template <class T> T native_arg(const std::vector<Value>& args, std::size_t i, const T& fallback) {
+template <class T> T native_arg(std::span<const Value> args, std::size_t i, const T& fallback) {
   return i < args.size() ? from_value<T>(args[i].converted(pin_type_of<T>())) : fallback;
 }
 /// A value an event brought, as the C++ type of its handler's parameter: output `out` of the
@@ -625,17 +2391,24 @@ template <class T> T native_out(const Instance& instance, int node, int out) { r
 inline void native_set(bool& variable, const Value& v) { variable = v.as_number() != 0; }
 inline void native_set(i64& variable, const Value& v) { variable = whole(v.as_number()); }
 inline void native_set(Whole& variable, const Value& v) { variable = whole(v.as_number()); }
+template <class T> void native_set(Sized<T>& variable, const Value& v) { variable = Sized<T>(whole(v.as_number())); }
 inline void native_set(f64& variable, const Value& v) { variable = v.as_number(); }
 inline void native_set(Vec3& variable, const Value& v) { variable = v.as_vector(); }
 inline void native_set(std::string& variable, const Value& v) { variable = v.as_text(); }
+inline void native_set(Text& variable, const Value& v) { variable = Text(v.as_text()); }
 inline void native_set(ActorHandle& variable, const Value& v) { variable = {v.as_actor()}; }
 template <class T> void native_set(std::vector<T>& variable, const Value& v) { variable = from_value<std::vector<T>>(v.converted(pin_type_of<std::vector<T>>())); }
+template <class T, std::size_t N> void native_set(Fixed<T, N>& variable, const Value& v) { variable = from_value<Fixed<T, N>>(v.converted(pin_type_of<Fixed<T, N>>())); }
 template <class E>
   requires std::is_enum_v<E>
 void native_set(E& variable, const Value& v) {
   variable = from_value<E>(v.converted(PinType::enumeration));
 }
 template <detail::NativeStruct S> void native_set(S& variable, const Value& v) { variable = from_value<S>(v); }
+inline void native_set(Int64& variable, const Value& v) { variable = from_value<Int64>(v.converted(PinType::int64)); }
+template <class K, class V> void native_set(Map<K, V>& variable, const Value& v) { variable = from_value<Map<K, V>>(v.converted(pin_type_of<Map<K, V>>())); }
+template <class K> void native_set(Set<K>& variable, const Value& v) { variable = from_value<Set<K>>(v.converted(pin_type_of<Set<K>>())); }
+template <class R, class... A> void native_set(Callback<R(A...)>& variable, const Value& v) { variable = from_value<Callback<R(A...)>>(v); }
 
 /// A Random node's own sequence. `m` is the node's memory ([0] where the sequence is, [1] it has
 /// begun); it starts from the Blueprint's seed and the node's id. Two Random nodes never share a
@@ -682,6 +2455,95 @@ struct PureNodes {
   using Actor = ActorHandle;
   static constexpr f64 kDegrees = 3.14159265358979323846 / 180.0;
 
+  // ---- Int64: 64 bits, as u64 and i64 of C++ (WebAssembly's i64) ----
+  // Adding, subtracting, multiplying and shifting left go round at 2^64; what C++ leaves open is
+  // defined here for every value, the same in every tier: dividing by 0 gives 0 (and the
+  // smallest i64 by -1 itself), a shift goes by the amount's last 6 bits, a Float that is no
+  // number is 0 as an Int64, beyond its ends it is the nearest end.
+  using Int64 = logic::Int64;
+  static Int64 int64_add(Int64 a, Int64 b) { return Int64(a.bits + b.bits); }
+  static Int64 int64_sub(Int64 a, Int64 b) { return Int64(a.bits - b.bits); }
+  static Int64 int64_mul(Int64 a, Int64 b) { return Int64(a.bits * b.bits); }
+  static Int64 int64_div(Int64 a, Int64 b) {
+    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
+    if (y == 0) return Int64(0);
+    if (y == -1) return Int64(0 - a.bits);  // (the smallest i64 by -1: itself, as it goes round)
+    return Int64(static_cast<u64>(x / y));
+  }
+  static Int64 int64_div_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits / b.bits : 0); }
+  static Int64 int64_rem(Int64 a, Int64 b) {
+    const i64 x = static_cast<i64>(a.bits), y = static_cast<i64>(b.bits);
+    if (y == 0 || y == -1) return Int64(0);
+    return Int64(static_cast<u64>(x % y));
+  }
+  static Int64 int64_rem_unsigned(Int64 a, Int64 b) { return Int64(b.bits ? a.bits % b.bits : 0); }
+  static Int64 int64_and(Int64 a, Int64 b) { return Int64(a.bits & b.bits); }
+  static Int64 int64_or(Int64 a, Int64 b) { return Int64(a.bits | b.bits); }
+  static Int64 int64_xor(Int64 a, Int64 b) { return Int64(a.bits ^ b.bits); }
+  static Int64 int64_not(Int64 a) { return Int64(~a.bits); }
+  static Int64 int64_shift_left(Int64 a, Int by) { return Int64(a.bits << (static_cast<u64>(by) & 63)); }
+  static Int64 int64_shift_right(Int64 a, Int by) { return Int64(static_cast<u64>(static_cast<i64>(a.bits) >> (static_cast<u64>(by) & 63))); }
+  static Int64 int64_shift_right_unsigned(Int64 a, Int by) { return Int64(a.bits >> (static_cast<u64>(by) & 63)); }
+  static Int64 int64_rotate_left(Int64 a, Int by) { return Int64(std::rotl(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
+  static Int64 int64_rotate_right(Int64 a, Int by) { return Int64(std::rotr(a.bits, static_cast<int>(static_cast<u64>(by) & 63))); }
+  static Bool int64_equal(Int64 a, Int64 b) { return a.bits == b.bits; }
+  static Bool int64_less(Int64 a, Int64 b) { return static_cast<i64>(a.bits) < static_cast<i64>(b.bits); }
+  static Bool int64_less_unsigned(Int64 a, Int64 b) { return a.bits < b.bits; }
+  /// An Int as 64 bits: an i64 (a whole number below 0 is its two's complement).
+  static Int64 int64_of_int(Int a) { return Int64(static_cast<u64>(static_cast<i64>(a))); }
+  /// The bits as an i64 / a u64, as an Int holds that (exact up to 2^53, beyond: the nearest).
+  static Int int64_to_int(Int64 a) { return normal(static_cast<i64>(a.bits)); }
+  static Int int64_to_int_unsigned(Int64 a) { return whole(static_cast<f64>(a.bits)); }
+  static Float int64_to_float(Int64 a) { return static_cast<f64>(static_cast<i64>(a.bits)); }
+  static Float int64_to_float_unsigned(Int64 a) { return static_cast<f64>(a.bits); }
+  /// A Float toward zero as an i64 / a u64 (no number: 0; beyond the ends: the nearest end).
+  static Int64 int64_of_float(Float a) {
+    if (!(a == a)) return Int64(0);
+    if (a >= 9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::max()));
+    if (a < -9223372036854775808.0) return Int64(static_cast<u64>(std::numeric_limits<i64>::min()));
+    return Int64(static_cast<u64>(static_cast<i64>(a)));
+  }
+  static Int64 int64_of_float_unsigned(Float a) {
+    if (!(a > 0)) return Int64(0);
+    if (a >= 18446744073709551616.0) return Int64(~u64{0});
+    return Int64(static_cast<u64>(a));
+  }
+  /// A Float's 64 bits (IEEE 754), and the Float of 64 bits.
+  static Int64 int64_bits_of_float(Float a) { return Int64(std::bit_cast<u64>(a)); }
+  static Float int64_float_of_bits(Int64 a) { return std::bit_cast<f64>(a.bits); }
+  /// A float's 32 bits (IEEE 754, std::bit_cast of a float): of the float the Float is as a 32-bit number
+  /// (static_cast<f32>), 0 .. 2^32 - 1 - and the Float the 32 bits are (the Int's last 32 bits).
+  static Int math_bits_of_float32(Float a) { return static_cast<i64>(bytes::single_bits(a)); }
+  static Float math_float32_of_bits(Int a) { return bytes::single_value(static_cast<u32>(static_cast<u64>(a))); }
+  /// Two halves of 32 bits each (an Int each, cut to its last 32 bits), and the halves again (0 .. 2^32 - 1).
+  static Int64 int64_of_halves(Int high, Int low) { return Int64((static_cast<u64>(static_cast<u32>(high)) << 32) | static_cast<u32>(low)); }
+  static Int int64_high(Int64 a) { return static_cast<i64>(a.bits >> 32); }
+  static Int int64_low(Int64 a) { return static_cast<i64>(a.bits & 0xffffffffu); }
+  static Int int64_count_ones(Int64 a) { return static_cast<i64>(std::popcount(a.bits)); }
+  static Int int64_leading_zeros(Int64 a) { return static_cast<i64>(std::countl_zero(a.bits)); }
+  static Int int64_trailing_zeros(Int64 a) { return static_cast<i64>(std::countr_zero(a.bits)); }
+  /// The bits as a text: a u64 in decimal, an i64 in decimal, hexadecimal (lower case, no 0x).
+  static std::string int64_text(Int64 a) { return std::to_string(a.bits); }
+  static std::string int64_text_signed(Int64 a) { return std::to_string(static_cast<i64>(a.bits)); }
+  static std::string int64_text_hex(Int64 a) {
+    char b[20];
+    auto [end, ec] = std::to_chars(b, b + sizeof b, a.bits, 16);
+    (void)ec;
+    return std::string(b, end);
+  }
+  /// A text as 64 bits: its whole number (decimal, 0x hexadecimal; a - in front: two's complement), 0 if it is none.
+  static Int64 int64_of_text(const std::string& text) { return int64_parse(text); }
+  static Int64 int64_parse(std::string_view a) {
+    bool minus = !a.empty() && a.front() == '-';
+    if (minus) a.remove_prefix(1);
+    int base = 10;
+    if (a.size() > 2 && a[0] == '0' && (a[1] == 'x' || a[1] == 'X')) base = 16, a.remove_prefix(2);
+    u64 v = 0;
+    const auto [end, ec] = std::from_chars(a.data(), a.data() + a.size(), v, base);
+    if (ec != std::errc() || end != a.data() + a.size()) return Int64(0);
+    return Int64(minus ? 0 - v : v);
+  }
+
   // ---- math ----
   static Float math_add(Float a, Float b) { return a + b; }
   static Float math_sub(Float a, Float b) { return a - b; }
@@ -692,6 +2554,7 @@ struct PureNodes {
   static Float math_max(Float a, Float b) { return max_of(a, b); }
   static Float math_clamp(Float value, Float min, Float max) { return kern::clamp(value, min_of(min, max), max_of(min, max)); }
   static Float math_abs(Float a) { return std::fabs(a); }
+  static Float math_copysign(Float a, Float b) { return std::copysign(a, b); }  // (the formula's copysign)
   static Float math_negate(Float a) { return -a; }
   static Float math_lerp(Float a, Float b, Float alpha) { return a + (b - a) * alpha; }
   static Float math_sin(Float degrees) { return dm::sin(degrees * kDegrees); }
@@ -747,6 +2610,77 @@ struct PureNodes {
   static Bool text_equal(Text a, Text b) { return a == b; }
   static Bool text_contains(Text a, Text b) { return a.find(b) != std::string::npos; }
   static Int text_length(Text a) { return static_cast<i64>(a.size()); }
+  /// The byte at `index` as a number 0..255 (beyond the text: 0 - as std::string has a 0 after its last).
+  static Int text_code_at(Text a, Int index) { return index >= 0 && static_cast<u64>(index) < a.size() ? static_cast<i64>(static_cast<u8>(a[static_cast<std::size_t>(index)])) : 0; }
+  /// A text of one byte: the code cut to 8 bits, as a char holds it.
+  static Text text_of_code(Int code) { return Text(1, static_cast<char>(static_cast<u8>(code))); }
+  // (what std::string and std::string_view do - texts, nodes.h: a place is an Int, npos -1)
+  static Int text_find(Text a, Text b, Int from) { return texts::find(a, b, from); }
+  static Int text_rfind(Text a, Text b, Int from) { return texts::rfind(a, b, from); }
+  static Int text_find_first_of(Text a, Text b, Int from) { return texts::find_first_of(a, b, from); }
+  static Int text_find_last_of(Text a, Text b, Int from) { return texts::find_last_of(a, b, from); }
+  static Int text_find_first_not_of(Text a, Text b, Int from) { return texts::find_first_not_of(a, b, from); }
+  static Int text_find_last_not_of(Text a, Text b, Int from) { return texts::find_last_not_of(a, b, from); }
+  static Text text_sub(Text a, Int at, Int count) { return Text(texts::sub(a, at, count)); }
+  static Bool text_starts_with(Text a, Text b) { return std::string_view(a).starts_with(b); }
+  static Bool text_ends_with(Text a, Text b) { return std::string_view(a).ends_with(b); }
+  /// a < b, byte for byte as unsigned chars (std::string's order).
+  static Bool text_less(Text a, Text b) { return a < b; }
+  static Text text_insert(Text a, Int at, Text b) {
+    texts::insert(a, at, b);
+    return a;
+  }
+  static Text text_erase(Text a, Int at, Int count) {
+    texts::erase(a, at, count);
+    return a;
+  }
+  static Text text_replace(Text a, Int at, Int count, Text b) {
+    texts::replace(a, at, count, b);
+    return a;
+  }
+  // (numbers read from a text at a place, as C reads them there - scan, nodes.h: the value and the place
+  // just after what was read; nothing read: the place itself, as C's end pointer is the one it was given)
+  struct ParsedFloat {
+    Float value = 0;
+    Int end = 0;
+  };
+  struct ParsedWhole {
+    Int64 value{};
+    Int end = 0;
+  };
+  /// The text the bytes of a list are (each number cut to 8 bits, as a char holds it): Count of them from At
+  /// on - what std::string(reinterpret_cast<const char*>(bytes) + at, count) makes; beyond the list: up to its end.
+  static Text text_of_bytes(std::vector<i64> bytes, Int at, Int count) { return texts::of_bytes(bytes, at, count); }
+  /// Bytes of Text: its bytes as whole numbers 0 .. 255 - std::vector<u8>(text.begin(), text.end()).
+  static std::vector<i64> text_bytes(Text a) {
+    std::vector<i64> r;
+    texts::insert_bytes(r, 0, a);
+    return r;
+  }
+  /// Reserve Text: the text as it is - room for Count characters is a matter of the class (std::string::reserve).
+  static Text text_reserve(Text a, Int count) {
+    (void)count;
+    return a;
+  }
+  /// Text so many times one after the other - std::string(count, c) of one character (none: count 0 or less;
+  /// at most 2^24 characters).
+  static Text text_repeat(Text a, Int count) { return texts::repeat(a, count); }
+  static ParsedFloat text_parse_float(Text a, Int at) {
+    const scan::Real r = scan::real(scan::c_string(a, at), false);
+    return {r.value, at + static_cast<i64>(r.end)};
+  }
+  static ParsedFloat text_parse_float32(Text a, Int at) {
+    const scan::Real r = scan::real(scan::c_string(a, at), true);
+    return {r.value, at + static_cast<i64>(r.end)};
+  }
+  static ParsedWhole text_parse_int(Text a, Int at, Int base) {
+    const scan::Whole r = scan::whole(scan::c_string(a, at), base < 0 || base > 36 ? -1 : static_cast<int>(base), true);
+    return {Int64(r.bits), at + static_cast<i64>(r.end)};
+  }
+  static ParsedWhole text_parse_uint(Text a, Int at, Int base) {
+    const scan::Whole r = scan::whole(scan::c_string(a, at), base < 0 || base > 36 ? -1 : static_cast<int>(base), false);
+    return {Int64(r.bits), at + static_cast<i64>(r.end)};
+  }
 };
 
 /// The flow nodes that keep something between runs. `m`: the node's memory, four numbers (the
@@ -842,10 +2776,24 @@ inline f64 tween_step(f64* m, f64 now, std::string_view ease, bool first, bool& 
 /// Switch on Int with `cases` cases: the exec output (the case, or `cases` for Default).
 inline int switch_int(int cases, i64 selection) { return selection >= 0 && selection < cases ? static_cast<int>(selection) : cases; }
 /// Switch on Text: the exec output (the case that equals the selection, or the count for Default).
-inline int switch_text(std::string_view cases, const std::string& selection) {
-  const std::vector<std::string> list = setting_cases(cases);
-  for (std::size_t i = 0; i < list.size(); ++i) if (list[i] == selection) return static_cast<int>(i);
-  return static_cast<int>(list.size());
+/// (the cases as setting_cases has them - each piece between commas without the blanks around it,
+/// empty ones left out -, read where they stand: no list of them is made)
+inline int switch_text(std::string_view cases, std::string_view selection) {
+  int index = 0, found = -1;
+  std::size_t from = 0;
+  while (from <= cases.size()) {
+    std::size_t to = cases.find(',', from);
+    if (to == std::string_view::npos) to = cases.size();
+    std::string_view one = cases.substr(from, to - from);
+    while (!one.empty() && one.front() == ' ') one.remove_prefix(1);
+    while (!one.empty() && one.back() == ' ') one.remove_suffix(1);
+    if (!one.empty()) {
+      if (found < 0 && one == selection) found = index;
+      ++index;
+    }
+    from = to + 1;
+  }
+  return found >= 0 ? found : index;
 }
 }  // namespace flow
 
@@ -865,8 +2813,20 @@ template <> struct To<i64> {
   static i64 from(i64 v) { return v; }
   static i64 from(f64 v) { return whole(v); }
 };
-template <> struct To<Whole> : To<i64> {};
+template <> struct To<Whole> : To<i64> {
+  using To<i64>::from;
+  // (a number made whole is already as a Blueprint holds it: whole gives a number within 2^53, a
+  // number above 2^53 - which a double holds exactly, and logic::normal leaves - or one of Int's
+  // ends; so logic::normal, which Whole(i64) applies, is left out - the same Int, without the detour)
+  static Whole from(f64 v) {
+    Whole r;
+    r.v = whole(v);
+    return r;
+  }
+  static Whole from(math::Exact v) { return Whole(v); }  // (a formula of whole numbers: whole(double(v)) is normal(v))
+};
 template <> struct To<f64> {
+  template <class T> static f64 from(Sized<T> v) { return static_cast<f64>(v.v); }
   static f64 from(bool v) { return v ? 1 : 0; }
   static f64 from(i64 v) { return static_cast<f64>(v); }
   static f64 from(f64 v) { return v; }
@@ -881,6 +2841,12 @@ template <> struct To<Vec3> {
 };
 template <> struct To<std::string> {
   template <class S> static std::string from(const S& v) { return to_value(v).as_text(); }  // (everything prints, as the interpreter prints it)
+  static std::string from(math::Exact v) { return from(static_cast<f64>(v)); }
+};
+template <> struct To<Text> {
+  static Text from(const Text& v) { return v; }
+  template <class S> static Text from(const S& v) { return Text(to_value(v).as_text()); }  // (everything prints, as the interpreter prints it)
+  static Text from(math::Exact v) { return from(static_cast<f64>(v)); }
 };
 template <> struct To<ActorHandle> {
   static ActorHandle from(ActorHandle v) { return v; }

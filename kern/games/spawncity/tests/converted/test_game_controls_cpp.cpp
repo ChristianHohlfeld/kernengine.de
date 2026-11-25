@@ -19,10 +19,10 @@ using converted::arg; using converted::same; using converted::defined; using con
 using converted::wide::f32; using converted::wide::f64;
 using converted::wide::u8; using converted::wide::u16; using converted::wide::u32; using converted::wide::u64;
 using converted::wide::i8; using converted::wide::i16; using converted::wide::i32; using converted::wide::i64;
-using converted::wide::Vec2; using converted::wide::Vec3;
+using converted::wide::Vec2; using converted::wide::Vec3; using converted::wide::Span;
 using converted::wide::dot; using converted::wide::cross; using converted::wide::length; using converted::wide::length_sq;
 using converted::wide::distance; using converted::wide::distance_sq; using converted::wide::finite; using converted::wide::lerp;
-using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize;
+using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
 
@@ -35,6 +35,152 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Bvh;
+struct Mesh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Renderer;
+struct World : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MouseGrab : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct CharacterMover : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct KeyIndex : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BuildingBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FootprintStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadBuilder : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct RoadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Program : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct UniformCache : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SunShadowMap : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BloomPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct AmbientOcclusionPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Renderer;
+struct ShaderExtension : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Value : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct EngineValue;
+struct Callable : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct EngineValue : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Variable : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct StructField : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct FunctionPin : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Formula : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Context;
+struct Library : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Host : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Instance : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Context : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Mixer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Particles : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LightPool : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NightWindows : public ShaderExtension {
+  using ShaderExtension::ShaderExtension;
+};
+struct GameWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitWriter : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BitReader : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct WriteStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct ReadStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MeasureStream : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Endpoint : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Connection : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Transport : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Simulator : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct LoopbackNetwork : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct HostTransport : public Transport {
+  using Transport::Transport;
+};
+struct Client : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Server : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -42,42 +188,124 @@ enum class Key : u8 {
   left, right, up, down, space, enter, escape, tab, backspace, shift_left, shift_right, control_left, control_right, alt_left, alt_right,
   count
 };
-enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb };
+struct Input : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+  bool down(const Key& k) const;
+};
+struct Engine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct App : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundBank : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct GameAudio : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct InputArbiter : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct TouchControls : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace weapons { enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb }; }
 enum class Mode : u8 { foot, drone, car, jet, parachute };
-const char* hint_weapon(Mode m, Id foot, i32 drone) {
+namespace combat { } using namespace ::converted_game_controls_cpp::combat;
+f32 key(const Input& in, Key k) { return in.down(k) ? 1.0 : 0.0; }
+const char* hint_weapon(Mode m, weapons::Id foot, i32 drone) {
   // desktop_controls.mjs WEAPON_NAMES (sniper, fists, knife and GUIDED have none)
   if (m == Mode::drone) return drone == 0 ? "GUN" : drone == 1 ? "MISSILE" : "";
   switch (foot) {
-    case Id::smg: return "SMG";
-    case Id::glock: return "PISTOL";
-    case Id::grenade_launcher: return "GRENADE LAUNCHER";
-    case Id::rocket: return "ROCKET LAUNCHER";
+    case weapons::Id::smg: return "SMG";
+    case weapons::Id::glock: return "PISTOL";
+    case weapons::Id::grenade_launcher: return "GRENADE LAUNCHER";
+    case weapons::Id::rocket: return "ROCKET LAUNCHER";
     default: return "";
   }
+}
+std::string jesc(const std::string& s) {
+  std::string o;
+  for (char c : s) {
+    if (c == '"' || c == '\\') o += '\\';
+    if (static_cast<unsigned char>(c) < 0x20) continue;
+    o += c;
+  }
+  return o;
 }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
 
+inline bool Input::down(const Key& k) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.input.down", {converted::value_of(*this), converted::value_of(k)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 
 SC_TEST(converted_game_controls_cpp) {
   converted::Blueprint bp("game_controls_cpp");
-  {  // hint_weapon
-    converted::Tally tally("hint_weapon");
+  {  // key
+    converted::Tally tally("key");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
-    const auto run = [&]([[maybe_unused]] Mode a0, [[maybe_unused]] Id a1, [[maybe_unused]] int a2) { return converted::counted([&] { return converted_game_controls_cpp::hint_weapon(std::move(a0), std::move(a1), std::move(a2)); }); };
+    const auto run = [&]([[maybe_unused]] const Input& a0, [[maybe_unused]] Key& a1) { return converted::counted([&] { return converted_game_controls_cpp::key(a0, std::move(a1)); }); };
     for (int i = 0; tally.more(i); ++i) {
-      const Mode a0 = static_cast<Mode>(draw.below(5));
-      const Id a1 = static_cast<Id>(draw.below(14));
-      const int a2 = static_cast<int>(draw.whole());
+      const Input& a0 = *converted::engine_object<Input>(1 + draw.below(6));
+      Key a1 = converted::enum_value<Key>(draw.below(53));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
       const converted::Watch watch;
       if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
       converted::g_can_bail = true;
       converted::may_bail(true);
-      const auto want = run(a0, a1, a2);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
-      tally.take(bp, {arg(a0), arg(a1), arg(a2)}, want, watch.left(), [&] { return text(a0) + ", " + text(a1) + ", " + text(a2); }, {});
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // hint_weapon
+    converted::Tally tally("hint_weapon");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] Mode& a0, [[maybe_unused]] weapons::Id& a1, [[maybe_unused]] int& a2) { return converted::counted([&] { return converted_game_controls_cpp::hint_weapon(std::move(a0), std::move(a1), std::move(a2)); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      Mode a0 = converted::enum_value<Mode>(draw.below(5));
+      weapons::Id a1 = converted::enum_value<weapons::Id>(draw.below(14));
+      int a2 = static_cast<int>(draw.whole());
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // jesc
+    converted::Tally tally("jesc");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] std::string& a0) { return converted::counted([&] { return converted_game_controls_cpp::jesc(a0); }); };
+    for (int i = 0; tally.more(i); ++i) {
+      std::string a0 = draw.word();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
     }
   }
 }

@@ -15,7 +15,8 @@ f32 Simulator::random01() {
   return static_cast<f32>(rng_ >> 8) / static_cast<f32>(1u << 24);
 }
 
-void Simulator::send(Address from, Address to, const u8* data, int bytes, f64 now) {
+void Simulator::send(Address from, Address to, const u8* data, Count<1> count, f64 now) {
+  const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
   if (bytes <= 0) return;
   if (settings.loss_percent > 0 && random01() * 100.0f < settings.loss_percent) { ++dropped_; return; }
   const int copies = settings.duplicate_percent > 0 && random01() * 100.0f < settings.duplicate_percent ? 2 : 1;
@@ -53,12 +54,14 @@ class LoopbackTransport final : public Transport {
     if (LoopbackNetwork::Inbox* in = hub_.inbox(self_)) { in->open = false; in->packets.clear(); }
   }
   Address address() const override { return self_; }
-  bool send(Address to, const u8* data, int bytes) override {
+  bool send(Address to, const u8* data, Count<1> count) override {
+    const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
     if (bytes <= 0 || bytes > kMaxDatagram || !to.valid()) return false;
     hub_.sim_.send(self_, to, data, bytes, hub_.time_);
     return true;
   }
-  int receive(Address& from, u8* data, int max_bytes) override {
+  int receive(Address& from, u8* data, Count<1> room) override {
+    const int max_bytes = static_cast<int>(static_cast<u32>(room));   // (the room, as the caller says)
     LoopbackNetwork::Inbox* in = hub_.inbox(self_);
     if (!in || in->packets.empty()) return 0;
     auto& [src, bytes] = in->packets.front();
@@ -104,14 +107,16 @@ void LoopbackNetwork::advance_time(f64 time) {
 // ---------------------------------------------------------------------------
 // Host
 
-bool HostTransport::send(Address to, const u8* data, int bytes) {
+bool HostTransport::send(Address to, const u8* data, Count<1> count) {
+  const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
   if (bytes <= 0 || bytes > kMaxDatagram || !to.valid()) return false;
   if (out_.size() >= 4096) out_.pop_front();
   out_.emplace_back(to, std::vector<u8>(data, data + bytes));
   return true;
 }
 
-int HostTransport::receive(Address& from, u8* data, int max_bytes) {
+int HostTransport::receive(Address& from, u8* data, Count<1> room) {
+  const int max_bytes = static_cast<int>(static_cast<u32>(room));   // (the room, as the caller says)
   if (in_.empty()) return 0;
   auto& [src, bytes] = in_.front();
   const int n = static_cast<int>(bytes.size());
@@ -132,7 +137,8 @@ void HostTransport::advance_time(f64 time) {
   }
 }
 
-void HostTransport::push_incoming(Address from, const u8* data, int bytes) {
+void HostTransport::push_incoming(Address from, const u8* data, Count<1> count) {
+  const int bytes = static_cast<int>(static_cast<u32>(count));   // (the bytes, as many as the caller says)
   if (bytes <= 0 || bytes > kMaxDatagram) return;
   if (sim_.settings.active()) { sim_.send(from, self_, data, bytes, time_); return; }
   if (in_.size() >= 4096) in_.pop_front();

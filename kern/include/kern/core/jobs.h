@@ -1,7 +1,7 @@
 // Kern jobs: work off the frame thread. A game defines pure job functions (bytes in, bytes out,
 // no engine state) and submits inputs; results are taken without blocking.
 //
-//   * native: a small thread pool runs the jobs (std::thread)
+//   * native: a small thread pool runs the jobs (std::thread) - or, set_threads(false), pump does as on the web
 //   * web: the host page runs them in Web Workers on a second instance of the same module
 //     (kern/web/jobs.mjs: kern_jobs_take hands out the queued inputs, kern_job_run runs one in the
 //     worker, kern_job_done brings the result back). Without workers (or before the host takes
@@ -30,13 +30,23 @@ bool take(u32 id, std::vector<u8>& out);
 /// Forgets a job (its result is dropped when it arrives).
 void cancel(u32 id);
 /// Runs queued jobs on this thread for about `budget_ms` when nobody else does (no threads, no
-/// web workers). Call once per frame.
+/// web workers) - at least one, if one waits. Call once per frame.
 void pump(f64 budget_ms);
 /// Jobs waiting or running.
 u32 pending();
 /// The host has workers (web): jobs leave through kern_jobs_take instead of running in pump.
 void set_external(bool on);
 bool external();
+/// Native: the jobs run on worker threads (on, the default) or here, in pump, one after another in the
+/// order they came - as on a page without workers. The results are the same; off, when a job runs is
+/// fixed by the program's calls alone (a test that plays a program twice sees the same twice). Off
+/// waits for the jobs the threads are running. (On the web there are no threads: always off.)
+void set_threads(bool on);
+bool threads();
+/// Forgets every job - waiting, running (it waits for those the threads run) or done - and numbers the next one 1
+/// again, as when the program starts; what is defined and the switches stay. (A test that plays calls of a program
+/// on several sides from the same beginning: each side begins with the jobs as the others did.)
+void reset();
 
 // ---- host interface (kern/web/jobs.mjs) ----
 /// Queued jobs not yet handed out, as one buffer: u32 count, then per job u32 id, u32 kind,

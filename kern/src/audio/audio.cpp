@@ -261,16 +261,18 @@ void Mixer::set_reverb(f32 room_size, f32 damping, f32 wet) {
 // ---------------------------------------------------------------------------
 // clips
 
-ClipId Mixer::create_clip(const f32* samples, u32 frames, u32 channels, u32 rate, std::string name) {
+ClipId Mixer::create_clip(const f32* data, Count<1> samples, u32 channels, u32 rate, std::string name) {
   if (!rate_) { fail("audio: mixer not initialised"); return 0; }
-  if (!samples || !frames || (channels != 1 && channels != 2) || rate < 3000 || rate > 384000) {
-    fail("audio: invalid clip (frames %u, channels %u, rate %u)", frames, channels, rate);
+  const u32 n = samples;
+  if (!data || !n || (channels != 1 && channels != 2) || n % channels || rate < 3000 || rate > 384000) {
+    fail("audio: invalid clip (samples %u, channels %u, rate %u)", n, channels, rate);
     return 0;
   }
+  const u32 frames = n / channels;   // (the samples are interleaved: a whole number of frames)
   if (static_cast<u64>(frames) * channels > 60ull * 384000 * 2) { fail("audio: clip longer than 60 s"); return 0; }
-  std::vector<f32> data = resample(samples, frames, channels, rate, rate_);
-  for (f32& s : data) if (!std::isfinite(s)) s = 0;
-  return adopt_clip(std::move(data), channels, std::move(name));
+  std::vector<f32> pcm = resample(data, frames, channels, rate, rate_);
+  for (f32& s : pcm) if (!std::isfinite(s)) s = 0;
+  return adopt_clip(std::move(pcm), channels, std::move(name));
 }
 
 ClipId Mixer::adopt_clip(std::vector<f32> samples, u32 channels, std::string name, bool loopable) {
@@ -547,7 +549,8 @@ void Mixer::mix_voice(Voice& v, u32 frames) {
   v.gain_r = target_r;
 }
 
-void Mixer::render(f32* out, u32 frames) {
+void Mixer::render(f32* out, Count<2> count) {
+  const u32 frames = count;
   if (!out) return;
   if (!rate_) { std::memset(out, 0, static_cast<std::size_t>(frames) * 2 * sizeof(f32)); return; }
   for (Meter& m : stats_.buses) m = Meter{};

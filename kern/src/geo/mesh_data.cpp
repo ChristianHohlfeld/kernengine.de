@@ -2,6 +2,8 @@
 
 #include <cstring>
 
+#include "kern/gfx/renderer.h"
+
 namespace kern {
 
 MeshInput MeshData::as_input(u32 extra_slot) const {
@@ -13,6 +15,18 @@ MeshInput MeshData::as_input(u32 extra_slot) const {
   in.indices = Span<const u32>(indices.data(), indices.size());
   if (!extra.empty() && extra_slot < kMaxExtensionAttributes) in.extension[extra_slot] = Span<const f32>(extra.data(), extra.size());
   return in;
+}
+
+bool upsert(Renderer& renderer, u32 id, const MeshData& mesh, const MeshLook& look, Span<const f32> transforms, Span<const f32> tints) {
+  MeshInput in = mesh.as_input(look.extra_slot);
+  in.material = look.material;
+  in.texture = look.texture;
+  in.visible = look.visible;
+  in.layers = look.layers;
+  in.pick_bvh = look.pick_bvh;
+  in.transforms = transforms;
+  in.tints = tints;
+  return renderer.upsert(id, in);
 }
 
 namespace {
@@ -35,6 +49,11 @@ WeldStats weld(MeshData& m, std::size_t min_saving) {
   s.bytes_before = m.bytes();
   if (!n || !m.indices.empty() || m.extra_size > 4) return s;
   const u32 es = m.extra.empty() ? 0 : m.extra_size;
+  // every stream has one entry per vertex (as Renderer::upsert asks): else the soup stays as it is
+  const std::size_t nn = n;
+  if (m.positions.size() != nn * 3 || m.normals.size() != nn * 3 || m.colors.size() != nn * 3 || m.uvs.size() != nn * 2 ||
+      (es && m.extra.size() != nn * es))
+    return s;
   const u32 stride = 11 + es;
   if (stride > kMaxStride) return s;
 

@@ -6,16 +6,15 @@
 #include <algorithm>
 #include <cmath>
 
+#include "kern/core/map.h"
+
 namespace sc {
 
 namespace {
 constexpr f32 kCell = 40;       // junction lookup grid
 constexpr f32 kMerge = 3;       // street vertices closer than this are one node
-using kern::logic::Value;
-rules::Blueprint g_rules;  // the Blueprint of the level's actor "Traffic": the laws (see world_traffic.h)
+rules::Blueprint g_rules{"Traffic"};  // the laws (see world_traffic.h)
 /// The Blueprint's distances and times the loops below compare with (read when it is bound).
-struct Laws { f32 ahead_min = 0, ahead_max = 0, stop_line = 0, first_come = 0, claim_s = 0, patience_s = 0; } g_laws;
-f32 num(const char* function, const std::vector<Value>& args) { return static_cast<f32>(g_rules.number(function, args)); }
 u64 cell(i32 x, i32 y) { return (static_cast<u64>(static_cast<u32>(x)) << 32) | static_cast<u32>(y); }
 }  // namespace
 
@@ -25,7 +24,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
   blocked_.clear();
   struct Node { Vec2 p; std::vector<Arm> arms; };
   std::vector<Node> nodes;
-  std::unordered_map<u64, std::vector<i32>> cells;
+  kern::Map<u64, std::vector<i32>> cells;
   auto node_at = [&](Vec2 p) -> i32 {
     const i32 cx = static_cast<i32>(std::floor(p.x / kMerge)), cy = static_cast<i32>(std::floor(p.y / kMerge));
     for (i32 dy = -1; dy <= 1; ++dy)
@@ -62,7 +61,7 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
   {
     struct Seg { Vec2 a, b; f32 width; u32 lane; };
     std::vector<Seg> segs;
-    std::unordered_map<u64, std::vector<u32>> buckets;
+    kern::Map<u64, std::vector<u32>> buckets;
     for (u32 li = 0; li < lanes.size(); ++li) {
       const Lane& l = lanes[li];
       if (!l.alive || l.points.size() < 2) continue;
@@ -91,15 +90,17 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
           if (u < 0 || u > 1 || v < 0 || v > 1) continue;
           const Vec2 p = s.a + r * u;
           const i32 ni = node_at(p);
-          for (const Seg* g : {&s, &t})
-            for (const Vec2 end : {g->a, g->b}) {
+          for (const u32 gi : {list[m], list[n]}) {  // (the two segments, by their place in segs)
+            const Seg& g = segs[gi];
+            for (const Vec2 end : {g.a, g.b}) {
               const f32 d = std::hypot(end.x - p.x, end.y - p.y);
               if (d < 0.5f) continue;
               const Vec2 dir{(end.x - p.x) / d, (end.y - p.y) / d};
               bool dup = false;
               for (const Arm& a : nodes[ni].arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97f;
-              if (!dup) nodes[ni].arms.push_back({dir, g->width});
+              if (!dup) nodes[ni].arms.push_back({dir, g.width});
             }
+          }
         }
     }
   }
@@ -110,8 +111,8 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     j.arms = n.arms;
     f32 wmax = 0;
     for (const Arm& a : n.arms) wmax = std::fmax(wmax, a.width);
-    j.lights = g_rules.flag("JunctionLights", {rules::number(wmax)});
-    j.radius = num("JunctionRadius", {rules::number(wmax)});
+    j.lights = g_rules.flag("JunctionLights", rules::decimal(wmax));
+    j.radius = static_cast<f32>(g_rules.number("JunctionRadius", rules::decimal(wmax)));
     // The axis: the widest arm (the main road); of several as wide, the one with the smallest
     // bearing - the same on every machine, whatever order its streets came in
     {
@@ -127,25 +128,27 @@ void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
     // The signal posts: each on the kerb corner right of its arm's incoming traffic - between
     // this arm and the next one round the junction, 1.2 m off both carriageways (never on a
     // street: not on its own arm, not on the one crossing it).
-    for (Arm& a : j.arms) {
+    for (std::size_t ai = 0; ai < j.arms.size(); ++ai) {
+      Arm& a = j.arms[ai];
       const f32 aa = std::atan2(a.dir.y, a.dir.x);
       f32 best = 6.2831853f;
-      const Arm* next = nullptr;
-      for (const Arm& b : j.arms) {
-        if (&b == &a) continue;
+      std::size_t next = j.arms.size();  // the next arm round the junction: its place in j.arms (none: j.arms.size())
+      for (std::size_t bi = 0; bi < j.arms.size(); ++bi) {
+        if (bi == ai) continue;
+        const Arm& b = j.arms[bi];
         f32 d = std::atan2(b.dir.y, b.dir.x) - aa;
         while (d <= 1e-4f) d += 6.2831853f;
-        if (d < best) { best = d; next = &b; }
+        if (d < best) { best = d; next = bi; }
       }
       const f32 half = best / 2;
-      if (!next || best >= 3.1415927f) {
+      if (next == j.arms.size() || best >= 3.1415927f) {
         // no arm on that side: abeam of the junction, beside the arm's own kerb
         a.pole = Vec2{-a.dir.y, a.dir.x} * (a.width * 0.5f + 1.2f);
         a.has_pole = true;
         continue;
       }
       const f32 s = std::sin(half);
-      const f32 r = (std::fmax(a.width, next->width) * 0.5f + 1.2f) / std::fmax(s, 0.05f);
+      const f32 r = (std::fmax(a.width, j.arms[next].width) * 0.5f + 1.2f) / std::fmax(s, 0.05f);
       if (r > 30) continue;  // two arms nearly along each other: no corner to stand on
       a.pole = Vec2{std::cos(aa + half), std::sin(aa + half)} * r;
       a.has_pole = true;
@@ -171,23 +174,22 @@ void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
     }
 }
 
-void TrafficRules::bind(kern::logic::Instance* blueprint) {
-  g_rules.running = blueprint;
-  g_laws = Laws{};
-  if (!blueprint) return;
-  g_laws.ahead_min = static_cast<f32>(g_rules.variable("AheadMinM"));
-  g_laws.ahead_max = static_cast<f32>(g_rules.variable("AheadMaxM"));
-  g_laws.stop_line = static_cast<f32>(g_rules.variable("StopLineM"));
-  g_laws.first_come = static_cast<f32>(g_rules.variable("FirstComeM"));
-  g_laws.claim_s = static_cast<f32>(g_rules.variable("ClaimS"));
-  g_laws.patience_s = static_cast<f32>(g_rules.variable("PatienceS"));
+bool TrafficRules::bind(kern::logic::Runtime& logic) { return g_rules.bind(logic); }
+
+void TrafficRules::take_laws() {
+  laws_.ahead_min = static_cast<f32>(g_rules.get<f64>("AheadMinM"));
+  laws_.ahead_max = static_cast<f32>(g_rules.get<f64>("AheadMaxM"));
+  laws_.stop_line = static_cast<f32>(g_rules.get<f64>("StopLineM"));
+  laws_.first_come = static_cast<f32>(g_rules.get<f64>("FirstComeM"));
+  laws_.claim_s = static_cast<f32>(g_rules.get<f64>("ClaimS"));
+  laws_.patience_s = static_cast<f32>(g_rules.get<f64>("PatienceS"));
 }
 
 i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
   if (!j.lights) return -1;
-  std::vector<Value> r;
-  if (!g_rules.call("Light", {rules::number(lights_time >= 0 ? lights_time : now), rules::number(j.offset), rules::number(heading.x * j.axis.x + heading.y * j.axis.y)}, r) || r.empty()) return -1;
-  return static_cast<i32>(r[0].i);
+  i32 light = 0;
+  g_rules.call("Light", std::tie(light), rules::decimal(lights_time >= 0 ? lights_time : now), rules::decimal(j.offset), rules::decimal(heading.x * j.axis.x + heading.y * j.axis.y));
+  return light;
 }
 
 TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
@@ -223,9 +225,9 @@ TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir
   return out;
 }
 
-f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32* limiter) {
-  const f32 side = num("SideReach", {Value::boolean(bus)}), far = g_laws.ahead_max;
-  const f32 bodies[2] = {num("Bodies", {Value::boolean(bus), Value::boolean(false)}), num("Bodies", {Value::boolean(bus), Value::boolean(true)})};
+f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const {
+  const f32 side = static_cast<f32>(g_rules.number("SideReach", bus)), far = laws_.ahead_max;
+  const f32 bodies[2] = {static_cast<f32>(g_rules.number("Bodies", bus, false)), static_cast<f32>(g_rules.number("Bodies", bus, true))};
   f32 gap = 1e9f;
   i32 who = -1;
   for (std::size_t i = 0; i < all.size(); ++i) {
@@ -234,14 +236,14 @@ f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::v
     const f32 dx = o.p.x - pos.x, dy = o.p.y - pos.y;
     if (std::fabs(dx) > far || std::fabs(dy) > far) continue;
     const f32 along = dx * fwd.x + dy * fwd.y;
-    if (along < g_laws.ahead_min || along > far) continue;
+    if (along < laws_.ahead_min || along > far) continue;
     if (std::fabs(-dx * fwd.y + dy * fwd.x) > side) continue;
     const f32 g = along - bodies[o.bus ? 1 : 0];
     if (g < gap) { gap = g; who = static_cast<i32>(i); }
   }
-  if (limiter) *limiter = who;
+  limiter = who;
   if (who < 0) return 1e9f;
-  return num("GapSpeed", {rules::number(gap)});
+  return static_cast<f32>(g_rules.number("GapSpeed", rules::decimal(gap)));
 }
 
 f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 now, const std::vector<Vec3>& cars, const std::vector<Vec2>& people, Vec2 player,
@@ -251,7 +253,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   const f32 v = std::fmax(0.0f, speed);
   // 1. people in the corridor (yieldsToPedestrian)
   {
-    const f32 reach = num("YieldReach", {Value::boolean(bus), rules::number(v)}), half = num("YieldHalfWidth", {Value::boolean(bus)});
+    const f32 reach = static_cast<f32>(g_rules.number("YieldReach", bus, rules::decimal(v))), half = static_cast<f32>(g_rules.number("YieldHalfWidth", bus));
     auto in_lane = [&](Vec2 q) {
       const f32 dx = q.x - pos.x, dy = q.y - pos.y, along = dx * fwd.x + dy * fwd.y;
       return along >= -0.5f && along <= reach && std::fabs(-dx * fwd.y + dy * fwd.x) < half;
@@ -267,10 +269,9 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
       // honkCheck: the player sooner, a pedestrian after a while; then 9..16 s apart
       // (how much later the next honk comes: a number 0..1 from the car and the second)
       const f32 roll = static_cast<f32>((static_cast<u32>(car) * 2654435761u + static_cast<u32>(now)) % 700) / 700;
-      if (std::vector<Value> r; g_rules.call("Honk", {Value::boolean(by_player), rules::number(b.since), rules::number(b.next_honk), rules::number(now), rules::number(roll)}, r) && r.size() >= 2) {
-        view.honk = r[0].b;
-        b.next_honk = static_cast<f32>(r[1].as_number());
-      }
+      f64 next = 0;
+      g_rules.call("Honk", std::tie(view.honk, next), by_player, rules::decimal(b.since), rules::decimal(b.next_honk), rules::decimal(now), rules::decimal(roll));
+      b.next_honk = static_cast<f32>(next);
     } else b.since = -1;
   }
   // 2. the next junction ahead
@@ -284,7 +285,7 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     const f32 dist = std::hypot(d.x, d.y);
     // inside: claim it (first come, first served) and drive on
     if (dist < j.radius) {
-      if (j.claim < 0 || j.claim == car || now - j.claim_at > g_laws.claim_s) { j.claim = car; j.claim_at = now; }
+      if (j.claim < 0 || j.claim == car || now - j.claim_at > laws_.claim_s) { j.claim = car; j.claim_at = now; }
       continue;
     }
     if (j.claim == car && dist > j.radius + 3) j.claim = -1;  // left it
@@ -296,20 +297,20 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
   if (view.junction < 0) blocked_[car].wait_since = -1;
   if (view.junction >= 0) {
     Junction& j = junctions_[view.junction];
-    const f32 stop = std::fmax(0.0f, view.distance - g_laws.stop_line);  // the stop line before the junction
+    const f32 stop = std::fmax(0.0f, view.distance - laws_.stop_line);  // the stop line before the junction
     bool must_stop = false;
     view.light = light(j, fwd, now);
-    if (view.light >= 0) must_stop = g_rules.flag("MustStop", {Value::integer(view.light), rules::number(stop), rules::number(v)});  // red; amber: stop if it can
-    else if (view.distance < g_laws.first_come) {
+    if (view.light >= 0) must_stop = g_rules.flag("MustStop", view.light, rules::decimal(stop), rules::decimal(v));  // red; amber: stop if it can
+    else if (view.distance < laws_.first_come) {
       // Unsignalled: wait while someone else holds the junction (and is still in it).
-      if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < g_laws.claim_s) {
+      if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < laws_.claim_s) {
         const Vec3 c = cars[j.claim];
         if (c.z > -1e8f && std::hypot(c.x - j.p.x, c.y - j.p.y) < j.radius + 3) must_stop = true;
       }
       // Right before left: a car close to the edge on the right goes first (after 4 s of waiting
       // a driver goes anyway: four cars at a four-way junction would otherwise wait for ever).
       Blocked& b = blocked_[car];
-      if (!must_stop && (b.wait_since < 0 || now - b.wait_since < g_laws.patience_s))
+      if (!must_stop && (b.wait_since < 0 || now - b.wait_since < laws_.patience_s))
         for (std::size_t k = 0; k < cars.size(); ++k) {
           if (static_cast<i32>(k) == car || cars[k].z < -1e8f) continue;
           const Vec2 o{cars[k].x - j.p.x, cars[k].y - j.p.y};
@@ -322,11 +323,11 @@ f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 no
     {
       Blocked& b = blocked_[car];
       if (must_stop && v < 0.5f && b.wait_since < 0) b.wait_since = now;
-      if (view.distance > g_laws.first_come || view.light >= 0) b.wait_since = -1;
+      if (view.distance > laws_.first_come || view.light >= 0) b.wait_since = -1;
     }
     if (must_stop) {
       view.wait = true;
-      lim = std::fmin(lim, num("StopSpeed", {rules::number(stop)}));
+      lim = std::fmin(lim, static_cast<f32>(g_rules.number("StopSpeed", rules::decimal(stop))));
     }
   }
   return lim;

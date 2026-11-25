@@ -238,8 +238,8 @@ void Game::ui_equipment(f32 dt) {
   const bool in_car = mode_ == Mode::car && !ui_.paused;
   if (in_car && engine_ && !web_audio_) {  // on the page with the original's sound, car_radio.mjs itself (game_audio_web.cpp)
     // car_radio.mjs: N / B, the pad's D-pad right / left (padTick; D-pad right pings as well, pad_actions.mjs)
-    const bool next = engine_->input.pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
-    const bool prev = engine_->input.pressed(kern::Key::b) || pad.hit(kPadLeft);
+    const bool next = engine_->input().pressed(kern::Key::n) || pad.hit(kPadRight) || pad_touch_.take_pressed("radio");
+    const bool prev = engine_->input().pressed(kern::Key::b) || pad.hit(kPadLeft);
     if (next || prev) ui_radio(next ? 1 : -1);
   }
   ui_.banner_age += dt;
@@ -308,7 +308,7 @@ void Game::ui_mix_equipment(f32 dt) {
   else ui_.music.select(-2, 0);
 }
 
-void Game::ui_render_music(f32* out, u32 frames) { ui_.music.render_add(out, frames); }
+void Game::ui_render_music(std::vector<f32>& out, u32 frames) { ui_.music.render_add(out, frames); }
 
 // ---------------------------------------------------------------------------------------------
 // commands and HUD
@@ -325,7 +325,7 @@ bool Game::ui_equipment_command(const std::string& cmd, std::string& out) {
       rest = rest.substr(sp + 1);
     }
     nostr::Bytes32 sk{}, aux{};
-    if (!nostr::from_hex(part[1], sk.data(), 32) || !nostr::from_hex(part[2], aux.data(), 32) || part[3].empty() || part[3].front() != '[') { out = "bad key or tags"; return true; }
+    if (!nostr::from_hex(part[1], sk) || !nostr::from_hex(part[2], aux) || part[3].empty() || part[3].front() != '[') { out = "bad key or tags"; return true; }
     if (!nostr::event_json(sk, aux, std::atoll(part[0].c_str()), 30078, part[3], rest, out)) out = "sign failed";
     return true;
   }

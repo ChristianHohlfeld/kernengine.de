@@ -18,7 +18,7 @@ class Hello final : public App {
   }
 
   bool start(Engine& engine) override {
-    Renderer& r = engine.renderer;
+    Renderer& r = engine.renderer();
     ground_ = r.allocate_id();
     MeshInput g = ground_mesh_.as_input();
     g.material.color = {0.42f, 0.47f, 0.40f, 1};
@@ -33,23 +33,24 @@ class Hello final : public App {
   }
 
   void update(Engine& engine, const Frame& frame) override {
-    Input& in = engine.input;
+    Input& in = engine.input();
     if (in.button(0)) yaw_ -= in.pointer_delta().x * 0.005f;
     if (in.down(Key::left)) yaw_ += frame.dt * 1.5f;
     if (in.down(Key::right)) yaw_ -= frame.dt * 1.5f;
     distance_ = clamp(distance_ * (1 + in.wheel() * 0.001f), 8.0f, 80.0f);
-    Camera& c = engine.renderer.camera;
+    Camera c = engine.renderer().camera();
     c.target = {0, 0, 1};
     c.eye = {std::cos(yaw_) * distance_, std::sin(yaw_) * distance_, distance_ * 0.6f};
+    engine.renderer().set_camera(c);
 
     // Spin every box; one instance upload per frame for all of them.
     layout(static_cast<f32>(frame.time));
-    engine.renderer.update_instances(boxes_, Span<const f32>(transforms_.data(), transforms_.size()),
+    engine.renderer().update_instances(boxes_, Span<const f32>(transforms_.data(), transforms_.size()),
                                      Span<const f32>(tints_.data(), tints_.size()));
 
     if (in.button_pressed(0)) {
       PickHit hit;
-      if (engine.renderer.pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
+      if (engine.renderer().pick(in.pointer().x, in.pointer().y, {}, hit) && hit.mesh == boxes_) {
         tints_[hit.instance * 4 + 0] = 1.0f; tints_[hit.instance * 4 + 1] = 0.25f; tints_[hit.instance * 4 + 2] = 0.2f;
       }
     }
