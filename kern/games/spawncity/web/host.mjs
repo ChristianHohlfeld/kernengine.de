@@ -92,7 +92,7 @@ export async function startSpawnCity({url = null, base64 = null} = {}) {
   })();
   // Fresh views each time: the module's memory may have grown (and detached older views).
   const decoder = new TextDecoder();
-  const str = ptr => decoder.decode(new Uint8Array(kern.memory.buffer, ptr, e.sc_result_length()));
+  const str = ptr => decoder.decode(new Uint8Array(kern.memory.buffer, ptr, e.kern_text_length()));
   const command = text => {
     const bytes = new TextEncoder().encode(text), ptr = e.kern_alloc(bytes.length + 1);
     new Uint8Array(kern.memory.buffer, ptr, bytes.length).set(bytes);
