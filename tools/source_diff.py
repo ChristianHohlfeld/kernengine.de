@@ -2135,7 +2135,9 @@ class BuildsWriter(Writer):
         if ret:
             inner.append(f"std::optional<std::remove_cvref_t<decltype({call})>> r;")
             call = f"r.emplace({call})"
-        inner += ["long asks = 0;", f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
+        # (each call alone, in a process of its own - Builds::alone: a call the program does not survive is one C++ leaves open)
+        inner += ["long asks = 0;", "const bool defined = rec.alone([&](long& asks) {",
+                  f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
         if ret:
             inner.append('  rec.part("what it returns", ::sc::lowered::bytes_of(r));')
         ended = getattr(self, "ends", {}).get(label)
@@ -2150,7 +2152,7 @@ class BuildsWriter(Writer):
             inner.append('  rec.part("the object it makes", ::sc::lowered::bytes_of(made));')
         for what, x in writes:
             inner.append(f"  rec.part({C.text_literal(what)}, ::sc::lowered::bytes_of({x}));")
-        inner += ["}", "rec.take(defined, asks, call);"]
+        inner += ["}", "return defined;", "}, asks);", "rec.take(defined, asks, call);"]
         return body + ["      " + x for x in inner] + ["    }", "  }"]
 
 
