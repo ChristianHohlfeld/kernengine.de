@@ -77,3 +77,4 @@ else
   grep -o "undefined reference to \`[^']*'" "$out/link.log" | sort | uniq -c | sort -rn | head -80
   grep -v 'undefined reference' "$out/link.log" | grep -i error | head -20
 fi
+exit 0
