@@ -1,0 +1,5 @@
+round 1: 41 Blueprints
+round 2: 4 Blueprints
+round 3: 4 Blueprints
+round 4: 4 Blueprints
+round 5: 3 Blueprints
