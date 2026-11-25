@@ -145,9 +145,8 @@ kern::game::Level Game::build_level() const {
   // device decides and what is still built in code.
   Level l;
   {
-    kern::json::Value doc;
     std::string error;
-    if (!kern::json::parse(rules::level_text(), doc, &error) || !from_json(doc, l, &error)) {
+    if (!from_text(rules::level_text(), l, &error)) {   // (kern::json::parse, then from_json - level.cpp)
       kern::log(kern::LogLevel::error, "SpawnCity: the level file is broken: %s", error.c_str());
       l = Level{};
     }
