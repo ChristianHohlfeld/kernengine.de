@@ -13892,7 +13892,15 @@ class TestWriter:
             if m.group(1) not in table:
                 return m.group(0)
             return f"using {table[m.group(1)]};" if "::" in table[m.group(1)] else ""
-        return lambda text: self.in_code(text, lambda code: own(pattern.sub(lambda m: table[m.group(1)], using.sub(said, code))))
+        top = getattr(self, "test_ns", None)
+        def named(m):
+            # (a function the source calls by its full name - `kern::now_ms()` - by the test's full name of it: by its
+            # name alone a variable of that name would hide it, `const f64 now_ms = kern::now_ms();`)
+            local = table[m.group(1)]
+            if top and "::" in m.group(1) and "::" not in local and re.match(r"\s*\(", m.string[m.end():]):
+                return f"::{top}::{local}"
+            return local
+        return lambda text: self.in_code(text, lambda code: own(pattern.sub(named, using.sub(said, code))))
 
     # ---- what a test holds: the source of what it compares, and all that source names ----
     @staticmethod
@@ -14900,6 +14908,7 @@ class TestWriter:
         G = self.setup()
         unguarded = self.unguarded
         ns = f"converted_{stem}"
+        self.test_ns = ns   # (the test's namespace: what the renamer names in full - renamer)
         vectors = (ENGINE + "::Vec3", ENGINE + "::Vec2")
         converted = self.converted
         functions, records, enums, templates = G.functions, G.records, G.enums, G.templates
