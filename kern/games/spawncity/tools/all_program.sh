@@ -31,7 +31,9 @@ export -f compile
 mkdir -p "$out/logs"
 ls "$out"/gen/*.cpp | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c 'compile "$1"' _ {} | sort > "$out/files.txt"
 echo "files: $(wc -l < "$out/files.txt"), compile: $(grep -c '^rc=0' "$out/files.txt"), do not: $(grep -vc '^rc=0' "$out/files.txt")"
-echo "most memory: $(grep -o 'peak_kb=[0-9]*' "$out/files.txt" | cut -d= -f2 | sort -n | tail -1) KB"
+echo "memory per file (KB): median $(grep -o 'peak_kb=[0-9]*' "$out/files.txt" | cut -d= -f2 | sort -n | awk '{a[NR]=$1} END {print a[int((NR+1)/2)]}'), over 2 GB: $(grep -o 'peak_kb=[0-9]*' "$out/files.txt" | cut -d= -f2 | awk '$1 > 2097152' | wc -l); the ten that take most:"
+sed -E 's/^rc=[0-9]+ ([^ ]+) peak_kb=([0-9]+).*/\2 \1/' "$out/files.txt" | sort -n -r | head -10 | while read -r kb f; do
+  echo "  $kb KB $f ($(grep -o 'The Blueprint of [^"]*"[^"]*"' "$out/gen/$f" | head -1))"; done
 grep -v '^rc=0' "$out/files.txt" | head -50
 echo "errors by message:"
 cat "$out"/logs/*.log | grep 'error:' | sed -E 's/^[^ ]* error: //; s/kern_blueprint_[0-9a-f]+::/X::/g' | cut -c1-200 | sort | uniq -c | sort -rn | head -60
