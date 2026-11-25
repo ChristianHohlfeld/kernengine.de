@@ -5,7 +5,6 @@
 #include "../src/blueprint_call.h"
 #include "level_blueprints.h"
 #include "../src/combat_detail.h"
-#include "../src/guided.h"
 #include "../src/rules.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
