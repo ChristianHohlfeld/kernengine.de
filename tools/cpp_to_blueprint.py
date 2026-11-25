@@ -12801,6 +12801,9 @@ class TestWriter:
         c = self.u.clean(raw)
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return "const char*"
+        said = self.class_spell(c)
+        if said is not None:
+            return said
         q = self.u.object_of(raw)
         if q:   # (held as the program holds it: the stand-in by a pointer, a reference, as a value or owned)
             r, name = raw.strip(), self.object_name(q)
@@ -12946,6 +12949,8 @@ class TestWriter:
 
     def draw(self, raw):
         c = self.u.clean(raw)
+        if self.class_spell(c) is not None:   # (a value of a type of a Blueprint's class, or of the language's own: converted::draw_class)
+            return f"converted::draw_class<{self.class_spell(c)}>(draw)"
         if raw.replace(" ", "") in ("constchar*", "constchar*const"):
             return f"draw.said_c_word({self.said_list()})" if self.said else "draw.c_word()"
         cq = self.u.find_type(c)
@@ -13035,6 +13040,56 @@ class TestWriter:
             q = self.u.find_type(part)
             if q in self.tree.records and q not in ("kern::Vec3", "kern::Vec2") and not self.u.callback_record(q):   # (a callback: converted.h's)
                 self.helpers(q)
+
+    # ---- the types of a Blueprint's class (Unit.class_library): the source holds them where it calls a file of the program that is
+    # a Blueprint now; the test draws, hands over, compares and takes them back (converted.h, "the types of a Blueprint's class") ----
+    LANGUAGE_CPP = re.compile(r"kern::logic::(?:Sized<.+>|Whole|Text|Truth|List<.+>|Fixed<.+>)")
+
+    def class_spell(self, c):
+        """How the test spells a type of a Blueprint's class (`c`, cleaned) - as the compiler names it: the class's
+        own struct or enum (its helpers written: class_helpers), a type of the language as it is. None: no such type."""
+        m = CLASS_TYPE.fullmatch(c)
+        if m and m.group(2):
+            t = self.u.btype(c)   # (the type of that Blueprint - read from the level: Unit.class_named)
+            if t in self.u.struct_fields:
+                self.class_helpers(c, t)
+            return c
+        if self.LANGUAGE_CPP.fullmatch(c):
+            for inner in template_args(c) if "<" in c else []:
+                if not re.fullmatch(r"\d+[uUlL]*", inner.strip()):
+                    self.class_spell(self.u.clean(inner))   # (a struct of a class in a list: its helpers too)
+            return c
+        return None
+
+    def class_helpers(self, c, t):
+        """The helpers of a struct of a Blueprint's class (spelled `c` by the compiler, the Blueprint's struct `t`): draw, arg,
+        same, defined, text, take - field by field, as the level has its fields (Unit.struct_fields: a field of the class is
+        called as the Blueprint calls it), in the namespace of its class, where a call from converted.h looks for them."""
+        key = ("class", c)
+        if key in self.helped:
+            return
+        self.helped[key] = None
+        space, inner = c.split("::", 1)
+        fields = [f for f, _, _, _ in self.u.struct_fields[t]]
+        n = len(fields)
+        lines = [f"namespace {space} {{ using sc::converted::arg; using sc::converted::same; using sc::converted::defined; using sc::converted::text; using sc::converted::take;",
+                 f"[[maybe_unused]] static {inner} draw_value(sc::converted::Draw& draw, const {inner}*) {{ {inner} s{{}}; "
+                 + " ".join(f"s.{f} = sc::converted::draw_class<decltype(s.{f})>(draw);" for f in fields) + " return s; }",
+                 f"[[maybe_unused]] static sc::converted::Value arg(const {inner}& s) {{ return sc::converted::Value::structure({{{', '.join(f'arg(s.{f})' for f in fields)}}}); }}",
+                 f"[[maybe_unused]] static bool same(const {inner}& want, const sc::converted::Value& got) {{ return sc::converted::rows_of(got, {n})"
+                 + "".join(f" && sc::converted::at_place(same(want.{f}, (*got.rows)[{i}]), \".{f}\")" for i, f in enumerate(fields)) + "; }",
+                 f"[[maybe_unused]] static bool defined(const {inner}& s) {{ return " + " && ".join(f"defined(s.{f})" for f in fields) + "; }",
+                 f"[[maybe_unused]] static std::string text(const {inner}& s) {{ return std::string(\"{{\") + " + ' + ", " + '.join(f"text(s.{f})" for f in fields) + ' + "}"; }',
+                 f"[[maybe_unused]] static void take({inner}& s, const sc::converted::Value& v) {{ if (!v.rows || v.rows->size() != {n}) return; "
+                 + " ".join(f"take(s.{f}, (*v.rows)[{i}]);" for i, f in enumerate(fields)) + " }",
+                 "}"]
+        for f, ft, _, _ in self.u.struct_fields[t]:   # (a struct of a class a field is: its helpers before these)
+            part = self.u.part(ft)
+            if part in self.u.struct_fields and part != t and self.u.type_home.get(part) in class_libraries(self.u.world):
+                del self.helped[key]
+                raise Wait(f"the test has no values of {c} yet: its field {f} is a struct of a Blueprint's class too (not written yet)")
+        self.helped[key] = lines
+        self.helped.move_to_end(key)
 
     def helpers(self, q):
         """The helpers of a class of the test - draw, arg, same, defined, text - and the name of draw."""
