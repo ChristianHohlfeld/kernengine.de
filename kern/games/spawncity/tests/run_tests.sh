@@ -66,7 +66,8 @@ while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cp
 # only what its two programs need - the engine and test_main.cpp - and only that driver, tests/lowered/builds/<file>/.
 beleg="${SC_BELEG:-}"
 if [ -n "$beleg" ]; then
-  [ -f "$here/lowered/builds/$beleg/builds_$beleg.cpp" ] || { echo "FAIL SC_BELEG=$beleg: there is no tests/lowered/builds/$beleg/builds_$beleg.cpp"; exit 1; }
+  # (SC_BELEG=all: every driver there - the CI wrote them, "gen:")
+  [ "$beleg" = all ] || [ -f "$here/lowered/builds/$beleg/builds_$beleg.cpp" ] || { echo "FAIL SC_BELEG=$beleg: there is no tests/lowered/builds/$beleg/builds_$beleg.cpp"; exit 1; }
   keep=(); for f in "${sources[@]}"; do case "$f" in "$kern"/src/*|"$kern"/tests/gl_stub.cpp|"$here"/test_main.cpp) keep+=("$f") ;; esac; done
   sources=("${keep[@]}")
 fi
@@ -145,7 +146,7 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
   bdir="$(dirname "$drv")" stem="$(basename "$bdir")" name="lowered_$(basename "$bdir" | sed 's/[^A-Za-z0-9_]/_/g')_cpp"
   want=0; [ $# -eq 0 ] && want=1
   for a in "$@"; do case "$name" in *"$a"*) want=1 ;; esac; done
-  [ -n "$beleg" ] && { [ "$stem" = "$beleg" ] && want=1 || want=0; }
+  [ -n "$beleg" ] && { [ "$stem" = "$beleg" ] || [ "$beleg" = all ] && want=1 || want=0; }
   [ "$want" = 1 ] && [ "$pass" != 2 ] && [ "$whole" = 1 ] || continue
   bout="$out/builds/$stem"; tree="$bout/tree/src"
   rm -rf "$bout/tree" && mkdir -p "$bout/tree"
@@ -182,6 +183,16 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
       printf '%s\n' "${jobs_src[@]}" | xargs -P "${KERN_JOBS:-$(nproc)}" -I{} bash -c 'src="${1%%|*}" o="${1#*|}"; shift; "$cxx" "$@" -c "$src" -o "$o"' _ {} "${sf[@]}"
     fi
     dobj="$bout/driver-$side.o"
+    within="$(sed -n '1,12s#^// within: \([^ ]*\).*#\1#p' "$drv")"
+    if [ -n "$within" ]; then
+      # (a test within its file - it reaches the variables of the file: the file's text with the test appended is the
+      # object of that file, on each side; the test is no object of its own)
+      k=0; for f in "$t"/*.cpp; do [ "$(basename "$f")" = main.cpp ] && continue; [ "$(basename "$f")" = "$within" ] && objs[$k]="$dobj"; k=$((k + 1)); done
+      printf '#include "%s"\n#include "%s"\n' "$t/$within" "$d" > "$bout/within-$side.cpp"
+      "$cxx" "${sf[@]}" -c "$bout/within-$side.cpp" -o "$dobj"
+      "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "${objects[@]}" -lm -o "$bout/$side"
+      continue
+    fi
     "$cxx" "${sf[@]}" -c "$d" -o "$dobj"
     "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "$dobj" "${objects[@]}" -lm -o "$bout/$side"
   done
