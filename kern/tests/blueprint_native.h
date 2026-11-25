@@ -2005,6 +2005,7 @@ inline std::string cpp_type(PinType t, const std::string& of = {}, const std::st
     return t == PinType::map ? "kern::logic::Map<" + part(k) + ", " + part(logic::value_type({t, of})) + ">" : "kern::logic::Set<" + part(k) + ">";
   }
   if (t == PinType::integer_list && logic::width_bits(of) != 0) return "kern::List<kern::logic::Sized<kern::" + of + ">>";  // (List<U8>: its own type)
+  if (t == PinType::object) return "kern::logic::Object<" + logic::engine_class_cpp(of) + ">";  // (an object of the engine: Object<kern::App>)
   if (logic::element_of(t) != PinType::enumeration && logic::element_of(t) != PinType::structure) return builtin_cpp_type(t);
   return logic::is_list(t) ? "kern::List<" + owner + "::" + of + ">" : owner + "::" + of;
 }
@@ -2027,6 +2028,9 @@ inline std::string cpp_value(const Value& v, const std::string& of = {}, const s
     case PinType::text: return "std::string(" + c_string(v.s) + ")";
     case PinType::actor: std::snprintf(b, sizeof b, "kern::logic::ActorHandle{%lluu}", static_cast<unsigned long long>(v.a)); return b;
     case PinType::int64: std::snprintf(b, sizeof b, "kern::logic::Int64{0x%llxull}", static_cast<unsigned long long>(static_cast<u64>(v.i))); return b;
+    case PinType::object:  // (its handle and its world, as they are)
+      std::snprintf(b, sizeof b, "{kern::logic::ObjectRef{%lldLL, %uu}}", static_cast<long long>(v.i), static_cast<unsigned>(v.world));
+      return cpp_type(PinType::object, of) + b;
     case PinType::enumeration: return "static_cast<" + owner + "::" + of + ">(" + std::to_string(v.i) + ")";
     case PinType::structure: {
       const logic::StructType* s = g ? g->structure(of) : nullptr;
@@ -2067,6 +2071,7 @@ inline std::string value_source(const Value& v) {
     case PinType::vector: return L + "vector(" + cpp_value(v) + ")";
     case PinType::text: return L + "text(" + cpp_value(v) + ")";
     case PinType::actor: return L + "actor(" + std::to_string(v.a) + "u)";
+    case PinType::object: return L + "object(kern::logic::ObjectRef{" + std::to_string(v.i) + "LL, " + std::to_string(v.world) + "u})";
     case PinType::enumeration: return L + "enumeration(" + std::to_string(v.i) + ")";
     case PinType::structure: return v.rows ? rows("structure") : L + "zero(kern::logic::PinType::structure)";
     case PinType::structure_list: return rows("structures");
