@@ -80,7 +80,7 @@ SC_TEST(equipment_flight_log) {
   s.armed = true;
   for (int i = 0; i <= 100; ++i) {
     s.t = i * 0.1;
-    s.pos = {i * 0.5, 0, 2};
+    s.pos = {i * 0.5f, 0, 2};
     s.vel = {5, 0, 0};
     s.agl = 2;
     s.volts = 16.4 - i * 0.01;

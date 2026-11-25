@@ -56,11 +56,12 @@ SC_TEST(combat_flak_cells) {
   if (!rules.bound) return;
   Cr& cr = *rules;
   Cr::U32 seed = 0, seed2 = 0;
+  auto cell = [](i64 c) { return Cr::Int64{static_cast<u64>(c)}; };   // (a cell's index as the program's i64 gives it)
   int guns = 0;
   for (int x = -20; x < 20; ++x)
-    for (int y = -20; y < 20; ++y) guns += cr.flak_cell(seed, Cr::Int64{x}, Cr::Int64{y}).Result ? 1 : 0;
+    for (int y = -20; y < 20; ++y) guns += cr.flak_cell(seed, cell(x), cell(y)).Result ? 1 : 0;
   SC_CHECK(guns > 1600 * 0.25f && guns < 1600 * 0.4f, "about 32 %% of the cells have a gun (%d / 1600)", guns);
-  const bool a = cr.flak_cell(seed, Cr::Int64{3}, Cr::Int64{-7}).Result, b = cr.flak_cell(seed2, Cr::Int64{3}, Cr::Int64{-7}).Result;
+  const bool a = cr.flak_cell(seed, cell(3), cell(-7)).Result, b = cr.flak_cell(seed2, cell(3), cell(-7)).Result;
   SC_CHECK(a == b && seed == seed2, "placement is deterministic per cell");
   SC_CHECK(cr.flak_burst_damage(0).Result == 16 && cr.flak_burst_damage(7.5).Result == 0 && cr.flak_burst_damage(3.5).Result == 9, "airburst 14 (1 - d/7) + 2");
 }
@@ -94,13 +95,13 @@ SC_TEST(combat_zombie_rounds) {
   using E = Cr::combat_ZombieEvent;
   Cr::combat_ZombieRounds z;
   SC_CHECK(cr.ZombieRounds_update(z, 0, false, 0).Result == E::none && !z.active, "day: nothing");
-  SC_CHECK(cr.ZombieRounds_update(z, 1, true, 0).Result == E::night && z.round == 1 && z.to_spawn == 10, "night: round 1 with 6 + 4 zombies");
+  SC_CHECK(cr.ZombieRounds_update(z, 1, true, 0).Result == E::night && z.the_round == 1 && z.to_spawn == 10, "night: round 1 with 6 + 4 zombies");
   SC_CHECK(cr.ZombieRounds_update(z, 2, true, 0).Result == E::none, "first spawn after 1.8 s");
   SC_CHECK(cr.ZombieRounds_update(z, 3, true, 0).Result == E::spawn, "spawn due");
   for (int i = 0; i < 10; ++i) cr.ZombieRounds_spawned(z, 3);
   SC_CHECK(cr.ZombieRounds_update(z, 4, true, 3).Result == E::none, "zombies still up");
   SC_CHECK(cr.ZombieRounds_update(z, 5, true, 0).Result == E::round_done, "all down: round over");
-  SC_CHECK(cr.ZombieRounds_update(z, 15, true, 0).Result == E::round_ && z.round == 2 && z.to_spawn == 14, "9 s break, then round 2");
+  SC_CHECK(cr.ZombieRounds_update(z, 15, true, 0).Result == E::round_ && z.the_round == 2 && z.to_spawn == 14, "9 s break, then round 2");
   SC_CHECK(cr.ZombieRounds_hp(z).Result == 124, "hp 100 + 12 per round");
   SC_CHECK(cr.ZombieRounds_update(z, 16, false, 0).Result == E::dawn && !z.active, "dawn ends the night");
 }
