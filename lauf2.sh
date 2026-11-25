@@ -147,7 +147,7 @@ run_job() {  # name
       local engine_pid=$!
       # (die Texte der Blueprints gehen mit nach mag-zwischen/texts: scheitert das Einlesen ins Level, lässt sich jeder Text einzeln nachlesen)
       ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 TEST_ERRORS=1 $conv --level level/spawncity.klevel --test tests/converted --texts "$W/mag-zwischen/texts" -- \
-          $(cd kern/games/spawncity 2>/dev/null; ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
+          $(cd kern/games/spawncity 2>/dev/null; ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp") ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when
       # (Level und Tests sofort, mit dem Protokoll der Konvertierung in mag-zwischen/ - nicht in mag-log/: ein Auftrag gilt als fertig, sobald mag-log zweimal geschrieben ist)
       git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
@@ -159,7 +159,7 @@ run_job() {  # name
     konvert)   # konvert <git-ref> <kerne>: nur die Konvertierung des ganzen Spiels, mit genau so vielen Kernen
       export KERN_JOBS="${rest%% *}"; echo "kerne: $KERN_JOBS" >> mag-log/when
       ( cd kern/games/spawncity && rm -rf tests/converted && time FUNCTIONS=1 $conv --level level/spawncity.klevel --test tests/converted -- \
-          $(ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp\|main.cpp") ) > mag-log/convert.log 2>&1
+          $(ls src/*.cpp | grep -v "level_data.cpp\|level_blueprints.cpp") ) > mag-log/convert.log 2>&1
       echo "convert rc=$? $(date '+%T')" >> mag-log/when
       git add kern/games/spawncity/level/spawncity.klevel kern/games/spawncity/tests/converted
       $G commit -q -m "mag: $name auf $SHA – Level und Tests der Blueprints ($KERN_JOBS Kerne)" || true ;;
