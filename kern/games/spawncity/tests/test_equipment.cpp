@@ -1,88 +1,122 @@
 // Equipment: jetpack (player_walk_mode_v4.mjs), flight logbook (flight_logbook.mjs), procedural music.
+// They are the level's Blueprint equipment_cpp (its structs: equipment), called as its class - as the program
+// calls it (level_blueprints.h), with the game's loop guard; the jetpack's rules are the Blueprint Jetpack.
+#include <memory>
 #include <string>
 #include <vector>
 
-#include "../src/equipment.h"
+#include "../src/blueprint_call.h"
+#include "level_blueprints.h"
 #include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
 
+namespace {
+using Eq = blueprints::equipment_cpp;
+/// equipment_cpp running as its class, beside the level's rule actors it calls (`with`).
+struct EquipmentBlueprint {
+  RuleBlueprint rules;
+  bool bound = false;
+  explicit EquipmentBlueprint(const char* with = nullptr) : rules(with, nullptr, true, {"equipment_cpp"}) {
+    rules.rt.budget = rules::kLoopBudget;
+    bound = rules.problems.empty() && kern::logic::bind_blueprint<Eq>(rules.rt);
+  }
+  Eq& operator*() { return kern::logic::blueprint<Eq>(); }
+};
+}  // namespace
+
 SC_TEST(equipment_jetpack) {
-  RuleBlueprint bp("Jetpack", &Jetpack::bind);
+  EquipmentBlueprint e("Jetpack");
+  RuleBlueprint& bp = e.rules;
   SC_CHECK(bp.inst && bp.problems.empty() && !bp.inst->disabled(), "the level's Jetpack Blueprint compiles and runs: %s", bp.problems.c_str());
   SC_CHECK(bp.inst && std::string(bp.inst->tier()) == "native C++", "it runs as its C++ class");
-  Jetpack j;
-  SC_CHECK(j.update(0.1f, 0, false, 0, 0, false) == 0 && j.fuel == 1, "on the ground: nothing");
-  SC_CHECK(j.ignite(1), "ignition in the air");
+  SC_CHECK(e.bound, "equipment_cpp runs as its class");
+  if (!e.bound) return;
+  Eq& eq = *e;
+  SC_CHECK(eq.Jetpack_bind().Result, "the game finds the Jetpack's Blueprint");
+  const f64 gravity = eq.Jetpack_gravity().Result, max_climb = eq.Jetpack_max_climb().Result, acc_full = eq.Jetpack_acc().Result, fall_safe = eq.Jetpack_fall_safe().Result;
+  Eq::Jetpack j;
+  SC_CHECK(eq.Jetpack_update(j, 0.1, 0, false, 0, 0, false).Result == 0 && j.fuel == 1, "on the ground: nothing");
+  SC_CHECK(eq.Jetpack_ignite(j, 1).Result, "ignition in the air");
   // Simulate a vertical hop: thrust while jump is held.
-  f32 z = 1, vz = 1, t = 0;
+  f64 z = 1, vz = 1, t = 0;
   for (int i = 0; i < 120; ++i) {  // 2 s
-    const f32 acc = j.update(1.0f / 60, t, true, vz, z, true);
-    vz += (acc - Jetpack::gravity()) / 60;
+    const f64 acc = eq.Jetpack_update(j, 1.0 / 60, t, true, vz, z, true).Result;
+    vz += (acc - gravity) / 60;
     z += vz / 60;
-    t += 1.0f / 60;
+    t += 1.0 / 60;
   }
-  SC_CHECK(z > 10 && vz <= Jetpack::max_climb() + 0.5f, "climbs over a house at most 8 m/s (z %.1f, vz %.1f)", z, vz);
-  SC_CHECK(j.fuel < 0.75f && j.fuel > 0.4f, "2 s burn uses fuel (%.2f)", j.fuel);
+  SC_CHECK(z > 10 && vz <= max_climb + 0.5, "climbs over a house at most 8 m/s (z %.1f, vz %.1f)", z, vz);
+  SC_CHECK(j.fuel < 0.75 && j.fuel > 0.4, "2 s burn uses fuel (%.2f)", static_cast<f64>(j.fuel));
   // Let go, fall: the cushion fires before touchdown.
   bool cushion = false;
   for (int i = 0; i < 600 && z > 0; ++i) {
-    const f32 acc = j.update(1.0f / 60, t, true, vz, z, false);
-    if (acc >= Jetpack::acc()) cushion = true;
-    vz += (acc - Jetpack::gravity()) / 60;
+    const f64 acc = eq.Jetpack_update(j, 1.0 / 60, t, true, vz, z, false).Result;
+    if (acc >= acc_full) cushion = true;
+    vz += (acc - gravity) / 60;
     z += vz / 60;
-    t += 1.0f / 60;
+    t += 1.0 / 60;
   }
-  SC_CHECK(cushion && vz > -Jetpack::fall_safe(), "the cushion catches the fall (%.1f m/s)", vz);
-  const f32 f0 = j.fuel;
-  for (int i = 0; i < 240; ++i) j.update(1.0f / 60, t + i / 60.0f, false, 0, 0, false);
-  SC_CHECK(j.fuel > f0 + 0.8f || j.fuel == 1, "refills on the ground (%.2f -> %.2f)", f0, j.fuel);
-  Jetpack empty;
-  empty.fuel = 0.01f;
-  SC_CHECK(!empty.ignite(0), "no ignition without fuel");
+  SC_CHECK(cushion && vz > -fall_safe, "the cushion catches the fall (%.1f m/s)", vz);
+  const f64 f0 = j.fuel;
+  for (int i = 0; i < 240; ++i) eq.Jetpack_update(j, 1.0 / 60, t + i / 60.0, false, 0, 0, false);
+  SC_CHECK(j.fuel > f0 + 0.8 || j.fuel == 1, "refills on the ground (%.2f -> %.2f)", f0, static_cast<f64>(j.fuel));
+  Eq::Jetpack empty;
+  empty.fuel = 0.01;
+  SC_CHECK(!eq.Jetpack_ignite(empty, 0).Result, "no ignition without fuel");
 }
 
 SC_TEST(equipment_flight_log) {
-  FlightLog log;
-  FlightSample s;
-  s.volts = 16.4f;
-  log.observe(s);
-  SC_CHECK(!log.flying() && log.flights().empty(), "disarmed: no flight");
+  EquipmentBlueprint e;
+  SC_CHECK(e.bound, "equipment_cpp runs as its class: %s", e.rules.problems.c_str());
+  if (!e.bound) return;
+  Eq& eq = *e;
+  Eq::FlightLog log;
+  Eq::FlightSample s;
+  s.volts = 16.4;
+  eq.FlightLog_observe(log, s);
+  SC_CHECK(!eq.FlightLog_flying(log).Result && log.flights_.empty(), "disarmed: no flight");
   s.armed = true;
   for (int i = 0; i <= 100; ++i) {
-    s.t = i * 0.1f;
-    s.pos = {i * 0.5f, 0, 2};
+    s.t = i * 0.1;
+    s.pos = {i * 0.5, 0, 2};
     s.vel = {5, 0, 0};
     s.agl = 2;
-    s.volts = 16.4f - i * 0.01f;
-    log.observe(s);
+    s.volts = 16.4 - i * 0.01;
+    eq.FlightLog_observe(log, s);
   }
   s.armed = false;
-  log.observe(s);
-  SC_CHECK(log.flights().size() == 1, "one flight");
-  const Flight& f = log.flights()[0];
-  SC_CHECK(std::fabs(f.duration - 10) < 0.15f && std::fabs(f.distance - 50) < 0.6f && std::fabs(f.max_speed - 5) < 1e-3f, "10 s, 50 m, 5 m/s (%.2f %.2f %.2f)", f.duration, f.distance, f.max_speed);
-  SC_CHECK(f.path.size() >= 20 && f.path.size() <= 22 && f.reason == "FC_DISARM", "path every 0.5 s (%zu)", f.path.size());
+  eq.FlightLog_observe(log, s);
+  SC_CHECK(log.flights_.size() == 1, "one flight");
+  if (log.flights_.size() != 1) return;
+  const Eq::Flight& f = log.flights_[0];
+  SC_CHECK(std::fabs(f.duration - 10) < 0.15 && std::fabs(f.distance - 50) < 0.6 && std::fabs(f.max_speed - 5) < 1e-3, "10 s, 50 m, 5 m/s (%.2f %.2f %.2f)",
+           static_cast<f64>(f.duration), static_cast<f64>(f.distance), static_cast<f64>(f.max_speed));
+  SC_CHECK(f.path.size() >= 20 && f.path.size() <= 22 && f.reason.str() == "FC_DISARM", "path every 0.5 s (%zu)", f.path.size());
   SC_CHECK(f.volts_min < f.volts_start, "battery sag");
-  log.network("peer-join", 3);
-  const std::string j = log.json();
+  eq.FlightLog_network(log, kern::logic::Text("peer-join"), 3);
+  const std::string j = eq.FlightLog_json(log).Result.str();
   SC_CHECK(j.find("\"flights\":[{\"id\":1") != std::string::npos && j.find("peer-join") != std::string::npos, "json");
 }
 
 SC_TEST(equipment_music) {
-  MusicSynth m;
-  m.init(48000);
-  std::vector<f32> buf(2 * 4800);
-  m.select(MusicSynth::kMenu, 1);
-  f32 peak = 0;
-  for (int i = 0; i < 40; ++i) { std::fill(buf.begin(), buf.end(), 0.0f); m.render_add(buf, 4800); peak = std::fmax(peak, m.peak); }
-  SC_CHECK(peak > 0.05f && peak < 1.2f, "the title music plays (peak %.3f)", peak);
-  m.select(2, 1);
-  for (int i = 0; i < 20; ++i) m.render_add(buf, 4800);
-  SC_CHECK(m.programme() == 2, "the radio station takes over (%d)", m.programme());
-  m.select(-2, 0);
-  for (int i = 0; i < 20; ++i) { std::fill(buf.begin(), buf.end(), 0.0f); m.render_add(buf, 4800); }
-  SC_CHECK(m.peak == 0, "radio off: silence");
-  SC_CHECK(MusicSynth::station_count() == 5, "five stations");
+  EquipmentBlueprint e;
+  SC_CHECK(e.bound, "equipment_cpp runs as its class: %s", e.rules.problems.c_str());
+  if (!e.bound) return;
+  Eq& eq = *e;
+  auto m = std::make_unique<Eq::MusicSynth>();   // (its echo: 24000 numbers)
+  eq.MusicSynth_init(*m, 48000);
+  Eq::List<Eq::Float> buf(std::vector<f64>(2 * 4800));
+  eq.MusicSynth_select(*m, Eq::kMenu, 1);
+  f64 peak = 0;
+  for (int i = 0; i < 40; ++i) { std::fill(buf.begin(), buf.end(), 0.0); eq.MusicSynth_render_add(*m, buf, 4800); peak = std::fmax(peak, m->peak); }
+  SC_CHECK(peak > 0.05 && peak < 1.2, "the title music plays (peak %.3f)", peak);
+  eq.MusicSynth_select(*m, 2, 1);
+  for (int i = 0; i < 20; ++i) eq.MusicSynth_render_add(*m, buf, 4800);
+  SC_CHECK(eq.MusicSynth_programme(*m).Result == 2, "the radio station takes over (%d)", static_cast<int>(eq.MusicSynth_programme(*m).Result));
+  eq.MusicSynth_select(*m, -2, 0);
+  for (int i = 0; i < 20; ++i) { std::fill(buf.begin(), buf.end(), 0.0); eq.MusicSynth_render_add(*m, buf, 4800); }
+  SC_CHECK(m->peak == 0, "radio off: silence");
+  SC_CHECK(eq.MusicSynth_station_count().Result == 5, "five stations");
 }
