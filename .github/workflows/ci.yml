@@ -44,11 +44,11 @@ jobs:
         env:
           SOURCES: ${{ inputs.probe }}
         run: |
-          W=/home/runner/probe; mkdir -p "$W/pt/converted" "$W/texts"
+          W=/home/runner/probe; mkdir -p "$W/pt/converted" "$W/texts" "$W/keep"
           cp kern/games/spawncity/tests/*.h "$W/pt/"; cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"
           cd kern/games/spawncity
           set +e
-          KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract \
+          KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 TEST_KEEP="$W/keep" python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract \
             -I../../include -I../../third_party/box3d/include -Isrc --level "$W/pt/l.klevel" --test "$W/pt/converted" --texts "$W/texts" -- $SOURCES > "$W/convert.log" 2>&1
           rc=$?; cat "$W/convert.log"; echo "convert rc=$rc"; exit $rc   # (the whole log: a session without access to the artifacts reads it here)
       - uses: actions/upload-artifact@v4
@@ -59,6 +59,7 @@ jobs:
             /home/runner/probe/convert.log
             /home/runner/probe/pt/converted
             /home/runner/probe/texts
+            /home/runner/probe/keep
           retention-days: 2
 
   # A proof of one lowering (workflow_dispatch with "beleg"): its driver in the form "two builds" - the old tree's program
