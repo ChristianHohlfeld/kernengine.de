@@ -10,7 +10,6 @@
 #include <vector>
 
 #include "game.h"
-#include "shader_look.h"
 #include "kern/api/c_api.h"
 #include "kern/logic/blueprint_class.h"  // (what an export gives: kern::logic::export_text, export_bytes, export_floats)
 #include "kern/kern.h"
@@ -33,9 +32,7 @@ class SpawnCityApp final : public kern::App {
   }
   kern::Span<kern::ShaderExtension* const> extensions() override {
     // facades (extension stream 0: Kern's wall records), water (stream 1: terrain.cpp build_water_chunk)
-    static sc::LookExtension<sc::Facades> facades{sc::game().windows()};
-    static sc::LookExtension<sc::WaterLook> water{sc::game().water_look()};
-    static kern::ShaderExtension* ext[2] = {&facades, &water};
+    static kern::ShaderExtension* ext[2] = {&sc::facades(), &sc::water_look()};
     return {ext, 2};
   }
   bool start(kern::Engine& e) override {

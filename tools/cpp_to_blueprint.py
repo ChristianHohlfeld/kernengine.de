@@ -6849,6 +6849,9 @@ class Emit:
                 return []
             if self.on_actor(n) is not None:
                 return self.call_on(n, self.on_actor(n))
+            if self.other_state(n) is not None:
+                got = self.state_call(n)
+                return got if isinstance(got, list) else []   # (what it gives, unread: the call stands before the statement - hoist)
             if self.actor_bind(n) is not None:
                 self.has_blueprint(n, self.actor_bind(n))   # (what it gives is not used: binding is the Blueprint's own, nothing to do)
                 return []
@@ -7503,6 +7506,36 @@ class Emit:
         if b.get("kind") != "DeclRefExpr" or b.get("referencedDecl", {}).get("id") not in self.logic_params:
             raise Wait("a logic handed on that is not the one the function was given (a Blueprint runs in its own)")
 
+    def other_state(self, n):
+        """A call of a method of the one object of another class of the program that is the state of a Blueprint
+        (`sc::game().start(e)` in SpawnCityApp, whose Blueprint is another): (its Blueprint - an actor of the level -,
+        the method's function there); else None. (Its one object is that Blueprint: reached by its name, Call on Actor.)"""
+        if n.get("kind") != "CXXMemberCallExpr":
+            return None
+        m = callee(n)
+        d = self.tree.decl.get(m.get("referencedMemberDecl"))
+        owner = self.tree.owner.get(d["id"]) if d is not None else None
+        if owner is None or owner not in self.u.world.states or owner == self.u.state:
+            return None
+        return self.u.world.states[owner], d
+
+    def state_call(self, n, gives_type=None):
+        """A method of another state's one object, called (other_state): Call on Actor on its Blueprint, which has the
+        method as its function of the same name - each argument a value the call hands over (a reference has no way
+        to another Blueprint), what it returns the value of the call."""
+        actor, d = self.other_state(n)
+        g = self.u.function(d["id"])
+        if g.self_type is not None or any(g.kinds):
+            raise Wait(f"a reference handed to the Blueprint {actor} (Call on Actor hands values over)")
+        function = g.name.split("::")[-1]
+        values = [x for x in kids(n)[1:] if x.get("kind") != "CXXDefaultArgExpr"]
+        if len(values) != len(kids(n)[1:]):
+            raise Wait(f"a call of {function} on the Blueprint {actor} that leaves an argument to its default")
+        t = self.tp(n) if g.result is not None else None
+        if g.result is None:
+            return self.call_on_actor(actor, function, values, [], None, state=True)
+        return self.call_on_actor(actor, function, values, [None], gives_type or t, state=True)
+
     def actor_named(self, obj):
         """The actor whose Blueprint `obj` is: named where it is made (ActorBlueprint rules{"Lamps"}). The name
         is a constant of the object (`const char* const actor`) - the same for as long as it lives."""
@@ -7591,6 +7624,14 @@ class Emit:
                 raise Wait("a call on an actor's Blueprint whose outputs are not the places std::tie names")
             places, values = kids(outs)[1:], args[2:]
         function, actor = c_string(named["value"]).decode("utf-8"), self.actor_named(obj)
+        return self.call_on_actor(actor, function, values, places, gives_type)
+
+    def call_on_actor(self, actor, function, values, places, gives_type=None, state=False):
+        """Call on Actor: the function `function` of the Blueprint of the actor `actor` runs with `values` - what it gives
+        goes to `places` (None: the value of the call, of type gives_type). `state`: the actor's Blueprint is the state
+        of a class of the program (another one than this Blueprint's - state_call); its function is called as the
+        program calls the method."""
+        u = self.u
         target = u.world.actors.get(actor)
         if target is None:
             raise Wait(f"a call on the Blueprint of the actor {actor}, which the level does not have")
@@ -7634,6 +7675,8 @@ class Emit:
         elif held[:2] != pins:
             raise Wait(f"two calls of {function} on the Blueprint of the actor {actor} with other values (a Blueprint says once what a function of another one looks like)")
         texts = [self.ex(a, t) for a, t in zip(values, in_types)]
+        if state and not gives and gives_type:
+            raise Wait(f"a call of {function} on the Blueprint {actor} as a value, where it gives nothing")
         self.f.pure = False   # (a step: what the other Blueprint does is not known here)
         self.f.on_actors.append((actor, function))
         node = u.next_node
@@ -11333,6 +11376,11 @@ class Emit:
             return self.has_blueprint(b, self.actor_bind(b))
         if self.actor_value(b) is not None:
             return self.call_on(b, self.actor_value(b), "Float" if name == "number" else "Bool")
+        if self.other_state(b) is not None:
+            got = self.state_call(b)
+            if isinstance(got, list):
+                raise Wait("a call on the Blueprint of another state that gives nothing, as a value")
+            return got
         d = self.engine_decl(m.get("referencedMemberDecl"))
         if d is not None:
             return self.engine_value(d, base, kids(b)[1:])
@@ -14713,6 +14761,13 @@ class TestWriter:
                 segments.append((text, None if m.get("explicitlyDefaulted") else self.ident(m), raw[ma:mb].count("\n")))
                 at = end
             segments.append((tree.said(self.cut(d["_file"], at, b0, [])), None, 0))
+            if q in self.u.world.state_implements:
+                # (a class that is the object of an interface of the engine: in the test it is the class as such - the
+                # interface is the engine's, its stand-in has no functions to override; what the engine calls of it the
+                # test calls directly)
+                head, *rest = segments
+                text = re.sub(r"(\b(?:class|struct)\s+\w+(?:\s+final)?)\s*:\s*public\s+(?:::)?[\w:]+", r"\1", head[0], count=1)
+                segments = [(re.sub(r"\boverride\b", "", text), head[1], head[2])] + [(re.sub(r"\)\s*(const\s*)?override\b", lambda m_: ")" + (" " + m_.group(1).strip() if m_.group(1) else ""), x), i_, n_) for x, i_, n_ in rest]
             inside_of = self.local_path(outer(q), local_of(d)) if not self.outside_its_class(q, G.records) else self.spaces_of(outer(q)) + ([local_of(d)] if local_of(d) else [])
             put(d, {"kind": "record", "segments": segments, "head": "".join(f"namespace {c} {{ " for c in inside_of), "tail": " }" * len(inside_of),
                     "pairs": [(self.absolute(x), names[x]) for x in names if self.compiled_top(x, G.records) == q] + [(self.absolute(x), enum_names[x]) for x in enum_names if self.compiled_top(x, G.records) == q and x not in G.enums]})
@@ -15271,6 +15326,11 @@ class TestWriter:
                     else:
                         inner.append((raw[a0:ma].count("\n"), raw[a0:mb].count("\n"), ("member", m["id"])))
                 text += self.cut(d["_file"], at, b0)
+                if q in self.u.world.state_implements:
+                    # (a class that is the object of an interface of the engine: in the test it is the class as such - the
+                    # interface is the engine's, its stand-in has no functions to override; the test calls them directly)
+                    text = re.sub(r"(\b(?:class|struct)\s+\w+(?:\s+final)?)\s*:\s*public\s+(?:::)?[\w:]+", r"\1", text, count=1)
+                    text = re.sub(r"\s*\boverride\b", "", text)
                 first = add(("record", q), self.wrapped(q, re.sub(r"^\s*class\b", "struct", wide(tree.said(text))) + ";", records=records))
                 where.extend((first + x, first + y, key) for x, y, key in inner)
             add(None, "\n".join(["#undef private", "#undef protected", '#pragma GCC diagnostic pop', ""]))
@@ -15819,8 +15879,9 @@ def objects_made(tree):
 
 def engine_interface_of(tree, rec):
     """The interface of the engine a class of the program derives from (kern/docs/blueprint_cpp.md, "Schnittstellen der
-    Engine"): its one base, public, a class of the engine whose functions are all virtual and that holds nothing
-    (`class SpawnCityApp final : public kern::App`) - by the name the Blueprints give it (App); else None."""
+    Engine"): its one base, public, a class of the engine whose functions are all virtual, and what it holds the class
+    does not name (`class SpawnCityApp final : public kern::App`) - [the name the Blueprints give it (App), its pure
+    functions]; else None."""
     bases = rec.get("bases") or []
     if len(bases) != 1 or bases[0].get("access", "public") != "public" or bases[0].get("isVirtual"):
         return None
@@ -15829,8 +15890,18 @@ def engine_interface_of(tree, rec):
     if not q.startswith(ENGINE + "::") or base is None or base.get("bases"):
         return None
     methods = [c for c in kids(base) if c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit")]
-    if any(c.get("kind") == "FieldDecl" for c in kids(base)) or not methods or not all(c.get("virtual") for c in methods):
+    if not methods or not all(c.get("virtual") for c in methods):
         return None
+    # (what the interface holds - `u32 material_base`, set by the renderer - is the engine's: the engine's object of
+    # the Blueprint holds it; the class must not name it)
+    held = {c["id"] for c in kids(base) if c.get("kind") == "FieldDecl"}
+    if held:
+        mine = rec.get("_q")
+        for d in tree.body.values():
+            if tree.owner.get(d.get("id")) == mine and any(x.get("kind") == "MemberExpr" and x.get("referencedMemberDecl") in held for x in walk(d)):
+                return None
+        if any(x.get("kind") == "MemberExpr" and x.get("referencedMemberDecl") in held for x in walk(rec)):
+            return None
     return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")})]
 
 

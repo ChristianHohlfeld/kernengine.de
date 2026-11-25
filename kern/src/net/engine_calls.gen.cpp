@@ -1,5 +1,6 @@
 // The engine's nodes on the engine itself: the calls of the functions the headers of this component declare
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
+#include <algorithm>
 #include "kern/net/client_server.h"
 #include "kern/net/connection.h"
 #include "kern/net/reliable.h"
@@ -1440,6 +1441,55 @@ bool c134_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>
   return true;
 }
 
+// kern::net::Transport: the object of the engine a Blueprint is (Graph::implements "net_Transport")
+class Implements_net_Transport final : public kern::net::Transport {
+ public:
+  Implements_net_Transport(EngineObjects& o, std::shared_ptr<Implementer> by) : o_(o), by_(std::move(by)) {}
+  decltype(std::declval<const kern::net::Transport&>().address()) address() const override {
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("address", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::net::Transport&>().address()) kern_r = ev::blank<decltype(std::declval<const kern::net::Transport&>().address())>();
+    if (kern_given) ev::Conv<ev::Struct<S_net_Address>>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>())) send(kern::net::Address kern_p0, unsigned char const* kern_p1, kern::Count<1u> kern_p2) override {
+    const std::vector<Value> kern_in{ev::Conv<ev::Struct<S_net_Address>>::to(o_, kern_p0), ev::Conv<ev::List<ev::Int>>::to(o_, kern::Span<const unsigned char>(kern_p1, static_cast<std::size_t>(ev::numbers(kern_p2)))), ev::Conv<ev::Int>::to(o_, kern_p2)};
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("send", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>())) kern_r = ev::blank<decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>()))>();
+    if (kern_given) ev::Conv<ev::Bool>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>())) receive(kern::net::Address& kern_p0, unsigned char* kern_p1, kern::Count<1u> kern_p2) override {
+    const std::vector<Value> kern_in{ev::Conv<ev::Struct<S_net_Address>>::to(o_, kern_p0), ev::Conv<ev::Int>::to(o_, kern_p2)};
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("receive", kern_in, kern_out) && !kern_out.empty();
+    if (kern_given && kern_out.size() > 1) ev::Conv<ev::Struct<S_net_Address>>::from(o_, kern_out[1], kern_p0);
+    if (kern_given && kern_out.size() > 2) {
+      std::vector<std::remove_pointer_t<decltype(kern_p1)>> kern_w;
+      ev::Conv<ev::List<ev::Int>>::from(o_, kern_out[2], kern_w);
+      std::copy_n(kern_w.begin(), std::min(kern_w.size(), static_cast<std::size_t>(ev::numbers(kern_p2))), kern_p1);
+    }
+    decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>())) kern_r = ev::blank<decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>()))>();
+    if (kern_given) ev::Conv<ev::Int>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<kern::net::Transport&>().advance_time(std::declval<double>())) advance_time(double kern_p0) override {
+    if (!by_->has("advance_time")) return kern::net::Transport::advance_time(kern_p0);
+    const std::vector<Value> kern_in{ev::Conv<ev::Float>::to(o_, kern_p0)};
+    std::vector<Value> kern_out;
+    by_->call("advance_time", kern_in, kern_out);
+  }
+
+ private:
+  EngineObjects& o_;
+  std::shared_ptr<Implementer> by_;
+};
+i64 implements_net_Transport(EngineObjects& o, std::shared_ptr<Implementer> by) {
+  return o.own<Implements_net_Transport, kern::net::Transport>(std::make_unique<Implements_net_Transport>(o, std::move(by)));
+}
+
 const EngineCall kCalls[] = {
     {"engine.net.client_state_name", &c0},
     {"engine.client.connect", &c1},
@@ -1591,6 +1641,11 @@ const EngineMaker kMakers[] = {
     {EngineObjects::kind<kern::net::Simulator>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::net::Simulator>(handle, std::unique_ptr<kern::net::Simulator>(new kern::net::Simulator())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));
+
+const EngineImplement kAdapters[] = {
+    {"net_Transport", &implements_net_Transport},
+};
+const EngineImplements kAllAdapters(kAdapters, std::size(kAdapters));
 
 }  // namespace
 }  // namespace kern::logic
