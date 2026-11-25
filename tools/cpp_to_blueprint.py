@@ -1539,6 +1539,9 @@ class Unit:
         self.deciding = set()       # (the engine's classes engine_object is deciding about: one that holds itself)
         self.lives, self.deciding_life = {}, set()       # the program's classes -> what ends with a value of one (life)
         self.makings, self.deciding_making = {}, set()   # the program's classes -> does C++ make more of one than its defaults (needs_making)
+        self.interface = set()      # the constants of its header it holds whether a function uses them or not (interface_constants)
+        self.interface_waits = []   # (a constant of its header it cannot hold, why)
+        self.class_constants = {}   # (a Blueprint called as its class, a constant of it) -> (its name here, its type)
         self.externs = {}           # a function of an actor's Blueprint it calls on that actor -> (its inputs, its outputs: [(name, type)], its declaration)
         self.extern_inputs = {}     # such a function -> (the head of its declaration, its inputs as the actor's Blueprint names them: [(type, name, default)])
         self.working = set()
@@ -2355,6 +2358,8 @@ class Unit:
             return ZERO["Int64"]
         if t.startswith(("List<", "Map<", "Set<")) and v in ([], None):
             return self.zero(t)
+        if t.startswith("List<") and isinstance(v, list):
+            return t + "{" + ", ".join(self.level_value(x, t[5:-1], None, what) for x in v) + "}"
         if t in self.enum_values and isinstance(v, int) and 0 <= v < len(self.enum_values[t]):
             return f"{t}::{self.enum_values[t][v]}"
         if t in self.struct_fields and isinstance(v, dict):
@@ -2396,6 +2401,43 @@ class Unit:
             raise Wait(f"{lib}::{name}() gives {len(outs)} outputs (a call of a class reads its Result)")
         self.stubs[key] = g
         return g
+
+    def class_constant(self, name):
+        """A constant `name` of a Blueprint the program calls as its class (blueprints::combat_audio_cpp::kVariants): the
+        Blueprint's constant as the level holds it, held here as a constant of this Blueprint - as every constant of the
+        program is held by the Blueprints that use it. (name here, type), or None: no such Blueprint has one. Wait: more
+        than one has."""
+        libs = sorted(lib for lib in class_libraries(self.world) if name in self.world.actors[lib].get("const_defs", {}))
+        if not libs:
+            return None
+        if len(libs) > 1:
+            raise Wait(f"the constant {name}, which the Blueprints {', '.join(libs)} called as their classes each have")
+        lib = libs[0]
+        if (lib, name) not in self.class_constants:
+            v = self.world.actors[lib]["const_defs"][name]
+            vt, count = self.class_pin(lib, v)
+            lit = self.level_value(v.get("value"), vt, count, f"the constant {name} of {lib}")
+            mine = self.fresh(name)
+            self.names.add(mine)
+            self.variable_lines.append(f"  /// The constant {name} of the Blueprint {lib}")
+            self.variable_lines.append(f"  KERN_CONST {self.fixed_type(vt, count)} {mine} = {lit};")
+            self.class_constants[(lib, name)] = (mine, vt)
+        return self.class_constants[(lib, name)]
+
+    def interface_constants(self, headers):
+        """The header holds its whole interface (BLUEPRINTS.md, "5 - Umschalten"): every constant a header of the program
+        declares - in a namespace or in a class -, whether a function uses it or not, is a constant of its Blueprint. A
+        file that is a Blueprint now is called by the rest of the program with it (kern::logic::blueprint, Unit.class_constant)."""
+        mine = {os.path.abspath(h) for h in headers}
+        found = [d for d in self.tree.decl.values() if d.get("kind") == "VarDecl" and os.path.abspath(d.get("_file") or "?") in mine
+                 and (d["id"] in self.tree.scope_of or self.tree.owner.get(d["id"])) and kids(d) and d.get("init")
+                 and (d.get("constexpr") or re.search(r"\bconst\b", qtype(d)))]
+        for d in sorted(found, key=lambda d: (os.path.abspath(d["_file"]), (d.get("_at") or (0,))[0] or 0)):
+            try:
+                name, _ = self.constant(d)
+                self.interface.add(name)
+            except Wait as w:
+                self.interface_waits.append((d.get("name"), str(w)))
 
     # ---- what a value makes and ends: the objects of the engine it holds ----
     # An object of the engine a value holds as a field (Session::transport_, LookState::lights) is made where
@@ -2985,7 +3027,7 @@ class Unit:
             if line.strip().startswith("///"):
                 pending = [line]
                 continue
-            if name_of(line) in used:
+            if name_of(line) in used or name_of(line) in self.interface:
                 variables += pending + [line]
                 used.update(word.findall(line))
             pending = []
@@ -9833,6 +9875,8 @@ class Emit:
                 if i in u.variables:   # (a constant of the function's own, `static const Vec3 kHair[6] = {…};` - see stmt1)
                     return u.variables[i]
                 d = self.tree.decl.get(i)
+                if d is None and u.class_constant(ref.get("name", "")) is not None:
+                    return u.class_constant(ref["name"])   # (a constant of a Blueprint called as its class)
                 if d is None:
                     if ref.get("name") == "kPi":
                         return self.engine_constant("kPi", 3.14159265358979323846, "Pi")
@@ -15588,6 +15632,15 @@ def convert_unit(job):
             shutil.rmtree(scratch, ignore_errors=True)
     fs = unit.all
     written = [f for f in fs if f.text or f.place]   # (a name for a place is written where it is called)
+    # (the constants of its headers: of a header's Blueprint its own; of a source file's, those of its header where that
+    # header has no Blueprint of its own - combat_audio.h declares constants and no function)
+    own = set(world.function_units.values())
+    if source is None:
+        headers = [f for f in files if is_header(f) and world.program(f)]
+    else:
+        header = os.path.splitext(source)[0] + ".h"
+        headers = [header] if os.path.exists(header) and world.program(header) and world.unit_of(header) not in own else []
+    unit.interface_constants(headers)
     variables, functions, members, types = unit.parts()
     return {"name": name, "path": main_file, "program": world.program(main_file), "total": len(fs), "done": len(written), "total_lines": sum(f.lines for f in fs),
             "done_lines": sum(f.lines for f in written), "waits": [(f.wait, f.lines) for f in fs if f.wait],
@@ -15685,7 +15738,8 @@ def class_facts(actors, level_actors):
         actors[a["name"]].update({"folder": a.get("folder"), "engine": engine(a["name"], set()),
                                   "struct_defs": {s["name"]: s for s in g.get("structs", []) if s.get("name")},
                                   "enum_defs": {e["name"]: e for e in g.get("enums", []) if e.get("name")},
-                                  "function_defs": {f["name"]: f for f in g.get("functions", []) if f.get("name") and "::" not in f["name"]}})
+                                  "function_defs": {f["name"]: f for f in g.get("functions", []) if f.get("name") and "::" not in f["name"]},
+                                  "const_defs": {v["name"]: v for v in g.get("variables", []) if v.get("name") and v.get("const")}})
 
 
 def class_libraries(world):
