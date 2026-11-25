@@ -1,6 +1,6 @@
 // Host tool: the Blueprints of a Kern level as C++ classes a game links.
 //
-//   tools/blueprint_cpp.sh <level.klevel> <out.cpp> [<out.h> <folder>]   (builds this file once, then runs it)
+//   tools/blueprint_cpp.sh <level.klevel> <out.cpp> [<out.h> <folder> [<actor> ...]]   (builds this file once, then runs it)
 //   tools/blueprint_cpp.sh --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]
 //                                                        (the other way: Blueprints from their C++ texts)
 //   tools/blueprint_cpp.sh --node-names                  (the names the nodes have in a Blueprint's C++)
@@ -35,7 +35,9 @@
 // glue), each once, and named there by their class names in the namespace `blueprints`
 // (blueprints::qr_code_cpp), with blueprints::bind(Runtime&): it binds each of them to the object the
 // runtime runs it as. The program calls their functions on that object, typed and directly, with
-// the types they declare - no value is packed, nothing is looked up by name.
+// the types they declare - no value is packed, nothing is looked up by name. Actors named after the
+// folder are called as their classes too, wherever they stand (a program's tests call Blueprints of other
+// folders the same way: what they prove binds those Blueprints, before the program does).
 //
 // <out.cpp> and <out.h> are only rewritten when they change, so nothing recompiles for an unchanged level.
 #include <algorithm>
@@ -205,12 +207,12 @@ int main(int argc, char** argv) {
     for (int k = 4; k < argc; ++k) only.insert(argv[k]);
     argv += 1, argc -= 1;
   }
-  if (argc < 3 || (!classes_only && argc != 3 && argc != 5) || std::string(argv[1]) == "--apply") {
-    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp> [<out.h> <folder>]\n       blueprint_cpp --classes <level.klevel> <out.h> <actor> [<actor> ...]\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
+  if (argc < 3 || (!classes_only && argc != 3 && argc < 5) || std::string(argv[1]) == "--apply") {
+    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp> [<out.h> <folder> [<actor> ...]]\n       blueprint_cpp --classes <level.klevel> <out.h> <actor> [<actor> ...]\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
     return 2;
   }
   // (the header of the Blueprints the program calls by their classes, and the folder they stand in)
-  const char* header_path = !classes_only && argc == 5 ? argv[3] : nullptr;
+  const char* header_path = !classes_only && argc >= 5 ? argv[3] : nullptr;
   const std::string called_folder = header_path ? argv[4] : "";
   std::string text, why;
   json::Value doc;
@@ -221,11 +223,15 @@ int main(int argc, char** argv) {
   // (owner as the file says it, the graph)
   std::vector<std::pair<std::string, const json::Value*>> found;
   std::set<std::string> called;  // (the actors of the folder whose Blueprints the program calls by their classes)
+  std::set<std::string> named_too;  // (and those named after the folder, wherever they stand)
+  if (header_path)
+    for (int k = 5; k < argc; ++k) named_too.insert(argv[k]), called.insert(argv[k]);
   if (const json::Value* g = doc.find("logic"); g && g->is_object()) found.push_back({"the level", g});
   for (const json::Value& a : doc["actors"].items())
     if (const json::Value* g = a["components"].find("logic"); g && g->is_object()) {
       found.push_back({"actor \"" + a["name"].as_string() + "\"", g});
       if (header_path && a["folder"].as_string() == called_folder) called.insert(a["name"].as_string());
+      named_too.erase(a["name"].as_string());
     }
 
   std::string name = argv[1];
@@ -379,6 +385,10 @@ int main(int argc, char** argv) {
   }
   if (classes_only) out += "\nnamespace blueprints {\n" + aliases + "}  // namespace blueprints\n";
   if (header_path) {
+    for (const std::string& c : named_too) {
+      std::fprintf(stderr, "%s: no actor %s with a Blueprint\n", argv[1], c.c_str());
+      return 1;
+    }
     for (const std::string& c : called)
       if (std::none_of(held.begin(), held.end(), [&](const Held& h) { return h.owner != "the level" && h.name == c; })) {
         std::fprintf(stderr, "%s: the actor %s of the folder %s has no Blueprint\n", argv[1], c.c_str(), called_folder.c_str());

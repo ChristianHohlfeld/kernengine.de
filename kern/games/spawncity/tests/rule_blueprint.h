@@ -171,7 +171,16 @@ struct RuleBlueprint {
     kern::logic::EngineStandIn* keeps = nullptr;
     kern::logic::EngineObjects* keeps_objects = nullptr;
     bool engine(std::string_view function, const std::vector<kern::logic::Value>& in, std::vector<kern::logic::Value>& out) override {
+      if (direct) return kern::logic::call_engine(objects, function, in, out);
       return test_engine(keeps ? *keeps : stand_in, keeps && keeps_objects ? *keeps_objects : objects, function, in, out);
+    }
+    /// The engine as the game has it (`RuleBlueprint::Engine::direct`): the Blueprints' classes call the engine's
+    /// functions on these objects themselves (kern/logic/engine_direct.h) - a test hands them its own (a physics
+    /// world: `objects.adopt(world)` is its handle) - and the interpreter calls them the same way.
+    bool direct = false;
+    kern::logic::EngineObjects* engine_objects() override { return direct ? &objects : nullptr; }
+    void engine_failed(std::string_view function) override {
+      if (direct) error(std::string(function) + ": " + objects.error);
     }
     /// The actors of this runtime by their names.
     std::map<std::string, kern::logic::ActorRef, std::less<>> actors;
@@ -187,8 +196,14 @@ struct RuleBlueprint {
   /// and whether its tables are as the game needs them).
   bool (*bind)(kern::logic::Runtime&) = nullptr;
   bool bound = false;
-  RuleBlueprint(const char* actor, bool (*binder)(kern::logic::Runtime&), bool native = true, const std::vector<std::string>& others = {}) : bind(binder) {
+  /// The engine its Blueprints call: the test's (the stand-in, or SC_ENGINE=real) or - `direct` - the engine
+  /// itself on the objects the test gives it, as in the game (a test of the program's classes: what they do).
+  enum class Engine { test, direct };
+  RuleBlueprint(const char* actor, bool (*binder)(kern::logic::Runtime&), bool native = true, const std::vector<std::string>& others = {},
+                Engine engine = Engine::test)
+      : bind(binder) {
     std::string error;
+    host.direct = engine == Engine::direct;
     // The libraries a Blueprint uses are the Blueprints of the level's other actors, by their names:
     // with them it is one graph, and the rules that follow calls judge that one.
     rt.blueprints = [](std::string_view name) { return level_blueprint(name); };
