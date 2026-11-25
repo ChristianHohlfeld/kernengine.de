@@ -2275,6 +2275,13 @@ struct Reader {
   Reader(std::string_view t, const Library& l, const Blueprints* blueprints = nullptr) : text(t), lib(l), all(blueprints) {}
 
   // ---- tokens ----
+  /// Where the reader stands: for the one case it gives up without having said why (a mistake of the reader - the
+  /// text's author at least learns where).
+  std::string where() const {
+    if (toks.empty()) return "its first character";
+    const Tok& t = toks[std::min(p, toks.size() - 1)];
+    return "line " + std::to_string(t.line) + ", column " + std::to_string(t.col);
+  }
   bool fail(std::size_t tok, const std::string& why) {
     if (error.empty()) {
       const Tok& t = toks[std::min(tok, toks.size() - 1)];
@@ -2738,7 +2745,12 @@ struct Reader {
       std::string field;
       if (const Tok& w = peek(); places && w.kind == Tok::id && w.s.size() > 6 && w.s.ends_with("_place") && is("<", 1)) {
         p += 2;
-        if (!type_here(t) || !expect(">") || !word(field, "the name") || !expect("=") || !expect("{") || !expect("}") || !expect(";")) return false;
+        // (the type of the place: one the Blueprint knows - a struct or an enum of the engine is declared by the
+        // library of the engine it uses, KERN_STRUCT(audio_BusSettings) {...} - else the reader says so)
+        if (!type_here(t) && !failed())
+          return fail(p, what + ": " + w.s + "<...> is the place of a node of the engine, of a type: " + kTypes + shown(peek()) +
+                             (peek().kind == Tok::id ? " (a struct or an enum the engine's place is of is declared by the Blueprint or a library it uses)" : ""));
+        if (failed() || !expect(">") || !word(field, "the name") || !expect("=") || !expect("{") || !expect("}") || !expect(";")) return false;
         out.push_back({field, t});
         places->resize(out.size());
         places->back() = w.s.substr(0, w.s.size() - 6);
@@ -5628,7 +5640,7 @@ bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::stri
 bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib, const Blueprints& all) {
   Reader r(text, lib, &all);
   if (!r.read()) {
-    if (error) *error = r.error.empty() ? std::string("the text is no Blueprint") : r.error;
+    if (error) *error = r.error.empty() ? "the text is no Blueprint: the reader stopped at " + r.where() + " and did not say why" : r.error;
     return false;
   }
   out = std::move(r.g);
@@ -5640,7 +5652,7 @@ bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::stri
   Reader r(text, lib, &all);
   r.before = &before;
   if (!r.read()) {
-    if (error) *error = r.error.empty() ? std::string("the text is no Blueprint") : r.error;
+    if (error) *error = r.error.empty() ? "the text is no Blueprint: the reader stopped at " + r.where() + " and did not say why" : r.error;
     return false;
   }
   out = std::move(r.g);

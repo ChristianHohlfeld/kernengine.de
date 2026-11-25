@@ -2212,6 +2212,48 @@ TEST(logic_copy_bytes) {
   CHECK(said);
 }
 
+TEST(logic_place_of_the_engine_text_round) {
+  // A place of the engine of a struct of the engine (Mixer::bus gives BusSettings&): what the writer writes for the node that
+  // binds it - `engine_mixer_bus_place<audio_BusSettings> result = {};` - the reader reads back, the same Blueprint (text ->
+  // graph -> text). Where the Blueprint does not declare the struct, the reader says why it stops - and never stops silently.
+  const std::string text =
+      "struct Mix : kern::Blueprint {\n"
+      "  // ---- types ----\n"
+      "  KERN_ENUM(audio_Bus, master, music, sfx, ambience, ui, voice, count);\n"
+      "  KERN_STRUCT(audio_BusSettings) { Float volume = 1.0; Bool muted = false; Float lowpass_hz = 0.0; Float reverb_send = 0.0; };\n"
+      "\n"
+      "  // ---- variables ----\n"
+      "  Int Mixer = 0;\n"
+      "\n"
+      "  void Mute() {\n"
+      "    engine_mixer_bus(n1, Mixer, audio_Bus::master);\n"
+      "    n1.result.muted = true;\n"
+      "  }\n"
+      "\n"
+      "  // ---- what nodes give and keep ----\n"
+      "  struct { engine_mixer_bus_place<audio_BusSettings> result = {}; } n1;\n"
+      "};\n";
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp(text, g, nullptr, &error));
+  if (!error.empty()) std::printf("%s\n", error.c_str());
+  std::string again;
+  CHECK(logic::to_cpp(g, "Mix", again, &error));
+  CHECK(again.find("  struct { engine_mixer_bus_place<audio_BusSettings> result = {}; } n") != std::string::npos);
+  logic::Graph read;
+  CHECK(logic::from_cpp(again, read, nullptr, &error) && read == g);
+  // without the struct: a reason, at the place's type
+  std::string without = text;
+  const std::size_t at = without.find("  KERN_STRUCT(audio_BusSettings)");
+  without.erase(at, without.find('\n', at) + 1 - at);
+  logic::Graph none;
+  error.clear();
+  CHECK(!logic::from_cpp(without, none, nullptr, &error));
+  CHECK(error.find("no Blueprint") == std::string::npos);
+  CHECK(error.find("engine_mixer_bus_place") != std::string::npos && error.find("audio_BusSettings") != std::string::npos);
+  if (error.find("audio_BusSettings") == std::string::npos) std::printf("%s\n", error.c_str());
+}
+
 TEST(logic_local_variables) {
   // A function's local variables: every call starts with their defaults; two functions have one
   // of the same name; a call another call of the same function interrupts has its own back.

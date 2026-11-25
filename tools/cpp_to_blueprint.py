@@ -3034,6 +3034,12 @@ class Unit:
                 variables += pending + [line]
                 used.update(word.findall(line))
             pending = []
+        # (what the nodes give and keep names types of its own - a place of the engine, `engine_mixer_bus_place<audio_BusSettings>
+        # result = {};`, whose type no function names where it only sets a field of it: the text declares them too, else
+        # the reader does not know the type)
+        members = [line for line in self.members if name_of(line) in used]
+        for line in members:
+            used.update(word.findall(line))
         keep = [False] * len(self.types)
         changed = True
         while changed:   # (a type another kept type is made of is kept too)
@@ -3047,7 +3053,6 @@ class Unit:
             if keep[i]:
                 name = name_of(line)
                 types[name] = (self.type_home[name], line, self.type_parts[name])
-        members = [line for line in self.members if name_of(line) in used]
         externs = ["\n".join(lines) for name, (_, _, lines) in self.externs.items() if name in used]
         return variables, externs + [f.text for f in self.order], members, types
 
