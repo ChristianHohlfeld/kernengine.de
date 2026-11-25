@@ -526,6 +526,14 @@ der Konverter um die Ersatzform kürzer, alles wird neu gewandelt, verglichen un
 Was unten zu `Whole64`, zu „Maps und Sets sind Listen“ und zu Methoden auf einem Objekt steht,
 beschreibt den Stand davor und wird Schritt für Schritt ersetzt.
 
+**Stand 25.11.2026 – Abschluss in drei Stufen** (Entscheidung mit Chris: es gibt Zwischenabschlüsse, jeder für sich
+sauber und live). (1) *Der bewiesene Stand geht live:* das Spiel läuft wie bisher aus seinem C++; daneben stehen die
+Blueprints, die der Konverter daraus schreibt, jeder im Test Bit für Bit an seine Quelle gebunden. Das gebaute Spiel
+trägt, was es ausführt: `build.sh` bettet das Level ohne den Ordner „Source“ ein (`tools/embed_level.py --without`);
+die Tests betten das ganze Level ein. (2) *Der Rest der Konvertierung:* die noch wartenden Funktionen und jede
+`cost:`-Zeile (die Klasse fordert öfter Speicher an als die Quelle), in kleinen Schritten nach `work`. (3) *Umschalten*
+(Stufe 5) und das Projekt im Editor (Stufe 6) – erst, wenn die Klasse so schnell ist wie ihr C++.
+
 **Kursprüfung 18.11.2026.** Der Weg oben gilt unverändert; geprüft gegen den ganzen Verlauf (313
 Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
 
@@ -546,6 +554,15 @@ Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
 
 Der Vergleich gegen die Engine selbst (nicht nur gegen ihren Stellvertreter) läuft seit 15.11. im
 Test mit (`SC_ENGINE=real`).
+
+**Stand 25.11.2026, 15:30 (Abschluss 1: `work` = der bewiesene Stand, live).** Voller Lauf auf mag
+`work-abschluss1-voll-130718-2` (convert, suite, engine rc=0) und CI-Lauf 45621562516 (alle Jobs grün, die
+Spiel-Suite in 24 Teil-Läufen): 1.763 von 1.847 Funktionen des Programms sind als Blueprints geschrieben (24.611 von
+30.990 Zeilen), 158 Blueprints; 1.718 Funktionen sind mit ihrem Quelltext Bit für Bit verglichen – gegen den
+Stellvertreter der Engine und gegen die Engine selbst. Offen für Abschluss 2 (aus `convert.log` dieses Laufs): 126
+Grundursachen mit 4.798 Zeilen, davon 31 Funktionen (2.769 Zeilen) „its source does not compile with a Blueprint's
+numbers yet“ (Test-Schreiber) und 13 Funktionen von Game mit Zeigern; dazu 711 `cost:`-Zeilen (die Klasse fordert
+öfter Speicher an als die Quelle). Der Abschnitt darunter ist der Stand vom 14.11.
 
 **Stand 14.11.2026, 23:35 (Schlusslauf auf `work`).** 1.360 von 1.817 Funktionen des Programms
 (11.947 von 30.758 Zeilen) stehen als Blueprints im Level – 155 Blueprints (70 von Quelldateien,
@@ -892,8 +909,14 @@ aus der der Konverter den Blueprint schreibt, und der Vergleichstest hält beide
 Das Projekt ist die Datei des Levels: `level/spawncity.klevel` mit den Actors, ihren Blueprints,
 den Typen des Projekts und den Daten – dazu das Seitenmodul (`web/`: Ansicht, Menüs, Ton).
 
-- [x] Der Editor öffnet die Datei wie jedes Level (Kern Studio: Open); jeder Blueprint ist im
+- [ ] Der Editor öffnet die Datei wie jedes Level (Kern Studio: Open); jeder Blueprint ist im
   Blueprint-Editor als Graph und als C++ zu sehen und zu ändern.
+  **Wieder offen seit 25.11.2026:** mit dem ganzen Level (158 Blueprints im Ordner „Source“, darunter Game mit den
+  Funktionen von ~40 Dateien) endet `kern/tests/e2e/blueprint_e2e.mjs` nicht in den 30 Minuten der CI (Lauf
+  45613904805: bis `game_world` in Sekunden je Blueprint, danach kein Fortschritt mehr). Die CI öffnet darum das Level,
+  wie das gebaute Spiel es trägt (ohne „Source“, s. `build.sh`); `KERN_E2E_WHOLE_LEVEL=1` öffnet das ganze Projekt.
+  Zu klären und zu beheben, bevor dieser Punkt wieder gilt: welcher Blueprint hängt (vermutlich Game), und warum
+  (Laden, Prüfen oder Zeichnen im Editor).
 - [x] `tools/blueprint_cpp.sh level.klevel out.cpp` schreibt die Blueprints als Klassen;
   `tools/export_game.sh level.klevel spiel.html` baut daraus das eigenständige Spiel.
 - [ ] Das Projekt nennt sein Seitenmodul und die Einstellungen der Laufzeit (Schleifenwächter,
