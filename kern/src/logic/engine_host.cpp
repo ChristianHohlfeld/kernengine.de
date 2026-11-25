@@ -24,6 +24,7 @@ i64 EngineObjects::put(Kinds kinds, void (*end)(void*)) {
 }
 
 void EngineObjects::place(i64 handle, Kinds kinds, void (*end)(void*), void* owner) {
+  ++generation_;
   Entry e;
   e.at = kinds.front().second;
   e.end = end;
@@ -69,6 +70,7 @@ bool EngineObjects::end(i64 handle, Kind k) {
   if (it == entries_.end()) return false;
   const auto x = std::find_if(it->second.begin(), it->second.end(), [&](const Entry& e) { return e.kinds.front().first == k; });
   if (x == it->second.end() || !x->end) return false;
+  ++generation_;
   Entry e;
   take(entries_, handle, x->at, e);
   order_.erase(std::find(order_.begin(), order_.end(), std::pair<i64, void*>{handle, e.at}));
@@ -111,6 +113,7 @@ void EngineObjects::forget_lent(i64 lender) {
 }
 
 void EngineObjects::clear() {
+  ++generation_;
   // (what it owns ends in the reverse order it came - what came later may hold what came before)
   while (!order_.empty()) {
     const auto [handle, at] = order_.back();
@@ -169,6 +172,50 @@ EngineCallFn engine_call(std::string_view function) {
   }();
   const auto it = by_type.find(function);
   return it == by_type.end() ? nullptr : it->second;
+}
+
+namespace {
+const EngineImplements*& first_adapters() {
+  static const EngineImplements* first = nullptr;
+  return first;
+}
+
+struct InstanceImplementer final : Implementer {
+  i32 id = 0;
+  std::vector<std::string> functions;  // (what the graph has: its functions do not change while it runs)
+  bool has(std::string_view function) const override { return std::find(functions.begin(), functions.end(), function) != functions.end(); }
+  bool call(std::string_view function, std::span<const Value> args, std::vector<Value>& results) override {
+    Instance* const inst = Runtime::instance_by_id(id);
+    if (!inst) return false;
+    // (each as the type of its input: what the engine hands over is a value of the signature)
+    const Function* const fn = inst->graph().function(function);
+    std::vector<Value> in;
+    in.reserve(args.size());
+    for (std::size_t k = 0; k < args.size(); ++k) in.push_back(fn && k < fn->inputs.size() && args[k].type != fn->inputs[k].type ? args[k].converted(fn->inputs[k].type) : args[k]);
+    return inst->call(function, in, results);
+  }
+};
+}  // namespace
+
+EngineImplements::EngineImplements(const EngineImplement* a, std::size_t n) : adapters(a), count(n), next(first_adapters()) { first_adapters() = this; }
+
+i64 engine_implement(EngineObjects& objects, std::string_view interface, std::shared_ptr<Implementer> by) {
+  for (const EngineImplements* p = first_adapters(); p; p = p->next)
+    for (std::size_t k = 0; k < p->count; ++k)
+      if (interface == p->adapters[k].interface) return p->adapters[k].make(objects, std::move(by));
+  return 0;
+}
+
+std::shared_ptr<Implementer> implementer_of(const Instance& blueprint) {
+  auto i = std::make_shared<InstanceImplementer>();
+  i->id = blueprint.id();
+  for (const Function& f : blueprint.graph().functions) i->functions.push_back(f.name);
+  return i;
+}
+
+i64 engine_implement(EngineObjects& objects, const Instance& blueprint) {
+  if (blueprint.graph().implements.empty()) return 0;
+  return engine_implement(objects, blueprint.graph().implements, implementer_of(blueprint));
 }
 
 bool call_engine(EngineObjects& objects, std::string_view function, const std::vector<Value>& in, std::vector<Value>& out) {
