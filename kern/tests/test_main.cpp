@@ -4110,6 +4110,28 @@ static logic::Graph every_node_graph(bool wired) {
     for (const logic::PinDef& p : out)
       if (p.type != PinType::exec) read(id, p, tail, tail_pin);
   }
+  // A place of the engine (Graph::Root::bound, setting "bound"): the node of the engine binds it when it runs, the
+  // nodes of places name it - read whole, an entry set, added to, its length (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  {
+    const u32 e = add("event.custom", {{"name", "Bound"}});
+    const u32 b = add("engine.game_world.events");
+    g.find(b)->set_value("game_world", json::Value(3));
+    wire(e, "then", b, first_exec(b, true));
+    const std::string at = std::to_string(b);
+    const u32 a = add("list.add", {{"bound", at}});
+    g.find(a)->set_value("item", json::Value("x \"y\""));
+    wire(b, first_exec(b, false), a, first_exec(a, true));
+    const u32 s = add("var.set", {{"bound", at}, {"path", "[]"}});
+    g.find(s)->set_value("path0", json::Value(1));
+    g.find(s)->set_value("value", json::Value("z"));
+    wire(a, first_exec(a, false), s, first_exec(s, true));
+    const u32 r = add("var.get", {{"bound", at}});
+    const u32 l = add("list.length", {{"type", "text"}});
+    wire(r, "value", l, "list");
+    const u32 v = add("var.set", {{"variable", "VI"}});
+    wire(l, "length", v, "value");
+    wire(s, first_exec(s, false), v, first_exec(v, true));
+  }
   g.comments.push_back({next++, -40.5f, 12, 640, 320.25f, "Everything \"there is\"", 0x336699});
   g.comments.push_back({next++, 0, 0, 100, 100, "", 0});
   g.next_id = next + 3;
@@ -6965,6 +6987,176 @@ template <> struct Held<Probe::game_Transform> : HeldBy<Probe::game_Transform, &
 template <> struct Held<Probe::physics_Pose> : HeldBy<Probe::physics_Pose, &Probe::physics_Pose::position, &Probe::physics_Pose::rotation> {};
 }  // namespace kern::logic::detail
 
+// A place of the engine in a Blueprint's class (kern/logic/engine_direct.h, Place): the class below is the text of
+// the native case EnginePlaces (blueprint_native.h) as it stands - the node of kern::BuildingBuilder::chunks binds
+// the engine's list, the nodes of places name it.
+namespace engine_place_probe {
+struct EnginePlaces : kern::Blueprint {
+  // ---- types ----
+  KERN_STRUCT(MeshData) {
+    List<Float> positions = List<Float>{};
+    List<Float> normals = List<Float>{};
+    List<Float> colors = List<Float>{};
+    List<Float> uvs = List<Float>{};
+    List<Float> extra = List<Float>{};
+    Int extra_size = 0;
+    List<Int> indices = List<Int>{};
+  };
+  KERN_STRUCT(GeoChunk) {
+    Int x = 0;
+    Int y = 0;
+    Int items = 0;
+    Int triangles = 0;
+    Int hash = 0;
+    Bool welded = false;
+    MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+  };
+  KERN_STRUCT(WeldStats) {
+    U32 source_vertices = 0;
+    U32 unique_vertices = 0;
+    Int bytes_before = 0;
+    Int bytes_after = 0;
+    Bool indexed = false;
+  };
+
+  // ---- variables ----
+  Int Builder = 0;
+  Int Length = 0;
+  Int At = 0;
+  Int X = 0;
+  Int Items = 0;
+  Float P0 = 0.0;
+  Int Beside = 0;
+  Int Set = 0;
+  List<GeoChunk> Chunks = List<GeoChunk>{};
+  Int LengthAfter = 0;
+  Bool Removed = false;
+  GeoChunk First = GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}};
+  Int Before = 0;
+  Int Gone = 0;
+  Int GoneLength = 0;
+  List<GeoChunk> GoneChunks = List<GeoChunk>{};
+  Int AppendedLength = 0;
+  List<GeoChunk> Appended = List<GeoChunk>{};
+  MeshData Soup = MeshData{List<Float>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<Float>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<Float>{}, 0, List<Int>{}};
+  WeldStats Stats = WeldStats{0, 0, 0, 0, false};
+  MeshData Welded = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
+
+  // ---- functions ----
+  void Bind() {
+    engine_building_builder_make(n1);
+    Builder = n1.result;
+    engine_building_builder_chunks(n2, Builder);
+    Length = list_length<GeoChunk>(n2.result);
+  }
+
+  void Change() {
+    engine_building_builder_chunks(n7, Builder);
+    list_add(n3, n7.result, GeoChunk{3, -4, 5, 0, 0, true, MeshData{List<Float>{0.1, 2.5}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 2, List<Int>{1, 2}}});
+    At = n3.index;
+    list_add(n7.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    n7.result[0].items = 7;
+    n5.value = (n7.result[0].x += 3);
+    X = n5.value;
+    n7.result[1].mesh.positions = List<Float>{0.3333333333333333, 4.0};
+    P0 = n7.result[1].mesh.positions[0];
+    n7.result[1].mesh.positions[1] = 0.1;
+    Items = n7.result[0].items;
+    Removed = list_contains<GeoChunk>(n7.result, First);
+    First = list_get<GeoChunk>(n7.result, 1);
+    P0 = math_mul(n7.result[1].mesh.positions[0], 2.0);
+    LengthAfter = list_length<Float>(n7.result[1].mesh.positions);
+    Beside = n7.result[5].x;
+    n6.value = (n7.result[5].x = 9);
+    Set = n6.value;
+    Chunks = n7.result;
+    First = n7.result[0];
+    LengthAfter = list_length<GeoChunk>(n7.result);
+    list_insert(n7.result, 0, First);
+    list_remove_at(n7.result, 1);
+    list_remove(n4, n7.result, First);
+    Removed = n4.removed;
+  }
+
+  void Append() {
+    engine_building_builder_chunks(n10, Builder);
+    engine_building_builder_chunks(n11, Builder);
+    list_append(n10.result, Chunks);
+    list_add(n10.result, First);
+    AppendedLength = list_length<GeoChunk>(n11.result);
+    Appended = n11.result;
+  }
+
+  void Weld() {
+    engine_building_builder_chunks(n12, Builder);
+    n12.result[0].mesh = Soup;
+    engine_weld(n13, n12.result[0].mesh, 0);
+    Stats = n13.result;
+    n12.result[0].mesh = n13.mesh;
+    Welded = n12.result[0].mesh;
+  }
+
+  void Release() {
+    engine_building_builder_chunks(n8, Builder);
+    Before = n8.result[0].x;
+    engine_building_builder_release(Builder);
+    Gone = n8.result[0].x;
+    n8.result[0].x = 4;
+    list_add(n8.result, GeoChunk{0, 0, 0, 0, 0, false, MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}});
+    GoneLength = list_length<GeoChunk>(n8.result);
+    GoneChunks = n8.result;
+  }
+
+  void Read() {
+    engine_building_builder_chunks(n9, Builder);
+    Gone = n9.result[1].x;
+    n9.result[0].items = 4;
+    GoneLength = list_length<GeoChunk>(n9.result);
+  }
+
+  // ---- what nodes give and keep ----
+  struct { Int result = 0; } n1;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n2;
+  struct { Int index = 0; } n3;
+  struct { Bool removed = false; } n4;
+  struct { Int value = 0; } n5;
+  struct { Int value = 0; } n6;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n7;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n8;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}; } n13;
+};
+
+}  // namespace engine_place_probe
+
+namespace kern::logic::detail {
+using engine_place_probe::EnginePlaces;
+template <>
+struct Held<EnginePlaces::MeshData> : HeldBy<EnginePlaces::MeshData, &EnginePlaces::MeshData::positions, &EnginePlaces::MeshData::normals, &EnginePlaces::MeshData::colors, &EnginePlaces::MeshData::uvs,
+                                             &EnginePlaces::MeshData::extra, &EnginePlaces::MeshData::extra_size, &EnginePlaces::MeshData::indices> {};
+template <>
+struct Held<EnginePlaces::GeoChunk> : HeldBy<EnginePlaces::GeoChunk, &EnginePlaces::GeoChunk::x, &EnginePlaces::GeoChunk::y, &EnginePlaces::GeoChunk::items, &EnginePlaces::GeoChunk::triangles,
+                                             &EnginePlaces::GeoChunk::hash, &EnginePlaces::GeoChunk::welded, &EnginePlaces::GeoChunk::mesh> {};
+template <>
+struct Held<EnginePlaces::WeldStats> : HeldBy<EnginePlaces::WeldStats, &EnginePlaces::WeldStats::source_vertices, &EnginePlaces::WeldStats::unique_vertices,
+                                              &EnginePlaces::WeldStats::bytes_before, &EnginePlaces::WeldStats::bytes_after, &EnginePlaces::WeldStats::indexed> {};
+}  // namespace kern::logic::detail
+
+namespace engine_place_probe {
+inline std::string shown(const EnginePlaces& p) {
+  std::string s;
+  const auto put = [&](const char* name, const auto& v) { s += std::string(name) + "=" + logic::engine_shown(logic::to_value(v)) + "\n"; };
+  put("Builder", p.Builder), put("Length", p.Length), put("At", p.At), put("X", p.X), put("Items", p.Items), put("P0", p.P0), put("Beside", p.Beside), put("Set", p.Set);
+  put("Chunks", p.Chunks), put("LengthAfter", p.LengthAfter), put("Removed", p.Removed), put("First", p.First), put("Before", p.Before), put("Gone", p.Gone);
+  put("GoneLength", p.GoneLength), put("GoneChunks", p.GoneChunks), put("AppendedLength", p.AppendedLength), put("Appended", p.Appended);
+  put("Stats", p.Stats), put("Welded", p.Welded);
+  return s;
+}
+}  // namespace engine_place_probe
+
 namespace engine_probe {
 
 // A mixer: made, set up, given a clip, played and rendered - handles, a list the engine takes, a text, a
@@ -7160,6 +7352,444 @@ TEST(engine_calls_class_asks_for_no_memory) {
   CHECK(through_door > 0);
   if (by_itself != 0) std::printf("the class asked for memory %ld times in calls of the engine it made itself\n", by_itself);
   CHECK(itself.door == 0 && a.Rate == 48000 && b.Rate == 48000 && a.shown() == b.shown());
+}
+
+// A place of the engine in the class: what the class does to the engine's list where it stands is what C++ does to
+// kern::BuildingBuilder::chunks() - the same list, bit for bit; through the door (a host without the engine's
+// objects) the class reads and sets it as the interpreter does, and both tell the host the same; an object that
+// ended while its place was bound is not written (EngineObjects::generation): its place reads the zero of its type.
+TEST(engine_places_class_names_the_engines_list) {
+  using engine_place_probe::EnginePlaces;
+  NativeEngineHost itself, door;
+  itself.direct = true;
+  EnginePlaces a, b;
+  a.kern_world.host = &itself;
+  a.kern_world.engine = itself.engine_objects();
+  b.kern_world.host = &door;
+  for (EnginePlaces* p : {&a, &b}) {
+    p->Bind();
+    p->Change();
+  }
+  CHECK(itself.door == 0 && door.door > 0);
+  // ... the engine's list: what C++ makes of it
+  kern::BuildingBuilder* const held = logic::engine_values::object_of<kern::BuildingBuilder>(itself.objects, static_cast<i64>(a.Builder), "building_builder");
+  CHECK(held != nullptr);
+  kern::BuildingBuilder cpp;
+  std::vector<GeoChunk>& c = cpp.chunks();
+  GeoChunk made;
+  made.x = 3, made.y = -4, made.items = 5, made.welded = true, made.mesh.positions = {static_cast<f32>(0.1), 2.5f}, made.mesh.extra_size = 2, made.mesh.indices = {1, 2};
+  c.push_back(made);
+  c.push_back(GeoChunk{});
+  c[0].items = 7;
+  c[0].x += 3;
+  c[1].mesh.positions = {static_cast<f32>(0.3333333333333333), 4.0f};
+  c[1].mesh.positions[1] = static_cast<f32>(0.1);
+  const std::vector<GeoChunk> chunks = c;
+  const GeoChunk first = c[0];
+  c.insert(c.begin(), first);
+  c.erase(c.begin() + 1);
+  std::erase_if(c, [&](const GeoChunk& k) { return k.x == first.x && k.y == first.y && k.items == first.items && k.welded == first.welded && k.mesh.positions == first.mesh.positions && k.mesh.indices == first.mesh.indices; });
+  const auto same = [](const std::vector<GeoChunk>& x, const std::vector<GeoChunk>& y) {
+    bool r = x.size() == y.size();
+    for (std::size_t k = 0; r && k < x.size(); ++k) {
+      const GeoChunk &p = x[k], &q = y[k];
+      r = p.x == q.x && p.y == q.y && p.items == q.items && p.triangles == q.triangles && p.hash == q.hash && p.welded == q.welded && p.mesh.extra_size == q.mesh.extra_size &&
+          p.mesh.indices == q.mesh.indices && p.mesh.positions.size() == q.mesh.positions.size() && p.mesh.normals == q.mesh.normals && p.mesh.colors == q.mesh.colors &&
+          p.mesh.uvs == q.mesh.uvs && p.mesh.extra == q.mesh.extra;
+      for (std::size_t j = 0; r && j < p.mesh.positions.size(); ++j) r = std::bit_cast<u32>(p.mesh.positions[j]) == std::bit_cast<u32>(q.mesh.positions[j]);
+    }
+    return r;
+  };
+  CHECK(held && same(held->chunks(), c) && c.size() == 1);
+  // ... and what the class read: what the door read
+  CHECK(shown(a) == shown(b));
+  CHECK(a.X == 6 && a.Items == 7 && a.Set == 9 && a.Beside == 0 && a.LengthAfter == 2 && a.Removed);
+  CHECK(std::bit_cast<u64>(static_cast<f64>(a.P0)) == std::bit_cast<u64>(2.0 * static_cast<f64>(static_cast<f32>(0.3333333333333333))));
+  // what naming the place costs: a field read, a field set, the length - no memory asked for (C++: none either)
+  logic::Whole x = 0, length = 0;
+  const long asked = memory_asked_by([&] {
+    a.engine_building_builder_chunks(a.n7, a.Builder);
+    x = a.n7.result[0].x;
+    a.n7.result[0].items = 11;
+    length = a.list_length<EnginePlaces::GeoChunk>(a.n7.result);
+  });
+  CHECK(asked == 0 && static_cast<i64>(x) == c[0].x && static_cast<i64>(length) == 1 && held && held->chunks()[0].items == 11);
+  b.engine_building_builder_chunks(b.n7, b.Builder);
+  b.n7.result[0].items = 11;
+  // a list appended at the place, then an item added; read through a second place on the same list - what C++'s insert
+  // of a range and push_back do (the library grows the list)
+  c[0].items = 11;
+  c.insert(c.end(), chunks.begin(), chunks.end());
+  c.push_back(first);
+  for (EnginePlaces* p : {&a, &b}) p->Append();
+  CHECK(held && same(held->chunks(), c) && a.AppendedLength == 4 && shown(a) == shown(b));
+  // an entry's field at the place handed to a function of the engine (`kern::weld(c.mesh)` on `b.chunks()`): what stands
+  // there is read as the input, what the function makes of it set there after - as C++ welds the engine's mesh
+  MeshData soup;
+  soup.positions = {0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0};
+  for (int v = 0; v < 6; ++v) soup.normals.insert(soup.normals.end(), {0, 0, 1}), soup.colors.insert(soup.colors.end(), {1, 0.5f, 0.25f});
+  soup.uvs = {0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1};
+  c[0].mesh = soup;
+  const WeldStats welded = kern::weld(c[0].mesh);
+  for (EnginePlaces* p : {&a, &b}) p->Weld();
+  CHECK(held && same(held->chunks(), c) && shown(a) == shown(b) && welded.indexed && welded.unique_vertices == 4 && c[0].mesh.indices.size() == 6);
+  CHECK(static_cast<i64>(a.Stats.unique_vertices) == welded.unique_vertices && static_cast<i64>(a.Stats.bytes_after) == static_cast<i64>(welded.bytes_after) && a.Stats.indexed);
+  // the object ends while its place is bound: the class does not write where it was, and says what the door says
+  itself.told.clear(), door.told.clear();
+  for (EnginePlaces* p : {&a, &b}) {
+    p->Release();
+    p->Read();
+  }
+  CHECK(shown(a) == shown(b));
+  CHECK(itself.told == door.told);
+  CHECK(itself.told.find(" !engine.building_builder.chunks@get: ") != std::string::npos && itself.told.find("chunks@set") == std::string::npos);
+  CHECK(a.Before == c[0].x && a.Gone == 0 && a.GoneLength == 0 && a.GoneChunks.empty());
+  CHECK(itself.objects.size() == 0 && itself.door == 0);
+  if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
+}
+
+// What a function of the engine reports through a pointer that is null by default (`std::string* error = nullptr`):
+// a further output of its node - game::from_text says why a text is no level, and reads one that is.
+TEST(engine_reports_through_an_optional_pointer) {
+  using logic::Value;
+  const logic::EngineFunction* f = logic::engine_function("engine.game.from_text");
+  CHECK(f && f->outputs.size() == 3 && std::string(f->outputs[2].id) == "error");
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::boolean), Value::zero(logic::PinType::structure), Value::zero(logic::PinType::text)};
+  CHECK(logic::call_engine(objects, "engine.game.from_text", {Value::text("{\"format\":\"other\"}"), Value::zero(logic::PinType::structure)}, out));
+  CHECK(!out[0].as_bool() && out[2].as_text() == "not a Kern level (format must be \"kern-level\")");
+  out = {Value::zero(logic::PinType::boolean), Value::zero(logic::PinType::structure), Value::zero(logic::PinType::text)};
+  CHECK(logic::call_engine(objects, "engine.game.from_text", {Value::text(game::to_text(game::Level{})), Value::zero(logic::PinType::structure)}, out));
+  CHECK(out[0].as_bool() && out[2].as_text().empty());
+}
+
+// A list the engine holds behind a pointer and a size (FootprintStream::data/size): its node `values` gives every number
+// of it, as C++ has them - not what the pointer alone shows (one entry).
+TEST(engine_footprint_stream_values) {
+  using logic::Value;
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.make", {}, out));
+  const Value fs = out[0];
+  std::vector<Value> none;
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.begin", {fs, Value::integer(7), Value::number(1.5), Value::number(9.25)}, none));
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.ring", {fs, Value::of(std::vector<Vec3>{{0, 0, 0}, {4, 0, 0}, {4, 3, 0}}), Value::integer(3)}, none));
+  const FootprintStream* const held = logic::engine_values::object_of<FootprintStream>(objects, fs.as_int(), "footprint_stream");
+  out = {Value::zero(logic::PinType::number_list)};
+  CHECK(held && logic::call_engine(objects, "engine.footprint_stream.values", {fs}, out) && out[0].size() == held->size());
+  bool same = held != nullptr;
+  for (std::size_t k = 0; same && k < out[0].size(); ++k) same = std::bit_cast<u64>(out[0].item(k).as_number()) == std::bit_cast<u64>(held->data()[k]);
+  CHECK(same && held && held->size() == 1 + 7 + 1 + 6);
+  objects.clear();
+}
+
+// The same Blueprints as their classes (the texts of the native cases Water and Running, blueprint_native.h, as they
+// stand): kern::logic::implementation makes the engine's object of a class - the engine calls the class's functions
+// typed, what it hands over made into the class's types where they are read.
+}  // namespace
+
+namespace implements_probe {
+struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+  // ---- variables ----
+  Float Time = 0.25;
+  Int Program = 0;
+  Int Cache = 0;
+  Int Frames = 0;
+
+  // ---- functions ----
+  struct nameResult { Text result = ""; };
+  KERN_PURE nameResult name() {
+    return {"water"};
+  }
+
+  struct vertexResult { Text result = ""; };
+  KERN_PURE vertexResult vertex() {
+    return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
+  }
+
+  void bind(Int program = 0) {
+    Program = program;
+  }
+
+  void frame_uniforms(Int cache = 0, Int renderer = 0) {
+    Cache = cache;
+    Frames += 1;
+  }
+};
+struct Running : kern::Blueprint, kern::Implements<"App"> {
+  // ---- types ----
+  KERN_STRUCT(Frame) {
+    Float time = 0.0;
+    Float dt = 0.0;
+    Int64 index = Int64{0x0};
+  };
+
+  // ---- variables ----
+  Int Engine = 0;
+  Int Updates = 0;
+  Float Last = 0.0;
+  Bool Stopped = false;
+
+  // ---- functions ----
+  struct startResult { Bool result = false; };
+  startResult start(Int engine = 0) {
+    Engine = engine;
+    return {true};
+  }
+
+  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+    Updates += 1;
+    Last = frame.time;
+  }
+
+  void stop(Int engine = 0) {
+    Stopped = true;
+  }
+};
+}  // namespace implements_probe
+
+namespace implements_probe {
+struct Loop : kern::Blueprint, kern::Implements<"net_Transport"> {
+  // ---- types ----
+  KERN_STRUCT(net_Address) {
+    Int64 id = Int64{0x0};
+  };
+
+  // ---- variables ----
+  net_Address Last = net_Address{Int64{0x0}};
+  Int Bytes = 0;
+  Int Sent = 0;
+
+  // ---- functions ----
+  struct addressResult { net_Address result = net_Address{Int64{0x0}}; };
+  KERN_PURE addressResult address() {
+    return {net_Address{Int64{0x7}}};
+  }
+
+  struct sendResult { Bool result = false; };
+  sendResult send(net_Address to = net_Address{Int64{0x0}}, List<U8> data = List<U8>{}, Int bytes = 0) {
+    Last = to;
+    Bytes = bytes;
+    Sent = list_length<U8>(data);
+    return {true};
+  }
+
+  struct receiveResult { Int result = 0; net_Address from = net_Address{Int64{0x0}}; List<Int> data = List<Int>{}; };
+  receiveResult receive(net_Address from = net_Address{Int64{0x0}}, Int max_bytes = 0) {
+    return {Bytes, Last, List<Int>{1, 2, 3}};
+  }
+};
+}  // namespace implements_probe
+
+namespace kern::logic::detail {
+template <>
+struct Held<implements_probe::Loop::net_Address> : HeldBy<implements_probe::Loop::net_Address, &implements_probe::Loop::net_Address::id> {};
+template <>
+struct Held<implements_probe::Running::Frame> : HeldBy<implements_probe::Running::Frame, &implements_probe::Running::Frame::time, &implements_probe::Running::Frame::dt,
+                                                       &implements_probe::Running::Frame::index> {};
+}  // namespace kern::logic::detail
+
+namespace {
+
+TEST(engine_interface_a_class_implements) {
+  implements_probe::Water w;
+  implements_probe::Running r;
+  logic::EngineObjects objects;
+  w.kern_world.engine = &objects;
+  r.kern_world.engine = &objects;
+  const auto ext = logic::implementation(w);
+  const auto app = logic::implementation(r);
+  ShaderExtension& e = *ext;
+  App& a = *app;
+  CHECK(std::string(e.name()) == "water" && std::string(e.vertex()) == "vWater = aWater * 0.25;");
+  CHECK(std::string(e.vertex_declarations()).empty() && e.attributes().empty() && std::string(e.fragment_surface()).empty());  // (the interface's own)
+  Program program;
+  UniformCache cache;
+  Renderer renderer;
+  e.bind(program);
+  e.frame_uniforms(cache, renderer);
+  e.frame_uniforms(cache, renderer);
+  CHECK(static_cast<i64>(w.Program) == objects.adopt<Program>(program) && static_cast<i64>(w.Frames) == 2 && static_cast<i64>(w.Cache) == objects.adopt<UniformCache>(cache));
+  Engine engine(renderer);
+  CHECK(a.start(engine) && static_cast<i64>(r.Engine) == objects.adopt<Engine>(engine));
+  Frame f;
+  f.time = 1.5, f.dt = 0.25f, f.index = 3;
+  a.update(engine, f);
+  f.time = 2.0;
+  a.update(engine, f);
+  CHECK(static_cast<i64>(r.Updates) == 2 && r.Last == 2.0 && !r.Stopped);
+  a.resized(engine);
+  CHECK(a.extensions().empty() && !a.configure().shadows);  // (App's own)
+  a.stop(engine);
+  CHECK(r.Stopped);
+  // without the engine's objects (a class a test holds): the handles it is handed are the adapter's own
+  implements_probe::Water alone;
+  const auto other = logic::implementation(alone);
+  other->bind(program);
+  CHECK(static_cast<i64>(alone.Program) != 0);
+  objects.clear();
+}
+
+// A Blueprint as a transport of the engine (net::Transport), on the interpreter and as its class: the numbers the engine
+// hands through a pointer with their count are a list; what the Blueprint gives back for `from` is written through the
+// reference, its list through the pointer - no more than the count beside it says room for.
+TEST(engine_interface_with_pointers) {
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Graph loop;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsLoop, loop, nullptr, &error) && loop.implements == "net_Transport" && no_errors(logic::check(loop)));
+  logic::Instance* const inst = rt.add(loop, 13, "Loop");
+  rt.begin();
+  logic::EngineObjects objects;
+  implements_probe::Loop cls;
+  cls.kern_world.engine = &objects;
+  const auto by_class = logic::implementation(cls);
+  net::Transport* const by_name = objects.get<net::Transport>(logic::engine_implement(objects, *inst));
+  CHECK(by_name != nullptr);
+  if (!by_name) return;
+  for (net::Transport* t : {by_name, static_cast<net::Transport*>(by_class.get())}) {
+    CHECK(t->address().id == 7);
+    const u8 bytes[3] = {4, 5, 6};
+    CHECK(t->send(net::Address{9}, bytes, 3));
+    net::Address from{0};
+    u8 room[3] = {0, 0, 0xee};
+    CHECK(t->receive(from, room, 2) == 3 && from.id == 9 && room[0] == 1 && room[1] == 2 && room[2] == 0xee);
+  }
+  CHECK(inst->get("Sent").i == 3 && static_cast<i64>(cls.Sent) == 3 && static_cast<i64>(cls.Bytes) == 3);
+  objects.clear();
+}
+
+// The Blueprints a logic runs, as a Blueprint sees them (engine.game.blueprints_running): each one's name, how it runs, how
+// many functions and nodes its graph has, whether it stopped - in the order the logic runs them; through the door the same.
+TEST(engine_blueprints_running) {
+  using logic::Value;
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Graph water, game;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && logic::from_cpp(blueprint_native::kImplementsGame, game, nullptr, &error));
+  rt.add(water, 11, "Water");
+  rt.add(game, 12, "Running");
+  rt.begin();
+  const std::vector<game::BlueprintRunning> shown = game::blueprints_running(rt);
+  CHECK(shown.size() == 2 && shown[0].name == "Water" && shown[1].name == "Running" && shown[0].tier == "interpreter");
+  CHECK(shown.size() == 2 && shown[0].functions == water.functions.size() && shown[1].nodes == game.nodes.size() && !shown[0].disabled && !shown[1].disabled);
+  logic::EngineObjects objects;
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::structure_list)};
+  CHECK(logic::call_engine(objects, "engine.game.blueprints_running", {logic::Value::integer(objects.adopt(rt))}, out) && out[0].size() == 2);
+  if (out[0].size() == 2) {
+    const logic::Value first = out[0].item(0);
+    CHECK(first.field(0) && first.field(0)->as_text() == "Water" && first.field(2) && first.field(2)->as_int() == static_cast<i64>(water.functions.size()));
+  }
+  // one by one, without a copy: the name where the logic holds it; an index of no Blueprint names none
+  CHECK(game::blueprint_count(rt) == 2 && &game::blueprint_name(rt, 1) == &rt.instances()[1]->name() && game::blueprint_name(rt, 2).empty());
+  CHECK(std::string(game::blueprint_tier(rt, 0)) == "interpreter" && std::string(game::blueprint_tier(rt, 9)).empty());
+  CHECK(game::blueprint_functions(rt, 0) == water.functions.size() && game::blueprint_nodes(rt, 1) == game.nodes.size() && game::blueprint_nodes(rt, 2) == 0);
+  CHECK(!game::blueprint_disabled(rt, 0) && !game::blueprint_disabled(rt, 5));
+  const Value logic_handle = Value::integer(objects.adopt(rt));
+  std::vector<Value> one{Value::zero(logic::PinType::text)};
+  CHECK(logic::call_engine(objects, "engine.game.blueprint_name", {logic_handle, Value::integer(1)}, one) && one[0].as_text() == "Running");
+  one = {Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.game.blueprint_count", {logic_handle}, one) && one[0].as_int() == 2);
+  objects.clear();
+}
+
+// Blueprints as objects of interfaces of the engine (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"): the engine's
+// object of each (the adapter tools/engine_api.py writes) calls the Blueprint's function of the name the engine calls -
+// what it hands over as values, its objects as handles, what the Blueprint gives back as the C++ the engine takes; where
+// the Blueprint has no function of a name that is not pure, the interface's own runs. Played on the interpreter here;
+// the native cases Water and Running (blueprint_native.h) play the same calls on the class.
+TEST(engine_interface_a_blueprint_implements) {
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Graph water, game;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && water.implements == "ShaderExtension");
+  CHECK(logic::from_cpp(blueprint_native::kImplementsGame, game, nullptr, &error) && game.implements == "App");
+  CHECK(no_errors(logic::check(water)) && no_errors(logic::check(game)));
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(water), back, &error) && back.implements == "ShaderExtension");
+  logic::Instance* const w = rt.add(water, 11, "Water");
+  logic::Instance* const a = rt.add(game, 12, "Running");
+  rt.begin();
+  logic::EngineObjects objects;
+  const i64 hw = logic::engine_implement(objects, *w), ha = logic::engine_implement(objects, *a);
+  ShaderExtension* const ext = objects.get<ShaderExtension>(hw);
+  App* const app = objects.get<App>(ha);
+  CHECK(ext && app);
+  if (!ext || !app) return;
+  CHECK(std::string(ext->name()) == "water" && std::string(ext->vertex()) == "vWater = aWater * 0.25;");
+  // (what the Blueprint has not: the interface's own)
+  CHECK(std::string(ext->vertex_declarations()).empty() && ext->attributes().empty() && std::string(ext->fragment_surface()).empty());
+  Program program;
+  UniformCache cache;
+  Renderer renderer;
+  ext->bind(program);
+  ext->frame_uniforms(cache, renderer);
+  ext->frame_uniforms(cache, renderer);
+  CHECK(w->get("Program").i == objects.adopt<Program>(program) && w->get("Frames").i == 2 && w->get("Cache").i == objects.adopt<UniformCache>(cache));
+  Engine engine(renderer);
+  CHECK(app->start(engine) && a->get("Engine").i == objects.adopt<Engine>(engine));
+  Frame f;
+  f.time = 1.5, f.dt = 0.25f, f.index = 3;
+  app->update(engine, f);
+  f.time = 2.0;
+  app->update(engine, f);
+  CHECK(a->get("Updates").i == 2 && a->get("Last").n == 2.0 && !a->get("Stopped").b);
+  app->resized(engine);
+  CHECK(app->extensions().empty() && !app->configure().shadows);  // (App's own)
+  app->stop(engine);
+  CHECK(a->get("Stopped").b);
+  // a function the engine hands a pointer without its count (material_uniforms) has no way to a Blueprint: the
+  // interface's own runs there; an interface the build has not: no object
+  const logic::EngineInterface* const shader = logic::engine_interface("ShaderExtension");
+  CHECK(shader && std::any_of(shader->functions.begin(), shader->functions.end(), [](const logic::EngineVirtual& v) { return std::string(v.name) == "material_uniforms" && *v.waits; }));
+  CHECK(logic::engine_implement(objects, "Nothing", logic::implementer_of(*w)) == 0);
+  // check(): every pure function there, each of the interface's types
+  logic::Graph wrong;
+  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<\"ShaderExtension\"> {\n  void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
+  const std::vector<logic::Issue> issues = logic::check(wrong);
+  const auto said = [&](const char* text) { return std::any_of(issues.begin(), issues.end(), [&](const logic::Issue& i) { return i.error && i.text.find(text) != std::string::npos; }); };
+  CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is int, not float"));
+  wrong.implements = "Nothing";
+  CHECK(!no_errors(logic::check(wrong)));
+  // the Blueprint ends: the engine's object stays, and gets nothing from it - the zero of what it asks for
+  rt.remove(11);
+  CHECK(std::string(ext->name()).empty() && std::string(ext->vertex()).empty());
+  objects.clear();
+}
+
+// A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
+// the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
+// names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).
+TEST(engine_place_at_an_entry_of_an_array) {
+  using logic::Value;
+  const logic::EngineFunction* bus = logic::engine_function("engine.mixer.bus");
+  CHECK(bus && bus->place && bus->inputs.size() == 2);
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.mixer.make", {}, out));
+  const Value mixer = out[0];
+  const Value sfx = Value::enumeration(static_cast<i64>(audio::Bus::sfx));
+  // set at the place: the Mixer's own entry changes, no other
+  const Value put = Value::structure({Value::number(0.25), Value::boolean(true), Value::number(500), Value::number(0.5)});
+  std::vector<Value> none;
+  CHECK(logic::call_engine(objects, "engine.mixer.bus@set", {mixer, sfx, put}, none));
+  audio::Mixer* const m = logic::engine_values::object_of<audio::Mixer>(objects, mixer.as_int(), "mixer");
+  CHECK(m && m->bus(audio::Bus::sfx).volume == 0.25f && m->bus(audio::Bus::sfx).muted && m->bus(audio::Bus::sfx).lowpass_hz == 500 &&
+        m->bus(audio::Bus::sfx).reverb_send == 0.5f && m->bus(audio::Bus::master).volume == 1 && !m->bus(audio::Bus::master).muted);
+  // read at the place: what C++ reads there
+  out = {Value::zero(logic::PinType::structure)};
+  CHECK(logic::call_engine(objects, "engine.mixer.bus@get", {mixer, sfx}, out) && out[0].field(1) && out[0].field(1)->b && out[0].field(0)->n == 0.25);
+  // outside the array: refused, said, nothing set
+  const Value outside = Value::enumeration(static_cast<i64>(audio::Bus::count));
+  objects.error.clear();
+  CHECK(!logic::call_engine(objects, "engine.mixer.bus@set", {mixer, outside, put}, none));
+  CHECK(objects.error == "the input b names no entry: there are 6");
+  objects.error.clear();
+  CHECK(!logic::call_engine(objects, "engine.mixer.bus@get", {mixer, outside}, out) && objects.error == "the input b names no entry: there are 6");
+  CHECK(!logic::call_engine(objects, "engine.mixer.bus", {mixer, outside}, out));
 }
 
 TEST(audio_mixer_panning_and_limits) {
@@ -11689,6 +12319,31 @@ TEST(studio_logic_functions) {
   CHECK(f.s->state()["logic"]["functions"].size() == 1);
 }
 
+TEST(studio_logic_places_of_the_engine) {
+  // A place of the engine in the editor: the action menu offers the nodes of places on it as on a variable - its
+  // Get, its Set, an entry's Set and the steps of a list, each naming the node that binds it ("bound").
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  auto cmd = [&](std::initializer_list<std::pair<const char*, json::Value>> fields) {
+    json::Value c = json::Value::object();
+    for (const auto& [k, v] : fields) c.set(k, v);
+    return f.s->command(c);
+  };
+  CHECK(cmd({{"cmd", "logicCppApply"}, {"text", "struct Level : kern::Blueprint {\n  Int Count = 0;\n\n  void Note() {\n    engine_game_world_events(n2, 1);\n    list_add(n2.result, \"x\");\n"
+                                                "    Count = list_length<Text>(n2.result);\n  }\n\n  struct { engine_game_world_events_place<List<Text>> result = {}; } n2;\n};\n"}})["ok"].as_bool());
+  const json::Value pal = cmd({{"cmd", "logicPalette"}, {"query", "n2"}});
+  bool get = false, set = false, entry = false, add = false;
+  for (const json::Value& e : pal["items"].items()) {
+    if (e["category"].as_string() != "Places of the Engine" || e["params"]["bound"].as_string() != "2" || e["params"].has("variable")) continue;
+    get = get || (e["type"].as_string() == "var.get" && e["label"].as_string() == "Get n2");
+    set = set || (e["type"].as_string() == "var.set" && !e["params"].has("path"));
+    entry = entry || (e["type"].as_string() == "var.set" && e["params"]["path"].as_string() == "[]");
+    add = add || e["type"].as_string() == "list.add";
+  }
+  CHECK(get && set && entry && add);
+}
+
 TEST(studio_logic_local_variables) {
   // A function's local variables with the editor's commands: made, named, typed, offered as nodes.
   StudioFixture f;
@@ -11794,6 +12449,42 @@ TEST(studio_logic_reference_inputs) {
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"type", "float"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"ref", "ref"}})["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
+}
+
+TEST(studio_logic_implements) {
+  // The interface of the engine a Blueprint is the object of, in the editor: offered with its functions, set, written
+  // in the text, its missing pure functions said by the check; one no Blueprint implements refused; undone like any edit.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  f.cmd(R"({"cmd":"spawn","item":"cube"})");
+  CHECK(!f.s->level().actors.empty());
+  if (f.s->level().actors.empty()) return;
+  const game::ActorId id = f.s->level().actors.back().id;
+  CHECK(f.cmd((std::string(R"({"cmd":"logicOpen","owner":)") + std::to_string(id) + "}").c_str())["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Time","type":"float"})")["ok"].as_bool());   // (the actor has a Blueprint now)
+  json::Value st = f.s->state();
+  bool offered = false, transport = false;
+  for (const json::Value& i : st["logic"]["interfaces"].items()) {
+    if (i["name"].as_string() == "ShaderExtension") {
+      bool name = false, vertex = false;
+      for (const json::Value& fn : i["functions"].items()) name = name || fn.as_string() == "name", vertex = vertex || fn.as_string() == "vertex?";
+      offered = name && vertex;
+    }
+    transport = transport || i["name"].as_string() == "net_Transport";
+  }
+  CHECK(offered);
+  CHECK(transport);
+  CHECK(st["logic"]["implements"].as_string().empty());
+  CHECK(f.cmd(R"({"cmd":"logicImplements","name":"ShaderExtension"})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
+  bool missing = false;
+  const json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
+  for (const json::Value& i : compiled["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
+  CHECK(missing);
+  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["implements"].as_string().empty());
 }
 
 TEST(studio_logic_libraries) {

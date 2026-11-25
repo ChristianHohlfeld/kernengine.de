@@ -30,6 +30,7 @@
 #include <initializer_list>
 #include <list>
 #include <map>
+#include <functional>
 #include <memory>
 #include <new>
 #include <optional>
@@ -562,7 +563,14 @@ template <class T> T* engine_object(long long handle) {
 /// itself (SC_ENGINE=real: sc::real_engine), the source's objects of the engine in that call.
 inline kern::logic::EngineStandIn g_source_engine;
 inline kern::logic::EngineObjects g_source_objects;
+/// (the places of the engine the source holds: set back before every call of the engine, read again after it - below)
+inline void places_set();
+inline void places_get();
 inline std::vector<Value> engine_call(const char* function, const std::vector<Value>& in) {
+  places_set();
+  struct Again {
+    ~Again() { places_get(); }
+  } again;
   std::vector<Value> out;
   if (const kern::logic::EngineFunction* f = kern::logic::engine_function(function))
     for (const kern::logic::EnginePin& p : f->outputs) out.push_back(Value::zero(p.type));
@@ -1393,6 +1401,98 @@ __attribute__((format(printf, 1, 0))) inline std::string formatted(const char* f
   if (n > 0) std::vsnprintf(out.data(), out.size() + 1, format, again);
   va_end(again);
   return out;
+}
+
+/// A place of the engine the source holds (`std::vector<ShotEvent>& shots() { return shots_; }`: kern/docs/blueprint_cpp.md,
+/// "Plätze der Engine"). The stand-in of the source's engine object gives a reference to a copy the test keeps: read
+/// from the engine ("<function>@get") when the source calls the function, set back ("<function>@set") before each
+/// further call of the engine and when the source's function returns (places_close), read again after each call - so
+/// the engine sees what the source wrote where the Blueprint, which sets the place with every change, has written it.
+/// Neither is a call of the source (the stand-in and test_engine do not write them down); only the function is.
+struct OpenPlace {
+  std::function<void()> get, set;
+};
+inline std::vector<OpenPlace> g_places;
+inline bool g_places_busy = false;   // (while they are read or set: no other place is)
+/// The fields of the source's objects of the engine (`Mesh::visible`, kern/docs/blueprint_cpp.md "Felder eines Objekts
+/// der Engine"): the stand-in of the object holds each as a field of its own - C++ reads and sets it there, unseen -
+/// and every object that is alive has one FieldSync, which sets them in the engine ("<field>@set") with the places
+/// and reads them from it ("<field>@get") with the places: before and after each call of the engine, as a call of
+/// the source begins and when it returns. Neither is a call of the source; the Blueprint binds a field without a call.
+struct FieldSync {
+  using Fn = void (*)(void* owner, bool set);
+  std::ptrdiff_t at;   // (where it stands in its object: the object of a copy is found the same way)
+  Fn fn;
+  template <class O> FieldSync(O* owner, Fn f) : at(reinterpret_cast<char*>(this) - reinterpret_cast<char*>(static_cast<void*>(owner))), fn(f) { live().insert(this); }
+  FieldSync(const FieldSync& o) : at(o.at), fn(o.fn) { live().insert(this); }
+  FieldSync& operator=(const FieldSync&) { return *this; }   // (it stays its own object's)
+  ~FieldSync() { live().erase(this); }
+  void* owner() const { return const_cast<char*>(reinterpret_cast<const char*>(this)) - at; }
+  static std::set<FieldSync*>& live() {
+    static std::set<FieldSync*> all;
+    return all;
+  }
+};
+inline void fields_sync(bool set) {
+  const std::vector<FieldSync*> all(FieldSync::live().begin(), FieldSync::live().end());
+  for (FieldSync* f : all)
+    if (FieldSync::live().count(f)) f->fn(f->owner(), set);
+}
+inline void places_set() {
+  if (g_places_busy) return;
+  g_places_busy = true;
+  for (OpenPlace& p : g_places) p.set();
+  fields_sync(true);
+  g_places_busy = false;
+}
+inline void places_get() {
+  if (g_places_busy) return;
+  g_places_busy = true;
+  for (OpenPlace& p : g_places) p.get();
+  fields_sync(false);
+  g_places_busy = false;
+}
+/// One field of an object of the source (FieldSync): set in the engine or read from it - an object without a handle
+/// has nothing there.
+template <class T, class Shape> void field_sync(const char* function, const EngineObject& o, T& field, bool set) {
+  if (!o.kern_handle) return;
+  const std::vector<Value> in{value_of(o)};
+  if (set) {
+    std::vector<Value> with = in, none;
+    with.push_back(value_of(field));
+    test_engine(g_source_engine, g_source_objects, std::string(function) + "@set", with, none);
+    return;
+  }
+  const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
+  std::vector<Value> out{Value::zero(f ? f->outputs[0].type : kern::logic::PinType::exec)};
+  if (test_engine(g_source_engine, g_source_objects, std::string(function) + "@get", in, out)) take_as<Shape>(field, out[0]);
+}
+/// The source's function returned: its places are set back, and it holds none.
+inline void places_close() {
+  places_set();
+  g_places.clear();
+}
+template <class T, class Shape> T& engine_place(const char* function, const std::vector<Value>& in) {
+  (void)engine_call(function, in);
+  const auto kept = std::make_shared<T>(quiet<T>());
+  const std::string get = std::string(function) + "@get", set = std::string(function) + "@set";
+  const kern::logic::EngineFunction* f = kern::logic::engine_function(function);
+  const kern::logic::TypeRef type{f ? f->outputs[0].type : kern::logic::PinType::exec, f && f->outputs[0].of ? f->outputs[0].of : ""};
+  OpenPlace p;
+  p.get = [kept, get, in, type] {
+    std::vector<Value> out{Value::zero(type.type)};
+    if (test_engine(g_source_engine, g_source_objects, get, in, out)) take_as<Shape>(*kept, out[0]);
+  };
+  p.set = [kept, set, in] {
+    std::vector<Value> with = in, none;
+    with.push_back(value_of(*kept));
+    test_engine(g_source_engine, g_source_objects, set, with, none);
+  };
+  g_places_busy = true;
+  p.get();
+  g_places_busy = false;
+  g_places.push_back(std::move(p));
+  return *kept;
 }
 
 /// Is what the Blueprint gives this very value, bit for bit? (Numbers by their bits; a struct, a list, a map
@@ -2350,6 +2450,7 @@ struct Watch {
     g_open_reads = 0;
     g_engine_refused = 0;
     g_source_engine.calls.clear();
+    g_places.clear();
     g_source_engine.kept.clear();   // (the Callbacks objects of the engine kept from an earlier call: each call begins with an engine that holds none - both sides alike)
     g_clocks = {&g_source_engine, {}};   // (what the engine's clocks answer the source in this call: the Blueprints get the same - rule_blueprint.h)
     if (real_engine()) fresh_engine(g_source_objects);

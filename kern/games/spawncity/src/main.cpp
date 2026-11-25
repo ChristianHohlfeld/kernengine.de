@@ -10,12 +10,14 @@
 #include <vector>
 
 #include "game.h"
-#include "shader_look.h"
 #include "kern/api/c_api.h"
 #include "kern/kern.h"
 
-namespace {
+namespace sc {
 
+// The game as the App the engine runs (kern::App) - in the program's namespace, its one object made where it is first
+// asked for, as Game's (game()): the state of a Blueprint that implements the interface (kern/docs/blueprint_cpp.md,
+// "Schnittstellen der Engine").
 class SpawnCityApp final : public kern::App {
  public:
   kern::RendererOptions configure() override {
@@ -29,9 +31,7 @@ class SpawnCityApp final : public kern::App {
   }
   kern::Span<kern::ShaderExtension* const> extensions() override {
     // facades (extension stream 0: Kern's wall records), water (stream 1: terrain.cpp build_water_chunk)
-    static sc::LookExtension<sc::Facades> facades{sc::game().windows()};
-    static sc::LookExtension<sc::WaterLook> water{sc::game().water_look()};
-    static kern::ShaderExtension* ext[2] = {&facades, &water};
+    static kern::ShaderExtension* ext[2] = {&sc::facades(), &sc::water_look()};
     return {ext, 2};
   }
   bool start(kern::Engine& e) override {
@@ -66,6 +66,15 @@ class SpawnCityApp final : public kern::App {
 
 };
 
+SpawnCityApp& app() {
+  static SpawnCityApp a;
+  return a;
+}
+
+}  // namespace sc
+
+namespace {
+
 std::string g_result;
 const char* result(std::string s) {
   g_result = std::move(s);
@@ -74,10 +83,7 @@ const char* result(std::string s) {
 
 }  // namespace
 
-kern::App* kern_create_app() {
-  static SpawnCityApp app;
-  return &app;
-}
+kern::App* kern_create_app() { return &sc::app(); }
 
 /// Length of the last string an sc_* export returned.
 KERN_EXPORT(sc_result_length) kern::u32 sc_result_length() { return static_cast<kern::u32>(g_result.size()); }
