@@ -6184,12 +6184,15 @@ SC_TEST(lowered_game_controls_cpp) {
       ::sc::lowered::draw(draw, ::sc::g_view);
       std::optional<std::remove_cvref_t<decltype(((*self).*got(::sc::lowered::builds_game_controls::M0{}))())>> r;
       long asks = 0;
+      const bool defined = rec.alone([&](long& asks) {
       const bool defined = ::sc::lowered::run([&] { r.emplace(((*self).*got(::sc::lowered::builds_game_controls::M0{}))()); }, asks);
       if (defined) {
         rec.part("what it returns", ::sc::lowered::bytes_of(r));
         rec.object("its object", *self);
         rec.part("the variable sc::g_view of the file", ::sc::lowered::bytes_of(::sc::g_view));
       }
+      return defined;
+      }, asks);
       rec.take(defined, asks, call);
     }
   }
