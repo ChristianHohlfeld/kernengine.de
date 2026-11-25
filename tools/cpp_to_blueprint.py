@@ -3448,6 +3448,7 @@ class Const:
                     return t + "{" + ", ".join(vals) + "}"
                 fields = u.struct_fields[t]
                 vals = []
+                if os.environ.get("DBG_CONST"): sys.stderr.write(f"DBG_STRUCT {t} {[(f, ft) for f, ft, _, _ in fields]} {[a.get('kind') for a in args]} {qtype(n)}\n")
                 for i, (f, ft, d, _) in enumerate(fields):
                     if i < len(args) and args[i].get("kind") not in ("ImplicitValueInitExpr", "CXXDefaultInitExpr"):
                         vals.append(self.literal(args[i], ft))
