@@ -2751,4 +2751,11 @@ void GameWorld::debug_lines(bool colliders, bool contacts, bool joints, std::vec
   }
 }
 
+std::vector<BlueprintRunning> blueprints_running(const logic::Runtime& logic) {
+  std::vector<BlueprintRunning> out;
+  out.reserve(logic.instances().size());
+  for (const auto& inst : logic.instances()) out.push_back({inst->name(), inst->tier(), inst->graph().functions.size(), inst->graph().nodes.size(), inst->disabled()});
+  return out;
+}
+
 }  // namespace kern::game

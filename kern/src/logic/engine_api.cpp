@@ -19,6 +19,12 @@ const EngineFunction* engine_function(std::string_view type) {
   return it == by_type.end() ? nullptr : it->second;
 }
 
+const EngineInterface* engine_interface(std::string_view name) {
+  for (const EngineInterface& i : engine_interfaces())
+    if (name == i.name) return &i;
+  return nullptr;
+}
+
 void add_engine_nodes(Library& lib) {
   for (const EngineFunction& f : engine_functions()) {
     NodeDef d;
@@ -41,7 +47,14 @@ void add_engine_nodes(Library& lib) {
       std::vector<Value> in, out;
       for (std::size_t k = 0; k < f.inputs.size(); ++k) in.push_back(c.in(first + k));
       for (const EnginePin& p : f.outputs) out.push_back(Value::zero(p.type));
-      c.host().engine(f.type, in, out);
+      if (!f.field) c.host().engine(f.type, in, out);   // (a field of an object: nothing is asked - EngineFunction::field)
+      // A place of the engine: the node binds it - its output is not what the function gave (a copy)
+      // but what it was given, the place's key: the nodes that name it (setting "bound") read and set
+      // what the engine holds there through the door, "<function>@get" / "<function>@set".
+      if (f.place) {
+        c.bind(first, std::move(in));
+        return f.value ? kStop : 0;
+      }
       for (std::size_t k = 0; k < f.outputs.size(); ++k) c.out(first + k, std::move(out[k]));
       return f.value ? kStop : 0;
     };
@@ -220,6 +233,28 @@ std::string called(const EngineStandIn::Kept& k, u64& state) {
 }  // namespace
 
 bool EngineStandIn::engine(std::string_view function, const std::vector<Value>& in, std::vector<Value>& out) {
+  const std::size_t at = function.find('@');
+  if (at != std::string_view::npos) {
+    // (a place of the engine: read or set what the stand-in holds there)
+    const EngineFunction* f = engine_function(function.substr(0, at));
+    const std::string_view op = function.substr(at + 1);
+    if (!f || !f->place || (op != "get" && op != "set") || (op == "set" && in.empty())) return false;
+    const std::vector<Value> key_in(in.begin(), in.end() - (op == "set" ? 1 : 0));
+    const std::string key = engine_call_shown(f->type, key_in);
+    if (op == "set") {
+      places[key] = in.back();
+      return true;
+    }
+    auto it = places.find(key);
+    if (it == places.end()) {
+      u64 state = 1469598103934665603ull;
+      for (const char ch : std::string(function) + key) state = (state ^ static_cast<unsigned char>(ch)) * 1099511628211ull;
+      std::size_t from = 0;
+      it = places.emplace(key, answer(f->outputs[0].shape, from, state)).first;
+    }
+    if (!out.empty()) out[0] = it->second;
+    return true;
+  }
   const EngineFunction* f = engine_function(function);
   if (!f) return false;
   std::string call = engine_call_shown(function, in);

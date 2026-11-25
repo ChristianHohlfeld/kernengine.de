@@ -2,6 +2,7 @@
 #include "facades.h"
 
 #include "kern/gfx/program.h"
+#include "kern/gfx/renderer.h"   // (frame_uniforms names the renderer: its definition)
 
 namespace sc {
 

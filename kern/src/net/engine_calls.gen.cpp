@@ -22,6 +22,7 @@ struct S_net_ConnectionConfig { [[maybe_unused]] static Value to(EngineObjects& 
 struct S_net_EndpointConfig { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::EndpointConfig& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::EndpointConfig& x); };
 struct S_net_EndpointStats { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::EndpointStats& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::EndpointStats& x); };
 struct S_net_Message { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::Message& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::Message& x); };
+struct S_net_SimulatorSettings { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::SimulatorSettings& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::SimulatorSettings& x); };
 struct S_net_Simulator_Packet { [[maybe_unused]] static Value to(EngineObjects& o, const kern::net::Simulator::Packet& x); [[maybe_unused]] static void from(EngineObjects& o, const Value& v, kern::net::Simulator::Packet& x); };
 Value S_net_Address::to(EngineObjects& o, const kern::net::Address& x) { return Value::structure({ev::Conv<ev::Int64>::to(o, x.id)}); }
 void S_net_Address::from(EngineObjects& o, const Value& v, kern::net::Address& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int64>::from(o, *f, x.id); }
@@ -37,6 +38,8 @@ Value S_net_EndpointStats::to(EngineObjects& o, const kern::net::EndpointStats& 
 void S_net_EndpointStats::from(EngineObjects& o, const Value& v, kern::net::EndpointStats& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.rtt_ms); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.packet_loss); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.sent_kbps); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.received_kbps); if (const Value* f = v.field(4)) ev::Conv<ev::Float>::from(o, *f, x.acked_kbps); if (const Value* f = v.field(5)) ev::Conv<ev::Int64>::from(o, *f, x.packets_sent); if (const Value* f = v.field(6)) ev::Conv<ev::Int64>::from(o, *f, x.packets_received); if (const Value* f = v.field(7)) ev::Conv<ev::Int64>::from(o, *f, x.packets_acked); if (const Value* f = v.field(8)) ev::Conv<ev::Int64>::from(o, *f, x.packets_stale); if (const Value* f = v.field(9)) ev::Conv<ev::Int64>::from(o, *f, x.packets_invalid); if (const Value* f = v.field(10)) ev::Conv<ev::Int64>::from(o, *f, x.packets_too_large_to_send); if (const Value* f = v.field(11)) ev::Conv<ev::Int64>::from(o, *f, x.packets_too_large_to_receive); if (const Value* f = v.field(12)) ev::Conv<ev::Int64>::from(o, *f, x.fragments_sent); if (const Value* f = v.field(13)) ev::Conv<ev::Int64>::from(o, *f, x.fragments_received); if (const Value* f = v.field(14)) ev::Conv<ev::Int64>::from(o, *f, x.fragments_invalid); }
 Value S_net_Message::to(EngineObjects& o, const kern::net::Message& x) { return Value::structure({ev::Conv<ev::Int>::to(o, x.id), ev::Conv<ev::Int>::to(o, x.type), ev::Conv<ev::List<ev::Int>>::to(o, x.data)}); }
 void S_net_Message::from(EngineObjects& o, const Value& v, kern::net::Message& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Int>::from(o, *f, x.id); if (const Value* f = v.field(1)) ev::Conv<ev::Int>::from(o, *f, x.type); if (const Value* f = v.field(2)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.data); }
+Value S_net_SimulatorSettings::to(EngineObjects& o, const kern::net::SimulatorSettings& x) { return Value::structure({ev::Conv<ev::Float>::to(o, x.latency_ms), ev::Conv<ev::Float>::to(o, x.jitter_ms), ev::Conv<ev::Float>::to(o, x.loss_percent), ev::Conv<ev::Float>::to(o, x.duplicate_percent)}); }
+void S_net_SimulatorSettings::from(EngineObjects& o, const Value& v, kern::net::SimulatorSettings& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Float>::from(o, *f, x.latency_ms); if (const Value* f = v.field(1)) ev::Conv<ev::Float>::from(o, *f, x.jitter_ms); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.loss_percent); if (const Value* f = v.field(3)) ev::Conv<ev::Float>::from(o, *f, x.duplicate_percent); }
 Value S_net_Simulator_Packet::to(EngineObjects& o, const kern::net::Simulator::Packet& x) { return Value::structure({ev::Conv<ev::Struct<S_net_Address>>::to(o, x.from), ev::Conv<ev::Struct<S_net_Address>>::to(o, x.to), ev::Conv<ev::Float>::to(o, x.deliver), ev::Conv<ev::List<ev::Int>>::to(o, x.data)}); }
 void S_net_Simulator_Packet::from(EngineObjects& o, const Value& v, kern::net::Simulator::Packet& x) { if (const Value* f = v.field(0)) ev::Conv<ev::Struct<S_net_Address>>::from(o, *f, x.from); if (const Value* f = v.field(1)) ev::Conv<ev::Struct<S_net_Address>>::from(o, *f, x.to); if (const Value* f = v.field(2)) ev::Conv<ev::Float>::from(o, *f, x.deliver); if (const Value* f = v.field(3)) ev::Conv<ev::List<ev::Int>>::from(o, *f, x.data); }
 
@@ -1421,6 +1424,22 @@ bool c133(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// engine.simulator.settings: kern::net::Simulator::settings
+bool c134(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& out) {
+  auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
+  if (!self) return false;
+  ev::give<ev::Struct<S_net_SimulatorSettings>>(o, out, 0, self->settings);
+  return true;
+}
+
+// engine.simulator.settings@set: what stands at the place kern::net::Simulator::settings gives
+bool c134_set(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>&) {
+  auto* self = ev::object<kern::net::Simulator>(o, in, 0, "simulator");
+  if (!self) return false;
+  ev::take<ev::Struct<S_net_SimulatorSettings>>(o, in, 1, self->settings);
+  return true;
+}
+
 const EngineCall kCalls[] = {
     {"engine.net.client_state_name", &c0},
     {"engine.client.connect", &c1},
@@ -1556,6 +1575,9 @@ const EngineCall kCalls[] = {
     {"engine.server.release", &c131},
     {"engine.simulator.make", &c132},
     {"engine.simulator.release", &c133},
+    {"engine.simulator.settings", &c134},
+    {"engine.simulator.settings@get", &c134},
+    {"engine.simulator.settings@set", &c134_set},
 };
 const EngineCalls kAll(kCalls, std::size(kCalls));
 

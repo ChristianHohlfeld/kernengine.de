@@ -100,7 +100,8 @@ ParamDef local_of() { return param("scope", "Local of", ParamDef::Kind::scope); 
 /// entries (ParamDef::Kind::path).
 ParamDef path_of() { return param("path", "Path", ParamDef::Kind::path); }
 /// The place a node names, as its title has it: Cars[].Speed.
-std::string place_title(const Node& n) { return n.param("variable", "?") + n.param("path"); }
+// (a place of the engine: the node that bound it - n12[].to)
+std::string place_title(const Node& n) { return (n.param("bound").empty() ? n.param("variable", "?") : "n" + n.param("bound")) + n.param("path"); }
 
 /// The setting "Type" of a generic node: the type of its pins (`with_lists`: a list type too).
 ParamDef type_param(bool with_lists) {

@@ -640,6 +640,11 @@ struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   bool uses_library(std::string_view name) const;
   bool empty() const { return nodes.empty() && variables.empty() && machines.empty() && functions.empty() && enums.empty() && structs.empty() && comments.empty(); }
   const EnumType* enumeration(std::string_view name) const;
@@ -657,11 +662,14 @@ struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   Root root_of(const Node& n, Variable& out, std::string_view prefix = {}) const;
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
-  static bool writable(Root r) { return r == Root::variable || r == Root::local || r == Root::reference; }
+  static bool writable(Root r) { return r == Root::variable || r == Root::local || r == Root::reference || r == Root::bound; }
   /// The place a node's settings name: its variable (variable_of) and from there the path of the
   /// setting "path" - fields and list entries (logic::path_steps). `out` holds what is there, as
   /// a Variable: its type, its default (a field's declared one, the zero of a list's entry), and
@@ -688,6 +696,10 @@ struct Graph {
 /// The steps of a path (the setting "path" of a node that names a place): ".Wheels[].Slip" is
 /// the field Wheels, a list entry (an empty step), the field Slip. False: no path.
 bool path_steps(std::string_view path, std::vector<std::string>& steps);
+struct EngineFunction;
+/// The function of the node of the engine a node's setting "bound" names (Graph::Root::bound), if that
+/// node is a place of the engine (EngineFunction::place) - `binder` gets that node; else null.
+const EngineFunction* bound_function(const Graph& g, const Node& n, const Node** binder = nullptr);
 /// The path its steps are (path_steps the other way round).
 std::string path_text(const std::vector<std::string>& steps);
 /// How many list entries a path goes through: the node has an index input for each (path_pin).
@@ -1233,6 +1245,10 @@ class Instance {
       Value value;
     };
     std::shared_ptr<Beside> beside;
+    /// Or - a place of the engine - the node of the engine that bound it (its compiled index): what is
+    /// there is what the engine holds now, read through the door ("<function>@get") and set back
+    /// ("<function>@set") with the inputs the node was given when it ran.
+    int bound = -1;
     struct Step {
       std::string field;          // a field by its name; empty: a list entry
       i64 index = 0;
@@ -1402,6 +1418,10 @@ class Instance {
   bool call_function(std::string_view function, const std::vector<Value>& args, std::vector<Value>& results, bool inside, const std::vector<Spot>* places = nullptr);
   bool call_class(std::string_view function, std::span<const Value> args, Results& results);  // (the class's: NativeBlueprint::call)
   Value read(const Spot& s) const;
+  /// A place of the engine (Spot::bound): its function, the inputs its node was given, its type and
+  /// what the engine holds there now (the zero of the type where it holds nothing - false: the host
+  /// has been told why).
+  bool bound_now(const Spot& s, std::string& function, std::vector<Value>& in, TypeRef& t, Value& now) const;
   /// How long each list of any length (each map) is that the place goes through, outermost first - up to the first
   /// the place lies beside (Runtime::held_lost: a call that holds the place checks them after it).
   std::vector<std::size_t> lengths_on(const Spot& s) const;
@@ -1672,6 +1692,9 @@ class Context {
   std::size_t node_outputs() const { return inst_.nodes_[node_].out.size(); }
   void out(std::string_view pin, Value v);
   void out(std::size_t index, Value v);
+  /// A node of the engine that is a place of the engine binds it: its output `index` holds what the
+  /// node was given (the place's key - Instance::Spot::bound), as it is, not a value of the pin's type.
+  void bind(std::size_t index, std::vector<Value> in);
   /// Exec output ordinal by pin id (for returning from run()).
   int exec(std::string_view pin) const;
   NodeState& state() { return inst_.nodes_[node_].state; }
