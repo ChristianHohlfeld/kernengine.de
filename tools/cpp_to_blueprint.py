@@ -108,6 +108,7 @@ import io
 import itertools
 import json
 import os
+os.environ.setdefault("WHY", r"rebase_origin|update_town|handle_shots|minimap_json|update_net")   # (nur Probe work-game-c-why, nicht mergen)
 import re
 import shutil
 import struct
