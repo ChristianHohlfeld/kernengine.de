@@ -14,8 +14,11 @@
 #include "kern/api/c_api.h"
 #include "kern/kern.h"
 
-namespace {
+namespace sc {
 
+// The game as the App the engine runs (kern::App) - in the program's namespace, its one object made where it is first
+// asked for, as Game's (game()): the state of a Blueprint that implements the interface (kern/docs/blueprint_cpp.md,
+// "Schnittstellen der Engine").
 class SpawnCityApp final : public kern::App {
  public:
   kern::RendererOptions configure() override {
@@ -66,6 +69,15 @@ class SpawnCityApp final : public kern::App {
 
 };
 
+SpawnCityApp& app() {
+  static SpawnCityApp a;
+  return a;
+}
+
+}  // namespace sc
+
+namespace {
+
 std::string g_result;
 const char* result(std::string s) {
   g_result = std::move(s);
@@ -74,10 +86,7 @@ const char* result(std::string s) {
 
 }  // namespace
 
-kern::App* kern_create_app() {
-  static SpawnCityApp app;
-  return &app;
-}
+kern::App* kern_create_app() { return &sc::app(); }
 
 /// Length of the last string an sc_* export returned.
 KERN_EXPORT(sc_result_length) kern::u32 sc_result_length() { return static_cast<kern::u32>(g_result.size()); }
