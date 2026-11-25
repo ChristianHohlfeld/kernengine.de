@@ -35,6 +35,7 @@ it compares through its callers."""
 
 import argparse
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -142,6 +143,17 @@ class Fn:
         self.const = bool(re.search(r"\)\s*const\b", sig))
         self.params = [(p.get("name") or f"p{k}", (p.get("type") or {}).get("qualType", ""), C.qtype(p)) for k, p in enumerate(x for x in kids(node) if x.get("kind") == "ParmVarDecl")]
         self.body = next((c for c in kids(node) if c.get("kind") == "CompoundStmt"), None)
+        # (extern "C" - an export, KERN_EXPORT(name): one function of its C name in the program, whatever its namespace)
+        self.c_name = owner is None and (bool(node.get("_c_linkage")) or self._spelled_c(version))
+
+    def _spelled_c(self, v):
+        if not self.at or self.at[0] is None:
+            return False
+        a = self.at[0]
+        head = v.text(self.file)[max(0, a - 200):a + 200]
+        k = min(200, a)
+        before, at = head[:k], head[k:]
+        return bool(re.match(r'\s*(KERN_EXPORT\s*\(\s*\w+\s*\)|extern\s+"C")', at) or re.search(r'(KERN_EXPORT\s*\(\s*\w+\s*\)|extern\s+"C")\s*$', before))
 
     @property
     def cpp_scope(self):
@@ -192,10 +204,42 @@ class Version:
         self.program_ns = namespace   # (the namespace of the program around this side: the old program's for the old)
         self.variables = []     # (qualified name, node) - the variables of the source file's namespaces
         self.decl_by_id = {}
+        self.scope_by_id = {}   # id -> the namespaces around a declaration
         for o in self.dumps:
             self._ids(o, [namespace])
         for o in self.dumps:
             self._visit(o, [namespace], None)
+        self._c_exports(cpp, flags, namespace)
+
+    def _c_exports(self, cpp, flags, namespace):
+        """The exports of the file that stand outside the program's namespace (extern "C" at the top, ::sc_x): the
+        compiler's tree of the namespace does not hold them - a run of its own for their names."""
+        text = self.text(self.cpp)
+        names = set(re.findall(r"KERN_EXPORT\s*\(\s*(\w+)\s*\)", text)) | set(re.findall(r'extern\s+"C"\s+[^;{()]*?\b(\w+)\s*\(', text))
+        have = {f.name for f in self.functions if f.c_name}
+        names -= have
+        if not names:
+            return
+        pre = os.path.commonprefix(sorted(names))
+        for flt in ([pre] if len(pre) >= 3 else sorted(names)):
+            cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", flt, *flags, cpp]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            s, dec, i, dumps = r.stdout, json.JSONDecoder(), 0, []
+            while True:
+                j = s.find("{", i)
+                if j < 0:
+                    break
+                o, i = dec.raw_decode(s, j)
+                dumps.append(o)
+            st = {"file": ""}
+            for o in dumps:
+                C.annotate(o, st)
+            for o in dumps:
+                if o.get("kind") == "FunctionDecl" and o.get("name") in names and o.get("name") not in have and self.mine(o):
+                    f = self._function(o, [], None, None)
+                    if f is not None and f.c_name:
+                        self.functions.append(f)
+                        have.add(f.name)
 
     def text(self, file):
         f = os.path.abspath(file)
@@ -212,7 +256,11 @@ class Version:
         k = n.get("kind")
         if "id" in n:
             self.decl_by_id[n["id"]] = n
-        if k == "NamespaceDecl":
+            self.scope_by_id[n["id"]] = scope
+        if k == "LinkageSpecDecl":
+            for c in kids(n):
+                self._ids(c, scope)   # (extern "C" { ... } / KERN_EXPORT: its functions stand in the scope around it)
+        elif k == "NamespaceDecl":
             for c in kids(n):
                 self._ids(c, scope + [n.get("name") or "(anonymous)"])
         elif k in ("CXXRecordDecl", "ClassTemplateDecl") and n.get("name"):
@@ -234,7 +282,13 @@ class Version:
     def _visit(self, n, scope, owner):
         k = n.get("kind")
         q = lambda name: "::".join(s for s in scope + [name] if s != "(anonymous)")
-        if k == "NamespaceDecl":
+        if k == "LinkageSpecDecl":
+            # (extern "C" - an export of the program, KERN_EXPORT: its C name is the function, wherever its namespace)
+            for c in kids(n):
+                if c.get("kind") in FUNCTIONS and n.get("language") == "C":
+                    c["_c_linkage"] = True
+                self._visit(c, scope, owner)
+        elif k == "NamespaceDecl":
             for c in kids(n):
                 self._visit(c, scope + [n.get("name") or "(anonymous)"], None)
         elif k in ("CXXRecordDecl", "EnumDecl") and n.get("parentDeclContextId") in self.record_ids and n.get("parentDeclContextId") != (scope and self._scope_id(scope)):
@@ -409,6 +463,48 @@ class Version:
 
     def actors(self):
         return [(q, self.actor_of(n)) for q, n, _ in self.variables if self.actor_of(n) is not None]
+
+    def objects(self):
+        """Of each function, the objects of the program it reaches through a function of another file that gives one
+        (`Game& game()`: the one object of the program) - itself or through what it calls in the file: {(accessor, class)}."""
+        by_id = {f.node["id"]: f for f in self.functions}
+        def scope_of(r):
+            sc = self.scope_by_id.get(r.get("id"))
+            if sc is None:   # (a node of another run of the compiler: the declaration of that name and type)
+                t = (r.get("type") or {}).get("qualType")
+                sc = next((self.scope_by_id.get(i) for i, d in self.decl_by_id.items()
+                           if d.get("kind") == "FunctionDecl" and d.get("name") == r.get("name") and (d.get("type") or {}).get("qualType") == t), None)
+            return sc
+        direct, calls = {}, {}
+        for f in self.functions:
+            got, called = set(), set()
+            for x in walk(f.body):
+                r = x.get("referencedDecl") or {}
+                if x.get("kind") == "DeclRefExpr" and r.get("kind") == "FunctionDecl" and r.get("id") not in by_id:
+                    m = re.fullmatch(r"(?:struct |class )?([\w:]+)\s*&\s*\(\)", (r.get("type") or {}).get("qualType", ""))
+                    sc = scope_of(r) if m else None
+                    if sc is not None:
+                        sc = [y for y in sc if y != "(anonymous)"]
+                        rec = next((q for q in ["::".join(sc[:k] + [m.group(1)]) for k in range(len(sc), -1, -1)] if q in self.records), None)
+                        if rec is not None:
+                            got.add(("::".join(sc + [r["name"]]), rec))
+                if x.get("kind") in ("DeclRefExpr", "MemberExpr"):
+                    rid = r.get("id") if x.get("kind") == "DeclRefExpr" else x.get("referencedMemberDecl")
+                    if rid in by_id:
+                        called.add(rid)
+            direct[f.node["id"]], calls[f.node["id"]] = got, called
+        out = {}
+        for f in self.functions:
+            seen, todo, got = set(), [f.node["id"]], set()
+            while todo:
+                i = todo.pop()
+                if i in seen:
+                    continue
+                seen.add(i)
+                got |= direct.get(i, set())
+                todo += list(calls.get(i, ()))
+            out[f.node["id"]] = got
+        return out
 
     def users(self):
         """Of each function, the variables of the file it reads or changes - itself or through what it calls in the file."""
@@ -865,6 +961,8 @@ class Module:
         state_old = [q for q, _ in self.old.state()]
         out, alone = [], []
         def place(f):
+            if f.c_name:
+                return ('extern "C"', None, f.kind)   # (::sc_x and sc::sc_x: the same C name, the same export)
             return (f.cpp_scope, f.owner.split("::")[-1] if f.owner else None, f.kind)
         self.bindings, self.binding_gets, self.plans = [], [], {}
         for o in olds:
@@ -1831,14 +1929,42 @@ class BuildsWriter(Writer):
             if e or o.template or n.template or o.param_types() != n.param_types() or plain(o.ret) != plain(n.ret) or o.kind != n.kind:
                 raise Stop(f"{o.label()} -> {n.label()}: the form \"two builds\" compares a function with its counterpart of the same signature - "
                            "one that changed its parameters (the state made explicit, a template made functions) is not compared in it yet")
+            if n.c_name and re.search(r"\*\s*$", plain(n.ret)) and not re.search(r"\bchar\s*\*\s*$", plain(n.ret)):
+                raise Stop(f"{n.label()} gives a pointer to data whose length the page knows (not the function's type): "
+                           "the form \"two builds\" compares a text by its characters, not such data yet")
             if n.local or o.local:
                 raise Stop(f"{o.label()}: only its own file can call it - the form \"two builds\" calls what the program's other files can call")
         for label in covered:
             pass   # (a gone helper is compared through its callers, which are compared here)
-        users = m.old.users()
+        # the variables of the file a compared function reads or changes (itself or through what it calls in the file): the
+        # test is then compiled within the file (appended to its text, "// within:"), where it reaches them - each drawn
+        # before every call, alike on both sides, and compared after it. Each is the same variable in the new text (one
+        # that became a field of a struct is the state made explicit - not this form).
+        users, new_users = m.old.users(), m.new.users()
+        used = set()
         for o, n, e in tested:
-            if users.get(o.node["id"]):
-                raise Stop(f"{o.label()} uses the variables of the file ({', '.join(sorted(users[o.node['id']]))}): the form \"two builds\" does not reach them yet")
+            used |= set(users.get(o.node["id"], ())) | set(new_users.get(n.node["id"], ()))
+        old_state, new_state = dict(m.old.state()), dict(m.new.state())
+        self.within = []
+        for q in sorted(used):
+            if q not in old_state or q not in new_state:
+                raise Stop(f"the variable {q} of the file is not in both texts: the form \"two builds\" compares a variable with itself")
+            t_old, t_new = self.field_type(old_state[q]), self.field_type(new_state[q])
+            if plain(t_old) != plain(t_new):
+                raise Stop(f"the variable {q} of the file has another type in the old text ({t_old} -> {t_new})")
+            self.within.append((q, t_new))
+        # the one objects of the program a compared function reaches through a function of another file (`Game&
+        # game()` - an export of main.cpp acts on the game): drawn before every call, alike on both sides, as a method's
+        # object is, and compared after it. Each is reached so in both texts (else it is no longer the same object).
+        objs, new_objs = m.old.objects(), m.new.objects()
+        self.objects = []
+        for o, n, e in tested:
+            a, b = objs.get(o.node["id"], set()), new_objs.get(n.node["id"], set())
+            if a != b and a and b:
+                raise Stop(f"{o.label()} reaches {sorted(a)} in the old text and {sorted(b)} in the new: the form \"two builds\" compares an object with itself")
+            for x in sorted(a | b):
+                if x not in self.objects:
+                    self.objects.append(x)
         if any(True for _ in m.old.actors()) or any(self.logic_param(t) for o, n, _ in tested for _, t, _ in o.params + n.params):
             raise Stop("the file binds Blueprints of actors: the form \"two builds\" does not run a logic for them yet")
         self.reached = {}       # qualified name -> (side "sc"/"kern", record) of the classes the test draws or writes
@@ -1848,6 +1974,7 @@ class BuildsWriter(Writer):
             if n.owner:
                 roots.append(n.owner)
             roots += [t for _, t, _ in n.params] + [t for _, _, t in n.params] + [n.ret or ""]
+        roots += [t for _, t in self.within] + [t for _, t in self.objects]
         self.reach(roots)
         self.check_same()
         text = self.driver(tested)
@@ -1922,6 +2049,8 @@ class BuildsWriter(Writer):
             dd = node.get("definitionData") or {}
             fields = [c for c in kids(node) if c.get("kind") == "FieldDecl"]
             return bool(dd.get("isAggregate")) and not node.get("bases") and bool(fields) and node.get("tagUsed") != "class"
+        if getattr(self, "within", None) and os.path.abspath(node.get("_file") or "?") == os.path.abspath(self.m.src):
+            return True   # (a class of the file itself: the test is compiled within the file)
         return (node.get("_file") or "").endswith((".h", ".hpp"))
 
     def fields_of(self, q, depth=0):
@@ -1999,11 +2128,10 @@ class BuildsWriter(Writer):
                f"// as they stood at the base, old/ and gone beside it) and into the program as it stands; the old writes what every changed",
                "// function gives and leaves, call for call, the new draws the same calls and compares, bit for bit.",
                f"// base: {m.base}"]
-        labels = {n.label() for _, n, _ in tested}
-        for label, fields in sorted(getattr(self, "ends", {}).items()):
-            if label not in labels:
-                raise Stop(f"--ends {label}: no function of the test is called so")
-            out.append(f"// ends on purpose (BLUEPRINTS.md, \"Bewusste Abweichungen\"): --ends '{label}={','.join(fields)}'")
+        if self.within or os.path.basename(m.src) == "main.cpp":
+            # (main.cpp is no source the tests link - its kern_create_app is the tests' own: the test is compiled within it,
+            # and run_tests.sh renames its kern_create_app)
+            out.append(f"// within: {os.path.basename(m.src)} (appended to its text on each side: the test reaches the variables of the file)")
         out += [f'#include "{h}"' for h in sorted(headers)]
         out += ['#include "../../../source_diff.h"', ""]
         # the fields, as C++ lets an explicit instantiation reach them (what a class keeps to itself too)
@@ -2079,6 +2207,12 @@ class BuildsWriter(Writer):
             args.append(f"a{k}.get()")
             if re.search(r"&\s*$", t) and not re.match(r"^const\b", t.strip()):
                 writes.append((f"its parameter {pn}", f"a{k}.v"))
+        for q, t in self.within:
+            inner.append(f"::sc::lowered::draw(draw, ::{q});")
+            writes.append((f"the variable {q} of the file", f"::{q}"))
+        for acc, t in self.objects:
+            # (the one object of the program, as Self makes a method's: what the engine makes given, then drawn)
+            inner += [f"::sc::lowered::give_engine_made(::{acc}());", f"if (draw.flag()) ::sc::lowered::draw(draw, ::{acc}());"]
         a = ", ".join(args)
         ret = n.ret and plain(n.ret) != "void" and n.kind not in ("CXXConstructorDecl", "CXXDestructorDecl")
         if n.kind == "CXXDestructorDecl":
@@ -2090,27 +2224,27 @@ class BuildsWriter(Writer):
             call = f"{robbed}({a})" if robbed else f"self->{n.name}({a})"
         elif n.owner:
             call = f"{T}::{n.name}({a})"
+        elif n.c_name:
+            call = f"{n.name}({a})"   # (an export: ::sc_x in one text, sc::sc_x in the other - the test stands in sc, it finds either)
         else:
             call = f"::{n.cpp_scope}::{n.name}({a})" if n.cpp_scope else f"::{n.name}({a})"
         if ret:
             inner.append(f"std::optional<std::remove_cvref_t<decltype({call})>> r;")
             call = f"r.emplace({call})"
-        inner += ["long asks = 0;", f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
+        # (each call alone, in a process of its own - Builds::alone: a call the program does not survive is one C++ leaves open)
+        inner += ["long asks = 0;", "const bool defined = rec.alone([&](long& asks) {",
+                  f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
         if ret:
             inner.append('  rec.part("what it returns", ::sc::lowered::bytes_of(r));')
-        ended = getattr(self, "ends", {}).get(label)
-        if ended is not None and not (method and n.kind != "CXXDestructorDecl"):
-            raise Stop(f"--ends {label}: only a method leaves fields of its object")
-        if method and n.kind != "CXXDestructorDecl" and ended:
-            inner.append("  static constexpr const char* ended[] = {" + ", ".join(C.text_literal(f) for f in ended) + "};")
-            inner.append('  rec.object_ending("its object", *self, ended);')
-        elif method and n.kind != "CXXDestructorDecl":
+        if method and n.kind != "CXXDestructorDecl":
             inner.append('  rec.object("its object", *self);')
+        for acc, t in self.objects:
+            inner.append(f'  rec.object({C.text_literal("the object of " + acc + "()")}, ::{acc}());')
         if n.kind == "CXXConstructorDecl":
             inner.append('  rec.part("the object it makes", ::sc::lowered::bytes_of(made));')
         for what, x in writes:
             inner.append(f"  rec.part({C.text_literal(what)}, ::sc::lowered::bytes_of({x}));")
-        inner += ["}", "rec.take(defined, asks, call);"]
+        inner += ["}", "return defined;", "}, asks);", "rec.take(defined, asks, call);"]
         return body + ["      " + x for x in inner] + ["    }", "  }"]
 
 
@@ -2120,16 +2254,7 @@ def main(argv):
     ap.add_argument("--test", required=True, help="the folder of the tests (tests/lowered)")
     ap.add_argument("--namespace", default="sc", help="the program's namespace")
     ap.add_argument("--builds", action="store_true", help="the form \"two builds\" for every file (else for a file whose class has methods in other files)")
-    ap.add_argument("--ends", action="append", default=[], metavar="FUNCTION=FIELD,...",
-                    help="the form \"two builds\": a method whose change ends these fields of its object on purpose (BLUEPRINTS.md, "
-                         "\"Bewusste Abweichungen\"): the new must leave each ended - as {} makes it -, every other field as the old")
     args, rest = ap.parse_known_args(argv[1:])
-    ends = {}
-    for e in args.ends:
-        label, _, fields = e.partition("=")
-        if not label or not fields:
-            ap.error(f"--ends {e}: FUNCTION=FIELD,...")
-        ends[label.strip()] = [f.strip() for f in fields.split(",") if f.strip()]
     if "--" not in rest:
         ap.error("the sources follow --")
     flags, sources = rest[:rest.index("--")], rest[rest.index("--") + 1:]
@@ -2147,9 +2272,7 @@ def main(argv):
                 if args.builds or spans_files(m):
                     m, writer = BuildsModule(src, args.base, fl, args.namespace, scratch), BuildsWriter
                     print(f"{os.path.basename(src)}: the form \"two builds\" (the old tree and the new, each a program of its own)")
-                w = writer(m, args.test)
-                w.ends = ends
-                path, tested, covered, report = w.write()
+                path, tested, covered, report = writer(m, args.test).write()
                 if path is None:
                     print(f"{os.path.basename(src)}: every function it had is unchanged since {args.base} (the new text only has more) - no test")
                 else:
