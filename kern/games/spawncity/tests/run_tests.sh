@@ -66,7 +66,8 @@ while IFS= read -r f; do sources+=("$f"); done < <(find "$here" -name 'test_*.cp
 # only what its two programs need - the engine and test_main.cpp - and only that driver, tests/lowered/builds/<file>/.
 beleg="${SC_BELEG:-}"
 if [ -n "$beleg" ]; then
-  [ -f "$here/lowered/builds/$beleg/builds_$beleg.cpp" ] || { echo "FAIL SC_BELEG=$beleg: there is no tests/lowered/builds/$beleg/builds_$beleg.cpp"; exit 1; }
+  # (SC_BELEG=all: every driver there - the CI wrote them, "gen:")
+  [ "$beleg" = all ] || [ -f "$here/lowered/builds/$beleg/builds_$beleg.cpp" ] || { echo "FAIL SC_BELEG=$beleg: there is no tests/lowered/builds/$beleg/builds_$beleg.cpp"; exit 1; }
   keep=(); for f in "${sources[@]}"; do case "$f" in "$kern"/src/*|"$kern"/tests/gl_stub.cpp|"$here"/test_main.cpp) keep+=("$f") ;; esac; done
   sources=("${keep[@]}")
 fi
@@ -145,7 +146,7 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
   bdir="$(dirname "$drv")" stem="$(basename "$bdir")" name="lowered_$(basename "$bdir" | sed 's/[^A-Za-z0-9_]/_/g')_cpp"
   want=0; [ $# -eq 0 ] && want=1
   for a in "$@"; do case "$name" in *"$a"*) want=1 ;; esac; done
-  [ -n "$beleg" ] && { [ "$stem" = "$beleg" ] && want=1 || want=0; }
+  [ -n "$beleg" ] && { [ "$stem" = "$beleg" ] || [ "$beleg" = all ] && want=1 || want=0; }
   [ "$want" = 1 ] && [ "$pass" != 2 ] && [ "$whole" = 1 ] || continue
   bout="$out/builds/$stem"; tree="$bout/tree/src"
   rm -rf "$bout/tree" && mkdir -p "$bout/tree"
