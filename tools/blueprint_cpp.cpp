@@ -374,9 +374,17 @@ int main(int argc, char** argv) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
       return 1;
     }
-    if (to_header) {  // (the class in the header, its glue here)
+    if (to_header) {  // (the class in the header, its glue here - but how its structs are held as values goes with the
+      // class: what it gives the engine and other Blueprints, it gives as values, in every source that includes the header)
+      std::string held;
+      if (!logic::native_glue(g, cls, held, &error, logic::library(), space, all, true)) {
+        std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
+        return 1;
+      }
+      if (const std::size_t at = held.empty() ? std::string::npos : glue.find(held); at != std::string::npos) glue.erase(at, held.size());
+      else held.clear();
       header += "\n// ---------------------------------------------------------------------------\n// The Blueprint of " + owner + "\n" +
-                std::string("namespace ") + space + " {\n\n" + uses + (uses.empty() ? "" : "\n") + code + "\n}  // namespace " + space + "\n";
+                std::string("namespace ") + space + " {\n\n" + uses + (uses.empty() ? "" : "\n") + code + "\n" + held + "}  // namespace " + space + "\n";
       out += " (its class: in the header)\n" + std::string("namespace ") + space + " {\n\n" + glue + "\n}  // namespace " + space + "\n";
     } else {
       out += std::string("\nnamespace ") + space + " {\n\n" + uses + (uses.empty() ? "" : "\n") + code + "\n" + glue + "\n}  // namespace " + space + "\n";

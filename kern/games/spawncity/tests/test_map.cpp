@@ -1,22 +1,50 @@
 // Map data: the MVT decoder reads what the writer wrote (round trip with zig-zag deltas, packed
 // tags, every value type), OpenMapTiles layers become buildings / roads / areas in metres at the
-// right place and size, tiles and the procedural stand-in city.
+// right place and size, tiles and the procedural stand-in city. The tile maths, the stand-in city and the
+// clipping are the level's Blueprint tiles_cpp, called as its class - as the program calls it
+// (level_blueprints.h), with the game's loop guard. (The round trip still runs the C++: the writer's
+// end_layer waits - mvt_cpp Writer::end_layer, put_bytes.)
+#include "../src/blueprint_call.h"
 #include "../src/tiles.h"
+#include "level_blueprints.h"
+#include "rule_blueprint.h"
 #include "test_util.h"
 
 using namespace sc;
 
+namespace {
+using Tiles = blueprints::tiles_cpp;
+/// tiles_cpp running as its class in a logic of its own.
+struct TilesBlueprint {
+  RuleBlueprint rules{"tiles_cpp", nullptr, true};
+  bool bound = false;
+  TilesBlueprint() {
+    rules.rt.budget = rules::kLoopBudget;
+    bound = rules.problems.empty() && kern::logic::bind_blueprint<Tiles>(rules.rt);
+  }
+  Tiles& operator*() { return kern::logic::blueprint<Tiles>(); }
+};
+/// Konstanz, where the game starts (tiles.h), and the zoom of its tiles.
+constexpr f64 kLon = 9.1766, kLat = 47.6600;
+constexpr i32 kZoom = 14;
+Tiles::List<Tiles::Vector> line_of(std::initializer_list<Vec3> points) { return Tiles::List<Tiles::Vector>(std::vector<Vec3>(points)); }
+}  // namespace
+
 SC_TEST(map_tile_math) {
-  const TileKey t = tile_at(kKonstanzLon, kKonstanzLat);
-  SC_CHECK(t.z == 14 && t.x == 8609 && t.y == 5718, "Konstanz tile %d/%d/%d", t.z, t.x, t.y);
-  f64 lon, lat;
-  tile_lonlat(t, 0, 0, lon, lat);
-  SC_CHECK(lon <= kKonstanzLon && lat >= kKonstanzLat, "north-west corner %.5f %.5f", lon, lat);
-  kern::GeoProjector p;
-  p.init(kKonstanzLon, kKonstanzLat);
-  f64 x, y, lo, la;
-  p.project(9.18, 47.665, x, y);
-  unproject(p, x, y, lo, la);
+  TilesBlueprint bp;
+  SC_CHECK(bp.bound, "tiles_cpp runs as its class: %s", bp.rules.problems.c_str());
+  if (!bp.bound) return;
+  Tiles& tl = *bp;
+  const Tiles::TileKey t = tl.tile_at(kLon, kLat, kZoom).Result;
+  SC_CHECK(t.z == 14 && t.x == 8609 && t.y == 5718, "Konstanz tile %d/%d/%d", static_cast<int>(t.z), static_cast<int>(t.x), static_cast<int>(t.y));
+  f64 lon = 0, lat = 0;
+  tl.tile_lonlat(t, lon, lat, 0, 0);
+  SC_CHECK(lon <= kLon && lat >= kLat, "north-west corner %.5f %.5f", lon, lat);
+  Tiles::GeoProjector p;
+  tl.GeoProjector_init(p, kLon, kLat);
+  f64 x = 0, y = 0, lo = 0, la = 0;
+  tl.GeoProjector_project(p, x, y, 9.18, 47.665);
+  tl.unproject(p, lo, la, x, y);
   SC_CHECK(std::fabs(lo - 9.18) < 1e-9 && std::fabs(la - 47.665) < 1e-9, "unproject inverts project");
 }
 
@@ -79,33 +107,45 @@ SC_TEST(map_mvt_round_trip) {
 }
 
 SC_TEST(map_procedural_city) {
-  MapFeatures f;
-  procedural_city(0, 0, 600, 7, f);
+  TilesBlueprint bp;
+  SC_CHECK(bp.bound, "tiles_cpp runs as its class: %s", bp.rules.problems.c_str());
+  if (!bp.bound) return;
+  Tiles& tl = *bp;
+  Tiles::MapFeatures f;
+  tl.procedural_city(f, 0, 0, 600, 7);
   SC_CHECK(f.procedural, "marked as procedural");
   SC_CHECK(f.buildings.size() > 150, "a town of buildings (%zu)", f.buildings.size());
   SC_CHECK(f.roads.size() > 10, "streets (%zu)", f.roads.size());
   bool water = false;
-  for (const auto& a : f.areas) water |= a.kind == AreaKind::water;
+  for (const auto& a : f.areas) water |= a.kind == Tiles::AreaKind::water;
   SC_CHECK(water, "lake shore");
   for (const auto& b : f.buildings) {
-    if (!(b.top >= 8 && b.top < 25)) { SC_CHECK(false, "storey heights %.1f", b.top); break; }
+    if (!(b.top >= 8 && b.top < 25)) { SC_CHECK(false, "storey heights %.1f", static_cast<f64>(b.top)); break; }
   }
 }
 
 
 SC_TEST(map_line_clipped_to_square) {
+  TilesBlueprint bp;
+  SC_CHECK(bp.bound, "tiles_cpp runs as its class: %s", bp.rules.problems.c_str());
+  if (!bp.bound) return;
+  Tiles& tl = *bp;
   // a street as far as it lies in its tile's square: in order, a part per stay inside
-  const kern::Vec4 sq{0, 0, 100, 100};
-  auto parts = clip_line({{-20, 50}, {50, 50}, {50, 130}, {80, 130}, {80, 90}, {120, 90}}, sq);
+  const Tiles::Vec4 sq{0, 0, 100, 100};
+  auto parts = tl.clip_line(line_of({{-20, 50, 0}, {50, 50, 0}, {50, 130, 0}, {80, 130, 0}, {80, 90, 0}, {120, 90, 0}}), sq).Result;
   SC_CHECK(parts.size() == 2, "two stays inside (%zu)", parts.size());
   if (parts.size() == 2) {
-    SC_CHECK(parts[0].size() == 3 && parts[0][0].x == 0 && parts[0][0].y == 50 && parts[0][2].x == 50 && parts[0][2].y == 100, "in at the west edge, out at the north (%zu points)", parts[0].size());
-    SC_CHECK(parts[1].size() == 3 && parts[1][0].y == 100 && parts[1][2].x == 100 && parts[1][2].y == 90, "back in from the north, out at the east (%zu points)", parts[1].size());
+    const auto& a = parts[0].items;
+    const auto& b = parts[1].items;
+    SC_CHECK(a.size() == 3 && a[0].x == 0 && a[0].y == 50 && a[2].x == 50 && a[2].y == 100, "in at the west edge, out at the north (%zu points)", a.size());
+    SC_CHECK(b.size() == 3 && b[0].y == 100 && b[2].x == 100 && b[2].y == 90, "back in from the north, out at the east (%zu points)", b.size());
   }
-  SC_CHECK(clip_line({{-5, -5}, {-1, 200}}, sq).empty(), "outside: nothing");
-  parts = clip_line({{10, 10}, {20, 20}, {30, 10}}, sq);
-  SC_CHECK(parts.size() == 1 && parts[0].size() == 3, "inside: the whole line");
+  SC_CHECK(tl.clip_line(line_of({{-5, -5, 0}, {-1, 200, 0}}), sq).Result.empty(), "outside: nothing");
+  parts = tl.clip_line(line_of({{10, 10, 0}, {20, 20, 0}, {30, 10, 0}}), sq).Result;
+  SC_CHECK(parts.size() == 1 && parts[0].items.size() == 3, "inside: the whole line");
   // two tiles side by side cut the same street at the same point of their common edge
-  const auto left = clip_line({{60, 40}, {140, 60}}, sq), right = clip_line({{60, 40}, {140, 60}}, {100, 0, 200, 100});
-  SC_CHECK(left.size() == 1 && right.size() == 1 && std::fabs(left[0].back().x - right[0].front().x) < 1e-3f && std::fabs(left[0].back().y - right[0].front().y) < 1e-3f, "the parts meet on the edge");
+  const auto left = tl.clip_line(line_of({{60, 40, 0}, {140, 60, 0}}), sq).Result, right = tl.clip_line(line_of({{60, 40, 0}, {140, 60, 0}}), Tiles::Vec4{100, 0, 200, 100}).Result;
+  SC_CHECK(left.size() == 1 && right.size() == 1 && std::fabs(left[0].items.back().x - right[0].items.front().x) < 1e-3f &&
+               std::fabs(left[0].items.back().y - right[0].items.front().y) < 1e-3f,
+           "the parts meet on the edge");
 }
