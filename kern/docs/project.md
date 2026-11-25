@@ -56,7 +56,7 @@ sich daraus, **wo er steht**: im Projekt ist er Programm, im Level gehört er zu
  └──────────────────────────────┘                 └──────────────────────────────────────┘
           ▲                                                    │
           └──── Welt → Programm nur über Objekte der Engine ───┘
-               (Knotentyp des Projekts, Schnittstellen wie App)
+               (fester Schritt, Schnittstellen wie App)
 ```
 
 - Beim Start entsteht **genau eine Programm-Laufzeit** mit allen Programm-Blueprints des Projekts, in ihrer Reihenfolge.
@@ -96,7 +96,7 @@ Ein Blueprint nennt seine Bibliotheken in `uses` (beim Namen).
 - Steht derselbe Name im Level und im Projekt, ist das ein Fehler. Er wird beim Laden mit beiden Stellen gemeldet;
   stillschweigend gewinnt keiner.
 
-## 6. Der feste Schritt und Knotentypen des Projekts
+## 6. Der feste Schritt und eigene Knoten
 
 ### 6.1 Der feste Schritt einer Welt (gebaut)
 
@@ -117,25 +117,23 @@ Physik. Es hängt nicht davon ab, wo ein Knoten steht. Geprüft: `game_world_fix
 `register_node_type`, ein globales Register, dessen Typen der Editor erst kannte, wenn das Programm lief, und dessen
 Zeiger nach dem Ende der Programm-Laufzeit hingen – ersatzlos entfernt.)
 
-### 6.2 Knotentypen des Projekts (Entwurf, noch nicht gebaut)
+### 6.2 Eigene Knoten eines Projekts
 
-Ein Projekt kann eigene Knotentypen haben. Ein Programm-Blueprint, der die
-Schnittstelle **`logic_NodeType`** implementiert, **ist** ein Knotentyp des Projekts:
+Einen eigenen Knotentyp als besondere Datenart gibt es nicht – ein Weg je Sache: **Die Funktion einer Bibliothek des
+Projekts ist der eigene Knoten.** Ein Blueprint, der die Bibliothek benutzt (`uses`), hat ihre Funktionen als
+Aufruf-Knoten in der Palette, mit ihren Ein- und Ausgängen; der Editor kennt sie, sobald das Projekt geladen ist.
 
-- Seine Beschreibung sind **Daten des Blueprints**, keine Funktionen:
-  - Typ: `project.<Name des Blueprints>`
-  - Label: der Anzeigename des Blueprints
-  - Ereignis: eine Einstellung des Blueprints, z. B. `logic.tick`; leer heißt, der Knoten ist eine Aktion
-  - Hilfe: die Beschreibung des Blueprints
+```cpp
+// im Projekt: die Bibliothek Mathe
+struct Mathe : virtual kern::Library {
+  struct clampedResult { Float value = 0.0; };
+  KERN_PURE clampedResult clamped(Float value = 0.0) { return {math_max(value, 0.0)}; }
+};
+// in einem Level: ein Akteur, der sie benutzt – „Clamped“ ist sein Knoten
+struct Tuer : virtual kern::Blueprint, virtual Mathe { … clamped(Hoehe) … };
+```
 
-  Damit kennt der Editor den Knoten, **sobald das Projekt geladen ist**. Er steht in der Palette, ohne dass etwas läuft.
-- Die Schnittstelle selbst hat nur `run()` (und optional `help()`). Läuft ein Knoten dieses Typs (in einer Welt), ruft er
-  `run` des Blueprints in der Programm-Laufzeit.
-- Die Knotentypen gelten **je Projekt**: Das Projekt baut beim Laden seine Library aus dem Kern der Engine und seinen
-  Knotentypen. Editor, Prüfung (`check`), Notation und alle Laufzeiten des Projekts nutzen diese Library. Eine globale
-  Anmeldung zur Laufzeit gibt es nicht.
-- Wo der Knoten steht, entscheidet das Level (oder das Programm, wenn es eine Welt baut). Eine Reihenfolge ergibt sich
-  daraus nicht: was in jedem Schritt zuerst laufen muss, ist der feste Schritt (6.1).
+Was in jedem Schritt laufen muss, ist kein Knoten, sondern der feste Schritt (6.1).
 
 ## 7. Akteure einer Welt aus dem Programm erreichen: der Eingang „World“
 
@@ -150,7 +148,7 @@ Eingang **World** (Int, der Handle einer GameWorld):
 - In der Notation steht der Eingang nur, wenn er verbunden oder ungleich 0 ist:
   `func_call_on<"Oeffnen">(kern::in_world(welt, tuer), kern::out())`. Ohne ihn bleibt der Text wie bisher.
 - In die andere Richtung, von der Welt zum Programm, gibt es **kein** stilles Durchfallen. Der Weg führt nur über Objekte
-  der Engine, die das Programm der Welt gibt: einen Knotentyp des Projekts oder eine Schnittstelle.
+  der Engine, die das Programm der Welt gibt: den festen Schritt (6.1) oder eine Schnittstelle.
 
 ## 8. Ein zweites Spiel anlegen – Schritt für Schritt
 
@@ -174,7 +172,6 @@ Eingang **World** (Int, der Handle einer GameWorld):
   speichern, Levels und Start-Level, Einstellungen, Programm-Blueprints im Blueprint-Editor; Studio-Test
   `studio_project`, e2e im Modul-Bau.
 - Noch nach diesem Entwurf zu ersetzen:
-  - Knotentypen des Projekts als Daten (6.2; `register_node_type` ist entfernt, Teil 2: der feste Schritt 6.1)
   - schwache `kern_create_app`/`kern_project_app`/`kern_project_text` (Teil 3: `kern::run`)
-- Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) Knotentypen je Projekt,
+- Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.
