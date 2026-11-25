@@ -3907,6 +3907,13 @@ class Emit:
                 if init.get("kind") != "CXXCtorInitializer":
                     continue
                 if "anyInit" not in init:
+                    # (a base that is an interface of the engine - kern::App -, made without arguments: it has nothing
+                    # to make - its object is the Blueprint's own, Graph::implements)
+                    base = (init.get("baseInit") or {}).get("qualType", "")
+                    made = kids(init)[0] if kids(init) else {}
+                    if base.startswith(ENGINE + "::") and base in self.tree.records and made.get("kind") == "CXXConstructExpr" and not kids(made) and not any(
+                            c.get("kind") == "FieldDecl" for c in kids(self.tree.records.get(base, {}))):
+                        continue
                     raise Wait("a constructor that calls another constructor or a base class")
                 e = kids(init)[0] if kids(init) else None
                 # (what the constructor does not write, the compiler does - it stands where the constructor's name
