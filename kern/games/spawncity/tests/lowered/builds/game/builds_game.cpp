@@ -3,6 +3,7 @@
 // as they stood at the base, old/ and gone beside it) and into the program as it stands; the old writes what every changed
 // function gives and leaves, call for call, the new draws the same calls and compares, bit for bit.
 // base: 8971e5c3
+// ends on purpose (BLUEPRINTS.md, "Bewusste Abweichungen"): --ends 'Game::stop()=swarm_cruiser_,life_,cars_,remote_car_,remote_bus_'
 #include "car.h"
 #include "city_stream.h"
 #include "combat_art.h"
@@ -6165,7 +6166,8 @@ SC_TEST(lowered_game_cpp) {
       long asks = 0;
       const bool defined = ::sc::lowered::run([&] { self->stop(); }, asks);
       if (defined) {
-        rec.object("its object", *self);
+        static constexpr const char* ended[] = {"swarm_cruiser_", "life_", "cars_", "remote_car_", "remote_bus_"};
+        rec.object_ending("its object", *self, ended);
       }
       rec.take(defined, asks, call);
     }

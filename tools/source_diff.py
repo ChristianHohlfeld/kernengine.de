@@ -1999,6 +1999,11 @@ class BuildsWriter(Writer):
                f"// as they stood at the base, old/ and gone beside it) and into the program as it stands; the old writes what every changed",
                "// function gives and leaves, call for call, the new draws the same calls and compares, bit for bit.",
                f"// base: {m.base}"]
+        labels = {n.label() for _, n, _ in tested}
+        for label, fields in sorted(getattr(self, "ends", {}).items()):
+            if label not in labels:
+                raise Stop(f"--ends {label}: no function of the test is called so")
+            out.append(f"// ends on purpose (BLUEPRINTS.md, \"Bewusste Abweichungen\"): --ends '{label}={','.join(fields)}'")
         out += [f'#include "{h}"' for h in sorted(headers)]
         out += ['#include "../../../source_diff.h"', ""]
         # the fields, as C++ lets an explicit instantiation reach them (what a class keeps to itself too)
@@ -2093,7 +2098,13 @@ class BuildsWriter(Writer):
         inner += ["long asks = 0;", f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
         if ret:
             inner.append('  rec.part("what it returns", ::sc::lowered::bytes_of(r));')
-        if method and n.kind != "CXXDestructorDecl":
+        ended = getattr(self, "ends", {}).get(label)
+        if ended is not None and not (method and n.kind != "CXXDestructorDecl"):
+            raise Stop(f"--ends {label}: only a method leaves fields of its object")
+        if method and n.kind != "CXXDestructorDecl" and ended:
+            inner.append("  static constexpr const char* ended[] = {" + ", ".join(C.text_literal(f) for f in ended) + "};")
+            inner.append('  rec.object_ending("its object", *self, ended);')
+        elif method and n.kind != "CXXDestructorDecl":
             inner.append('  rec.object("its object", *self);')
         if n.kind == "CXXConstructorDecl":
             inner.append('  rec.part("the object it makes", ::sc::lowered::bytes_of(made));')
@@ -2109,7 +2120,16 @@ def main(argv):
     ap.add_argument("--test", required=True, help="the folder of the tests (tests/lowered)")
     ap.add_argument("--namespace", default="sc", help="the program's namespace")
     ap.add_argument("--builds", action="store_true", help="the form \"two builds\" for every file (else for a file whose class has methods in other files)")
+    ap.add_argument("--ends", action="append", default=[], metavar="FUNCTION=FIELD,...",
+                    help="the form \"two builds\": a method whose change ends these fields of its object on purpose (BLUEPRINTS.md, "
+                         "\"Bewusste Abweichungen\"): the new must leave each ended - as {} makes it -, every other field as the old")
     args, rest = ap.parse_known_args(argv[1:])
+    ends = {}
+    for e in args.ends:
+        label, _, fields = e.partition("=")
+        if not label or not fields:
+            ap.error(f"--ends {e}: FUNCTION=FIELD,...")
+        ends[label.strip()] = [f.strip() for f in fields.split(",") if f.strip()]
     if "--" not in rest:
         ap.error("the sources follow --")
     flags, sources = rest[:rest.index("--")], rest[rest.index("--") + 1:]
@@ -2127,7 +2147,9 @@ def main(argv):
                 if args.builds or spans_files(m):
                     m, writer = BuildsModule(src, args.base, fl, args.namespace, scratch), BuildsWriter
                     print(f"{os.path.basename(src)}: the form \"two builds\" (the old tree and the new, each a program of its own)")
-                path, tested, covered, report = writer(m, args.test).write()
+                w = writer(m, args.test)
+                w.ends = ends
+                path, tested, covered, report = w.write()
                 if path is None:
                     print(f"{os.path.basename(src)}: every function it had is unchanged since {args.base} (the new text only has more) - no test")
                 else:

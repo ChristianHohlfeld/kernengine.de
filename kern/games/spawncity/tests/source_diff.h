@@ -1012,6 +1012,50 @@ struct Builds {
       std::apply([&](const auto&... f) { ((part(std::string(name) + ": " + names[k++], bytes_of(f))), ...); }, fields(x));
     }
   }
+  /// An object a call leaves, where the change of the source changes on purpose what the call leaves in some fields
+  /// (`ended`, with the reason - BLUEPRINTS.md, "Bewusste Abweichungen"): every other field as one part (compared as a
+  /// whole, an object held twice the same object) and each once more as a part of its own; of each of `ended` that the
+  /// new program leaves it as a value made by `{}` - ended, empty - (the old leaves what it held: not compared). Any
+  /// other difference is one, as with object().
+  template <class T, std::size_t N> void object_ending(const char* name, const T& x, const char* const (&ended)[N]) {
+    constexpr auto& names = Fields<std::remove_const_t<T>>::names;
+    auto is_ended = [&](const char* f) {
+      for (const char* e : ended)
+        if (std::string_view(e) == f) return true;
+      return false;
+    };
+    for (const char* e : ended) {
+      bool known = false;
+      for (const char* f : names) known = known || std::string_view(e) == f;
+      SC_CHECK(known, "%s: %s is no field of the object", function.c_str(), e);
+    }
+    Bytes rest;
+    std::size_t k = 0;
+    std::apply([&](const auto&... f) { ((is_ended(names[k++]) ? void() : put(rest, f)), ...); }, fields(x));
+    part(std::string(name) + " (but what it ends on purpose)", std::move(rest));
+    k = 0;
+    std::apply([&](const auto&... f) {
+      (([&] {
+         const char* n = names[k++];
+         if (!is_ended(n)) {
+           part(std::string(name) + ": " + n, bytes_of(f));
+           return;
+         }
+         using F = std::remove_cvref_t<decltype(f)>;
+         // (the old program writes that it is to be ended; the new, whether it is)
+         bool ends = writing;
+         if constexpr (std::is_default_constructible_v<F>) {
+           if (!writing) ends = bytes_of(f).b == bytes_of(F{}).b;
+         } else {
+           SC_CHECK(false, "%s: %s ends on purpose, but the test cannot make an ended one to compare with", function.c_str(), n);
+         }
+         Bytes said;
+         said.num<unsigned char>(ends ? 1 : 0);
+         part(std::string(name) + ": " + n + " ends (on purpose)", std::move(said));
+       }()),
+       ...);
+    }, fields(x));
+  }
   void take(bool defined, long asks, int call) {
     now.defined = defined;
     now.asks = defined ? asks : 0;
