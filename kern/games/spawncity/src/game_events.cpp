@@ -84,7 +84,7 @@ void Game::update_fighters_back(f32 dt) {
         e.normal = h.normal;
         world_->shots().push_back(e);
         combat_tracer(from, e.to, {3.0f, 2.2f, 1.0f});
-        world_->play_sound(combat_sfx(combat_audio::Kind::pistol), from, 0.6f, 0.92f + rng_.unit() * 0.1f, true);
+        world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::pistol), from, 0.6f, 0.92f + rng_.unit() * 0.1f, true);
         osfx("gangsters.bang", from);
         people_.frighten(from, 22, now, 1);  // other people run from gangster gunfire like from yours
         ++C.gangster_shots;
@@ -102,7 +102,7 @@ void Game::update_fighters_back(f32 dt) {
           p.last_attack = now;
           // a stab: ~16 % of the player's health; a punch of an untrained adult ~8 %
           world_->damage(soldier_, arm == Arms::knife ? kStabDmg : kPunchDmg, 0, false, p.pos + Vec3{0, 0, 1.2f});
-          world_->play_sound(arm == Arms::knife ? combat_sfx(combat_audio::Kind::hit) : "builtin:impact_light", me + Vec3{0, 0, 1.2f}, 0.7f, arm == Arms::knife ? 1.3f : 0.8f, true);
+          world_->play_sound(arm == Arms::knife ? combat_sfx(blueprints::combat_audio::combat_audio_Kind::hit) : "builtin:impact_light", me + Vec3{0, 0, 1.2f}, 0.7f, arm == Arms::knife ? 1.3f : 0.8f, true);
           if (arm == Arms::knife) osfx("gangsters.stabSound", me);  // "arondight:pedestrian-stab" at the player
           ++(arm == Arms::knife ? C.stabs : C.punches);
         }
@@ -267,7 +267,7 @@ void Game::update_enemies(f32 dt) {
     if (rng_.unit() < enemy_hit_chance(s, dist, kern::length(tv))) { hurt_player(s.dmg, s.dmg, from); world_->shake_camera(0.12f); }
     else aim += Vec3{rng_.range(-2.5f, 2.5f), rng_.range(-2.5f, 2.5f), rng_.range(-0.6f, 1.2f)};
     combat_tracer(from, aim, e.type == EnemyType::cop ? Vec3{3.0f, 2.8f, 1.9f} : Vec3{3.0f, 2.0f, 0.8f});
-    world_->play_sound(combat_sfx(combat_audio::Kind::pistol), from, 0.45f, e.type == EnemyType::cop ? 1.35f : 1.05f, true);
+    world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::pistol), from, 0.45f, e.type == EnemyType::cop ? 1.35f : 1.05f, true);
     osfx("sandbox_game.sfx", from, 0, 0.45f, e.type == EnemyType::cop ? 1.35f : 1.05f);  // sfx("shot", ...)
   }
   std::erase_if(C.enemies, [](const EnemyAi& e) { return e.person < 0; });
@@ -303,7 +303,7 @@ void Game::update_scores(f32 dt) {
   std::vector<People::Death> deaths;
   people_.take_deaths(deaths);
   for (const People::Death& d : deaths) {
-    if (d.head && d.by_player) { world_->play_sound(combat_sfx(combat_audio::Kind::crack), cam_.eye, 0.32f, 1.0f, false); osfx("headshot_feedback.announceHeadshot", cam_.eye); }  // headshot_feedback.mjs: a neutral short click
+    if (d.head && d.by_player) { world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::crack), cam_.eye, 0.32f, 1.0f, false); osfx("headshot_feedback.announceHeadshot", cam_.eye); }  // headshot_feedback.mjs: a neutral short click
     if (!d.by_player) continue;
     // "npc-death": the mates' copy of this person falls too (the same id on every machine)
     if (net_.active() && d.kind == People::Kind::citizen && d.index >= 0) {

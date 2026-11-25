@@ -1,6 +1,7 @@
 // GUIDED missile, critical damage clocks, bullet momentum (guided.h,
 // combat_detail.h) with SpawnCity's numbers.
-#include "../src/combat_audio.h"
+#include "../src/blueprint_call.h"
+#include "level_blueprints.h"
 #include "../src/combat_detail.h"
 #include "../src/guided.h"
 #include "../src/rules.h"
@@ -150,17 +151,28 @@ SC_TEST(details_bullet_momentum) {
 }
 
 SC_TEST(details_combat_audio_bank) {
-  using namespace combat_audio;
+  // The bank is the level's Blueprint combat_audio_cpp (its kinds: combat_audio), called as its class - as the game
+  // calls it (level_blueprints.h), with the game's loop guard.
+  RuleBlueprint audio_rules("combat_audio_cpp", nullptr, true, {"combat_audio"});
+  audio_rules.rt.budget = rules::kLoopBudget;
+  SC_CHECK(audio_rules.problems.empty() && kern::logic::bind_blueprint<blueprints::combat_audio_cpp>(audio_rules.rt),
+           "combat_audio_cpp runs as its class: %s", audio_rules.problems.c_str());
+  auto& bank = kern::logic::blueprint<blueprints::combat_audio_cpp>();
+  using Kind = blueprints::combat_audio::combat_audio_Kind;
+  const auto render = [&](Kind k, u32 v) { return bank.render(k, v, blueprints::combat_audio_cpp::kSampleRate).Result; };
   // Lengths as SpawnCity's prebaked bank (ceil(duration * 44100)), every sample finite and in range.
   auto near = [](std::size_t n, std::size_t want) { return n + 1 >= want && n <= want + 1; };
   SC_CHECK(near(render(Kind::shot, 0).size(), 8820), "MP round 0.2 s (%zu)", render(Kind::shot, 0).size());
   SC_CHECK(near(render(Kind::pistol, 1).size(), 26108), "pistol variant 1: 0.592 s (%zu)", render(Kind::pistol, 1).size());
   for (u8 i = 0; i < static_cast<u8>(Kind::count); ++i)
-    for (u32 v = 0; v < kVariants[i]; ++v) {
-      const std::vector<f32> pcm = render(static_cast<Kind>(i), v);
+    for (u32 v = 0; v < blueprints::combat_audio_cpp::kVariants[i]; ++v) {
+      // (as the game hands them to the engine's bank: each sample made into 32 bit)
+      std::vector<f32> pcm;
+      for (const f64 x : render(static_cast<Kind>(i), v)) pcm.push_back(static_cast<f32>(x));
       f32 peak = 0;
       bool finite = !pcm.empty();
       for (f32 x : pcm) { finite = finite && std::isfinite(x); peak = std::fmax(peak, std::fabs(x)); }
-      SC_CHECK(finite && peak > 0.3f && peak <= 1.0f, "%s %u: finite, normalised (peak %.2f)", kind_name(static_cast<Kind>(i)), v, peak);
+      const std::string name(bank.kind_name(static_cast<Kind>(i)).Result.view());
+      SC_CHECK(finite && peak > 0.3f && peak <= 1.0f, "%s %u: finite, normalised (peak %.2f)", name.c_str(), v, peak);
     }
 }

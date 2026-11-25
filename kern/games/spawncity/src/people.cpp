@@ -1,6 +1,7 @@
 // The town's people (see people.h).
 #include "people.h"
-#include "person_hit.h"
+#include "blueprint_call.h"     // (rules::decimal: a number of the game into a Blueprint)
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes: person_hit
 
 #include <algorithm>
 #include <cmath>
@@ -345,12 +346,13 @@ i32 People::shot(Vec3 from, Vec3& to, f32 damage, bool by_player, f32 now, f32 m
     if (dist2d(p.pos, from) < self_r) continue;  // the shooter himself
     if (p.kind == Kind::citizen && now < p.knocked_until) continue;  // down as a ragdoll: the body is hidden
     // the body as it is drawn (person_hit.h): legs, the leaning torso with the arms, the head
-    f32 s = 2;
-    const BodyPart part = person_hit::hit(p.pos, p.yaw, p.v, from, to - from, s, 1.08f);
-    if (part != BodyPart::none && s < best_s) {
+    f64 t = 2;  // (the Blueprint person_hit, called as its class: its numbers - rules::decimal in, static_cast<f32> out)
+    const blueprints::person_hit::BodyPart part = kern::logic::blueprint<blueprints::person_hit>().hit(t, p.pos, rules::decimal(p.yaw), rules::decimal(p.v), from, to - from, 1.08).Result;
+    const f32 s = static_cast<f32>(t);
+    if (part != blueprints::person_hit::BodyPart::none && s < best_s) {
       best_s = s;
       best = static_cast<i32>(i);
-      head = part == BodyPart::head;
+      head = part == blueprints::person_hit::BodyPart::head;
       hit_point = from + (to - from) * s;
     }
   }

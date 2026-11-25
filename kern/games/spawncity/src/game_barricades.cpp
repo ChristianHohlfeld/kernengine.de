@@ -92,7 +92,7 @@ Vec3 Game::gaps_zombie_goal(i32 person, Vec3 pos, Vec3 player, f32 now, bool& wa
         --st[static_cast<std::size_t>(door.i)];
         townsync_plank(door.key, static_cast<u8>(door.i), static_cast<u8>(st.size()), -1);
       }
-      world_->play_sound(combat_sfx(combat_audio::Kind::bounce), {door.c.x, door.c.y, door.floor + 1}, 0.5f, 0.55f, true);
+      world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::bounce), {door.c.x, door.c.y, door.floor + 1}, 0.5f, 0.55f, true);
       ++g.planks_broken;
     }
     return {o.x - door.n.x * 0.2f, o.y - door.n.y * 0.2f, pos.z};  // facing the door
@@ -119,7 +119,7 @@ bool Game::gaps_repair_barricade() {
   ++gaps_->planks[best.key][static_cast<std::size_t>(best.i)];
   townsync_plank(best.key, static_cast<u8>(best.i), static_cast<u8>(gaps_->planks[best.key].size()), 1);
   combat_.zombies.points -= kRepairCost;
-  world_->play_sound(combat_sfx(combat_audio::Kind::bounce), cam_.eye, 0.4f, 0.7f, false);  // playCombatAudio "bounce" .4 / .7
+  world_->play_sound(combat_sfx(blueprints::combat_audio::combat_audio_Kind::bounce), cam_.eye, 0.4f, 0.7f, false);  // playCombatAudio "bounce" .4 / .7
   osfx("zombie_nights.repairKnock", cam_.eye);
   return true;
 }
