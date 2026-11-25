@@ -2322,7 +2322,7 @@ void add_functions(Library& lib) {
     d.inputs = {data("target", "Target", PinType::actor, 0)};
     d.outputs = {data("result", "Engine Object", PinType::object)};
     d.keywords = "engine object interface implements implementation handle extension app other actor";
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>&, std::vector<PinDef>& out) { out[0].of = n.param("interface"); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>&, std::vector<PinDef>& out) { out[0].of = n.param("interface", "App"); };   // (unset: its default, as the node shows it)
     d.problem = interface_problem;
     d.run = [](Context& c) {
       c.out(std::size_t{0}, Value::object(c.runtime().engine_object(c.instance(), c.in_actor("target"), c.param("interface"))));
@@ -2336,7 +2336,7 @@ void add_functions(Library& lib) {
                      "says where it is used.");
     d.params = {interface_param()};
     d.inputs = {data("object", "Object", PinType::object)};
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("interface"); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("interface", "App"); };   // (unset: its default, as the node shows it)
     d.problem = interface_problem;
     d.outputs = {data("result", "Is Valid", PinType::boolean)};
     d.keywords = "object valid none engine handle";
@@ -2353,7 +2353,7 @@ void add_functions(Library& lib) {
                      "Object.");
     d.params = {interface_param()};
     d.inputs = {data("object", "Object", PinType::object)};
-    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("interface"); };
+    d.shape = [](const NodeDef&, const Node& n, const Graph&, std::vector<PinDef>& in, std::vector<PinDef>&) { in[0].of = n.param("interface", "App"); };   // (unset: its default, as the node shows it)
     d.problem = interface_problem;
     d.outputs = {data("result", "Handle", PinType::integer)};
     d.keywords = "object handle int engine";
