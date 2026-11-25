@@ -862,7 +862,8 @@ bool CityStream::work(Tile& t, f64 deadline) {
       while (t.upload_next < chunks.size()) {
         const std::size_t before = t.meshes.size();
         const f64 t1 = kern::now_ms();
-        upload(t, chunks[t.upload_next], m, false);
+        kern::GeoChunk chunk = std::move(chunks[t.upload_next]);   // (out of the engine's list: upload welds it)
+        upload(t, chunk, m, false);
         step_time("roads.upload", t1);
         // road meshes are the re-layable ones
         t.lay_meshes.insert(t.lay_meshes.end(), t.meshes.begin() + static_cast<std::ptrdiff_t>(before), t.meshes.end());
@@ -944,20 +945,19 @@ void CityStream::update(Vec3 focus, f64 budget_ms) {
   t0 = kern::now_ms();
   update_collision(focus, kern::now_ms() + std::fmax(1.5, budget_ms * 0.5));
   step_time("collision", t0);
-  // Nearest unfinished tile first.
-  std::vector<Tile*> order;
-  for (auto& [k, t] : tiles_) order.push_back(t.get());
-  std::stable_sort(order.begin(), order.end(), [&](Tile* a, Tile* b) {
-    const f32 da = (a->center.x - focus.x) * (a->center.x - focus.x) + (a->center.y - focus.y) * (a->center.y - focus.y);
-    const f32 db = (b->center.x - focus.x) * (b->center.x - focus.x) + (b->center.y - focus.y) * (b->center.y - focus.y);
-    return da < db;
-  });
+  // Nearest unfinished tile first: each tile by its key, with its distance (squared) - stably, so tiles as far
+  // keep the order of the map.
+  std::vector<std::pair<f32, u64>> order;
+  for (auto& [k, t] : tiles_) order.push_back({(t->center.x - focus.x) * (t->center.x - focus.x) + (t->center.y - focus.y) * (t->center.y - focus.y), k});
+  std::stable_sort(order.begin(), order.end(), [](const std::pair<f32, u64>& a, const std::pair<f32, u64>& b) { return a.first < b.first; });
   static const char* kStateName[] = {"requested", "decoding", "terrain_wait", "building", "roads", "areas", "collision", "ready", "failed"};
-  for (Tile* t : order) {
+  for (const auto& [d, k] : order) {
     if (kern::now_ms() > deadline) break;
     t0 = kern::now_ms();
-    const char* name = kStateName[static_cast<u32>(t->state)];
-    const bool more = work(*t, deadline);
+    auto it = tiles_.find(k);
+    Tile& t = *it->second;
+    const char* name = kStateName[static_cast<u32>(t.state)];
+    const bool more = work(t, deadline);
     step_time(name, t0);
     if (!more) break;
   }

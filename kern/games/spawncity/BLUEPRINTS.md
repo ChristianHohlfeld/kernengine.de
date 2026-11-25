@@ -555,6 +555,13 @@ Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
 Der Vergleich gegen die Engine selbst (nicht nur gegen ihren Stellvertreter) läuft seit 15.11. im
 Test mit (`SC_ENGINE=real`).
 
+**Bewusste Abweichungen** (eine Änderung der Quelle, die ihr Verhalten mit Absicht ändert – keine Absenkung;
+der Differenztest hält genau sie fest, jede andere Abweichung ist ein Fehler):
+
+| Funktion | was anders ist | Grund | Beleg |
+|---|---|---|---|
+| `Game::stop()` (game.cpp, a5a157f2, 8b27771d) | beendet `swarm_cruiser_`, `life_`, `cars_`, `remote_car_`, `remote_bus_` vor `world_` (vorher blieben sie bis `~Game`) | Das Original griff beim Abbau nach dem Ende von `world_` auf die beendete Physik zu (`~Car` → `detach` auf `rig_world_`, ASan heap-use-after-free) – undefiniert, also nicht Bit für Bit abbildbar. Entschieden vom Koordinator 25.11.2026 | `tests/lowered/builds/game` (Basis 8971e5c3, `--ends 'Game::stop()=…'`): jedes andere Feld gleich, jedes dieser fünf danach leer wie `{}`; `Game::~Game()` gleich |
+
 **Stand 25.11.2026, 15:30 (Abschluss 1: `work` = der bewiesene Stand, live).** Voller Lauf auf mag
 `work-abschluss1-voll-130718-2` (convert, suite, engine rc=0) und CI-Lauf 45621562516 (alle Jobs grün, die
 Spiel-Suite in 24 Teil-Läufen): 1.763 von 1.847 Funktionen des Programms sind als Blueprints geschrieben (24.611 von
