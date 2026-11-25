@@ -114,6 +114,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import traceback
 
 ROOT = os.environ.get("KERN_ROOT") or os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -134,6 +135,11 @@ FORMULA_WORDS = set("min max clamp abs sign copysign remainder floor ceil round 
 # (math_add, list_get ... - the engine says which there are: NODES, see main) or a name of the shape the
 # notation gives its nodes and paths (n12, go3 ...).
 NODES = set()
+# Where the time of a run goes (KERN_TIMES=0: not said): what a process spent in the compiler and how often - the tree,
+# the layouts, the checks of the tests -, said per Blueprint and per round in lines of their own ("time: ...").
+# Nothing of it changes what is written.
+TIMES = collections.Counter()
+SAY_TIMES = os.environ.get("KERN_TIMES", "1") != "0"
 NODE_SHAPE = re.compile(r"^(n|go|on|it|machine)\d+$")
 
 
@@ -358,7 +364,10 @@ def run_clang(path, namespace, flags):
     cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", f"{namespace}::", *flags, path]
     if STEADY:
         cmd = ["setarch", "-R", *cmd]
+    start = time.monotonic()
     r = subprocess.run(cmd, capture_output=True, text=True)
+    TIMES["tree_s"] += time.monotonic() - start
+    TIMES["trees"] += 1
     if r.returncode != 0 and not r.stdout:
         sys.stderr.write(f"{path}: clang failed\n{r.stderr[:2000]}\n")
         return []
@@ -718,7 +727,9 @@ class Tree:
         if self.layouts is None:
             self.layouts = {}
             cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-fdump-record-layouts", *self.flags, self.path]
+            start = time.monotonic()
             r = subprocess.run(cmd, capture_output=True, text=True)
+            TIMES["layout_s"] += time.monotonic() - start
             name, size, fields = None, None, []
             for line in r.stdout.splitlines():
                 if line.startswith("*** Dumping AST Record Layout"):
@@ -14572,11 +14583,14 @@ class TestWriter:
             shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
         # (the switches of the suite itself - run_tests.sh: -Wall -Wextra, no -Werror: what only warns there does not
         # make a function wait here; its warnings are said in the log - see below)
+        start = time.monotonic()
         r = subprocess.run([self.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Wno-unused-parameter",
                             # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
                             # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
                             "-Wno-missing-field-initializers",
                             *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
+        TIMES["check_s"] += time.monotonic() - start
+        TIMES["checks"] += 1
         errors = []
         warned = sorted({w.group(1)[:160] for w in re.finditer(r"\bwarning: (.*)", r.stderr)})
         if warned:
@@ -14902,6 +14916,7 @@ def convert_unit(job):
         barred, reserved = {}, set()
         exported = ({}, {})
         while True:
+            TIMES["tries"] += 1
             writer = None
             unit = Unit(tree, name, world, part)
             unit.barred, unit.reserved = dict(barred), set(reserved)
@@ -14988,10 +15003,10 @@ def settled_extern(text, shape, whole):
 def convert_timed(job):
     """convert_unit, and how long it took: main hands out the longest first (the order the work is handed
     out in changes nothing of what is written - only when the round is through)."""
-    import time
+    TIMES.clear()
     start = time.monotonic()
     r = convert_unit(job)
-    return time.monotonic() - start, r
+    return time.monotonic() - start, r, dict(TIMES)
 
 
 def apply_to_level(level, folder, blueprints, prune=False):
@@ -15121,7 +15136,10 @@ def main(argv):
             raise SystemExit(f"{path} and {sources[unit]} would both be the Blueprint {unit}")
         sources[unit] = os.path.abspath(path)
     world.source_units = set(sources)
+    run_start = time.monotonic()
     surveys = list(pool.map(survey_one, [(path, namespace, flags, world.spaces) for path in files]))
+    if SAY_TIMES:
+        print(f"time: the plan (every file read once): {time.monotonic() - run_start:.1f} s", flush=True)
     handed = collections.defaultdict(set)   # (a function, a parameter that may be a pointer into a list) -> what the calls hand it
     for r in surveys:
         for f in r["functions"]:
@@ -15418,10 +15436,17 @@ def main(argv):
         jobs = {u: job_of(u) for u in now}   # (all of the round's from the same state, before any of them is done)
         # (the longest first: as long as it took the last time, or - the first time - as long as its files are)
         first = sorted(now, key=lambda u: (u in took, -took.get(u, 0), -sum(os.path.getsize(f) for f in unit_files[u]), u))
+        round_start = time.monotonic()
         futures = {u: pool.submit(convert_timed, jobs[u]) for u in first}
-        got = {}
+        got, spent = {}, {}
         for u in now:
-            took[u], got[u] = futures[u].result()
+            took[u], got[u], spent[u] = futures[u].result()
+        if SAY_TIMES:
+            print(f"time: round {rounds}: {time.monotonic() - round_start:.1f} s, {sum(took[u] for u in now):.1f} s of work ({workers} at once)", flush=True)
+            for u in sorted(now, key=lambda u: (-took[u], u))[:12]:
+                t = spent[u]
+                print(f"time:   {u}: {took[u]:.1f} s - tree {t.get('tree_s', 0):.1f} s ({t.get('trees', 0)}), layouts {t.get('layout_s', 0):.1f} s, "
+                      f"test checked {t.get('checks', 0)} times in {t.get('tries', 0)} tries: {t.get('check_s', 0):.1f} s", flush=True)
         for u in now:
             r = got[u]
             # (what is given only grows - more of the others written - and with it what is written: a function
@@ -15616,7 +15641,10 @@ def main(argv):
         for u in order:
             open(os.path.join(texts, u + ".cpp"), "w").write(blueprints[u])
     if level and mode == "--convert":
+        apply_start = time.monotonic()
         apply_to_level(level, folder, [(u, blueprints[u]) for u in order], prune=whole)
+        if SAY_TIMES:
+            print(f"time: the Blueprints read into the level: {time.monotonic() - apply_start:.1f} s", flush=True)
     for f in nowhere:   # (a header's function that needs a source file which is not among those converted)
         if world.program(f["file"]):
             total += 1
@@ -15638,6 +15666,8 @@ def main(argv):
     print("\nwhat the others wait for: functions (lines)")
     for w, n in sorted(waits.items(), key=lambda kv: -wait_lines[kv[0]])[:int(os.environ.get("TOP", "40"))]:
         print(f"  {n:4} ({wait_lines[w]:6})   {w}")
+    if SAY_TIMES:
+        print(f"time: the whole run: {time.monotonic() - run_start:.1f} s, {rounds} rounds", flush=True)
     return 0
 
 
