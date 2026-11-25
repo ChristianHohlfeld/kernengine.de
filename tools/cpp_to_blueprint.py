@@ -114,7 +114,6 @@ import struct
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import traceback
 
@@ -11386,218 +11385,6 @@ class Held:
         self.objects = set()    # the engine's classes with a life of their own those pieces hold
 
 
-# ---- the checks of a test, side by side ----------------------------------------------------------
-# A test is checked round after round (TestWriter.write): the compiler checks its text, the pieces it complains of go, the
-# rest is checked again - each round's text follows from what the compiler said of the one before, so they come one after
-# another. While the compiler checks one, the texts of the rounds after it are foreseen from all it said of a text before
-# (Checks.guess: the same complaints, of the pieces still there) and checked beside it on the cores the run has free. A
-# round takes a check begun before only when its text is that text, byte for byte - what the compiler says of it is
-# what it would say now -, and takes it in its order: what is written is what the rounds one by one write. A text
-# foreseen wrongly is a check for nothing, stopped when that is seen. (Nothing of it is kept beyond the test it is for.)
-# KERN_FORESEE=0: every check in its round, as without.
-FORESEE = os.environ.get("KERN_FORESEE", "1") != "0"
-CHECK_SLOTS = None   # (the run's: how many compilers check at once in all its processes - main; and how many checks of a round wait for one)
-
-
-def pool_started(slots, waiting):
-    """In each process of the run's pool: the slots for the compiler, shared by all (CHECK_SLOTS)."""
-    global CHECK_SLOTS
-    CHECK_SLOTS = (slots, waiting)
-
-
-class CheckJob:
-    """One check of a test's text by the compiler, in a thread of its own: in a slot of the run's (CHECK_SLOTS), one a
-    round needs (`needed`) before those only foreseen. `result()`: (the compiler's return code, what it said, the path
-    the text stood at)."""
-
-    def __init__(self, command, text, name, needed):
-        self.command, self.text, self.name, self.needed = command, text, name, needed
-        self.stopped, self.proc, self.got, self.began = False, None, None, False
-        self.lock, self.done = threading.Lock(), threading.Event()
-        self.thread = threading.Thread(target=self.run, daemon=True)
-        self.thread.start()
-
-    def slot(self):
-        if CHECK_SLOTS is None:
-            return True
-        slots, waiting = CHECK_SLOTS
-        counted = False
-        try:
-            while not self.stopped:
-                if self.needed and not counted:   # (a round waits for it now)
-                    with waiting.get_lock():
-                        waiting.value += 1
-                    counted = True
-                # (a check only foreseen takes a slot only while no round's own waits for one)
-                if (self.needed or waiting.value == 0) and slots.acquire(timeout=0.2):
-                    return True
-                if not self.needed:
-                    time.sleep(0.05)
-            return False
-        finally:
-            if counted:
-                with waiting.get_lock():
-                    waiting.value -= 1
-
-    def run(self):
-        held, d = False, None
-        try:
-            held = self.slot()
-            if not held:
-                return
-            d = tempfile.mkdtemp(prefix="kern-converted-check-")   # (nothing is kept between runs)
-            path = os.path.join(d, self.name)
-            open(path, "w").write(self.text)
-            with self.lock:
-                if self.stopped:
-                    return
-                start, self.began = time.monotonic(), True
-                self.proc = subprocess.Popen([*self.command, path], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            _, stderr = self.proc.communicate()
-            if not self.stopped:
-                self.got = (self.proc.returncode, stderr, path)
-                TIMES["check_s" if self.needed else "foreseen_s"] += time.monotonic() - start
-        finally:
-            if held:
-                CHECK_SLOTS[0].release() if CHECK_SLOTS is not None else None
-            if d:
-                shutil.rmtree(d, ignore_errors=True)
-            self.done.set()
-
-    def stop(self):
-        with self.lock:
-            self.stopped = True
-            if self.proc is not None and self.proc.poll() is None:
-                self.proc.kill()
-
-    def result(self):
-        self.needed = True   # (a round waits for it now)
-        self.done.wait()
-        if self.got is None:   # (stopped before it was done: checked now - the same command, the same text)
-            return CheckJob(self.command, self.text, self.name, True).result()
-        return self.got
-
-    def result_if_begun(self):
-        """Its result, if the compiler has begun it (None: it waited for a slot - it is stopped)."""
-        if not self.began:
-            self.stop()
-            if not self.began:
-                return None
-        self.done.wait()
-        return self.got
-
-
-class Checks:
-    """The checks of one test's rounds (TestWriter.write), with the texts of the rounds to come foreseen and checked beside
-    them - see above."""
-    STEPS = 12   # (how many rounds ahead)
-
-    def __init__(self, writer, stem):
-        self.writer, self.stem = writer, stem
-        self.ahead = {}         # a text foreseen -> its check, begun
-        self.full = None        # all the compiler said of the last text it checked in full: [(piece, line in it, complaint)]
-        self.limit, self.fatal = 20, "too many errors emitted, stopping now [-ferror-limit=]"
-        self.cut = False        # (whether the compiler's complaints of the last text were cut off at its limit)
-        self.pending = None     # (a check in full begun after the text's own: its job and the text's pieces - foresee)
-
-    @staticmethod
-    def pieces_of(errors, where):
-        firsts, out = {}, []
-        for line, message in errors:
-            piece, first = None, None
-            for a, b, key in where:
-                if a <= line <= b and (piece is None or key[0] == "member"):
-                    piece, first = key, a
-            out.append((piece, None if piece is None else line - first, message))
-        return out
-
-    def errors(self, text, where):
-        """What the compiler complains of in this round's text (TestWriter.compiles): of its check begun before, or begun now."""
-        job, whole = self.ahead.pop(text, None), None
-        foreseen = job is not None
-        if job is None:   # (not foreseen: what was foreseen is for nothing)
-            for other in self.ahead.values():
-                other.stop()
-            self.ahead = {}
-            job = self.writer.check_job(text, self.stem, True)
-            if FORESEE and self.cut:   # (all it says of this text, beside: to foresee the rounds after it with)
-                whole = self.writer.check_job(text, self.stem, False, unlimited=True)
-        TIMES["checks"] += 1
-        errors = self.writer.compiles(text, self.stem, job)
-        if FORESEE:
-            cut = [e for e in errors if e[1] == self.fatal or e[1].startswith("too many errors emitted")]
-            self.cut = bool(cut)
-            if cut:
-                self.fatal, self.limit = cut[0][1], max(1, len(errors) - len(cut))
-            if not self.cut:
-                self.full = self.pieces_of(errors, where)
-            elif whole is not None:
-                got = whole.result_if_begun()
-                if got is not None:
-                    self.full = self.pieces_of(self.writer.complaints(*got), where)
-            elif not foreseen:   # (cut off, and nothing foresaw it: all it says of this text, checked beside the next round's)
-                self.pending = (self.writer.check_job(text, self.stem, False, unlimited=True), where)
-        if whole is not None:
-            whole.stop()
-        return errors
-
-    def guess(self, where, dropped):
-        """What the compiler will say of a text to come (`where`: its pieces), as far as it is foreseen: what it said of the
-        last text it checked in full, of the pieces still there - its first ones, as many as it says."""
-        firsts = {}
-        for a, b, key in where:
-            firsts.setdefault(key, a)
-        out = []
-        for piece, offset, message in self.full:
-            if piece is None:
-                out.append((0, message))
-            elif piece not in dropped and piece in firsts:
-                out.append((firsts[piece] + offset, message))
-        if len(out) > self.limit:
-            out = out[:self.limit] + [(out[self.limit - 1][0], self.fatal)]
-        return out
-
-    def foresee(self, ahead):
-        """After a round: the texts of the rounds to come (`ahead`: TestWriter.write), each checked beside - begun now,
-        unless it is already; what is foreseen no more is stopped."""
-        if not FORESEE:
-            return
-        if self.pending is not None:
-            # (the next round's text is that for certain - begun before what is foreseen with all the compiler said of this one)
-            job, where = self.pending
-            self.pending = None
-            texts = ahead(lambda where, dropped: [], 1)
-            for text in list(self.ahead):
-                if text not in texts:
-                    self.ahead.pop(text).stop()
-            for text in texts:
-                if text not in self.ahead:
-                    self.ahead[text] = self.writer.check_job(text, self.stem, True)
-            self.full = self.pieces_of(self.writer.complaints(*job.result()), where)
-        if self.full is None:
-            return
-        start = time.monotonic()
-        texts = ahead(self.guess, self.STEPS)
-        TIMES["foresee_s"] += time.monotonic() - start
-        for text in list(self.ahead):
-            if text not in texts:
-                self.ahead.pop(text).stop()
-        for i, text in enumerate(texts):
-            if text not in self.ahead:
-                self.ahead[text] = self.writer.check_job(text, self.stem, i == 0)
-                TIMES["foreseen"] += i > 0
-            elif i == 0:
-                self.ahead[text].needed = True   # (the next round's, for certain)
-
-    def stop(self):
-        for job in self.ahead.values():
-            job.stop()
-        self.ahead = {}
-        if self.pending is not None:
-            self.pending[0].stop()
-            self.pending = None
-
-
 class TestWriter:
     # the logic the level's Blueprints run in, and the program's way to call them: the test's own (converted::Blueprint, RuleBlueprint)
     OWN_LOGIC = (ENGINE + "::logic::Runtime", ENGINE + "::logic::ActorBlueprint")
@@ -14669,14 +14456,13 @@ class TestWriter:
             add(None, "\n".join(["}", "", f"}}  // namespace {ns}", ""]))
             return "\n".join(lines), where
 
-        def named_by(key):
-            d = tree.decl.get(key[1]) if isinstance(key[1], str) else None
-            n = (d or {}).get("name") or (key[1].split("::")[-1] if isinstance(key[1], str) else "")
-            return n if n and re.fullmatch(r"\w+", n) else None
-
-        def named_in_full(where, text):
-            """What the source still names of the program in full is not the test's: such a piece goes, like one that does
-            not compile - [(line, complaint)] (no compiler is asked)."""
+        dropped, why = set(unconverted), {}
+        roots = {}   # (the name of a piece that went -> the piece whose complaint it went for, and that complaint: see `rooted`)
+        for _ in range(400):
+            text, where = assemble(dropped)
+            if not any(key not in dropped for key, _ in cases):
+                break
+            # what the source still names of the program in full is not the test's: such a piece goes, like one that does not compile
             errors, lines = [], "".join(part if i % 2 == 0 else re.sub(r"[^\n]", " ", part) for i, part in enumerate(self.code_and_rest(text))).split("\n")
             for first, last, key in where:
                 if key[0] in ("helper", "case") or is_record(key):
@@ -14691,12 +14477,9 @@ class TestWriter:
                         m = foreign.search(lines[at - 1])
                         if m:
                             errors.append((at, f"it names {m.group(0).lstrip(':')}, which the test does not hold"))
-            return errors
-
-        def drop(errors, where, dropped, why, roots, say):
-            """One round of the checks: of what the compiler said of the test (`errors`), the pieces that go - into `dropped`,
-            `why` and `roots`. None, or ("whole", complaint): a complaint of a line that is no piece's (the test as a whole
-            does not compile). (`say`: TEST_ERRORS says what went - not where the checks to come are foreseen: Checks.)"""
+            errors = errors or self.compiles(text, stem)
+            if not errors:
+                break
             found = {}
             for line, message in errors:
                 piece = None
@@ -14704,13 +14487,18 @@ class TestWriter:
                     if first <= line <= last and (piece is None or key[0] == "member"):
                         piece = key
                 if piece is None:
-                    return ("whole", message)
+                    done = [case_of[key[1]] for key, _ in cases if key not in dropped]
+                    return None, skipped + [(f, "its source does not compile with a Blueprint's numbers yet: " + message) for f in done]
                 found.setdefault(piece, message)
             # a piece of the source that does not compile may be why later ones do not: the first one goes - and with
             # it every other one whose complaint names nothing of a piece that does not compile either (a complaint
             # of its own, not one that follows from another: it would go in a later round all the same)
             only_cases = all(k[0] == "case" for k in found)
             early = min(first for first, last, key in where if key in found and (only_cases or key[0] != "case"))
+            def named_by(key):
+                d = tree.decl.get(key[1]) if isinstance(key[1], str) else None
+                n = (d or {}).get("name") or (key[1].split("::")[-1] if isinstance(key[1], str) else "")
+                return n if n and re.fullmatch(r"\w+", n) else None
             failing = {n for n in (named_by(k) for k in found) if n}
             def own_complaint(key, message):
                 mine = named_by(key)
@@ -14738,49 +14526,11 @@ class TestWriter:
                             for k in ([("member", place), ("foreign", place)] if d is None else [("member", d["id"]), ("declaration", d["id"])]):
                                 dropped.add(k)
                                 why[k] = message
-                    if say and os.environ.get("TEST_ERRORS"):
+                    if os.environ.get("TEST_ERRORS"):
                         what = tree.decl.get(key[1], {}).get("name", key[1]) if key[0] in ("member", "function", "case") else key[1]
                         sys.stderr.write(f"--- {stem}: without the {key[0]} {what}: {message}\n")
-            return None
-
-        def ahead(dropped, why, roots, guess, steps):
-            """The texts of the test the checks to come will compile, as far as `guess` foresees what the compiler will say of
-            each (Checks): the rounds below, run on copies - the first text is the next one for certain."""
-            dropped, why, roots, texts = set(dropped), dict(why), dict(roots), []
-            for _ in range(steps):
-                text, where = assemble(dropped)
-                if not any(key not in dropped for key, _ in cases):
-                    break
-                errors = named_in_full(where, text)
-                if not errors:
-                    texts.append(text)
-                    errors = guess(where, dropped)
-                    if not errors:
-                        break
-                if drop(errors, where, dropped, why, roots, False) is not None:
-                    break
-            return texts
-
-        dropped, why = set(unconverted), {}
-        roots = {}   # (the name of a piece that went -> the piece whose complaint it went for, and that complaint: see `rooted`)
-        checks = Checks(self, stem)
-        try:
-            for _ in range(400):
-                text, where = assemble(dropped)
-                if not any(key not in dropped for key, _ in cases):
-                    break
-                errors = named_in_full(where, text) or checks.errors(text, where)
-                if not errors:
-                    break
-                whole = drop(errors, where, dropped, why, roots, True)
-                if whole is not None:
-                    done = [case_of[key[1]] for key, _ in cases if key not in dropped]
-                    return None, skipped + [(f, "its source does not compile with a Blueprint's numbers yet: " + whole[1]) for f in done]
-                checks.foresee(lambda guess, steps: ahead(dropped, why, roots, guess, steps))
-            else:
-                return None, skipped + [(case_of[key[1]], "its source does not compile with a Blueprint's numbers yet") for key, _ in cases]
-        finally:
-            checks.stop()
+        else:
+            return None, skipped + [(case_of[key[1]], "its source does not compile with a Blueprint's numbers yet") for key, _ in cases]
         for key, _ in cases:
             if key in dropped:
                 skipped.append((case_of[key[1]], "its source does not compile with a Blueprint's numbers yet: " + why[key]))
@@ -14819,52 +14569,45 @@ class TestWriter:
                 return c
         sys.exit("no clang (CXX, CLANGXX, clang++, clang++-20 ... clang++-16): the tests are built with the game's compiler")
 
-    def check_job(self, text, stem, needed, unlimited=False):
-        """The compiler's check of the test's text, begun (CheckJob): as the suite compiles it (run_tests.sh: -Wall -Wextra,
-        no -Werror: what only warns there does not make a function wait here; its warnings are said in the log - see
-        `complaints`). `unlimited`: with all the complaints, not only the compiler's first ones - for Checks to foresee
-        with, never what a test is judged by."""
+    def compiles(self, text, stem):
+        """What the compiler complains of in the test: [(line, complaint)], empty when it compiles."""
+        d = tempfile.mkdtemp(prefix="kern-converted-check-")   # (nothing is kept between runs)
+        path = os.path.join(d, f"test_{stem}.cpp")
+        head = text.split("\n")
         full = text.replace('#include "../converted.h"', f'#include "{os.path.abspath(os.path.join(self.test_dir, "..", "converted.h"))}"').replace(f'#include "{self.source_dir}/', f'#include "{os.path.dirname(self.path)}/')
-        assert len(full.split("\n")) == len(text.split("\n"))
-        command = [self.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Wno-unused-parameter",
-                   # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
-                   # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
-                   "-Wno-missing-field-initializers",
-                   *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), *(["-ferror-limit=0"] if unlimited else [])]
-        return CheckJob(command, full, f"test_{stem}.cpp", needed)
-
-    def compiles(self, text, stem, job=None):
-        """What the compiler complains of in the test: [(line, complaint)], empty when it compiles - of the check `job`
-        of this text, begun before (Checks), or of one begun now."""
-        if job is None:
-            job = self.check_job(text, stem, True)
+        assert len(full.split("\n")) == len(head)
+        open(path, "w").write(full)
         if os.environ.get("TEST_KEEP"):   # (to look at: every text of the tests, as it was compiled - numbered)
             os.makedirs(os.environ["TEST_KEEP"], exist_ok=True)
             n = len([x for x in os.listdir(os.environ["TEST_KEEP"]) if x.startswith(f"test_{stem}.")])
-            open(os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"), "w").write(job.text)
-        returncode, stderr, path = job.result()
-        warned = sorted({w.group(1)[:160] for w in re.finditer(r"\bwarning: (.*)", stderr)})
+            shutil.copy(path, os.path.join(os.environ["TEST_KEEP"], f"test_{stem}.{n}.cpp"))
+        # (the switches of the suite itself - run_tests.sh: -Wall -Wextra, no -Werror: what only warns there does not
+        # make a function wait here; its warnings are said in the log - see below)
+        start = time.monotonic()
+        r = subprocess.run([self.test_compiler(), "-std=c++20", "-fsyntax-only", "-ffp-contract=off", "-fno-exceptions", "-fno-rtti", "-Wall", "-Wextra", "-Wno-unused-parameter",
+                            # (a member an initializer list leaves out is made as by `{}` - in the source as in the test; the
+                            # game's own build says so, without an error: TrafficRules::Arm `{dir, width}`)
+                            "-Wno-missing-field-initializers",
+                            *self.flags, "-I" + os.path.join(ROOT, "kern", "tests"), path], capture_output=True, text=True)
+        TIMES["check_s"] += time.monotonic() - start
+        TIMES["checks"] += 1
+        errors = []
+        warned = sorted({w.group(1)[:160] for w in re.finditer(r"\bwarning: (.*)", r.stderr)})
         if warned:
             print(f"    (test_{stem}: compiles with {len(warned)} kind(s) of warning, as in the suite: {warned[0]}{' …' if len(warned) > 1 else ''})")
-        if returncode != 0 and os.environ.get("TEST_ERRORS"):   # (to look at: the first errors as the compiler says them, with the test's text there)
-            said = [x for x in stderr.split("\n") if x.strip()]
-            firsts = [i for i, x in enumerate(said) if re.search(r"\berror: ", x)][:3]
-            for i in firsts:
-                # (with the notes that follow it - which candidate did not fit, and why -, up to the next error)
-                upto = next((j for j in range(i + 1, min(len(said), i + 40)) if re.search(r"\berror: ", said[j])), min(len(said), i + 40))
-                for x in said[max(0, i - 2):upto]:
-                    if x.lstrip().startswith(("In file included", "|")) or re.match(r"\s*\d+ \|", x):
-                        continue
-                    sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
-        return self.complaints(returncode, stderr, path)
-
-    @staticmethod
-    def complaints(returncode, stderr, path):
-        """What the compiler said of the test at `path`, as complaints: [(line, complaint)], empty when it compiles."""
-        errors = []
-        if returncode != 0:
+        if r.returncode != 0:
+            if os.environ.get("TEST_ERRORS"):   # (to look at: the first errors as the compiler says them, with the test's text there)
+                said = [x for x in r.stderr.split("\n") if x.strip()]
+                firsts = [i for i, x in enumerate(said) if re.search(r"\berror: ", x)][:3]
+                for i in firsts:
+                    # (with the notes that follow it - which candidate did not fit, and why -, up to the next error)
+                    upto = next((j for j in range(i + 1, min(len(said), i + 40)) if re.search(r"\berror: ", said[j])), min(len(said), i + 40))
+                    for x in said[max(0, i - 2):upto]:
+                        if x.lstrip().startswith(("In file included", "|")) or re.match(r"\s*\d+ \|", x):
+                            continue
+                        sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
-            out = stderr.split("\n")
+            out = r.stderr.split("\n")
             mine = re.compile(re.escape(path) + r":(\d+):")
             last = None
             for i, line in enumerate(out):
@@ -14883,7 +14626,8 @@ class TestWriter:
                             break
                 errors.append((at or 0, e.group(1)[:200]))
             if not errors:
-                errors = [(0, stderr.strip().split("\n")[0][:200])]
+                errors = [(0, r.stderr.strip().split("\n")[0][:200])]
+        shutil.rmtree(d, ignore_errors=True)
         return errors
 
 
@@ -15138,59 +14882,6 @@ def state_classes(world, surveys):
     return out
 
 
-class Reads(dict):
-    """A map a conversion is given (World.table, World.closures, World.pieces) that keeps what of it the conversion reads:
-    the keys it asks for, whether it is empty (LEN) - or all of it (ALL: it went through it). A conversion is a function
-    of what it is given; of these maps it is a function of what it read of them (main: a Blueprint converted again with
-    the same of what it read gives what it gave)."""
-    LEN, ALL = ("(its length)",), ("(all of it)",)
-
-    def __init__(self, data):
-        super().__init__(data)
-        self.read = set()
-
-    def get(self, k, default=None):
-        self.read.add(k)
-        return super().get(k, default)
-
-    def __getitem__(self, k):
-        self.read.add(k)
-        return super().__getitem__(k)
-
-    def __contains__(self, k):
-        self.read.add(k)
-        return super().__contains__(k)
-
-    def __len__(self):
-        self.read.add(Reads.LEN)
-        return super().__len__()
-
-    def __all(name):
-        def through(self, *a, **k):
-            self.read.add(Reads.ALL)
-            return getattr(dict, name)(self, *a, **k)
-        return through
-    for _name in ("__iter__", "keys", "items", "values", "__eq__", "__ne__", "copy", "__reduce__", "__reduce_ex__", "__or__", "__ror__", "__repr__",
-                  "setdefault", "pop", "popitem", "update", "__setitem__", "__delitem__", "clear", "__ior__"):
-        locals()[_name] = __all(_name)
-    del _name, __all
-
-
-def same_reads(read, before, now):
-    """Whether the map `now` gives what `before` gave of what was read of it (Reads)."""
-    if before is None or now is None:
-        return before is None and now is None
-    if Reads.ALL in read:
-        return before == now
-    for k in read:
-        if k == Reads.LEN:
-            if len(before) != len(now):
-                return False
-        elif (k in before) != (k in now) or before.get(k) != now.get(k):
-            return False
-    return True
-
-
 def convert_unit(job):
     """One Blueprint: the functions of its files, converted as far as they are, and - with a test directory
     - its test written. What main needs of it, as plain values (a process of its own does this for every
@@ -15199,9 +14890,6 @@ def convert_unit(job):
     part, source, files, namespace, flags, world, test = job
     name = world.parts.get(part, part)
     NODES.update(world.nodes)
-    # (what it reads of what the others gave: main converts it again only when that has changed - Reads)
-    world.table = Reads(world.table)
-    world.closures, world.pieces = (None, None) if world.closures is None else (Reads(world.closures), Reads(world.pieces))
     said = io.StringIO()
     keep, sys.stderr = sys.stderr, said
     scratch = None
@@ -15290,8 +14978,7 @@ def convert_unit(job):
             "parts": (variables, functions, members), "types": types, "uses": unit.uses(), "missing": sorted(unit.missing), "asked": sorted(unit.asked), "state": unit.state_used,
             "test": (unit.test[0], [(f.cpp, why) for f, why in unit.test[1]]), "exports": exports, "errors": said.getvalue(),
             "names": sorted((unit.names - world.taken) | set(unit.type_line)),
-            "externs": {"\n".join(unit.externs[x][2]): unit.extern_inputs[x] for x in unit.extern_inputs if x in unit.externs},
-            "reads": (frozenset(world.table.read), None if world.closures is None else frozenset(world.closures.read), None if world.pieces is None else frozenset(world.pieces.read))}
+            "externs": {"\n".join(unit.externs[x][2]): unit.extern_inputs[x] for x in unit.extern_inputs if x in unit.externs}}
 
 
 def settled_extern(text, shape, whole):
@@ -15318,14 +15005,7 @@ def convert_timed(job):
     out in changes nothing of what is written - only when the round is through)."""
     TIMES.clear()
     start = time.monotonic()
-    # (what it says - the warnings of its test - main says, in the order of the rounds and the Blueprints)
-    said, keep = io.StringIO(), sys.stdout
-    sys.stdout = said
-    try:
-        r = convert_unit(job)
-    finally:
-        sys.stdout = keep
-    r["printed"] = said.getvalue()
+    r = convert_unit(job)
     return time.monotonic() - start, r, dict(TIMES)
 
 
@@ -15433,9 +15113,7 @@ def main(argv):
     if r.returncode != 0 or not r.stdout.strip():
         raise SystemExit("the engine's node names are not to be had (tools/blueprint_cpp.sh --node-names): " + (r.stderr or r.stdout).strip()[:500])
     NODES.update(r.stdout.split())
-    # (the compilers that check the tests, in all the pool's processes: as many at once as the run has workers - Checks)
-    import multiprocessing
-    pool = concurrent.futures.ProcessPoolExecutor(workers, initializer=pool_started, initargs=(multiprocessing.BoundedSemaphore(workers), multiprocessing.Value("i", 0)))
+    pool = concurrent.futures.ProcessPoolExecutor(workers)
     world = World(files, flags, more)
     world.nodes = set(NODES)
     if level:   # (the Blueprints of the level's actors: what the program calls on them looks as they have it)
@@ -15647,7 +15325,6 @@ def main(argv):
     # time the rounds go round more wait for good - there are only so many functions -, so the rounds end. Rounds that do not
     # go round never come to this: what they write stays as it was.
     held = {}                               # a Blueprint -> its functions that wait for good: key -> why
-    last_job, printed = {}, []              # a Blueprint -> its job when it was converted last, and what it gave; what the conversions said
     visited = collections.defaultdict(list) # a Blueprint -> (the round, the version it gave then), round by round
 
     def asked_of(u, needs):
@@ -15757,41 +15434,19 @@ def main(argv):
         rounds += 1
         print(f"round {rounds}: {len(now)} Blueprints", flush=True)
         jobs = {u: job_of(u) for u in now}   # (all of the round's from the same state, before any of them is done)
-        # What a Blueprint is given changes when any of those it may call gives something new - but what its conversion
-        # reads of that is only what it calls and holds of them (Reads): when that is as it was the last time it was
-        # converted, and so is the rest of what it is given, it is what it gave then (the same given, the same written).
-        # (Of the parts of a Blueprint, each may call every other: each part's new function asked them all again.)
-        again = {}
-        for u in now:
-            before = last_job.get(u)
-            if before is None:
-                continue
-            (_, source0, files0, _, _, w0, _), r0 = before
-            _, source1, files1, _, _, w1, _ = jobs[u]
-            table_read, closures_read, pieces_read = r0["reads"]
-            if (source0, files0, w0.wanted, w0.bars) == (source1, files1, w1.wanted, w1.bars) and same_reads(table_read, w0.table, w1.table) \
-                    and (closures_read is None or same_reads(closures_read, w0.closures, w1.closures) and same_reads(pieces_read, w0.pieces, w1.pieces)):
-                again[u] = r0
         # (the longest first: as long as it took the last time, or - the first time - as long as its files are)
         first = sorted(now, key=lambda u: (u in took, -took.get(u, 0), -sum(os.path.getsize(f) for f in unit_files[u]), u))
         round_start = time.monotonic()
-        futures = {u: pool.submit(convert_timed, jobs[u]) for u in first if u not in again}
+        futures = {u: pool.submit(convert_timed, jobs[u]) for u in first}
         got, spent = {}, {}
         for u in now:
-            if u in again:
-                got[u], spent[u] = again[u], {}
-            else:
-                took[u], got[u], spent[u] = futures[u].result()
-            last_job[u] = (jobs[u], got[u])
-            printed.append(got[u]["printed"])
+            took[u], got[u], spent[u] = futures[u].result()
         if SAY_TIMES:
-            print(f"time: round {rounds}: {time.monotonic() - round_start:.1f} s, {sum(took[u] for u in now if u not in again):.1f} s of work ({workers} at once)"
-                  + (f"; {len(again)} of {len(now)} given the same of what they read as the last time: not converted again" if again else ""), flush=True)
-            for u in sorted((u for u in now if u not in again), key=lambda u: (-took[u], u))[:12]:
+            print(f"time: round {rounds}: {time.monotonic() - round_start:.1f} s, {sum(took[u] for u in now):.1f} s of work ({workers} at once)", flush=True)
+            for u in sorted(now, key=lambda u: (-took[u], u))[:12]:
                 t = spent[u]
                 print(f"time:   {u}: {took[u]:.1f} s - tree {t.get('tree_s', 0):.1f} s ({t.get('trees', 0)}), layouts {t.get('layout_s', 0):.1f} s, "
-                      f"test checked {t.get('checks', 0)} times in {t.get('tries', 0)} tries: {t.get('check_s', 0):.1f} s; "
-                      f"{t.get('foreseen', 0)} foreseen: {t.get('foreseen_s', 0):.1f} s, foreseeing {t.get('foresee_s', 0):.1f} s", flush=True)
+                      f"test checked {t.get('checks', 0)} times in {t.get('tries', 0)} tries: {t.get('check_s', 0):.1f} s", flush=True)
         for u in now:
             r = got[u]
             # (what is given only grows - more of the others written - and with it what is written: a function
@@ -15829,8 +15484,6 @@ def main(argv):
             for line in r["said"]:
                 print(line)
     pool.shutdown()
-    sys.stdout.write("".join(printed))   # (what the conversions said - the warnings of the tests -, round by round)
-    sys.stdout.flush()
 
     # ---- the parts of a Blueprint of several files: one Blueprint ----
     # What a function of an actor's Blueprint looks like (KERN_EXTERN) is said where it is called, with its inputs as the
