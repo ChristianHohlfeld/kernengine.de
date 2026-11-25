@@ -12,22 +12,26 @@
 
 namespace sc {
 
-// Plain state with the functions of a shader extension: the renderer gets it as
-// LookExtension<Facades> (shader_look.h).
-class Facades final {
+// The shader extension the renderer is given (main.cpp, SpawnCityApp::extensions): one object, the state of its
+// Blueprint, which implements kern::ShaderExtension (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine").
+class Facades final : public kern::ShaderExtension {
  public:
-  f32 night = 0;  // 0 day .. 1 night (game_look.cpp)
-  const char* name() const { return "spawncity-facades"; }
-  kern::Span<const kern::ExtensionAttribute> attributes() const;
-  const char* vertex_declarations() const;
-  const char* vertex() const;
-  const char* fragment_declarations() const;
-  const char* fragment_surface() const;
-  void bind(const kern::Program& p);
-  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&);
+  f32 night = 0;  // 0 day .. 1 night (game_look.cpp: set_night)
+  const char* name() const override { return "spawncity-facades"; }
+  kern::Span<const kern::ExtensionAttribute> attributes() const override;
+  const char* vertex_declarations() const override;
+  const char* vertex() const override;
+  const char* fragment_declarations() const override;
+  const char* fragment_surface() const override;
+  void bind(const kern::Program& p) override;
+  void frame_uniforms(kern::UniformCache& cache, const kern::Renderer&) override;
+  void set_night(f32 n) { night = n; }
 
  private:
   u32 u_night_ = 0;
 };
+
+/// Its one object.
+Facades& facades();
 
 }  // namespace sc

@@ -1551,7 +1551,10 @@ class Runtime {
   void end();
   /// One fixed step: latent actions, timers, state machine timers, Tick events.
   void tick(f32 dt);
-  /// Raises an event (synchronously runs the handlers).
+  /// Raises an event (synchronously runs the handlers): the instances in the order they were added - a game's
+  /// world adds the level's own graph first, then the Blueprints of its actors in the order of the level
+  /// (game::GameWorld::start_logic), and those spawned later after them -, and in each instance its handlers of
+  /// the event in the order of their node ids. Every tier keeps this order.
   void fire(const Event& e);
   /// Custom event by name on every instance (or on `target`'s).
   void call(std::string_view name, ActorRef target = 0, std::vector<std::pair<std::string, Value>> args = {});

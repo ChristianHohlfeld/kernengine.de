@@ -1,5 +1,6 @@
 // The engine's nodes on the engine itself: the calls of the functions the headers of this component declare
 // (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).
+#include <algorithm>
 #include "kern/geo/buildings.h"
 #include "kern/geo/earcut.h"
 #include "kern/geo/mesh_data.h"

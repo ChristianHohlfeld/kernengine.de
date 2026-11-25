@@ -266,7 +266,7 @@ bool Game::start(kern::Engine& e) {
   soldier_controller_.camera_fov = 59;  // 90 degrees across a 16:9 view (camera_pitch_contract.mjs)
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
-  world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (windows_.night)
+  world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (facades().set_night)
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
   // The rules that are Blueprints of the level's actors: the C++ that still calls them is bound to the
   // logic they run in, and finds each by its name at every call (as a Blueprint does).

@@ -870,10 +870,18 @@ struct Blueprint : game::BlueprintNodesOf<logic::EngineNodesOf<BlueprintCore>> {
 ///   struct Door : virtual kern::Blueprint, virtual Random { ... n5 = Random::range(Seed, 0.0, 1.0); ... };
 /// (virtual: a Blueprint and the libraries it uses share what a Blueprint is.)
 using Library = Blueprint;
-/// A Blueprint that is the object of an interface of the engine (Graph::implements; kern/docs/blueprint_cpp.md,
-/// "Schnittstellen der Engine") names it as its last base - the engine calls its functions of the interface's names:
-///   struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> { ... Text vertex() { ... } ... };
-template <Setting Interface> struct Implements {};
+// (kern::Implements<"ShaderExtension">, the base of a Blueprint that is the object of an interface of the engine:
+// kern/logic/engine_direct.h)
+namespace logic {
+/// The engine's object of the interface the class of a Blueprint implements (its last base kern::Implements<"...">):
+/// each function the engine calls is the class's of that name, called typed - what the engine hands it made into the
+/// class's types (an object of the engine its handle in the class's EngineObjects), what it gives into the engine's.
+/// The class must outlive it. (The interpreter's way: logic::engine_implement.)
+template <class B> auto implementation(B& blueprint) {
+  using Adapter = typename decltype(engine_direct::interface_of(blueprint))::template adapter<B>;
+  return std::make_unique<Adapter>(blueprint);
+}
+}  // namespace logic
 
 }  // namespace kern
 
