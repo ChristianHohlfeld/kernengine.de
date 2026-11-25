@@ -114,6 +114,7 @@ template <class T> void draw(Draw& d, T& x) {
   else if constexpr (std::is_floating_point_v<U>) x = static_cast<U>(d.number());
   else if constexpr (is_vec<U>) std::apply([&](auto&... c) { ((c = static_cast<f32>(d.number())), ...); }, components(x));
   else if constexpr (std::is_same_v<U, std::string>) x = d.word();
+  else if constexpr (std::is_same_v<U, const char*>) x = d.c_word();   // (a text that lasts: one of the draws' words, never none)
   else if constexpr (is_vector<U>::value) {
     using E = typename U::value_type;
     if constexpr (std::is_same_v<E, bool>) {
@@ -575,6 +576,246 @@ struct Differs {
   std::string text;
   template <class A, class B> void check(const char* what, const A& a, const B& b) {
     if (!same(a, b)) text += (text.empty() ? "" : ", ") + std::string(what);
+  }
+};
+
+
+// ---- the form "two builds" (UEBERGABE 4.2; source_diff.py --builds) ----
+// Each side is the whole program in its state - the old tree (the sources as they stood at --base) and the new -, and
+// the same test is compiled against each and linked into each. The old program writes, call for call, what every
+// compared function gave and left as bytes (each part apart: what it returns, its object, a parameter); the new
+// draws the same calls (the same draws: the classes drawn have the same fields on both sides - source_diff.py checks
+// it) and compares its bytes with those, bit for bit. Nothing of one program is in the other: a class of ~40 files
+// (Game), helpers of the same name in two texts, an old text that would not compile against the new headers - each
+// is in its own program.
+
+/// The bytes a value leaves: every number by its bits, a list by its length and its entries, an object held by a
+/// pointer by whether there is one and what it holds (one already written by its number: the same object twice).
+struct Bytes {
+  std::string b;
+  std::vector<const void*> seen;
+  void raw(const void* p, std::size_t n) { b.append(static_cast<const char*>(p), n); }
+  template <class N> void num(N v) { raw(&v, sizeof v); }
+};
+template <class T> void put(Bytes& o, const T& x) {
+  using X = std::remove_cv_t<T>;
+  if constexpr (std::is_same_v<X, bool>) o.num<unsigned char>(x ? 1 : 0);
+  else if constexpr (std::is_enum_v<X>) o.num(static_cast<long long>(x));
+  else if constexpr (std::is_arithmetic_v<X>) o.num(x);   // (a float by its bits: -0.0 and 0.0, two NaNs, are other bytes)
+  else if constexpr (is_text<X>) {
+    o.num<u64>(x.size());
+    o.raw(x.data(), x.size());
+  } else if constexpr (std::is_same_v<X, const char*> || std::is_same_v<X, char*>) {
+    o.num<unsigned char>(x != nullptr);
+    if (x != nullptr) put(o, std::string_view(x));
+  } else if constexpr (is_vec<X>) {
+    std::apply([&](const auto&... c) { (put(o, c), ...); }, components(x));
+  } else if constexpr (is_vector<X>::value || is_span<X>::value) {
+    o.num<u64>(std::size(x));
+    for (std::size_t k = 0; k < std::size(x); ++k) {
+      if constexpr (std::is_same_v<typename X::value_type, bool>) put(o, static_cast<bool>(x[k]));
+      else put(o, x[k]);
+    }
+  } else if constexpr (is_array<X>::value || std::is_array_v<X>) {
+    for (const auto& e : x) put(o, e);
+  } else if constexpr (is_optional<X>::value) {
+    o.num<unsigned char>(x.has_value());
+    if (x) put(o, *x);
+  } else if constexpr (is_pair<X>::value) {
+    put(o, x.first);
+    put(o, x.second);
+  } else if constexpr (is_map<X>::value) {
+    o.num<u64>(x.size());
+    for (std::size_t k = 0; k < x.size(); ++k) {
+      put(o, x.key_at(k));
+      put(o, x.value_at(k));
+    }
+  } else if constexpr (is_set<X>::value) {
+    o.num<u64>(x.size());
+    for (std::size_t k = 0; k < x.size(); ++k) {
+      const typename X::key_type key = x.key_at(k);
+      put(o, key);
+    }
+  } else if constexpr (is_held<X>) {
+    o.num<unsigned char>(x != nullptr);
+    if (x == nullptr) return;
+    const void* at = &*x;
+    for (std::size_t k = 0; k < o.seen.size(); ++k)
+      if (o.seen[k] == at) {
+        o.num<unsigned char>(1);
+        o.num<u64>(k);
+        return;
+      }
+    o.num<unsigned char>(0);
+    o.seen.push_back(at);
+    put(o, *x);
+  } else if constexpr (HasFields<X>) {
+    std::apply([&](const auto&... f) { (put(o, f), ...); }, fields(x));
+  } else if constexpr (std::is_class_v<X>) {
+    // (a class of the engine that keeps what it holds to itself: what a call left in it is not written - the test says so once)
+    static const bool said = (std::printf("  note: %s: what it holds is its own - not compared\n", __PRETTY_FUNCTION__), true);
+    (void)said;
+  } else {
+    static_assert(sizeof(X) == 0, "a value the test cannot write");
+  }
+}
+template <class T> Bytes bytes_of(const T& x) {
+  Bytes b;
+  put(b, x);
+  return b;
+}
+
+/// The object a method is called on: made by its constructor (value-initialized, as `T x{}`), drawn or not; a
+/// destructor ends it in the call (end()), else it ends with the call.
+template <class T> struct Self {
+  void* room = ::operator new(sizeof(T), std::align_val_t(alignof(T)));
+  T* p = ::new (room) T{};
+  Self() = default;
+  Self(const Self&) = delete;
+  Self& operator=(const Self&) = delete;
+  ~Self() {
+    if (p != nullptr) p->~T();
+    ::operator delete(room, std::align_val_t(alignof(T)));
+  }
+  void end() {
+    T* was = p;
+    p = nullptr;
+    was->~T();
+  }
+  T& operator*() { return *p; }
+  T* operator->() { return p; }
+};
+
+/// One compared function in one program: SC_LOWERED_BUILDS=write:<file> (the old program) or check:<file> (the new).
+/// The old draws calls until kCalls of them are ones C++ says what they give (or twenty times as many were drawn) and
+/// writes them all; the new draws exactly as many - the same draws - and compares those both programs say.
+struct Builds {
+  static constexpr int kCalls = Tally::kCalls;
+  struct Call {
+    bool defined = false;
+    long asks = 0;
+    std::vector<std::pair<std::string, std::string>> parts;
+  };
+  std::string function, file;
+  bool writing = false;
+  std::vector<Call> old;   // (write: what this program gives; check: what the old program wrote)
+  std::size_t at = 0;
+  int compared = 0, outside = 0, wrong = 0, costlier = 0, defined_old = 0;
+  long most_new = 0, with_old = 0;
+  Call now;
+  explicit Builds(std::string f) : function(std::move(f)) {
+    const char* how = std::getenv("SC_LOWERED_BUILDS");
+    const std::string h = how ? how : "";
+    writing = h.rfind("write:", 0) == 0;
+    SC_CHECK(writing || h.rfind("check:", 0) == 0, "%s: SC_LOWERED_BUILDS is write:<file> or check:<file> (run_tests.sh sets it), not '%s'", function.c_str(), h.c_str());
+    file = h.size() > 6 ? h.substr(6) : "";
+    if (!writing) read();
+  }
+  // (the record: per function its name and one field; in it per call a head - defined, asks, the number of parts - and
+  // the parts, each a name and its bytes)
+  static void text(std::string& out, const std::string& s) {
+    const u64 n = s.size();
+    out.append(reinterpret_cast<const char*>(&n), sizeof n);
+    out += s;
+  }
+  static bool text(const std::string& in, std::size_t& k, std::string& s) {
+    u64 n = 0;
+    if (k + sizeof n > in.size()) return false;
+    std::memcpy(&n, in.data() + k, sizeof n);
+    k += sizeof n;
+    if (k + n > in.size()) return false;
+    s.assign(in, k, n);
+    k += n;
+    return true;
+  }
+  void read() {
+    std::string all;
+    if (FILE* f = std::fopen(file.c_str(), "rb")) {
+      char buf[65536];
+      for (std::size_t n; (n = std::fread(buf, 1, sizeof buf, f)) > 0;) all.append(buf, n);
+      std::fclose(f);
+    }
+    std::size_t k = 0;
+    std::string name, field;
+    while (text(all, k, name)) {
+      if (!text(all, k, field)) break;
+      if (name != function) continue;
+      std::size_t j = 0;
+      std::string head, part, bytes;
+      while (text(field, j, head)) {
+        Call c;
+        c.defined = head[0] == 1;
+        std::memcpy(&c.asks, head.data() + 1, sizeof c.asks);
+        const unsigned parts = static_cast<unsigned char>(head[1 + sizeof c.asks]);
+        for (unsigned q = 0; q < parts && text(field, j, part) && text(field, j, bytes); ++q) c.parts.emplace_back(part, bytes);
+        old.push_back(std::move(c));
+      }
+      return;
+    }
+    SC_CHECK(false, "%s: the old program wrote nothing for it (%s)", function.c_str(), file.c_str());
+  }
+  bool more(int tried) {
+    ++g_call;   // (a new call: what the test made for the last one - made() - is gone)
+    now = Call{};
+    if (writing) return defined_old < kCalls && tried < kCalls * 20;
+    return at < old.size();
+  }
+  void part(const char* name, Bytes b) { now.parts.emplace_back(name, std::move(b.b)); }
+  void take(bool defined, long asks, int call) {
+    now.defined = defined;
+    now.asks = defined ? asks : 0;
+    if (writing) {
+      if (defined) ++defined_old;
+      old.push_back(std::move(now));
+      return;
+    }
+    const Call& was = old[at++];
+    if (!defined || !was.defined) {
+      ++outside;
+      return;
+    }
+    ++compared;
+    std::string differs;
+    for (std::size_t q = 0; q < std::max(was.parts.size(), now.parts.size()); ++q) {
+      if (q < was.parts.size() && q < now.parts.size() && was.parts[q] == now.parts[q]) continue;
+      differs += (differs.empty() ? "" : ", ") + (q < now.parts.size() ? now.parts[q].first : was.parts[q].first);
+    }
+    if (!differs.empty() && ++wrong <= 3) std::printf("  %s, call %d: %s\n", function.c_str(), call, differs.c_str());
+    if (now.asks > was.asks) {
+      ++costlier;
+      if (now.asks - was.asks > most_new - with_old) most_new = now.asks, with_old = was.asks;
+    }
+  }
+  ~Builds() {
+    if (writing) {
+      std::string field;
+      for (const Call& c : old) {
+        std::string head(1, c.defined ? 1 : 0);
+        head.append(reinterpret_cast<const char*>(&c.asks), sizeof c.asks);
+        head.push_back(static_cast<char>(c.parts.size()));
+        text(field, head);
+        for (const auto& [name, b] : c.parts) {
+          text(field, name);
+          text(field, b);
+        }
+      }
+      std::string rec;
+      text(rec, function);
+      text(rec, field);
+      FILE* f = std::fopen(file.c_str(), "ab");
+      SC_CHECK(f != nullptr, "%s: cannot write %s", function.c_str(), file.c_str());
+      if (f != nullptr) {
+        std::fwrite(rec.data(), 1, rec.size(), f);
+        std::fclose(f);
+      }
+      std::printf("  %s: %zu calls written by the old program (%d where C++ says what they give)\n", function.c_str(), old.size(), defined_old);
+      return;
+    }
+    SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
+    SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
+             compared, most_new, with_old);
+    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
+    std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
   }
 };
 

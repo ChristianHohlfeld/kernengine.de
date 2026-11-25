@@ -37,6 +37,7 @@ import argparse
 import importlib.util
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -780,6 +781,33 @@ class Writer:
         return re.sub(r"(?<![\w:])((?:\w+::)*)(\w+)\b(?!\s*::)", rep, t)
 
     def write(self):
+        planned = self.plan()
+        if planned[0] is None:
+            return planned
+        pairs, tested, covered = planned
+        report = []
+        self.check_fields()
+        text = self.unit(tested)
+        os.makedirs(self.out_dir, exist_ok=True)
+        path = os.path.join(self.out_dir, f"test_{self.m.stem}_lowered.cpp")
+        open(path, "w", encoding="latin-1").write(text)   # (the bytes of the sources as they are: see Version.text)
+        return path, tested, covered, self.report(pairs, tested, covered)
+
+    @staticmethod
+    def report(pairs, tested, covered):
+        report = []
+        for o, n, e in tested:
+            report.append(f"    compared: {o.label()}  ->  {n.label()}" + (f"  (the state: {', '.join(f'{f} = {v}' for x in e.values() for f, v in x.items())})" if e else ""))
+        for o, n, e in pairs:
+            if (o, n, e) not in tested:
+                report.append(f"    the same: {o.label()}")
+        for label, through in covered.items():
+            report.append(f"    gone, compared through its callers: {label}  <-  {', '.join(through)}")
+        return report
+
+    def plan(self):
+        """(pairs, the changed ones, the gone ones with the callers they are compared through) - or, where there is
+        nothing to compare, (None, tested, covered, report)."""
         m = self.m
         pairs, alone = m.pairs()
         tested = [(o, n, e) for o, n, e in pairs if m.changed(o, n, e)]
@@ -823,19 +851,7 @@ class Writer:
         if not tested and not covered:
             # (every function the old had stands in the new as it was - the new only has more: nothing to compare)
             return None, tested, covered, [f"    the same: {o.label()}" for o, _, _ in pairs]
-        self.check_fields()
-        text = self.unit(tested)
-        os.makedirs(self.out_dir, exist_ok=True)
-        path = os.path.join(self.out_dir, f"test_{m.stem}_lowered.cpp")
-        open(path, "w", encoding="latin-1").write(text)   # (the bytes of the sources as they are: see Version.text)
-        for o, n, e in tested:
-            report.append(f"    compared: {o.label()}  ->  {n.label()}" + (f"  (the state: {', '.join(f'{f} = {v}' for x in e.values() for f, v in x.items())})" if e else ""))
-        for o, n, e in pairs:
-            if (o, n, e) not in tested:
-                report.append(f"    the same: {o.label()}")
-        for label, through in covered.items():
-            report.append(f"    gone, compared through its callers: {label}  <-  {', '.join(through)}")
-        return path, tested, covered, report
+        return pairs, tested, covered
 
     def check_fields(self):
         """A class of the old and the new of one name has the same fields, in the same order (carried by name)."""
@@ -1021,11 +1037,385 @@ class Writer:
         return lines
 
 
+# ---- the form "two builds" (UEBERGABE 4.2) ----
+# Each side is the whole program in its state: the old tree - the game's sources as they stood at --base - and the
+# new, as they stand. The same test (a driver) is compiled against each and linked into each, with the engine as it
+# stands (the lowering rewrites the game's sources, not the engine) and the level as it stands; the old program writes
+# what every compared function gave and left as bytes, the new compares (tests/source_diff.h, Builds). So a class of
+# many files (Game: game.h and ~40 sources), helpers of one name in two texts and an old text that would not compile
+# against the new headers are each in their own program. The test keeps the old tree's sources that differ from the
+# new (tests/lowered/builds/<file>/old/...) and the names of those the old did not have (.../gone): run_tests.sh makes
+# the old tree from them, with no git.
+
+def spans_files(m):
+    """Whether a class a changed method of the file belongs to has methods whose bodies stand in other files (a class
+    of many files: its two texts cannot both be in one program)."""
+    defined = {(f.owner, f.name) for f in m.new.functions}
+    owners = {n.owner for o, n, e in m.pairs()[0] if n.method and m.changed(o, n, e)}
+    for q, (rec, _) in m.new.records.items():
+        if q not in owners:
+            continue
+        for c in kids(rec):
+            if c.get("kind") not in ("CXXMethodDecl", "CXXConstructorDecl", "CXXDestructorDecl") or c.get("isImplicit"):
+                continue
+            if c.get("explicitlyDefaulted") or c.get("explicitlyDeleted") or c.get("pure"):
+                continue
+            if not any(x.get("kind") == "CompoundStmt" for x in kids(c)) and (q, c.get("name")) not in defined:
+                return True
+    return False
+
+
+class BuildsModule(Module):
+    """One source file of the program: its old text in the old tree (the sources of its folder as they stood at the
+    base), its new text in the tree as it stands."""
+
+    def __init__(self, src, base, flags, namespace, scratch):
+        self.src = src
+        self.base = subprocess.run(["git", "rev-parse", "--short=8", base], capture_output=True, text=True).stdout.strip() or base
+        self.stem = os.path.splitext(os.path.basename(src))[0]
+        header = os.path.splitext(src)[0] + ".h"
+        self.header = header if os.path.exists(header) else None
+        self.namespace = namespace
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True, check=True).stdout.strip()
+        self.srcdir = os.path.dirname(os.path.abspath(src))
+        rel_dir = os.path.relpath(self.srcdir, top)
+        # the old tree: the folder as it stands, with the files that differ from the base as they stood there
+        r = subprocess.run(["git", "diff", "--no-renames", "--name-status", base, "--", rel_dir], capture_output=True, text=True, cwd=top)
+        if r.returncode != 0:
+            raise Stop(f"git does not know {base}: {r.stderr.strip()[:200]}")
+        self.old_files, self.gone = {}, []
+        for line in r.stdout.splitlines():
+            st, path = line.split("\t", 1)
+            name = os.path.relpath(path, rel_dir)
+            if st.startswith("A"):
+                self.gone.append(name)
+            else:
+                t = subprocess.run(["git", "show", f"{base}:{path}"], capture_output=True, cwd=top)
+                if t.returncode != 0:
+                    raise Stop(f"{path} is not in {base}")
+                self.old_files[name] = t.stdout
+        name = os.path.relpath(os.path.abspath(src), self.srcdir)
+        if name in self.gone:
+            raise Stop(f"{src} is not in {base}: a new file has no old text to compare with")
+        # (beside it, linked, what stands beside the folder: a header of it names ../firmware/...)
+        beside = os.path.join(scratch, "tree-" + self.stem)
+        shutil.rmtree(beside, ignore_errors=True)
+        os.makedirs(beside)
+        parent = os.path.dirname(self.srcdir)
+        for e in os.listdir(parent):
+            if e != os.path.basename(self.srcdir):
+                os.symlink(os.path.join(parent, e), os.path.join(beside, e))
+        tree = os.path.join(beside, os.path.basename(self.srcdir))
+        shutil.copytree(self.srcdir, tree)
+        for g in self.gone:
+            os.remove(os.path.join(tree, g))
+        for f, data in self.old_files.items():
+            os.makedirs(os.path.dirname(os.path.join(tree, f)), exist_ok=True)
+            open(os.path.join(tree, f), "wb").write(data)
+        self.tree = tree
+        old_flags = [f"-I{tree}" if f.startswith("-I") and os.path.abspath(f[2:]) == self.srcdir else f for f in flags]
+        self.include_dirs = [f[2:] for f in flags if f.startswith("-I")]
+        old_header = os.path.join(tree, os.path.basename(header)) if self.header and os.path.exists(os.path.join(tree, os.path.basename(header))) else None
+        self.old = Version(os.path.join(tree, name), old_header, old_flags, namespace, "old")
+        self.new = Version(src, self.header, flags, namespace, "new")
+        self.flags = flags
+        self.engine = None
+
+    def engine_records(self):
+        """The engine's classes and enums (namespace kern), as the new text sees them."""
+        if self.engine is None:
+            self.engine = Version(self.src, self.header, self.flags, "kern", "new")
+        return self.engine
+
+
+class BuildsWriter(Writer):
+    """The test of one module in the form "two builds": tests/lowered/builds/<file>/builds_<file>.cpp, with the old
+    tree's sources that differ (old/) and the names of those it did not have (gone)."""
+
+    def write(self):
+        planned = self.plan()
+        if planned[0] is None:
+            return planned
+        pairs, tested, covered = planned
+        m = self.m
+        for o, n, e in tested:
+            if e or o.template or n.template or o.param_types() != n.param_types() or plain(o.ret) != plain(n.ret) or o.kind != n.kind:
+                raise Stop(f"{o.label()} -> {n.label()}: the form \"two builds\" compares a function with its counterpart of the same signature - "
+                           "one that changed its parameters (the state made explicit, a template made functions) is not compared in it yet")
+            if n.local or o.local:
+                raise Stop(f"{o.label()}: only its own file can call it - the form \"two builds\" calls what the program's other files can call")
+        for label in covered:
+            pass   # (a gone helper is compared through its callers, which are compared here)
+        users = m.old.users()
+        for o, n, e in tested:
+            if users.get(o.node["id"]):
+                raise Stop(f"{o.label()} uses the variables of the file ({', '.join(sorted(users[o.node['id']]))}): the form \"two builds\" does not reach them yet")
+        if any(True for _ in m.old.actors()) or any(self.logic_param(t) for o, n, _ in tested for _, t, _ in o.params + n.params):
+            raise Stop("the file binds Blueprints of actors: the form \"two builds\" does not run a logic for them yet")
+        self.reached = {}       # qualified name -> (side "sc"/"kern", record) of the classes the test draws or writes
+        self.reached_enums = {}
+        roots = []
+        for o, n, e in tested:
+            if n.owner:
+                roots.append(n.owner)
+            roots += [t for _, t, _ in n.params] + [t for _, _, t in n.params] + [n.ret or ""]
+        self.reach(roots)
+        self.check_same()
+        text = self.driver(tested)
+        folder = os.path.join(self.out_dir, "builds", m.stem)
+        shutil.rmtree(folder, ignore_errors=True)
+        os.makedirs(os.path.join(folder, "old"), exist_ok=True)
+        stale = os.path.join(self.out_dir, f"test_{m.stem}_lowered.cpp")
+        if os.path.exists(stale):
+            os.remove(stale)   # (the test of the file is in this form now)
+        path = os.path.join(folder, f"builds_{m.stem}.cpp")
+        open(path, "w", encoding="latin-1").write(text)
+        for f, data in m.old_files.items():
+            os.makedirs(os.path.dirname(os.path.join(folder, "old", f)), exist_ok=True)
+            open(os.path.join(folder, "old", f), "wb").write(data)
+        open(os.path.join(folder, "gone"), "w").write("".join(g + "\n" for g in m.gone))
+        return path, tested, covered, self.report(pairs, tested, covered)
+
+    # ---- the classes the test draws and writes ----
+    @staticmethod
+    def names_in(t):
+        return re.findall(r"[A-Za-z_]\w*(?:::[A-Za-z_]\w*)*", re.sub(r"\(anonymous namespace\)::", "", t or ""))
+
+    def find(self, chain):
+        """The classes and enums a name of a type may be: [(qualified name, side, node, is_enum)]."""
+        m = self.m
+        out = []
+        tables = [("sc", m.new.records, False), ("sc", m.new.enums, True)]
+        if chain.startswith("kern::"):
+            e = m.engine_records()
+            tables = [("kern", e.records, False), ("kern", e.enums, True)]
+        elif chain.startswith("std::"):
+            return []
+        for side, table, is_enum in tables:
+            for q, v in table.items():
+                if q == chain or q.endswith("::" + chain):
+                    out.append((q, side, v if is_enum else v[0], is_enum))
+        return out
+
+    @staticmethod
+    def field_type(c):
+        t = c.get("type") or {}
+        return t.get("desugaredQualType") or t.get("qualType", "")
+
+    def reach(self, roots):
+        todo = list(roots)
+        seen = set()
+        while todo:
+            t = todo.pop()
+            for chain in self.names_in(t):
+                if chain in seen:
+                    continue
+                seen.add(chain)
+                for q, side, node, is_enum in self.find(chain):
+                    if is_enum:
+                        self.reached_enums.setdefault(q, (side, node))
+                        continue
+                    if q in self.reached:
+                        continue
+                    self.reached[q] = (side, node)
+                    for c in kids(node):
+                        if c.get("kind") == "FieldDecl":
+                            todo += [(c.get("type") or {}).get("qualType", ""), self.field_type(c)]
+                    for b in node.get("bases") or []:
+                        todo.append((b.get("type") or {}).get("qualType", ""))
+
+    def described(self, q):
+        """Whether the test names the fields of the class q: a class of the program (in a header), or a plain struct of the engine."""
+        side, node = self.reached[q]
+        if node.get("tagUsed") == "union" or not node.get("completeDefinition"):
+            return False
+        if side == "kern":
+            dd = node.get("definitionData") or {}
+            fields = [c for c in kids(node) if c.get("kind") == "FieldDecl"]
+            return bool(dd.get("isAggregate")) and not node.get("bases") and bool(fields) and node.get("tagUsed") != "class"
+        return (node.get("_file") or "").endswith((".h", ".hpp"))
+
+    def fields_of(self, q, depth=0):
+        """[(the class that declares it, field name, its node)] - those of its bases first."""
+        side, node = self.reached[q]
+        out = []
+        for b in node.get("bases") or []:
+            bt = plain((b.get("type") or {}).get("desugaredQualType") or (b.get("type") or {}).get("qualType", ""))
+            found = [x for x in self.find(bt) if not x[3]]
+            if not found or found[0][0] not in self.reached or not self.described(found[0][0]):
+                raise Stop(f"the class {q} is made on {bt}, whose fields the test does not know")
+            out += self.fields_of(found[0][0], depth + 1)
+        for c in kids(node):
+            if c.get("kind") != "FieldDecl":
+                continue
+            if c.get("isBitfield"):
+                raise Stop(f"the field {q}::{c.get('name')} is a field of bits: the form \"two builds\" does not reach it yet")
+            if re.search(r"&\s*$", self.field_type(c)):
+                raise Stop(f"the field {q}::{c.get('name')} is a reference: the form \"two builds\" does not reach it yet")
+            if not c.get("name"):
+                raise Stop(f"the class {q} has a field without a name")
+            out.append((q, c["name"], c))
+        return out
+
+    def check_same(self):
+        """Every class the test draws has the same fields, of the same types, in both trees - and every enum the same
+        values: the same draws then give the same values on both sides."""
+        m = self.m
+        for q, (side, node) in self.reached.items():
+            if side != "sc" or not self.described(q):
+                continue
+            old = m.old.records.get(q, (None, None))[0]
+            if old is None:
+                raise Stop(f"the class {q}, which the test draws, is not in the old tree")
+            sig = lambda r: ([(c.get("name"), self.field_type(c)) for c in kids(r) if c.get("kind") == "FieldDecl"],
+                             [plain((b.get("type") or {}).get("qualType", "")) for b in r.get("bases") or []])
+            if sig(old) != sig(node):
+                raise Stop(f"the class {q} has other fields in the old tree: the same draws would not give the two sides the same values")
+        for q, (side, node) in self.reached_enums.items():
+            if side != "sc":
+                continue
+            old = m.old.enums.get(q)
+            if old is None or self.enum_values(old) != self.enum_values(node):
+                raise Stop(f"the enum {q} has other values in the old tree")
+
+    @staticmethod
+    def enum_values(e):
+        out, nxt = [], 0
+        for c in kids(e):
+            if c.get("kind") != "EnumConstantDecl":
+                continue
+            v = next((x.get("value") for x in walk(c) if x.get("kind") == "ConstantExpr" and "value" in x), None)
+            nxt = int(v) if v is not None else nxt
+            out.append((c.get("name"), nxt))
+            nxt += 1
+        return out
+
+    # ---- the text of the test ----
+    def driver(self, tested):
+        m = self.m
+        key = re.sub(r"\W", "_", m.stem)
+        rob = f"::sc::lowered::builds_{key}"
+        headers = set()
+        for q, (side, node) in list(self.reached.items()) + list(self.reached_enums.items()):
+            f = os.path.abspath(node.get("_file") or "")
+            if side == "sc" and f.startswith(m.srcdir + os.sep) and f.endswith((".h", ".hpp")):
+                headers.add(os.path.relpath(f, m.srcdir))
+        if m.header:
+            headers.add(os.path.relpath(os.path.abspath(m.header), m.srcdir))
+        for h in headers:
+            if h in m.gone:
+                raise Stop(f"{h} is not in the old tree")
+        out = [f"// Generated by tools/source_diff.py from {os.path.basename(m.src)} - do not edit. The proof of its lowering in the form",
+               "// \"two builds\" (UEBERGABE 4.2, ../../../source_diff.h): this test is compiled into the program of the old tree (the sources",
+               f"// as they stood at the base, old/ and gone beside it) and into the program as it stands; the old writes what every changed",
+               "// function gives and leaves, call for call, the new draws the same calls and compares, bit for bit.",
+               f"// base: {m.base}"]
+        out += [f'#include "{h}"' for h in sorted(headers)]
+        out += ['#include "../../../source_diff.h"', ""]
+        # the fields, as C++ lets an explicit instantiation reach them (what a class keeps to itself too)
+        out += [f"namespace sc::lowered::builds_{key} {{", "template <class Tag, auto M> struct Rob { friend constexpr auto got(Tag) { return M; } };"]
+        ties, k = {}, 0
+        for q in sorted(self.reached):
+            if not self.described(q):
+                continue
+            side, node = self.reached[q]
+            parts = []
+            for owner, fname, c in self.fields_of(q):
+                if side == "kern":
+                    parts.append(f"x.{fname}")
+                    continue
+                out.append(f"struct F{k} {{ friend constexpr auto got(F{k}); }};")
+                out.append(f"template struct Rob<F{k}, &::{owner}::{fname}>;")
+                parts.append(f"x.*got({rob}::F{k}{{}})")
+                k += 1
+            if parts:
+                ties[q] = parts
+        calls = {}
+        for j, (o, n, e) in enumerate(tested):
+            if n.method and not n.static and n.kind == "CXXMethodDecl" and self.hidden_method(n):
+                out.append(f"struct M{j} {{ friend constexpr auto got(M{j}); }};")
+                out.append(f"template struct Rob<M{j}, &::{n.owner}::{n.name}>;")
+                calls[j] = f"((*self).*got({rob}::M{j}{{}}))"
+        out += [f"}}  // namespace sc::lowered::builds_{key}", "", "namespace sc::lowered {"]
+        for q, parts in ties.items():
+            out.append(f"template <> struct Fields<::{q}> {{ template <class X> static auto of(X& x) {{ return std::tie({', '.join(parts)}); }} }};")
+        for q, (side, node) in sorted(self.reached_enums.items()):
+            values = self.enum_values(node)
+            if values and node.get("name"):
+                out.append(f"template <> struct Values<::{q}> {{ static constexpr long long all[] = {{{', '.join(str(v) for _, v in values)}}}; }};")
+        out += ["}  // namespace sc::lowered", "", f"namespace {m.namespace} {{", f"SC_TEST(lowered_{key}_cpp) {{"]
+        for j, (o, n, e) in enumerate(tested):
+            out += self.builds_case(j, n, calls.get(j))
+        out += ["}", f"}}  // namespace {m.namespace}", ""]
+        return "\n".join(out)
+
+    def hidden_method(self, n):
+        """Whether the method is one its class keeps to itself (private or protected): reached by its address."""
+        rec = self.m.new.records.get(n.owner, (None, None))[0]
+        if rec is None:
+            return False
+        access = "private" if rec.get("tagUsed") == "class" else "public"
+        hidden = None
+        for c in kids(rec):
+            if c.get("kind") == "AccessSpecDecl":
+                access = c.get("access", access)
+            elif c.get("kind") == "CXXMethodDecl" and c.get("name") == n.name:
+                if hidden is not None:
+                    raise Stop(f"{n.label()}: its class has more than one {n.name} - the form \"two builds\" does not take an overloaded method yet")
+                hidden = access != "public"
+        return bool(hidden)
+
+    def builds_case(self, j, n, robbed):
+        label = n.label()
+        T = f"::{n.owner}" if n.owner else None
+        body = [f"  {{  // {label}", f"    ::sc::lowered::Builds rec({C.text_literal(label)});", "    ::sc::converted::Draw draw;",
+                "    for (int call = 0; rec.more(call); ++call) {"]
+        inner = []
+        method = n.method and not n.static and n.kind in ("CXXMethodDecl", "CXXDestructorDecl")
+        if method:
+            inner += [f"::sc::lowered::Self<{T}> self;", "if (draw.flag()) ::sc::lowered::draw(draw, *self);"]
+        args, writes = [], []
+        for k, (pn, pt, pd) in enumerate(n.params):
+            t = pd or pt
+            inner += [f"::sc::lowered::Arg<{t}> a{k};", f"::sc::lowered::draw(draw, a{k});"]
+            args.append(f"a{k}.get()")
+            if re.search(r"&\s*$", t) and not re.match(r"^const\b", t.strip()):
+                writes.append((f"its parameter {pn}", f"a{k}.v"))
+        a = ", ".join(args)
+        ret = n.ret and plain(n.ret) != "void" and n.kind not in ("CXXConstructorDecl", "CXXDestructorDecl")
+        if n.kind == "CXXDestructorDecl":
+            call = "self.end()"
+        elif n.kind == "CXXConstructorDecl":
+            inner.append(f"std::optional<{T}> made;")
+            call = f"made.emplace({a})"
+        elif method:
+            call = f"{robbed}({a})" if robbed else f"self->{n.name}({a})"
+        elif n.owner:
+            call = f"{T}::{n.name}({a})"
+        else:
+            call = f"::{n.cpp_scope}::{n.name}({a})" if n.cpp_scope else f"::{n.name}({a})"
+        if ret:
+            inner.append(f"std::optional<std::remove_cvref_t<decltype({call})>> r;")
+            call = f"r.emplace({call})"
+        inner += ["long asks = 0;", f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
+        if ret:
+            inner.append('  rec.part("what it returns", ::sc::lowered::bytes_of(r));')
+        if method and n.kind != "CXXDestructorDecl":
+            inner.append('  rec.part("its object", ::sc::lowered::bytes_of(*self));')
+        if n.kind == "CXXConstructorDecl":
+            inner.append('  rec.part("the object it makes", ::sc::lowered::bytes_of(made));')
+        for what, x in writes:
+            inner.append(f"  rec.part({C.text_literal(what)}, ::sc::lowered::bytes_of({x}));")
+        inner += ["}", "rec.take(defined, asks, call);"]
+        return body + ["      " + x for x in inner] + ["    }", "  }"]
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--base", required=True, help="the commit the lowering started from (the old text)")
     ap.add_argument("--test", required=True, help="the folder of the tests (tests/lowered)")
     ap.add_argument("--namespace", default="sc", help="the program's namespace")
+    ap.add_argument("--builds", action="store_true", help="the form \"two builds\" for every file (else for a file whose class has methods in other files)")
     args, rest = ap.parse_known_args(argv[1:])
     if "--" not in rest:
         ap.error("the sources follow --")
@@ -1035,11 +1425,16 @@ def main(argv):
     with tempfile.TemporaryDirectory(prefix="kern-source-diff-") as scratch:
         for src in sources:
             try:
-                m = Module(src, args.base, [f for f in flags if f != "-std=c++20"], args.namespace, scratch)
+                fl = [f for f in flags if f != "-std=c++20"]
+                m = Module(src, args.base, fl, args.namespace, scratch)
                 if m.unchanged():
                     print(f"{os.path.basename(src)}: unchanged since {args.base}")
                     continue
-                path, tested, covered, report = Writer(m, args.test).write()
+                writer = Writer
+                if args.builds or spans_files(m):
+                    m, writer = BuildsModule(src, args.base, fl, args.namespace, scratch), BuildsWriter
+                    print(f"{os.path.basename(src)}: the form \"two builds\" (the old tree and the new, each a program of its own)")
+                path, tested, covered, report = writer(m, args.test).write()
                 if path is None:
                     print(f"{os.path.basename(src)}: every function it had is unchanged since {args.base} (the new text only has more) - no test")
                 else:
