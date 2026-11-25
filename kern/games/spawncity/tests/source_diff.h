@@ -746,7 +746,8 @@ struct Builds {
         Call c;
         c.defined = head[0] == 1;
         std::memcpy(&c.asks, head.data() + 1, sizeof c.asks);
-        const unsigned parts = static_cast<unsigned char>(head[1 + sizeof c.asks]);
+        u32 parts = 0;
+        std::memcpy(&parts, head.data() + 1 + sizeof c.asks, sizeof parts);
         for (unsigned q = 0; q < parts && text(field, j, part) && text(field, j, bytes); ++q) c.parts.emplace_back(part, bytes);
         old.push_back(std::move(c));
       }
@@ -760,7 +761,18 @@ struct Builds {
     if (writing) return defined_old < kCalls && tried < kCalls * 20;
     return at < old.size();
   }
-  void part(const char* name, Bytes b) { now.parts.emplace_back(name, std::move(b.b)); }
+  void part(std::string name, Bytes b) { now.parts.emplace_back(std::move(name), std::move(b.b)); }
+  /// An object a call leaves: as one part (what it holds, every field, compared as a whole - an object held twice is
+  /// the same object), and - where the test has its fields' names - each field once more as a part of its own, so that
+  /// where it differs the test says which fields do.
+  template <class T> void object(const char* name, const T& x) {
+    part(name, bytes_of(x));
+    if constexpr (Named<T> && requires { Fields<std::remove_const_t<T>>::names; }) {
+      constexpr auto& names = Fields<std::remove_const_t<T>>::names;
+      std::size_t k = 0;
+      std::apply([&](const auto&... f) { ((part(std::string(name) + ": " + names[k++], bytes_of(f))), ...); }, fields(x));
+    }
+  }
   void take(bool defined, long asks, int call) {
     now.defined = defined;
     now.asks = defined ? asks : 0;
@@ -792,7 +804,8 @@ struct Builds {
       for (const Call& c : old) {
         std::string head(1, c.defined ? 1 : 0);
         head.append(reinterpret_cast<const char*>(&c.asks), sizeof c.asks);
-        head.push_back(static_cast<char>(c.parts.size()));
+        const u32 parts = static_cast<u32>(c.parts.size());   // (an object of ~250 fields: a part each - more than a byte counts)
+        head.append(reinterpret_cast<const char*>(&parts), sizeof parts);
         text(field, head);
         for (const auto& [name, b] : c.parts) {
           text(field, name);

@@ -1319,8 +1319,9 @@ class BuildsWriter(Writer):
             if not self.described(q):
                 continue
             side, node = self.reached[q]
-            parts = []
+            parts, said = [], []
             for owner, fname, c in self.fields_of(q):
+                said.append(fname)
                 if side == "kern":
                     parts.append(f"x.{fname}")
                     continue
@@ -1329,7 +1330,7 @@ class BuildsWriter(Writer):
                 parts.append(f"x.*got({rob}::F{k}{{}})")
                 k += 1
             if parts:
-                ties[q] = parts
+                ties[q] = (parts, said)
         calls = {}
         for j, (o, n, e) in enumerate(tested):
             if n.method and not n.static and n.kind == "CXXMethodDecl" and self.hidden_method(n):
@@ -1337,8 +1338,11 @@ class BuildsWriter(Writer):
                 out.append(f"template struct Rob<M{j}, &::{n.owner}::{n.name}>;")
                 calls[j] = f"((*self).*got({rob}::M{j}{{}}))"
         out += [f"}}  // namespace sc::lowered::builds_{key}", "", "namespace sc::lowered {"]
-        for q, parts in ties.items():
-            out.append(f"template <> struct Fields<::{q}> {{ template <class X> static auto of(X& x) {{ return std::tie({', '.join(parts)}); }} }};")
+        for q, (parts, said) in ties.items():
+            # (with the fields' names: where an object differs, the test names the fields that do - Builds::object)
+            names = ", ".join(C.text_literal(x) for x in said)
+            out.append(f"template <> struct Fields<::{q}> {{ template <class X> static auto of(X& x) {{ return std::tie({', '.join(parts)}); }} "
+                       f"static constexpr const char* names[] = {{{names}}}; }};")
         for q, (side, node) in sorted(self.reached_enums.items()):
             values = self.enum_values(node)
             if values and node.get("name"):
@@ -1401,7 +1405,7 @@ class BuildsWriter(Writer):
         if ret:
             inner.append('  rec.part("what it returns", ::sc::lowered::bytes_of(r));')
         if method and n.kind != "CXXDestructorDecl":
-            inner.append('  rec.part("its object", ::sc::lowered::bytes_of(*self));')
+            inner.append('  rec.object("its object", *self);')
         if n.kind == "CXXConstructorDecl":
             inner.append('  rec.part("the object it makes", ::sc::lowered::bytes_of(made));')
         for what, x in writes:
