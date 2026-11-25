@@ -394,6 +394,71 @@ class Calls:
                 f"  return o.own<{cls}, {q}>(std::make_unique<{cls}>(o, std::move(by)));",
                 "}", ""]
 
+    def class_adapter_text(self, q, name, virtuals, need):
+        """The engine's object of the interface q that a Blueprint's class is (kern::logic::implementation; the class
+        derives from kern::Implements<"name">): each virtual function calls the class's own function of its name, typed
+        - what the engine hands it made into the class's types where the class reads it (engine_values::Given; an
+        object of the engine its handle), what the function gives made into the engine's (Direct::from); one the class
+        has not, and one the engine cannot hand to a Blueprint, is the interface's own."""
+        EV, cls, lines, kept, has = self.EV, f"ClassImplements_{name}", [], [], []
+        for f, pure, why in virtuals:
+            d = f["decl"]
+            m, const = d["name"], " const" if c2b.qtype(d).rstrip().endswith("const") else ""
+            ptypes = self.ptypes(f)
+            ret = f"decltype(std::declval<{'const ' if const else ''}{q}&>().{m}({', '.join(f'std::declval<{P}>()' for P in ptypes)}))"
+            params = ", ".join(f"{P} kern_p{k}" for k, P in enumerate(ptypes))
+            own = f"{q}::{m}({', '.join(f'kern_p{k}' for k in range(len(ptypes)))})"
+            has.append(f"  template <class X> static constexpr bool kern_has_{m} = requires {{ requires std::is_same_v<typename MemberOf<decltype(&X::{m})>::type, X>; }};")
+            lines.append(f"  {ret} {m}({params}){const} override {{")
+            if why:
+                lines += [f"    return {own};   // (the engine cannot hand it to a Blueprint: it {why})", "  }"]
+                continue
+            if pure:   # (one the interface has no body of: the class has it - check() says so of its graph, the compiler here)
+                lines.append(f'    static_assert(kern_has_{m}<B>, "a Blueprint that implements {name} has its function {m}");')
+                lines.append("    {")
+            else:
+                lines.append(f"    if constexpr (!kern_has_{m}<B>) {{")
+                lines.append(f"      return {own};")
+                lines.append("    } else {")
+            lines.append("      ::kern::logic::EngineObjects& kern_o = kern_objects();")
+            args = []
+            for k, ((pin_in, _), P) in enumerate(zip(f["params"], ptypes)):
+                bt, h = next((bt, h) for n_, bt, h in f["ins"] if n_ == pin_in)
+                if h:
+                    args.append(f"{EV}handle_as<::kern::logic::Whole>(kern_o.adopt<{h}>(kern_p{k}))")
+                else:
+                    args.append(f"{EV}Given<{self.dtag(bt, need)}, {P}{'' if P.rstrip().endswith('&') else ' const&'}>(kern_o, kern_p{k})")
+            call = f"b_.{m}({', '.join(args)})"
+            if not f["outs"]:
+                lines += [f"      {call};", "    }", "  }"]
+                continue
+            tg = self.dtag(f["outs"][0][1], need)
+            raw = c2b.qtype(d).split("(")[0].strip()
+            lines.append(f"      const auto& [kern_given] = {call};")
+            if re.match(r"(?:kern::)?Span<", raw):
+                member = f"kern_kept_{m}"
+                kept.append(f"  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<{ret}>().data)>>> {member};")
+                lines += [f"      {member}.clear();", f"      {EV}Direct<{tg}>::from(kern_o, kern_given, {member});",
+                          f"      return {ret}({member}.data(), {member}.size());", "    }", "  }"]
+                continue
+            lines += [f"      auto kern_r = {EV}blank<{ret}>();", f"      {EV}Direct<{tg}>::from(kern_o, kern_given, kern_r);", "      return kern_r;", "    }", "  }"]
+        return [f"// {q} that a Blueprint's class is (kern::Implements<\"{name}\">: kern::logic::implementation)",
+                f"template <class B> class {cls} final : public {q} {{",
+                " public:",
+                f"  explicit {cls}(B& b) : b_(b) {{}}",
+                *has,
+                *lines,
+                "",
+                " private:",
+                "  B& b_;",
+                "  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)",
+                "  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }",
+                *kept,
+                "};",
+                f'template <> struct InterfaceOf<"{name}"> {{',
+                f"  template <class B> using adapter = {cls}<B>;",
+                "};", ""]
+
     # ---- the Blueprint type of a pin as a tag (engine_values) ----
     def tag(self, bt, need, ev="ev::", types=""):
         """`ev`, `types`: how the file the tag stands in names engine_values and the tool's own types (E_, S_)."""
@@ -903,6 +968,7 @@ class Calls:
                 function(f"template <{', '.join(['class KernNode'] + templates)}> void {name}({', '.join(['KernNode& kern_n'] + params)})", direct + ["return;"],
                          [f"const std::vector<Value> kern_out = {door};", *takes])
             bodies += lines
+        adapters = [x for q, name, virtuals, waits in self.interfaces() if not waits for x in self.class_adapter_text(q, name, virtuals, need)]
         text = ["// The engine's functions as a Blueprint's class calls them (written by tools/engine_api.py from the",
                 "// engine's headers - see kern/logic/engine_api.h; not edited by hand). Included by kern/logic/blueprint.h.",
                 "//",
@@ -918,7 +984,9 @@ class Calls:
                 "// the Blueprint's struct has the engine's fields in their order.",
                 "namespace engine_direct {", "namespace ev = engine_values;", "", *self.direct_types_text(need), "",
                 "// The places of the engine (engine_values::Place): the object's class, what it holds there, how it is reached.",
-                *[x for p in places for x in p], "", "}  // namespace engine_direct", "",
+                *[x for p in places for x in p], "",
+                "// The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).",
+                *adapters, "}  // namespace engine_direct", "",
                 "template <class Core> struct EngineNodesOf : Core {",
                 "  using Bool = bool;", "  using Int = logic::Whole;", "  using Float = f64;", "  using Vector = Vec3;", "  using Text = logic::Text;", "  using Int64 = logic::Int64;",
                 "  template <class T> using List = logic::List<T>;", "",

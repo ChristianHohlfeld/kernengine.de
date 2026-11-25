@@ -1496,6 +1496,12 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   (`""` für einen Text). `logic::engine_implement(objects, instance)` macht das Objekt der Engine eines laufenden
   Blueprints; das Handle nennt auch ein Objekt der Schnittstelle (was man der Engine gibt: `engine.renderer.init(…,
   extensions)`).
+- **Klasse:** `kern::logic::implementation(blueprint)` macht das Objekt der Schnittstelle aus der Klasse eines Blueprints
+  (sie leitet von `kern::Implements<"…">` ab): `ClassImplements_<Name><B>` in `engine_nodes.gen.h`, je virtuelle Funktion
+  die der Klasse gleichen Namens, typisiert gerufen – was die Engine gibt, als `engine_values::Given` (gelesen, wo die
+  Klasse es liest), ein Objekt der Engine als Handle in den `EngineObjects` der Klasse; was sie gibt, mit `Direct::from`.
+  Eine reine, die die Klasse nicht hat, sagt der Compiler. Kein Wert, kein Name dazwischen. Geprüft:
+  `engine_interface_a_class_implements`.
 - **Ein Knotentyp des Programms** (`kern::logic::NodeDef` mit `kind = NodeKind::event`, festem `event`, `accepts`, das
   immer wahr gibt, und `run` ohne Fang, das mit `kStop` endet, angemeldet mit `kern::logic::library().add`) ist im
   Blueprint kein Wert, sondern ein **Ereignis** des Blueprints, dessen Funktion ihn anmeldet: `logic.tick` →
