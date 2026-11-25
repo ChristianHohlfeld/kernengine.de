@@ -81,6 +81,8 @@ jobs:
     timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # (the differential tests build an older state of a source beside today's: tests/run_tests.sh reads it with git archive)
       - name: Build the SpawnCity tests (ASan/UBSan)
         env:
           SC_TEST_OUT: /home/runner/sc-tests
