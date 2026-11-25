@@ -32,6 +32,7 @@ inline std::string native_show(const kern::logic::Value& v) {
     case PinType::vector: return "(" + number(v.v.x, 9) + ", " + number(v.v.y, 9) + ", " + number(v.v.z, 9) + ")";
     case PinType::text: return "\"" + v.s + "\"";
     case PinType::actor: std::snprintf(b, sizeof b, "#%llu", static_cast<unsigned long long>(v.a)); return b;
+    case PinType::object: std::snprintf(b, sizeof b, "@%lld/%u", static_cast<long long>(v.i), static_cast<unsigned>(v.world)); return b;  // (its handle and its world)
     case PinType::enumeration: std::snprintf(b, sizeof b, "~%lld", static_cast<long long>(v.i)); return b;  // (its place among its enum's values)
     case PinType::callback: {  // (called, as the engine would: with 1.5, -2.25, 4 - what it gives, as above)
       if (!v.call) return "unbound";

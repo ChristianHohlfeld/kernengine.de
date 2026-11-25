@@ -3947,7 +3947,7 @@ class Emit:
         return n.get("kind") == "CXXThisExpr"
 
     def implementing_state(self, n):
-        """The Blueprint (its actor's name) whose one object `n` is, where that is a state that derives from an
+        """The Blueprint (its actor's name) and the interface of the engine it implements, whose one object `n` is, where that is a state that derives from an
         interface of the engine (World.state_implements: Facades, a ShaderExtension) and `n` its getter called -
         `sc::facades()` (World.getters); else None."""
         n = bare(n)
@@ -3963,7 +3963,7 @@ class Emit:
         q = next((s for s in self.u.world.states if s == q or s.endswith("::" + q) or q.endswith("::" + s)), None)
         if q is None or q not in self.u.world.state_implements:
             return None
-        return self.u.world.states[q]
+        return self.u.world.states[q], self.u.world.state_implements[q][0]
 
     def at_state(self, n):
         """Is this the one object of the state, reached through a field that holds it (`g->` of a struct a method
@@ -10068,8 +10068,11 @@ class Emit:
             implementing = self.implementing_state(kids(b)[0]) if op == "&" and kids(b) else None
             if implementing is not None:
                 # (&sc::facades(): the one object of a state that is an object of an interface of the engine - what
-                # the engine is handed as that object is its handle: Engine Object of Blueprint on its Blueprint)
-                return f"func_engine_object(actor_find({text_literal(implementing)}))", "Int"
+                # the engine is handed as that object: Engine Object of Blueprint on its Blueprint, as that interface;
+                # its handle, as long as the engine's functions take their objects as Ints - kern/docs/engine_object.md)
+                actor, interface = implementing
+                cpp = "kern::" + interface.replace("_", "::")
+                return f"object_handle<{cpp}>(func_engine_object<{cpp}>(actor_find({text_literal(actor)})))", "Int"
             if op in ("*", "&"):
                 raise Wait("a pointer")
             if op == "~":

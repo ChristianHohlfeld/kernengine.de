@@ -1146,6 +1146,9 @@ inline std::vector<Value> samples(PinType t, std::size_t count = 0) {
     case PinType::actor:
       for (logic::ActorRef v : {0u, 1u, 42u}) r.push_back(Value::actor(v));
       break;
+    case PinType::object:  // (no object, and one of a world: what a caller hands over - the class takes it as it is)
+      r = {Value::object({}), Value::object({7, 2})};
+      break;
     case PinType::enumeration:
       for (std::size_t k = 0; k < count; ++k) r.push_back(Value::enumeration(static_cast<i64>(k)));
       break;
@@ -1299,9 +1302,10 @@ inline Case nodes_case(const logic::Library& lib = logic::library()) {
   const std::vector<std::string>& of_the_game = game::logic_node_types();
   for (const auto& d : lib.all()) {
     if (d->kind != logic::NodeKind::pure || std::find(of_the_game.begin(), of_the_game.end(), d->type) != of_the_game.end()) continue;
-    // (what another actor's Blueprint holds or whether there is one asks the runtime the class runs in - a class
-    // called by itself has none: the tier case on_actor plays them, in every stage, as the engine runs them)
-    if (d->type == "func.get_on" || d->type == "func.has_blueprint") continue;
+    // (what another actor's Blueprint holds, whether there is one and the object of the engine it is ask the runtime the
+    // class runs in - a class called by itself has none: the tier case on_actor plays them, in every stage, as the
+    // engine runs them)
+    if (d->type == "func.get_on" || d->type == "func.has_blueprint" || d->type == "func.engine_object") continue;
     std::vector<std::vector<std::pair<std::string, std::string>>> variants{{}};
     if (d->type == "math.formula") {
       variants.clear();

@@ -192,6 +192,7 @@ KERN_LAYOUT(Demo) {
 | Funktion ohne Ausgänge | `void Fn(...) { ... }` |
 | Funktion „pure“ (als Wert-Knoten angeboten) | `KERN_PURE` vor der Funktion |
 | Make Callback (eine Funktion einer Bibliothek, die die Engine ruft) | `callback<&Lib::fn>(platz)`, Typ `Callback<Float(Float, Float)>` |
+| Objekt der Engine (eine Schnittstelle der Engine; kern/docs/engine_object.md) | Typ `Object<kern::App>`, kein Objekt `Object<kern::App>{}` – nie eine Zahl |
 | Eingang einer Funktion als Wert | `Float by = 1.0` – mit seinem Default |
 | Bibliothek (ein Blueprint, der nichts behält) und wer sie benutzt | `struct Workshop : virtual kern::Library { … };` · `struct Garage : virtual kern::Blueprint, virtual Workshop { … };` – Aufruf `Workshop::skid(Spare[i], 1.0);` (siehe „Bibliotheken“) |
 | Eingang einer Funktion als Referenz (der Aufruf nennt einen Platz) | `Car& car` – die Funktion ändert den Platz; `const Car& car` – sie liest ihn nur. Im Aufruf steht der Platz: `Drive(Cars[i], 0.5);` (siehe „Referenz-Eingänge“) |
@@ -200,7 +201,9 @@ KERN_LAYOUT(Demo) {
 | Call on Actor | `func_call_on<"Fn">(target, kern::out(n7.y), x);` – erst das Target (`Actor{0}`: der Blueprint des Levels), dann `kern::out(...)` mit allen Ausgängen in ihrer Reihenfolge als Felder des Members `n7` (oder `kern::out()`, wenn niemand sie liest), dann die Eingänge |
 | Get Variable on Actor | `func_get_on<"Speed", Float>(target)` – was die Variable des Namens im Blueprint von Target jetzt hält, als Wert des Typs der Einstellung (die Null des Typs, wo Target keine solche Variable hat oder eine, deren Typ nicht zu ihm wird: „Ein Weg“); ein Wert-Knoten |
 | Has Blueprint | `func_has_blueprint(target)` – ob Target (`Actor{0}`: das Level) einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt); ein Wert-Knoten |
-| Engine Object of Blueprint | `func_engine_object(target)` – das Objekt der Engine, das der Blueprint auf Target ist (die Schnittstelle, die er implementiert: App, ShaderExtension …), als Handle der Engine – einmal gemacht, jedes Mal dasselbe; 0 ohne laufenden Blueprint, ohne Schnittstelle oder ohne Objekte der Engine beim Host (`Runtime::engine_object`); ein Wert-Knoten |
+| Engine Object of Blueprint | `func_engine_object<kern::App>(target)` – das Objekt der Engine, das der Blueprint auf Target als die Schnittstelle der Einstellung ist (App, ShaderExtension …), als `Object<kern::App>` (kern/docs/engine_object.md) – einmal gemacht, jedes Mal dasselbe. Kein Objekt, und das Log sagt den Grund: Target hat keinen laufenden Blueprint, er implementiert keine oder eine andere Schnittstelle, der Host hat keine Objekte der Engine, der Build hat die Schnittstelle nicht (`Runtime::engine_object`); ein Wert-Knoten |
+| Is Valid Object | `object_valid<kern::App>(x)` – verweist es auf ein Objekt der Engine (nicht `Object<…>{}`)? |
+| Handle of Object | `object_handle<kern::App>(x)` – sein Handle als Int: der eine Übergang, solange die Funktionen der Engine ihre Objekte als Int nehmen; kein Int wird ein Objekt |
 | Function Entry | der Anfang des Funktionsrumpfs; seine Ausgänge sind die Parameter |
 | Lokale Variable einer Funktion | `Float Total = 0.0;` als erste Zeilen des Funktionsrumpfs – eine lokale Variable von C++; gelesen und gesetzt wie jede Variable (`Total`, `Total = x;`, `Total += x;`, `Hit.Damage = x;`, `list_add(n7, Seen, x);`) |
 | Platz (eine Variable, ein Feld davon, ein Eintrag einer Liste darin – beliebig tief) | wie C++ ihn schreibt: `Cars[i].Wheels[j].Slip` – die Einstellung „path“ des Knotens (`[].Wheels[].Slip`), jeder Index ein Eingang (siehe „Plätze“) |

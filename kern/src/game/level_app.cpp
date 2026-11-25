@@ -68,7 +68,13 @@ App* level_app(logic::Runtime& rt) {
     }
   logic::EngineObjects* objects = rt.host().engine_objects();
   if (!one || !objects) return nullptr;
-  return objects->get<App>(rt.engine_object(one->self()));
+  std::string why;
+  const logic::ObjectRef app = rt.engine_object(one->self(), "App", why);
+  if (!app.valid()) {
+    log(LogLevel::error, "the program's App: %s", why.c_str());
+    return nullptr;
+  }
+  return objects->get<App>(app);
 }
 
 App* start_program_level(std::string_view level_text) {

@@ -220,9 +220,18 @@ struct BlueprintCore : logic::PureNodes {
   /// Has Blueprint: does `target` (Actor{0}: the Level) have a Blueprint that runs - what Call on Actor
   /// and Get Variable on Actor reach? func_has_blueprint(actor_find("Wanted")).
   Bool func_has_blueprint(Actor target) const { return kern_world.runtime && kern_world.runtime->has_blueprint(target.id); }
-  /// Engine Object of Blueprint: the handle of the object of the engine the Blueprint of `target` is (the interface
-  /// it implements; Runtime::engine_object) - func_engine_object(actor_find("Facades")).
-  Int func_engine_object(Actor target) const { return kern_world.runtime ? kern_world.runtime->engine_object(target.id) : 0; }
+  /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` is as the interface I
+  /// (Runtime::engine_object: what fails is told to the host, as in the interpreter) -
+  /// func_engine_object<kern::ShaderExtension>(actor_find("Water")). A class without a world has none, and says so.
+  template <class I> Object<I> func_engine_object(Actor target) const {
+    static const std::string interface = logic::engine_class_name(logic::cpp_name_of<I>());
+    if (kern_world.runtime && kern_world.instance) return Object<I>{kern_world.runtime->engine_object(*kern_world.instance, target.id, interface)};
+    if (kern_world.host) kern_world.host->error("Engine Object of Blueprint: a class without a runtime has no Blueprints to ask");
+    return {};
+  }
+  /// Is Valid Object, Handle of Object (kern/docs/engine_object.md).
+  template <class I> static Bool object_valid(Object<I> object) { return object.valid(); }
+  template <class I> static Int object_handle(Object<I> object) { return object.ref.handle; }
 
   // ---- random ----
   /// Where the Random nodes start from: the instance's seed (a class without a world: its host's

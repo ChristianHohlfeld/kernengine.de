@@ -38,7 +38,7 @@ const char* const kCppKeywords[] = {
     "xor", "xor_eq",
 };
 /// Names the notation itself uses inside a Blueprint's struct.
-const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "Callback", "callback", "loop", "machine", "entry", "detached", "kern"};
+const char* const kOwnWords[] = {"Bool", "Int", "Float", "Vector", "Text", "Actor", "U8", "U16", "U32", "I8", "I16", "I32", "List", "Fixed", "Callback", "callback", "Object", "loop", "machine", "entry", "detached", "kern"};
 
 bool is_start(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_'; }
 bool is_digit(char c) { return c >= '0' && c <= '9'; }
@@ -93,6 +93,7 @@ std::string width_of_cpp(std::string_view name) {
 /// A type as the notation writes it: Float, List<Text>; an enum or a struct by its name - Mode,
 /// List<Mode>.
 std::string cpp_type(const TypeRef& t) {
+  if (t.type == PinType::object) return "Object<" + engine_class_cpp(t.of) + ">";  // (Object<kern::App>: kern/docs/engine_object.md)
   if (t.type == PinType::callback) {  // (Callback<Float(Float, Float)>, Callback<void(Int)>)
     const TypeRef r = callback_result(t);
     std::string s = "Callback<" + (r.type == PinType::exec ? std::string("void") : cpp_type(r)) + "(";
@@ -214,6 +215,7 @@ std::string literal(const Value& v, const TypeRef& declared, const Graph& g, std
 }
 std::string literal(const Value& v, const std::string& of, const Graph& g, std::size_t depth) {
   if (v.type == PinType::callback) return cpp_type(TypeRef{PinType::callback, of}) + "{}";  // (unbound: what a place of one holds until it is set)
+  if (v.type == PinType::object) return cpp_type(TypeRef{PinType::object, of}) + "{}";  // (no object: the one a text writes out)
   if (is_keyed(v.type)) {
     // a map: Map<Int, Float>{{1, 2.5}, {3, 4.0}} - its entries in their order; a set: Set<Int>{1, 3}
     const TypeRef t{v.type, of}, key = key_type(t), value = v.type == PinType::map ? value_type(t) : TypeRef{};
@@ -268,6 +270,10 @@ std::string settings_of(const NodeDef& def, const Node& n, const Graph& g, const
     if (pd.kind == ParamDef::Kind::type && pd.structs_only && k + 1 < def.params.size() && def.params[k + 1].kind == ParamDef::Kind::field) {
       r += (r.empty() ? "<&" : ", &") + value + "::" + n.param(def.params[k + 1].key, def.params[k + 1].def);
       ++k;
+      continue;
+    }
+    if (pd.engine_class) {  // (a class of the engine: its C++ type - func_engine_object<kern::App>)
+      r += (r.empty() ? "<" : ", ") + engine_class_cpp(value);
       continue;
     }
     TypeRef type;
@@ -2171,6 +2177,12 @@ struct Writer {
 // ---------------------------------------------------------------------------
 // reading
 
+/// The interfaces of the engine, as a text names them: "kern::App, kern::ShaderExtension ...".
+std::string interface_names() {
+  std::string r;
+  for (const EngineInterface& i : engine_interfaces()) r += (r.empty() ? "" : ", ") + std::string(i.cpp);
+  return r.empty() ? "this build has none" : "it has " + r;
+}
 const char* const kTypes = "a type (Bool, Int, U8 ... I32, Float, Vector, Text, Actor, Int64, an enum or a struct of the Blueprint, List<one of them>, Map<key, value> or Set<key>) expected, not ";
 const char* const kListTypes = "List<Bool>, List<Int>, List<U8> ... List<I32>, List<Float>, List<Vector>, List<Text>, List<Actor>, List<Int64>, List<an enum> or List<a struct of the Blueprint>";
 
@@ -2482,6 +2494,14 @@ struct Reader {
   bool literal_here(Value& v, std::string* of = nullptr, u32* count = nullptr) {
     const Tok& t = peek();
     if (of) of->clear();
+    if (t.kind == Tok::id && t.s == "Object" && is("<", 1)) {
+      // Object<kern::App>{}: no object - the one object a text writes out (no number becomes one)
+      TypeRef o;
+      if (!type_here(o) || !expect("{", "(no object is " + cpp_type(o) + "{})") || !expect("}")) return true;
+      v = Value::zero(PinType::object);
+      if (of) *of = o.of;
+      return true;
+    }
     if (t.kind == Tok::id && t.s == "Callback" && is("<", 1)) {
       // Callback<Float(Float, Float)>{}: unbound - the one Callback a text writes out
       TypeRef c;
@@ -2656,6 +2676,20 @@ struct Reader {
     return true;
   }
 
+  /// kern::App, kern::physics::World: a class of the engine by its C++ name - as a Blueprint names it ("App",
+  /// "physics_World": engine_class_name).
+  bool engine_class_here(std::string& out) {
+    if (!expect("kern", "(a class of the engine: kern::App)") || !expect("::")) return false;
+    std::string cpp = "kern";
+    do {
+      std::string part;
+      if (!word(part, "a class of the engine")) return false;
+      cpp += "::" + part;
+    } while (accept("::"));
+    out = engine_class_name(cpp);
+    return true;
+  }
+
   // ---- the first pass: what the struct declares ----
   /// A type: Float, an enum or a struct the Blueprint has declared, List<one of them>.
   bool type_here(TypeRef& t) {
@@ -2671,6 +2705,15 @@ struct Reader {
       t.type = g.enumeration(peek().s) ? PinType::enumeration : PinType::structure;
       t.of = toks[p++].s;
       return true;
+    }
+    if (is("Object") && is("<", 1)) {
+      // Object<kern::App>: an object of the engine of that class (kern/docs/engine_object.md)
+      p += 2;
+      std::string of;
+      if (!engine_class_here(of)) return false;
+      if (!engine_interface(of)) return fail(p - 1, "Object<" + engine_class_cpp(of) + ">: the engine has no interface " + of + " (" + interface_names() + ")");
+      t = {PinType::object, of};
+      return expect(">");
     }
     if (is("Callback") && is("<", 1)) {
       // Callback<Float(Float, Float)>: a function of a library the engine calls (Make Callback), its signature -
@@ -2866,6 +2909,14 @@ struct Reader {
         ++p;  // (a setting that names no function)
         out.emplace_back();
         if (types) types->push_back(false);
+        if (!accept(",")) break;
+        continue;
+      }
+      if (is("kern") && is("::", 1)) {
+        // kern::App   a class of the engine (ParamDef::engine_class), by its C++ type
+        if (!engine_class_here(s)) return false;
+        out.push_back(std::move(s));
+        if (types) types->push_back(true);
         if (!accept(",")) break;
         continue;
       }
@@ -3341,7 +3392,11 @@ struct Reader {
     for (std::size_t k = 0, at = 0; k < def->params.size(); ++k) {
       const ParamDef& pd = def->params[k];
       if (pd.kind == ParamDef::Kind::variable || pd.kind == ParamDef::Kind::scope || pd.kind == ParamDef::Kind::path) continue;
-      bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type);
+      bool fits = as_type[at] == (pd.kind == ParamDef::Kind::type || pd.engine_class);
+      if (fits && pd.engine_class && !engine_interface(given[at])) {
+        fail(tok, node_name(def->type) + ": the engine has no interface " + engine_class_cpp(given[at]) + " (" + interface_names() + ")");
+        return -1;
+      }
       if (fits && pd.kind == ParamDef::Kind::type) {
         fits = false;
         for (const TypeRef& choice : type_choices(pd, g)) fits = fits || given[at] == type_text(choice);
@@ -5342,6 +5397,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
     };
     if (t == PinType::map) return "kern::logic::Map<" + inner(key_type({t, of})) + ", " + inner(value_type({t, of})) + ">";
     if (t == PinType::set) return "kern::logic::Set<" + inner(key_type({t, of})) + ">";
+    if (t == PinType::object) return "kern::logic::Object<" + engine_class_cpp(of) + ">";  // (kern::logic::Object<kern::App>)
     if (t == PinType::callback) {  // (kern::logic::Callback<kern::f64(kern::f64, kern::f64)>)
       const TypeRef r = callback_result({t, of});
       std::string c = "kern::logic::Callback<" + (r.type == PinType::exec ? std::string("void") : inner(r)) + "(";
@@ -5372,6 +5428,7 @@ bool native_glue(const Graph& g, const std::string& name, std::string& out, std:
       }
       return r + "}";
     }
+    if (v.type == PinType::object) return type(v.type, of) + "{}";  // (no object: the one a text writes out)
     const std::string text = literal(v);
     if (v.type == PinType::vector) return "kern::Vec3" + text.substr(6);
     if (v.type == PinType::actor) return "kern::logic::ActorHandle" + text.substr(5);

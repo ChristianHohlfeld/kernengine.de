@@ -4054,7 +4054,9 @@ static logic::Graph every_node_graph(bool wired) {
                       // (a map and a set as the nodes of maps and sets are typed by default: Int keys, Float values)
                       {"VM", PinType::map, "int>float"},  {"VQ", PinType::set, "int"},   {"VSB", PinType::structure, "SB"},
                       // (bytes - Bytes of Text, Bytes of S: a List<U8>)
-                      {"L8", PinType::integer_list, "u8"}};
+                      {"L8", PinType::integer_list, "u8"},
+                      // (an object of the engine: what Engine Object of Blueprint gives, as its Interface says by default)
+                      {"VO", PinType::object, "App"}};
   g.enums.push_back({"EM", {"One", "Two", "Three"}, "An enum.\n\nWith three values."});
   // (a struct with a field of every kind - a value, an enum's, another struct's, lists of them - and the struct it holds)
   g.structs.push_back({"SI", {{"N", {PinType::integer, ""}, json::Value(3)}, {"Tag", {PinType::text, ""}, json::Value("t \"q\"")}}, "A struct."});
@@ -7915,43 +7917,116 @@ TEST(engine_object_of_a_blueprint) {
     logic::EngineObjects objects;
     bool has = true;
     logic::EngineObjects* engine_objects() override { return has ? &objects : nullptr; }
-    logic::ActorRef find_actor(std::string_view name) override { return name == "Water" ? 11 : name == "Asks" ? 12 : 0; }
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Water" ? 11 : name == "Asks" ? 12 : name == "Nobody" ? 13 : 0; }
   } host;
   logic::Runtime rt(host);
   logic::Graph water, asks;
   std::string error;
   CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && water.implements == "ShaderExtension");
-  CHECK(logic::from_cpp("struct Asks : kern::Blueprint {\n"
-                        "  // ---- functions ----\n"
-                        "  struct waterResult { Int result = 0; };\n"
-                        "  waterResult water() {\n"
-                        "    return {func_engine_object(actor_find(\"Water\"))};\n"
-                        "  }\n"
-                        "\n"
-                        "  struct selfResult { Int result = 0; };\n"
-                        "  selfResult self() {\n"
-                        "    return {func_engine_object(actor_find(\"Asks\"))};\n"
-                        "  }\n"
-                        "};\n", asks, nullptr, &error));
+  const char* const kAsks =
+      "struct Asks : kern::Blueprint {\n"
+      "  // ---- functions ----\n"
+      "  struct waterResult { Object<kern::ShaderExtension> result = Object<kern::ShaderExtension>{}; };\n"
+      "  waterResult water() {\n"
+      "    return {func_engine_object<kern::ShaderExtension>(actor_find(\"Water\"))};\n"
+      "  }\n"
+      "\n"
+      "  struct asAppResult { Object<kern::App> result = Object<kern::App>{}; };\n"
+      "  asAppResult asApp() {\n"
+      "    return {func_engine_object<kern::App>(actor_find(\"Water\"))};\n"
+      "  }\n"
+      "\n"
+      "  struct selfResult { Object<kern::App> result = Object<kern::App>{}; };\n"
+      "  selfResult self() {\n"
+      "    return {func_engine_object<kern::App>(actor_find(\"Asks\"))};\n"
+      "  }\n"
+      "\n"
+      "  struct nobodyResult { Bool result = false; };\n"
+      "  nobodyResult nobody() {\n"
+      "    return {object_valid<kern::App>(func_engine_object<kern::App>(actor_find(\"Nobody\")))};\n"
+      "  }\n"
+      "\n"
+      "  struct handleResult { Int result = 0; };\n"
+      "  handleResult handle() {\n"
+      "    return {object_handle<kern::ShaderExtension>(func_engine_object<kern::ShaderExtension>(actor_find(\"Water\")))};\n"
+      "  }\n"
+      "};\n";
+  CHECK(logic::from_cpp(kAsks, asks, nullptr, &error));
+  if (!error.empty()) std::printf("  engine_object_of_a_blueprint: %s\n", error.c_str());
   CHECK(no_errors(logic::check(asks)));
+  std::string again;
+  CHECK(logic::to_cpp(asks, "Asks", again, &error, logic::library(), false) && again.ends_with(kAsks));   // (the one way it is written: after the text's head)
+  if (!again.ends_with(kAsks)) std::printf("%s\n", again.c_str());
   logic::Instance* const w = rt.add(water, 11, "Water");
   logic::Instance* const a = rt.add(asks, 12, "Asks");
   rt.begin();
   CHECK(w && a);
   if (!w || !a) return;
   std::vector<logic::Value> got;
-  CHECK(a->call("water", {}, got) && got.size() == 1);
-  const i64 h = got.empty() ? 0 : got[0].as_int();
+  CHECK(a->call("water", {}, got) && got.size() == 1 && got[0].type == logic::PinType::object);
+  const logic::ObjectRef h = got.empty() ? logic::ObjectRef{} : got[0].as_object();
+  CHECK(h.valid() && h.world == host.objects.world());
   ShaderExtension* const ext = host.objects.get<ShaderExtension>(h);
-  CHECK(h != 0 && ext && std::string(ext->name()) == "water");
-  CHECK(rt.engine_object(11) == h && rt.engine_object(11) == h);   // (made once)
-  CHECK(a->call("self", {}, got) && got.size() == 1 && got[0].as_int() == 0);   // (it implements nothing)
-  CHECK(rt.engine_object(99) == 0);   // (no Blueprint there)
+  CHECK(ext && std::string(ext->name()) == "water");
+  CHECK(host.errors.empty());
+  std::string why;
+  CHECK(rt.engine_object(11, "ShaderExtension", why) == h && rt.engine_object(11, "ShaderExtension", why) == h);   // (made once)
+  CHECK(a->call("handle", {}, got) && got.size() == 1 && got[0].as_int() == h.handle);   // (Handle of Object: the one way to an Int)
+  // (each reason in its own words, at the caller - and no object)
+  CHECK(a->call("asApp", {}, got) && got.size() == 1 && !got[0].as_object().valid());
+  CHECK(host.errors.size() == 1 && host.errors.back() == "Asks: Engine Object of Blueprint: the Blueprint Water implements ShaderExtension, not App");
+  CHECK(a->call("self", {}, got) && got.size() == 1 && !got[0].as_object().valid());
+  CHECK(host.errors.size() == 2 && host.errors.back() == "Asks: Engine Object of Blueprint: the Blueprint Asks implements no interface of the engine (App was asked for)");
+  CHECK(a->call("nobody", {}, got) && got.size() == 1 && !got[0].as_bool());
+  CHECK(host.errors.size() == 3 && host.errors.back() == "Asks: Engine Object of Blueprint: actor 13 has no Blueprint that runs");
   host.has = false;
   logic::Runtime other(host);
   other.add(water, 11, "Water");
-  CHECK(other.engine_object(11) == 0);   // (a host without objects of the engine)
+  CHECK(!other.engine_object(11, "ShaderExtension", why).valid() && why == "this host has no objects of the engine - the Blueprint Water cannot be one");
+  // (a setting that names no interface of the engine is refused where it is read, and checked)
+  logic::Graph wrong;
+  CHECK(!logic::from_cpp("struct Wrong : kern::Blueprint {\n  // ---- functions ----\n  struct fResult { Int result = 0; };\n  fResult f() {\n    return {object_handle<kern::App>(func_engine_object<kern::Nothing>(actor_find(\"Water\")))};\n  }\n};\n", wrong, nullptr, &error) &&
+        error.find("the engine has no interface kern::Nothing") != std::string::npos);
   host.objects.clear();
+}
+
+// An object of the engine is a type of its own (kern/docs/engine_object.md): Object<I> goes where an Object of the same
+// class goes - or an input of any (Is Valid Object) -, never where another class or a number is, and no number becomes
+// one; an ObjectRef names its object only in its own world, and says why elsewhere.
+TEST(object_refs_know_their_world) {
+  using logic::PinType;
+  using logic::TypeRef;
+  CHECK(logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::object, "App"}));
+  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::object, "ShaderExtension"}));
+  CHECK(!logic::fits(TypeRef{PinType::integer, ""}, TypeRef{PinType::object, "App"}));
+  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::integer, ""}));
+  CHECK(!logic::fits(TypeRef{PinType::object, "App"}, TypeRef{PinType::text, ""}));
+  CHECK(!logic::convertible(PinType::integer, PinType::object) && !logic::convertible(PinType::object, PinType::boolean));
+  CHECK(!logic::Value::integer(7).converted(PinType::object).as_object().valid());
+  CHECK(logic::engine_class_name("kern::physics::World") == "physics_World" && logic::engine_class_cpp("physics_World") == "kern::physics::World");
+  CHECK(logic::engine_class_name(logic::cpp_name_of<kern::App>()) == "App");
+  logic::EngineObjects one, two;
+  CHECK(one.world() != 0 && two.world() != 0 && one.world() != two.world());
+  logic::EngineObjects same(one.world());
+  CHECK(same.world() == one.world());
+  struct Thing { int x = 7; };
+  const logic::ObjectRef r = one.ref(one.own(std::make_unique<Thing>()));
+  const logic::ObjectRef t = two.ref(two.own(std::make_unique<Thing>()));
+  CHECK(r.valid() && t.valid() && r.handle == t.handle && !(r == t));   // (the same handle, another world)
+  CHECK(one.get<Thing>(r) && one.get<Thing>(r)->x == 7);
+  CHECK(!one.get<Thing>(t) && one.error == "an object of world " + std::to_string(two.world()) + " used in world " + std::to_string(one.world()) + " - it names nothing here");
+  CHECK(!one.get<Thing>(logic::ObjectRef{}) && one.error == "no object of the engine (an Object that refers to none)");
+  CHECK(!one.ref(0).valid());
+  // (as a variable: none to begin with, written and read as no object; a number typed in is no object)
+  logic::Graph g;
+  std::string error;
+  CHECK(logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::App> Main = Object<kern::App>{};\n};\n", g, nullptr, &error) &&
+        g.variables.size() == 1 && g.variables[0].type == PinType::object && g.variables[0].of == "App");
+  if (!error.empty()) std::printf("  object_refs_know_their_world: %s\n", error.c_str());
+  CHECK(no_errors(logic::check(g)));
+  CHECK(!logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::App> Main = 3;\n};\n", g, nullptr, &error));
+  CHECK(!logic::from_cpp("struct Holds : kern::Blueprint {\n  // ---- variables ----\n  Object<kern::Nothing> Main = Object<kern::Nothing>{};\n};\n", g, nullptr, &error) &&
+        error.find("the engine has no interface Nothing") != std::string::npos);
 }
 
 // A type of node that an object is (kern/logic/node_type.h): register_node_type adds it to library() - an event node
@@ -8014,7 +8089,8 @@ TEST(node_type_of_an_object) {
   if (!error.empty()) std::printf("  node_type_of_an_object: %s\n", error.c_str());
   CHECK(program.add(ticker, 7, "Ticker") != nullptr);
   program.begin();
-  logic::NodeType* const object = program_host.objects.get<logic::NodeType>(program.engine_object(7));
+  std::string why;
+  logic::NodeType* const object = program_host.objects.get<logic::NodeType>(program.engine_object(7, "logic_NodeType", why));
   CHECK(object != nullptr);
   if (!object) return;
   CHECK(logic::register_node_type(object));
