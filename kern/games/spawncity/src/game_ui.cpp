@@ -9,6 +9,8 @@
 #include <cstdio>
 
 #include "game.h"
+#include "blueprint_call.h"     // (rules::decimal: a number of the game into a Blueprint)
+#include "level_blueprints.h"  // the Blueprints the game calls as their classes: gps_live, gps_live_cpp
 #include "kern/geo/primitives.h"
 
 namespace sc {
@@ -87,37 +89,38 @@ bool Game::ui_command(const std::string& cmd, std::string& out) {
   // ---- LIVE GPS (gps_live_mode.mjs) ----
   if (starts("gps ")) {
     const std::string rest = cmd.substr(4);
-    GpsLive& g = ui_.gps;
-    if (rest == "on") { if (!g.active()) { g.start(time_); ui_.trail.clear(); ui_.trail_dirty = true; } out = "on"; return true; }
-    if (rest == "off") { g.stop(); ui_.gps_cam_init = false; out = "off"; return true; }
+    blueprints::gps_live::GpsLive& g = ui_.gps;
+    if (rest == "on") { if (!kern::logic::blueprint<blueprints::gps_live>().GpsLive_active(g).Result) { kern::logic::blueprint<blueprints::gps_live_cpp>().GpsLive_start(g, time_); ui_.trail.clear(); ui_.trail_dirty = true; } out = "on"; return true; }
+    if (rest == "off") { kern::logic::blueprint<blueprints::gps_live>().GpsLive_stop(g); ui_.gps_cam_init = false; out = "off"; return true; }
     if (rest.rfind("view", 0) == 0) {
       const std::string v = rest.size() > 5 ? rest.substr(5) : "next";
-      g.view = v == "eye" ? GpsLive::View::eye : v == "follow" ? GpsLive::View::follow : v == "map" ? GpsLive::View::map
-                                                                                              : static_cast<GpsLive::View>((static_cast<u8>(g.view) + 1) % 3);
+      g.view = v == "eye" ? blueprints::gps_live::GpsLive_View::eye : v == "follow" ? blueprints::gps_live::GpsLive_View::follow : v == "map" ? blueprints::gps_live::GpsLive_View::map
+                                                                                              : static_cast<blueprints::gps_live::GpsLive_View>((static_cast<u8>(g.view) + 1) % 3);
       ui_.gps_cam_init = false;
-      out = g.view == GpsLive::View::eye ? "eye" : g.view == GpsLive::View::follow ? "follow" : "map";
+      out = g.view == blueprints::gps_live::GpsLive_View::eye ? "eye" : g.view == blueprints::gps_live::GpsLive_View::follow ? "follow" : "map";
       return true;
     }
-    if (rest.rfind("compass ", 0) == 0) { g.compass(static_cast<f32>(std::atof(rest.c_str() + 8))); out = "ok"; return true; }
+    if (rest.rfind("compass ", 0) == 0) { kern::logic::blueprint<blueprints::gps_live>().GpsLive_compass(g, rules::decimal(static_cast<f32>(std::atof(rest.c_str() + 8)))); out = "ok"; return true; }
     double lat = 0, lon = 0, acc = 0, speed = -1, course = -1;
     if (rest.rfind("fix ", 0) == 0 && std::sscanf(rest.c_str() + 4, "%lf %lf %lf %lf %lf", &lat, &lon, &acc, &speed, &course) >= 3) {
-      if (!g.active()) { out = "off"; return true; }
+      if (!kern::logic::blueprint<blueprints::gps_live>().GpsLive_active(g).Result) { out = "off"; return true; }
       if (!world_placed_) { out = "loading"; return true; }
       f64 x = 0, y = 0;
       city_.projector().project(lon, lat, x, y);
-      if (std::hypot(x, y) / 1000 > GpsLive::kReanchorKm && !net_.active()) {
+      if (std::hypot(x, y) / 1000 > blueprints::gps_live::kReanchorKm && !net_.active()) {
         // Far from the world's origin: the world moves to you.
         ui_move_world(lon, lat);
-        g.start(time_);
+        kern::logic::blueprint<blueprints::gps_live_cpp>().GpsLive_start(g, time_);
         out = "reanchor";
         return true;
       }
-      const bool first = !g.has_fix();
-      out = g.fix(time_, static_cast<f32>(x), static_cast<f32>(y), static_cast<f32>(acc), static_cast<f32>(speed),
-                  course >= 0 ? static_cast<f32>(course * kDeg) : -1.0f) ? "ok" : "rejected";
+      const bool first = !kern::logic::blueprint<blueprints::gps_live>().GpsLive_has_fix(g).Result;
+      out = kern::logic::blueprint<blueprints::gps_live_cpp>().GpsLive_fix(g, time_, rules::decimal(static_cast<f32>(x)), rules::decimal(static_cast<f32>(y)), rules::decimal(static_cast<f32>(acc)),
+                            rules::decimal(static_cast<f32>(speed)), course >= 0 ? rules::decimal(static_cast<f32>(course * kDeg)) : -1.0).Result ? "ok" : "rejected";
       if (out == "ok") {
         // gps_live_mode.mjs addTrail: a point every 2 m, at most 4000.
-        const Vec2 p = g.position();
+        const Vec3 at = kern::logic::blueprint<blueprints::gps_live>().GpsLive_position(g).Result;
+        const Vec2 p{at.x, at.y};
         if (first || ui_.trail.empty() || std::hypot(p.x - ui_.trail.back().x, p.y - ui_.trail.back().y) >= 2) {
           ui_.trail.push_back(p);
           if (ui_.trail.size() > 4000) ui_.trail.erase(ui_.trail.begin());
@@ -142,13 +145,13 @@ void Game::ui_move_world(f64 lon, f64 lat) {
 }
 
 void Game::ui_gps_update(f32 dt) {
-  GpsLive& g = ui_.gps;
-  if (!g.active() || !world_placed_ || ui_.paused) return;
+  blueprints::gps_live::GpsLive& g = ui_.gps;
+  if (!kern::logic::blueprint<blueprints::gps_live>().GpsLive_active(g).Result || !world_placed_ || ui_.paused) return;
   // The game can't hurt you in this mode: it mirrors real life (on foot, no damage, no wanted level).
   if (mode_ != Mode::foot) command("mode foot");
-  g.frame(time_, dt);
-  if (g.has_fix()) {
-    const Vec2 p = g.shown();
+  kern::logic::blueprint<blueprints::gps_live_cpp>().GpsLive_frame(g, time_, rules::decimal(dt));
+  if (kern::logic::blueprint<blueprints::gps_live>().GpsLive_has_fix(g).Result) {
+    const Vec3 p = kern::logic::blueprint<blueprints::gps_live>().GpsLive_shown(g).Result;
     world_->teleport(soldier_, {p.x, p.y, city_.ground_height(p.x, p.y) + 0.73f});
     world_->set_actor_velocity(soldier_, {});
   }
@@ -188,19 +191,19 @@ void Game::ui_draw_gps(f32 dt) {
     }
     make(ui_.puck_wedge, wedge, blue, 0.28f);
   }
-  const GpsLive& g = ui_.gps;
-  const bool show = g.active() && g.has_fix() && world_placed_;
+  const blueprints::gps_live::GpsLive& g = ui_.gps;
+  const bool show = kern::logic::blueprint<blueprints::gps_live>().GpsLive_active(g).Result && kern::logic::blueprint<blueprints::gps_live>().GpsLive_has_fix(g).Result && world_placed_;
   for (u32 id : {ui_.puck_acc, ui_.puck_ring, ui_.puck_dot, ui_.puck_wedge})
     if (id) r.set_visible(id, show);
   if (show) {
-    const Vec2 p = g.shown();
-    const f32 z = city_.ground_height(p.x, p.y) + 0.05f, acc = std::fmax(1.0f, g.accuracy());
+    const Vec3 p = kern::logic::blueprint<blueprints::gps_live>().GpsLive_shown(g).Result;
+    const f32 z = city_.ground_height(p.x, p.y) + 0.05f, acc = std::fmax(1.0f, static_cast<f32>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_accuracy(g).Result));
     auto put = [&](u32 id, const kern::Mat4& m) { if (id) r.update_instances(id, kern::Span<const f32>(m.m, 16), {}); };
     put(ui_.puck_acc, kern::Mat4::trs({p.x, p.y, z}, {}, {acc, acc, 1}));
     put(ui_.puck_ring, kern::Mat4::translate({p.x, p.y, z + 0.01f}));
     put(ui_.puck_dot, kern::Mat4::translate({p.x, p.y, z + 0.02f}));
     // heading: clockwise from north (+y); the wedge points along +y
-    put(ui_.puck_wedge, kern::Mat4::trs({p.x, p.y, z + 0.03f}, Quat::axis_angle({0, 0, 1}, -g.heading()), {1, 1, 1}));
+    put(ui_.puck_wedge, kern::Mat4::trs({p.x, p.y, z + 0.03f}, Quat::axis_angle({0, 0, 1}, -static_cast<f32>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_heading(g).Result)), {1, 1, 1}));
   }
   // The track line, re-uploaded at most twice a second.
   ui_.trail_upload += dt;
@@ -224,7 +227,7 @@ void Game::ui_draw_gps(f32 dt) {
       if (!kern::upsert(r, ui_.trail_mesh, line, look)) { r.release_id(ui_.trail_mesh); ui_.trail_mesh = 0; }
     }
   }
-  if (ui_.trail_mesh && !g.active()) r.set_visible(ui_.trail_mesh, false);
+  if (ui_.trail_mesh && !kern::logic::blueprint<blueprints::gps_live>().GpsLive_active(g).Result) r.set_visible(ui_.trail_mesh, false);
   else if (ui_.trail_mesh && ui_.trail.size() >= 2 && !ui_.trail_dirty) r.set_visible(ui_.trail_mesh, true);
 }
 
@@ -280,14 +283,15 @@ void Game::ui_draw_helpers() {
 
 void Game::ui_camera(f32 dt) {
   (void)dt;
-  const GpsLive& g = ui_.gps;
-  if (!g.active() || !g.has_fix() || g.view == GpsLive::View::eye || mode_ != Mode::foot) return;
+  const blueprints::gps_live::GpsLive& g = ui_.gps;
+  if (!kern::logic::blueprint<blueprints::gps_live>().GpsLive_active(g).Result || !kern::logic::blueprint<blueprints::gps_live>().GpsLive_has_fix(g).Result || g.view == blueprints::gps_live::GpsLive_View::eye || mode_ != Mode::foot) return;
   // FOLLOW (behind and above, navigation style) or MAP (top-down, heading up), gps_live_mode.mjs.
-  const Vec2 p = g.shown();
-  const f32 h = g.heading(), fx = std::sin(h), fy = std::cos(h), gz = city_.ground_height(p.x, p.y), fast = clampf(g.speed() / 12, 0, 1);
+  const Vec3 p = kern::logic::blueprint<blueprints::gps_live>().GpsLive_shown(g).Result;
+  const f32 h = static_cast<f32>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_heading(g).Result), fx = std::sin(h), fy = std::cos(h), gz = city_.ground_height(p.x, p.y),
+            fast = clampf(static_cast<f32>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_speed(g).Result) / 12, 0, 1);
   Vec3 eye, look, up{0, 0, 1};
   f32 fov = 62;
-  if (g.view == GpsLive::View::follow) {
+  if (g.view == blueprints::gps_live::GpsLive_View::follow) {
     const f32 back = 9 + 10 * fast, high = 6 + 6 * fast;
     eye = {p.x - fx * back, p.y - fy * back, gz + high};
     look = {p.x + fx * (6 + 10 * fast), p.y + fy * (6 + 10 * fast), gz + 1};
@@ -508,11 +512,13 @@ std::string Game::ui_hud_json() {
                 ui_.settings.on(Opt::view_minimap_north) ? "true" : "false", ui_.assists, ui_.settings.on(Opt::audio_on) ? "true" : "false",
                 ui_.settings.on(Opt::music_on) ? "true" : "false");
   s += b;
-  const GpsLive& g = ui_.gps;
-  if (g.active()) {
-    const char* view = g.view == GpsLive::View::eye ? "AUGE" : g.view == GpsLive::View::follow ? "FOLGEN" : "KARTE";
+  const blueprints::gps_live::GpsLive& g = ui_.gps;
+  if (kern::logic::blueprint<blueprints::gps_live>().GpsLive_active(g).Result) {
+    const char* view = g.view == blueprints::gps_live::GpsLive_View::eye ? "AUGE" : g.view == blueprints::gps_live::GpsLive_View::follow ? "FOLGEN" : "KARTE";
+    const std::string activity(kern::logic::blueprint<blueprints::gps_live_cpp>().GpsLive_activity_label(g).Result.view());
     std::snprintf(b, sizeof b, ",\"gps\":{\"fix\":%s,\"activity\":\"%s\",\"speed\":%.2f,\"distance\":%.1f,\"time\":%.0f,\"accuracy\":%.0f,\"view\":\"%s\",\"accepted\":%u,\"rejected\":%u}",
-                  g.has_fix() ? "true" : "false", g.activity_label(), g.speed(), g.distance(), g.elapsed(time_), g.accuracy(), view, g.accepted, g.rejected);
+                  kern::logic::blueprint<blueprints::gps_live>().GpsLive_has_fix(g).Result ? "true" : "false", activity.c_str(), static_cast<f32>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_speed(g).Result), static_cast<f32>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_distance(g).Result),
+                  static_cast<f64>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_elapsed(g, time_).Result), static_cast<f32>(kern::logic::blueprint<blueprints::gps_live>().GpsLive_accuracy(g).Result), view, static_cast<u32>(g.accepted), static_cast<u32>(g.rejected));
     s += b;
   }
   return s + ui_equipment_json();
