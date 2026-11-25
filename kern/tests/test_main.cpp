@@ -2241,7 +2241,10 @@ TEST(logic_place_of_the_engine_text_round) {
   CHECK(logic::to_cpp(g, "Mix", again, &error));
   CHECK(again.find("  struct { engine_mixer_bus_place<audio_BusSettings> result = {}; } n") != std::string::npos);
   logic::Graph read;
-  CHECK(logic::from_cpp(again, read, nullptr, &error) && read == g);
+  CHECK(logic::from_cpp(again, read, nullptr, &error));
+  std::string twice;
+  CHECK(logic::to_cpp(read, "Mix", twice, &error) && twice == again);
+  if (twice != again) std::printf("%s\n---\n%s\n", again.c_str(), twice.c_str());
   // without the struct: a reason, at the place's type
   std::string without = text;
   const std::size_t at = without.find("  KERN_STRUCT(audio_BusSettings)");

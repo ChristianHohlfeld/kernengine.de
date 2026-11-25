@@ -3220,7 +3220,8 @@ struct Reader {
           if (!(is("struct") && (is("{", 1) || is(":", 1)))) break;
           ++p;
           if (accept(":") && !node_base(d.memory, base)) return false;
-          if (!expect("{") || !fields(d.fields, nullptr, "what a node gives") || !member_name(std::move(d), base)) return false;
+          // (a place of the engine the node binds - engine_mixer_bus_place<audio_BusSettings> result = {}; - as among the members)
+          if (!expect("{") || !fields(d.fields, nullptr, "what a node gives", &d.places) || !member_name(std::move(d), base)) return false;
         }
       }
       it.open = p;
