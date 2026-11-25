@@ -139,7 +139,38 @@ bool graph_from_level_json(const json::Value& j, Graph& out, std::string* error,
       return false;
     }
   }
-  return graph_from_json(j, out, error);
+  // What it uses of the engine the level does not hold: the types and functions of the engine's libraries it
+  // used when it was written (its marks; its uses) go in front of its own, so that what names them reads - and
+  // hold_engine keeps, once the level is read, only what the Blueprint uses of them.
+  Graph engine;
+  for (const char* list : {"engine", "uses"}) {
+    const json::Value* v = j.is_object() ? j.find(list) : nullptr;
+    if (!v) continue;
+    if (v->is_object())
+      for (const auto& [name, mark] : v->members()) {
+        if (is_engine_library(name) && !engine.uses_library(name)) engine.uses.push_back(name);
+      }
+    else if (v->is_array())
+      for (const json::Value& u : v->items())
+        if (u.is_string() && is_engine_library(u.as_string()) && !engine.uses_library(u.as_string())) engine.uses.push_back(u.as_string());
+  }
+  if (engine.uses.empty()) return graph_from_json(j, out, error);
+  std::string why;
+  if (!take_libraries(engine, Blueprints(), &why, true)) {
+    if (error) *error = "the engine's libraries it uses: " + why;
+    return false;
+  }
+  const json::Value given = graph_to_json(engine);
+  json::Value whole = j;
+  for (const char* list : {"enums", "structs", "functions"}) {
+    json::Value items = json::Value::array();
+    if (given.is_object() && given.find(list) && given[list].is_array())
+      for (const json::Value& x : given[list].items()) items.push(x);
+    if (const json::Value* own = j.find(list); own && own->is_array())
+      for (const json::Value& x : own->items()) items.push(x);
+    if (items.size()) whole.set(list, std::move(items));
+  }
+  return graph_from_json(whole, out, error);
 }
 
 bool hold_engine(Graph& g, const Blueprints& project, std::string* error) {
