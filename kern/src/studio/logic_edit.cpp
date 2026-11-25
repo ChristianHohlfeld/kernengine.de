@@ -720,6 +720,20 @@ json::Value Studio::logic_json() const {
     }
     o.set("uses", std::move(uses));
     o.set("libraries", std::move(libraries));
+    // The interface of the engine it is the object of (Graph::implements), and those it could be (kern/docs/blueprint_cpp.md,
+    // "Schnittstellen der Engine"): each with the functions the engine calls - a pure one it must have.
+    o.set("implements", g->implements);
+    json::Value interfaces = json::Value::array();
+    for (const logic::EngineInterface& i : logic::engine_interfaces()) {
+      if (*i.waits) continue;
+      json::Value x = json::Value::object(), fns = json::Value::array();
+      x.set("name", i.name);
+      for (const logic::EngineVirtual& v : i.functions)
+        if (!*v.waits) fns.push(std::string(v.name) + (v.pure ? "" : "?"));
+      x.set("functions", std::move(fns));
+      interfaces.push(std::move(x));
+    }
+    o.set("interfaces", std::move(interfaces));
   }
   {
     // (the functions of the level's other Blueprints this one does not have or declare yet)
@@ -1760,6 +1774,22 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
       logic::Node* n = g.find(static_cast<u32>(num("node")));
       if (!n) return false;
       n->comment = str("text");
+      return true;
+    });
+  }
+  if (name == "logicImplements") {
+    // The interface of the engine this Blueprint is the object of: `name` (empty: none). Its functions are the
+    // Blueprint's of the names of the interface's (check() says what is missing or does not fit).
+    const std::string which = str("name");
+    return graph_edit("Implements", [&](logic::Graph& g, game::Level&) {
+      if (g.implements == which) return false;
+      if (!which.empty()) {
+        const logic::EngineInterface* const i = logic::engine_interface(which);
+        if (!i) { error = which + " is no interface of the engine"; return false; }
+        if (*i->waits) { error = "no Blueprint implements " + which + " in this build: " + i->waits; return false; }
+        if (g.library) { error = "a library is no object: it implements no interface of the engine"; return false; }
+      }
+      g.implements = which;
       return true;
     });
   }

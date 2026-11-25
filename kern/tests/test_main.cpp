@@ -7448,6 +7448,69 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
+// Blueprints as objects of interfaces of the engine (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"): the engine's
+// object of each (the adapter tools/engine_api.py writes) calls the Blueprint's function of the name the engine calls -
+// what it hands over as values, its objects as handles, what the Blueprint gives back as the C++ the engine takes; where
+// the Blueprint has no function of a name that is not pure, the interface's own runs. Played on the interpreter here;
+// the native cases Water and Running (blueprint_native.h) play the same calls on the class.
+TEST(engine_interface_a_blueprint_implements) {
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Graph water, game;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && water.implements == "ShaderExtension");
+  CHECK(logic::from_cpp(blueprint_native::kImplementsGame, game, nullptr, &error) && game.implements == "App");
+  CHECK(no_errors(logic::check(water)) && no_errors(logic::check(game)));
+  logic::Graph back;
+  CHECK(logic::graph_from_json(logic::graph_to_json(water), back, &error) && back.implements == "ShaderExtension");
+  logic::Instance* const w = rt.add(water, 11, "Water");
+  logic::Instance* const a = rt.add(game, 12, "Running");
+  rt.begin();
+  logic::EngineObjects objects;
+  const i64 hw = logic::engine_implement(objects, *w), ha = logic::engine_implement(objects, *a);
+  ShaderExtension* const ext = objects.get<ShaderExtension>(hw);
+  App* const app = objects.get<App>(ha);
+  CHECK(ext && app);
+  if (!ext || !app) return;
+  CHECK(std::string(ext->name()) == "water" && std::string(ext->vertex()) == "vWater = aWater * 0.25;");
+  // (what the Blueprint has not: the interface's own)
+  CHECK(std::string(ext->vertex_declarations()).empty() && ext->attributes().empty() && std::string(ext->fragment_surface()).empty());
+  Program program;
+  UniformCache cache;
+  Renderer renderer;
+  ext->bind(program);
+  ext->frame_uniforms(cache, renderer);
+  ext->frame_uniforms(cache, renderer);
+  CHECK(w->get("Program").i == objects.adopt<Program>(program) && w->get("Frames").i == 2 && w->get("Cache").i == objects.adopt<UniformCache>(cache));
+  Engine engine(renderer);
+  CHECK(app->start(engine) && a->get("Engine").i == objects.adopt<Engine>(engine));
+  Frame f;
+  f.time = 1.5, f.dt = 0.25f, f.index = 3;
+  app->update(engine, f);
+  f.time = 2.0;
+  app->update(engine, f);
+  CHECK(a->get("Updates").i == 2 && a->get("Last").n == 2.0 && !a->get("Stopped").b);
+  app->resized(engine);
+  CHECK(app->extensions().empty() && !app->configure().shadows);  // (App's own)
+  app->stop(engine);
+  CHECK(a->get("Stopped").b);
+  // an interface no Blueprint implements in this build (a pure function the engine hands a pointer): no object
+  const logic::EngineInterface* const transport = logic::engine_interface("net_Transport");
+  CHECK(transport && *transport->waits && logic::engine_implement(objects, "net_Transport", logic::implementer_of(*w)) == 0);
+  // check(): every pure function there, each of the interface's types
+  logic::Graph wrong;
+  CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<\"ShaderExtension\"> {\n  void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
+  const std::vector<logic::Issue> issues = logic::check(wrong);
+  const auto said = [&](const char* text) { return std::any_of(issues.begin(), issues.end(), [&](const logic::Issue& i) { return i.error && i.text.find(text) != std::string::npos; }); };
+  CHECK(said("it has no function name") && said("function \"bind\" of the interface ShaderExtension: its input 1 is int, not float"));
+  wrong.implements = "Nothing";
+  CHECK(!no_errors(logic::check(wrong)));
+  // the Blueprint ends: the engine's object stays, and gets nothing from it - the zero of what it asks for
+  rt.remove(11);
+  CHECK(std::string(ext->name()).empty() && std::string(ext->vertex()).empty());
+  objects.clear();
+}
+
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
 // the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
 // names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).
@@ -12046,6 +12109,38 @@ TEST(studio_logic_reference_inputs) {
   CHECK(cmd({{"cmd", "logicFunction"}, {"op", "pinAdd"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"type", "float"}})["ok"].as_bool());
   CHECK(!cmd({{"cmd", "logicFunction"}, {"op", "pinRef"}, {"name", "Bump"}, {"side", "out"}, {"pin", "result"}, {"ref", "ref"}})["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicCompile"})")["ok"].as_bool());
+}
+
+TEST(studio_logic_implements) {
+  // The interface of the engine a Blueprint is the object of, in the editor: offered with its functions, set, written
+  // in the text, its missing pure functions said by the check; one no Blueprint implements refused; undone like any edit.
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  f.cmd(R"({"cmd":"spawn","item":"cube"})");
+  CHECK(!f.s->level().actors.empty());
+  if (f.s->level().actors.empty()) return;
+  const game::ActorId id = f.s->level().actors.back().id;
+  CHECK(f.cmd((std::string(R"({"cmd":"logicOpen","owner":)") + std::to_string(id) + "}").c_str())["ok"].as_bool());
+  json::Value st = f.s->state();
+  bool offered = false, transport = false;
+  for (const json::Value& i : st["logic"]["interfaces"].items()) {
+    if (i["name"].as_string() == "ShaderExtension") {
+      bool name = false, vertex = false;
+      for (const json::Value& fn : i["functions"].items()) name = name || fn.as_string() == "name", vertex = vertex || fn.as_string() == "vertex?";
+      offered = name && vertex;
+    }
+    transport = transport || i["name"].as_string() == "net_Transport";
+  }
+  CHECK(offered && !transport && st["logic"]["implements"].as_string().empty());
+  CHECK(f.cmd(R"({"cmd":"logicImplements","name":"ShaderExtension"})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
+  CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
+  bool missing = false;
+  for (const json::Value& i : f.cmd(R"({"cmd":"logicCompile"})")["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
+  CHECK(missing);
+  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"net_Transport"})")["ok"].as_bool() && !f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["implements"].as_string().empty());
 }
 
 TEST(studio_logic_libraries) {

@@ -19,6 +19,12 @@ const EngineFunction* engine_function(std::string_view type) {
   return it == by_type.end() ? nullptr : it->second;
 }
 
+const EngineInterface* engine_interface(std::string_view name) {
+  for (const EngineInterface& i : engine_interfaces())
+    if (name == i.name) return &i;
+  return nullptr;
+}
+
 void add_engine_nodes(Library& lib) {
   for (const EngineFunction& f : engine_functions()) {
     NodeDef d;

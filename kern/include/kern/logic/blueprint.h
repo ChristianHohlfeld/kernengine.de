@@ -870,6 +870,10 @@ struct Blueprint : game::BlueprintNodesOf<logic::EngineNodesOf<BlueprintCore>> {
 ///   struct Door : virtual kern::Blueprint, virtual Random { ... n5 = Random::range(Seed, 0.0, 1.0); ... };
 /// (virtual: a Blueprint and the libraries it uses share what a Blueprint is.)
 using Library = Blueprint;
+/// A Blueprint that is the object of an interface of the engine (Graph::implements; kern/docs/blueprint_cpp.md,
+/// "Schnittstellen der Engine") names it as its last base - the engine calls its functions of the interface's names:
+///   struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> { ... Text vertex() { ... } ... };
+template <Setting Interface> struct Implements {};
 
 }  // namespace kern
 

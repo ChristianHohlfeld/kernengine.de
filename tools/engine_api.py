@@ -69,7 +69,7 @@ def c_text(s):
     return '"' + s.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ") + '"'
 
 
-def table_text(api, functions):
+def table_text(api, functions, interfaces=()):
     lines = ["// The engine's functions as nodes: the table (written by tools/engine_api.py from the engine's headers -",
              "// see kern/logic/engine_api.h; not edited by hand).",
              '#include "kern/logic/engine_api.h"', "", "namespace kern::logic {", "",
@@ -89,6 +89,12 @@ def table_text(api, functions):
         while flags and not flags[-1]:
             flags.pop()
         lines.append(f"       {pins(f['outs'])}" + "".join(", true" if x else ", false" for x in flags) + "},")
+    lines += ["  };", "  return all;", "}", ""]
+    # the interfaces of the engine (EngineInterface): a Blueprint can be the object the engine calls
+    lines += ["const std::vector<EngineInterface>& engine_interfaces() {", "  static const std::vector<EngineInterface> all = {"]
+    for q, name, virtuals, waits in interfaces:
+        fs = ", ".join(f"{{{c_text(f['decl']['name'])}, {c_text(f['type'])}, {'true' if pure else 'false'}" + (f", {c_text(why)}" if why else "") + "}" for f, pure, why in virtuals)
+        lines.append(f"      {{{c_text(name)}, {c_text(q)}, {{{fs}}}" + (f", {c_text(waits)}" if waits else "") + "},")
     lines += ["  };", "  return all;", "}", "", "}  // namespace kern::logic", ""]
     return "\n".join(lines)
 
@@ -302,6 +308,91 @@ class Calls:
         self.names = demangled([f["decl"].get("mangledName") for f in functions if f.get("role") != "release"])
         self.enum_q = {name: q for q, name in self.u.enums.items()}
         self.struct_q = {name: q for q, name in self.u.structs.items() if name}
+
+    # ---- the interfaces of the engine: a Blueprint as the object the engine calls (kern/docs/blueprint_cpp.md,
+    # "Schnittstellen der Engine") ----
+    def interfaces(self):
+        """Every class of the engine with virtual functions that are nodes: [(class, its Blueprint name, [(node, pure,
+        why a Blueprint has it not)], why no Blueprint implements it - "" where one can)], in the order of the table.
+        The adapter hands what the engine hands a virtual function to the Blueprint as values - an object of the
+        engine as its handle - and takes what it gives back; a function the engine hands a pointer, or one that
+        writes through what it is handed, has no such way yet: the interface's own runs there - and where it has
+        none (a pure one), no Blueprint implements the interface."""
+        by = collections.OrderedDict()
+        for f in self.functions:
+            d = f["decl"]
+            if f.get("role") is None and d.get("kind") == "CXXMethodDecl" and d.get("virtual"):
+                by.setdefault(self.tree.owner[d["id"]], []).append(f)
+        out = []
+        for q, fs in by.items():
+            virtuals = [(f, bool(f["decl"].get("pure")), self.unhanded(f)) for f in fs]
+            waits = next((f"{f['decl']['name']}() {why}" for f, pure, why in virtuals if pure and why), "")
+            out.append((q, c2b.type_name_of(q), virtuals, waits))
+        return out
+
+    def unhanded(self, f):
+        """Why the adapter cannot hand the engine's arguments of the virtual function f to a Blueprint ("": it can)."""
+        for (pin_in, pin_out), P in zip(f["params"], self.ptypes(f)):
+            if pin_in is None or pin_out is not None:
+                return "writes through what it is handed"
+            if P.rstrip().endswith("*"):
+                return "is handed a pointer"
+        if len(f["outs"]) > 1:
+            return "gives more than one value"
+        return ""
+
+    def adapter_text(self, q, name, virtuals, need):
+        """The engine's object of the interface q that a Blueprint is (engine_host.h, Implementer): each virtual
+        function calls the Blueprint's of its name - one that is not pure the interface's own where the Blueprint
+        has none."""
+        cls, lines, kept = f"Implements_{name}", [], []
+        for f, pure, why in virtuals:
+            if why:
+                continue   # (the interface's own runs: interfaces)
+            d = f["decl"]
+            m, const = d["name"], " const" if c2b.qtype(d).rstrip().endswith("const") else ""
+            ptypes = self.ptypes(f)
+            ret = f"decltype(std::declval<{'const ' if const else ''}{q}&>().{m}({', '.join(f'std::declval<{P}>()' for P in ptypes)}))"
+            params = ", ".join(f"{P} kern_p{k}" for k, P in enumerate(ptypes))
+            lines.append(f"  {ret} {m}({params}){const} override {{")
+            if not pure:
+                lines.append(f'    if (!by_->has("{m}")) return {q}::{m}({", ".join(f"kern_p{k}" for k in range(len(ptypes)))});')
+            args = []
+            for k, ((pin_in, _), P) in enumerate(zip(f["params"], ptypes)):
+                bt, h = next((bt, h) for n_, bt, h in f["ins"] if n_ == pin_in)
+                args.append(f"Value::integer(o_.adopt<{h}>(kern_p{k}))" if h else f"ev::Conv<{self.tag(bt, need)}>::to(o_, kern_p{k})")
+            lines.append(f"    const std::vector<Value> kern_in{{{', '.join(args)}}};" if args else "    const std::vector<Value> kern_in;")
+            lines.append("    std::vector<Value> kern_out;")
+            if not f["outs"]:
+                lines += [f'    by_->call("{m}", kern_in, kern_out);', "  }"]
+                continue
+            bt = f["outs"][0][1]
+            tg = self.tag(bt, need)
+            raw = c2b.qtype(d).split("(")[0].strip()
+            lines.append(f'    const bool kern_given = by_->call("{m}", kern_in, kern_out) && !kern_out.empty();')
+            if re.match(r"(?:kern::)?Span<", raw):
+                # (a view of what the Blueprint gave: kept here until the engine asks again)
+                member = f"kern_kept_{m}"
+                kept.append(f"  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<{ret}>().data)>>> {member};")
+                lines += [f"    {member}.clear();", f"    if (kern_given) ev::Conv<{tg}>::from(o_, kern_out[0], {member});",
+                          f"    return {ret}({member}.data(), {member}.size());", "  }"]
+                continue
+            zero = '""' if re.fullmatch(r"const char\s*\*", raw) else f"ev::blank<{ret}>()"
+            lines += [f"    {ret} kern_r = {zero};", f"    if (kern_given) ev::Conv<{tg}>::from(o_, kern_out[0], kern_r);", "    return kern_r;", "  }"]
+        return [f"// {q}: the object of the engine a Blueprint is (Graph::implements \"{name}\")",
+                f"class {cls} final : public {q} {{",
+                " public:",
+                f"  {cls}(EngineObjects& o, std::shared_ptr<Implementer> by) : o_(o), by_(std::move(by)) {{}}",
+                *lines,
+                "",
+                " private:",
+                "  EngineObjects& o_;",
+                "  std::shared_ptr<Implementer> by_;",
+                *kept,
+                "};",
+                f"i64 implements_{name}(EngineObjects& o, std::shared_ptr<Implementer> by) {{",
+                f"  return o.own<{cls}, {q}>(std::make_unique<{cls}>(o, std::move(by)));",
+                "}", ""]
 
     # ---- the Blueprint type of a pin as a tag (engine_values) ----
     def tag(self, bt, need, ev="ev::", types=""):
@@ -1000,6 +1091,11 @@ class Calls:
                 if f.get("role") == "make" and f["class"] in plans and plans[f["class"]][0] is f:
                     # (a host without an object at a handle - a test - makes one there: see default_makers)
                     makers.append((f["class"], self.maker_text(f["class"], plans, headers)))
+            adapters = []   # (the interfaces of this component a Blueprint can be the object of)
+            for q, name, virtuals, waits in self.interfaces():
+                if not waits and component_of(self.file_of(virtuals[0][0])) == comp:
+                    bodies += self.adapter_text(q, name, virtuals, need)
+                    adapters.append(name)
             text = ["// The engine's nodes on the engine itself: the calls of the functions the headers of this component declare",
                     "// (written by tools/engine_api.py from the engine's headers - see kern/logic/engine_host.h; not edited by hand).",
                     *[f'#include "{h}"' for h in sorted(headers)], '#include "kern/logic/engine_host.h"', "",
@@ -1010,6 +1106,9 @@ class Calls:
                     "const EngineCalls kAll(kCalls, std::size(kCalls));"]
             if makers:
                 text += ["", "const EngineMaker kMakers[] = {", *[f"    {m}," for _, m in makers], "};", "const EngineMakers kAllMakers(kMakers, std::size(kMakers));"]
+            if adapters:
+                text += ["", "const EngineImplement kAdapters[] = {", *[f'    {{"{a}", &implements_{a}}},' for a in adapters], "};",
+                         "const EngineImplements kAllAdapters(kAdapters, std::size(kAdapters));"]
             text += ["", "}  // namespace", "}  // namespace kern::logic", ""]
             out[f"src/{comp}/engine_calls.gen.cpp"] = "\n".join(text)
         return out
@@ -1068,7 +1167,7 @@ def main(argv):
         calls.default_makers()
         for q, why in sorted(calls.unmade.items()):
             print(f"not made for a handle: {q}: {why}")
-    for rel, text in (("src/logic/engine_api.gen.cpp", table_text(api, functions)), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
+    for rel, text in (("src/logic/engine_api.gen.cpp", table_text(api, functions, calls.interfaces())), ("include/kern/logic/engine_nodes.gen.h", calls.class_text()),
                       ("tests/engine_case.gen.h", case_text(api, functions)), *calls.texts().items()):
         path = os.path.join(KERN, rel)
         if "--list" not in argv and (not os.path.exists(path) or open(path).read() != text):

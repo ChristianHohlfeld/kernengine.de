@@ -2158,6 +2158,103 @@ bool c180(EngineObjects& o, const std::vector<Value>& in, std::vector<Value>& ou
   return true;
 }
 
+// kern::ShaderExtension: the object of the engine a Blueprint is (Graph::implements "ShaderExtension")
+class Implements_ShaderExtension final : public kern::ShaderExtension {
+ public:
+  Implements_ShaderExtension(EngineObjects& o, std::shared_ptr<Implementer> by) : o_(o), by_(std::move(by)) {}
+  decltype(std::declval<const kern::ShaderExtension&>().name()) name() const override {
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("name", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::ShaderExtension&>().name()) kern_r = "";
+    if (kern_given) ev::Conv<ev::Text>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().attributes()) attributes() const override {
+    if (!by_->has("attributes")) return kern::ShaderExtension::attributes();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("attributes", kern_in, kern_out) && !kern_out.empty();
+    kern_kept_attributes.clear();
+    if (kern_given) ev::Conv<ev::List<ev::Struct<S_ExtensionAttribute>>>::from(o_, kern_out[0], kern_kept_attributes);
+    return decltype(std::declval<const kern::ShaderExtension&>().attributes())(kern_kept_attributes.data(), kern_kept_attributes.size());
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().vertex_declarations()) vertex_declarations() const override {
+    if (!by_->has("vertex_declarations")) return kern::ShaderExtension::vertex_declarations();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("vertex_declarations", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::ShaderExtension&>().vertex_declarations()) kern_r = "";
+    if (kern_given) ev::Conv<ev::Text>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().vertex()) vertex() const override {
+    if (!by_->has("vertex")) return kern::ShaderExtension::vertex();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("vertex", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::ShaderExtension&>().vertex()) kern_r = "";
+    if (kern_given) ev::Conv<ev::Text>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_declarations()) fragment_declarations() const override {
+    if (!by_->has("fragment_declarations")) return kern::ShaderExtension::fragment_declarations();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("fragment_declarations", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::ShaderExtension&>().fragment_declarations()) kern_r = "";
+    if (kern_given) ev::Conv<ev::Text>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_discard()) fragment_discard() const override {
+    if (!by_->has("fragment_discard")) return kern::ShaderExtension::fragment_discard();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("fragment_discard", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::ShaderExtension&>().fragment_discard()) kern_r = "";
+    if (kern_given) ev::Conv<ev::Text>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_input()) fragment_input() const override {
+    if (!by_->has("fragment_input")) return kern::ShaderExtension::fragment_input();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("fragment_input", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::ShaderExtension&>().fragment_input()) kern_r = "";
+    if (kern_given) ev::Conv<ev::Text>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_surface()) fragment_surface() const override {
+    if (!by_->has("fragment_surface")) return kern::ShaderExtension::fragment_surface();
+    const std::vector<Value> kern_in;
+    std::vector<Value> kern_out;
+    const bool kern_given = by_->call("fragment_surface", kern_in, kern_out) && !kern_out.empty();
+    decltype(std::declval<const kern::ShaderExtension&>().fragment_surface()) kern_r = "";
+    if (kern_given) ev::Conv<ev::Text>::from(o_, kern_out[0], kern_r);
+    return kern_r;
+  }
+  decltype(std::declval<kern::ShaderExtension&>().bind(std::declval<kern::Program const&>())) bind(kern::Program const& kern_p0) override {
+    if (!by_->has("bind")) return kern::ShaderExtension::bind(kern_p0);
+    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::Program>(kern_p0))};
+    std::vector<Value> kern_out;
+    by_->call("bind", kern_in, kern_out);
+  }
+  decltype(std::declval<kern::ShaderExtension&>().frame_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Renderer const&>())) frame_uniforms(kern::UniformCache& kern_p0, kern::Renderer const& kern_p1) override {
+    if (!by_->has("frame_uniforms")) return kern::ShaderExtension::frame_uniforms(kern_p0, kern_p1);
+    const std::vector<Value> kern_in{Value::integer(o_.adopt<kern::UniformCache>(kern_p0)), Value::integer(o_.adopt<kern::Renderer>(kern_p1))};
+    std::vector<Value> kern_out;
+    by_->call("frame_uniforms", kern_in, kern_out);
+  }
+
+ private:
+  EngineObjects& o_;
+  std::shared_ptr<Implementer> by_;
+  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<const kern::ShaderExtension&>().attributes())>().data)>>> kern_kept_attributes;
+};
+i64 implements_ShaderExtension(EngineObjects& o, std::shared_ptr<Implementer> by) {
+  return o.own<Implements_ShaderExtension, kern::ShaderExtension>(std::make_unique<Implements_ShaderExtension>(o, std::move(by)));
+}
+
 const EngineCall kCalls[] = {
     {"engine.mesh.skinned", &c0},
     {"engine.mesh.cull_mode", &c1},
@@ -2421,6 +2518,11 @@ const EngineMaker kMakers[] = {
     {EngineObjects::kind<kern::UniformCache>(), [](EngineObjects& o, i64 handle) -> void* { return o.put_at<kern::UniformCache>(handle, std::unique_ptr<kern::UniformCache>(new kern::UniformCache())); }},
 };
 const EngineMakers kAllMakers(kMakers, std::size(kMakers));
+
+const EngineImplement kAdapters[] = {
+    {"ShaderExtension", &implements_ShaderExtension},
+};
+const EngineImplements kAllAdapters(kAdapters, std::size(kAdapters));
 
 }  // namespace
 }  // namespace kern::logic

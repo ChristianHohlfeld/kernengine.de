@@ -78,6 +78,31 @@ struct EngineFunction {
 const std::vector<EngineFunction>& engine_functions();
 /// The function of a node type, or null.
 const EngineFunction* engine_function(std::string_view type);
+
+/// An interface of the engine (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"): a class of the engine whose
+/// functions are virtual - kern::App, kern::ShaderExtension. The engine calls an object of it; a Blueprint can be that
+/// object (Graph::implements names the interface): its functions of the names of the interface's are what the engine
+/// calls. Each virtual function is the node of the table that calls it (EngineVirtual::node): the Blueprint's function
+/// has that node's inputs after the first (the object: the Blueprint itself) and its outputs, in their order and of
+/// their types. One that is pure the Blueprint must have; one that is not it may have - else the interface's own runs.
+struct EngineVirtual {
+  const char* name;  // the function: "vertex"
+  const char* node;  // its node: "engine.shader_extension.vertex"
+  bool pure;
+  /// Why the engine cannot hand this one to a Blueprint ("is handed a pointer"; "": it can) - a Blueprint has no
+  /// function of its name, the interface's own runs.
+  const char* waits = "";
+};
+struct EngineInterface {
+  const char* name;  // as a Blueprint names it: "ShaderExtension", "net_Transport"
+  const char* cpp;   // "kern::ShaderExtension"
+  std::vector<EngineVirtual> functions;
+  /// Why no Blueprint implements it in this build ("" where one can): a function of it whose pins the engine
+  /// cannot hand to a Blueprint and take back (a pointer the engine writes through) - tools/engine_api.py says which.
+  const char* waits = "";
+};
+const std::vector<EngineInterface>& engine_interfaces();
+const EngineInterface* engine_interface(std::string_view name);
 /// The nodes of the table, in a library (Library::core has them).
 void add_engine_nodes(Library& lib);
 

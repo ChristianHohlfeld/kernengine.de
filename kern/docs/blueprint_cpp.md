@@ -1461,6 +1461,51 @@ struct Site : virtual kern::Blueprint, virtual Ground {
   jedem späteren Aufruf auf diesem Objekt wieder, bis es freigegeben wird – so wird auch der behaltene Weg verglichen.
 - Geprüft: `logic_callbacks` (kern/tests/test_main.cpp).
 
+### Schnittstellen der Engine (ein Blueprint als Objekt, das die Engine ruft)
+
+Eine Klasse der Engine mit virtuellen Funktionen – `kern::App` (configure, extensions, start, update, resized, stop),
+`kern::ShaderExtension` (name, die Stücke des Shader-Texts, bind, frame_uniforms …) – ist eine **Schnittstelle**: die
+Engine ruft ein Objekt von ihr. Ein Blueprint kann dieses Objekt sein (Entscheidung E-c2). Anders als ein Callback (eine
+Funktion einer Bibliothek, ohne Welt) ist es ein Blueprint mit Zustand, der in der Welt läuft.
+
+```cpp
+struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+  Float Time = 0.0;
+  struct nameResult { Text result = ""; };
+  KERN_PURE nameResult name() { return {"water"}; }
+  void frame_uniforms(Int cache = 0, Int renderer = 0) { engine_uniform_cache_set_float(cache, 3, Time); }
+};
+```
+
+- **Sprache:** `Graph::implements` nennt die Schnittstelle mit ihrem Namen in den Blueprints (`EngineInterface::name`:
+  `App`, `ShaderExtension`, `net_Transport`); JSON `"implements"`, im Text die letzte Basis `kern::Implements<"…">`. Die
+  Funktionen des Blueprints mit den Namen der virtuellen Funktionen sind, was die Engine ruft: jede hat die Eingänge des
+  Knotens dieser Funktion nach dem ersten (das Objekt ist der Blueprint selbst) und seine Ausgänge, in ihrer Reihenfolge,
+  von ihren Typen – ein Objekt der Engine als Handle (`Int engine`), ein Struct der Engine als Struct des Blueprints
+  (`Frame frame`), `const char*` als Text.
+- **Regeln (check):** die Schnittstelle gibt es; jede reine virtuelle Funktion hat der Blueprint; jede Funktion mit dem
+  Namen einer virtuellen hat deren Eingänge und Ausgänge (keine Referenz: die Engine übergibt Werte) und ist seine eigene;
+  eine Bibliothek ist kein Objekt. Eine nicht reine, die der Blueprint nicht hat, ist die der Schnittstelle.
+- **Engine:** `tools/engine_api.py` schreibt aus dem Header je Schnittstelle die Tabelle (`engine_interfaces()`,
+  `EngineVirtual`: Name, Knoten, rein) und im `engine_calls.gen.cpp` ihres Teils den **Adapter**
+  (`Implements_<Name>`, eine Klasse, die von der Schnittstelle erbt): jede virtuelle Funktion gibt dem Blueprint, was die
+  Engine ihr gibt, als Werte (`Conv<…>::to`; ein Objekt der Engine als Handle in denselben `EngineObjects`, `adopt`), ruft
+  seine Funktion beim Namen (`Implementer`, an der Grenze wie `Instance::call` – jede Stufe) und gibt der Engine, was er
+  gibt (`Conv<…>::from`; ein Text bleibt mit den Objekten, eine Liste hinter einem `Span` im Adapter bis zur nächsten
+  Frage). Gab er nichts (er ist zu Ende, der Aufruf scheiterte), bekommt die Engine die Null dessen, was sie fragte
+  (`""` für einen Text). `logic::engine_implement(objects, instance)` macht das Objekt der Engine eines laufenden
+  Blueprints; das Handle nennt auch ein Objekt der Schnittstelle (was man der Engine gibt: `engine.renderer.init(…,
+  extensions)`).
+- **Was noch wartet:** eine virtuelle Funktion, der die Engine einen Zeiger gibt oder die durch das Gegebene schreibt
+  (`ShaderExtension::material_uniforms`, `net::Transport::send/receive`), hat noch keinen Weg zum Blueprint
+  (`EngineVirtual::waits`): dort läuft die der Schnittstelle; ist sie rein (`Transport`), implementiert kein Blueprint die
+  Schnittstelle (`EngineInterface::waits`).
+- **Editor:** im Abschnitt „Libraries“ die Auswahl „Implements …“ (Befehl `logicImplements`), mit den Funktionen jeder
+  Schnittstelle (eine mit `?` darf fehlen).
+- Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
+  Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
+  Aufrufe auf der Klasse), `studio_logic_implements`.
+
 ### Formeln
 
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas

@@ -2002,6 +2002,7 @@ struct Writer {
     // (a library: `virtual kern::Library`; what it uses, or a Blueprint uses, are bases beside that)
     out += "struct " + type + " : " + (g.library ? "virtual kern::Library" : g.uses.empty() ? "kern::Blueprint" : "virtual kern::Blueprint");
     for (const std::string& used : g.uses) out += ", virtual " + used;
+    if (!g.implements.empty()) out += ", kern::Implements<" + text_literal(g.implements) + ">";  // (the interface of the engine it is the object of)
     out += " {\n";
     bool own_types = false;  // (a type of a library it uses is the library's: its text has it)
     for (const EnumType& e : g.enums) own_types = own_types || e.from.empty();
@@ -4589,6 +4590,7 @@ struct Reader {
   /// struct Name : virtual kern::Library {                             a library: it keeps nothing, others use it
   /// struct Name : virtual kern::Blueprint, virtual Random {           a Blueprint that uses the library Random
   /// struct Name : virtual kern::Library, virtual Types {              a library that uses one
+  /// struct Name : kern::Blueprint, kern::Implements<"App"> {          the object of an interface of the engine (Graph::implements)
   /// What it uses it has: the libraries' types, and their functions as Random::range(...).
   bool head() {
     if (!expect("struct") || !word(name, "the Blueprint's name") || !expect(":")) return false;
@@ -4603,6 +4605,15 @@ struct Reader {
     }
     while (accept(",")) {
       const std::size_t at = p;
+      if (is("kern") && is("::", 1) && is("Implements", 2)) {   // (last: the interface of the engine it is the object of)
+        p += 3;
+        if (!expect("<")) return false;
+        if (peek().kind != Tok::text) return fail(p, "the name of an interface of the engine expected (kern::Implements<\"App\">), not " + shown(peek()));
+        g.implements = toks[p++].s;
+        if (!expect(">")) return false;
+        if (!is("{")) return fail(p, "kern::Implements<...> is the last base of a Blueprint");
+        break;
+      }
       if (!shared) return fail(base, "a Blueprint that uses libraries is `struct " + name + " : virtual kern::Blueprint, virtual <Library>`");
       if (!expect("virtual")) return false;
       std::string used;

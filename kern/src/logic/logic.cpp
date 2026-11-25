@@ -1573,6 +1573,7 @@ json::Value graph_to_json(const Graph& g) {
     for (const std::string& name : g.uses) uses.push(name);
     root.set("uses", std::move(uses));
   }
+  if (!g.implements.empty()) root.set("implements", g.implements);  // (only then: other graphs keep their content hash)
   if (!g.enums.empty()) {  // (only then: graphs without types of their own keep their content hash)
     json::Value enums = json::Value::array();
     for (const EnumType& e : g.enums) {
@@ -1746,6 +1747,8 @@ bool graph_from_json(const json::Value& j, Graph& out, std::string* error) {
     if (g.uses_library(name)) return bad("the library \"" + name + "\" is used twice");
     g.uses.push_back(name);
   }
+  g.implements = j["implements"].as_string();
+  if (g.implements.size() > 64) return bad("the interface a Blueprint implements has a name of 1-64 characters");
   for (const json::Value& v : j["enums"].items()) {
     EnumType e;
     e.name = v["name"].as_string();
@@ -2253,6 +2256,49 @@ std::vector<Issue> check(const Graph& g, const Library& lib) {
   for (std::size_t k = 0; k < g.uses.size(); ++k)
     for (std::size_t o = 0; o < k; ++o)
       if (g.uses[o] == g.uses[k]) err(0, "the library \"" + g.uses[k] + "\" is used twice");
+  // The object of an interface of the engine (Graph::implements): the engine calls its functions of the names of the
+  // interface's - each with the inputs and outputs of the interface's function (its node's after the object), every
+  // pure one there (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine").
+  if (!g.implements.empty()) {
+    const EngineInterface* const i = engine_interface(g.implements);
+    if (!i) {
+      err(0, "it implements " + g.implements + ", which is no interface of the engine");
+    } else {
+      if (g.library) err(0, "a library is no object: it implements no interface of the engine (" + g.implements + ")");
+      if (*i->waits) err(0, "no Blueprint implements " + g.implements + " in this build: " + i->waits);
+      auto shown = [](PinType t, std::string_view of) { return pin_type_name(t) + (of.empty() ? "" : "<" + std::string(of) + ">"); };
+      for (const EngineVirtual& v : i->functions) {
+        const Function* const f = g.function(v.name);
+        const EngineFunction* const e = engine_function(v.node);
+        if (!f) {
+          if (v.pure) err(0, "it implements " + g.implements + ": it has no function " + v.name + " (the interface's has no body - " + v.node + ")");
+          continue;
+        }
+        if (!e) continue;
+        const std::string what = "function \"" + f->name + "\" of the interface " + g.implements;
+        if (*v.waits) {
+          err(0, what + ": the engine cannot call it on a Blueprint yet - it " + v.waits + " (the interface's own runs there)");
+          continue;
+        }
+        if (!f->from.empty() || f->external) err(0, what + ": it is the Blueprint's own (the engine calls it on this one)");
+        if (f->inputs.size() + 1 != e->inputs.size()) err(0, what + ": it takes " + std::to_string(e->inputs.size() - 1) + " input(s), not " + std::to_string(f->inputs.size()));
+        else
+          for (std::size_t k = 0; k < f->inputs.size(); ++k) {
+            const EnginePin& p = e->inputs[k + 1];
+            const FunctionPin& in = f->inputs[k];
+            if (in.ref) err(0, what + ": its input " + in.name + " is a value the engine hands over, no reference");
+            if (in.type != p.type || in.of != p.of) err(0, what + ": its input " + std::to_string(k + 1) + " is " + shown(p.type, p.of) + ", not " + shown(in.type, in.of));
+          }
+        if (f->outputs.size() != e->outputs.size()) err(0, what + ": it gives " + std::to_string(e->outputs.size()) + " output(s), not " + std::to_string(f->outputs.size()));
+        else
+          for (std::size_t k = 0; k < f->outputs.size(); ++k) {
+            const EnginePin& p = e->outputs[k];
+            const FunctionPin& o = f->outputs[k];
+            if (o.type != p.type || o.of != p.of) err(0, what + ": its output " + std::to_string(k + 1) + " is " + shown(p.type, p.of) + ", not " + shown(o.type, o.of));
+          }
+      }
+    }
+  }
   // Reference inputs (FunctionPin::ref): a call names a place for each, and the function works
   // on it where it stands.
   for (const Function& f : g.functions)

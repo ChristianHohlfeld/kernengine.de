@@ -1513,6 +1513,73 @@ struct EnginePlaces : kern::Blueprint {
 };
 )kn";
 
+// Blueprints as objects of interfaces of the engine (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"): a shader
+// extension whose name and vertex text are Texts, its bind and frame_uniforms taking the engine's objects as handles - and
+// an App with start, update (a struct of the engine) and stop. Called by the names of the interface's functions, as the
+// engine's adapter calls them (engine_interface_a_blueprint_implements plays them through the adapters).
+inline const char* kImplementsWater = R"kn(
+struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
+  // ---- variables ----
+  Float Time = 0.25;
+  Int Program = 0;
+  Int Cache = 0;
+  Int Frames = 0;
+
+  // ---- functions ----
+  struct nameResult { Text result = ""; };
+  KERN_PURE nameResult name() {
+    return {"water"};
+  }
+
+  struct vertexResult { Text result = ""; };
+  KERN_PURE vertexResult vertex() {
+    return {text_append("vWater = aWater * ", kern::to<Text>(Time), ";")};
+  }
+
+  void bind(Int program = 0) {
+    Program = program;
+  }
+
+  void frame_uniforms(Int cache = 0, Int renderer = 0) {
+    Cache = cache;
+    Frames += 1;
+  }
+};
+)kn";
+
+inline const char* kImplementsGame = R"kn(
+struct Running : kern::Blueprint, kern::Implements<"App"> {
+  // ---- types ----
+  KERN_STRUCT(Frame) {
+    Float time = 0.0;
+    Float dt = 0.0;
+    Int64 index = Int64{0x0};
+  };
+
+  // ---- variables ----
+  Int Engine = 0;
+  Int Updates = 0;
+  Float Last = 0.0;
+  Bool Stopped = false;
+
+  // ---- functions ----
+  struct startResult { Bool result = false; };
+  startResult start(Int engine = 0) {
+    Engine = engine;
+    return {true};
+  }
+
+  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {
+    Updates += 1;
+    Last = frame.time;
+  }
+
+  void stop(Int engine = 0) {
+    Stopped = true;
+  }
+};
+)kn";
+
 inline std::vector<Case> cases() {
   std::vector<Case> all;
   // (a case that uses libraries finds them among the cases before it)
@@ -1767,6 +1834,22 @@ inline std::vector<Case> cases() {
       c.calls.push_back({run, {}});
       c.on_engine.push_back(run);
     }
+  }
+  {
+    Case& c = read("Water", kImplementsWater);
+    c.calls.push_back({"name", {}});
+    c.calls.push_back({"vertex", {}});
+    c.calls.push_back({"bind", {I(5)}});
+    c.calls.push_back({"frame_uniforms", {I(3), I(4)}});
+    c.calls.push_back({"frame_uniforms", {I(0), I(4)}});
+    c.calls.push_back({"vertex", {}});
+  }
+  {
+    Case& c = read("Running", kImplementsGame);
+    c.calls.push_back({"start", {I(2)}});
+    c.calls.push_back({"update", {I(2), Value::structure({N(1.5), N(0.016), Value::int64(7)})}});
+    c.calls.push_back({"update", {I(2), Value::structure({N(1.75), N(0.25), Value::int64(8)})}});
+    c.calls.push_back({"stop", {I(2)}});
   }
   // The tier cases a compiler runs as they stand: their events are handlers of the class, the
   // runtime is the same for every tier.

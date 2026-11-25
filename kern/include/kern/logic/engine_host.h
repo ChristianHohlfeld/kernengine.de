@@ -32,6 +32,7 @@
 #include <iterator>
 #include <memory>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -240,6 +241,41 @@ EngineCallFn engine_call(std::string_view function);
 /// Calls the engine's function of a node: `in` the node's inputs, `out` its outputs (given as their
 /// zeros). False: no such function in this build, or the call failed (objects.error says why).
 bool call_engine(EngineObjects& objects, std::string_view function, const std::vector<Value>& in, std::vector<Value>& out);
+
+/// A Blueprint as the object of an interface of the engine (EngineInterface, Graph::implements): what the engine's
+/// object - the adapter tools/engine_api.py writes for the interface - calls when the engine calls one of its
+/// functions. `has`: does the Blueprint have that function (else the interface's own runs - it is not pure);
+/// `call`: the function, by its name, with the values the engine hands it (handles for its objects), into the
+/// values it gives. False: it gave nothing (the Blueprint has ended, or the call failed) - the engine gets the
+/// zero of what it asked for.
+struct Implementer {
+  virtual ~Implementer() = default;
+  virtual bool has(std::string_view function) const = 0;
+  virtual bool call(std::string_view function, std::span<const Value> args, std::vector<Value>& results) = 0;
+};
+/// The adapter of one interface (written by tools/engine_api.py in the engine_calls.gen.cpp of its component): the
+/// object of the engine made for `by`, owned by `objects` - its handle (it is also one of the interface's class).
+using EngineImplementFn = i64 (*)(EngineObjects& objects, std::shared_ptr<Implementer> by);
+struct EngineImplement {
+  const char* interface;  // EngineInterface::name
+  EngineImplementFn make;
+};
+struct EngineImplements {
+  EngineImplements(const EngineImplement* adapters, std::size_t count);
+  const EngineImplement* adapters;
+  std::size_t count;
+  const EngineImplements* next;
+};
+/// The object of the engine of the interface `interface` that `by` is: its handle in `objects`, which own it (the
+/// handle names an object of the interface's class: what the engine is handed - App, ShaderExtension). 0: this build
+/// has no adapter of that interface (its component is not linked, or it waits - EngineInterface::waits).
+i64 engine_implement(EngineObjects& objects, std::string_view interface, std::shared_ptr<Implementer> by);
+/// The Implementer of a running Blueprint (Instance, of any tier): its functions by name, as the engine calls into
+/// it at the boundary (Instance::call) - nothing once the Blueprint has ended.
+std::shared_ptr<Implementer> implementer_of(const Instance& blueprint);
+/// The object of the engine a running Blueprint is, of the interface its graph implements (Graph::implements) -
+/// engine_implement with implementer_of. 0: its graph implements none, or this build has no adapter of it.
+i64 engine_implement(EngineObjects& objects, const Instance& blueprint);
 
 // ---- values: a pin's value as the C++ function takes it, and back ----
 // The tool writes, per pin, the Blueprint type it is (a tag below) and lets C++ name the C++ type: a
