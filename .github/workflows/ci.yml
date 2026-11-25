@@ -42,6 +42,7 @@ jobs:
   # job holds two or three of Game, ~25 min on 4 cores. The steps after the tests (the game's sources, the rules' C++)
   # go with 1/12 of pass 1.
   native-spawncity-build:
+    if: false   # (diagnosis branch)
     runs-on: ubuntu-24.04
     timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
     steps:
@@ -250,7 +251,7 @@ jobs:
   e2e:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -288,7 +289,7 @@ jobs:
           mkdir -p artifacts/e2e
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/studio_e2e.mjs http://127.0.0.1:8771
           # functions and formulas in the Blueprint editor; SpawnCity's level file opens in the editor
-          NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8771
+          KERN_E2E_WHOLE_LEVEL=1 NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/blueprint_e2e.mjs http://127.0.0.1:8771   # (diagnosis branch work-editor only)
           # the native export: a game whose Blueprints run as their compiled C++ classes
           NODE_PATH=/tmp/e2e/node_modules node kern/tests/e2e/export_e2e.mjs http://127.0.0.1:8771/generated/native_export.html
       - name: Keep the screenshots

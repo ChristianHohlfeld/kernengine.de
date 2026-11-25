@@ -618,8 +618,12 @@ const carriers = JSON.parse(text).actors.filter(a => a.components?.logic).map(a 
 const withBlueprint = (st.actors || []).filter(([, name]) => carriers.includes(name)).map(([id, name]) => ({id, name}));
 check(carriers.length >= 1 && withBlueprint.length === carriers.length && carriers.includes("Wanted"), `its rule actors are there (${withBlueprint.map(a => a.name).join(", ")})`);
 for (const a of withBlueprint) {
+  const opening = Date.now();
+  if (whole) console.log(`opening ${a.name} ...`);   // (the whole project: which Blueprint takes how long - or does not end)
   await cmd({cmd: "logicOpen", owner: a.id});
+  if (whole) console.log(`  ${a.name}: open after ${Date.now() - opening} ms`);
   l = await logic();
+  if (whole) console.log(`  ${a.name}: state after ${Date.now() - opening} ms (${l.functions.length} functions, ${l.nodes.length} nodes)`);
   const bad = errorsOf(l);
   check(bad.length === 0 && l.nodes.every(n => n.title), `${a.name}: its Blueprint compiles in the editor (${l.functions.length} functions, ${l.nodes.length} nodes)` + (bad.length ? ": " + bad.slice(0, 3).join(" | ") : ""));
   await cmd({cmd: "logicClose"});
