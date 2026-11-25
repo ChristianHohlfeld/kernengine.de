@@ -16,7 +16,10 @@ on:
   workflow_dispatch:
     inputs:
       probe:
-        description: "Only the converter over these sources (kern/games/spawncity, e.g. 'src/qr.cpp src/town_sync.cpp'), with their tests' errors - no other job; 'all_program': every Blueprint as a class of the program, each file compiled (tools/all_program.sh)"
+        description: "Only the converter over these sources (kern/games/spawncity, e.g. 'src/qr.cpp src/town_sync.cpp'), with their tests' errors - no other job"
+        default: ""
+      beleg:
+        description: "Only the proof of one lowering in the form 'two builds': the driver tests/lowered/builds/<file> (e.g. 'game_town') - no other job (tests/lowered/BELEGE.md)"
         default: ""
 
 permissions:
@@ -25,7 +28,7 @@ permissions:
 # A newer push to a pull request makes its older run moot; on main every push runs to the end, so
 # every green main state is published (a run takes ~17 min and main gets pushes more often).
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}-${{ inputs.probe && github.run_id || '' }}
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}-${{ (inputs.probe || inputs.beleg) && github.run_id || '' }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -34,40 +37,20 @@ jobs:
   probe:
     if: ${{ inputs.probe != '' && inputs.probe != null }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 180
+    timeout-minutes: 340   # (the whole program on 4 cores takes hours: a probe of all sources is allowed to)
     steps:
       - uses: actions/checkout@v4
-      - name: wasi-sdk 25 (cached; the probe "all_program" builds for the browser too)
-        if: ${{ inputs.probe == 'all_program' }}
-        id: sdk
-        uses: actions/cache@v4
-        with:
-          path: /home/runner/wasi-sdk
-          key: wasi-sdk-25.0-v2
-      - name: Install wasi-sdk 25
-        if: ${{ inputs.probe == 'all_program' && steps.sdk.outputs.cache-hit != 'true' }}
-        run: |
-          set -euo pipefail
-          mkdir -p /home/runner/wasi-sdk
-          curl -fsSL --retry 3 -o /tmp/wasi-sdk.tar.gz https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-25/wasi-sdk-25.0-x86_64-linux.tar.gz
-          tar xzf /tmp/wasi-sdk.tar.gz -C /home/runner/wasi-sdk --strip-components=1
       - name: Convert
         env:
           SOURCES: ${{ inputs.probe }}
         run: |
           W=/home/runner/probe; mkdir -p "$W/pt/converted" "$W/texts"
-          if [ "$SOURCES" = all_program ]; then  # (the whole game as classes: kern/games/spawncity/tools/all_program.sh)
-            set +e
-            command -v /usr/bin/time > /dev/null || sudo apt-get install -y -qq time > /dev/null
-            WASI_SDK=/home/runner/wasi-sdk KERN_JOBS=4 REFRESH="src/game.cpp" LINK=1 WEB=1 TICKS=600 kern/games/spawncity/tools/all_program.sh "$W/all" > "$W/convert.log" 2>&1; rc=$?
-            tail -n 200 "$W/convert.log"; cp "$W/all/files.txt" "$W/texts/" 2>/dev/null; cp -r "$W/all/logs" "$W/all/link.log" "$W/all/run.log" "$W/all/refresh.log" "$W/all/web.log" "$W/texts/" 2>/dev/null; exit $rc
-          fi
           cp kern/games/spawncity/tests/*.h "$W/pt/"; cp kern/games/spawncity/level/spawncity.klevel "$W/pt/l.klevel"
           cd kern/games/spawncity
           set +e
           KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract \
             -I../../include -I../../third_party/box3d/include -Isrc --level "$W/pt/l.klevel" --test "$W/pt/converted" --texts "$W/texts" -- $SOURCES > "$W/convert.log" 2>&1
-          rc=$?; tail -n 200 "$W/convert.log"; echo "convert rc=$rc"; exit $rc
+          rc=$?; cat "$W/convert.log"; echo "convert rc=$rc"; exit $rc   # (the whole log: a session without access to the artifacts reads it here)
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -78,8 +61,38 @@ jobs:
             /home/runner/probe/texts
           retention-days: 2
 
+  # A proof of one lowering (workflow_dispatch with "beleg"): its driver in the form "two builds" - the old tree's program
+  # and today's, the engine as it stands -, nothing else (tests/run_tests.sh, SC_BELEG; the result goes to BELEGE.md).
+  beleg:
+    if: ${{ inputs.beleg != '' && inputs.beleg != null }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # (the old tree: git archive of the driver's base)
+      - name: Drivers
+        # ("gen:<base> src/a.cpp ...": the drivers are written here, tools/source_diff.py --builds against <base>, then all run)
+        if: ${{ startsWith(inputs.beleg, 'gen:') }}
+        env:
+          GEN: ${{ inputs.beleg }}
+        run: |
+          set -- ${GEN#gen:}; base="$1"; shift
+          cd kern/games/spawncity
+          rm -rf tests/lowered/builds   # (a driver the tree held is of another state: only those written here)
+          for f in "$@"; do
+            python3 ../../../tools/source_diff.py --builds --base "$base" --test tests/lowered -I../../include -I../../third_party/box3d/include -Isrc -- "$f" 2>&1 | grep -v '^    the same: ' || true
+          done
+          ls tests/lowered/builds/*/builds_*.cpp 2>/dev/null || { echo "FAIL no driver"; exit 1; }
+      - name: Two builds
+        env:
+          SC_BELEG: ${{ startsWith(inputs.beleg, 'gen:') && 'all' || inputs.beleg }}
+          SC_TEST_OUT: /home/runner/sc-tests
+          KERN_JOBS: 4
+        run: CXX=clang++ CC=clang kern/games/spawncity/tests/run_tests.sh
+
   native:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -96,7 +109,7 @@ jobs:
   # job holds two or three of Game, ~25 min on 4 cores. The steps after the tests (the game's sources, the rules' C++)
   # go with 1/12 of pass 1.
   native-spawncity-build:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120   # (the build alone passed 45 minutes on 4 cores with 158 Blueprints' tests: run 45610844512 was cut off)
     steps:
@@ -116,7 +129,7 @@ jobs:
           compression-level: 1
 
   native-spawncity:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: native-spawncity-build
     runs-on: ubuntu-24.04
     timeout-minutes: 75
@@ -142,7 +155,7 @@ jobs:
   # Bit-identical everywhere (docs/lehrer.md, determinism): the Lehrer built with Apple clang on
   # ARM must step the duck exactly as GCC on x86 and WebAssembly do (the golden hashes).
   determinism:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: macos-15
     timeout-minutes: 30
     steps:
@@ -153,7 +166,7 @@ jobs:
         run: build-mac/kern_lehrer --fingerprint 400 | diff - kern/tests/determinism_fingerprint.txt
 
   build:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
@@ -318,7 +331,7 @@ jobs:
           git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" spawncity-de-dropin
 
   e2e:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -373,7 +386,7 @@ jobs:
   # One input reader for every host (kern.mjs BrowserInput, readGamepad): its contract, the example
   # games and SpawnCity with a real mouse and keyboard - beside the Studio's test, not after it.
   input:
-    if: ${{ inputs.probe == '' || inputs.probe == null }}
+    if: ${{ (inputs.probe == '' || inputs.probe == null) && (inputs.beleg == '' || inputs.beleg == null) }}
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 20
