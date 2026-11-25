@@ -1258,7 +1258,7 @@ class World:
         self.pointer_lists = {}    # (a function's key, the place of a parameter that is a pointer into a list) -> the length of the list every call hands it ("list": any; "mixed", "other": see main)
         self.states = {}       # a class of the program there is one object of (see state_classes) -> the Blueprint it is the state of
         self.state_members = {}  # such a class -> its fields and methods by name, in their order (a part that does not see the class)
-        self.state_implements = {}  # such a class that derives from an interface of the engine -> the interface's name (Graph::implements)
+        self.state_implements = {}  # such a class that derives from an interface of the engine -> [the interface's name (Graph::implements), its pure functions]
         self.state_functions = set()   # (keys of) the functions that are no methods of a state but functions of its Blueprint: they share a variable of the program (main)
         self.globals = {}      # a variable of a namespace of the program with external linkage (its qualified name) -> does it start at zero (as its definition says)
         self.parts = {}        # a part of a Blueprint of several source files (a job: "Game/game_net_cpp") -> that Blueprint
@@ -2790,11 +2790,14 @@ def actors_called(f, met=None):
 
 def blueprint_text(name, uses, types, variables, functions, members, state=False, implements=None):
     """A library's text, of its parts - or, with `state`, that of a Blueprint that keeps something: the
-    variables of a state (World.states) - and, with `implements`, the interface of the engine it is the object of
-    (World.state_implements)."""
+    variables of a state (World.states) - and, with `implements` ([name, pure functions]: World.state_implements),
+    the interface of the engine it is the object of: once it has every pure function of it (until then the
+    engine has no object of it - what waits keeps the interface's functions from it, as from any caller)."""
     # (`virtual` is for a library and for what uses one: a Blueprint that uses none is a kern::Blueprint as such)
+    defines = lambda t, f: re.search(r"(?m)^\s*(?:KERN_\w+\s+)*[\w:<>,]+\s+" + re.escape(f) + r"\(", t)   # (a function's text: its head names it)
+    whole = bool(state and implements) and all(any(defines(t, p) for t in functions) for p in implements[1])
     out = [f"struct {name} : {'virtual ' if uses or not state else ''}kern::{'Blueprint' if state else 'Library'}" + "".join(f", virtual {u}" for u in uses)
-           + (f', kern::Implements<"{implements}">' if state and implements else "") + " {"]
+           + (f', kern::Implements<"{implements[0]}">' if whole else "") + " {"]
     if types:
         out += ["  // ---- types ----", *types, ""]
     if variables:
@@ -15049,7 +15052,7 @@ def engine_interface_of(tree, rec):
     methods = [c for c in kids(base) if c.get("kind") == "CXXMethodDecl" and not c.get("isImplicit")]
     if any(c.get("kind") == "FieldDecl" for c in kids(base)) or not methods or not all(c.get("virtual") for c in methods):
         return None
-    return type_name_of(q)
+    return [type_name_of(q), sorted({c["name"] for c in methods if c.get("pure")})]
 
 
 def state_classes(world, surveys):
