@@ -60,11 +60,23 @@ called_by_tests=(
   gps_live_cpp
   nostr_cpp
   settings_cpp
+  car_cpp
+  drone_cpp
+  jet_cpp
+  combat_detail_cpp
+  guided_cpp
+  world_traffic_cpp
+  spawn_guard_cpp
+  gaps_rules_cpp
+  lamps_cpp
+  jet_seats_cpp
+  ragdoll_cpp
+  interiors_cpp
+  life_cpp
   perf_cpp
   look_cpp
   road_graph_cpp
   people_cpp
-  world_traffic_cpp
   controls_cpp
   touch_play_cpp
   mp_rules_cpp
