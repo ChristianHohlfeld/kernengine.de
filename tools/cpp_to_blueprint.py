@@ -8124,6 +8124,24 @@ class Emit:
             lst, at = self.place(args[0])
             if not self.same_list(lst, base):
                 raise Wait("list: insert() at a place of another list")
+            if len(args) == 3 and self.text_range(args[1], args[2]) is not None:
+                # v.insert(at, text.begin(), text.end()): the bytes of a text, each as the list's entry type holds a
+                # char (char_of) - at the end in one go (one request for memory at most, as in C++): the list that
+                # much longer (Set Length), then each byte set where it stands
+                text = self.text_range(args[1], args[2])
+                byte = lambda i: self.char_of(text, i, self.entry_cpp(base))
+                e = self.unwrap(args[0])
+                while e.get("kind") in ("CXXConstructExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr") and len(kids(e)) == 1:
+                    e = self.unwrap(kids(e)[0])   # (v.end() made a const_iterator)
+                a, b = self.temp("first", "Int"), self.temp("last", "Int")
+                lines = [f"{a} = 0;", f"{b} = {self.whole_math('-', f'text_length({text})', '1')};"]
+                if e.get("kind") == "CXXMemberCallExpr" and callee(e).get("name") in ("end", "cend"):
+                    n0 = self.temp("length", "Int")
+                    lines += [f"{n0} = list_length<{it}>({lv});",
+                              f"list_resize({lv}, {self.whole_math('+', n0, f'text_length({text})')}, {self.u.zero(it)});"]
+                    return lines + self.count_loop(a, b, lambda i: [f"{lv}[{self.whole_math('+', n0, i)}] = {byte(i)};"])
+                p = self.temp("place", "Int")
+                return [f"{p} = {at};"] + lines + self.count_loop(a, b, lambda i: [f"list_insert({lv}, {self.whole_math('+', p, i)}, {byte(i)});"])
             end = "end" in callee(self.unwrap(args[0])).get("name", "") if self.unwrap(args[0]).get("kind") == "CXXMemberCallExpr" else False
             lines = []
             if not end:

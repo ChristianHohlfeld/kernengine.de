@@ -2,6 +2,7 @@
 #include "water_look.h"
 
 #include "kern/gfx/program.h"
+#include "kern/gfx/renderer.h"   // (frame_uniforms takes the renderer: its type, defined)
 
 namespace sc {
 
