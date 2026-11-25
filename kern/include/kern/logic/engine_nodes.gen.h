@@ -7,6 +7,7 @@
 // (src/<component>/engine_calls.gen.cpp).
 #pragma once
 
+#include <algorithm>
 #include <initializer_list>
 #include <memory>
 #include <string_view>
@@ -2787,6 +2788,275 @@ struct P_engine_character_mover_settings {
   static C* at(EngineObjects&, Object& self, const In&) { return &self.settings; }
 };
 
+// The interfaces of the engine a Blueprint's class can be the object of (kern::logic::implementation).
+// kern::App that a Blueprint's class is (kern::Implements<"App">: kern::logic::implementation)
+template <class B> class ClassImplements_App final : public kern::App {
+ public:
+  explicit ClassImplements_App(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_configure = requires { requires std::is_same_v<typename MemberOf<decltype(&X::configure)>::type, X>; };
+  template <class X> static constexpr bool kern_has_extensions = requires { requires std::is_same_v<typename MemberOf<decltype(&X::extensions)>::type, X>; };
+  template <class X> static constexpr bool kern_has_start = requires { requires std::is_same_v<typename MemberOf<decltype(&X::start)>::type, X>; };
+  template <class X> static constexpr bool kern_has_update = requires { requires std::is_same_v<typename MemberOf<decltype(&X::update)>::type, X>; };
+  template <class X> static constexpr bool kern_has_resized = requires { requires std::is_same_v<typename MemberOf<decltype(&X::resized)>::type, X>; };
+  template <class X> static constexpr bool kern_has_stop = requires { requires std::is_same_v<typename MemberOf<decltype(&X::stop)>::type, X>; };
+  decltype(std::declval<kern::App&>().configure()) configure() override {
+    if constexpr (!kern_has_configure<B>) {
+      return kern::App::configure();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.configure();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::App&>().configure())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::App&>().extensions()) extensions() override {
+    if constexpr (!kern_has_extensions<B>) {
+      return kern::App::extensions();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.extensions();
+      kern_kept_extensions.clear();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(kern_o, kern_given, kern_kept_extensions);
+      return decltype(std::declval<kern::App&>().extensions())(kern_kept_extensions.data(), kern_kept_extensions.size());
+    }
+  }
+  decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>())) start(kern::Engine& kern_p0) override {
+    static_assert(kern_has_start<B>, "a Blueprint that implements App has its function start");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.start(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)));
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::App&>().start(std::declval<kern::Engine&>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::App&>().update(std::declval<kern::Engine&>(), std::declval<kern::Frame const&>())) update(kern::Engine& kern_p0, kern::Frame const& kern_p1) override {
+    static_assert(kern_has_update<B>, "a Blueprint that implements App has its function update");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.update(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Frame>, kern::Frame const&>(kern_o, kern_p1));
+    }
+  }
+  decltype(std::declval<kern::App&>().resized(std::declval<kern::Engine&>())) resized(kern::Engine& kern_p0) override {
+    if constexpr (!kern_has_resized<B>) {
+      return kern::App::resized(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.resized(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)));
+    }
+  }
+  decltype(std::declval<kern::App&>().stop(std::declval<kern::Engine&>())) stop(kern::Engine& kern_p0) override {
+    if constexpr (!kern_has_stop<B>) {
+      return kern::App::stop(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.stop(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Engine>(kern_p0)));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<kern::App&>().extensions())>().data)>>> kern_kept_extensions;
+};
+template <> struct InterfaceOf<"App"> {
+  template <class B> using adapter = ClassImplements_App<B>;
+};
+
+// kern::ShaderExtension that a Blueprint's class is (kern::Implements<"ShaderExtension">: kern::logic::implementation)
+template <class B> class ClassImplements_ShaderExtension final : public kern::ShaderExtension {
+ public:
+  explicit ClassImplements_ShaderExtension(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_name = requires { requires std::is_same_v<typename MemberOf<decltype(&X::name)>::type, X>; };
+  template <class X> static constexpr bool kern_has_attributes = requires { requires std::is_same_v<typename MemberOf<decltype(&X::attributes)>::type, X>; };
+  template <class X> static constexpr bool kern_has_vertex_declarations = requires { requires std::is_same_v<typename MemberOf<decltype(&X::vertex_declarations)>::type, X>; };
+  template <class X> static constexpr bool kern_has_vertex = requires { requires std::is_same_v<typename MemberOf<decltype(&X::vertex)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_declarations = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_declarations)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_discard = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_discard)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_input = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_input)>::type, X>; };
+  template <class X> static constexpr bool kern_has_fragment_surface = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fragment_surface)>::type, X>; };
+  template <class X> static constexpr bool kern_has_bind = requires { requires std::is_same_v<typename MemberOf<decltype(&X::bind)>::type, X>; };
+  template <class X> static constexpr bool kern_has_frame_uniforms = requires { requires std::is_same_v<typename MemberOf<decltype(&X::frame_uniforms)>::type, X>; };
+  template <class X> static constexpr bool kern_has_material_uniforms = requires { requires std::is_same_v<typename MemberOf<decltype(&X::material_uniforms)>::type, X>; };
+  decltype(std::declval<const kern::ShaderExtension&>().name()) name() const override {
+    static_assert(kern_has_name<B>, "a Blueprint that implements ShaderExtension has its function name");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.name();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().name())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().attributes()) attributes() const override {
+    if constexpr (!kern_has_attributes<B>) {
+      return kern::ShaderExtension::attributes();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.attributes();
+      kern_kept_attributes.clear();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ExtensionAttribute>>>::from(kern_o, kern_given, kern_kept_attributes);
+      return decltype(std::declval<const kern::ShaderExtension&>().attributes())(kern_kept_attributes.data(), kern_kept_attributes.size());
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().vertex_declarations()) vertex_declarations() const override {
+    if constexpr (!kern_has_vertex_declarations<B>) {
+      return kern::ShaderExtension::vertex_declarations();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.vertex_declarations();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().vertex_declarations())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().vertex()) vertex() const override {
+    if constexpr (!kern_has_vertex<B>) {
+      return kern::ShaderExtension::vertex();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.vertex();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().vertex())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_declarations()) fragment_declarations() const override {
+    if constexpr (!kern_has_fragment_declarations<B>) {
+      return kern::ShaderExtension::fragment_declarations();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_declarations();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_declarations())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_discard()) fragment_discard() const override {
+    if constexpr (!kern_has_fragment_discard<B>) {
+      return kern::ShaderExtension::fragment_discard();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_discard();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_discard())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_input()) fragment_input() const override {
+    if constexpr (!kern_has_fragment_input<B>) {
+      return kern::ShaderExtension::fragment_input();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_input();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_input())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<const kern::ShaderExtension&>().fragment_surface()) fragment_surface() const override {
+    if constexpr (!kern_has_fragment_surface<B>) {
+      return kern::ShaderExtension::fragment_surface();
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.fragment_surface();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::ShaderExtension&>().fragment_surface())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::ShaderExtension&>().bind(std::declval<kern::Program const&>())) bind(kern::Program const& kern_p0) override {
+    if constexpr (!kern_has_bind<B>) {
+      return kern::ShaderExtension::bind(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.bind(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Program>(kern_p0)));
+    }
+  }
+  decltype(std::declval<kern::ShaderExtension&>().frame_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Renderer const&>())) frame_uniforms(kern::UniformCache& kern_p0, kern::Renderer const& kern_p1) override {
+    if constexpr (!kern_has_frame_uniforms<B>) {
+      return kern::ShaderExtension::frame_uniforms(kern_p0, kern_p1);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.frame_uniforms(::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::UniformCache>(kern_p0)), ::kern::logic::engine_values::handle_as<::kern::logic::Whole>(kern_o.adopt<kern::Renderer>(kern_p1)));
+    }
+  }
+  decltype(std::declval<kern::ShaderExtension&>().material_uniforms(std::declval<kern::UniformCache&>(), std::declval<kern::Material const&>(), std::declval<int const*>())) material_uniforms(kern::UniformCache& kern_p0, kern::Material const& kern_p1, int const* kern_p2) override {
+    return kern::ShaderExtension::material_uniforms(kern_p0, kern_p1, kern_p2);   // (the engine cannot hand it to a Blueprint: it is handed a pointer without its count)
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+  mutable std::vector<std::remove_cv_t<std::remove_pointer_t<decltype(std::declval<decltype(std::declval<const kern::ShaderExtension&>().attributes())>().data)>>> kern_kept_attributes;
+};
+template <> struct InterfaceOf<"ShaderExtension"> {
+  template <class B> using adapter = ClassImplements_ShaderExtension<B>;
+};
+
+// kern::net::Transport that a Blueprint's class is (kern::Implements<"net_Transport">: kern::logic::implementation)
+template <class B> class ClassImplements_net_Transport final : public kern::net::Transport {
+ public:
+  explicit ClassImplements_net_Transport(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_address = requires { requires std::is_same_v<typename MemberOf<decltype(&X::address)>::type, X>; };
+  template <class X> static constexpr bool kern_has_send = requires { requires std::is_same_v<typename MemberOf<decltype(&X::send)>::type, X>; };
+  template <class X> static constexpr bool kern_has_receive = requires { requires std::is_same_v<typename MemberOf<decltype(&X::receive)>::type, X>; };
+  template <class X> static constexpr bool kern_has_advance_time = requires { requires std::is_same_v<typename MemberOf<decltype(&X::advance_time)>::type, X>; };
+  decltype(std::declval<const kern::net::Transport&>().address()) address() const override {
+    static_assert(kern_has_address<B>, "a Blueprint that implements net_Transport has its function address");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.address();
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::net::Transport&>().address())>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>())) send(kern::net::Address kern_p0, unsigned char const* kern_p1, kern::Count<1u> kern_p2) override {
+    static_assert(kern_has_send<B>, "a Blueprint that implements net_Transport has its function send");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_given] = b_.send(::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>, kern::net::Address const&>(kern_o, kern_p0), ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, ::kern::Span<const unsigned char>>(kern_o, ::kern::Span<const unsigned char>(kern_p1, static_cast<std::size_t>(::kern::logic::engine_values::numbers(kern_p2)))), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Int, kern::Count<1u> const&>(kern_o, kern_p2));
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::net::Transport&>().send(std::declval<kern::net::Address>(), std::declval<unsigned char const*>(), std::declval<kern::Count<1u>>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(kern_o, kern_given, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>())) receive(kern::net::Address& kern_p0, unsigned char* kern_p1, kern::Count<1u> kern_p2) override {
+    static_assert(kern_has_receive<B>, "a Blueprint that implements net_Transport has its function receive");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      const auto& [kern_g0, kern_g1, kern_g2] = b_.receive(::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>, kern::net::Address&>(kern_o, kern_p0), ::kern::logic::engine_values::Given<::kern::logic::engine_values::Int, kern::Count<1u> const&>(kern_o, kern_p2));
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(kern_o, kern_g1, kern_p0);
+      std::vector<std::remove_pointer_t<decltype(kern_p1)>> kern_w1;
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(kern_o, kern_g2, kern_w1);
+      std::copy_n(kern_w1.begin(), std::min(kern_w1.size(), static_cast<std::size_t>(::kern::logic::engine_values::numbers(kern_p2))), kern_p1);
+      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<kern::net::Transport&>().receive(std::declval<kern::net::Address&>(), std::declval<unsigned char*>(), std::declval<kern::Count<1u>>()))>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(kern_o, kern_g0, kern_r);
+      return kern_r;
+    }
+  }
+  decltype(std::declval<kern::net::Transport&>().advance_time(std::declval<double>())) advance_time(double kern_p0) override {
+    if constexpr (!kern_has_advance_time<B>) {
+      return kern::net::Transport::advance_time(kern_p0);
+    } else {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.advance_time(::kern::logic::engine_values::Given<::kern::logic::engine_values::Float, double const&>(kern_o, kern_p0));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+};
+template <> struct InterfaceOf<"net_Transport"> {
+  template <class B> using adapter = ClassImplements_net_Transport<B>;
+};
+
 }  // namespace engine_direct
 
 template <class Core> struct EngineNodesOf : Core {
@@ -5369,6 +5639,75 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Text>(this->kern_engine("engine.game.to_text", {to_value(::kern::logic::engine_values::input_value(level)), to_value(indent)}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
+  /// Reads a level; unknown keys are ignored, missing ones take defaults.
+  template <class T1> void engine_game_from_json(Int doc, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(doc), "doc");
+      if (!kern_a0) { this->kern_engine_failed("engine.game.from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_json(*kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.from_json", {to_value(doc), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_from_json(KernNode& kern_n, Int doc, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(doc), "doc");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_json(*kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.from_json", {to_value(doc), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
+  }
+  template <class T1> void engine_game_from_text(const Text& text, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = text.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_text(kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.from_text", {to_value(text), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_from_text(KernNode& kern_n, const Text& text, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      const std::string_view kern_a0 = text.view();
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Level&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::from_text(kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.from_text", {to_value(text), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
+  }
   template <class T1> Int engine_game_actor_to_json(const T1& a) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -5378,6 +5717,41 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Int>(this->kern_engine("engine.game.actor_to_json", {to_value(::kern::logic::engine_values::input_value(a))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
+  template <class T1> void engine_game_actor_from_json(Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { this->kern_engine_failed("engine.game.actor_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::actor_from_json(*kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.actor_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_actor_from_json(KernNode& kern_n, Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.actor_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::actor_from_json(*kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.actor_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
+  }
   template <class T1> Int engine_game_world_to_json(const T1& w) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
@@ -5386,6 +5760,41 @@ template <class Core> struct EngineNodesOf : Core {
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
     return from_value<Int>(this->kern_engine("engine.game.world_to_json", {to_value(::kern::logic::engine_values::input_value(w))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+  }
+  template <class T1> void engine_game_world_from_json(Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { this->kern_engine_failed("engine.game.world_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WorldSettings&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::world_from_json(*kern_a0, kern_a1, &kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::pass(*kern_o, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::pass(*kern_o, kern_a2);
+      return;
+    }
+    this->kern_engine("engine.game.world_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+  }
+  template <class KernNode, class T1> void engine_game_world_from_json(KernNode& kern_n, Int v, const T1& out) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::json::Value* const kern_a0 = ::kern::logic::engine_values::object_of<kern::json::Value>(*kern_o, static_cast<::kern::i64>(v), "v");
+      if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.out); ::kern::logic::engine_values::none(kern_n.error); this->kern_engine_failed("engine.game.world_from_json"); return; }
+      auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WorldSettings&>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
+      auto kern_a2 = ::kern::logic::engine_values::blank<std::basic_string<char, std::char_traits<char>, std::allocator<char> >>();
+      decltype(auto) kern_r = kern::game::world_from_json(*kern_a0, kern_a1, &kern_a2);
+      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
+      kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
+      kern_n.error = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<std::remove_cvref_t<decltype(kern_n.error)>>(*kern_o, kern_a2);
+      return;
+    }
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.world_from_json", {to_value(v), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::text});
+    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+    kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
+    kern_n.error = from_value<std::remove_cvref_t<decltype(kern_n.error)>>(kern_out[2]);
   }
   /// Problems of a level: errors keep it from playing (dangling references, bad values), warnings point at likely mistakes. True for "", "none", "auto", a known "builtin:<name>" or an imported sound id.
   template <class T1> Bool engine_game_sound_reference_ok(const T1& level, const Text& ref) const {

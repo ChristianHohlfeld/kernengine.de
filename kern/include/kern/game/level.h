@@ -450,12 +450,12 @@ struct Level {
 json::Value to_json(const Level& level);
 std::string to_text(const Level& level, i32 indent = 2);
 /// Reads a level; unknown keys are ignored, missing ones take defaults.
-bool from_json(const json::Value& doc, Level& out, std::string* error);
-bool from_text(std::string_view text, Level& out, std::string* error);
+bool from_json(const json::Value& doc, Level& out, std::string* error = nullptr);
+bool from_text(std::string_view text, Level& out, std::string* error = nullptr);
 json::Value actor_to_json(const Actor& a);
-bool actor_from_json(const json::Value& v, Actor& out, std::string* error);
+bool actor_from_json(const json::Value& v, Actor& out, std::string* error = nullptr);
 json::Value world_to_json(const WorldSettings& w);
-bool world_from_json(const json::Value& v, WorldSettings& out, std::string* error);
+bool world_from_json(const json::Value& v, WorldSettings& out, std::string* error = nullptr);
 
 struct Issue {
   bool error = true;  // false: a warning, the level still plays
