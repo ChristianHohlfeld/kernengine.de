@@ -133,6 +133,9 @@ jobs:
             kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun.cpp
             kern/build.sh --lehrer generated/kern_lehrer.wasm
             kern/games/spawncity/build.sh
+            # The way "only Blueprints": SpawnCity's level alone, exported as Kern Studio exports any level, and
+            # what it still lacks (generated/spawncity_gaps.txt - BLUEPRINTS.md, "5 - Umschalten").
+            kern/games/spawncity/build.sh --only-blueprints
             # The native export: a level as a game with its Blueprints compiled in as C++ classes
             # (the browser test plays it: kern/tests/e2e/export_e2e.mjs).
             tools/export_game.sh kern/tests/e2e/native_export.klevel generated/native_export.html
@@ -206,6 +209,13 @@ jobs:
           name: site
           path: _site
           include-hidden-files: true
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spawncity-only-blueprints
+          path: |
+            generated/spawncity_blueprints.html
+            generated/spawncity_gaps.txt
           retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
