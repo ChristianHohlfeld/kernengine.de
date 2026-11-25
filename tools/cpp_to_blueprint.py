@@ -2410,8 +2410,9 @@ class Unit:
         libs = sorted(lib for lib in class_libraries(self.world) if name in self.world.actors[lib].get("const_defs", {}))
         if not libs:
             return None
-        if len(libs) > 1:
-            raise Wait(f"the constant {name}, which the Blueprints {', '.join(libs)} called as their classes each have")
+        said = {json.dumps({k: v for k, v in self.world.actors[lib]["const_defs"][name].items() if k != "help"}, sort_keys=True) for lib in libs}
+        if len(said) > 1:   # (the same constant of the program, held by each Blueprint that uses it, is one; two that differ are not)
+            raise Wait(f"the constant {name}, which the Blueprints {', '.join(libs)} called as their classes have, not the same in each")
         lib = libs[0]
         if (lib, name) not in self.class_constants:
             v = self.world.actors[lib]["const_defs"][name]
