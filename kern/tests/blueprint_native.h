@@ -1393,6 +1393,13 @@ struct EnginePlaces : kern::Blueprint {
     Bool welded = false;
     MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
   };
+  KERN_STRUCT(WeldStats) {
+    U32 source_vertices = 0;
+    U32 unique_vertices = 0;
+    Int bytes_before = 0;
+    Int bytes_after = 0;
+    Bool indexed = false;
+  };
 
   // ---- variables ----
   Int Builder = 0;
@@ -1413,6 +1420,9 @@ struct EnginePlaces : kern::Blueprint {
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
   Int AppendedLength = 0;
   List<GeoChunk> Appended = List<GeoChunk>{};
+  MeshData Soup = MeshData{List<Float>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<Float>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<Float>{}, 0, List<Int>{}};
+  WeldStats Stats = WeldStats{0, 0, 0, 0, false};
+  MeshData Welded = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
 
   // ---- functions ----
   void Bind() {
@@ -1459,6 +1469,15 @@ struct EnginePlaces : kern::Blueprint {
     Appended = n11.result;
   }
 
+  void Weld() {
+    engine_building_builder_chunks(n12, Builder);
+    n12.result[0].mesh = Soup;
+    engine_weld(n13, n12.result[0].mesh, 0);
+    Stats = n13.result;
+    n12.result[0].mesh = n13.mesh;
+    Welded = n12.result[0].mesh;
+  }
+
   void Release() {
     engine_building_builder_chunks(n8, Builder);
     Before = n8.result[0].x;
@@ -1489,6 +1508,8 @@ struct EnginePlaces : kern::Blueprint {
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}; } n13;
 };
 )kn";
 
@@ -1742,7 +1763,7 @@ inline std::vector<Case> cases() {
     // itself - there the class names the engine's list where it stands, typed, and does what the interpreter does
     // through the door ("<function>@get", "<function>@set").
     Case& c = read("EnginePlaces", kEnginePlaces);
-    for (const char* run : {"Bind", "Change", "Append", "Release", "Read"}) {
+    for (const char* run : {"Bind", "Change", "Append", "Weld", "Release", "Read"}) {
       c.calls.push_back({run, {}});
       c.on_engine.push_back(run);
     }

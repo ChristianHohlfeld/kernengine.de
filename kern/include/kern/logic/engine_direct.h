@@ -640,6 +640,14 @@ template <class P, class B> struct Place : PlaceOps<Place<P, B>, typename P::Tag
 /// Something that names a place of the engine (a Place, a Ref, a Field of one).
 template <class X> concept NamesPlace = requires(const X& x) { x.ref().kern_count(); };
 
+/// What an input of a node of the engine is given (engine_nodes.gen.h): where it names a place of the engine
+/// (`kern::weld(c.mesh)` on an entry of `b.chunks()`), what stands there now, read - as the interpreter reads it
+/// into the wire of the input; any other value as it is.
+template <class X> decltype(auto) input_value(const X& x) {
+  if constexpr (NamesPlace<X>) return x.ref().kern_read();
+  else return (x);
+}
+
 /// The steps of a list at a place of the engine: on the engine's list itself (an item made into the engine's
 /// type first, Direct::from), or on the entry of its own where the place has one - what logic::list does on a
 /// Blueprint's list; through the door the list is set back after.

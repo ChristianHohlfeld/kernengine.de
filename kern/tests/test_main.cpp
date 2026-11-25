@@ -7011,6 +7011,13 @@ struct EnginePlaces : kern::Blueprint {
     Bool welded = false;
     MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
   };
+  KERN_STRUCT(WeldStats) {
+    U32 source_vertices = 0;
+    U32 unique_vertices = 0;
+    Int bytes_before = 0;
+    Int bytes_after = 0;
+    Bool indexed = false;
+  };
 
   // ---- variables ----
   Int Builder = 0;
@@ -7031,6 +7038,9 @@ struct EnginePlaces : kern::Blueprint {
   List<GeoChunk> GoneChunks = List<GeoChunk>{};
   Int AppendedLength = 0;
   List<GeoChunk> Appended = List<GeoChunk>{};
+  MeshData Soup = MeshData{List<Float>{0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0}, List<Float>{1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25, 1.0, 0.5, 0.25}, List<Float>{0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0}, List<Float>{}, 0, List<Int>{}};
+  WeldStats Stats = WeldStats{0, 0, 0, 0, false};
+  MeshData Welded = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}};
 
   // ---- functions ----
   void Bind() {
@@ -7077,6 +7087,15 @@ struct EnginePlaces : kern::Blueprint {
     Appended = n11.result;
   }
 
+  void Weld() {
+    engine_building_builder_chunks(n12, Builder);
+    n12.result[0].mesh = Soup;
+    engine_weld(n13, n12.result[0].mesh, 0);
+    Stats = n13.result;
+    n12.result[0].mesh = n13.mesh;
+    Welded = n12.result[0].mesh;
+  }
+
   void Release() {
     engine_building_builder_chunks(n8, Builder);
     Before = n8.result[0].x;
@@ -7107,6 +7126,8 @@ struct EnginePlaces : kern::Blueprint {
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n9;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n10;
   struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n11;
+  struct { engine_building_builder_chunks_place<List<GeoChunk>> result = {}; } n12;
+  struct { WeldStats result = WeldStats{0, 0, 0, 0, false}; MeshData mesh = MeshData{List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, List<Float>{}, 0, List<Int>{}}; } n13;
 };
 
 }  // namespace engine_place_probe
@@ -7119,6 +7140,9 @@ struct Held<EnginePlaces::MeshData> : HeldBy<EnginePlaces::MeshData, &EnginePlac
 template <>
 struct Held<EnginePlaces::GeoChunk> : HeldBy<EnginePlaces::GeoChunk, &EnginePlaces::GeoChunk::x, &EnginePlaces::GeoChunk::y, &EnginePlaces::GeoChunk::items, &EnginePlaces::GeoChunk::triangles,
                                              &EnginePlaces::GeoChunk::hash, &EnginePlaces::GeoChunk::welded, &EnginePlaces::GeoChunk::mesh> {};
+template <>
+struct Held<EnginePlaces::WeldStats> : HeldBy<EnginePlaces::WeldStats, &EnginePlaces::WeldStats::source_vertices, &EnginePlaces::WeldStats::unique_vertices,
+                                              &EnginePlaces::WeldStats::bytes_before, &EnginePlaces::WeldStats::bytes_after, &EnginePlaces::WeldStats::indexed> {};
 }  // namespace kern::logic::detail
 
 namespace engine_place_probe {
@@ -7128,6 +7152,7 @@ inline std::string shown(const EnginePlaces& p) {
   put("Builder", p.Builder), put("Length", p.Length), put("At", p.At), put("X", p.X), put("Items", p.Items), put("P0", p.P0), put("Beside", p.Beside), put("Set", p.Set);
   put("Chunks", p.Chunks), put("LengthAfter", p.LengthAfter), put("Removed", p.Removed), put("First", p.First), put("Before", p.Before), put("Gone", p.Gone);
   put("GoneLength", p.GoneLength), put("GoneChunks", p.GoneChunks), put("AppendedLength", p.AppendedLength), put("Appended", p.Appended);
+  put("Stats", p.Stats), put("Welded", p.Welded);
   return s;
 }
 }  // namespace engine_place_probe
@@ -7398,6 +7423,17 @@ TEST(engine_places_class_names_the_engines_list) {
   c.push_back(first);
   for (EnginePlaces* p : {&a, &b}) p->Append();
   CHECK(held && same(held->chunks(), c) && a.AppendedLength == 4 && shown(a) == shown(b));
+  // an entry's field at the place handed to a function of the engine (`kern::weld(c.mesh)` on `b.chunks()`): what stands
+  // there is read as the input, what the function makes of it set there after - as C++ welds the engine's mesh
+  MeshData soup;
+  soup.positions = {0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0};
+  for (int v = 0; v < 6; ++v) soup.normals.insert(soup.normals.end(), {0, 0, 1}), soup.colors.insert(soup.colors.end(), {1, 0.5f, 0.25f});
+  soup.uvs = {0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 1};
+  c[0].mesh = soup;
+  const WeldStats welded = kern::weld(c[0].mesh);
+  for (EnginePlaces* p : {&a, &b}) p->Weld();
+  CHECK(held && same(held->chunks(), c) && shown(a) == shown(b) && welded.indexed && welded.unique_vertices == 4 && c[0].mesh.indices.size() == 6);
+  CHECK(static_cast<i64>(a.Stats.unique_vertices) == welded.unique_vertices && static_cast<i64>(a.Stats.bytes_after) == static_cast<i64>(welded.bytes_after) && a.Stats.indexed);
   // the object ends while its place is bound: the class does not write where it was, and says what the door says
   itself.told.clear(), door.told.clear();
   for (EnginePlaces* p : {&a, &b}) {

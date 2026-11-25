@@ -134,7 +134,7 @@ def case_text(api, functions):
         return out
 
     # (where the class of a place has a maker without inputs and a releaser: the place of an object it made - and of
-    # the same handle after the object ended)
+    # the same handle after the object ended; its further inputs - the index of an entry - at their defaults, which name an entry)
     made = {}
     for f in functions:
         if f.get("role") in ("make", "release") and (f["role"] == "release" or not f["ins"]):
@@ -177,7 +177,7 @@ def case_text(api, functions):
         members.append(f"  struct {{ Int result = 0; }} n{mk};")
         node += 1
         members.append(f"  struct {{ {name}_place<{f['outs'][0][1]}> {f['outs'][0][0]} = {{}}; }} n{node};")
-        lines = [f"{maker}(n{mk});", f"H{k} = n{mk}.result;", *place_lines(f, name, f"n{node}.{f['outs'][0][0]}", [f"H{k}"], f"P{k}", node)]
+        lines = [f"{maker}(n{mk});", f"H{k} = n{mk}.result;", *place_lines(f, name, f"n{node}.{f['outs'][0][0]}", [f"H{k}"] + [value(bt) for _, bt, _ in f["ins"][1:]], f"P{k}", node)]
         lines.append(f"{life['release']['type'].replace('.', '_')}(H{k});")
         variables.append(f"  {f['outs'][0][1]} P{k}_4 = {zero(f['outs'][0][1])};")
         lines += [f"P{k}_4 = n{node}.{f['outs'][0][0]};", f"n{node}.{f['outs'][0][0]} = {value(f['outs'][0][1])};"]
@@ -521,6 +521,17 @@ class Calls:
     def dtag(self, bt, need):
         return self.tag(bt, need, self.EV, self.TY)
 
+    # (the pins the class has as a C++ type of the language: an input of any other type is a template - it may name a
+    # place of the engine, an entry of `b.chunks()` or a field of it: read where the input is taken, input_value)
+    PLAIN = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
+
+    def templated(self, bt):
+        return bt not in self.PLAIN and not (bt.startswith("List<") and bt[5:-1] in self.PLAIN)
+
+    def taken_in(self, name, bt):
+        """An input of the class's function as it is taken: what stands at a place it names, or the value."""
+        return f"{self.EV}input_value({name})" if self.templated(bt) else name
+
     def direct(self, f, need, mode, fail):
         """The lines of the call of a node by a Blueprint's class itself: the same steps in the same order as
         `body` writes them for the door, on the C++ types of the class instead of values. `mode`: "value" (a
@@ -566,7 +577,7 @@ class Calls:
                 lines += [f'auto* const kern_self = {EV}object_of<{owner}>({O}, {i64}({name0}), "{name0}");', f"if (!kern_self) {fail(given)}"]
                 obj = "kern_self->"
             else:
-                lines += [f"auto kern_self = {EV}blank<{owner}>();", f"{EV}Direct<{self.dtag(bt0, need)}>::from({O}, {name0}, kern_self);"]
+                lines += [f"auto kern_self = {EV}blank<{owner}>();", f"{EV}Direct<{self.dtag(bt0, need)}>::from({O}, {self.taken_in(name0, bt0)}, kern_self);"]
                 obj = "kern_self."
                 if "self" in outs:
                     after.append(lambda: give("self", outs["self"][0], "kern_self"))
@@ -601,6 +612,7 @@ class Calls:
                     args.append(f"*{a}")
                 continue
             tg = self.dtag(bt, need)
+            given_in = self.taken_in(pin_in, bt)
             if P in ("char const*", "char const* const"):
                 lines.append(f"const {EV}Chars {a}({pin_in});")
                 if pin_in == f.get("printf"):   # (the text its format makes: written as it is)
@@ -614,7 +626,7 @@ class Calls:
                 args.append(f"{a}.get()")
             elif pointer:
                 x = re.sub(r"\s*\bconst$", "", P[:-1].strip())
-                lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::vector<{x}>>({O}, {pin_in});")
+                lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::vector<{x}>>({O}, {given_in});")
                 args.append(f"{a}.empty() ? nullptr : {a}.data()")
                 fixed = c2b.declared_length(tree, parms[i]) if i < len(parms) else None
                 if fixed:   # (an array of a fixed length: the engine reads so many)
@@ -628,15 +640,15 @@ class Calls:
                 item = c2b.template_args(span)[0].strip()
                 x = re.sub(r"\s*\bconst$", "", item)
                 if item != x:   # (a view of entries it only reads)
-                    lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::vector<{x}>>({O}, {pin_in});")
+                    lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::vector<{x}>>({O}, {given_in});")
                 else:
-                    lines += [f"std::vector<{x}> {a};", f"{EV}Direct<{tg}>::from({O}, {pin_in}, {a});"]
+                    lines += [f"std::vector<{x}> {a};", f"{EV}Direct<{tg}>::from({O}, {given_in}, {a});"]
                 args.append(f"{span}({a}.data(), {a}.size())")
             elif reads:
-                lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::remove_cvref_t<{P}>>({O}, {pin_in});")
+                lines.append(f"decltype(auto) {a} = {EV}taken<{tg}, std::remove_cvref_t<{P}>>({O}, {given_in});")
                 args.append(a)
             else:
-                lines += [f"auto {a} = {EV}blank<std::remove_cvref_t<{P}>>();", f"{EV}Direct<{tg}>::from({O}, {pin_in}, {a});"]
+                lines += [f"auto {a} = {EV}blank<std::remove_cvref_t<{P}>>();", f"{EV}Direct<{tg}>::from({O}, {given_in}, {a});"]
                 args.append(a if ref else f"std::move({a})")   # (a value it takes: handed over, as nothing reads it after)
                 if pin_out is not None:
                     after.append(lambda a=a, pin_out=pin_out: give(pin_out, outs[pin_out][0], a))
@@ -675,7 +687,7 @@ class Calls:
         gives the class the engine's objects - and else hands its inputs to the host's door and takes what it
         gives."""
         api, EV = self.api, self.EV
-        plain = {"Bool": "Bool", "Int": "Int", "Float": "Float", "Vector": "Vector", "Text": "const Text&", "Int64": "Int64"}
+        plain = self.PLAIN
         need, bodies, headers, places = set(), [], set(), []
 
         def typed(bt):
@@ -696,7 +708,7 @@ class Calls:
                 else:
                     templates.append(f"class T{len(templates) + 1}")
                     params.append(f"const T{len(templates)}& {name_}")
-                values.append(f"to_value({name_})")
+                values.append(f"to_value({self.taken_in(name_, bt)})")
             zeros = ", ".join(f"PinType::{api.pin(bt)[0]}" for _, bt, _ in f["outs"])
             door = f"this->kern_engine({node}, {{{', '.join(values)}}}, {{{zeros}}})"
             failed = f"this->kern_engine_failed({node});"
@@ -774,7 +786,7 @@ class Calls:
                 taken = []
                 for k_, (n_, bt_, P_) in enumerate(more):
                     taken += [f"auto kern_a{k_} = {EV}blank<std::remove_cvref_t<{P_}>>();",
-                              f"{EV}Direct<{self.dtag(bt_, need)}>::from(*kern_o, {n_}, kern_a{k_});"]
+                              f"{EV}Direct<{self.dtag(bt_, need)}>::from(*kern_o, {self.taken_in(n_, bt_)}, kern_a{k_});"]
                 bind = ["kern_o->begin_call();", f"auto* const kern_self = {EV}object_of<{q}>(*kern_o, {handle}, {c_text(pin)});",
                         f"typename {P_name}::In kern_in{{}};"]
                 if more:

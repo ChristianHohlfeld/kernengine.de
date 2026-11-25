@@ -2271,7 +2271,7 @@ struct Engine : kern::Blueprint {
     engine_world_release(0);
     engine_mixer_make(n291);
     H101 = n291.result;
-    engine_mixer_bus(n292, H101);
+    engine_mixer_bus(n292, H101, In5);
     P101_0 = n292.result;
     n292.result = In9;
     P101_3 = n292.result;

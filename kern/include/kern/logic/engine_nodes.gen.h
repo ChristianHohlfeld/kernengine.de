@@ -2802,11 +2802,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Input>(*kern_o, static_cast<::kern::i64>(input), "input");
       if (!kern_self) { this->kern_engine_failed("engine.input.down"); return Bool{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, k, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
       decltype(auto) kern_r = kern_self->down(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.input.down", {to_value(input), to_value(k)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.input.down", {to_value(input), to_value(::kern::logic::engine_values::input_value(k))}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   template <class T1> Bool engine_input_pressed(Int input, const T1& k) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -2814,11 +2814,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Input>(*kern_o, static_cast<::kern::i64>(input), "input");
       if (!kern_self) { this->kern_engine_failed("engine.input.pressed"); return Bool{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, k, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
       decltype(auto) kern_r = kern_self->pressed(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.input.pressed", {to_value(input), to_value(k)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.input.pressed", {to_value(input), to_value(::kern::logic::engine_values::input_value(k))}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   template <class T1> Bool engine_input_released(Int input, const T1& k) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -2826,11 +2826,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Input>(*kern_o, static_cast<::kern::i64>(input), "input");
       if (!kern_self) { this->kern_engine_failed("engine.input.released"); return Bool{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, k, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
       decltype(auto) kern_r = kern_self->released(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.input.released", {to_value(input), to_value(k)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.input.released", {to_value(input), to_value(::kern::logic::engine_values::input_value(k))}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   /// Pointer position in drawing-buffer pixels, movement since the last frame (pixels, includes locked movement).
   Vector engine_input_pointer(Int input) const {
@@ -2926,13 +2926,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Input>(*kern_o, static_cast<::kern::i64>(input), "input");
       if (!kern_self) { this->kern_engine_failed("engine.input.key"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Key>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, k, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_Key>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, down, kern_a1);
       kern_self->key(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.input.key", {to_value(input), to_value(k), to_value(down)}, {});
+    this->kern_engine("engine.input.key", {to_value(input), to_value(::kern::logic::engine_values::input_value(k)), to_value(down)}, {});
   }
   void engine_input_pointer_move(Int input, Vector position, Vector delta) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -3194,11 +3194,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
       if (!kern_self) { this->kern_engine_failed("engine.engine.set_clear_color"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec4>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Vec4>>::from(*kern_o, color, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Vec4>>::from(*kern_o, ::kern::logic::engine_values::input_value(color), kern_a0);
       kern_self->set_clear_color(std::move(kern_a0));
       return;
     }
-    this->kern_engine("engine.engine.set_clear_color", {to_value(engine), to_value(color)}, {});
+    this->kern_engine("engine.engine.set_clear_color", {to_value(engine), to_value(::kern::logic::engine_values::input_value(color))}, {});
   }
   /// WebXR (kern_app_frame_xr): the headset's eye in the world and where it looks, as drawn last frame (the first eye); `xr` false outside a session.
   Bool engine_engine_xr(Int engine) const {
@@ -3487,11 +3487,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
       if (!kern_self) { this->kern_engine_failed("engine.engine.set_xr_scope_camera"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, camera);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, ::kern::logic::engine_values::input_value(camera));
       kern_self->set_xr_scope_camera(kern_a0);
       return;
     }
-    this->kern_engine("engine.engine.set_xr_scope_camera", {to_value(engine), to_value(camera)}, {});
+    this->kern_engine("engine.engine.set_xr_scope_camera", {to_value(engine), to_value(::kern::logic::engine_values::input_value(camera))}, {});
   }
   Int engine_engine_xr_scope_fbo(Int engine) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -3686,11 +3686,11 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.app.update"); return; }
       kern::Engine* const kern_a0 = ::kern::logic::engine_values::object_of<kern::Engine>(*kern_o, static_cast<::kern::i64>(engine), "engine");
       if (!kern_a0) { this->kern_engine_failed("engine.app.update"); return; }
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Frame>, std::remove_cvref_t<kern::Frame const&>>(*kern_o, frame);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Frame>, std::remove_cvref_t<kern::Frame const&>>(*kern_o, ::kern::logic::engine_values::input_value(frame));
       kern_self->update(*kern_a0, kern_a1);
       return;
     }
-    this->kern_engine("engine.app.update", {to_value(app), to_value(engine), to_value(frame)}, {});
+    this->kern_engine("engine.app.update", {to_value(app), to_value(engine), to_value(::kern::logic::engine_values::input_value(frame))}, {});
   }
   void engine_app_resized(Int app, Int engine) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -3720,37 +3720,37 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Bus>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, b, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, ::kern::logic::engine_values::input_value(b), kern_a0);
       decltype(auto) kern_r = kern::audio::bus_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.audio.bus_name", {to_value(b)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.audio.bus_name", {to_value(::kern::logic::engine_values::input_value(b))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> void engine_audio_parse_bus(const Text& s, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const std::string_view kern_a0 = s.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Bus&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::audio::parse_bus(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.audio.parse_bus", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    this->kern_engine("engine.audio.parse_bus", {to_value(s), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
   }
   template <class KernNode, class T1> void engine_audio_parse_bus(KernNode& kern_n, const Text& s, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const std::string_view kern_a0 = s.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Bus&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::audio::parse_bus(kern_a0, kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.audio.parse_bus", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    const std::vector<Value> kern_out = this->kern_engine("engine.audio.parse_bus", {to_value(s), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -3758,37 +3758,37 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Rolloff>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::from(*kern_o, r, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::from(*kern_o, ::kern::logic::engine_values::input_value(r), kern_a0);
       decltype(auto) kern_r = kern::audio::rolloff_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.audio.rolloff_name", {to_value(r)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.audio.rolloff_name", {to_value(::kern::logic::engine_values::input_value(r))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> void engine_audio_parse_rolloff(const Text& s, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const std::string_view kern_a0 = s.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Rolloff&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::audio::parse_rolloff(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.audio.parse_rolloff", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    this->kern_engine("engine.audio.parse_rolloff", {to_value(s), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
   }
   template <class KernNode, class T1> void engine_audio_parse_rolloff(KernNode& kern_n, const Text& s, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const std::string_view kern_a0 = s.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Rolloff&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::audio::parse_rolloff(kern_a0, kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Rolloff>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.audio.parse_rolloff", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    const std::vector<Value> kern_out = this->kern_engine("engine.audio.parse_rolloff", {to_value(s), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -4002,12 +4002,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.mixer.play"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, clip, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_PlayParams>, std::remove_cvref_t<kern::audio::PlayParams const&>>(*kern_o, params);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_PlayParams>, std::remove_cvref_t<kern::audio::PlayParams const&>>(*kern_o, ::kern::logic::engine_values::input_value(params));
       decltype(auto) kern_r = kern_self->play(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.mixer.play", {to_value(mixer), to_value(clip), to_value(params)}, {PinType::int64});
+    this->kern_engine("engine.mixer.play", {to_value(mixer), to_value(clip), to_value(::kern::logic::engine_values::input_value(params))}, {PinType::int64});
   }
   template <class KernNode, class T1> void engine_mixer_play(KernNode& kern_n, Int mixer, Int clip, const T1& params) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -4016,12 +4016,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.mixer.play"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, clip, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_PlayParams>, std::remove_cvref_t<kern::audio::PlayParams const&>>(*kern_o, params);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_PlayParams>, std::remove_cvref_t<kern::audio::PlayParams const&>>(*kern_o, ::kern::logic::engine_values::input_value(params));
       decltype(auto) kern_r = kern_self->play(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.mixer.play", {to_value(mixer), to_value(clip), to_value(params)}, {PinType::int64});
+    const std::vector<Value> kern_out = this->kern_engine("engine.mixer.play", {to_value(mixer), to_value(clip), to_value(::kern::logic::engine_values::input_value(params))}, {PinType::int64});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Stops with a short fade (seconds; 0 = 5 ms click guard).
@@ -4046,13 +4046,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.stop_all"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Bus>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, bus, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, ::kern::logic::engine_values::input_value(bus), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, fade, kern_a1);
       kern_self->stop_all(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.mixer.stop_all", {to_value(mixer), to_value(bus), to_value(fade)}, {});
+    this->kern_engine("engine.mixer.stop_all", {to_value(mixer), to_value(::kern::logic::engine_values::input_value(bus)), to_value(fade)}, {});
   }
   Bool engine_mixer_playing(Int mixer, Int64 voice) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -4172,11 +4172,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.set_listener"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_Listener>, std::remove_cvref_t<kern::audio::Listener const&>>(*kern_o, listener);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_Listener>, std::remove_cvref_t<kern::audio::Listener const&>>(*kern_o, ::kern::logic::engine_values::input_value(listener));
       kern_self->set_listener(kern_a0);
       return;
     }
-    this->kern_engine("engine.mixer.set_listener", {to_value(mixer), to_value(listener)}, {});
+    this->kern_engine("engine.mixer.set_listener", {to_value(mixer), to_value(::kern::logic::engine_values::input_value(listener))}, {});
   }
   using kern_given_engine_mixer_listener = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_Listener>, decltype(std::declval<kern::audio::Mixer&>().listener())>;
   kern_given_engine_mixer_listener engine_mixer_listener(Int mixer) const {
@@ -4196,13 +4196,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.bus"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Bus>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, b, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, ::kern::logic::engine_values::input_value(b), kern_a0);
       if (static_cast<std::size_t>(kern_a0) >= 6) { kern_o->error = "the input b names no entry: there are 6"; { this->kern_engine_failed("engine.mixer.bus"); return; } }
       decltype(auto) kern_r = kern_self->bus(std::move(kern_a0));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_BusSettings>>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.mixer.bus", {to_value(mixer), to_value(b)}, {PinType::structure});
+    this->kern_engine("engine.mixer.bus", {to_value(mixer), to_value(::kern::logic::engine_values::input_value(b))}, {PinType::structure});
   }
   /// The place kern::audio::Mixer::bus gives (kern/logic/engine_direct.h, Place): the member of the node that binds it.
   template <class B> using engine_mixer_bus_place = ::kern::logic::engine_values::Place<engine_direct::P_engine_mixer_bus, B>;
@@ -4213,7 +4213,7 @@ template <class Core> struct EngineNodesOf : Core {
       typename engine_direct::P_engine_mixer_bus::In kern_in{};
       if (kern_self) {
         auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Bus>>();
-        ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, b, kern_a0);
+        ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, ::kern::logic::engine_values::input_value(b), kern_a0);
         kern_in = typename engine_direct::P_engine_mixer_bus::In{kern_a0};
       }
       auto* const kern_at = kern_self ? engine_direct::P_engine_mixer_bus::at(*kern_o, *kern_self, kern_in) : nullptr;
@@ -4221,8 +4221,8 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_at) this->kern_engine_failed("engine.mixer.bus");
       return;
     }
-    this->kern_engine("engine.mixer.bus", {to_value(mixer), to_value(b)}, {PinType::structure});
-    kern_n.result.kern_bind(this->kern_world, {to_value(mixer), to_value(b)});
+    this->kern_engine("engine.mixer.bus", {to_value(mixer), to_value(::kern::logic::engine_values::input_value(b))}, {PinType::structure});
+    kern_n.result.kern_bind(this->kern_world, {to_value(mixer), to_value(::kern::logic::engine_values::input_value(b))});
   }
   using kern_given_engine_mixer_bus_2 = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_BusSettings>, decltype(std::declval<kern::audio::Mixer&>().bus(std::declval<kern::audio::Bus>()))>;
   template <class T1> kern_given_engine_mixer_bus_2 engine_mixer_bus_2(Int mixer, const T1& b) const {
@@ -4232,11 +4232,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::audio::Mixer>(*kern_o, static_cast<::kern::i64>(mixer), "mixer");
       if (!kern_self) { this->kern_engine_failed("engine.mixer.bus_2"); return kern_G(*kern_o); }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::audio::Bus>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, b, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_audio_Bus>>::from(*kern_o, ::kern::logic::engine_values::input_value(b), kern_a0);
       decltype(auto) kern_r = kern_self->bus(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.mixer.bus_2", {to_value(mixer), to_value(b)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.mixer.bus_2", {to_value(mixer), to_value(::kern::logic::engine_values::input_value(b))}, {PinType::structure})[0]);
   }
   /// Reverb character of the master return.
   void engine_mixer_set_reverb(Int mixer, Float room_size, Float damping, Float wet) {
@@ -4303,13 +4303,13 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1> List<Float> engine_audio_synthesize(const T1& patch, Int rate) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_SynthPatch>, std::remove_cvref_t<kern::audio::SynthPatch const&>>(*kern_o, patch);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_audio_SynthPatch>, std::remove_cvref_t<kern::audio::SynthPatch const&>>(*kern_o, ::kern::logic::engine_values::input_value(patch));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, rate, kern_a1);
       decltype(auto) kern_r = kern::audio::synthesize(kern_a0, std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>>::template make<List<Float>>(*kern_o, kern_r);
     }
-    return from_value<List<Float>>(this->kern_engine("engine.audio.synthesize", {to_value(patch), to_value(rate)}, {PinType::number_list})[0].converted(pin_type_of<List<Float>>()));
+    return from_value<List<Float>>(this->kern_engine("engine.audio.synthesize", {to_value(::kern::logic::engine_values::input_value(patch)), to_value(rate)}, {PinType::number_list})[0].converted(pin_type_of<List<Float>>()));
   }
   /// Mixes `src` into `dst` starting at `offset_seconds` (dst grows as needed).
   void engine_audio_mix_into(const List<Float>& dst, const List<Float>& src, Float offset_seconds, Int rate, Float gain) {
@@ -4623,12 +4623,12 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::LogLevel>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_LogLevel>>::from(*kern_o, level, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_LogLevel>>::from(*kern_o, ::kern::logic::engine_values::input_value(level), kern_a0);
       const ::kern::logic::engine_values::Chars kern_a1(text);
       kern::log(std::move(kern_a0), "%s", kern_a1.c_str());
       return;
     }
-    this->kern_engine("engine.log", {to_value(level), to_value(text)}, {});
+    this->kern_engine("engine.log", {to_value(::kern::logic::engine_values::input_value(level)), to_value(text)}, {});
   }
   /// Monotonic milliseconds (performance.now() in the browser).
   Float engine_now_ms() const {
@@ -4655,12 +4655,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, kind, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, input, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(input), kern_a1);
       decltype(auto) kern_r = kern::jobs::submit(std::move(kern_a0), std::move(kern_a1));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.jobs.submit", {to_value(kind), to_value(input)}, {PinType::integer});
+    this->kern_engine("engine.jobs.submit", {to_value(kind), to_value(::kern::logic::engine_values::input_value(input))}, {PinType::integer});
   }
   template <class KernNode, class T1> void engine_jobs_submit(KernNode& kern_n, Int kind, const T1& input) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -4668,12 +4668,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, kind, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, input, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(input), kern_a1);
       decltype(auto) kern_r = kern::jobs::submit(std::move(kern_a0), std::move(kern_a1));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.jobs.submit", {to_value(kind), to_value(input)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.jobs.submit", {to_value(kind), to_value(::kern::logic::engine_values::input_value(input))}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// True once job `id` finished; moves its result into `out` (the job is then forgotten).
@@ -4683,13 +4683,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::jobs::take(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.jobs.take", {to_value(id), to_value(out)}, {PinType::boolean, PinType::integer_list});
+    this->kern_engine("engine.jobs.take", {to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::integer_list});
   }
   template <class KernNode, class T1> void engine_jobs_take(KernNode& kern_n, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -4697,13 +4697,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::jobs::take(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.jobs.take", {to_value(id), to_value(out)}, {PinType::boolean, PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.jobs.take", {to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::integer_list});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -4802,28 +4802,28 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, kind, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, input);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, output, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(output), kern_a2);
       kern::jobs::run(std::move(kern_a0), kern::Span<unsigned char const>(kern_a1.data(), kern_a1.size()), kern_a2);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a2);
       return;
     }
-    this->kern_engine("engine.jobs.run", {to_value(kind), to_value(input), to_value(output)}, {PinType::integer_list});
+    this->kern_engine("engine.jobs.run", {to_value(kind), to_value(::kern::logic::engine_values::input_value(input)), to_value(::kern::logic::engine_values::input_value(output))}, {PinType::integer_list});
   }
   template <class KernNode, class T1, class T2> void engine_jobs_run(KernNode& kern_n, Int kind, const T1& input, const T2& output) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, kind, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, input);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, output, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(output), kern_a2);
       kern::jobs::run(std::move(kern_a0), kern::Span<unsigned char const>(kern_a1.data(), kern_a1.size()), kern_a2);
       kern_n.output = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.output)>>(*kern_o, kern_a2);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.jobs.run", {to_value(kind), to_value(input), to_value(output)}, {PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.jobs.run", {to_value(kind), to_value(::kern::logic::engine_values::input_value(input)), to_value(::kern::logic::engine_values::input_value(output))}, {PinType::integer_list});
     kern_n.output = from_value<std::remove_cvref_t<decltype(kern_n.output)>>(kern_out[0]);
   }
   /// The result of a handed-out job.
@@ -4832,11 +4832,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, output);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(output));
       kern::jobs::done(std::move(kern_a0), kern::Span<unsigned char const>(kern_a1.data(), kern_a1.size()));
       return;
     }
-    this->kern_engine("engine.jobs.done", {to_value(id), to_value(output)}, {});
+    this->kern_engine("engine.jobs.done", {to_value(id), to_value(::kern::logic::engine_values::input_value(output))}, {});
   }
   /// Mesh of a shape, centred on the actor origin, white vertex colours (the material colour tints it). UVs: metres * tiling on planar faces.
   using kern_given_engine_game_shape_mesh = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, decltype(kern::game::shape_mesh(std::declval<kern::game::MeshComponent const&>()))>;
@@ -4844,11 +4844,11 @@ template <class Core> struct EngineNodesOf : Core {
     using kern_G = kern_given_engine_game_shape_mesh;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, mesh);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
       decltype(auto) kern_r = kern::game::shape_mesh(kern_a0);
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.shape_mesh", {to_value(mesh)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.game.shape_mesh", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::structure})[0]);
   }
   /// Local bounds of a shape (centred on the origin).
   using kern_given_engine_game_shape_bounds = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>, decltype(kern::game::shape_bounds(std::declval<kern::game::MeshComponent const&>()))>;
@@ -4856,11 +4856,11 @@ template <class Core> struct EngineNodesOf : Core {
     using kern_G = kern_given_engine_game_shape_bounds;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, mesh);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
       decltype(auto) kern_r = kern::game::shape_bounds(kern_a0);
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.shape_bounds", {to_value(mesh)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.game.shape_bounds", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::structure})[0]);
   }
   /// A concrete collider (box, sphere, capsule or hull) matching a mesh.
   using kern_given_engine_game_fit_collider = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_ColliderComponent>, decltype(kern::game::fit_collider(std::declval<kern::game::MeshComponent const&>()))>;
@@ -4868,48 +4868,48 @@ template <class Core> struct EngineNodesOf : Core {
     using kern_G = kern_given_engine_game_fit_collider;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, mesh);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
       decltype(auto) kern_r = kern::game::fit_collider(kern_a0);
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.fit_collider", {to_value(mesh)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.game.fit_collider", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::structure})[0]);
   }
   /// Hull points of a shape (used for automatic colliders of cylinders, cones, ramps, tori).
   template <class T1> List<Vector> engine_game_shape_hull_points(const T1& mesh) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, mesh);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_MeshComponent>, std::remove_cvref_t<kern::game::MeshComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
       decltype(auto) kern_r = kern::game::shape_hull_points(kern_a0);
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Vector>>::template make<List<Vector>>(*kern_o, kern_r);
     }
-    return from_value<List<Vector>>(this->kern_engine("engine.game.shape_hull_points", {to_value(mesh)}, {PinType::vector_list})[0].converted(pin_type_of<List<Vector>>()));
+    return from_value<List<Vector>>(this->kern_engine("engine.game.shape_hull_points", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::vector_list})[0].converted(pin_type_of<List<Vector>>()));
   }
   /// Builds the city (deterministic for a seed). Fails only for invalid parameters.
   template <class T1, class T2> void engine_game_build_city(const T1& city, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, city);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::CityGeometry&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::game::build_city(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game.build_city", {to_value(city), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game.build_city", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_game_build_city(KernNode& kern_n, const T1& city, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, city);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::CityGeometry&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::game::build_city(kern_a0, kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityGeometry>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.build_city", {to_value(city), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.build_city", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -4917,28 +4917,28 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1, class T2> void engine_game_city_street_point(const T1& city, const T2& rng) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, city);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Rng&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::from(*kern_o, rng, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::from(*kern_o, ::kern::logic::engine_values::input_value(rng), kern_a1);
       decltype(auto) kern_r = kern::game::city_street_point(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game.city_street_point", {to_value(city), to_value(rng)}, {PinType::vector, PinType::structure});
+    this->kern_engine("engine.game.city_street_point", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(rng))}, {PinType::vector, PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_game_city_street_point(KernNode& kern_n, const T1& city, const T2& rng) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, city);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_CityComponent>, std::remove_cvref_t<kern::game::CityComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(city));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Rng&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::from(*kern_o, rng, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::from(*kern_o, ::kern::logic::engine_values::input_value(rng), kern_a1);
       decltype(auto) kern_r = kern::game::city_street_point(kern_a0, kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.rng = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Rng>>::template make<std::remove_cvref_t<decltype(kern_n.rng)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.city_street_point", {to_value(city), to_value(rng)}, {PinType::vector, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.city_street_point", {to_value(::kern::logic::engine_values::input_value(city)), to_value(::kern::logic::engine_values::input_value(rng))}, {PinType::vector, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.rng = from_value<std::remove_cvref_t<decltype(kern_n.rng)>>(kern_out[1]);
   }
@@ -4960,11 +4960,11 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Quat>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Quat>>::from(*kern_o, q, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Quat>>::from(*kern_o, ::kern::logic::engine_values::input_value(q), kern_a0);
       decltype(auto) kern_r = kern::game::quat_to_euler(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.game.quat_to_euler", {to_value(q)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.game.quat_to_euler", {to_value(::kern::logic::engine_values::input_value(q))}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   /// Matrix of a transform (translation * rotation * scale).
   using kern_given_engine_game_transform_matrix = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, decltype(kern::game::transform_matrix(std::declval<kern::game::Transform const&>()))>;
@@ -4972,11 +4972,11 @@ template <class Core> struct EngineNodesOf : Core {
     using kern_G = kern_given_engine_game_transform_matrix;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Transform>, std::remove_cvref_t<kern::game::Transform const&>>(*kern_o, t);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Transform>, std::remove_cvref_t<kern::game::Transform const&>>(*kern_o, ::kern::logic::engine_values::input_value(t));
       decltype(auto) kern_r = kern::game::transform_matrix(kern_a0);
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.transform_matrix", {to_value(t)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.game.transform_matrix", {to_value(::kern::logic::engine_values::input_value(t))}, {PinType::structure})[0]);
   }
   /// Decomposes a matrix without shear into a transform (scale signs stay positive).
   using kern_given_engine_game_matrix_transform = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Transform>, decltype(kern::game::matrix_transform(std::declval<kern::Mat4 const&>()))>;
@@ -4984,47 +4984,47 @@ template <class Core> struct EngineNodesOf : Core {
     using kern_G = kern_given_engine_game_matrix_transform;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, m);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, ::kern::logic::engine_values::input_value(m));
       decltype(auto) kern_r = kern::game::matrix_transform(kern_a0);
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.matrix_transform", {to_value(m)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.game.matrix_transform", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::structure})[0]);
   }
   template <class T1> Text engine_game_shape_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Shape>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::from(*kern_o, s, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::from(*kern_o, ::kern::logic::engine_values::input_value(s), kern_a0);
       decltype(auto) kern_r = kern::game::shape_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.shape_name", {to_value(s)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.shape_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> void engine_game_parse_shape(const Text& s, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const std::string_view kern_a0 = s.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Shape&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::game::parse_shape(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
   }
   template <class KernNode, class T1> void engine_game_parse_shape(KernNode& kern_n, const Text& s, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const std::string_view kern_a0 = s.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Shape&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::game::parse_shape(kern_a0, kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Shape>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game.parse_shape", {to_value(s), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -5032,61 +5032,61 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Motion>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Motion>>::from(*kern_o, m, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_Motion>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
       decltype(auto) kern_r = kern::game::motion_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.motion_name", {to_value(m)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.motion_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Text engine_game_collider_shape_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::ColliderShape>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_ColliderShape>>::from(*kern_o, s, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_ColliderShape>>::from(*kern_o, ::kern::logic::engine_values::input_value(s), kern_a0);
       decltype(auto) kern_r = kern::game::collider_shape_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.collider_shape_name", {to_value(s)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.collider_shape_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Text engine_game_joint_kind_name(const T1& k) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::JointKind>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_JointKind>>::from(*kern_o, k, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_JointKind>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
       decltype(auto) kern_r = kern::game::joint_kind_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.joint_kind_name", {to_value(k)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.joint_kind_name", {to_value(::kern::logic::engine_values::input_value(k))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Text engine_game_control_mode_name(const T1& m) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::ControlMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_ControlMode>>::from(*kern_o, m, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_ControlMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
       decltype(auto) kern_r = kern::game::control_mode_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.control_mode_name", {to_value(m)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.control_mode_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Text engine_game_camera_mode_name(const T1& m) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::CameraMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_CameraMode>>::from(*kern_o, m, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_CameraMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
       decltype(auto) kern_r = kern::game::camera_mode_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.camera_mode_name", {to_value(m)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.camera_mode_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Text engine_game_weapon_kind_name(const T1& k) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WeaponKind>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_WeaponKind>>::from(*kern_o, k, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_WeaponKind>>::from(*kern_o, ::kern::logic::engine_values::input_value(k), kern_a0);
       decltype(auto) kern_r = kern::game::weapon_kind_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.weapon_kind_name", {to_value(k)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.weapon_kind_name", {to_value(::kern::logic::engine_values::input_value(k))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   /// Hit points: actors with health take damage from weapons (and falls for players). Handling of a weapon type: damage, rate, magazine, spread and recoil.
   using kern_given_engine_game_weapon_preset = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WeaponComponent>, decltype(kern::game::weapon_preset(std::declval<kern::game::WeaponKind>()))>;
@@ -5095,41 +5095,41 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::WeaponKind>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_WeaponKind>>::from(*kern_o, kind, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_WeaponKind>>::from(*kern_o, ::kern::logic::engine_values::input_value(kind), kern_a0);
       decltype(auto) kern_r = kern::game::weapon_preset(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.weapon_preset", {to_value(kind)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.game.weapon_preset", {to_value(::kern::logic::engine_values::input_value(kind))}, {PinType::structure})[0]);
   }
   template <class T1> Text engine_game_trigger_action_name(const T1& a) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::TriggerAction>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_TriggerAction>>::from(*kern_o, a, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_TriggerAction>>::from(*kern_o, ::kern::logic::engine_values::input_value(a), kern_a0);
       decltype(auto) kern_r = kern::game::trigger_action_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.trigger_action_name", {to_value(a)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.trigger_action_name", {to_value(::kern::logic::engine_values::input_value(a))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Text engine_game_mover_mode_name(const T1& m) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::MoverMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_MoverMode>>::from(*kern_o, m, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_MoverMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(m), kern_a0);
       decltype(auto) kern_r = kern::game::mover_mode_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.mover_mode_name", {to_value(m)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.mover_mode_name", {to_value(::kern::logic::engine_values::input_value(m))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Text engine_game_game_goal_name(const T1& g) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::GameGoal>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_GameGoal>>::from(*kern_o, g, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_GameGoal>>::from(*kern_o, ::kern::logic::engine_values::input_value(g), kern_a0);
       decltype(auto) kern_r = kern::game::game_goal_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.game_goal_name", {to_value(g)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.game_goal_name", {to_value(::kern::logic::engine_values::input_value(g))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   /// What a motion may be called: a-z, 0-9, _ and -, 1 to 38 characters.
   Bool engine_game_motion_name_ok(const Text& name) const {
@@ -5144,32 +5144,32 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1> Int engine_game_default_player(const T1& level) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       decltype(auto) kern_r = kern::game::default_player(kern_a0);
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
     }
-    return from_value<Int>(this->kern_engine("engine.game.default_player", {to_value(level)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.game.default_player", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   /// The names of a level's collision channels, in the order of their bits (WorldSettings::channels).
   template <class T1> List<Text> engine_game_channel_names(const T1& w) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, w);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
       decltype(auto) kern_r = kern::game::channel_names(kern_a0);
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Text>>::template make<List<Text>>(*kern_o, kern_r);
     }
-    return from_value<List<Text>>(this->kern_engine("engine.game.channel_names", {to_value(w)}, {PinType::text_list})[0].converted(pin_type_of<List<Text>>()));
+    return from_value<List<Text>>(this->kern_engine("engine.game.channel_names", {to_value(::kern::logic::engine_values::input_value(w))}, {PinType::text_list})[0].converted(pin_type_of<List<Text>>()));
   }
   /// The bits of the channels a text names ("World, Vehicle"); a name the level does not have is no bit. "*" or "All": every bit.
   template <class T1> Int engine_game_channel_bits(const T1& w, const Text& names) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, w);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
       const std::string_view kern_a1 = names.view();
       decltype(auto) kern_r = kern::game::channel_bits(kern_a0, kern_a1);
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
     }
-    return from_value<Int>(this->kern_engine("engine.game.channel_bits", {to_value(w), to_value(names)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.game.channel_bits", {to_value(::kern::logic::engine_values::input_value(w)), to_value(names)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   using kern_given_engine_level_find_2 = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>, decltype(std::declval<kern::game::Level&>().find(std::declval<unsigned int>()))>;
   template <class T1> kern_given_engine_level_find_2 engine_level_find_2(const T1& self, Int id) const {
@@ -5177,42 +5177,42 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       decltype(auto) kern_r = kern_self.find(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.level.find_2", {to_value(self), to_value(id)}, {PinType::structure_list})[0]);
+    return kern_G(this->kern_engine("engine.level.find_2", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::structure_list})[0]);
   }
   /// assigns an id when actor.id == 0
   template <class T1, class T2> void engine_level_add(const T1& self, const T2& actor) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, actor, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(actor), kern_a0);
       decltype(auto) kern_r = kern_self.add(std::move(kern_a0));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_self);
       return;
     }
-    this->kern_engine("engine.level.add", {to_value(self), to_value(actor)}, {PinType::structure, PinType::structure});
+    this->kern_engine("engine.level.add", {to_value(::kern::logic::engine_values::input_value(self)), to_value(::kern::logic::engine_values::input_value(actor))}, {PinType::structure, PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_level_add(KernNode& kern_n, const T1& self, const T2& actor) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::Actor>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, actor, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::from(*kern_o, ::kern::logic::engine_values::input_value(actor), kern_a0);
       decltype(auto) kern_r = kern_self.add(std::move(kern_a0));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.self = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.self)>>(*kern_o, kern_self);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.level.add", {to_value(self), to_value(actor)}, {PinType::structure, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.level.add", {to_value(::kern::logic::engine_values::input_value(self)), to_value(::kern::logic::engine_values::input_value(actor))}, {PinType::structure, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.self = from_value<std::remove_cvref_t<decltype(kern_n.self)>>(kern_out[1]);
   }
@@ -5223,13 +5223,13 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, parent, kern_a0);
       decltype(auto) kern_r = kern_self.children(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.level.children", {to_value(self), to_value(parent)}, {PinType::integer_list})[0]);
+    return kern_G(this->kern_engine("engine.level.children", {to_value(::kern::logic::engine_values::input_value(self)), to_value(parent)}, {PinType::integer_list})[0]);
   }
   /// Matrix from actor space to world space (parents applied).
   using kern_given_engine_level_world_matrix = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, decltype(std::declval<kern::game::Level&>().world_matrix(std::declval<unsigned int>()))>;
@@ -5238,32 +5238,32 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       decltype(auto) kern_r = kern_self.world_matrix(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.level.world_matrix", {to_value(self), to_value(id)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.level.world_matrix", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::structure})[0]);
   }
   /// The nearest ancestor (or the actor itself) with a body, 0 = none.
   template <class T1> Int engine_level_body_owner(const T1& self, Int id) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       decltype(auto) kern_r = kern_self.body_owner(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
     }
-    return from_value<Int>(this->kern_engine("engine.level.body_owner", {to_value(self), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.level.body_owner", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   template <class T1> Bool engine_level_is_ancestor(const T1& self, Int ancestor, Int id) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, ancestor, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -5271,128 +5271,128 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_r = kern_self.is_ancestor(std::move(kern_a0), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.level.is_ancestor", {to_value(self), to_value(ancestor), to_value(id)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.level.is_ancestor", {to_value(::kern::logic::engine_values::input_value(self)), to_value(ancestor), to_value(id)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   template <class T1> Int engine_level_texture(const T1& self, const Text& id) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       const std::string_view kern_a0 = id.view();
       decltype(auto) kern_r = kern_self.texture(kern_a0);
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::TextureAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
-    return from_value<Int>(this->kern_engine("engine.level.texture", {to_value(self), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.level.texture", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   template <class T1> Int engine_level_sound(const T1& self, const Text& id) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       const std::string_view kern_a0 = id.view();
       decltype(auto) kern_r = kern_self.sound(kern_a0);
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::SoundAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
-    return from_value<Int>(this->kern_engine("engine.level.sound", {to_value(self), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.level.sound", {to_value(::kern::logic::engine_values::input_value(self)), to_value(id)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   template <class T1> Int engine_level_motion(const T1& self, const Text& name) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       const std::string_view kern_a0 = name.view();
       decltype(auto) kern_r = kern_self.motion(kern_a0);
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::MotionAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
-    return from_value<Int>(this->kern_engine("engine.level.motion", {to_value(self), to_value(name)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.level.motion", {to_value(::kern::logic::engine_values::input_value(self)), to_value(name)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   template <class T1> void engine_level_motion_2(const T1& self, const Text& name) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       const std::string_view kern_a0 = name.view();
       decltype(auto) kern_r = kern_self.motion(kern_a0);
       (void)::kern::logic::engine_values::handle_of<kern::game::MotionAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::pass(*kern_o, kern_self);
       return;
     }
-    this->kern_engine("engine.level.motion_2", {to_value(self), to_value(name)}, {PinType::integer, PinType::structure});
+    this->kern_engine("engine.level.motion_2", {to_value(::kern::logic::engine_values::input_value(self)), to_value(name)}, {PinType::integer, PinType::structure});
   }
   template <class KernNode, class T1> void engine_level_motion_2(KernNode& kern_n, const T1& self, const Text& name) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::game::Level>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       const std::string_view kern_a0 = name.view();
       decltype(auto) kern_r = kern_self.motion(kern_a0);
       kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(::kern::logic::engine_values::handle_of<kern::game::MotionAsset>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
       kern_n.self = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>>::template make<std::remove_cvref_t<decltype(kern_n.self)>>(*kern_o, kern_self);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.level.motion_2", {to_value(self), to_value(name)}, {PinType::integer, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.level.motion_2", {to_value(::kern::logic::engine_values::input_value(self)), to_value(name)}, {PinType::integer, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.self = from_value<std::remove_cvref_t<decltype(kern_n.self)>>(kern_out[1]);
   }
   template <class T1> Int engine_game_to_json(const T1& level) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       decltype(auto) kern_r = kern::game::to_json(kern_a0);
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
-    return from_value<Int>(this->kern_engine("engine.game.to_json", {to_value(level)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.game.to_json", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   template <class T1> Text engine_game_to_text(const T1& level, Int indent) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, indent, kern_a1);
       decltype(auto) kern_r = kern::game::to_text(kern_a0, std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.to_text", {to_value(level), to_value(indent)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.to_text", {to_value(::kern::logic::engine_values::input_value(level)), to_value(indent)}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> Int engine_game_actor_to_json(const T1& a) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>, std::remove_cvref_t<kern::game::Actor const&>>(*kern_o, a);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Actor>, std::remove_cvref_t<kern::game::Actor const&>>(*kern_o, ::kern::logic::engine_values::input_value(a));
       decltype(auto) kern_r = kern::game::actor_to_json(kern_a0);
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
-    return from_value<Int>(this->kern_engine("engine.game.actor_to_json", {to_value(a)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.game.actor_to_json", {to_value(::kern::logic::engine_values::input_value(a))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   template <class T1> Int engine_game_world_to_json(const T1& w) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, w);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
       decltype(auto) kern_r = kern::game::world_to_json(kern_a0);
       return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::json::Value>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
     }
-    return from_value<Int>(this->kern_engine("engine.game.world_to_json", {to_value(w)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.game.world_to_json", {to_value(::kern::logic::engine_values::input_value(w))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   /// Problems of a level: errors keep it from playing (dangling references, bad values), warnings point at likely mistakes. True for "", "none", "auto", a known "builtin:<name>" or an imported sound id.
   template <class T1> Bool engine_game_sound_reference_ok(const T1& level, const Text& ref) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       const std::string_view kern_a1 = ref.view();
       decltype(auto) kern_r = kern::game::sound_reference_ok(kern_a0, kern_a1);
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.game.sound_reference_ok", {to_value(level), to_value(ref)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.game.sound_reference_ok", {to_value(::kern::logic::engine_values::input_value(level)), to_value(ref)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   using kern_given_engine_game_validate = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Issue>>, decltype(kern::game::validate(std::declval<kern::game::Level const&>()))>;
   template <class T1> kern_given_engine_game_validate engine_game_validate(const T1& level) const {
     using kern_G = kern_given_engine_game_validate;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       decltype(auto) kern_r = kern::game::validate(kern_a0);
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.validate", {to_value(level)}, {PinType::structure_list})[0]);
+    return kern_G(this->kern_engine("engine.game.validate", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::structure_list})[0]);
   }
   /// "#rrggbb" <-> sRGB 0..1.
   Text engine_game_hex_color(Vector c) const {
@@ -5565,21 +5565,21 @@ template <class Core> struct EngineNodesOf : Core {
     using kern_G = kern_given_engine_game_plan_bodies;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       decltype(auto) kern_r = kern::game::plan_bodies(kern_a0);
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.game.plan_bodies", {to_value(level)}, {PinType::structure_list})[0]);
+    return kern_G(this->kern_engine("engine.game.plan_bodies", {to_value(::kern::logic::engine_values::input_value(level))}, {PinType::structure_list})[0]);
   }
   template <class T1> Text engine_game_game_status_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::GameStatus>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_GameStatus>>::from(*kern_o, s, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_GameStatus>>::from(*kern_o, ::kern::logic::engine_values::input_value(s), kern_a0);
       decltype(auto) kern_r = kern::game::game_status_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.game_status_name", {to_value(s)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.game_status_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   /// Renderer layer bits for the scene meshes (default 1).
   void engine_game_world_set_layers(Int game_world, Int layers) {
@@ -5600,11 +5600,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.sync"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       kern_self->sync(kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.sync", {to_value(game_world), to_value(level)}, {});
+    this->kern_engine("engine.game_world.sync", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level))}, {});
   }
   void engine_game_world_clear(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -5638,13 +5638,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Mat4&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->actor_matrix(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.actor_matrix", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game_world.actor_matrix", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_game_world_actor_matrix(KernNode& kern_n, Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -5654,13 +5654,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Mat4&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->actor_matrix(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actor_matrix", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actor_matrix", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -5673,13 +5673,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Aabb&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->actor_bounds(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.actor_bounds", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game_world.actor_bounds", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_game_world_actor_bounds(KernNode& kern_n, Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -5689,13 +5689,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Aabb&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->actor_bounds(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Aabb>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actor_bounds", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actor_bounds", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -5708,12 +5708,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->actor_meshes(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.actor_meshes", {to_value(game_world), to_value(id), to_value(out)}, {PinType::integer_list});
+    this->kern_engine("engine.game_world.actor_meshes", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
   }
   template <class KernNode, class T1> void engine_game_world_actor_meshes(KernNode& kern_n, Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -5723,12 +5723,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->actor_meshes(std::move(kern_a0), kern_a1);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actor_meshes", {to_value(game_world), to_value(id), to_value(out)}, {PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actor_meshes", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   /// Texture assets that need pixels from the host (decoded images).
@@ -5752,12 +5752,12 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, width, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, height, kern_a2);
-      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, rgba);
+      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(rgba));
       decltype(auto) kern_r = kern_self->set_texture_pixels(kern_a0.get(), std::move(kern_a1), std::move(kern_a2), kern_a3.empty() ? nullptr : kern_a3.data());
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.set_texture_pixels", {to_value(game_world), to_value(id), to_value(width), to_value(height), to_value(rgba)}, {PinType::boolean});
+    this->kern_engine("engine.game_world.set_texture_pixels", {to_value(game_world), to_value(id), to_value(width), to_value(height), to_value(::kern::logic::engine_values::input_value(rgba))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_game_world_set_texture_pixels(KernNode& kern_n, Int game_world, const Text& id, Int width, Int height, const T1& rgba) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -5769,12 +5769,12 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, width, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, height, kern_a2);
-      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, rgba);
+      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(rgba));
       decltype(auto) kern_r = kern_self->set_texture_pixels(kern_a0.get(), std::move(kern_a1), std::move(kern_a2), kern_a3.empty() ? nullptr : kern_a3.data());
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_texture_pixels", {to_value(game_world), to_value(id), to_value(width), to_value(height), to_value(rgba)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_texture_pixels", {to_value(game_world), to_value(id), to_value(width), to_value(height), to_value(::kern::logic::engine_values::input_value(rgba))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Lighting, sky, fog and point lights for the frame; returns the night factor.
@@ -5837,28 +5837,28 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.start"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, mode, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a1);
       decltype(auto) kern_r = kern_self->start(kern_a0, std::move(kern_a1));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.start", {to_value(game_world), to_value(level), to_value(mode)}, {PinType::boolean});
+    this->kern_engine("engine.game_world.start", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level)), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
   }
   template <class KernNode, class T1, class T2> void engine_game_world_start(KernNode& kern_n, Int game_world, const T1& level, const T2& mode) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.start"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, mode, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a1);
       decltype(auto) kern_r = kern_self->start(kern_a0, std::move(kern_a1));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start", {to_value(game_world), to_value(level), to_value(mode)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level)), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_game_world_stop(Int game_world) {
@@ -5933,12 +5933,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.set_mode"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, mode, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a0);
       decltype(auto) kern_r = kern_self->set_mode(std::move(kern_a0));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.set_mode", {to_value(game_world), to_value(mode)}, {PinType::boolean});
+    this->kern_engine("engine.game_world.set_mode", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_game_world_set_mode(KernNode& kern_n, Int game_world, const T1& mode) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -5946,12 +5946,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.set_mode"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SimMode>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, mode, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_game_SimMode>>::from(*kern_o, ::kern::logic::engine_values::input_value(mode), kern_a0);
       decltype(auto) kern_r = kern_self->set_mode(std::move(kern_a0));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_mode", {to_value(game_world), to_value(mode)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_mode", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Advances real time `dt` (fixed steps at the level's rate, at most 8 per call).
@@ -5962,11 +5962,11 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.game_world.step"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, input);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       kern_self->step(std::move(kern_a0), kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.step", {to_value(game_world), to_value(dt), to_value(input)}, {});
+    this->kern_engine("engine.game_world.step", {to_value(game_world), to_value(dt), to_value(::kern::logic::engine_values::input_value(input))}, {});
   }
   /// Exactly one fixed step (also while paused).
   template <class T1> void engine_game_world_step_once(Int game_world, const T1& input) {
@@ -5974,11 +5974,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.step_once"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, input);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       kern_self->step_once(kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.step_once", {to_value(game_world), to_value(input)}, {});
+    this->kern_engine("engine.game_world.step_once", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(input))}, {});
   }
   void engine_game_world_restart(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6010,16 +6010,16 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.update_camera"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Camera&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, camera, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, ::kern::logic::engine_values::input_value(camera), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, input);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       decltype(auto) kern_r = kern_self->update_camera(kern_a0, std::move(kern_a1), kern_a2);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::pass(*kern_o, kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.update_camera", {to_value(game_world), to_value(camera), to_value(dt), to_value(input)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game_world.update_camera", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(camera)), to_value(dt), to_value(::kern::logic::engine_values::input_value(input))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_game_world_update_camera(KernNode& kern_n, Int game_world, const T1& camera, Float dt, const T2& input) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6027,16 +6027,16 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.camera); this->kern_engine_failed("engine.game_world.update_camera"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Camera&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, camera, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, ::kern::logic::engine_values::input_value(camera), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, input);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       decltype(auto) kern_r = kern_self->update_camera(kern_a0, std::move(kern_a1), kern_a2);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.camera = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::template make<std::remove_cvref_t<decltype(kern_n.camera)>>(*kern_o, kern_a0);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.update_camera", {to_value(game_world), to_value(camera), to_value(dt), to_value(input)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.update_camera", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(camera)), to_value(dt), to_value(::kern::logic::engine_values::input_value(input))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.camera = from_value<std::remove_cvref_t<decltype(kern_n.camera)>>(kern_out[1]);
   }
@@ -6170,11 +6170,11 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.game_world.set_pawn_input"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, pawn, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, input);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       kern_self->set_pawn_input(std::move(kern_a0), kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.set_pawn_input", {to_value(game_world), to_value(pawn), to_value(input)}, {});
+    this->kern_engine("engine.game_world.set_pawn_input", {to_value(game_world), to_value(pawn), to_value(::kern::logic::engine_values::input_value(input))}, {});
   }
   /// The pawn this machine controls and the camera follows.
   void engine_game_world_set_local_pawn(Int game_world, Int pawn) {
@@ -6208,12 +6208,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.take_alive_changes"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<std::pair<unsigned int, bool>, std::allocator<std::pair<unsigned int, bool> > >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Int, ::kern::logic::engine_values::Bool>>>::from(*kern_o, out, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Int, ::kern::logic::engine_values::Bool>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a0);
       kern_self->take_alive_changes(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Int, ::kern::logic::engine_values::Bool>>>::pass(*kern_o, kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.take_alive_changes", {to_value(game_world), to_value(out)}, {PinType::structure_list});
+    this->kern_engine("engine.game_world.take_alive_changes", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
   }
   template <class KernNode, class T1> void engine_game_world_take_alive_changes(KernNode& kern_n, Int game_world, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6221,12 +6221,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.game_world.take_alive_changes"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<std::pair<unsigned int, bool>, std::allocator<std::pair<unsigned int, bool> > >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Int, ::kern::logic::engine_values::Bool>>>::from(*kern_o, out, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Int, ::kern::logic::engine_values::Bool>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a0);
       kern_self->take_alive_changes(kern_a0);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Int, ::kern::logic::engine_values::Bool>>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a0);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.take_alive_changes", {to_value(game_world), to_value(out)}, {PinType::structure_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.take_alive_changes", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   using kern_given_engine_game_world_dead_actors = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::game::GameWorld&>().dead_actors())>;
@@ -6262,12 +6262,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.networked_actors"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a0);
       kern_self->networked_actors(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.networked_actors", {to_value(game_world), to_value(out)}, {PinType::integer_list});
+    this->kern_engine("engine.game_world.networked_actors", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
   }
   template <class KernNode, class T1> void engine_game_world_networked_actors(KernNode& kern_n, Int game_world, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6275,12 +6275,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.game_world.networked_actors"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a0);
       kern_self->networked_actors(kern_a0);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a0);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.networked_actors", {to_value(game_world), to_value(out)}, {PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.networked_actors", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   void engine_game_world_hud_mut(Int game_world) {
@@ -6315,24 +6315,24 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.start_replica"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       decltype(auto) kern_r = kern_self->start_replica(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.start_replica", {to_value(game_world), to_value(level)}, {PinType::boolean});
+    this->kern_engine("engine.game_world.start_replica", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_game_world_start_replica(KernNode& kern_n, Int game_world, const T1& level) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.start_replica"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       decltype(auto) kern_r = kern_self->start_replica(kern_a0);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start_replica", {to_value(game_world), to_value(level)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start_replica", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   template <class T1> void engine_game_world_set_replica_pose(Int game_world, Int id, Vector position, const T1& rotation) {
@@ -6345,11 +6345,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, position, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Quat>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Quat>>::from(*kern_o, rotation, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Quat>>::from(*kern_o, ::kern::logic::engine_values::input_value(rotation), kern_a2);
       kern_self->set_replica_pose(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.game_world.set_replica_pose", {to_value(game_world), to_value(id), to_value(position), to_value(rotation)}, {});
+    this->kern_engine("engine.game_world.set_replica_pose", {to_value(game_world), to_value(id), to_value(position), to_value(::kern::logic::engine_values::input_value(rotation))}, {});
   }
   /// Advances the replica's clock (`time` = the server time being shown).
   template <class T1> void engine_game_world_step_replica(Int game_world, Float dt, Float time, const T1& input) {
@@ -6361,11 +6361,11 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, time, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, input);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_PlayInput>, std::remove_cvref_t<kern::game::PlayInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       kern_self->step_replica(std::move(kern_a0), std::move(kern_a1), kern_a2);
       return;
     }
-    this->kern_engine("engine.game_world.step_replica", {to_value(game_world), to_value(dt), to_value(time), to_value(input)}, {});
+    this->kern_engine("engine.game_world.step_replica", {to_value(game_world), to_value(dt), to_value(time), to_value(::kern::logic::engine_values::input_value(input))}, {});
   }
   using kern_given_engine_game_world_hud = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Hud>, decltype(std::declval<kern::game::GameWorld&>().hud())>;
   kern_given_engine_game_world_hud engine_game_world_hud(Int game_world) const {
@@ -6706,13 +6706,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, pawn, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SoldierState&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->soldier_state(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.soldier_state", {to_value(game_world), to_value(pawn), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game_world.soldier_state", {to_value(game_world), to_value(pawn), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_game_world_soldier_state(KernNode& kern_n, Int game_world, Int pawn, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6722,13 +6722,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, pawn, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::SoldierState&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->soldier_state(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.soldier_state", {to_value(game_world), to_value(pawn), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.soldier_state", {to_value(game_world), to_value(pawn), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -6766,11 +6766,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.apply_soldier_state"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>, std::remove_cvref_t<kern::game::SoldierState const&>>(*kern_o, s);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_SoldierState>, std::remove_cvref_t<kern::game::SoldierState const&>>(*kern_o, ::kern::logic::engine_values::input_value(s));
       kern_self->apply_soldier_state(kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.apply_soldier_state", {to_value(game_world), to_value(s)}, {});
+    this->kern_engine("engine.game_world.apply_soldier_state", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(s))}, {});
   }
   /// The camera the frame is drawn with (view model of a first-person player).
   template <class T1> void engine_game_world_set_view(Int game_world, const T1& camera) {
@@ -6778,11 +6778,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.set_view"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, camera);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, ::kern::logic::engine_values::input_value(camera));
       kern_self->set_view(kern_a0);
       return;
     }
-    this->kern_engine("engine.game_world.set_view", {to_value(game_world), to_value(camera)}, {});
+    this->kern_engine("engine.game_world.set_view", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(camera))}, {});
   }
   /// VR: the first-person weapon in the hand - `hand` (x right, y up, z back, the controller's pointing ray along -z) places the gun's grip there; nullptr: back in front of the camera.
   template <class T1> void engine_game_world_set_view_hand(Int game_world, const T1& hand) {
@@ -6790,11 +6790,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
       if (!kern_self) { this->kern_engine_failed("engine.game_world.set_view_hand"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>, std::vector<kern::Mat4>>(*kern_o, hand);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>>, std::vector<kern::Mat4>>(*kern_o, ::kern::logic::engine_values::input_value(hand));
       kern_self->set_view_hand(kern_a0.empty() ? nullptr : kern_a0.data());
       return;
     }
-    this->kern_engine("engine.game_world.set_view_hand", {to_value(game_world), to_value(hand)}, {});
+    this->kern_engine("engine.game_world.set_view_hand", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(hand))}, {});
   }
   /// False for collected pickups and used triggers (and their children).
   Bool engine_game_world_actor_alive(Int game_world, Int id) const {
@@ -6867,13 +6867,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, props, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::SpawnChange, std::allocator<kern::game::GameWorld::SpawnChange> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, spawns, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, ::kern::logic::engine_values::input_value(spawns), kern_a1);
       kern_self->take_replicated_changes(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.take_replicated_changes", {to_value(game_world), to_value(props), to_value(spawns)}, {PinType::integer_list, PinType::structure_list});
+    this->kern_engine("engine.game_world.take_replicated_changes", {to_value(game_world), to_value(props), to_value(::kern::logic::engine_values::input_value(spawns))}, {PinType::integer_list, PinType::structure_list});
   }
   template <class KernNode, class T1> void engine_game_world_take_replicated_changes(KernNode& kern_n, Int game_world, const List<Int>& props, const T1& spawns) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6883,13 +6883,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, props, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::SpawnChange, std::allocator<kern::game::GameWorld::SpawnChange> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, spawns, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, ::kern::logic::engine_values::input_value(spawns), kern_a1);
       kern_self->take_replicated_changes(kern_a0, kern_a1);
       kern_n.props = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.props)>>(*kern_o, kern_a0);
       kern_n.spawns = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::template make<std::remove_cvref_t<decltype(kern_n.spawns)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.take_replicated_changes", {to_value(game_world), to_value(props), to_value(spawns)}, {PinType::integer_list, PinType::structure_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.take_replicated_changes", {to_value(game_world), to_value(props), to_value(::kern::logic::engine_values::input_value(spawns))}, {PinType::integer_list, PinType::structure_list});
     kern_n.props = from_value<std::remove_cvref_t<decltype(kern_n.props)>>(kern_out[0]);
     kern_n.spawns = from_value<std::remove_cvref_t<decltype(kern_n.spawns)>>(kern_out[1]);
   }
@@ -6902,13 +6902,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, props, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::SpawnChange, std::allocator<kern::game::GameWorld::SpawnChange> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, spawns, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, ::kern::logic::engine_values::input_value(spawns), kern_a1);
       kern_self->replicated_state(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.replicated_state", {to_value(game_world), to_value(props), to_value(spawns)}, {PinType::integer_list, PinType::structure_list});
+    this->kern_engine("engine.game_world.replicated_state", {to_value(game_world), to_value(props), to_value(::kern::logic::engine_values::input_value(spawns))}, {PinType::integer_list, PinType::structure_list});
   }
   template <class KernNode, class T1> void engine_game_world_replicated_state(KernNode& kern_n, Int game_world, const List<Int>& props, const T1& spawns) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6918,13 +6918,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::PropertyChange, std::allocator<kern::game::GameWorld::PropertyChange> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, props, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::game::GameWorld::SpawnChange, std::allocator<kern::game::GameWorld::SpawnChange> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, spawns, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::from(*kern_o, ::kern::logic::engine_values::input_value(spawns), kern_a1);
       kern_self->replicated_state(kern_a0, kern_a1);
       kern_n.props = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.props)>>(*kern_o, kern_a0);
       kern_n.spawns = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_SpawnChange>>>::template make<std::remove_cvref_t<decltype(kern_n.spawns)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.replicated_state", {to_value(game_world), to_value(props), to_value(spawns)}, {PinType::integer_list, PinType::structure_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.replicated_state", {to_value(game_world), to_value(props), to_value(::kern::logic::engine_values::input_value(spawns))}, {PinType::integer_list, PinType::structure_list});
     kern_n.props = from_value<std::remove_cvref_t<decltype(kern_n.props)>>(kern_out[0]);
     kern_n.spawns = from_value<std::remove_cvref_t<decltype(kern_n.spawns)>>(kern_out[1]);
   }
@@ -7304,12 +7304,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.game_world.actors_with_tag"); return; }
       const std::string_view kern_a0 = tag.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->actors_with_tag(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.actors_with_tag", {to_value(game_world), to_value(tag), to_value(out)}, {PinType::integer_list});
+    this->kern_engine("engine.game_world.actors_with_tag", {to_value(game_world), to_value(tag), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
   }
   template <class KernNode, class T1> void engine_game_world_actors_with_tag(KernNode& kern_n, Int game_world, const Text& tag, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -7318,12 +7318,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.game_world.actors_with_tag"); return; }
       const std::string_view kern_a0 = tag.view();
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->actors_with_tag(kern_a0, kern_a1);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actors_with_tag", {to_value(game_world), to_value(tag), to_value(out)}, {PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.actors_with_tag", {to_value(game_world), to_value(tag), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   Bool engine_game_world_has_tag(Int game_world, Int id, const Text& tag) const {
@@ -7358,7 +7358,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, normal, kern_a5);
       auto kern_a6 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a6);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a6);
       decltype(auto) kern_r = kern_self->line_trace(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), kern_a3, kern_a4, kern_a5, std::move(kern_a6));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_a3);
@@ -7366,7 +7366,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::pass(*kern_o, kern_a5);
       return;
     }
-    this->kern_engine("engine.game_world.line_trace", {to_value(game_world), to_value(from), to_value(to), to_value(ignore), to_value(actor), to_value(point), to_value(normal), to_value(filter)}, {PinType::boolean, PinType::integer, PinType::vector, PinType::vector});
+    this->kern_engine("engine.game_world.line_trace", {to_value(game_world), to_value(from), to_value(to), to_value(ignore), to_value(actor), to_value(point), to_value(normal), to_value(::kern::logic::engine_values::input_value(filter))}, {PinType::boolean, PinType::integer, PinType::vector, PinType::vector});
   }
   template <class KernNode, class T1> void engine_game_world_line_trace(KernNode& kern_n, Int game_world, Vector from, Vector to, Int ignore, Int actor, Vector point, Vector normal, const T1& filter) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -7386,7 +7386,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, normal, kern_a5);
       auto kern_a6 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a6);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a6);
       decltype(auto) kern_r = kern_self->line_trace(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), kern_a3, kern_a4, kern_a5, std::move(kern_a6));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.actor = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.actor)>>(*kern_o, kern_a3);
@@ -7394,7 +7394,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.normal = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<std::remove_cvref_t<decltype(kern_n.normal)>>(*kern_o, kern_a5);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.line_trace", {to_value(game_world), to_value(from), to_value(to), to_value(ignore), to_value(actor), to_value(point), to_value(normal), to_value(filter)}, {PinType::boolean, PinType::integer, PinType::vector, PinType::vector});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.line_trace", {to_value(game_world), to_value(from), to_value(to), to_value(ignore), to_value(actor), to_value(point), to_value(normal), to_value(::kern::logic::engine_values::input_value(filter))}, {PinType::boolean, PinType::integer, PinType::vector, PinType::vector});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.actor = from_value<std::remove_cvref_t<decltype(kern_n.actor)>>(kern_out[1]);
     kern_n.point = from_value<std::remove_cvref_t<decltype(kern_n.point)>>(kern_out[2]);
@@ -7563,13 +7563,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::GameWorld::WalkerSensors&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerSensors>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerSensors>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->walker_sensors(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerSensors>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.walker_sensors", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game_world.walker_sensors", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_game_world_walker_sensors(KernNode& kern_n, Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -7579,13 +7579,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::GameWorld::WalkerSensors&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerSensors>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerSensors>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->walker_sensors(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerSensors>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.walker_sensors", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.walker_sensors", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -7598,13 +7598,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Camera&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->walker_camera(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.walker_camera", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game_world.walker_camera", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_game_world_walker_camera(KernNode& kern_n, Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -7614,13 +7614,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Camera&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->walker_camera(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.walker_camera", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.walker_camera", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -8120,13 +8120,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::GameWorld::WalkerProbe&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerProbe>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerProbe>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->walker_probe(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerProbe>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.game_world.walker_probe", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.game_world.walker_probe", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_game_world_walker_probe(KernNode& kern_n, Int game_world, Int id, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -8136,13 +8136,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::game::GameWorld::WalkerProbe&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerProbe>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerProbe>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern_self->walker_probe(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_WalkerProbe>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.walker_probe", {to_value(game_world), to_value(id), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.walker_probe", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -8273,12 +8273,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.game_world.set_walker_detector"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_DetectorModel>, std::remove_cvref_t<kern::game::GameWorld::DetectorModel const&>>(*kern_o, model);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_DetectorModel>, std::remove_cvref_t<kern::game::GameWorld::DetectorModel const&>>(*kern_o, ::kern::logic::engine_values::input_value(model));
       decltype(auto) kern_r = kern_self->set_walker_detector(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.game_world.set_walker_detector", {to_value(game_world), to_value(id), to_value(model)}, {PinType::boolean});
+    this->kern_engine("engine.game_world.set_walker_detector", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(model))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_game_world_set_walker_detector(KernNode& kern_n, Int game_world, Int id, const T1& model) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -8287,12 +8287,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.game_world.set_walker_detector"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_DetectorModel>, std::remove_cvref_t<kern::game::GameWorld::DetectorModel const&>>(*kern_o, model);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_GameWorld_DetectorModel>, std::remove_cvref_t<kern::game::GameWorld::DetectorModel const&>>(*kern_o, ::kern::logic::engine_values::input_value(model));
       decltype(auto) kern_r = kern_self->set_walker_detector(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_walker_detector", {to_value(game_world), to_value(id), to_value(model)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.game_world.set_walker_detector", {to_value(game_world), to_value(id), to_value(::kern::logic::engine_values::input_value(model))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// True when the next fixed step starts a control tick that is also a play decision (25 Hz).
@@ -8480,11 +8480,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
       if (!kern_self) { this->kern_engine_failed("engine.sound_bank.request_level"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       kern_self->request_level(kern_a0);
       return;
     }
-    this->kern_engine("engine.sound_bank.request_level", {to_value(sound_bank), to_value(level)}, {});
+    this->kern_engine("engine.sound_bank.request_level", {to_value(sound_bank), to_value(::kern::logic::engine_values::input_value(level))}, {});
   }
   /// Tracks the level's imported assets: clips of removed or replaced assets are dropped.
   template <class T1> void engine_sound_bank_sync_assets(Int sound_bank, const T1& level) {
@@ -8492,11 +8492,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::SoundBank>(*kern_o, static_cast<::kern::i64>(sound_bank), "sound_bank");
       if (!kern_self) { this->kern_engine_failed("engine.sound_bank.sync_assets"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, level);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_Level>, std::remove_cvref_t<kern::game::Level const&>>(*kern_o, ::kern::logic::engine_values::input_value(level));
       kern_self->sync_assets(kern_a0);
       return;
     }
-    this->kern_engine("engine.sound_bank.sync_assets", {to_value(sound_bank), to_value(level)}, {});
+    this->kern_engine("engine.sound_bank.sync_assets", {to_value(sound_bank), to_value(::kern::logic::engine_values::input_value(level))}, {});
   }
   /// Renders queued built-in sounds for about `budget_ms` (0 = all now). True when none is queued.
   void engine_sound_bank_prepare(Int sound_bank, Float budget_ms) {
@@ -8680,13 +8680,13 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.game_audio.update"); return; }
       kern::game::GameWorld* const kern_a0 = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_a0) { this->kern_engine_failed("engine.game_audio.update"); return; }
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, listener);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, ::kern::logic::engine_values::input_value(listener));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a2);
       kern_self->update(*kern_a0, kern_a1, std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.game_audio.update", {to_value(game_audio), to_value(world), to_value(listener), to_value(dt)}, {});
+    this->kern_engine("engine.game_audio.update", {to_value(game_audio), to_value(world), to_value(::kern::logic::engine_values::input_value(listener)), to_value(dt)}, {});
   }
   /// Fades everything of the game out.
   void engine_game_audio_end(Int game_audio, Float fade) {
@@ -8717,11 +8717,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameAudio>(*kern_o, static_cast<::kern::i64>(game_audio), "game_audio");
       if (!kern_self) { this->kern_engine_failed("engine.game_audio.apply_settings"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, w);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_WorldSettings>, std::remove_cvref_t<kern::game::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(w));
       kern_self->apply_settings(kern_a0);
       return;
     }
-    this->kern_engine("engine.game_audio.apply_settings", {to_value(game_audio), to_value(w)}, {});
+    this->kern_engine("engine.game_audio.apply_settings", {to_value(game_audio), to_value(::kern::logic::engine_values::input_value(w))}, {});
   }
   /// Editor master mute (kept across begin/end).
   void engine_game_audio_set_muted(Int game_audio, Bool muted) {
@@ -8770,11 +8770,11 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1> Text engine_game_engine_sound_for(const T1& c) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_ControllerComponent>, std::remove_cvref_t<kern::game::ControllerComponent const&>>(*kern_o, c);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_ControllerComponent>, std::remove_cvref_t<kern::game::ControllerComponent const&>>(*kern_o, ::kern::logic::engine_values::input_value(c));
       decltype(auto) kern_r = kern::game::engine_sound_for(kern_a0);
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.game.engine_sound_for", {to_value(c)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.game.engine_sound_for", {to_value(::kern::logic::engine_values::input_value(c))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> void engine_building_builder_begin(Int building_builder, const List<Float>& stream, Int length, const T1& options) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -8784,13 +8784,13 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.building_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.building_builder.begin", {to_value(building_builder), to_value(stream), to_value(length), to_value(options)}, {PinType::boolean});
+    this->kern_engine("engine.building_builder.begin", {to_value(building_builder), to_value(stream), to_value(length), to_value(::kern::logic::engine_values::input_value(options))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_building_builder_begin(KernNode& kern_n, Int building_builder, const List<Float>& stream, Int length, const T1& options) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -8800,13 +8800,13 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BuildingOptions>, std::remove_cvref_t<kern::BuildingOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.building_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.building_builder.begin", {to_value(building_builder), to_value(stream), to_value(length), to_value(options)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.building_builder.begin", {to_value(building_builder), to_value(stream), to_value(length), to_value(::kern::logic::engine_values::input_value(options))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Processes buildings until `budget_ms` elapsed. Returns true when finished.
@@ -9039,18 +9039,18 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, ::kern::logic::engine_values::input_value(hole_starts));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a4);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.earcut.triangulate"); return; } }
       if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { this->kern_engine_failed("engine.earcut.triangulate"); return; } }
       kern_self->triangulate(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), kern_a4);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a4);
       return;
     }
-    this->kern_engine("engine.earcut.triangulate", {to_value(earcut), to_value(xy), to_value(vertex_count), to_value(hole_starts), to_value(hole_count), to_value(out)}, {PinType::integer_list});
+    this->kern_engine("engine.earcut.triangulate", {to_value(earcut), to_value(xy), to_value(vertex_count), to_value(::kern::logic::engine_values::input_value(hole_starts)), to_value(hole_count), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
   }
   template <class KernNode, class T1, class T2> void engine_earcut_triangulate(KernNode& kern_n, Int earcut, const List<Float>& xy, Int vertex_count, const T1& hole_starts, Int hole_count, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -9060,18 +9060,18 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, ::kern::logic::engine_values::input_value(hole_starts));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned int, std::allocator<unsigned int> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, out, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a4);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.earcut.triangulate"); return; } }
       if (::kern::logic::engine_values::numbers(kern_a3) > kern_a2.size()) { kern_o->error = "the list hole_starts has fewer entries than hole_count says"; { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.earcut.triangulate"); return; } }
       kern_self->triangulate(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), kern_a4);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a4);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.earcut.triangulate", {to_value(earcut), to_value(xy), to_value(vertex_count), to_value(hole_starts), to_value(hole_count), to_value(out)}, {PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.earcut.triangulate", {to_value(earcut), to_value(xy), to_value(vertex_count), to_value(::kern::logic::engine_values::input_value(hole_starts)), to_value(hole_count), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::integer_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   /// Relative difference between polygon area and triangulated area (0 = exact).
@@ -9081,10 +9081,10 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, xy);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<2u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, hole_starts);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, ::kern::logic::engine_values::input_value(hole_starts));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, hole_count, kern_a3);
-      decltype(auto) kern_a4 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, triangles);
+      decltype(auto) kern_a4 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, ::kern::logic::engine_values::input_value(triangles));
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index_count, kern_a5);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list xy has fewer entries than vertex_count says"; { this->kern_engine_failed("engine.earcut.deviation"); return Float{}; } }
@@ -9093,7 +9093,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_r = kern::Earcut::deviation(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), kern_a4.empty() ? nullptr : kern_a4.data(), std::move(kern_a5));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.earcut.deviation", {to_value(xy), to_value(vertex_count), to_value(hole_starts), to_value(hole_count), to_value(triangles), to_value(index_count)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.earcut.deviation", {to_value(xy), to_value(vertex_count), to_value(::kern::logic::engine_values::input_value(hole_starts)), to_value(hole_count), to_value(::kern::logic::engine_values::input_value(triangles)), to_value(index_count)}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   /// Borrowed MeshInput view (geometry only; material etc. stay default).
   using kern_given_engine_mesh_data_as_input = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshInput>, decltype(std::declval<kern::MeshData&>().as_input(std::declval<unsigned int>()))>;
@@ -9102,13 +9102,13 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_self = ::kern::logic::engine_values::blank<kern::MeshData>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, self, kern_self);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_self);
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, extra_slot, kern_a0);
       decltype(auto) kern_r = kern_self.as_input(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.mesh_data.as_input", {to_value(self), to_value(extra_slot)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.mesh_data.as_input", {to_value(::kern::logic::engine_values::input_value(self)), to_value(extra_slot)}, {PinType::structure})[0]);
   }
   /// Creates or replaces mesh `id` of `renderer` from `mesh` as it stands, drawn as `look` says, with its instances: `transforms` 16 floats each (none: one identity), `tints` rgba each (none: white). The same as Renderer::upsert with mesh.as_input(look.extra_slot) and the look's fields: the mesh is read where it is, nothing of it is copied but what the renderer keeps.
   template <class T1, class T2> void engine_upsert(Int renderer, Int id, const T1& mesh, const T2& look, const List<Float>& transforms, const List<Float>& tints) {
@@ -9118,15 +9118,15 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_a0) { this->kern_engine_failed("engine.upsert"); return; }
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, mesh);
-      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshLook>, std::remove_cvref_t<kern::MeshLook const&>>(*kern_o, look);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
+      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshLook>, std::remove_cvref_t<kern::MeshLook const&>>(*kern_o, ::kern::logic::engine_values::input_value(look));
       decltype(auto) kern_a4 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, transforms);
       decltype(auto) kern_a5 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, tints);
       decltype(auto) kern_r = kern::upsert(*kern_a0, std::move(kern_a1), kern_a2, kern_a3, kern::Span<float const>(kern_a4.data(), kern_a4.size()), kern::Span<float const>(kern_a5.data(), kern_a5.size()));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.upsert", {to_value(renderer), to_value(id), to_value(mesh), to_value(look), to_value(transforms), to_value(tints)}, {PinType::boolean});
+    this->kern_engine("engine.upsert", {to_value(renderer), to_value(id), to_value(::kern::logic::engine_values::input_value(mesh)), to_value(::kern::logic::engine_values::input_value(look)), to_value(transforms), to_value(tints)}, {PinType::boolean});
   }
   template <class KernNode, class T1, class T2> void engine_upsert(KernNode& kern_n, Int renderer, Int id, const T1& mesh, const T2& look, const List<Float>& transforms, const List<Float>& tints) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -9135,15 +9135,15 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.upsert"); return; }
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, mesh);
-      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshLook>, std::remove_cvref_t<kern::MeshLook const&>>(*kern_o, look);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
+      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshLook>, std::remove_cvref_t<kern::MeshLook const&>>(*kern_o, ::kern::logic::engine_values::input_value(look));
       decltype(auto) kern_a4 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, transforms);
       decltype(auto) kern_a5 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, tints);
       decltype(auto) kern_r = kern::upsert(*kern_a0, std::move(kern_a1), kern_a2, kern_a3, kern::Span<float const>(kern_a4.data(), kern_a4.size()), kern::Span<float const>(kern_a5.data(), kern_a5.size()));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.upsert", {to_value(renderer), to_value(id), to_value(mesh), to_value(look), to_value(transforms), to_value(tints)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.upsert", {to_value(renderer), to_value(id), to_value(::kern::logic::engine_values::input_value(mesh)), to_value(::kern::logic::engine_values::input_value(look)), to_value(transforms), to_value(tints)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Merges vertices whose position, normal, colour, uv and extra stream are bit-identical (IEEE-754 patterns, never rounded), producing an indexed mesh. Hard edges stay hard. Keeps the soup when indexing would not save bytes (`min_saving`). The mesh must be a triangle soup whose streams have one entry per vertex (positions, normals and colours 3, uvs 2, extra `extra_size`); one that does not stays as it is (nothing indexed).
@@ -9151,7 +9151,7 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, mesh, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(mesh), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, min_saving, kern_a1);
       decltype(auto) kern_r = kern::weld(kern_a0, std::move(kern_a1));
@@ -9159,13 +9159,13 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::pass(*kern_o, kern_a0);
       return;
     }
-    this->kern_engine("engine.weld", {to_value(mesh), to_value(min_saving)}, {PinType::structure, PinType::structure});
+    this->kern_engine("engine.weld", {to_value(::kern::logic::engine_values::input_value(mesh)), to_value(min_saving)}, {PinType::structure, PinType::structure});
   }
   template <class KernNode, class T1> void engine_weld(KernNode& kern_n, const T1& mesh, Int min_saving) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, mesh, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(mesh), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::size_t>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, min_saving, kern_a1);
       decltype(auto) kern_r = kern::weld(kern_a0, std::move(kern_a1));
@@ -9173,7 +9173,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.mesh = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::template make<std::remove_cvref_t<decltype(kern_n.mesh)>>(*kern_o, kern_a0);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.weld", {to_value(mesh), to_value(min_saving)}, {PinType::structure, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.weld", {to_value(::kern::logic::engine_values::input_value(mesh)), to_value(min_saving)}, {PinType::structure, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.mesh = from_value<std::remove_cvref_t<decltype(kern_n.mesh)>>(kern_out[1]);
   }
@@ -9181,11 +9181,11 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1> Int engine_content_hash(const T1& mesh) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, mesh);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, ::kern::logic::engine_values::input_value(mesh));
       decltype(auto) kern_r = kern::content_hash(kern_a0);
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<Int>(*kern_o, kern_r);
     }
-    return from_value<Int>(this->kern_engine("engine.content_hash", {to_value(mesh)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
+    return from_value<Int>(this->kern_engine("engine.content_hash", {to_value(::kern::logic::engine_values::input_value(mesh))}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   /// Axis-aligned box with flat faces (24 vertices).
   using kern_given_engine_primitives_box = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, decltype(kern::primitives::box(std::declval<kern::Vec3>(), std::declval<kern::Vec3>()))>;
@@ -9340,27 +9340,27 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, dst, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, src);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, m);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(dst), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, ::kern::logic::engine_values::input_value(src));
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, ::kern::logic::engine_values::input_value(m));
       kern::primitives::append(kern_a0, kern_a1, kern_a2);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::pass(*kern_o, kern_a0);
       return;
     }
-    this->kern_engine("engine.primitives.append", {to_value(dst), to_value(src), to_value(m)}, {PinType::structure});
+    this->kern_engine("engine.primitives.append", {to_value(::kern::logic::engine_values::input_value(dst)), to_value(::kern::logic::engine_values::input_value(src)), to_value(::kern::logic::engine_values::input_value(m))}, {PinType::structure});
   }
   template <class KernNode, class T1, class T2, class T3> void engine_primitives_append(KernNode& kern_n, const T1& dst, const T2& src, const T3& m) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, dst, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, src);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, m);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(dst), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>, std::remove_cvref_t<kern::MeshData const&>>(*kern_o, ::kern::logic::engine_values::input_value(src));
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, ::kern::logic::engine_values::input_value(m));
       kern::primitives::append(kern_a0, kern_a1, kern_a2);
       kern_n.dst = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::template make<std::remove_cvref_t<decltype(kern_n.dst)>>(*kern_o, kern_a0);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.primitives.append", {to_value(dst), to_value(src), to_value(m)}, {PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.primitives.append", {to_value(::kern::logic::engine_values::input_value(dst)), to_value(::kern::logic::engine_values::input_value(src)), to_value(::kern::logic::engine_values::input_value(m))}, {PinType::structure});
     kern_n.dst = from_value<std::remove_cvref_t<decltype(kern_n.dst)>>(kern_out[0]);
   }
   template <class T1, class T2> void engine_road_builder_begin(Int road_builder, const List<Float>& stream, Int length, const T1& options, const T2& heights) {
@@ -9371,15 +9371,15 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RoadOptions>, std::remove_cvref_t<kern::RoadOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RoadOptions>, std::remove_cvref_t<kern::RoadOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, ::kern::logic::engine_values::input_value(heights), kern_a3);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { this->kern_engine_failed("engine.road_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2, std::move(kern_a3));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.road_builder.begin", {to_value(road_builder), to_value(stream), to_value(length), to_value(options), to_value(heights)}, {PinType::boolean});
+    this->kern_engine("engine.road_builder.begin", {to_value(road_builder), to_value(stream), to_value(length), to_value(::kern::logic::engine_values::input_value(options)), to_value(::kern::logic::engine_values::input_value(heights))}, {PinType::boolean});
   }
   template <class KernNode, class T1, class T2> void engine_road_builder_begin(KernNode& kern_n, Int road_builder, const List<Float>& stream, Int length, const T1& options, const T2& heights) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -9389,15 +9389,15 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<double>>(*kern_o, stream);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, length, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RoadOptions>, std::remove_cvref_t<kern::RoadOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RoadOptions>, std::remove_cvref_t<kern::RoadOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, ::kern::logic::engine_values::input_value(heights), kern_a3);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list stream has fewer entries than length says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.road_builder.begin"); return; } }
       decltype(auto) kern_r = kern_self->begin(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2, std::move(kern_a3));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.road_builder.begin", {to_value(road_builder), to_value(stream), to_value(length), to_value(options), to_value(heights)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.road_builder.begin", {to_value(road_builder), to_value(stream), to_value(length), to_value(::kern::logic::engine_values::input_value(options)), to_value(::kern::logic::engine_values::input_value(heights))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_road_builder_step(Int road_builder, Float budget_ms) {
@@ -9548,11 +9548,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, cells, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Rgb>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Rgb>>::from(*kern_o, albedo, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Rgb>>::from(*kern_o, ::kern::logic::engine_values::input_value(albedo), kern_a4);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a5);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, ::kern::logic::engine_values::input_value(heights), kern_a5);
       auto kern_a6 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, out, kern_a6);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a6);
       auto kern_a7 = ::kern::logic::engine_values::blank<double>();
       auto kern_a8 = ::kern::logic::engine_values::blank<double>();
       decltype(auto) kern_r = kern::build_terrain_tile(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5), kern_a6, &kern_a7, &kern_a8);
@@ -9562,7 +9562,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::pass(*kern_o, kern_a8);
       return;
     }
-    this->kern_engine("engine.build_terrain_tile", {to_value(x0), to_value(y0), to_value(step), to_value(cells), to_value(albedo), to_value(heights), to_value(out)}, {PinType::boolean, PinType::structure, PinType::number, PinType::number});
+    this->kern_engine("engine.build_terrain_tile", {to_value(x0), to_value(y0), to_value(step), to_value(cells), to_value(::kern::logic::engine_values::input_value(albedo)), to_value(::kern::logic::engine_values::input_value(heights)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::number, PinType::number});
   }
   template <class KernNode, class T1, class T2, class T3> void engine_build_terrain_tile(KernNode& kern_n, Float x0, Float y0, Float step, Int cells, const T1& albedo, const T2& heights, const T3& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -9576,11 +9576,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, cells, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Rgb>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Rgb>>::from(*kern_o, albedo, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Rgb>>::from(*kern_o, ::kern::logic::engine_values::input_value(albedo), kern_a4);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::HeightSampler>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, heights, kern_a5);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Callback<::kern::logic::engine_values::Float(::kern::logic::engine_values::Float, ::kern::logic::engine_values::Float)>>::from(*kern_o, ::kern::logic::engine_values::input_value(heights), kern_a5);
       auto kern_a6 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, out, kern_a6);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a6);
       auto kern_a7 = ::kern::logic::engine_values::blank<double>();
       auto kern_a8 = ::kern::logic::engine_values::blank<double>();
       decltype(auto) kern_r = kern::build_terrain_tile(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5), kern_a6, &kern_a7, &kern_a8);
@@ -9590,7 +9590,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.max_height = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<std::remove_cvref_t<decltype(kern_n.max_height)>>(*kern_o, kern_a8);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.build_terrain_tile", {to_value(x0), to_value(y0), to_value(step), to_value(cells), to_value(albedo), to_value(heights), to_value(out)}, {PinType::boolean, PinType::structure, PinType::number, PinType::number});
+    const std::vector<Value> kern_out = this->kern_engine("engine.build_terrain_tile", {to_value(x0), to_value(y0), to_value(step), to_value(cells), to_value(::kern::logic::engine_values::input_value(albedo)), to_value(::kern::logic::engine_values::input_value(heights)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure, PinType::number, PinType::number});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
     kern_n.min_height = from_value<std::remove_cvref_t<decltype(kern_n.min_height)>>(kern_out[2]);
@@ -9705,7 +9705,7 @@ template <class Core> struct EngineNodesOf : Core {
     using kern_G = kern_given_engine_instanced_bounds;
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>, std::remove_cvref_t<kern::Sphere const&>>(*kern_o, local);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Sphere>, std::remove_cvref_t<kern::Sphere const&>>(*kern_o, ::kern::logic::engine_values::input_value(local));
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, transforms);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<16u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, instance_count, kern_a2);
@@ -9713,7 +9713,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_r = kern::instanced_bounds(kern_a0, kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.instanced_bounds", {to_value(local), to_value(transforms), to_value(instance_count)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.instanced_bounds", {to_value(::kern::logic::engine_values::input_value(local)), to_value(transforms), to_value(instance_count)}, {PinType::structure})[0]);
   }
   /// Creates the system drawing into mesh `mesh_id` of `renderer` (0 = allocate one).
   void engine_particles_init(Int particles, Int renderer, Int capacity, Int mesh_id) {
@@ -9757,24 +9757,24 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Particles>(*kern_o, static_cast<::kern::i64>(particles), "particles");
       if (!kern_self) { this->kern_engine_failed("engine.particles.emit"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ParticleSpec>, std::remove_cvref_t<kern::ParticleSpec const&>>(*kern_o, spec);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ParticleSpec>, std::remove_cvref_t<kern::ParticleSpec const&>>(*kern_o, ::kern::logic::engine_values::input_value(spec));
       decltype(auto) kern_r = kern_self->emit(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.particles.emit", {to_value(particles), to_value(spec)}, {PinType::integer});
+    this->kern_engine("engine.particles.emit", {to_value(particles), to_value(::kern::logic::engine_values::input_value(spec))}, {PinType::integer});
   }
   template <class KernNode, class T1> void engine_particles_emit(KernNode& kern_n, Int particles, const T1& spec) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Particles>(*kern_o, static_cast<::kern::i64>(particles), "particles");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.particles.emit"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ParticleSpec>, std::remove_cvref_t<kern::ParticleSpec const&>>(*kern_o, spec);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ParticleSpec>, std::remove_cvref_t<kern::ParticleSpec const&>>(*kern_o, ::kern::logic::engine_values::input_value(spec));
       decltype(auto) kern_r = kern_self->emit(kern_a0);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.particles.emit", {to_value(particles), to_value(spec)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.particles.emit", {to_value(particles), to_value(::kern::logic::engine_values::input_value(spec))}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Advances to `now_ms` (never backwards), drops expired particles and uploads the sorted billboards facing `eye`. The mesh is hidden while no particle is alive.
@@ -9934,24 +9934,24 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::SunShadowMap>(*kern_o, static_cast<::kern::i64>(sun_shadow_map), "sun_shadow_map");
       if (!kern_self) { this->kern_engine_failed("engine.sun_shadow_map.init"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>, std::remove_cvref_t<kern::ShadowOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>, std::remove_cvref_t<kern::ShadowOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       decltype(auto) kern_r = kern_self->init(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.sun_shadow_map.init", {to_value(sun_shadow_map), to_value(options)}, {PinType::boolean});
+    this->kern_engine("engine.sun_shadow_map.init", {to_value(sun_shadow_map), to_value(::kern::logic::engine_values::input_value(options))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_sun_shadow_map_init(KernNode& kern_n, Int sun_shadow_map, const T1& options) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::SunShadowMap>(*kern_o, static_cast<::kern::i64>(sun_shadow_map), "sun_shadow_map");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.sun_shadow_map.init"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>, std::remove_cvref_t<kern::ShadowOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>, std::remove_cvref_t<kern::ShadowOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       decltype(auto) kern_r = kern_self->init(kern_a0);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.sun_shadow_map.init", {to_value(sun_shadow_map), to_value(options)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.sun_shadow_map.init", {to_value(sun_shadow_map), to_value(::kern::logic::engine_values::input_value(options))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_sun_shadow_map_destroy(Int sun_shadow_map, Bool contextLost) {
@@ -10151,30 +10151,30 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::SkyPass>(*kern_o, static_cast<::kern::i64>(sky_pass), "sky_pass");
       if (!kern_self) { this->kern_engine_failed("engine.sky_pass.draw"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, camera);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, ::kern::logic::engine_values::input_value(camera));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, aspect, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_SkyState>, std::remove_cvref_t<kern::SkyState const&>>(*kern_o, state);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_SkyState>, std::remove_cvref_t<kern::SkyState const&>>(*kern_o, ::kern::logic::engine_values::input_value(state));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, exposure, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, time_seconds, kern_a4);
-      decltype(auto) kern_a5 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_SkyAtmosphere>, std::remove_cvref_t<kern::SkyAtmosphere const&>>(*kern_o, atmosphere);
+      decltype(auto) kern_a5 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_SkyAtmosphere>, std::remove_cvref_t<kern::SkyAtmosphere const&>>(*kern_o, ::kern::logic::engine_values::input_value(atmosphere));
       kern_self->draw(kern_a0, std::move(kern_a1), kern_a2, std::move(kern_a3), std::move(kern_a4), kern_a5);
       return;
     }
-    this->kern_engine("engine.sky_pass.draw", {to_value(sky_pass), to_value(camera), to_value(aspect), to_value(state), to_value(exposure), to_value(time_seconds), to_value(atmosphere)}, {});
+    this->kern_engine("engine.sky_pass.draw", {to_value(sky_pass), to_value(::kern::logic::engine_values::input_value(camera)), to_value(aspect), to_value(::kern::logic::engine_values::input_value(state)), to_value(exposure), to_value(time_seconds), to_value(::kern::logic::engine_values::input_value(atmosphere))}, {});
   }
   template <class T1> void engine_bloom_pass_configure(Int bloom_pass, const T1& options) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::BloomPass>(*kern_o, static_cast<::kern::i64>(bloom_pass), "bloom_pass");
       if (!kern_self) { this->kern_engine_failed("engine.bloom_pass.configure"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BloomOptions>, std::remove_cvref_t<kern::BloomOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BloomOptions>, std::remove_cvref_t<kern::BloomOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       kern_self->configure(kern_a0);
       return;
     }
-    this->kern_engine("engine.bloom_pass.configure", {to_value(bloom_pass), to_value(options)}, {});
+    this->kern_engine("engine.bloom_pass.configure", {to_value(bloom_pass), to_value(::kern::logic::engine_values::input_value(options))}, {});
   }
   /// Binds the scene target for (width, height); false = render directly to the screen.
   void engine_bloom_pass_begin(Int bloom_pass, Int width, Int height, Float now_ms, Bool page_hidden) {
@@ -10224,11 +10224,11 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.bloom_pass.end"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, exposure, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BloomPass_Occlusion>>, std::vector<kern::BloomPass::Occlusion>>(*kern_o, occlusion);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_BloomPass_Occlusion>>, std::vector<kern::BloomPass::Occlusion>>(*kern_o, ::kern::logic::engine_values::input_value(occlusion));
       kern_self->end(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data());
       return;
     }
-    this->kern_engine("engine.bloom_pass.end", {to_value(bloom_pass), to_value(exposure), to_value(occlusion)}, {});
+    this->kern_engine("engine.bloom_pass.end", {to_value(bloom_pass), to_value(exposure), to_value(::kern::logic::engine_values::input_value(occlusion))}, {});
   }
   void engine_bloom_pass_destroy(Int bloom_pass, Bool contextLost) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -10280,11 +10280,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::AmbientOcclusionPass>(*kern_o, static_cast<::kern::i64>(ambient_occlusion_pass), "ambient_occlusion_pass");
       if (!kern_self) { this->kern_engine_failed("engine.ambient_occlusion_pass.configure"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_AoOptions>, std::remove_cvref_t<kern::AoOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_AoOptions>, std::remove_cvref_t<kern::AoOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       kern_self->configure(kern_a0);
       return;
     }
-    this->kern_engine("engine.ambient_occlusion_pass.configure", {to_value(ambient_occlusion_pass), to_value(options)}, {});
+    this->kern_engine("engine.ambient_occlusion_pass.configure", {to_value(ambient_occlusion_pass), to_value(::kern::logic::engine_values::input_value(options))}, {});
   }
   /// World units; 0 = no ambient occlusion (a per-scene setting, unlike the device-dependent quality).
   void engine_ambient_occlusion_pass_set_radius(Int ambient_occlusion_pass, Float radius) {
@@ -10323,14 +10323,14 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, width, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, height, kern_a2);
-      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, projection);
+      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, ::kern::logic::engine_values::input_value(projection));
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, now_ms, kern_a4);
       decltype(auto) kern_r = kern_self->compute(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), kern_a3, std::move(kern_a4));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.ambient_occlusion_pass.compute", {to_value(ambient_occlusion_pass), to_value(depth), to_value(width), to_value(height), to_value(projection), to_value(now_ms)}, {PinType::boolean});
+    this->kern_engine("engine.ambient_occlusion_pass.compute", {to_value(ambient_occlusion_pass), to_value(depth), to_value(width), to_value(height), to_value(::kern::logic::engine_values::input_value(projection)), to_value(now_ms)}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_ambient_occlusion_pass_compute(KernNode& kern_n, Int ambient_occlusion_pass, Int depth, Int width, Int height, const T1& projection, Float now_ms) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -10343,14 +10343,14 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, width, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, height, kern_a2);
-      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, projection);
+      decltype(auto) kern_a3 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Mat4>, std::remove_cvref_t<kern::Mat4 const&>>(*kern_o, ::kern::logic::engine_values::input_value(projection));
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, now_ms, kern_a4);
       decltype(auto) kern_r = kern_self->compute(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), kern_a3, std::move(kern_a4));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.ambient_occlusion_pass.compute", {to_value(ambient_occlusion_pass), to_value(depth), to_value(width), to_value(height), to_value(projection), to_value(now_ms)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.ambient_occlusion_pass.compute", {to_value(ambient_occlusion_pass), to_value(depth), to_value(width), to_value(height), to_value(::kern::logic::engine_values::input_value(projection)), to_value(now_ms)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   Int engine_ambient_occlusion_pass_texture(Int ambient_occlusion_pass) const {
@@ -10579,11 +10579,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, location, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec4>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Vec4>>::from(*kern_o, v, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Vec4>>::from(*kern_o, ::kern::logic::engine_values::input_value(v), kern_a1);
       kern_self->set_vec4(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.uniform_cache.set_vec4", {to_value(uniform_cache), to_value(location), to_value(v)}, {});
+    this->kern_engine("engine.uniform_cache.set_vec4", {to_value(uniform_cache), to_value(location), to_value(::kern::logic::engine_values::input_value(v))}, {});
   }
   /// Arrays and matrices are compared by content (up to 64 floats cached).
   void engine_uniform_cache_set_vec4_array(Int uniform_cache, Int location, const List<Float>& values, Int count) {
@@ -10652,26 +10652,26 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.init"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>, std::remove_cvref_t<kern::RendererOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>, std::remove_cvref_t<kern::RendererOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<kern::ShaderExtension*>>(*kern_o, extensions);
       decltype(auto) kern_r = kern_self->init(kern_a0, kern::Span<kern::ShaderExtension* const>(kern_a1.data(), kern_a1.size()));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.renderer.init", {to_value(renderer), to_value(options), to_value(extensions)}, {PinType::boolean});
+    this->kern_engine("engine.renderer.init", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(options)), to_value(extensions)}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_renderer_init(KernNode& kern_n, Int renderer, const T1& options, const List<Int>& extensions) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.renderer.init"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>, std::remove_cvref_t<kern::RendererOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RendererOptions>, std::remove_cvref_t<kern::RendererOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<kern::ShaderExtension*>>(*kern_o, extensions);
       decltype(auto) kern_r = kern_self->init(kern_a0, kern::Span<kern::ShaderExtension* const>(kern_a1.data(), kern_a1.size()));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.init", {to_value(renderer), to_value(options), to_value(extensions)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.init", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(options)), to_value(extensions)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_renderer_shutdown(Int renderer) {
@@ -10792,12 +10792,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.renderer.upsert"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshInput>, std::remove_cvref_t<kern::MeshInput const&>>(*kern_o, input);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshInput>, std::remove_cvref_t<kern::MeshInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       decltype(auto) kern_r = kern_self->upsert(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.renderer.upsert", {to_value(renderer), to_value(id), to_value(input)}, {PinType::boolean});
+    this->kern_engine("engine.renderer.upsert", {to_value(renderer), to_value(id), to_value(::kern::logic::engine_values::input_value(input))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_renderer_upsert(KernNode& kern_n, Int renderer, Int id, const T1& input) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -10806,12 +10806,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.renderer.upsert"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshInput>, std::remove_cvref_t<kern::MeshInput const&>>(*kern_o, input);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshInput>, std::remove_cvref_t<kern::MeshInput const&>>(*kern_o, ::kern::logic::engine_values::input_value(input));
       decltype(auto) kern_r = kern_self->upsert(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.upsert", {to_value(renderer), to_value(id), to_value(input)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.upsert", {to_value(renderer), to_value(id), to_value(::kern::logic::engine_values::input_value(input))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Replaces the instance transforms (16 floats each; empty = keep the current instances, i.e. a tint-only update) and tints (4 floats each per instance, anything else = white). `changed` reports whether anything differed.
@@ -10946,12 +10946,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.renderer.set_material"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Material>, std::remove_cvref_t<kern::Material const&>>(*kern_o, material);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Material>, std::remove_cvref_t<kern::Material const&>>(*kern_o, ::kern::logic::engine_values::input_value(material));
       decltype(auto) kern_r = kern_self->set_material(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.renderer.set_material", {to_value(renderer), to_value(id), to_value(material)}, {PinType::boolean});
+    this->kern_engine("engine.renderer.set_material", {to_value(renderer), to_value(id), to_value(::kern::logic::engine_values::input_value(material))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_renderer_set_material(KernNode& kern_n, Int renderer, Int id, const T1& material) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -10960,12 +10960,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.renderer.set_material"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, id, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Material>, std::remove_cvref_t<kern::Material const&>>(*kern_o, material);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Material>, std::remove_cvref_t<kern::Material const&>>(*kern_o, ::kern::logic::engine_values::input_value(material));
       decltype(auto) kern_r = kern_self->set_material(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.set_material", {to_value(renderer), to_value(id), to_value(material)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.set_material", {to_value(renderer), to_value(id), to_value(::kern::logic::engine_values::input_value(material))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Moves a live mesh to other view layers.
@@ -11168,11 +11168,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.set_camera"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, camera);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, ::kern::logic::engine_values::input_value(camera));
       kern_self->set_camera(kern_a0);
       return;
     }
-    this->kern_engine("engine.renderer.set_camera", {to_value(renderer), to_value(camera)}, {});
+    this->kern_engine("engine.renderer.set_camera", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(camera))}, {});
   }
   using kern_given_engine_renderer_lighting = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Lighting>, decltype(std::declval<kern::Renderer&>().lighting())>;
   kern_given_engine_renderer_lighting engine_renderer_lighting(Int renderer) const {
@@ -11191,11 +11191,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.set_lighting"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Lighting>, std::remove_cvref_t<kern::Lighting const&>>(*kern_o, lighting);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Lighting>, std::remove_cvref_t<kern::Lighting const&>>(*kern_o, ::kern::logic::engine_values::input_value(lighting));
       kern_self->set_lighting(kern_a0);
       return;
     }
-    this->kern_engine("engine.renderer.set_lighting", {to_value(renderer), to_value(lighting)}, {});
+    this->kern_engine("engine.renderer.set_lighting", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(lighting))}, {});
   }
   using kern_given_engine_renderer_sky = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_SkyState>, decltype(std::declval<kern::Renderer&>().sky())>;
   kern_given_engine_renderer_sky engine_renderer_sky(Int renderer) const {
@@ -11214,35 +11214,35 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.set_sky"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_SkyState>, std::remove_cvref_t<kern::SkyState const&>>(*kern_o, sky);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_SkyState>, std::remove_cvref_t<kern::SkyState const&>>(*kern_o, ::kern::logic::engine_values::input_value(sky));
       kern_self->set_sky(kern_a0);
       return;
     }
-    this->kern_engine("engine.renderer.set_sky", {to_value(renderer), to_value(sky)}, {});
+    this->kern_engine("engine.renderer.set_sky", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(sky))}, {});
   }
   template <class T1> void engine_renderer_set_point_lights(Int renderer, const T1& lights) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.set_point_lights"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PointLights>, std::remove_cvref_t<kern::PointLights const&>>(*kern_o, lights);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PointLights>, std::remove_cvref_t<kern::PointLights const&>>(*kern_o, ::kern::logic::engine_values::input_value(lights));
       decltype(auto) kern_r = kern_self->set_point_lights(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.renderer.set_point_lights", {to_value(renderer), to_value(lights)}, {PinType::boolean});
+    this->kern_engine("engine.renderer.set_point_lights", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(lights))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_renderer_set_point_lights(KernNode& kern_n, Int renderer, const T1& lights) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.renderer.set_point_lights"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PointLights>, std::remove_cvref_t<kern::PointLights const&>>(*kern_o, lights);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PointLights>, std::remove_cvref_t<kern::PointLights const&>>(*kern_o, ::kern::logic::engine_values::input_value(lights));
       decltype(auto) kern_r = kern_self->set_point_lights(kern_a0);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.set_point_lights", {to_value(renderer), to_value(lights)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.set_point_lights", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(lights))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   using kern_given_engine_renderer_point_lights = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PointLights>, decltype(std::declval<kern::Renderer&>().point_lights())>;
@@ -11263,24 +11263,24 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.set_shadows"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>>, std::vector<kern::ShadowOptions>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>>, std::vector<kern::ShadowOptions>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       decltype(auto) kern_r = kern_self->set_shadows(kern_a0.empty() ? nullptr : kern_a0.data());
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.renderer.set_shadows", {to_value(renderer), to_value(options)}, {PinType::boolean});
+    this->kern_engine("engine.renderer.set_shadows", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(options))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_renderer_set_shadows(KernNode& kern_n, Int renderer, const T1& options) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.renderer.set_shadows"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>>, std::vector<kern::ShadowOptions>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShadowOptions>>, std::vector<kern::ShadowOptions>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       decltype(auto) kern_r = kern_self->set_shadows(kern_a0.empty() ? nullptr : kern_a0.data());
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.set_shadows", {to_value(renderer), to_value(options)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.set_shadows", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(options))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Shadow distance in metres (0 = the shadow map's fixed extent around the camera target): the map covers the bounding sphere of the view up to this distance - its size does not change as the camera turns, and its centre snaps to texels, so edges do not shimmer (stable shadow maps).
@@ -11314,11 +11314,11 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.set_ambient_occlusion"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_AoOptions>, std::remove_cvref_t<kern::AoOptions const&>>(*kern_o, options);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_AoOptions>, std::remove_cvref_t<kern::AoOptions const&>>(*kern_o, ::kern::logic::engine_values::input_value(options));
       kern_self->set_ambient_occlusion(kern_a0);
       return;
     }
-    this->kern_engine("engine.renderer.set_ambient_occlusion", {to_value(renderer), to_value(options)}, {});
+    this->kern_engine("engine.renderer.set_ambient_occlusion", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(options))}, {});
   }
   /// The scene's occlusion radius in world units (0 = none); keeps the device's quality settings.
   void engine_renderer_set_ambient_occlusion_radius(Int renderer, Float radius) {
@@ -11382,30 +11382,30 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.render"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderParams>, std::remove_cvref_t<kern::RenderParams const&>>(*kern_o, params);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderParams>, std::remove_cvref_t<kern::RenderParams const&>>(*kern_o, ::kern::logic::engine_values::input_value(params));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::RenderStats&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderStats>>::from(*kern_o, stats, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderStats>>::from(*kern_o, ::kern::logic::engine_values::input_value(stats), kern_a1);
       decltype(auto) kern_r = kern_self->render(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderStats>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.renderer.render", {to_value(renderer), to_value(params), to_value(stats)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.renderer.render", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(params)), to_value(::kern::logic::engine_values::input_value(stats))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_renderer_render(KernNode& kern_n, Int renderer, const T1& params, const T2& stats) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.stats); this->kern_engine_failed("engine.renderer.render"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderParams>, std::remove_cvref_t<kern::RenderParams const&>>(*kern_o, params);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderParams>, std::remove_cvref_t<kern::RenderParams const&>>(*kern_o, ::kern::logic::engine_values::input_value(params));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::RenderStats&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderStats>>::from(*kern_o, stats, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderStats>>::from(*kern_o, ::kern::logic::engine_values::input_value(stats), kern_a1);
       decltype(auto) kern_r = kern_self->render(kern_a0, kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.stats = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_RenderStats>>::template make<std::remove_cvref_t<decltype(kern_n.stats)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.render", {to_value(renderer), to_value(params), to_value(stats)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.render", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(params)), to_value(::kern::logic::engine_values::input_value(stats))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.stats = from_value<std::remove_cvref_t<decltype(kern_n.stats)>>(kern_out[1]);
   }
@@ -11432,13 +11432,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Ray&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, ray, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, ::kern::logic::engine_values::input_value(ray), kern_a2);
       decltype(auto) kern_r = kern_self->screen_ray(std::move(kern_a0), std::move(kern_a1), kern_a2);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::pass(*kern_o, kern_a2);
       return;
     }
-    this->kern_engine("engine.renderer.screen_ray", {to_value(renderer), to_value(x), to_value(y), to_value(ray)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.renderer.screen_ray", {to_value(renderer), to_value(x), to_value(y), to_value(::kern::logic::engine_values::input_value(ray))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_renderer_screen_ray(KernNode& kern_n, Int renderer, Float x, Float y, const T1& ray) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -11450,13 +11450,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Ray&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, ray, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, ::kern::logic::engine_values::input_value(ray), kern_a2);
       decltype(auto) kern_r = kern_self->screen_ray(std::move(kern_a0), std::move(kern_a1), kern_a2);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.ray = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::template make<std::remove_cvref_t<decltype(kern_n.ray)>>(*kern_o, kern_a2);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.screen_ray", {to_value(renderer), to_value(x), to_value(y), to_value(ray)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.screen_ray", {to_value(renderer), to_value(x), to_value(y), to_value(::kern::logic::engine_values::input_value(ray))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.ray = from_value<std::remove_cvref_t<decltype(kern_n.ray)>>(kern_out[1]);
   }
@@ -11469,9 +11469,9 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, query);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, hit, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
       decltype(auto) kern_r = kern_self->pick(std::move(kern_a0), std::move(kern_a1), kern_a2, kern_a3, &kern_a4);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
@@ -11479,7 +11479,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::pass(*kern_o, kern_a4);
       return;
     }
-    this->kern_engine("engine.renderer.pick", {to_value(renderer), to_value(x), to_value(y), to_value(query), to_value(hit)}, {PinType::boolean, PinType::structure, PinType::structure});
+    this->kern_engine("engine.renderer.pick", {to_value(renderer), to_value(x), to_value(y), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_renderer_pick(KernNode& kern_n, Int renderer, Float x, Float y, const T1& query, const T2& hit) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -11490,9 +11490,9 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, y, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, query);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, hit, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
       decltype(auto) kern_r = kern_self->pick(std::move(kern_a0), std::move(kern_a1), kern_a2, kern_a3, &kern_a4);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
@@ -11500,7 +11500,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.stats = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::template make<std::remove_cvref_t<decltype(kern_n.stats)>>(*kern_o, kern_a4);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.pick", {to_value(renderer), to_value(x), to_value(y), to_value(query), to_value(hit)}, {PinType::boolean, PinType::structure, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.pick", {to_value(renderer), to_value(x), to_value(y), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.hit = from_value<std::remove_cvref_t<decltype(kern_n.hit)>>(kern_out[1]);
     kern_n.stats = from_value<std::remove_cvref_t<decltype(kern_n.stats)>>(kern_out[2]);
@@ -11510,10 +11510,10 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { this->kern_engine_failed("engine.renderer.pick_ray"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ray);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, query);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, hit, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<kern::PickStats>();
       decltype(auto) kern_r = kern_self->pick_ray(kern_a0, kern_a1, kern_a2, &kern_a3);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
@@ -11521,17 +11521,17 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::pass(*kern_o, kern_a3);
       return;
     }
-    this->kern_engine("engine.renderer.pick_ray", {to_value(renderer), to_value(ray), to_value(query), to_value(hit)}, {PinType::boolean, PinType::structure, PinType::structure});
+    this->kern_engine("engine.renderer.pick_ray", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
   }
   template <class KernNode, class T1, class T2, class T3> void engine_renderer_pick_ray(KernNode& kern_n, Int renderer, const T1& ray, const T2& query, const T3& hit) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::Renderer>(*kern_o, static_cast<::kern::i64>(renderer), "renderer");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.hit); ::kern::logic::engine_values::none(kern_n.stats); this->kern_engine_failed("engine.renderer.pick_ray"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ray);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, query);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, hit, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<kern::PickStats>();
       decltype(auto) kern_r = kern_self->pick_ray(kern_a0, kern_a1, kern_a2, &kern_a3);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
@@ -11539,7 +11539,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.stats = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::template make<std::remove_cvref_t<decltype(kern_n.stats)>>(*kern_o, kern_a3);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.pick_ray", {to_value(renderer), to_value(ray), to_value(query), to_value(hit)}, {PinType::boolean, PinType::structure, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.renderer.pick_ray", {to_value(renderer), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.hit = from_value<std::remove_cvref_t<decltype(kern_n.hit)>>(kern_out[1]);
     kern_n.stats = from_value<std::remove_cvref_t<decltype(kern_n.stats)>>(kern_out[2]);
@@ -11728,12 +11728,12 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.shader_extension.material_uniforms"); return; }
       kern::UniformCache* const kern_a0 = ::kern::logic::engine_values::object_of<kern::UniformCache>(*kern_o, static_cast<::kern::i64>(cache), "cache");
       if (!kern_a0) { this->kern_engine_failed("engine.shader_extension.material_uniforms"); return; }
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Material>, std::remove_cvref_t<kern::Material const&>>(*kern_o, material);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<int>>(*kern_o, params);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Material>, std::remove_cvref_t<kern::Material const&>>(*kern_o, ::kern::logic::engine_values::input_value(material));
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<int>>(*kern_o, ::kern::logic::engine_values::input_value(params));
       kern_self->material_uniforms(*kern_a0, kern_a1, kern_a2.empty() ? nullptr : kern_a2.data());
       return;
     }
-    this->kern_engine("engine.shader_extension.material_uniforms", {to_value(shader_extension), to_value(cache), to_value(material), to_value(params)}, {});
+    this->kern_engine("engine.shader_extension.material_uniforms", {to_value(shader_extension), to_value(cache), to_value(::kern::logic::engine_values::input_value(material)), to_value(::kern::logic::engine_values::input_value(params))}, {});
   }
   /// Assembles the standard shader with the given extensions.
   using kern_given_engine_build_standard_shader = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_ShaderSource>, decltype(kern::build_standard_shader(std::declval<kern::Span<kern::ShaderExtension* const>>()))>;
@@ -11751,11 +11751,11 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::ClientState>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_net_ClientState>>::from(*kern_o, s, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_net_ClientState>>::from(*kern_o, ::kern::logic::engine_values::input_value(s), kern_a0);
       decltype(auto) kern_r = kern::net::client_state_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.net.client_state_name", {to_value(s)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.net.client_state_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> void engine_client_connect(Int client, const T1& server, Float time) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -11763,13 +11763,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Client>(*kern_o, static_cast<::kern::i64>(client), "client");
       if (!kern_self) { this->kern_engine_failed("engine.client.connect"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, server, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(server), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, time, kern_a1);
       kern_self->connect(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.client.connect", {to_value(client), to_value(server), to_value(time)}, {});
+    this->kern_engine("engine.client.connect", {to_value(client), to_value(::kern::logic::engine_values::input_value(server)), to_value(time)}, {});
   }
   void engine_client_disconnect(Int client) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -11866,12 +11866,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned short>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, type, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a2);
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.client.send", {to_value(client), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
+    this->kern_engine("engine.client.send", {to_value(client), to_value(channel), to_value(type), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_client_send(KernNode& kern_n, Int client, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -11883,12 +11883,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned short>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, type, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a2);
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.client.send", {to_value(client), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.client.send", {to_value(client), to_value(channel), to_value(type), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_client_receive(Int client, Int channel) {
@@ -12097,12 +12097,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned short>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, type, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a3);
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.server.send", {to_value(server), to_value(client), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
+    this->kern_engine("engine.server.send", {to_value(server), to_value(client), to_value(channel), to_value(type), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_server_send(KernNode& kern_n, Int server, Int client, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12116,12 +12116,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned short>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, type, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a3);
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.server.send", {to_value(server), to_value(client), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.server.send", {to_value(server), to_value(client), to_value(channel), to_value(type), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_server_receive(Int server, Int client, Int channel) {
@@ -12210,11 +12210,11 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::ConnectionError>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_net_ConnectionError>>::from(*kern_o, e, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_net_ConnectionError>>::from(*kern_o, ::kern::logic::engine_values::input_value(e), kern_a0);
       decltype(auto) kern_r = kern::net::connection_error_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.net.connection_error_name", {to_value(e)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.net.connection_error_name", {to_value(::kern::logic::engine_values::input_value(e))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   void engine_connection_reset(Int connection) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12249,12 +12249,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned short>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, type, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a2);
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.connection.send", {to_value(connection), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
+    this->kern_engine("engine.connection.send", {to_value(connection), to_value(channel), to_value(type), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_connection_send(KernNode& kern_n, Int connection, Int channel, Int type, const T1& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12266,12 +12266,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned short>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, type, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a2);
       decltype(auto) kern_r = kern_self->send(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.connection.send", {to_value(connection), to_value(channel), to_value(type), to_value(data)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.connection.send", {to_value(connection), to_value(channel), to_value(type), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_connection_receive(Int connection, Int channel) {
@@ -12318,14 +12318,14 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Connection>(*kern_o, static_cast<::kern::i64>(connection), "connection");
       if (!kern_self) { this->kern_engine_failed("engine.connection.receive_packet"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.connection.receive_packet"); return; } }
       kern_self->receive_packet(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.connection.receive_packet", {to_value(connection), to_value(data), to_value(bytes)}, {});
+    this->kern_engine("engine.connection.receive_packet", {to_value(connection), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {});
   }
   void engine_connection_advance_time(Int connection, Float time) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12435,7 +12435,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
       if (!kern_self) { this->kern_engine_failed("engine.endpoint.send_packet"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, payload);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(payload));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list payload has fewer entries than bytes says"; { this->kern_engine_failed("engine.endpoint.send_packet"); return; } }
@@ -12443,14 +12443,14 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.endpoint.send_packet", {to_value(endpoint), to_value(payload), to_value(bytes)}, {PinType::integer});
+    this->kern_engine("engine.endpoint.send_packet", {to_value(endpoint), to_value(::kern::logic::engine_values::input_value(payload)), to_value(bytes)}, {PinType::integer});
   }
   template <class KernNode, class T1> void engine_endpoint_send_packet(KernNode& kern_n, Int endpoint, const T1& payload, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.endpoint.send_packet"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, payload);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(payload));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list payload has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.endpoint.send_packet"); return; } }
@@ -12458,7 +12458,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.endpoint.send_packet", {to_value(endpoint), to_value(payload), to_value(bytes)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.endpoint.send_packet", {to_value(endpoint), to_value(::kern::logic::engine_values::input_value(payload)), to_value(bytes)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   template <class T1> void engine_endpoint_receive_packet(Int endpoint, const T1& packet, Int bytes) {
@@ -12466,14 +12466,14 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Endpoint>(*kern_o, static_cast<::kern::i64>(endpoint), "endpoint");
       if (!kern_self) { this->kern_engine_failed("engine.endpoint.receive_packet"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, packet);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(packet));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list packet has fewer entries than bytes says"; { this->kern_engine_failed("engine.endpoint.receive_packet"); return; } }
       kern_self->receive_packet(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.endpoint.receive_packet", {to_value(endpoint), to_value(packet), to_value(bytes)}, {});
+    this->kern_engine("engine.endpoint.receive_packet", {to_value(endpoint), to_value(::kern::logic::engine_values::input_value(packet)), to_value(bytes)}, {});
   }
   /// Sequences of our packets the remote side has acked since the last clear_acks().
   using kern_given_engine_endpoint_acks = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, decltype(std::declval<kern::net::Endpoint&>().acks())>;
@@ -12573,14 +12573,14 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::BitWriter>(*kern_o, static_cast<::kern::i64>(bit_writer), "bit_writer");
       if (!kern_self) { this->kern_engine_failed("engine.bit_writer.write_bytes"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.bit_writer.write_bytes"); return; } }
       kern_self->write_bytes(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.bit_writer.write_bytes", {to_value(bit_writer), to_value(data), to_value(bytes)}, {});
+    this->kern_engine("engine.bit_writer.write_bytes", {to_value(bit_writer), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {});
   }
   void engine_bit_writer_flush(Int bit_writer) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12847,7 +12847,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::WriteStream>(*kern_o, static_cast<::kern::i64>(write_stream), "write_stream");
       if (!kern_self) { this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; } }
@@ -12855,14 +12855,14 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.write_stream.serialize_bytes", {to_value(write_stream), to_value(data), to_value(bytes)}, {PinType::boolean});
+    this->kern_engine("engine.write_stream.serialize_bytes", {to_value(write_stream), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_write_stream_serialize_bytes(KernNode& kern_n, Int write_stream, const T1& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::WriteStream>(*kern_o, static_cast<::kern::i64>(write_stream), "write_stream");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.write_stream.serialize_bytes"); return; } }
@@ -12870,7 +12870,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.write_stream.serialize_bytes", {to_value(write_stream), to_value(data), to_value(bytes)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.write_stream.serialize_bytes", {to_value(write_stream), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_write_stream_serialize_align(Int write_stream) {
@@ -13241,7 +13241,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::MeasureStream>(*kern_o, static_cast<::kern::i64>(measure_stream), "measure_stream");
       if (!kern_self) { this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, value1);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(value1));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list value1 has fewer entries than bytes says"; { this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; } }
@@ -13249,14 +13249,14 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.measure_stream.serialize_bytes", {to_value(measure_stream), to_value(value1), to_value(bytes)}, {PinType::boolean});
+    this->kern_engine("engine.measure_stream.serialize_bytes", {to_value(measure_stream), to_value(::kern::logic::engine_values::input_value(value1)), to_value(bytes)}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_measure_stream_serialize_bytes(KernNode& kern_n, Int measure_stream, const T1& value1, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::MeasureStream>(*kern_o, static_cast<::kern::i64>(measure_stream), "measure_stream");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, value1);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(value1));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a1);
       if (::kern::logic::engine_values::numbers(kern_a1) > kern_a0.size()) { kern_o->error = "the list value1 has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.measure_stream.serialize_bytes"); return; } }
@@ -13264,7 +13264,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.measure_stream.serialize_bytes", {to_value(measure_stream), to_value(value1), to_value(bytes)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.measure_stream.serialize_bytes", {to_value(measure_stream), to_value(::kern::logic::engine_values::input_value(value1)), to_value(bytes)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_measure_stream_serialize_align(Int measure_stream) {
@@ -13365,8 +13365,8 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_self) { this->kern_engine_failed("engine.transport.send"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(to), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.transport.send"); return; } }
@@ -13374,7 +13374,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.transport.send", {to_value(transport), to_value(to), to_value(data), to_value(bytes)}, {PinType::boolean});
+    this->kern_engine("engine.transport.send", {to_value(transport), to_value(::kern::logic::engine_values::input_value(to)), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {PinType::boolean});
   }
   template <class KernNode, class T1, class T2> void engine_transport_send(KernNode& kern_n, Int transport, const T1& to, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13382,8 +13382,8 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.transport.send"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(to), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.transport.send"); return; } }
@@ -13391,7 +13391,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.transport.send", {to_value(transport), to_value(to), to_value(data), to_value(bytes)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.transport.send", {to_value(transport), to_value(::kern::logic::engine_values::input_value(to)), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Next received datagram (bytes, 0 = none); `from` is the sender.
@@ -13401,7 +13401,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_self) { this->kern_engine_failed("engine.transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(from), kern_a0);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
@@ -13412,7 +13412,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a1.room);
       return;
     }
-    this->kern_engine("engine.transport.receive", {to_value(transport), to_value(from), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
+    this->kern_engine("engine.transport.receive", {to_value(transport), to_value(::kern::logic::engine_values::input_value(from)), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
   }
   template <class KernNode, class T1> void engine_transport_receive(KernNode& kern_n, Int transport, const T1& from, Int max_bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13420,7 +13420,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.from); ::kern::logic::engine_values::none(kern_n.data); this->kern_engine_failed("engine.transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(from), kern_a0);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
@@ -13431,7 +13431,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.data = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.data)>>(*kern_o, kern_a1.room);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.transport.receive", {to_value(transport), to_value(from), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.transport.receive", {to_value(transport), to_value(::kern::logic::engine_values::input_value(from)), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.from = from_value<std::remove_cvref_t<decltype(kern_n.from)>>(kern_out[1]);
     kern_n.data = from_value<std::remove_cvref_t<decltype(kern_n.data)>>(kern_out[2]);
@@ -13455,10 +13455,10 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::Simulator>(*kern_o, static_cast<::kern::i64>(simulator), "simulator");
       if (!kern_self) { this->kern_engine_failed("engine.simulator.send"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(from), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(to), kern_a1);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
@@ -13467,7 +13467,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->send(std::move(kern_a0), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), std::move(kern_a4));
       return;
     }
-    this->kern_engine("engine.simulator.send", {to_value(simulator), to_value(from), to_value(to), to_value(data), to_value(bytes), to_value(now)}, {});
+    this->kern_engine("engine.simulator.send", {to_value(simulator), to_value(::kern::logic::engine_values::input_value(from)), to_value(::kern::logic::engine_values::input_value(to)), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes), to_value(now)}, {});
   }
   /// Packets due at `now`, in delivery order.
   template <class T1> void engine_simulator_take_due(Int simulator, Float now, const T1& out) {
@@ -13478,12 +13478,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, now, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::net::Simulator::Packet, std::allocator<kern::net::Simulator::Packet> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Simulator_Packet>>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Simulator_Packet>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->take_due(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Simulator_Packet>>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.simulator.take_due", {to_value(simulator), to_value(now), to_value(out)}, {PinType::structure_list});
+    this->kern_engine("engine.simulator.take_due", {to_value(simulator), to_value(now), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
   }
   template <class KernNode, class T1> void engine_simulator_take_due(KernNode& kern_n, Int simulator, Float now, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13493,12 +13493,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, now, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::net::Simulator::Packet, std::allocator<kern::net::Simulator::Packet> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Simulator_Packet>>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Simulator_Packet>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->take_due(std::move(kern_a0), kern_a1);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Simulator_Packet>>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.simulator.take_due", {to_value(simulator), to_value(now), to_value(out)}, {PinType::structure_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.simulator.take_due", {to_value(simulator), to_value(now), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   void engine_simulator_clear(Int simulator) {
@@ -13638,11 +13638,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { this->kern_engine_failed("engine.host_transport.set_address"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, a, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(a), kern_a0);
       kern_self->set_address(std::move(kern_a0));
       return;
     }
-    this->kern_engine("engine.host_transport.set_address", {to_value(host_transport), to_value(a)}, {});
+    this->kern_engine("engine.host_transport.set_address", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(a))}, {});
   }
   template <class T1, class T2> void engine_host_transport_send(Int host_transport, const T1& to, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13650,8 +13650,8 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { this->kern_engine_failed("engine.host_transport.send"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(to), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.host_transport.send"); return; } }
@@ -13659,7 +13659,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.host_transport.send", {to_value(host_transport), to_value(to), to_value(data), to_value(bytes)}, {PinType::boolean});
+    this->kern_engine("engine.host_transport.send", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(to)), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {PinType::boolean});
   }
   template <class KernNode, class T1, class T2> void engine_host_transport_send(KernNode& kern_n, Int host_transport, const T1& to, const T2& data, Int bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13667,8 +13667,8 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.host_transport.send"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(to), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.host_transport.send"); return; } }
@@ -13676,7 +13676,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.send", {to_value(host_transport), to_value(to), to_value(data), to_value(bytes)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.send", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(to)), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   template <class T1> void engine_host_transport_receive(Int host_transport, const T1& from, Int max_bytes) {
@@ -13685,7 +13685,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { this->kern_engine_failed("engine.host_transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(from), kern_a0);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
@@ -13696,7 +13696,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a1.room);
       return;
     }
-    this->kern_engine("engine.host_transport.receive", {to_value(host_transport), to_value(from), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
+    this->kern_engine("engine.host_transport.receive", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(from)), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
   }
   template <class KernNode, class T1> void engine_host_transport_receive(KernNode& kern_n, Int host_transport, const T1& from, Int max_bytes) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13704,7 +13704,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.from); ::kern::logic::engine_values::none(kern_n.data); this->kern_engine_failed("engine.host_transport.receive"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(from), kern_a0);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, max_bytes, kern_a2);
       ::kern::logic::engine_values::Written<unsigned char> kern_a1(::kern::logic::engine_values::room(kern_a2) * 1);
@@ -13715,7 +13715,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.data = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.data)>>(*kern_o, kern_a1.room);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.receive", {to_value(host_transport), to_value(from), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.receive", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(from)), to_value(max_bytes)}, {PinType::integer, PinType::structure, PinType::integer_list});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.from = from_value<std::remove_cvref_t<decltype(kern_n.from)>>(kern_out[1]);
     kern_n.data = from_value<std::remove_cvref_t<decltype(kern_n.data)>>(kern_out[2]);
@@ -13739,15 +13739,15 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { this->kern_engine_failed("engine.host_transport.push_incoming"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, from, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, data);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(from), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned char>>(*kern_o, ::kern::logic::engine_values::input_value(data));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, bytes, kern_a2);
       if (::kern::logic::engine_values::numbers(kern_a2) > kern_a1.size()) { kern_o->error = "the list data has fewer entries than bytes says"; { this->kern_engine_failed("engine.host_transport.push_incoming"); return; } }
       kern_self->push_incoming(std::move(kern_a0), kern_a1.empty() ? nullptr : kern_a1.data(), std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.host_transport.push_incoming", {to_value(host_transport), to_value(from), to_value(data), to_value(bytes)}, {});
+    this->kern_engine("engine.host_transport.push_incoming", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(from)), to_value(::kern::logic::engine_values::input_value(data)), to_value(bytes)}, {});
   }
   /// Host side: the next datagram to put on the wire (false when none).
   template <class T1, class T2> void engine_host_transport_take_outgoing(Int host_transport, const T1& to, const T2& data) {
@@ -13756,16 +13756,16 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { this->kern_engine_failed("engine.host_transport.take_outgoing"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(to), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a1);
       decltype(auto) kern_r = kern_self->take_outgoing(kern_a0, kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::pass(*kern_o, kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.host_transport.take_outgoing", {to_value(host_transport), to_value(to), to_value(data)}, {PinType::boolean, PinType::structure, PinType::integer_list});
+    this->kern_engine("engine.host_transport.take_outgoing", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(to)), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean, PinType::structure, PinType::integer_list});
   }
   template <class KernNode, class T1, class T2> void engine_host_transport_take_outgoing(KernNode& kern_n, Int host_transport, const T1& to, const T2& data) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13773,16 +13773,16 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::net::HostTransport>(*kern_o, static_cast<::kern::i64>(host_transport), "host_transport");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); ::kern::logic::engine_values::none(kern_n.to); ::kern::logic::engine_values::none(kern_n.data); this->kern_engine_failed("engine.host_transport.take_outgoing"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, to, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(to), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<unsigned char, std::allocator<unsigned char> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, data, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::from(*kern_o, ::kern::logic::engine_values::input_value(data), kern_a1);
       decltype(auto) kern_r = kern_self->take_outgoing(kern_a0, kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.to = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::template make<std::remove_cvref_t<decltype(kern_n.to)>>(*kern_o, kern_a0);
       kern_n.data = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>>::template make<std::remove_cvref_t<decltype(kern_n.data)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.take_outgoing", {to_value(host_transport), to_value(to), to_value(data)}, {PinType::boolean, PinType::structure, PinType::integer_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.take_outgoing", {to_value(host_transport), to_value(::kern::logic::engine_values::input_value(to)), to_value(::kern::logic::engine_values::input_value(data))}, {PinType::boolean, PinType::structure, PinType::integer_list});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.to = from_value<std::remove_cvref_t<decltype(kern_n.to)>>(kern_out[1]);
     kern_n.data = from_value<std::remove_cvref_t<decltype(kern_n.data)>>(kern_out[2]);
@@ -13814,37 +13814,37 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Surface>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, s, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, ::kern::logic::engine_values::input_value(s), kern_a0);
       decltype(auto) kern_r = kern::physics::surface_name(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
     }
-    return from_value<Text>(this->kern_engine("engine.physics.surface_name", {to_value(s)}, {PinType::text})[0].converted(pin_type_of<Text>()));
+    return from_value<Text>(this->kern_engine("engine.physics.surface_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
   template <class T1> void engine_physics_parse_surface(const Text& name, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const ::kern::logic::engine_values::String kern_a0(name);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Surface&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::physics::parse_surface(kern_a0.get(), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.physics.parse_surface", {to_value(name), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    this->kern_engine("engine.physics.parse_surface", {to_value(name), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
   }
   template <class KernNode, class T1> void engine_physics_parse_surface(KernNode& kern_n, const Text& name, const T1& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       const ::kern::logic::engine_values::String kern_a0(name);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Surface&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       decltype(auto) kern_r = kern::physics::parse_surface(kern_a0.get(), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.physics.parse_surface", {to_value(name), to_value(out)}, {PinType::boolean, PinType::enumeration});
+    const std::vector<Value> kern_out = this->kern_engine("engine.physics.parse_surface", {to_value(name), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::enumeration});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -13853,13 +13853,13 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Surface>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, a, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, ::kern::logic::engine_values::input_value(a), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Surface>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, b, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_Surface>>::from(*kern_o, ::kern::logic::engine_values::input_value(b), kern_a1);
       decltype(auto) kern_r = kern::physics::surface_friction(std::move(kern_a0), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.physics.surface_friction", {to_value(a), to_value(b)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.physics.surface_friction", {to_value(::kern::logic::engine_values::input_value(a)), to_value(::kern::logic::engine_values::input_value(b))}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   /// Local joint frame at `anchor` whose X (x_axis = true) or Z axis points along `axis`.
   using kern_given_engine_physics_frame_from_axis = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Pose>, decltype(kern::physics::frame_from_axis(std::declval<kern::Vec3>(), std::declval<kern::Vec3>(), std::declval<bool>()))>;
@@ -13893,24 +13893,24 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.create"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_WorldSettings>, std::remove_cvref_t<kern::physics::WorldSettings const&>>(*kern_o, settings);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_WorldSettings>, std::remove_cvref_t<kern::physics::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.world.create", {to_value(world), to_value(settings)}, {PinType::boolean});
+    this->kern_engine("engine.world.create", {to_value(world), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_world_create(KernNode& kern_n, Int world, const T1& settings) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.world.create"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_WorldSettings>, std::remove_cvref_t<kern::physics::WorldSettings const&>>(*kern_o, settings);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_WorldSettings>, std::remove_cvref_t<kern::physics::WorldSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create(kern_a0);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.create", {to_value(world), to_value(settings)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.create", {to_value(world), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_world_destroy(Int world) {
@@ -13938,24 +13938,24 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.create_body"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_BodySettings>, std::remove_cvref_t<kern::physics::BodySettings const&>>(*kern_o, settings);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_BodySettings>, std::remove_cvref_t<kern::physics::BodySettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create_body(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.world.create_body", {to_value(world), to_value(settings)}, {PinType::structure});
+    this->kern_engine("engine.world.create_body", {to_value(world), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::structure});
   }
   template <class KernNode, class T1> void engine_world_create_body(KernNode& kern_n, Int world, const T1& settings) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.world.create_body"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_BodySettings>, std::remove_cvref_t<kern::physics::BodySettings const&>>(*kern_o, settings);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_BodySettings>, std::remove_cvref_t<kern::physics::BodySettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create_body(kern_a0);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.create_body", {to_value(world), to_value(settings)}, {PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.create_body", {to_value(world), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   template <class T1> void engine_world_destroy_body(Int world, const T1& body) {
@@ -13964,11 +13964,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.destroy_body"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       kern_self->destroy_body(std::move(kern_a0));
       return;
     }
-    this->kern_engine("engine.world.destroy_body", {to_value(world), to_value(body)}, {});
+    this->kern_engine("engine.world.destroy_body", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {});
   }
   template <class T1> Bool engine_world_body_valid(Int world, const T1& body) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -13976,11 +13976,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.body_valid"); return Bool{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->body_valid(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.world.body_valid", {to_value(world), to_value(body)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.world.body_valid", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   /// Adds a shape; on failure returns an invalid handle and sets last_error().
   template <class T1, class T2> void engine_world_create_shape(Int world, const T1& body, const T2& settings) {
@@ -13989,13 +13989,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.create_shape"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ShapeSettings>, std::remove_cvref_t<kern::physics::ShapeSettings const&>>(*kern_o, settings);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ShapeSettings>, std::remove_cvref_t<kern::physics::ShapeSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create_shape(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.world.create_shape", {to_value(world), to_value(body), to_value(settings)}, {PinType::structure});
+    this->kern_engine("engine.world.create_shape", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_world_create_shape(KernNode& kern_n, Int world, const T1& body, const T2& settings) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14003,13 +14003,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.world.create_shape"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ShapeSettings>, std::remove_cvref_t<kern::physics::ShapeSettings const&>>(*kern_o, settings);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ShapeSettings>, std::remove_cvref_t<kern::physics::ShapeSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create_shape(std::move(kern_a0), kern_a1);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.create_shape", {to_value(world), to_value(body), to_value(settings)}, {PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.create_shape", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Removes one shape from its body (a static body's other shapes stay; a dynamic body's mass follows). A mesh shape's triangle data is freed with it.
@@ -14019,11 +14019,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.destroy_shape"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Shape>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::from(*kern_o, shape, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::from(*kern_o, ::kern::logic::engine_values::input_value(shape), kern_a0);
       kern_self->destroy_shape(std::move(kern_a0));
       return;
     }
-    this->kern_engine("engine.world.destroy_shape", {to_value(world), to_value(shape)}, {});
+    this->kern_engine("engine.world.destroy_shape", {to_value(world), to_value(::kern::logic::engine_values::input_value(shape))}, {});
   }
   /// Triangle meshes alive (one per mesh shape).
   Int engine_world_mesh_count(Int world) const {
@@ -14041,24 +14041,24 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.create_joint"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_JointSettings>, std::remove_cvref_t<kern::physics::JointSettings const&>>(*kern_o, settings);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_JointSettings>, std::remove_cvref_t<kern::physics::JointSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create_joint(kern_a0);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.world.create_joint", {to_value(world), to_value(settings)}, {PinType::structure});
+    this->kern_engine("engine.world.create_joint", {to_value(world), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::structure});
   }
   template <class KernNode, class T1> void engine_world_create_joint(KernNode& kern_n, Int world, const T1& settings) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.world.create_joint"); return; }
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_JointSettings>, std::remove_cvref_t<kern::physics::JointSettings const&>>(*kern_o, settings);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_JointSettings>, std::remove_cvref_t<kern::physics::JointSettings const&>>(*kern_o, ::kern::logic::engine_values::input_value(settings));
       decltype(auto) kern_r = kern_self->create_joint(kern_a0);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.create_joint", {to_value(world), to_value(settings)}, {PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.create_joint", {to_value(world), to_value(::kern::logic::engine_values::input_value(settings))}, {PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   template <class T1> void engine_world_destroy_joint(Int world, const T1& joint, Bool wake_bodies) {
@@ -14067,13 +14067,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.destroy_joint"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, wake_bodies, kern_a1);
       kern_self->destroy_joint(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.destroy_joint", {to_value(world), to_value(joint), to_value(wake_bodies)}, {});
+    this->kern_engine("engine.world.destroy_joint", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint)), to_value(wake_bodies)}, {});
   }
   template <class T1> Bool engine_world_joint_valid(Int world, const T1& joint) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14081,11 +14081,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.joint_valid"); return Bool{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       decltype(auto) kern_r = kern_self->joint_valid(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.world.joint_valid", {to_value(world), to_value(joint)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.world.joint_valid", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint))}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   /// Advances by `dt` seconds with `substeps` solver sub-steps and collects the events of this step.
   void engine_world_step(Int world, Float dt, Int substeps) {
@@ -14110,11 +14110,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.pose"); return kern_G(*kern_o); }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->pose(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.world.pose", {to_value(world), to_value(body)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.world.pose", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::structure})[0]);
   }
   template <class T1, class T2> void engine_world_set_pose(Int world, const T1& body, const T2& pose) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14122,12 +14122,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_pose"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Pose>, std::remove_cvref_t<kern::physics::Pose const&>>(*kern_o, pose);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Pose>, std::remove_cvref_t<kern::physics::Pose const&>>(*kern_o, ::kern::logic::engine_values::input_value(pose));
       kern_self->set_pose(std::move(kern_a0), kern_a1);
       return;
     }
-    this->kern_engine("engine.world.set_pose", {to_value(world), to_value(body), to_value(pose)}, {});
+    this->kern_engine("engine.world.set_pose", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(pose))}, {});
   }
   /// Moves a kinematic body so that it reaches `target` after `dt` (wakes touching bodies).
   template <class T1, class T2> void engine_world_set_target_pose(Int world, const T1& body, const T2& target, Float dt) {
@@ -14136,14 +14136,14 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_target_pose"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Pose>, std::remove_cvref_t<kern::physics::Pose const&>>(*kern_o, target);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Pose>, std::remove_cvref_t<kern::physics::Pose const&>>(*kern_o, ::kern::logic::engine_values::input_value(target));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a2);
       kern_self->set_target_pose(std::move(kern_a0), kern_a1, std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.world.set_target_pose", {to_value(world), to_value(body), to_value(target), to_value(dt)}, {});
+    this->kern_engine("engine.world.set_target_pose", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(target)), to_value(dt)}, {});
   }
   template <class T1> Vector engine_world_linear_velocity(Int world, const T1& body) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14151,11 +14151,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.linear_velocity"); return Vector{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->linear_velocity(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.world.linear_velocity", {to_value(world), to_value(body)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.world.linear_velocity", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   template <class T1> Vector engine_world_angular_velocity(Int world, const T1& body) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14163,11 +14163,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.angular_velocity"); return Vector{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->angular_velocity(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.world.angular_velocity", {to_value(world), to_value(body)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.world.angular_velocity", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   template <class T1> void engine_world_set_linear_velocity(Int world, const T1& body, Vector v) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14175,13 +14175,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_linear_velocity"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, v, kern_a1);
       kern_self->set_linear_velocity(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.set_linear_velocity", {to_value(world), to_value(body), to_value(v)}, {});
+    this->kern_engine("engine.world.set_linear_velocity", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(v)}, {});
   }
   template <class T1> void engine_world_set_angular_velocity(Int world, const T1& body, Vector w) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14189,13 +14189,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_angular_velocity"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, w, kern_a1);
       kern_self->set_angular_velocity(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.set_angular_velocity", {to_value(world), to_value(body), to_value(w)}, {});
+    this->kern_engine("engine.world.set_angular_velocity", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(w)}, {});
   }
   template <class T1> void engine_world_apply_force(Int world, const T1& body, Vector force, Vector point) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14203,7 +14203,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.apply_force"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, force, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -14211,7 +14211,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->apply_force(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.world.apply_force", {to_value(world), to_value(body), to_value(force), to_value(point)}, {});
+    this->kern_engine("engine.world.apply_force", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(force), to_value(point)}, {});
   }
   template <class T1> void engine_world_apply_force_to_center(Int world, const T1& body, Vector force) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14219,13 +14219,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.apply_force_to_center"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, force, kern_a1);
       kern_self->apply_force_to_center(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.apply_force_to_center", {to_value(world), to_value(body), to_value(force)}, {});
+    this->kern_engine("engine.world.apply_force_to_center", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(force)}, {});
   }
   template <class T1> void engine_world_apply_torque(Int world, const T1& body, Vector torque) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14233,13 +14233,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.apply_torque"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, torque, kern_a1);
       kern_self->apply_torque(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.apply_torque", {to_value(world), to_value(body), to_value(torque)}, {});
+    this->kern_engine("engine.world.apply_torque", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(torque)}, {});
   }
   template <class T1> void engine_world_apply_linear_impulse(Int world, const T1& body, Vector impulse, Vector point) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14247,7 +14247,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.apply_linear_impulse"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, impulse, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -14255,7 +14255,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->apply_linear_impulse(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.world.apply_linear_impulse", {to_value(world), to_value(body), to_value(impulse), to_value(point)}, {});
+    this->kern_engine("engine.world.apply_linear_impulse", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(impulse), to_value(point)}, {});
   }
   template <class T1> void engine_world_apply_linear_impulse_to_center(Int world, const T1& body, Vector impulse) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14263,13 +14263,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.apply_linear_impulse_to_center"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, impulse, kern_a1);
       kern_self->apply_linear_impulse_to_center(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.apply_linear_impulse_to_center", {to_value(world), to_value(body), to_value(impulse)}, {});
+    this->kern_engine("engine.world.apply_linear_impulse_to_center", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(impulse)}, {});
   }
   template <class T1> void engine_world_apply_angular_impulse(Int world, const T1& body, Vector impulse) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14277,13 +14277,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.apply_angular_impulse"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, impulse, kern_a1);
       kern_self->apply_angular_impulse(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.apply_angular_impulse", {to_value(world), to_value(body), to_value(impulse)}, {});
+    this->kern_engine("engine.world.apply_angular_impulse", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(impulse)}, {});
   }
   template <class T1> void engine_world_set_awake(Int world, const T1& body, Bool awake) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14291,13 +14291,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_awake"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, awake, kern_a1);
       kern_self->set_awake(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.set_awake", {to_value(world), to_value(body), to_value(awake)}, {});
+    this->kern_engine("engine.world.set_awake", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(awake)}, {});
   }
   template <class T1> Bool engine_world_awake(Int world, const T1& body) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14305,11 +14305,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.awake"); return Bool{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->awake(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<Bool>(*kern_o, kern_r);
     }
-    return from_value<Bool>(this->kern_engine("engine.world.awake", {to_value(world), to_value(body)}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
+    return from_value<Bool>(this->kern_engine("engine.world.awake", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::boolean})[0].converted(pin_type_of<Bool>()));
   }
   template <class T1> Float engine_world_mass(Int world, const T1& body) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14317,11 +14317,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.mass"); return Float{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->mass(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.world.mass", {to_value(world), to_value(body)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.world.mass", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   using kern_given_engine_world_body_type = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_BodyType>, decltype(std::declval<kern::physics::World&>().body_type(std::declval<kern::physics::Body>()))>;
   template <class T1> kern_given_engine_world_body_type engine_world_body_type(Int world, const T1& body) const {
@@ -14331,11 +14331,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.body_type"); return kern_G(*kern_o); }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->body_type(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.world.body_type", {to_value(world), to_value(body)}, {PinType::enumeration})[0]);
+    return kern_G(this->kern_engine("engine.world.body_type", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::enumeration})[0]);
   }
   template <class T1, class T2> void engine_world_set_body_type(Int world, const T1& body, const T2& type) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14343,13 +14343,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_body_type"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::BodyType>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_BodyType>>::from(*kern_o, type, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Enum<::kern::logic::engine_direct::E_physics_BodyType>>::from(*kern_o, ::kern::logic::engine_values::input_value(type), kern_a1);
       kern_self->set_body_type(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.set_body_type", {to_value(world), to_value(body), to_value(type)}, {});
+    this->kern_engine("engine.world.set_body_type", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(type))}, {});
   }
   /// What the body's shapes collide with (their mask bits, in shape order) - and setting it: one mask per shape (the last one repeats for the shapes beyond). The shapes' own categories stay, so queries still find them; contacts the new masks rule out end, others begin.
   template <class T1> void engine_world_body_masks(Int world, const T1& body, const List<Int64>& out) {
@@ -14358,14 +14358,14 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.body_masks"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::u64, std::allocator<kern::u64> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int64>>::from(*kern_o, out, kern_a1);
       kern_self->body_masks(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int64>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.world.body_masks", {to_value(world), to_value(body), to_value(out)}, {PinType::int64_list});
+    this->kern_engine("engine.world.body_masks", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(out)}, {PinType::int64_list});
   }
   template <class KernNode, class T1> void engine_world_body_masks(KernNode& kern_n, Int world, const T1& body, const List<Int64>& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14373,14 +14373,14 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.world.body_masks"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::u64, std::allocator<kern::u64> >&>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int64>>::from(*kern_o, out, kern_a1);
       kern_self->body_masks(std::move(kern_a0), kern_a1);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Int64>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.body_masks", {to_value(world), to_value(body), to_value(out)}, {PinType::int64_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.body_masks", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(out)}, {PinType::int64_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   template <class T1> void engine_world_set_body_masks(Int world, const T1& body, const List<Int64>& masks) {
@@ -14389,12 +14389,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_body_masks"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int64>, std::vector<kern::u64>>(*kern_o, masks);
       kern_self->set_body_masks(std::move(kern_a0), kern::Span<kern::u64 const>(kern_a1.data(), kern_a1.size()));
       return;
     }
-    this->kern_engine("engine.world.set_body_masks", {to_value(world), to_value(body), to_value(masks)}, {});
+    this->kern_engine("engine.world.set_body_masks", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(masks)}, {});
   }
   template <class T1> Vector engine_world_local_point(Int world, const T1& body, Vector world_point) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14402,13 +14402,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.local_point"); return Vector{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, world_point, kern_a1);
       decltype(auto) kern_r = kern_self->local_point(std::move(kern_a0), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.world.local_point", {to_value(world), to_value(body), to_value(world_point)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.world.local_point", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(world_point)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   template <class T1> Vector engine_world_world_point(Int world, const T1& body, Vector local_point) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14416,13 +14416,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.world_point"); return Vector{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, local_point, kern_a1);
       decltype(auto) kern_r = kern_self->world_point(std::move(kern_a0), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.world.world_point", {to_value(world), to_value(body), to_value(local_point)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.world.world_point", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(local_point)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   template <class T1> Vector engine_world_world_vector(Int world, const T1& body, Vector local_vector) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14430,13 +14430,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.world_vector"); return Vector{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, local_vector, kern_a1);
       decltype(auto) kern_r = kern_self->world_vector(std::move(kern_a0), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.world.world_vector", {to_value(world), to_value(body), to_value(local_vector)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.world.world_vector", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(local_vector)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   template <class T1> Int64 engine_world_body_user(Int world, const T1& body) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14444,11 +14444,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.body_user"); return Int64{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       decltype(auto) kern_r = kern_self->body_user(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::template make<Int64>(*kern_o, kern_r);
     }
-    return from_value<Int64>(this->kern_engine("engine.world.body_user", {to_value(world), to_value(body)}, {PinType::int64})[0].converted(pin_type_of<Int64>()));
+    return from_value<Int64>(this->kern_engine("engine.world.body_user", {to_value(world), to_value(::kern::logic::engine_values::input_value(body))}, {PinType::int64})[0].converted(pin_type_of<Int64>()));
   }
   template <class T1> Int64 engine_world_shape_user(Int world, const T1& shape) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14456,11 +14456,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.shape_user"); return Int64{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Shape>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::from(*kern_o, shape, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::from(*kern_o, ::kern::logic::engine_values::input_value(shape), kern_a0);
       decltype(auto) kern_r = kern_self->shape_user(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::template make<Int64>(*kern_o, kern_r);
     }
-    return from_value<Int64>(this->kern_engine("engine.world.shape_user", {to_value(world), to_value(shape)}, {PinType::int64})[0].converted(pin_type_of<Int64>()));
+    return from_value<Int64>(this->kern_engine("engine.world.shape_user", {to_value(world), to_value(::kern::logic::engine_values::input_value(shape))}, {PinType::int64})[0].converted(pin_type_of<Int64>()));
   }
   using kern_given_engine_world_shape_body = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>, decltype(std::declval<kern::physics::World&>().shape_body(std::declval<kern::physics::Shape>()))>;
   template <class T1> kern_given_engine_world_shape_body engine_world_shape_body(Int world, const T1& shape) const {
@@ -14470,11 +14470,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.shape_body"); return kern_G(*kern_o); }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Shape>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::from(*kern_o, shape, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Shape>>::from(*kern_o, ::kern::logic::engine_values::input_value(shape), kern_a0);
       decltype(auto) kern_r = kern_self->shape_body(std::move(kern_a0));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.world.shape_body", {to_value(world), to_value(shape)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.world.shape_body", {to_value(world), to_value(::kern::logic::engine_values::input_value(shape))}, {PinType::structure})[0]);
   }
   /// Restricts translation / rotation per world axis (a body that must stay upright, a 2D plane).
   template <class T1, class T2> void engine_world_set_motion_locks(Int world, const T1& body, const T2& locks) {
@@ -14483,12 +14483,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_motion_locks"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MotionLocks>, std::remove_cvref_t<kern::physics::MotionLocks const&>>(*kern_o, locks);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MotionLocks>, std::remove_cvref_t<kern::physics::MotionLocks const&>>(*kern_o, ::kern::logic::engine_values::input_value(locks));
       kern_self->set_motion_locks(std::move(kern_a0), kern_a1);
       return;
     }
-    this->kern_engine("engine.world.set_motion_locks", {to_value(world), to_value(body), to_value(locks)}, {});
+    this->kern_engine("engine.world.set_motion_locks", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(locks))}, {});
   }
   /// Overrides the mass, scaling the inertia of the shapes' mass data to match.
   template <class T1> void engine_world_set_mass(Int world, const T1& body, Float mass) {
@@ -14497,13 +14497,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_mass"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, mass, kern_a1);
       kern_self->set_mass(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.set_mass", {to_value(world), to_value(body), to_value(mass)}, {});
+    this->kern_engine("engine.world.set_mass", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(mass)}, {});
   }
   /// Overrides all mass properties: mass (kg), centre of mass (body-local) and the inertia tensor about it in body axes (kg*m^2: xx yy zz xy xz yz), e.g. from a robot description (MJCF, URDF).
   template <class T1> void engine_world_set_mass_data(Int world, const T1& body, Float mass, Vector center, const List<Float>& inertia) {
@@ -14512,7 +14512,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_mass_data"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, mass, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -14522,7 +14522,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->set_mass_data(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), kern_a3.empty() ? nullptr : kern_a3.data());
       return;
     }
-    this->kern_engine("engine.world.set_mass_data", {to_value(world), to_value(body), to_value(mass), to_value(center), to_value(inertia)}, {});
+    this->kern_engine("engine.world.set_mass_data", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(mass), to_value(center), to_value(inertia)}, {});
   }
   /// Joints whose constraint force (N) or torque (N*m) exceeds these values are reported in joint_events() after a step (0 = never).
   template <class T1> void engine_world_set_joint_thresholds(Int world, const T1& joint, Float force, Float torque) {
@@ -14531,7 +14531,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_joint_thresholds"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, force, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -14539,7 +14539,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->set_joint_thresholds(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2));
       return;
     }
-    this->kern_engine("engine.world.set_joint_thresholds", {to_value(world), to_value(joint), to_value(force), to_value(torque)}, {});
+    this->kern_engine("engine.world.set_joint_thresholds", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint)), to_value(force), to_value(torque)}, {});
   }
   template <class T1> Vector engine_world_joint_force(Int world, const T1& joint) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14547,11 +14547,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.joint_force"); return Vector{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       decltype(auto) kern_r = kern_self->joint_force(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.world.joint_force", {to_value(world), to_value(joint)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.world.joint_force", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint))}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   /// Motor of a revolute (rad/s, N*m), prismatic (m/s, N), distance (m/s, N) or spherical joint (torque only).
   template <class T1> void engine_world_set_joint_motor(Int world, const T1& joint, Bool enable, Float speed, Float max_force) {
@@ -14560,7 +14560,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_joint_motor"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, enable, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -14570,7 +14570,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->set_joint_motor(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
       return;
     }
-    this->kern_engine("engine.world.set_joint_motor", {to_value(world), to_value(joint), to_value(enable), to_value(speed), to_value(max_force)}, {});
+    this->kern_engine("engine.world.set_joint_motor", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint)), to_value(enable), to_value(speed), to_value(max_force)}, {});
   }
   /// Wheel joints: the steering servo's target angle (radians), and the angle it has now.
   template <class T1> void engine_world_set_wheel_steering(Int world, const T1& joint, Float target) {
@@ -14579,13 +14579,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_wheel_steering"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, target, kern_a1);
       kern_self->set_wheel_steering(std::move(kern_a0), std::move(kern_a1));
       return;
     }
-    this->kern_engine("engine.world.set_wheel_steering", {to_value(world), to_value(joint), to_value(target)}, {});
+    this->kern_engine("engine.world.set_wheel_steering", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint)), to_value(target)}, {});
   }
   template <class T1> Float engine_world_wheel_steering(Int world, const T1& joint) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14593,11 +14593,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.wheel_steering"); return Float{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       decltype(auto) kern_r = kern_self->wheel_steering(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.world.wheel_steering", {to_value(world), to_value(joint)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.world.wheel_steering", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint))}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   /// Revolute joints: angle of B relative to A (radians, from the reference angle); 0 for others.
   template <class T1> Float engine_world_joint_angle(Int world, const T1& joint) const {
@@ -14606,11 +14606,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.joint_angle"); return Float{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       decltype(auto) kern_r = kern_self->joint_angle(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.world.joint_angle", {to_value(world), to_value(joint)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.world.joint_angle", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint))}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   /// Revolute joints: angular speed of B relative to A about the hinge axis (rad/s); 0 for others.
   template <class T1> Float engine_world_joint_speed(Int world, const T1& joint) const {
@@ -14619,11 +14619,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.joint_speed"); return Float{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       decltype(auto) kern_r = kern_self->joint_speed(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.world.joint_speed", {to_value(world), to_value(joint)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.world.joint_speed", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint))}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   /// Revolute joints: a spring-damper toward `target` (radians) in physical units, stiffness N*m/rad and damping N*m*s/rad. Box3D's spring is set in Hertz and a damping ratio relative to the joint's axial effective mass; this converts with the current mass, so call it every step. The spring is solved implicitly (soft step): stable for any stiffness. stiffness <= 0 disables it.
   template <class T1> void engine_world_set_joint_spring(Int world, const T1& joint, Float target, Float stiffness, Float damping) {
@@ -14632,7 +14632,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.set_joint_spring"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, target, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -14642,7 +14642,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->set_joint_spring(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
       return;
     }
-    this->kern_engine("engine.world.set_joint_spring", {to_value(world), to_value(joint), to_value(target), to_value(stiffness), to_value(damping)}, {});
+    this->kern_engine("engine.world.set_joint_spring", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint)), to_value(target), to_value(stiffness), to_value(damping)}, {});
   }
   /// How far a point (world) lies from a hinge's axis, metres: the lever a force at the point has about the hinge. 0: no hinge.
   template <class T1> Float engine_world_hinge_lever(Int world, const T1& joint, Vector point) const {
@@ -14651,13 +14651,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.hinge_lever"); return Float{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, point, kern_a1);
       decltype(auto) kern_r = kern_self->hinge_lever(std::move(kern_a0), std::move(kern_a1));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.world.hinge_lever", {to_value(world), to_value(joint), to_value(point)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.world.hinge_lever", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint)), to_value(point)}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   template <class T1> Vector engine_world_joint_torque(Int world, const T1& joint) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14665,11 +14665,11 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.joint_torque"); return Vector{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Joint>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, joint, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Joint>>::from(*kern_o, ::kern::logic::engine_values::input_value(joint), kern_a0);
       decltype(auto) kern_r = kern_self->joint_torque(std::move(kern_a0));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::template make<Vector>(*kern_o, kern_r);
     }
-    return from_value<Vector>(this->kern_engine("engine.world.joint_torque", {to_value(world), to_value(joint)}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
+    return from_value<Vector>(this->kern_engine("engine.world.joint_torque", {to_value(world), to_value(::kern::logic::engine_values::input_value(joint))}, {PinType::vector})[0].converted(pin_type_of<Vector>()));
   }
   /// Touching contact points of a body (for debug views).
   template <class T1, class T2> void engine_world_contact_points(Int world, const T1& body, const T2& out) {
@@ -14678,14 +14678,14 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.contact_points"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::physics::ContactPoint, std::allocator<kern::physics::ContactPoint> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ContactPoint>>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ContactPoint>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->contact_points(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ContactPoint>>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.world.contact_points", {to_value(world), to_value(body), to_value(out)}, {PinType::structure_list});
+    this->kern_engine("engine.world.contact_points", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
   }
   template <class KernNode, class T1, class T2> void engine_world_contact_points(KernNode& kern_n, Int world, const T1& body, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14693,14 +14693,14 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.world.contact_points"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::physics::ContactPoint, std::allocator<kern::physics::ContactPoint> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ContactPoint>>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ContactPoint>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->contact_points(std::move(kern_a0), kern_a1);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_ContactPoint>>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.contact_points", {to_value(world), to_value(body), to_value(out)}, {PinType::structure_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.contact_points", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   /// The bodies `body` touches now (a manifold with points), each with the summed normal impulse of the last sub-step (N*s): what a contact sensor reports (a sole on the floor, a link on a link).
@@ -14710,14 +14710,14 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.touching"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<std::pair<kern::physics::Body, float>, std::allocator<std::pair<kern::physics::Body, float> > >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>, ::kern::logic::engine_values::Float>>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>, ::kern::logic::engine_values::Float>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->touching(std::move(kern_a0), kern_a1);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>, ::kern::logic::engine_values::Float>>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.world.touching", {to_value(world), to_value(body), to_value(out)}, {PinType::structure_list});
+    this->kern_engine("engine.world.touching", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
   }
   template <class KernNode, class T1, class T2> void engine_world_touching(KernNode& kern_n, Int world, const T1& body, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14725,14 +14725,14 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.world.touching"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<std::pair<kern::physics::Body, float>, std::allocator<std::pair<kern::physics::Body, float> > >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>, ::kern::logic::engine_values::Float>>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>, ::kern::logic::engine_values::Float>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       kern_self->touching(std::move(kern_a0), kern_a1);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Pair<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>, ::kern::logic::engine_values::Float>>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.touching", {to_value(world), to_value(body), to_value(out)}, {PinType::structure_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.touching", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   /// Closest hit along origin + translation (non-sensor shapes whose category matches mask_bits; shapes of `ignore` are skipped, e.g. the body the ray starts in).
@@ -14748,13 +14748,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, translation, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ignore, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(ignore), kern_a3);
       decltype(auto) kern_r = kern_self->cast_ray(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.world.cast_ray", {to_value(world), to_value(origin), to_value(translation), to_value(filter), to_value(ignore)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.world.cast_ray", {to_value(world), to_value(origin), to_value(translation), to_value(::kern::logic::engine_values::input_value(filter)), to_value(::kern::logic::engine_values::input_value(ignore))}, {PinType::structure})[0]);
   }
   /// Closest hit that is not on any of `ignore` (a robot's sensor does not see its own links).
   using kern_given_engine_world_cast_ray_ignoring = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_RayHit>, decltype(std::declval<kern::physics::World&>().cast_ray_ignoring(std::declval<kern::Vec3>(), std::declval<kern::Vec3>(), std::declval<kern::Span<kern::physics::Body const>>(), std::declval<kern::physics::QueryFilter>()))>;
@@ -14768,13 +14768,13 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, origin, kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, translation, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>, std::vector<kern::physics::Body>>(*kern_o, ignore);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>, std::vector<kern::physics::Body>>(*kern_o, ::kern::logic::engine_values::input_value(ignore));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a3);
       decltype(auto) kern_r = kern_self->cast_ray_ignoring(std::move(kern_a0), std::move(kern_a1), kern::Span<kern::physics::Body const>(kern_a2.data(), kern_a2.size()), std::move(kern_a3));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.world.cast_ray_ignoring", {to_value(world), to_value(origin), to_value(translation), to_value(ignore), to_value(filter)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.world.cast_ray_ignoring", {to_value(world), to_value(origin), to_value(translation), to_value(::kern::logic::engine_values::input_value(ignore)), to_value(::kern::logic::engine_values::input_value(filter))}, {PinType::structure})[0]);
   }
   /// Closest hit of a sphere swept along translation (a fat ray: ground probes that do not miss ledges).
   using kern_given_engine_world_cast_sphere = ::kern::logic::engine_values::Given<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_RayHit>, decltype(std::declval<kern::physics::World&>().cast_sphere(std::declval<kern::Vec3>(), std::declval<float>(), std::declval<kern::Vec3>(), std::declval<kern::physics::QueryFilter>(), std::declval<kern::physics::Body>()))>;
@@ -14791,13 +14791,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, translation, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ignore, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(ignore), kern_a4);
       decltype(auto) kern_r = kern_self->cast_sphere(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4));
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
-    return kern_G(this->kern_engine("engine.world.cast_sphere", {to_value(world), to_value(origin), to_value(radius), to_value(translation), to_value(filter), to_value(ignore)}, {PinType::structure})[0]);
+    return kern_G(this->kern_engine("engine.world.cast_sphere", {to_value(world), to_value(origin), to_value(radius), to_value(translation), to_value(::kern::logic::engine_values::input_value(filter)), to_value(::kern::logic::engine_values::input_value(ignore))}, {PinType::structure})[0]);
   }
   /// Character mover queries (Box3D "Character Mover"): how far the capsule can travel (0..1) and the planes it touches. Sensors and the shapes of `ignore` are skipped.
   template <class T1, class T2, class T3> Float engine_world_cast_mover(Int world, Vector origin, const T1& capsule, Vector translation, const T2& filter, const T3& ignore) const {
@@ -14807,17 +14807,17 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.world.cast_mover"); return Float{}; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, origin, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Capsule>, std::remove_cvref_t<kern::physics::Capsule const&>>(*kern_o, capsule);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Capsule>, std::remove_cvref_t<kern::physics::Capsule const&>>(*kern_o, ::kern::logic::engine_values::input_value(capsule));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, translation, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ignore, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(ignore), kern_a4);
       decltype(auto) kern_r = kern_self->cast_mover(std::move(kern_a0), kern_a1, std::move(kern_a2), std::move(kern_a3), std::move(kern_a4));
       return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::template make<Float>(*kern_o, kern_r);
     }
-    return from_value<Float>(this->kern_engine("engine.world.cast_mover", {to_value(world), to_value(origin), to_value(capsule), to_value(translation), to_value(filter), to_value(ignore)}, {PinType::number})[0].converted(pin_type_of<Float>()));
+    return from_value<Float>(this->kern_engine("engine.world.cast_mover", {to_value(world), to_value(origin), to_value(::kern::logic::engine_values::input_value(capsule)), to_value(translation), to_value(::kern::logic::engine_values::input_value(filter)), to_value(::kern::logic::engine_values::input_value(ignore))}, {PinType::number})[0].converted(pin_type_of<Float>()));
   }
   template <class T1, class T2, class T3, class T4> void engine_world_collide_mover(Int world, Vector origin, const T1& capsule, const T2& filter, const T3& ignore, const T4& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14826,18 +14826,18 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { this->kern_engine_failed("engine.world.collide_mover"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, origin, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Capsule>, std::remove_cvref_t<kern::physics::Capsule const&>>(*kern_o, capsule);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Capsule>, std::remove_cvref_t<kern::physics::Capsule const&>>(*kern_o, ::kern::logic::engine_values::input_value(capsule));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ignore, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(ignore), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::physics::MoverPlane, std::allocator<kern::physics::MoverPlane> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MoverPlane>>>::from(*kern_o, out, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MoverPlane>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a4);
       kern_self->collide_mover(std::move(kern_a0), kern_a1, std::move(kern_a2), std::move(kern_a3), kern_a4);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MoverPlane>>>::pass(*kern_o, kern_a4);
       return;
     }
-    this->kern_engine("engine.world.collide_mover", {to_value(world), to_value(origin), to_value(capsule), to_value(filter), to_value(ignore), to_value(out)}, {PinType::structure_list});
+    this->kern_engine("engine.world.collide_mover", {to_value(world), to_value(origin), to_value(::kern::logic::engine_values::input_value(capsule)), to_value(::kern::logic::engine_values::input_value(filter)), to_value(::kern::logic::engine_values::input_value(ignore)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
   }
   template <class KernNode, class T1, class T2, class T3, class T4> void engine_world_collide_mover(KernNode& kern_n, Int world, Vector origin, const T1& capsule, const T2& filter, const T3& ignore, const T4& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -14846,18 +14846,18 @@ template <class Core> struct EngineNodesOf : Core {
       if (!kern_self) { ::kern::logic::engine_values::none(kern_n.out); this->kern_engine_failed("engine.world.collide_mover"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, origin, kern_a0);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Capsule>, std::remove_cvref_t<kern::physics::Capsule const&>>(*kern_o, capsule);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Capsule>, std::remove_cvref_t<kern::physics::Capsule const&>>(*kern_o, ::kern::logic::engine_values::input_value(capsule));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::QueryFilter>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, filter, kern_a2);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_QueryFilter>>::from(*kern_o, ::kern::logic::engine_values::input_value(filter), kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ignore, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(ignore), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<std::vector<kern::physics::MoverPlane, std::allocator<kern::physics::MoverPlane> >&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MoverPlane>>>::from(*kern_o, out, kern_a4);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MoverPlane>>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a4);
       kern_self->collide_mover(std::move(kern_a0), kern_a1, std::move(kern_a2), std::move(kern_a3), kern_a4);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_MoverPlane>>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a4);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.world.collide_mover", {to_value(world), to_value(origin), to_value(capsule), to_value(filter), to_value(ignore), to_value(out)}, {PinType::structure_list});
+    const std::vector<Value> kern_out = this->kern_engine("engine.world.collide_mover", {to_value(world), to_value(origin), to_value(::kern::logic::engine_values::input_value(capsule)), to_value(::kern::logic::engine_values::input_value(filter)), to_value(::kern::logic::engine_values::input_value(ignore)), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::structure_list});
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[0]);
   }
   /// Radial impulse on spheres, capsules and hulls (b3World_Explode); negative impulse implodes.
@@ -14888,7 +14888,7 @@ template <class Core> struct EngineNodesOf : Core {
       auto* const kern_self = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_self) { this->kern_engine_failed("engine.world.push_body"); return; }
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a0);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, point, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
@@ -14898,7 +14898,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->push_body(std::move(kern_a0), std::move(kern_a1), std::move(kern_a2), std::move(kern_a3));
       return;
     }
-    this->kern_engine("engine.world.push_body", {to_value(world), to_value(body), to_value(point), to_value(normal), to_value(velocity)}, {});
+    this->kern_engine("engine.world.push_body", {to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(point), to_value(normal), to_value(velocity)}, {});
   }
   /// Events of the last step (shapes may have been destroyed since; check the bodies).
   using kern_given_engine_world_contact_begin = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_TouchEvent>>, decltype(std::declval<kern::physics::World&>().contact_begin())>;
@@ -15023,7 +15023,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern::physics::World* const kern_a0 = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_a0) { this->kern_engine_failed("engine.mouse_grab.begin"); return; }
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, point, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -15034,7 +15034,7 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.mouse_grab.begin", {to_value(mouse_grab), to_value(world), to_value(body), to_value(point), to_value(stiffness_hertz), to_value(hold_rotation)}, {PinType::boolean});
+    this->kern_engine("engine.mouse_grab.begin", {to_value(mouse_grab), to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(point), to_value(stiffness_hertz), to_value(hold_rotation)}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_mouse_grab_begin(KernNode& kern_n, Int mouse_grab, Int world, const T1& body, Vector point, Float stiffness_hertz, Bool hold_rotation) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15044,7 +15044,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern::physics::World* const kern_a0 = ::kern::logic::engine_values::object_of<kern::physics::World>(*kern_o, static_cast<::kern::i64>(world), "world");
       if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.mouse_grab.begin"); return; }
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, body, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(body), kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, point, kern_a2);
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -15055,7 +15055,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.mouse_grab.begin", {to_value(mouse_grab), to_value(world), to_value(body), to_value(point), to_value(stiffness_hertz), to_value(hold_rotation)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.mouse_grab.begin", {to_value(mouse_grab), to_value(world), to_value(::kern::logic::engine_values::input_value(body)), to_value(point), to_value(stiffness_hertz), to_value(hold_rotation)}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   void engine_mouse_grab_set_target(Int mouse_grab, Vector target) {
@@ -15176,12 +15176,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, sprint, kern_a4);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, self, kern_a5);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_a5);
       decltype(auto) kern_r = kern_self->step(*kern_a0, std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5));
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       return;
     }
-    this->kern_engine("engine.character_mover.step", {to_value(character_mover), to_value(world), to_value(dt), to_value(wish), to_value(jump), to_value(sprint), to_value(self)}, {PinType::boolean});
+    this->kern_engine("engine.character_mover.step", {to_value(character_mover), to_value(world), to_value(dt), to_value(wish), to_value(jump), to_value(sprint), to_value(::kern::logic::engine_values::input_value(self))}, {PinType::boolean});
   }
   template <class KernNode, class T1> void engine_character_mover_step(KernNode& kern_n, Int character_mover, Int world, Float dt, Vector wish, Bool jump, Bool sprint, const T1& self) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15199,12 +15199,12 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<bool>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::from(*kern_o, sprint, kern_a4);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::physics::Body>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, self, kern_a5);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_physics_Body>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_a5);
       decltype(auto) kern_r = kern_self->step(*kern_a0, std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), std::move(kern_a5));
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.character_mover.step", {to_value(character_mover), to_value(world), to_value(dt), to_value(wish), to_value(jump), to_value(sprint), to_value(self)}, {PinType::boolean});
+    const std::vector<Value> kern_out = this->kern_engine("engine.character_mover.step", {to_value(character_mover), to_value(world), to_value(dt), to_value(wish), to_value(jump), to_value(sprint), to_value(::kern::logic::engine_values::input_value(self))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   Vector engine_character_mover_position(Int character_mover) const {
@@ -15294,7 +15294,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Vector>, std::vector<kern::Vec3>>(*kern_o, points);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, color, kern_a2);
       decltype(auto) kern_r = kern::physics::hull_mesh(kern::Span<kern::Vec3 const>(kern_a0.data(), kern_a0.size()), kern_a1, std::move(kern_a2));
@@ -15302,14 +15302,14 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::pass(*kern_o, kern_a1);
       return;
     }
-    this->kern_engine("engine.physics.hull_mesh", {to_value(points), to_value(out), to_value(color)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.physics.hull_mesh", {to_value(points), to_value(::kern::logic::engine_values::input_value(out)), to_value(color)}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1> void engine_physics_hull_mesh(KernNode& kern_n, const List<Vector>& points, const T1& out, Vector color) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Vector>, std::vector<kern::Vec3>>(*kern_o, points);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::MeshData&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, out, kern_a1);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Vec3>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Vector>::from(*kern_o, color, kern_a2);
       decltype(auto) kern_r = kern::physics::hull_mesh(kern::Span<kern::Vec3 const>(kern_a0.data(), kern_a0.size()), kern_a1, std::move(kern_a2));
@@ -15317,7 +15317,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_MeshData>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a1);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.physics.hull_mesh", {to_value(points), to_value(out), to_value(color)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.physics.hull_mesh", {to_value(points), to_value(::kern::logic::engine_values::input_value(out)), to_value(color)}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -15330,7 +15330,7 @@ template <class Core> struct EngineNodesOf : Core {
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>, std::vector<float>>(*kern_o, positions);
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<3u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, vertex_count, kern_a1);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, indices);
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<unsigned int>>(*kern_o, ::kern::logic::engine_values::input_value(indices));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Count<1u>>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int>::from(*kern_o, index_count, kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<unsigned int>>();
@@ -15340,7 +15340,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_self->build(kern_a0.empty() ? nullptr : kern_a0.data(), std::move(kern_a1), kern_a2.empty() ? nullptr : kern_a2.data(), std::move(kern_a3), std::move(kern_a4));
       return;
     }
-    this->kern_engine("engine.bvh.build", {to_value(bvh), to_value(positions), to_value(vertex_count), to_value(indices), to_value(index_count), to_value(leaf_size)}, {});
+    this->kern_engine("engine.bvh.build", {to_value(bvh), to_value(positions), to_value(vertex_count), to_value(::kern::logic::engine_values::input_value(indices)), to_value(index_count), to_value(leaf_size)}, {});
   }
   Bool engine_bvh_empty(Int bvh) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -15366,7 +15366,7 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1, class T2> void engine_screen_ray(const T1& camera, Float x, Float y, Float width, Float height, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, camera);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, ::kern::logic::engine_values::input_value(camera));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -15376,18 +15376,18 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, height, kern_a4);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Ray&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, out, kern_a5);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a5);
       decltype(auto) kern_r = kern::screen_ray(kern_a0, std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), kern_a5);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::pass(*kern_o, kern_a5);
       return;
     }
-    this->kern_engine("engine.screen_ray", {to_value(camera), to_value(x), to_value(y), to_value(width), to_value(height), to_value(out)}, {PinType::boolean, PinType::structure});
+    this->kern_engine("engine.screen_ray", {to_value(::kern::logic::engine_values::input_value(camera)), to_value(x), to_value(y), to_value(width), to_value(height), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
   }
   template <class KernNode, class T1, class T2> void engine_screen_ray(KernNode& kern_n, const T1& camera, Float x, Float y, Float width, Float height, const T2& out) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, camera);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Camera>, std::remove_cvref_t<kern::Camera const&>>(*kern_o, ::kern::logic::engine_values::input_value(camera));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, x, kern_a1);
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
@@ -15397,13 +15397,13 @@ template <class Core> struct EngineNodesOf : Core {
       auto kern_a4 = ::kern::logic::engine_values::blank<std::remove_cvref_t<float>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, height, kern_a4);
       auto kern_a5 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::Ray&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, out, kern_a5);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::from(*kern_o, ::kern::logic::engine_values::input_value(out), kern_a5);
       decltype(auto) kern_r = kern::screen_ray(kern_a0, std::move(kern_a1), std::move(kern_a2), std::move(kern_a3), std::move(kern_a4), kern_a5);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
       kern_n.out = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>>::template make<std::remove_cvref_t<decltype(kern_n.out)>>(*kern_o, kern_a5);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.screen_ray", {to_value(camera), to_value(x), to_value(y), to_value(width), to_value(height), to_value(out)}, {PinType::boolean, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.screen_ray", {to_value(::kern::logic::engine_values::input_value(camera)), to_value(x), to_value(y), to_value(width), to_value(height), to_value(::kern::logic::engine_values::input_value(out))}, {PinType::boolean, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.out = from_value<std::remove_cvref_t<decltype(kern_n.out)>>(kern_out[1]);
   }
@@ -15412,10 +15412,10 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<kern::Mesh*>>(*kern_o, meshes);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ray);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, query);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, hit, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
       decltype(auto) kern_r = kern::pick_meshes(kern::Span<kern::Mesh* const>(kern_a0.data(), kern_a0.size()), kern_a1, kern_a2, kern_a3, &kern_a4);
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
@@ -15423,16 +15423,16 @@ template <class Core> struct EngineNodesOf : Core {
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::pass(*kern_o, kern_a4);
       return;
     }
-    this->kern_engine("engine.pick_meshes", {to_value(meshes), to_value(ray), to_value(query), to_value(hit)}, {PinType::boolean, PinType::structure, PinType::structure});
+    this->kern_engine("engine.pick_meshes", {to_value(meshes), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
   }
   template <class KernNode, class T1, class T2, class T3> void engine_pick_meshes(KernNode& kern_n, const List<Int>& meshes, const T1& ray, const T2& query, const T3& hit) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::List<::kern::logic::engine_values::Int>, std::vector<kern::Mesh*>>(*kern_o, meshes);
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ray);
-      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, query);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_Ray>, std::remove_cvref_t<kern::Ray const&>>(*kern_o, ::kern::logic::engine_values::input_value(ray));
+      decltype(auto) kern_a2 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickQuery>, std::remove_cvref_t<kern::PickQuery const&>>(*kern_o, ::kern::logic::engine_values::input_value(query));
       auto kern_a3 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::PickHit&>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, hit, kern_a3);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickHit>>::from(*kern_o, ::kern::logic::engine_values::input_value(hit), kern_a3);
       auto kern_a4 = ::kern::logic::engine_values::blank<kern::PickStats>();
       decltype(auto) kern_r = kern::pick_meshes(kern::Span<kern::Mesh* const>(kern_a0.data(), kern_a0.size()), kern_a1, kern_a2, kern_a3, &kern_a4);
       kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
@@ -15440,7 +15440,7 @@ template <class Core> struct EngineNodesOf : Core {
       kern_n.stats = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_PickStats>>::template make<std::remove_cvref_t<decltype(kern_n.stats)>>(*kern_o, kern_a4);
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.pick_meshes", {to_value(meshes), to_value(ray), to_value(query), to_value(hit)}, {PinType::boolean, PinType::structure, PinType::structure});
+    const std::vector<Value> kern_out = this->kern_engine("engine.pick_meshes", {to_value(meshes), to_value(::kern::logic::engine_values::input_value(ray)), to_value(::kern::logic::engine_values::input_value(query)), to_value(::kern::logic::engine_values::input_value(hit))}, {PinType::boolean, PinType::structure, PinType::structure});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
     kern_n.hit = from_value<std::remove_cvref_t<decltype(kern_n.hit)>>(kern_out[1]);
     kern_n.stats = from_value<std::remove_cvref_t<decltype(kern_n.stats)>>(kern_out[2]);
@@ -16547,26 +16547,26 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       kern::net::Transport* const kern_a0 = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_a0) { this->kern_engine_failed("engine.client.make"); return; }
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, config);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, ::kern::logic::engine_values::input_value(config));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, salt_seed, kern_a2);
       (void)kern_o->own<kern::net::Client>(std::unique_ptr<kern::net::Client>(new kern::net::Client(*kern_a0, kern_a1, std::move(kern_a2))));
       return;
     }
-    this->kern_engine("engine.client.make", {to_value(transport), to_value(config), to_value(salt_seed)}, {PinType::integer});
+    this->kern_engine("engine.client.make", {to_value(transport), to_value(::kern::logic::engine_values::input_value(config)), to_value(salt_seed)}, {PinType::integer});
   }
   template <class KernNode, class T1> void engine_client_make(KernNode& kern_n, Int transport, const T1& config, Int64 salt_seed) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       kern::net::Transport* const kern_a0 = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.client.make"); return; }
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, config);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, ::kern::logic::engine_values::input_value(config));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, salt_seed, kern_a2);
       kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::net::Client>(std::unique_ptr<kern::net::Client>(new kern::net::Client(*kern_a0, kern_a1, std::move(kern_a2)))));
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.client.make", {to_value(transport), to_value(config), to_value(salt_seed)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.client.make", {to_value(transport), to_value(::kern::logic::engine_values::input_value(config)), to_value(salt_seed)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Ends the Client (its destructor): the handle is none after it.
@@ -16582,24 +16582,24 @@ template <class Core> struct EngineNodesOf : Core {
   template <class T1> void engine_connection_make(const T1& config, Float time) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ConnectionConfig>, std::remove_cvref_t<kern::net::ConnectionConfig const&>>(*kern_o, config);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ConnectionConfig>, std::remove_cvref_t<kern::net::ConnectionConfig const&>>(*kern_o, ::kern::logic::engine_values::input_value(config));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, time, kern_a1);
       (void)kern_o->own<kern::net::Connection>(std::unique_ptr<kern::net::Connection>(new kern::net::Connection(kern_a0, std::move(kern_a1))));
       return;
     }
-    this->kern_engine("engine.connection.make", {to_value(config), to_value(time)}, {PinType::integer});
+    this->kern_engine("engine.connection.make", {to_value(::kern::logic::engine_values::input_value(config)), to_value(time)}, {PinType::integer});
   }
   template <class KernNode, class T1> void engine_connection_make(KernNode& kern_n, const T1& config, Float time) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
-      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ConnectionConfig>, std::remove_cvref_t<kern::net::ConnectionConfig const&>>(*kern_o, config);
+      decltype(auto) kern_a0 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ConnectionConfig>, std::remove_cvref_t<kern::net::ConnectionConfig const&>>(*kern_o, ::kern::logic::engine_values::input_value(config));
       auto kern_a1 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, time, kern_a1);
       kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::net::Connection>(std::unique_ptr<kern::net::Connection>(new kern::net::Connection(kern_a0, std::move(kern_a1)))));
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.connection.make", {to_value(config), to_value(time)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.connection.make", {to_value(::kern::logic::engine_values::input_value(config)), to_value(time)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Ends the Connection (its destructor): the handle is none after it.
@@ -16616,21 +16616,21 @@ template <class Core> struct EngineNodesOf : Core {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, self, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_a0);
       (void)kern_o->own<kern::net::HostTransport, kern::net::Transport>(std::unique_ptr<kern::net::HostTransport>(new kern::net::HostTransport(std::move(kern_a0))));
       return;
     }
-    this->kern_engine("engine.host_transport.make", {to_value(self)}, {PinType::integer});
+    this->kern_engine("engine.host_transport.make", {to_value(::kern::logic::engine_values::input_value(self))}, {PinType::integer});
   }
   template <class KernNode, class T1> void engine_host_transport_make(KernNode& kern_n, const T1& self) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::net::Address>>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, self, kern_a0);
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_Address>>::from(*kern_o, ::kern::logic::engine_values::input_value(self), kern_a0);
       kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::net::HostTransport, kern::net::Transport>(std::unique_ptr<kern::net::HostTransport>(new kern::net::HostTransport(std::move(kern_a0)))));
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.make", {to_value(self)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.host_transport.make", {to_value(::kern::logic::engine_values::input_value(self))}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Ends the HostTransport (its destructor): the handle is none after it.
@@ -16706,26 +16706,26 @@ template <class Core> struct EngineNodesOf : Core {
       kern_o->begin_call();
       kern::net::Transport* const kern_a0 = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_a0) { this->kern_engine_failed("engine.server.make"); return; }
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, config);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, ::kern::logic::engine_values::input_value(config));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, salt_seed, kern_a2);
       (void)kern_o->own<kern::net::Server>(std::unique_ptr<kern::net::Server>(new kern::net::Server(*kern_a0, kern_a1, std::move(kern_a2))));
       return;
     }
-    this->kern_engine("engine.server.make", {to_value(transport), to_value(config), to_value(salt_seed)}, {PinType::integer});
+    this->kern_engine("engine.server.make", {to_value(transport), to_value(::kern::logic::engine_values::input_value(config)), to_value(salt_seed)}, {PinType::integer});
   }
   template <class KernNode, class T1> void engine_server_make(KernNode& kern_n, Int transport, const T1& config, Int64 salt_seed) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();
       kern::net::Transport* const kern_a0 = ::kern::logic::engine_values::object_of<kern::net::Transport>(*kern_o, static_cast<::kern::i64>(transport), "transport");
       if (!kern_a0) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.server.make"); return; }
-      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, config);
+      decltype(auto) kern_a1 = ::kern::logic::engine_values::taken<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_net_ClientServerConfig>, std::remove_cvref_t<kern::net::ClientServerConfig const&>>(*kern_o, ::kern::logic::engine_values::input_value(config));
       auto kern_a2 = ::kern::logic::engine_values::blank<std::remove_cvref_t<kern::u64>>();
       ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Int64>::from(*kern_o, salt_seed, kern_a2);
       kern_n.result = ::kern::logic::engine_values::handle_as<std::remove_cvref_t<decltype(kern_n.result)>>(kern_o->own<kern::net::Server>(std::unique_ptr<kern::net::Server>(new kern::net::Server(*kern_a0, kern_a1, std::move(kern_a2)))));
       return;
     }
-    const std::vector<Value> kern_out = this->kern_engine("engine.server.make", {to_value(transport), to_value(config), to_value(salt_seed)}, {PinType::integer});
+    const std::vector<Value> kern_out = this->kern_engine("engine.server.make", {to_value(transport), to_value(::kern::logic::engine_values::input_value(config)), to_value(salt_seed)}, {PinType::integer});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   /// Ends the Server (its destructor): the handle is none after it.

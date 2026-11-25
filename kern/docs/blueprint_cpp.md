@@ -1391,7 +1391,14 @@ struct { engine_game_world_shots_place<List<game_ShotEvent>> result = {}; } n12;
   sie, `@set` den Wert danach). Ein Index außerhalb 0…N−1 nennt keinen Eintrag – C++ lässt den Aufruf offen –:
   der Aufruf scheitert in jeder Stufe gleich („the input b names no entry: there are 6“), gelesen wird die Null,
   geschrieben ins Leere. In der Klasse hält der Platz die Eingänge in den Typen von C++ (`P::In`, ohne
-  Speicher), `P::at` prüft den Index. Geprüft: `engine_place_at_an_entry_of_an_array` und der Fall „Engine“.
+  Speicher), `P::at` prüft den Index. Geprüft: `engine_place_at_an_entry_of_an_array` und der Fall „Engine“
+  (dort auch an einem gemachten Objekt, der Eingang bei seinem Default).
+- **Ein Platz als Eingang einer Funktion der Engine.** Ein Knoten, der einen Platz nennt (ein Eintrag, ein Feld
+  eines Eintrags: `n12.result[i].mesh`), kann der Eingang eines Knotens der Engine sein – `kern::weld(c.mesh)` auf
+  einem Eintrag von `b.chunks()`. Der Eingang bekommt, was jetzt dort steht (gelesen, wie jedes Nennen liest:
+  `engine_values::input_value`); was die Funktion daraus macht, ist ihr Ausgang und wird mit Set dorthin
+  gesetzt, wie C++ es dort hinterlässt. In jeder Stufe gleich; geprüft im Fall „EnginePlaces“ (`Weld`) und in
+  `engine_places_class_names_the_engines_list` gegen `kern::weld` auf der Liste von C++.
 
 ### Felder eines Objekts der Engine
 
