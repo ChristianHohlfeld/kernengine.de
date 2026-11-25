@@ -11614,6 +11614,27 @@ class TestWriter:
             if n.get("_named"):   # (a name for a part of a value - Emit.stood: the source has the name, there for every call)
                 return
             k, ks = n.get("kind"), kids(n)
+            if k == "CallExpr" and len(ks) > 1:
+                # A function of a namespace of the program, called by its name alone with a value of the engine: C++ looks
+                # it up where the call stands and - by the argument - in the engine's namespace, where no function of the
+                # program is. In the test the program and the engine are one namespace: there the argument would bring in
+                # what the program has at its top (slerp of common.h beside gaps::slerp - "ambiguous"). The call names the
+                # function C++ took (the tree says which), by its namespace: what C++ finds without the argument's.
+                c = ks[0]
+                while c.get("kind") in ("ImplicitCastExpr", "ParenExpr") and kids(c):
+                    c = kids(c)[0]
+                r = self.tree.decl.get((c.get("referencedDecl") or {}).get("id")) if c.get("kind") == "DeclRefExpr" else None
+                if r is not None and r.get("kind") == "FunctionDecl" and self.tree.owner.get(r["id"]) is None and c.get("_at", (None, None))[0] is not None:
+                    first = r
+                    while first.get("previousDecl") in self.tree.decl:
+                        first = self.tree.decl[first["previousDecl"]]
+                    scope = self.tree.scope_of.get(r["id"], "")
+                    path = self.local_path(scope) if scope.rstrip(":") not in self.tree.records else []
+                    ca = c["_at"][0]
+                    by_name = raw[ca:ca + len(r.get("name", ""))] == r.get("name") and not raw[max(lo, ca - 64):ca].rstrip().endswith(("::", ".", "->"))
+                    engine_arg = any(re.search(r"\b" + ENGINE + r"::\w", qtype(x) + " " + str((x.get("type") or {}).get("desugaredQualType", ""))) for x in ks[1:])
+                    if path and by_name and engine_arg and is_header(first.get("_file") or ""):
+                        edits.append((ca, 3, 0, ca, "::".join(path) + "::"))
             # the bytes of a value of a struct with a float, as the program lays them out (Bytes of Struct,
             # Struct of Bytes): the test holds the float as a 64-bit number
             if k == "CallExpr" and callee_name(n) == "bit_cast" and len(ks) == 2:
