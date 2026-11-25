@@ -20,45 +20,14 @@ namespace sc {
 // "Schnittstellen der Engine").
 class SpawnCityApp final : public kern::App {
  public:
-  kern::RendererOptions configure() override {
-    kern::RendererOptions o;
-    o.shadows = true;
-    o.shadow.resolution = 2048;  // stylized_world_style.mjs: 2048, mobile 1024 (the page passes ?mobile=1)
-    o.shadow.extent = 110;
-    o.shadow.bias = 0.0014f;
-    o.bloom.enabled = true;
-    return o;
-  }
+  // The renderer (desktop and phone) and the heap taken ahead are the project's settings: the level's "project"
+  // (kern/app/project.h), which the engine applies before start().
   kern::Span<kern::ShaderExtension* const> extensions() override {
     // facades (extension stream 0: Kern's wall records), water (stream 1: terrain.cpp build_water_chunk)
     static kern::ShaderExtension* ext[2] = {&sc::facades(), &sc::water_look()};
     return {ext, 2};
   }
   bool start(kern::Engine& e) override {
-    // The streamed city lives in 150 - 300 MB of heap. Grown piece by piece while playing, every
-    // memory.grow stalled a phone for 0.5 - 1.1 s (?perf=1: grew 8x, longest frame with a grow
-    // 1093 ms). Grow it once now, while the heap is small and the title is up: one big block taken
-    // and given back stays in the allocator's free space (wasm memory never shrinks). Only the game
-    // does this - the job workers run the same module without starting the game, and stay small.
-    if (void* reserve = std::malloc(static_cast<std::size_t>(320) << 20)) std::free(reserve);
-    const bool mobile = e.arg_number("mobile", 0) > 0;
-    if (mobile) {
-      kern::ShadowOptions s;
-      s.resolution = 1024;
-      s.extent = 70;
-      s.bias = 0.0016f;
-      s.filter = 4;
-      e.renderer().set_shadows(&s);
-      kern::AoOptions ao;
-      ao.quality = kern::AoQuality::low;
-      ao.half_resolution = true;
-      e.renderer().set_ambient_occlusion(ao);
-    } else {
-      kern::AoOptions ao;
-      ao.quality = kern::AoQuality::medium;
-      ao.half_resolution = false;
-      e.renderer().set_ambient_occlusion(ao);
-    }
     return sc::game().start(e);
   }
   void update(kern::Engine& e, const kern::Frame& f) override { sc::game().update(e, f); }

@@ -1262,6 +1262,48 @@ TEST(game_euler_and_transforms) {
   CHECK(!game::parse_hex_color("ff8000", c) && !game::parse_hex_color("#ggg000", c));
 }
 
+// The project's settings (kern/app/project.h): a level without them writes none and starts as the App says; with
+// them they round-trip as written (a 32-bit number as its decimal), stand before the world (a program reads them
+// first), and a phone's part starts from the desktop's shadows.
+TEST(game_level_project_settings) {
+  game::Level l = game::basic_level();
+  CHECK(!l.project.set && game::to_text(l).find("\"project\"") == std::string::npos);
+  l.project.set = true;
+  l.project.renderer.shadows = true;
+  l.project.renderer.shadow.resolution = 2048;
+  l.project.renderer.shadow.extent = 110;
+  l.project.renderer.shadow.bias = 0.0014f;
+  l.project.renderer.ao.quality = AoQuality::medium;
+  l.project.renderer.ao.half_resolution = false;
+  l.project.mobile_set = true;
+  l.project.mobile_shadow.resolution = 1024;
+  l.project.mobile_shadow.bias = 0.0016f;
+  l.project.mobile_shadow.filter = 4;
+  l.project.mobile_ao.quality = AoQuality::low;
+  l.project.heap_reserve_mb = 320;
+  const std::string text = game::to_text(l);
+  CHECK(text.find("\"project\"") < text.find("\"world\""));
+  CHECK(text.find("0.0014,") != std::string::npos);
+  game::Level back;
+  std::string error;
+  CHECK(game::from_text(text, back, &error));
+  CHECK(game::to_text(back) == text);
+  const ProjectSettings& p = back.project;
+  CHECK(p.set && p.renderer.shadows && p.renderer.shadow.resolution == 2048 && p.renderer.shadow.extent == 110 && p.renderer.shadow.bias == 0.0014f);
+  CHECK(p.renderer.ao.quality == AoQuality::medium && !p.renderer.ao.half_resolution && p.renderer.bloom.enabled && p.renderer.grade);
+  CHECK(p.mobile_set && p.mobile_shadow.resolution == 1024 && p.mobile_shadow.bias == 0.0016f && p.mobile_shadow.filter == 4 && p.mobile_ao.quality == AoQuality::low);
+  CHECK(p.heap_reserve_mb == 320);
+  // The member alone, as a program carries it (kern_project_text): a phone's part takes the desktop's shadows
+  // where it names none; nothing, or no object, is no settings.
+  ProjectSettings q;
+  CHECK(project_from_text("{\"renderer\":{\"shadow\":{\"extent\":90}},\"mobile\":{\"ao\":{\"quality\":\"low\"}},\"heapReserveMb\":64}", q));
+  CHECK(q.set && q.renderer.shadow.extent == 90 && q.mobile_set && q.mobile_shadow.extent == 90 && q.mobile_ao.quality == AoQuality::low && q.heap_reserve_mb == 64);
+  CHECK(!project_from_text("", q) && !q.set);
+  CHECK(!project_from_text("[1]", q) && !q.set);
+  CHECK(!project_from_text("{broken", q) && !q.set);
+  CHECK(project_from_text("{\"heapReserveMb\":-5}", q) && q.heap_reserve_mb == 0);
+}
+
 TEST(game_level_round_trip_and_validation) {
   game::Level l = game::physics_lab_level();
   const std::string text = game::to_text(l);
