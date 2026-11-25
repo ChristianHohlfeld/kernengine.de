@@ -404,11 +404,23 @@ Kleber, über den die Engine sie beim Namen erreicht; `tools/blueprint_cpp.sh le
 schreibt dasselbe für alle Blueprints eines Levels, und ein Spiel, das `out.cpp` einbindet, führt
 sie als kompilierten Code aus (Stufe „native C++“).
 
+### Blätter
+
+Jeder Blueprint wird Blatt für Blatt gezeigt, unabhängig von seiner Größe: ein Blatt je Funktion (ihr Rumpf) und
+ein Blatt der Events (alles, was in keiner Funktion steht). Es gibt keine Schwelle, ab der sich die Ansicht ändert.
+Welches Blatt offen ist, merkt sich der Editor **je Blueprint** (`Studio::logic_sheets_`): wer zu einem anderen
+Blueprint wechselt und zurückkommt, findet sein Blatt wieder – und ein anderer Blueprint öffnet nie auf einer Funktion
+gleichen Namens. Eine neue Funktion öffnet ihr eigenes Blatt; ein Knoten, der auf ein Blatt gesetzt wird und noch an
+keiner Funktion hängt, bleibt auf diesem Blatt (`Studio::logic_loose_`, nur für die laufende Sitzung). Find
+(`logicFind`) sucht in allen Blättern, `logicReveal` öffnet das Blatt eines Knotens. Geprüft:
+`studio_blueprint_sheets`, `kern/tests/e2e/blueprint_e2e.mjs`.
+
 ### Funktionen
 
 Eine Funktion hat einen Namen, typisierte Eingänge und typisierte Ausgänge. Angelegt wird sie mit
 **+** bei *Functions* in My Blueprint (oder „New Function“ im Aktionsmenü); Details zeigt dann Name,
-*Pure*, Beschreibung und die Pins.
+*Pure*, *Overrides* (bei einem Blueprint, der eine Schnittstelle der Engine implementiert: die Engine ruft diese
+Funktion – `KERN_OVERRIDE`), Beschreibung und die Pins.
 
 - Der Rumpf beginnt am Knoten **Function Entry** (die Eingänge kommen dort heraus; jede Funktion
   hat genau einen, er verschwindet nur mit der Funktion) und endet an einem **Return**-Knoten, der

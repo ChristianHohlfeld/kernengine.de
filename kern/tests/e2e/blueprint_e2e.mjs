@@ -46,12 +46,15 @@ await page.click('.lg-sec[data-sec="fns"] [data-add]');
 check(await until(async () => (await logic()).functions?.length === 1), "+ in Functions adds a function");
 let l = await logic();
 check(l.nodes.some(n => n.type === "func.entry") && l.nodes.some(n => n.type === "func.return") && l.links.length === 1, "with its entry and a Return wired to it");
+// (every Blueprint is shown sheet by sheet: the new function opens on its own sheet - its body, nothing else)
+check(l.sheet === l.functions[0].name && l.sheets?.length === 1 && l.nodes.length === 2, `the new function's sheet is open (${l.sheet})`);
 // Details shows the function with its name ready to type over
 const name = page.locator('.lg-dbody [data-fk="name"], [data-fk="name"]').first();
 check(await until(async () => await name.count() === 1), "Details shows the function");
 await name.fill("Twice");
 await name.press("Enter");
 check(await until(async () => (await logic()).functions[0].name === "Twice"), "typing renames it");
+check((await logic()).sheet === "Twice", "its sheet stays open under the new name");
 check(await until(async () => await page.locator('.lg-fn[data-fn="Twice"]').count() === 1), "My Blueprint lists it by its name");
 await page.click('[data-act="fn-in"]');
 await page.click('[data-act="fn-out"]');
@@ -602,8 +605,8 @@ await cmd({cmd: "logicClose"});
 // ---- 2. SpawnCity's level file -------------------------------------------------------------------
 // The whole project first: every Blueprint of the level file, the folder "Source" with it - the Blueprints written
 // from the game's C++ (the Blueprint Game has every function of ~40 files, tens of thousands of nodes). The editor
-// opens each one (step 6 of kern/games/spawncity/BLUEPRINTS.md, "the project loads in the editor"): a Blueprint
-// too large for one canvas shows a function's body at a time - its largest is opened too. Then the level as the
+// opens each one (step 6 of kern/games/spawncity/BLUEPRINTS.md, "the project loads in the editor"): every Blueprint
+// is shown sheet by sheet - it opens on its events, and its largest function's sheet is opened too. Then the level as the
 // built game carries it (kern/games/spawncity/build.sh: without "Source"), and Play runs that.
 const levelText = await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text();
 let withBlueprint = [];
@@ -636,7 +639,9 @@ for (const whole of [true, false]) {
     let l = await logic();
     const issues = errorsOf(l);
     let ok = issues.length === 0 && l.nodes.every(n => n.title);
-    if (l.sheets?.length) {
+    // (it opens on the sheet of its events: what stands in no function, and nothing else)
+    ok = ok && Array.isArray(l.sheets) && l.sheet === "" && l.nodes.length === l.sheetEvents;
+    if (l.sheets.length) {
       // (sheets: what is shown is one function's body - the largest one is drawn too, and it is that function's)
       const largest = l.sheets.reduce((x, y) => (y.nodes > x.nodes ? y : x));
       await cmd({cmd: "logicSheet", function: largest.name});

@@ -12460,9 +12460,11 @@ TEST(micro_duck_example_level_runs) {
   CHECK(f.world->walker_state(l.world.player) != "Idle");  // autonomous
 }
 
-// A Blueprint too large for one canvas (logic_edit.cpp, kCanvasNodes) shows one function's body at a time: the
-// editor's state has the nodes and wires of that sheet only, the lists every node shares once, and what the page
-// needs of the others as counts. Opening such a Blueprint took time with the square of its nodes before.
+// Every Blueprint is shown sheet by sheet, whatever its size (logic_edit.cpp, logic_json): one function's body at a
+// time, the events on a sheet of their own - the editor's state has the nodes and wires of that sheet only, the lists
+// every node shares once, and what the page needs of the others as counts. The sheet that is open is kept for each
+// owner: back at a Blueprint its sheet is open again, and another Blueprint with a function of the same name does not
+// open on it.
 TEST(studio_blueprint_sheets) {
   StudioFixture f;
   CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
@@ -12504,6 +12506,18 @@ TEST(studio_blueprint_sheets) {
   json::Value level;
   CHECK(json::parse(game::to_text(f.s->level()), level));
   level.set("logic", std::move(g));
+  // (an actor whose Blueprint has a function of the same name, F7)
+  CHECK(level["actors"].is_array() && level["actors"].size() > 0);
+  const u32 other = level["actors"].size() > 0 ? static_cast<u32>(level["actors"][0]["id"].as_number()) : 0;
+  json::Value small;
+  CHECK(json::parse(R"({"functions":[{"name":"F7"}],"nodes":[{"id":1,"type":"event.begin"},{"id":10,"type":"func.entry","params":{"function":"F7"}},)"
+                    R"({"id":11,"type":"func.return","params":{"function":"F7"}}],"links":[[10,"then",11,"exec"]]})", small));
+  if (json::Value* actors = level.find("actors"); actors && actors->size() > 0) {
+    json::Value& first = actors->at(0);
+    json::Value* parts = first.find("components");
+    if (!parts) parts = &first.set("components", json::Value::object());
+    parts->set("logic", std::move(small));
+  }
   json::Value open = json::Value::object();
   open.set("cmd", "open"); open.set("text", json::stringify(level)); open.set("name", "sheets.klevel");
   CHECK(f.s->command(open)["ok"].as_bool());
@@ -12543,12 +12557,29 @@ TEST(studio_blueprint_sheets) {
   CHECK(f.cmd(R"({"cmd":"logicReveal","node":1})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["sheet"].as_string().empty());
   CHECK(!f.cmd(R"({"cmd":"logicReveal","node":999999})")["ok"].as_bool());
-  // a small Blueprint shows all of itself: no sheets
+  // the open sheet is the owner's: the other Blueprint opens on its own (the events), not on its F7; back at the
+  // level, F7 is open again
+  CHECK(f.cmd(R"({"cmd":"logicSheet","function":"F7"})")["ok"].as_bool());
+  json::Value to_other = json::Value::object();
+  to_other.set("cmd", "logicOpen"); to_other.set("owner", other);
+  CHECK(other != 0 && f.s->command(to_other)["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["owner"].as_number() == other && l["sheet"].as_string().empty() && l["sheets"].size() == 1 && l["nodes"].size() == 1);
+  CHECK(f.cmd(R"({"cmd":"logicSheet","function":"F7"})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["sheet"].as_string() == "F7" && l["nodes"].size() == 2 && l["links"].size() == 1);
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["owner"].as_number() == 0 && l["sheet"].as_string() == "F7" && l["nodes"].size() == 42);
+  // a small Blueprint is shown sheet by sheet as well: no size switches how it is shown
   CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"logicTemplate","template":"robot_avoid"})")["ok"].as_bool());
   l = f.s->state()["logic"];
-  CHECK(l["sheets"].is_null() && l["nodes"].size() == 9 && l["counts"]["nodes"].as_number() == 9);
+  CHECK(l["sheets"].is_array() && l["sheet"].as_string().empty() && l["counts"]["nodes"].as_number() == 9);
+  std::size_t events = 0;
+  for (const logic::Node& n : f.s->level().logic.nodes) events += f.s->level().logic.bodies(logic::library()).count(n.id) ? 0 : 1;
+  CHECK(l["nodes"].size() == events && l["sheets"].size() == f.s->level().logic.functions.size());
 }
 
 TEST(studio_robot_template_compiles) {
