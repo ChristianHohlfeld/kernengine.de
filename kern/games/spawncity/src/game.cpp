@@ -18,6 +18,7 @@
 #include "kern/core/base.h"
 #include "kern/core/json.h"
 #include "kern/logic/logic.h"
+#include "kern/logic/node_type.h"
 #include "rules.h"
 
 namespace sc {
@@ -82,25 +83,23 @@ kern::game::Actor vehicle_actor(const char* name, const RigidSpec& spec, Vec3 po
 
 }  // namespace
 
-// (a method of the one Game: what it keeps from one call to the next - done - is a variable of its Blueprint, and the node type
-// is its Blueprint's Event Tick - the converter, node_registrations)
+/// The game's fixed-step node: the vehicle force models in every fixed physics step (Box3D clears forces after each
+/// step) - a type of node that an object is (kern/logic/node_type.h). Its node stands in the level's graph (build_level),
+/// so it runs first in each tick, before the actors' Blueprints.
+class FixedStepNode final : public kern::logic::NodeType {
+ public:
+  std::string type() const override { return kNodeType; }
+  std::string label() const override { return "SpawnCity Fixed Step"; }
+  std::string event() const override { return "logic.tick"; }
+  std::string category() const override { return "SpawnCity"; }
+  std::string help() const override { return "Runs the game's vehicle force models in every fixed physics step (Box3D clears forces after each step)."; }
+  void run() override { game().fixed_step(1.0f / kStepHz); }
+};
+
+// (a method of the one Game; the engine registers a type once - a second call gives the first)
 void Game::register_node() {
-  static bool done = false;
-  if (done) return;
-  done = true;
-  kern::logic::NodeDef d;
-  d.type = kNodeType;
-  d.label = "SpawnCity Fixed Step";
-  d.category = "SpawnCity";
-  d.help = "Runs the game's vehicle force models in every fixed physics step (Box3D clears forces after each step).";
-  d.kind = kern::logic::NodeKind::event;
-  d.event = "logic.tick";
-  d.accepts = [](const kern::logic::Node&, const kern::logic::Event&) { return true; };
-  d.run = [](kern::logic::Context&) {
-    game().fixed_step(1.0f / kStepHz);
-    return kern::logic::kStop;
-  };
-  kern::logic::library().add(std::move(d));
+  static FixedStepNode node;
+  kern::logic::register_node_type(&node);
 }
 
 namespace {

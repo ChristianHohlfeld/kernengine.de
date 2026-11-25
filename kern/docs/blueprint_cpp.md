@@ -1536,12 +1536,19 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   Klasse es liest), ein Objekt der Engine als Handle in den `EngineObjects` der Klasse; was sie gibt, mit `Direct::from`.
   Eine reine, die die Klasse nicht hat, sagt der Compiler. Kein Wert, kein Name dazwischen. Geprüft:
   `engine_interface_a_class_implements`.
-- **Ein Knotentyp des Programms** (`kern::logic::NodeDef` mit `kind = NodeKind::event`, festem `event`, `accepts`, das
-  immer wahr gibt, und `run` ohne Fang, das mit `kStop` endet, angemeldet mit `kern::logic::library().add`) ist im
-  Blueprint kein Wert, sondern ein **Ereignis** des Blueprints, dessen Funktion ihn anmeldet: `logic.tick` →
-  `KERN_EVENT(onN, event_tick)`, sein Rumpf die Schritte von `run` (Konverter: `Body.node_registrations`; die
-  Anmeldung steht nicht mehr im Rumpf). Vorausgesetzt ist, dass das Programm den Knoten in sein Level legt (beim
-  Umschalten fällt dieser Knoten aus dem Level: das Ereignis ist er). Jede andere Form wartet mit Grund.
+- **Ein Knotentyp aus einem Objekt** (`kern/logic/node_type.h`): eine Klasse, die `kern::logic::NodeType` ist (`type`,
+  `label`, `event`, `run`), meldet `kern::logic::register_node_type(&objekt)` als Knotentyp an – sein `run` ruft das
+  Objekt (ein Blueprint der Programm-Laufzeit über den Adapter). Der Konverter macht aus einer Anmeldung keinen
+  `NodeDef` und kein Ereignis mehr: der Knoten bleibt im Level-Graphen der Welt (Reihenfolge der Ticks wie heute).
+  Geprüft: `node_type_of_an_object`.
+- **Die App aus dem Level** (`kern/game/level_app.h`): ein Programm ohne eigenes `kern_create_app()` bekommt das der
+  App-Laufzeit (schwach): `kern_level_app` liest das Level, das das Programm trägt (`kern_level_text()`), und startet
+  EINE Logik-Laufzeit nur für die Blueprints des Ordners, den das Projekt als Programm nennt (`"project": {"program":
+  "<Ordner>"}`, `ProjectSettings::program`) – ohne Welt, ohne Renderer; die Bibliotheken, die sie nutzen, kommen aus dem
+  ganzen Level. Begin Play läuft, die App ist das Objekt der Engine des einen Blueprints dort, der `App` implementiert.
+  Nennt das Projekt kein Programm, keinen Blueprint im Ordner oder nicht genau eine App, gibt es keine App, und das Log
+  sagt warum (kein Ordner ist das Programm nur durch seinen Namen). Die Welten startet das Programm selbst
+  (GameWorld als Objekt der Engine): jede ist eine Laufzeit neben der des Programms. Geprüft: `app_from_the_level`.
 - **Zeiger und Referenzen:** was die Engine durch einen Zeiger mit einem `Count` daneben gibt, ist eine Liste
   (`send(to, const u8* data, Count<1> bytes)`); was die Funktion durch eine Referenz schreibt (`Address& from`), ist ein
   Eingang und ein Ausgang – gesetzt auf das, was der Blueprint gibt; was sie durch einen Zeiger mit Count schreibt

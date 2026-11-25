@@ -3731,7 +3731,6 @@ class Emit:
             f.mutates = f.ctor = True
         if "&" in ret and not re.search(r"\bconst\b", ret):
             raise Wait("a function that gives a reference to something to change")
-        registered = self.node_registrations(d)   # (a node type of the program: an event of its Blueprint - taken out of the body)
         self.lifetimes(d)
         body = next(c for c in kids(d) if c.get("kind") == "CompoundStmt")
         self.dissolve(d)   # (a call of a function that names a place: the place)
@@ -3864,15 +3863,6 @@ class Emit:
         lines += self.block(kids(body))
         if not self.ends(kids(body)) and f.ctor:
             lines.append(self.ret_line(None))
-        events = []
-        for handler, ins, run in registered:
-            held = len(self.locals)
-            steps = self.block(run)
-            if len(self.locals) > held:
-                raise Wait("the run of a node type of the program needs local variables (an event has none)")
-            node = u.next_node
-            u.next_node += 1
-            events += ["", f"  KERN_EVENT(on{node}, {handler})", f"  void on{node}({ins}) {{", *["    " + x for x in steps], "  }"]
         head = []
         doc = u.comment_of(d)
         if f.result is not None:
@@ -3919,114 +3909,8 @@ class Emit:
                 node = u.next_node
                 u.next_node += 1
                 out += ["", f"  KERN_EVENT(on{node}, event_end)", f"  void on{node}() {{", *["    " + x for x in ended], "  }"]
-        out += events
         f.local_names = set(self.taken)   # (its inputs and local variables: see convert_unit)
         f.text = "\n".join(out)
-
-    # The events of the language a node type of the program can be (NodeDef::event): its handler, and its inputs.
-    NODE_EVENTS = {"logic.tick": ("event_tick", "Float delta")}
-
-    def node_registrations(self, d):
-        """A node type the program adds to the language (`kern::logic::NodeDef d; d.type = ...; d.kind = NodeKind::event;
-        d.event = "logic.tick"; d.accepts = [](...) { return true; }; d.run = [](Context&) { ...; return kStop; };
-        kern::logic::library().add(std::move(d));`): in a Blueprint it is no value but an event of the Blueprint the
-        function is a function of, which runs what `run` runs (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine":
-        Entscheidung E-c2, register_node). Such statements are taken out of the body; [(handler, its inputs, the
-        statements of `run`)] - one for each. A NodeDef of any other form waits."""
-        body = next((c for c in kids(d) if c.get("kind") == "CompoundStmt"), None)
-        if body is None:
-            return []
-        logic = ENGINE + "::logic::"
-        def bare(x):
-            while x.get("kind") in ("ExprWithCleanups", "ImplicitCastExpr", "MaterializeTemporaryExpr", "CXXBindTemporaryExpr", "ParenExpr", "CXXFunctionalCastExpr") and kids(x):
-                x = kids(x)[-1] if x.get("kind") == "CXXFunctionalCastExpr" else kids(x)[0]
-            if x.get("kind") == "CXXConstructExpr" and len(kids(x)) == 1:
-                return bare(kids(x)[0])
-            return x
-        defs = {}
-        for st in kids(body):
-            if st.get("kind") == "DeclStmt" and len(kids(st)) == 1 and kids(st)[0].get("kind") == "VarDecl" and \
-                    re.sub(r"^const\s+", "", qtype(kids(st)[0])).strip() == logic + "NodeDef":
-                defs[kids(st)[0]["id"]] = {"decl": st, "fields": {}, "stmts": [st]}
-        if not defs:
-            return []
-        def of_def(x):
-            x = bare(x)
-            return defs.get((x.get("referencedDecl") or {}).get("id")) if x.get("kind") == "DeclRefExpr" else None
-        added = []
-        for st in kids(body):
-            if any(st is r["decl"] for r in defs.values()):
-                continue
-            e = bare(st)
-            target = value = None
-            if e.get("kind") == "BinaryOperator" and e.get("opcode") == "=" and len(kids(e)) == 2:
-                target, value = kids(e)
-            elif e.get("kind") == "CXXOperatorCallExpr" and callee_name(e) == "operator=" and len(kids(e)) == 3:
-                target, value = kids(e)[1], kids(e)[2]
-            if target is not None:
-                t = bare(target)
-                r = of_def(kids(t)[0]) if t.get("kind") == "MemberExpr" and kids(t) else None
-                if r is not None:
-                    r["fields"][t.get("name")] = bare(value)
-                    r["stmts"].append(st)
-                    continue
-            if e.get("kind") == "CXXMemberCallExpr" and callee(e).get("name") == "add" and len(kids(e)) == 2:
-                base = bare(kids(callee(e))[0]) if kids(callee(e)) else {}
-                arg = bare(kids(e)[1])
-                if arg.get("kind") == "CallExpr" and callee_name(arg) == "move" and len(kids(arg)) == 2:
-                    arg = kids(arg)[1]
-                r = of_def(arg)
-                if r is not None and base.get("kind") == "CallExpr" and callee_name(base) == "library" and \
-                        (self.tree.decl.get((callee(base).get("referencedDecl") or {}).get("id")) or {}).get("_q", logic + "library").startswith(logic):
-                    r["stmts"].append(st)
-                    added.append(r)
-                    continue
-            for x in walk(st):
-                if of_def(x) is not None:
-                    raise Wait("a node type of the program (NodeDef) used otherwise than set field by field and added to the language")
-        out = []
-        for r in defs.values():
-            if r not in added:
-                raise Wait("a node type of the program (NodeDef) that is not added to the language")
-            f = r["fields"]
-            extra = sorted(set(f) - {"type", "label", "category", "help", "kind", "event", "accepts", "run"})
-            if extra:
-                raise Wait(f"a node type of the program with {', '.join(extra)} (only an event that runs steps is an event of its Blueprint)")
-            kind = f.get("kind")
-            if kind is None or (kind.get("referencedDecl") or {}).get("name") != "event":
-                raise Wait("a node type of the program that is no event")
-            event = f.get("event")
-            if event is None or event.get("kind") != "StringLiteral" or json.loads(event.get("value", '""')) not in self.NODE_EVENTS:
-                raise Wait("a node type of the program for an event that is no event of a Blueprint: " + (event or {}).get("value", "?"))
-            handler, ins = self.NODE_EVENTS[json.loads(event["value"])]
-            def lambda_body(x, what):
-                if x is None or x.get("kind") != "LambdaExpr":
-                    raise Wait(f"a node type of the program whose {what} is no lambda")
-                parts = kids(x)
-                if len(parts) != 2 or parts[0].get("kind") != "CXXRecordDecl" or parts[1].get("kind") != "CompoundStmt":
-                    raise Wait(f"a node type of the program whose {what} captures something")
-                return parts[1]
-            accepts = f.get("accepts")
-            if accepts is not None:
-                a = kids(lambda_body(accepts, "accepts"))
-                lit = bare(kids(a[0])[0]) if len(a) == 1 and a[0].get("kind") == "ReturnStmt" and kids(a[0]) else {}
-                if lit.get("kind") != "CXXBoolLiteralExpr" or lit.get("value") is not True:
-                    raise Wait("a node type of the program that accepts only some events (an event of a Blueprint runs on every one)")
-            run = kids(lambda_body(f.get("run"), "run"))
-            last = run[-1] if run else {}
-            stop = bare(kids(last)[0]) if last.get("kind") == "ReturnStmt" and kids(last) else {}
-            if (stop.get("referencedDecl") or {}).get("name") != "kStop":
-                raise Wait("a node type of the program whose run goes on to another node (it does not end with kStop)")
-            steps = run[:-1]
-            if any(x.get("kind") == "ReturnStmt" for st in steps for x in walk(st)):
-                raise Wait("a node type of the program whose run ends in the middle")
-            params = [x for x in walk(f["run"]) if x.get("kind") == "ParmVarDecl"]
-            if any(x.get("kind") == "DeclRefExpr" and (x.get("referencedDecl") or {}).get("id") in {p_["id"] for p_ in params} for st in steps for x in walk(st)):
-                raise Wait("a node type of the program whose run reads what its node is handed (the Context)")
-            out.append((handler, ins, steps))
-        taken = {id(st) for r in defs.values() for st in r["stmts"]}
-        body["inner"] = [st for st in kids(body) if id(st) not in taken]
-        return out
 
     def ret_line(self, value):
         """The return of the function: what the C++ returns as it is at this place (a constructor: the object)."""
@@ -11537,6 +11421,17 @@ class Emit:
 # ---- the engine as nodes -----------------------------------------------------------------------------
 # Not the engine a game calls: the Blueprint language itself, the engine's own helpers.
 ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
+# ... but what of them is the engine's like any other part: the type of node an object is (kern/logic/node_type.h) - a
+# program's class or a Blueprint implements it, the program registers it
+ENGINE_KEEP = ("kern::logic::NodeType", "kern::logic::register_node_type")
+
+
+def engine_skipped(q):
+    """Is the qualified name q (a class, a function, or the scope of a declaration) one of the engine's own helpers
+    (ENGINE_SKIP) - not one ENGINE_KEEP keeps?"""
+    if any(q == k or q.startswith(k + "::") for k in ENGINE_KEEP):
+        return False
+    return any((q + "::").startswith(s) or q.startswith(s) for s in ENGINE_SKIP)
 # Functions that give something and change something (the rule below would call them values).
 ENGINE_STEPS = {"kern::jobs::submit", "kern::jobs::take", "kern::fail_text"}
 # (a u64 or an i64 the engine takes or gives - a mask of bits, a key, a counter of 64 bits - is an Int64 pin: 64
@@ -11687,7 +11582,7 @@ class Api:
         if d["id"] in self.tree.body and not self.of_object(d):
             return False
         scope = self.tree.scope_of.get(d["id"], "")
-        if not scope.startswith(ENGINE + "::") or any((scope + "::").startswith(s) or scope.startswith(s) for s in ENGINE_SKIP):
+        if not scope.startswith(ENGINE + "::") or engine_skipped(scope) and engine_skipped(scope.rstrip(":") + "::" + (d.get("name") or "")):
             return False
         if d.get("previousDecl") or d["id"] in self.tree.template_of or not d.get("name") or d["name"].startswith("operator") or "(anonymous" in scope:
             return False
@@ -11750,7 +11645,7 @@ class Api:
         not copied: the engine's object is one), of a class that is an object of the engine and not
         abstract. (None for any other class.)"""
         rec = self.tree.records.get(q)
-        if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or any((q + "::").startswith(s) for s in ENGINE_SKIP):
+        if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or engine_skipped(q):
             return []
         if not self.reachable(q):
             return []   # (a class declared where no one outside it sees it - Renderer::Texture: the engine's own)
@@ -11835,7 +11730,7 @@ class Api:
 
     def fields1(self, q):
         rec = self.tree.records.get(q)
-        if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or any((q + "::").startswith(s) for s in ENGINE_SKIP) or not self.reachable(q):
+        if rec is None or not q.startswith(ENGINE + "::") or not self.opaque(q) or engine_skipped(q) or not self.reachable(q):
             return []
         group = snake(q.split("::")[-1])
         out, access = [], "private" if rec.get("tagUsed") == "class" else "public"

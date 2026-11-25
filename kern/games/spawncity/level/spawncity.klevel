@@ -41,7 +41,8 @@
     "adaptive": true
    }
   },
-  "heapReserveMb": 320
+  "heapReserveMb": 320,
+  "program": "Program"
  },
  "world": {
   "channels": "World, Vehicle, Drone, Query",

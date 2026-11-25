@@ -7954,8 +7954,104 @@ TEST(engine_object_of_a_blueprint) {
   host.objects.clear();
 }
 
+// A type of node that an object is (kern/logic/node_type.h): register_node_type adds it to library() - an event node
+// where its event is named, an action otherwise - and a node of it runs the object's run, wherever the graph runs. The
+// object may be the program's C++ or the object of the engine of a Blueprint that implements logic_NodeType: then its
+// run is that Blueprint's, in the runtime it lives in (the program's), while the node stands in another one's graph
+// (the world's level graph) and runs there in the order Runtime::fire gives - first in the tick, as the level's own.
+TEST(node_type_of_an_object) {
+  struct Counting final : logic::NodeType {
+    int runs = 0;
+    std::string type() const override { return "test.counting"; }
+    std::string label() const override { return "Counting"; }
+    std::string event() const override { return ""; }
+    void run() override { ++runs; }
+  } counting;
+  CHECK(logic::register_node_type(&counting));
+  CHECK(logic::register_node_type(&counting));   // (the same object again: nothing changes)
+  Counting other;
+  CHECK(!logic::register_node_type(&other) && !logic::register_node_type(nullptr));   // (its type is there: the first stays)
+  const logic::NodeDef* action = logic::library().find("test.counting");
+  CHECK(action && action->kind == logic::NodeKind::action && action->label == "Counting" && action->inputs.size() == 1 && action->outputs.size() == 1);
+  // the program: a Blueprint that is a type of node (its run prints)
+  std::vector<std::string> order;   // (what both runtimes print, in order)
+  struct Host : FakeLogicHost {
+    std::vector<std::string>* order = nullptr;
+    void print(const std::string& text, bool screen) override {
+      FakeLogicHost::print(text, screen);
+      order->push_back(text);
+    }
+    logic::EngineObjects objects;
+    logic::EngineObjects* engine_objects() override { return &objects; }
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Ticker" ? 7 : 0; }
+  } program_host;
+  program_host.order = &order;
+  logic::Runtime program(program_host);
+  logic::Graph ticker;
+  std::string error;
+  CHECK(logic::from_cpp("struct Ticker : kern::Blueprint, kern::Implements<\"logic_NodeType\"> {\n"
+                        "  // ---- functions ----\n"
+                        "  struct typeResult { Text result = \"\"; };\n"
+                        "  typeResult type() {\n"
+                        "    return {\"test.ticker\"};\n"
+                        "  }\n"
+                        "\n"
+                        "  struct labelResult { Text result = \"\"; };\n"
+                        "  labelResult label() {\n"
+                        "    return {\"Ticker\"};\n"
+                        "  }\n"
+                        "\n"
+                        "  struct eventResult { Text result = \"\"; };\n"
+                        "  eventResult event() {\n"
+                        "    return {\"logic.tick\"};\n"
+                        "  }\n"
+                        "\n"
+                        "  void run() {\n"
+                        "    debug_print(\"ran\", false);\n"
+                        "  }\n"
+                        "};\n", ticker, nullptr, &error));
+  CHECK(error.empty() && ticker.implements == "logic_NodeType");
+  if (!error.empty()) std::printf("  node_type_of_an_object: %s\n", error.c_str());
+  CHECK(program.add(ticker, 7, "Ticker") != nullptr);
+  program.begin();
+  logic::NodeType* const object = program_host.objects.get<logic::NodeType>(program.engine_object(7));
+  CHECK(object != nullptr);
+  if (!object) return;
+  CHECK(logic::register_node_type(object));
+  const logic::NodeDef* tick = logic::library().find("test.ticker");
+  CHECK(tick && tick->kind == logic::NodeKind::event && tick->event == "logic.tick" && tick->label == "Ticker");
+  // the world: its level's graph holds a node of each type; an actor's Blueprint ticks after it
+  Host world_host;
+  world_host.order = &order;
+  logic::Runtime world(world_host);
+  logic::Graph level;
+  logic::Node n;
+  n.id = level.next_id++;
+  n.type = "test.ticker";
+  level.nodes.push_back(n);
+  logic::Graph actor;
+  CHECK(logic::from_cpp("struct Actor1 : kern::Blueprint {\n"
+                        "  KERN_EVENT(on1, event_tick)\n"
+                        "  void on1(Float delta) {\n"
+                        "    debug_print(\"actor\", false);\n"
+                        "  }\n"
+                        "};\n", actor, nullptr, &error));
+  world.add(level, 0, "Level");
+  world.add(actor, 3, "Actor1");
+  world.begin();
+  world.tick(0.5f);
+  world.tick(0.5f);
+  CHECK(program_host.printed.size() == 2 && program_host.printed[0] == "ran");   // (the run of the program's Blueprint)
+  CHECK(world_host.printed.size() == 2 && world_host.printed[0] == "actor");
+  const std::vector<std::string> want{"ran", "actor", "ran", "actor"};   // (the level's node first in each tick)
+  CHECK(order == want);
+  CHECK(world_host.errors.empty() && program_host.errors.empty());
+  world.end();
+  program.end();
+}
+
 // The App of a program built from a level (kern/game/level_app.h): of its level, as the program carries it (text), the
-// Blueprints of the folder Program run in one logic runtime of their own - before the renderer starts, as
+// Blueprints of the folder its project names (project.program) run in one logic runtime of their own - before the renderer starts, as
 // kern_app_start asks for the App first; no world, so no tick -, and the App is the engine's object of the one
 // Blueprint there that implements App. The engine calls it as any App: extensions before the renderer, then start,
 // update, stop - in this order. The level's own graph and the actors outside Program are the world's (not run here).
@@ -7982,6 +8078,8 @@ TEST(app_from_the_level) {
   };
   // the program: Main (implements App) and Second in the folder Program; the world: the level's graph and World
   game::Level l;
+  l.project.set = true;
+  l.project.program = "Program";   // (the project says which folder is the program)
   l.logic = ticks("Level");
   game::Actor main;
   main.name = "Main";
@@ -8063,6 +8161,9 @@ TEST(app_from_the_level) {
   game::Level two = l;
   two.actors[2].logic = two.actors[0].logic;
   CHECK(game::start_program_level(game::to_text(two)) == nullptr && game::program_runtime() == nullptr);
+  game::Level unnamed = l;   // (the project names no program: no folder is one by its name)
+  unnamed.project.program.clear();
+  CHECK(game::start_program_level(game::to_text(unnamed)) == nullptr && game::program_runtime() == nullptr);
   game::Level outside = l;
   outside.actors[0].folder.clear();
   CHECK(game::start_program_level(game::to_text(outside)) == nullptr && game::program_runtime() == nullptr);

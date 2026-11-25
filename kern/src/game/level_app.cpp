@@ -79,6 +79,11 @@ App* start_program_level(std::string_view level_text) {
     log(LogLevel::error, "the program's level is broken: %s", error.c_str());
     return nullptr;
   }
+  const std::string& folder = p->level.project.program;
+  if (folder.empty()) {
+    log(LogLevel::error, "the program's level names no program: its project has no \"program\" (the folder of its Blueprints)");
+    return nullptr;
+  }
   p->runtime = std::make_unique<logic::Runtime>(p->host);
   // (the libraries a Blueprint uses: the Blueprints of the level, by the name of the actor that has them - in
   // whatever folder they stand)
@@ -90,12 +95,12 @@ App* start_program_level(std::string_view level_text) {
   };
   bool any = false;
   for (const Actor& a : level.actors)
-    if (a.folder == kProgramFolder && a.logic && !a.logic->empty() && !a.logic->library) {
+    if (a.folder == folder && a.logic && !a.logic->empty() && !a.logic->library) {
       p->runtime->add(*a.logic, static_cast<logic::ActorRef>(a.id), a.name);
       any = true;
     }
   if (!any) {
-    log(LogLevel::error, "the program's level has no Blueprint in the folder %s", std::string(kProgramFolder).c_str());
+    log(LogLevel::error, "the program's level has no Blueprint in the folder %s (project.program)", folder.c_str());
     return nullptr;
   }
   p->runtime->begin();

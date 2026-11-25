@@ -29,6 +29,8 @@ struct ProjectSettings {
   ShadowOptions mobile_shadow;
   AoOptions mobile_ao;
   u32 heap_reserve_mb = 0;     // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
+  std::string program;         // the folder of the level whose Blueprints are the program's logic, not the world's - the App
+                               // among them (kern/game/level_app.h); "": the level says none (the program makes its App)
 };
 
 namespace project_json {
@@ -107,6 +109,7 @@ inline json::Value project_to_json(const ProjectSettings& p) {
     o.set("mobile", std::move(m));
   }
   o.set("heapReserveMb", p.heap_reserve_mb);
+  if (!p.program.empty()) o.set("program", p.program);
   return o;
 }
 
@@ -138,6 +141,7 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out) {
   }
   const f64 mb = v["heapReserveMb"].as_number(0);
   out.heap_reserve_mb = mb > 0 && mb < 4096 ? static_cast<u32>(mb) : 0;
+  out.program = v["program"].is_string() ? v["program"].as_string() : std::string();
   return true;
 }
 

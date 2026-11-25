@@ -1,12 +1,13 @@
-// The App of a program built from a level: the engine's object of the one Blueprint of the level's folder Program that
-// implements the interface App (kern::Implements<"App">, Graph::implements) - Engine Object of Blueprint
+// The App of a program built from a level: the engine's object of the one Blueprint of the level's program (the folder its
+// project names) that implements the interface App (kern::Implements<"App">, Graph::implements) - Engine Object of Blueprint
 // (Runtime::engine_object).
 //
 // A program that defines kern_create_app() makes its App itself (that one wins). One that does not gets the
 // app runtime's own (kern/src/app/app.cpp, weak): it asks kern_level_app (here), which reads the level the program
 // carries (kern_level_text(), written by the build - SpawnCity: tools/embed_level.py) once and starts the program's
-// logic: ONE runtime of the Blueprints of the folder Program (in the order of the level; the libraries they use are
-// found among all the level's actors), on a host of its own - no world, no renderer, no simulation. Its Begin Play
+// logic: ONE runtime of the Blueprints of the folder its project names (ProjectSettings::program, "program" in the
+// level's "project" - no folder is the program by its name alone), in the order of the level; the libraries they use
+// are found among all the level's actors, on a host of its own - no world, no renderer, no simulation. Its Begin Play
 // runs, and that Blueprint's object is the App: the engine calls it as any App (configure/extensions before the
 // renderer starts, start, update each frame, stop). The world the program then starts itself (a GameWorld of its
 // own level) is a second runtime beside this one, as before.
@@ -24,16 +25,13 @@ class Runtime;
 }
 namespace game {
 
-/// The folder of a level whose Blueprints are the program (the program's logic runtime) - not the world's.
-inline constexpr std::string_view kProgramFolder = "Program";
-
 /// The App a runtime's logic has: the object of the engine of the one Blueprint there whose graph implements App -
 /// null when none does or more than one does.
 App* level_app(logic::Runtime& runtime);
-/// Reads the level of `level_text`, starts the logic of its folder Program (Begin Play) and gives its App
+/// Reads the level of `level_text`, starts the logic of the folder its project names as the program (Begin Play) and gives its App
 /// (level_app); that logic is kept (program_runtime) and started once - a second call gives the App of the first.
-/// Null: a broken level, one without Blueprints in Program, or none of them (or two) implement App - then nothing
-/// is kept.
+/// Null - and the log says why: a broken level, a project that names no program, no Blueprint in that folder, or
+/// none of them (or two) implement App; then nothing is kept.
 App* start_program_level(std::string_view level_text);
 /// The program's logic runtime start_program_level started (null: none - the program made its own App).
 logic::Runtime* program_runtime();
