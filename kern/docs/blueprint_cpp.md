@@ -1496,6 +1496,12 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   (`""` für einen Text). `logic::engine_implement(objects, instance)` macht das Objekt der Engine eines laufenden
   Blueprints; das Handle nennt auch ein Objekt der Schnittstelle (was man der Engine gibt: `engine.renderer.init(…,
   extensions)`).
+- **Ein Knotentyp des Programms** (`kern::logic::NodeDef` mit `kind = NodeKind::event`, festem `event`, `accepts`, das
+  immer wahr gibt, und `run` ohne Fang, das mit `kStop` endet, angemeldet mit `kern::logic::library().add`) ist im
+  Blueprint kein Wert, sondern ein **Ereignis** des Blueprints, dessen Funktion ihn anmeldet: `logic.tick` →
+  `KERN_EVENT(onN, event_tick)`, sein Rumpf die Schritte von `run` (Konverter: `Body.node_registrations`; die
+  Anmeldung steht nicht mehr im Rumpf). Vorausgesetzt ist, dass das Programm den Knoten in sein Level legt (beim
+  Umschalten fällt dieser Knoten aus dem Level: das Ereignis ist er). Jede andere Form wartet mit Grund.
 - **Was noch wartet:** eine virtuelle Funktion, der die Engine einen Zeiger gibt oder die durch das Gegebene schreibt
   (`ShaderExtension::material_uniforms`, `net::Transport::send/receive`), hat noch keinen Weg zum Blueprint
   (`EngineVirtual::waits`): dort läuft die der Schnittstelle; ist sie rein (`Transport`), implementiert kein Blueprint die
