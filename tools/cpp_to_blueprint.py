@@ -2690,7 +2690,9 @@ class Unit:
         if f.wait:
             if (self.world.table.get(key) or {}).get("wait"):
                 self.asked.add(key)   # (it waits where it stands: should it be written later, this Blueprint is converted again - main)
-            raise Wait(f.wait if f.open else f"it calls {f.cpp}(), which waits")
+            # (its own reason stays with it: passed on as it is, a reason would go round a circle of parts and outlive
+            # its cause - the caller waits because the function waits, and leans on it where they are in a circle)
+            raise Wait(f"it calls {f.cpp}(), which waits")
         if getattr(f, "leans", False) and self.converting:
             self.asked.add(key)
             for g in self.converting:
