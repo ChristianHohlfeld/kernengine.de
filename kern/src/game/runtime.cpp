@@ -1,4 +1,5 @@
 #include "kern/game/runtime.h"
+#include "kern/game/project.h"
 #include "kern/core/dmath.h"
 
 #include "runtime_internal.h"
@@ -1237,6 +1238,8 @@ bool GameWorld::start(const Level& level, SimMode mode) {
   if (running()) stop();
   for (const Issue& i : validate(level))
     if (i.error) return fail("%s", i.text.c_str());
+  if (project_)
+    for (const std::string& c : library_conflicts(level, *project_)) return fail("%s", c.c_str());
   sync(level);
   level_ = level;
   edit_level_ = level;

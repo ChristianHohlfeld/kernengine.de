@@ -107,7 +107,6 @@ struct S_PickHit;
 struct S_PickQuery;
 struct S_PickStats;
 struct S_PointLights;
-struct S_ProjectSettings;
 struct S_Quat;
 struct S_Ray;
 struct S_RenderParams;
@@ -540,21 +539,6 @@ struct S_PointLights {
     ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::PointLights::pos_range), decltype(B::pos_range), &kern::PointLights::pos_range, &B::pos_range> pos_range;
     ev::Field<D, ev::List<ev::Float>, C, B, decltype(kern::PointLights::color_intensity), decltype(B::color_intensity), &kern::PointLights::color_intensity, &B::color_intensity> color_intensity;
     explicit Fields(D* kern_d) : count(kern_d), pos_range(kern_d), color_intensity(kern_d) { (void)kern_d; }
-  };
-};
-struct S_ProjectSettings {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::ProjectSettings& x) { const auto& [f0, f1, f2, f3, f4, f5, f6] = b; ev::Direct<ev::Bool>::from(o, f0, x.set); ev::Direct<ev::Struct<S_RendererOptions>>::from(o, f1, x.renderer); ev::Direct<ev::Bool>::from(o, f2, x.mobile_set); ev::Direct<ev::Struct<S_ShadowOptions>>::from(o, f3, x.mobile_shadow); ev::Direct<ev::Struct<S_AoOptions>>::from(o, f4, x.mobile_ao); ev::Direct<ev::Int>::from(o, f5, x.heap_reserve_mb); ev::Direct<ev::Text>::from(o, f6, x.program); }
-  template <class B> static B make(EngineObjects& o, const kern::ProjectSettings& x) { B b{ev::made<ev::Bool>(o, x.set), ev::made<ev::Struct<S_RendererOptions>>(o, x.renderer), ev::made<ev::Bool>(o, x.mobile_set), ev::made<ev::Struct<S_ShadowOptions>>(o, x.mobile_shadow), ev::made<ev::Struct<S_AoOptions>>(o, x.mobile_ao), ev::made<ev::Int>(o, x.heap_reserve_mb), ev::made<ev::Text>(o, x.program)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Bool>::pass(o, x.set); ev::Direct<ev::Struct<S_RendererOptions>>::pass(o, x.renderer); ev::Direct<ev::Bool>::pass(o, x.mobile_set); ev::Direct<ev::Struct<S_ShadowOptions>>::pass(o, x.mobile_shadow); ev::Direct<ev::Struct<S_AoOptions>>::pass(o, x.mobile_ao); ev::Direct<ev::Int>::pass(o, x.heap_reserve_mb); ev::Direct<ev::Text>::pass(o, x.program); }
-  template <class D, class C, class B> struct Fields {
-    ev::Field<D, ev::Bool, C, B, decltype(kern::ProjectSettings::set), decltype(B::set), &kern::ProjectSettings::set, &B::set> set;
-    ev::Field<D, ev::Struct<S_RendererOptions>, C, B, decltype(kern::ProjectSettings::renderer), decltype(B::renderer), &kern::ProjectSettings::renderer, &B::renderer> renderer;
-    ev::Field<D, ev::Bool, C, B, decltype(kern::ProjectSettings::mobile_set), decltype(B::mobile_set), &kern::ProjectSettings::mobile_set, &B::mobile_set> mobile_set;
-    ev::Field<D, ev::Struct<S_ShadowOptions>, C, B, decltype(kern::ProjectSettings::mobile_shadow), decltype(B::mobile_shadow), &kern::ProjectSettings::mobile_shadow, &B::mobile_shadow> mobile_shadow;
-    ev::Field<D, ev::Struct<S_AoOptions>, C, B, decltype(kern::ProjectSettings::mobile_ao), decltype(B::mobile_ao), &kern::ProjectSettings::mobile_ao, &B::mobile_ao> mobile_ao;
-    ev::Field<D, ev::Int, C, B, decltype(kern::ProjectSettings::heap_reserve_mb), decltype(B::heap_reserve_mb), &kern::ProjectSettings::heap_reserve_mb, &B::heap_reserve_mb> heap_reserve_mb;
-    ev::Field<D, ev::Text, C, B, decltype(kern::ProjectSettings::program), decltype(B::program), &kern::ProjectSettings::program, &B::program> program;
-    explicit Fields(D* kern_d) : set(kern_d), renderer(kern_d), mobile_set(kern_d), mobile_shadow(kern_d), mobile_ao(kern_d), heap_reserve_mb(kern_d), program(kern_d) { (void)kern_d; }
   };
 };
 struct S_Quat {
@@ -1324,9 +1308,9 @@ struct S_game_JointComponent {
   };
 };
 struct S_game_Level {
-  template <class B> static void from(EngineObjects& o, const B& b, kern::game::Level& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::Struct<S_game_WorldSettings>>::from(o, f1, x.world); ev::Direct<ev::List<ev::Struct<S_game_Actor>>>::from(o, f2, x.actors); ev::Direct<ev::List<ev::Int>>::from(o, f3, x.textures); ev::Direct<ev::List<ev::Int>>::from(o, f4, x.sounds); ev::Direct<ev::List<ev::Int>>::from(o, f5, x.motions); ev::Direct<ev::Struct<S_logic_Graph>>::from(o, f6, x.logic); ev::Direct<ev::Struct<S_game_EditorCamera>>::from(o, f7, x.camera); ev::Direct<ev::Int>::from(o, f8, x.next_id); ev::Direct<ev::Struct<S_ProjectSettings>>::from(o, f9, x.project); }
-  template <class B> static B make(EngineObjects& o, const kern::game::Level& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::Struct<S_game_WorldSettings>>(o, x.world), ev::made<ev::List<ev::Struct<S_game_Actor>>>(o, x.actors), ev::made<ev::List<ev::Int>>(o, x.textures), ev::made<ev::List<ev::Int>>(o, x.sounds), ev::made<ev::List<ev::Int>>(o, x.motions), ev::made<ev::Struct<S_logic_Graph>>(o, x.logic), ev::made<ev::Struct<S_game_EditorCamera>>(o, x.camera), ev::made<ev::Int>(o, x.next_id), ev::made<ev::Struct<S_ProjectSettings>>(o, x.project)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8, f9] = b; return b; }
-  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::Struct<S_game_WorldSettings>>::pass(o, x.world); ev::Direct<ev::List<ev::Struct<S_game_Actor>>>::pass(o, x.actors); ev::Direct<ev::List<ev::Int>>::pass(o, x.textures); ev::Direct<ev::List<ev::Int>>::pass(o, x.sounds); ev::Direct<ev::List<ev::Int>>::pass(o, x.motions); ev::Direct<ev::Struct<S_logic_Graph>>::pass(o, x.logic); ev::Direct<ev::Struct<S_game_EditorCamera>>::pass(o, x.camera); ev::Direct<ev::Int>::pass(o, x.next_id); ev::Direct<ev::Struct<S_ProjectSettings>>::pass(o, x.project); }
+  template <class B> static void from(EngineObjects& o, const B& b, kern::game::Level& x) { const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::Struct<S_game_WorldSettings>>::from(o, f1, x.world); ev::Direct<ev::List<ev::Struct<S_game_Actor>>>::from(o, f2, x.actors); ev::Direct<ev::List<ev::Int>>::from(o, f3, x.textures); ev::Direct<ev::List<ev::Int>>::from(o, f4, x.sounds); ev::Direct<ev::List<ev::Int>>::from(o, f5, x.motions); ev::Direct<ev::Struct<S_logic_Graph>>::from(o, f6, x.logic); ev::Direct<ev::Struct<S_game_EditorCamera>>::from(o, f7, x.camera); ev::Direct<ev::Int>::from(o, f8, x.next_id); }
+  template <class B> static B make(EngineObjects& o, const kern::game::Level& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::Struct<S_game_WorldSettings>>(o, x.world), ev::made<ev::List<ev::Struct<S_game_Actor>>>(o, x.actors), ev::made<ev::List<ev::Int>>(o, x.textures), ev::made<ev::List<ev::Int>>(o, x.sounds), ev::made<ev::List<ev::Int>>(o, x.motions), ev::made<ev::Struct<S_logic_Graph>>(o, x.logic), ev::made<ev::Struct<S_game_EditorCamera>>(o, x.camera), ev::made<ev::Int>(o, x.next_id)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4, f5, f6, f7, f8] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::Struct<S_game_WorldSettings>>::pass(o, x.world); ev::Direct<ev::List<ev::Struct<S_game_Actor>>>::pass(o, x.actors); ev::Direct<ev::List<ev::Int>>::pass(o, x.textures); ev::Direct<ev::List<ev::Int>>::pass(o, x.sounds); ev::Direct<ev::List<ev::Int>>::pass(o, x.motions); ev::Direct<ev::Struct<S_logic_Graph>>::pass(o, x.logic); ev::Direct<ev::Struct<S_game_EditorCamera>>::pass(o, x.camera); ev::Direct<ev::Int>::pass(o, x.next_id); }
   template <class D, class C, class B> struct Fields {
     ev::Field<D, ev::Text, C, B, decltype(kern::game::Level::name), decltype(B::name), &kern::game::Level::name, &B::name> name;
     ev::Field<D, ev::Struct<S_game_WorldSettings>, C, B, decltype(kern::game::Level::world), decltype(B::world), &kern::game::Level::world, &B::world> world;
@@ -1337,8 +1321,7 @@ struct S_game_Level {
     ev::Field<D, ev::Struct<S_logic_Graph>, C, B, decltype(kern::game::Level::logic), decltype(B::logic), &kern::game::Level::logic, &B::logic> logic;
     ev::Field<D, ev::Struct<S_game_EditorCamera>, C, B, decltype(kern::game::Level::camera), decltype(B::camera), &kern::game::Level::camera, &B::camera> camera;
     ev::Field<D, ev::Int, C, B, decltype(kern::game::Level::next_id), decltype(B::next_id), &kern::game::Level::next_id, &B::next_id> next_id;
-    ev::Field<D, ev::Struct<S_ProjectSettings>, C, B, decltype(kern::game::Level::project), decltype(B::project), &kern::game::Level::project, &B::project> project;
-    explicit Fields(D* kern_d) : name(kern_d), world(kern_d), actors(kern_d), textures(kern_d), sounds(kern_d), motions(kern_d), logic(kern_d), camera(kern_d), next_id(kern_d), project(kern_d) { (void)kern_d; }
+    explicit Fields(D* kern_d) : name(kern_d), world(kern_d), actors(kern_d), textures(kern_d), sounds(kern_d), motions(kern_d), logic(kern_d), camera(kern_d), next_id(kern_d) { (void)kern_d; }
   };
 };
 struct S_game_LightComponent {
@@ -6354,7 +6337,7 @@ template <class Core> struct EngineNodesOf : Core {
     }
     this->kern_engine("engine.game_world.present", {to_value(game_world), to_value(now_ms), to_value(eye)}, {});
   }
-  /// ---- simulation ---- Builds the Box3D world from `level` and starts Simulate or Play.
+  /// ---- simulation ---- Builds the Box3D world from `level` and starts Simulate or Play. With a project (set_project), a name that stands in the level and in the project (library_conflicts) keeps it from starting.
   template <class T1, class T2> void engine_game_world_start(Int game_world, const T1& level, const T2& mode) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
       kern_o->begin_call();

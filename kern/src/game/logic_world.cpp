@@ -2,6 +2,7 @@
 // the authority, the events the simulation raises for them, and the actor
 // operations their nodes use (with automatic replication of what they change).
 #include <algorithm>
+#include "kern/game/project.h"
 #include "kern/core/dmath.h"
 #include <cmath>
 
@@ -33,12 +34,8 @@ void GameWorld::start_logic() {
   logic_host_ = std::make_unique<LogicHost>(*this);
   logic_ = std::make_unique<logic::Runtime>(*logic_host_);
   logic_->native = logic_native;
-  // (the libraries a Blueprint uses: the Blueprints of the level, by the name of the actor that has them)
-  logic_->blueprints = [this](std::string_view name) -> const logic::Graph* {
-    for (const Actor& a : level_.actors)
-      if (a.logic && a.name == name) return &*a.logic;
-    return nullptr;
-  };
+  // (the libraries a Blueprint uses: the level's, by the name of the actor that has them, then the project's)
+  logic_->blueprints = world_blueprints(level_, project_);
   if (!level_.logic.empty()) logic_->add(level_.logic, 0, "Level");
   for (const Actor& a : level_.actors)
     if (a.logic && !a.logic->empty()) logic_->add(*a.logic, static_cast<logic::ActorRef>(a.id), a.name);

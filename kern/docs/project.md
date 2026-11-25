@@ -141,14 +141,16 @@ Eingang **World** (Int, der Handle einer GameWorld):
    `logic.tick`, und `run` schreiben. Danach den Knoten „FesterSchritt“ aus der Palette in den Level-Graphen ziehen.
 5. Play im Editor oder bauen: Der Bau erzeugt den Einstieg `kern::run(kern::Project::embedded())`.
 
-## Stand (25.11.2026, Zweig work-einstieg2)
+## Stand (25.11.2026, Zweig work-projekt)
 
-- Gebaut, wird nach diesem Entwurf ersetzt:
-  - `kern/game/level_app.h` (Programm-Laufzeit aus dem Ordner `project.program` eines Levels)
-  - `ProjectSettings::program`
-  - `embed_level.py --split-program`
-  - `kern/logic/node_type.h` mit `register_node_type`, einer globalen Anmeldung zur Laufzeit
-  - schwache `kern_create_app`/`kern_level_app`/`kern_level_text`
-- Diese Teile werden zurückgenommen, nicht neben dem neuen Weg stehen gelassen.
+- Gebaut (Teil 1): die Projekt-Datei (`kern/game/project.h`: `Project`, Leser/Schreiber mit Stelle und Grund,
+  `program_blueprints`, `world_blueprints`, `library_conflicts`), die Programm-Laufzeit aus dem Projekt
+  (`kern/game/program.h`: `kern::game::Program`), die Suche der Bibliotheken einer Welt (`GameWorld::set_project`),
+  das Einbetten (`kern/tools/embed_project.py`, `kern/game/embedded.h`). Ein Level hat keinen Abschnitt `"project"`
+  mehr (Fehler beim Lesen); `ProjectSettings::program`, `kern/game/level_app.h` und `embed_level.py --split-program`
+  sind entfernt.
+- Noch nach diesem Entwurf zu ersetzen:
+  - `kern/logic/node_type.h` mit `register_node_type`, einer globalen Anmeldung zur Laufzeit (Teil 2)
+  - schwache `kern_create_app`/`kern_project_app`/`kern_project_text` (Teil 3: `kern::run`)
 - Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) Knotentypen je Projekt,
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

@@ -593,15 +593,16 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
 
 ### 12.2.7 Project settings
 
-A level can carry the settings the engine applies when the program starts: the member `"project"` of the
-level file (`kern::ProjectSettings`, `include/kern/app/project.h`; `game::Level::project`). It holds the
-renderer options (`renderer`: shadows, bloom, ambient occlusion, grade), a phone's part (`mobile`: shadows and
-ambient occlusion, used with the launch argument `mobile=1`) and `heapReserveMb`, the heap taken once and given
-back before the game starts - the allocator keeps it, so the game does not stall growing WebAssembly memory
-piece by piece while playing.
+The project file (`<name>.kproject`, `kern::game::Project`, `include/kern/game/project.h`; see `kern/docs/project.md`)
+carries the settings the engine applies when the program starts: its member `"settings"` (`kern::ProjectSettings`,
+`include/kern/app/project.h`). It holds the renderer options (`renderer`: shadows, bloom, ambient occlusion, grade),
+a phone's part (`mobile`: shadows and ambient occlusion, used with the launch argument `mobile=1`) and
+`heapReserveMb`, the heap taken once and given back before the game starts - the allocator keeps it, so the game
+does not stall growing WebAssembly memory piece by piece while playing. A level holds only its world: a level file
+with the old member `"project"` is refused with the place and the reason.
 
 ```json
-"project": {
+"settings": {
  "renderer": {"shadows": true, "shadow": {"resolution": 2048, "extent": 110, "bias": 0.0014, "filter": 9},
               "ao": {"quality": "medium", "halfResolution": false}},
  "mobile": {"shadow": {"resolution": 1024, "extent": 70, "bias": 0.0016, "filter": 4},
@@ -610,13 +611,13 @@ piece by piece while playing.
 }
 ```
 
-A program built from a level hands the member to the engine as `extern "C" const char* kern_project_text(u32*
-length)` (SpawnCity: `games/spawncity/tools/embed_level.py` writes it next to the level). `kern_app_start` reads it
-before anything of the App: with settings, the renderer starts with `renderer` instead of `App::configure()`; after
-its init the heap is reserved and, with `mobile=1`, the phone's shadows and ambient occlusion are set - then
-`App::start()` runs. Without (the default `kern_project_text()` returns nothing), the App decides as before.
-Missing keys keep the defaults of the engine's structs; `to_text` writes the member right after `"name"`, before
-the world.
+The build embeds the project and its levels (`kern/tools/embed_project.py <name.kproject> <out.cpp>`): the source
+it writes defines `kern::game::embedded_project()`, `kern::game::embedded_level(path)` (`include/kern/game/embedded.h`)
+and `extern "C" const char* kern_project_text(u32* length)`, the project file's text. `kern_app_start` reads its
+settings before anything of the App: with settings, the renderer starts with `renderer` instead of
+`App::configure()`; after its init the heap is reserved and, with `mobile=1`, the phone's shadows and ambient
+occlusion are set - then `App::start()` runs. Without (the default `kern_project_text()` returns nothing), the App
+decides. Missing keys keep the defaults of the engine's structs.
 
 ---
 

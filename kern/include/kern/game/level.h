@@ -17,7 +17,6 @@
 #include <string>
 #include <vector>
 
-#include "kern/app/project.h"
 #include "kern/audio/audio.h"
 #include "kern/core/json.h"
 #include "kern/math/math.h"
@@ -429,8 +428,6 @@ struct Level {
   logic::Graph logic;            // the level graph (Self = none; sees every actor's events)
   EditorCamera camera;
   ActorId next_id = 1;
-  ProjectSettings project;  // what the engine applies when the program starts (kern/app/project.h; at the end: the
-                            // Blueprints' copies of the struct take a field at their end, games/spawncity/tools/all_program.sh)
 
   Actor* find(ActorId id);
   const Actor* find(ActorId id) const;

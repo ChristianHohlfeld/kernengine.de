@@ -1,6 +1,6 @@
 // Application runtime: Input bookkeeping and the C ABI the platform layer
 // (kern/web/app.mjs) drives. The App is the program's kern_create_app() - or, where it defines none, the App of the
-// level it carries (kern_level_app, kern/game/level_app.h).
+// project it carries (kern_project_app, kern/game/program.h).
 #include "kern/app/app.h"
 
 #include <cmath>
@@ -154,8 +154,8 @@ u64 g_frame = 0;
 bool g_running = false;
 }  // namespace
 
-/// The text of the level's member "project" (kern/app/project.h): a game built from a level defines it (SpawnCity:
-/// tools/embed_level.py writes it into level_data.cpp); without, the App decides (configure(), start()).
+/// The project file the program carries (kern/game/project.h), as its text: a game built from its project defines it
+/// (SpawnCity: tools/embed_level.py writes it into level_data.cpp); without, the App decides (configure(), start()).
 extern "C" __attribute__((weak)) const char* kern_project_text(u32* length) {
   *length = 0;
   return nullptr;
@@ -174,12 +174,13 @@ void apply_project_start(const ProjectSettings& p, Engine& e) {
     e.renderer().set_ambient_occlusion(p.mobile_ao);
   }
 }
-/// The project's settings the program carries (kern_project_text()).
-ProjectSettings program_project() {
+/// The settings of the project the program carries (kern_project_text()); a text that is no project: none, and the log says why.
+ProjectSettings program_settings() {
   u32 n = 0;
   const char* text = kern_project_text(&n);
   ProjectSettings p;
-  if (text) project_from_text(std::string_view(text, n), p);
+  std::string error;
+  if (text && !project_settings_from_text(std::string_view(text, n), p, &error)) log(LogLevel::error, "%s", error.c_str());
   return p;
 }
 }  // namespace kern
@@ -189,11 +190,16 @@ Engine& engine_instance() {
   return engine;
 }
 
-/// The App of a program that makes none itself: the program's level's (kern/game/level_app.h - the engine's object of
-/// the one Blueprint there that implements App), where the game runtime is linked in; else none. A program's own
+/// The App of a program that makes none itself: its project's (kern/game/program.h - the engine's object of the one
+/// program Blueprint that implements App), where the game runtime is linked in; else none. A program's own
 /// kern_create_app() wins.
-extern "C" __attribute__((weak)) App* kern_level_app(Engine& engine);
-__attribute__((weak)) App* kern_create_app() { return kern_level_app ? kern_level_app(engine_instance()) : nullptr; }
+extern "C" __attribute__((weak)) App* kern_project_app(const char* text, unsigned length);
+__attribute__((weak)) App* kern_create_app() {
+  if (!kern_project_app) return nullptr;
+  u32 n = 0;
+  const char* text = kern_project_text(&n);
+  return kern_project_app(text, n);
+}
 
 /// Launch parameters, before kern_app_start ("k=v&k2=v2", URL-encoded).
 KERN_EXPORT(kern_app_set_args) void kern_app_set_args(const char* text, u32 length) { engine_instance().set_args(text, length); }
@@ -204,7 +210,7 @@ KERN_EXPORT(kern_app_start) i32 kern_app_start(i32 width, i32 height) {
   if (!g_app) { fail("no application"); return 0; }
   Engine& engine = engine_instance();
   g_engine = &engine;
-  const ProjectSettings project = program_project();
+  const ProjectSettings project = program_settings();
   RendererOptions options = project.set ? project.renderer : g_app->configure();
   options.width = width;
   options.height = height;

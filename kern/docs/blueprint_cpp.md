@@ -1541,14 +1541,16 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   Objekt (ein Blueprint der Programm-Laufzeit über den Adapter). Der Konverter macht aus einer Anmeldung keinen
   `NodeDef` und kein Ereignis mehr: der Knoten bleibt im Level-Graphen der Welt (Reihenfolge der Ticks wie heute).
   Geprüft: `node_type_of_an_object`.
-- **Die App aus dem Level** (`kern/game/level_app.h`): ein Programm ohne eigenes `kern_create_app()` bekommt das der
-  App-Laufzeit (schwach): `kern_level_app` liest das Level, das das Programm trägt (`kern_level_text()`), und startet
-  EINE Logik-Laufzeit nur für die Blueprints des Ordners, den das Projekt als Programm nennt (`"project": {"program":
-  "<Ordner>"}`, `ProjectSettings::program`) – ohne Welt, ohne Renderer; die Bibliotheken, die sie nutzen, kommen aus dem
-  ganzen Level. Begin Play läuft, die App ist das Objekt der Engine des einen Blueprints dort, der `App` implementiert.
-  Nennt das Projekt kein Programm, keinen Blueprint im Ordner oder nicht genau eine App, gibt es keine App, und das Log
-  sagt warum (kein Ordner ist das Programm nur durch seinen Namen). Die Welten startet das Programm selbst
-  (GameWorld als Objekt der Engine): jede ist eine Laufzeit neben der des Programms. Geprüft: `app_from_the_level`.
+- **Die App aus dem Projekt** (`kern/game/program.h`, `kern/docs/project.md`): ein Programm ohne eigenes
+  `kern_create_app()` bekommt das der App-Laufzeit (schwach, bis `kern::run`): `kern_project_app` liest das Projekt, das
+  das Programm trägt (`kern_project_text()`), und startet ein `kern::game::Program`: EINE Logik-Laufzeit der
+  Programm-Blueprints des Projekts (`"blueprints"`), in ihrer Reihenfolge – ohne Welt, ohne Renderer; ihre Bibliotheken
+  findet sie nur im Projekt. Begin Play läuft, die App ist das Objekt der Engine des einen Blueprints, der `App`
+  implementiert. Keine Programm-Blueprints, keiner oder zwei mit `App` (mit Namen), ein zweiter Start, solange es läuft:
+  kein Start, und die Meldung sagt warum. Die Welten startet das Programm selbst (GameWorld als Objekt der Engine): jede
+  ist eine Laufzeit neben der des Programms; ihre Blueprints finden Bibliotheken erst im Level, dann im Projekt
+  (`GameWorld::set_project`), derselbe Name an beiden Orten ist ein Fehler. Geprüft: `program_from_the_project`,
+  `game_project_library_search`.
 - **Zeiger und Referenzen:** was die Engine durch einen Zeiger mit einem `Count` daneben gibt, ist eine Liste
   (`send(to, const u8* data, Count<1> bytes)`); was die Funktion durch eine Referenz schreibt (`Address& from`), ist ein
   Eingang und ein Ausgang – gesetzt auf das, was der Blueprint gibt; was sie durch einen Zeiger mit Count schreibt

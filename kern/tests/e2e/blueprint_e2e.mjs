@@ -610,7 +610,7 @@ let withBlueprint = [];
 for (const whole of [true, false]) {
   const file = JSON.parse(levelText);
   if (!whole) {
-    // (but the libraries the Blueprints that stay use, through `uses`, one after the other - as tools/embed_level.py
+    // (but the libraries the Blueprints that stay use, through `uses`, one after the other - as games/spawncity/tools/ship_level.py
     // --without keeps them: those of "Program" call libraries of "Source")
     const byName = new Map(file.actors.map(a => [a.name, a]));
     const kept = new Set(file.actors.filter(a => a.folder !== "Source").map(a => a.name));

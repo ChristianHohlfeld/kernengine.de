@@ -610,15 +610,19 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
 
 ### 12.2.7 Projekt-Einstellungen
 
-Ein Level kann die Einstellungen tragen, die die Engine beim Start des Programms anwendet: das Feld `"project"`
-der Level-Datei (`kern::ProjectSettings`, `include/kern/app/project.h`; `game::Level::project`) – die
-Renderer-Optionen (`renderer`), den Teil fürs Telefon (`mobile`: Schatten und Umgebungsverdeckung, beim
-Startparameter `mobile=1`) und `heapReserveMb`, den Heap, der vor dem Start einmal genommen und zurückgegeben wird
-(der Allokator behält ihn; das Spiel stockt nicht, weil der Speicher beim Spielen Stück für Stück wächst).
-Ein Programm aus einem Level gibt das Feld der Engine als `extern "C" const char* kern_project_text(u32* length)`
-(SpawnCity: `games/spawncity/tools/embed_level.py`). `kern_app_start` liest es vor allem anderen der App: mit
-Einstellungen startet der Renderer mit `renderer` statt `App::configure()`, danach der Heap-Vorgriff und bei
-`mobile=1` Schatten und Verdeckung des Telefons – dann `App::start()`. Ohne entscheidet die App wie bisher.
+Die Projekt-Datei (`<name>.kproject`, `kern::game::Project`, `include/kern/game/project.h`; siehe `kern/docs/project.md`)
+trägt die Einstellungen, die die Engine beim Start des Programms anwendet: ihr Feld `"settings"`
+(`kern::ProjectSettings`, `include/kern/app/project.h`) – die Renderer-Optionen (`renderer`), den Teil fürs Telefon
+(`mobile`: Schatten und Umgebungsverdeckung, beim Startparameter `mobile=1`) und `heapReserveMb`, den Heap, der vor
+dem Start einmal genommen und zurückgegeben wird (der Allokator behält ihn; das Spiel stockt nicht, weil der Speicher
+beim Spielen Stück für Stück wächst). Ein Level enthält nur seine Welt: eine Level-Datei mit dem alten Feld
+`"project"` wird mit Stelle und Grund abgelehnt.
+Der Bau bettet Projekt und Levels ein (`kern/tools/embed_project.py <name.kproject> <out.cpp>`): die Quelle definiert
+`kern::game::embedded_project()`, `kern::game::embedded_level(pfad)` (`include/kern/game/embedded.h`) und
+`extern "C" const char* kern_project_text(u32* length)`, den Text der Projekt-Datei. `kern_app_start` liest ihre
+Einstellungen vor allem anderen der App: mit Einstellungen startet der Renderer mit `renderer` statt
+`App::configure()`, danach der Heap-Vorgriff und bei `mobile=1` Schatten und Verdeckung des Telefons – dann
+`App::start()`. Ohne entscheidet die App.
 
 ## 12.3 Die Plattformschicht `web/app.mjs`
 

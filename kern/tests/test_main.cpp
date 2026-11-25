@@ -17,7 +17,8 @@
 #include "kern/audio/synth.h"
 #include "kern/game/walker_policy.h"
 #include "kern/game/runtime.h"
-#include "kern/game/level_app.h"
+#include "kern/game/program.h"
+#include "kern/game/project.h"
 #include "kern/game/walker.h"
 #include "kern/lehrer/env.h"
 #include "kern/lehrer/nn.h"
@@ -1263,46 +1264,99 @@ TEST(game_euler_and_transforms) {
   CHECK(!game::parse_hex_color("ff8000", c) && !game::parse_hex_color("#ggg000", c));
 }
 
-// The project's settings (kern/app/project.h): a level without them writes none and starts as the App says; with
-// them they round-trip as written (a 32-bit number as its decimal), stand before the world (a program reads them
-// first), and a phone's part starts from the desktop's shadows.
-TEST(game_level_project_settings) {
-  game::Level l = game::basic_level();
-  CHECK(!l.project.set && game::to_text(l).find("\"project\"") == std::string::npos);
-  l.project.set = true;
-  l.project.renderer.shadows = true;
-  l.project.renderer.shadow.resolution = 2048;
-  l.project.renderer.shadow.extent = 110;
-  l.project.renderer.shadow.bias = 0.0014f;
-  l.project.renderer.ao.quality = AoQuality::medium;
-  l.project.renderer.ao.half_resolution = false;
-  l.project.mobile_set = true;
-  l.project.mobile_shadow.resolution = 1024;
-  l.project.mobile_shadow.bias = 0.0016f;
-  l.project.mobile_shadow.filter = 4;
-  l.project.mobile_ao.quality = AoQuality::low;
-  l.project.heap_reserve_mb = 320;
-  const std::string text = game::to_text(l);
-  CHECK(text.find("\"project\"") < text.find("\"world\""));
-  CHECK(text.find("0.0014,") != std::string::npos);
-  game::Level back;
+// The project file (kern/game/project.h): settings, levels, start level and the program's Blueprints round-trip as
+// written (a 32-bit number as its decimal); a phone's part starts from the desktop's shadows; a level holds only its
+// world - one with the old member "project" is refused with the place and the reason.
+TEST(game_project_round_trip) {
+  game::Project pr;
+  CHECK(game::to_text(pr).find("\"settings\"") == std::string::npos);
+  pr.name = "Probe";
+  pr.settings.set = true;
+  pr.settings.renderer.shadows = true;
+  pr.settings.renderer.shadow.resolution = 2048;
+  pr.settings.renderer.shadow.extent = 110;
+  pr.settings.renderer.shadow.bias = 0.0014f;
+  pr.settings.renderer.ao.quality = AoQuality::medium;
+  pr.settings.renderer.ao.half_resolution = false;
+  pr.settings.mobile_set = true;
+  pr.settings.mobile_shadow.resolution = 1024;
+  pr.settings.mobile_shadow.bias = 0.0016f;
+  pr.settings.mobile_shadow.filter = 4;
+  pr.settings.mobile_ao.quality = AoQuality::low;
+  pr.settings.heap_reserve_mb = 320;
+  pr.levels = {"levels/start.klevel", "levels/wald.klevel"};
+  pr.start_level = "levels/wald.klevel";
+  game::ProgramBlueprint math;
+  math.name = "Mathe";
+  math.logic.library = true;
+  game::ProgramBlueprint spiel;
+  spiel.name = "Spiel";
+  spiel.logic.uses = {"Mathe"};
+  pr.blueprints = {spiel, math};
+  const std::string text = game::to_text(pr);
+  CHECK(text.find("\"format\": \"kern-project\"") != std::string::npos && text.find("0.0014,") != std::string::npos);
+  game::Project back;
   std::string error;
   CHECK(game::from_text(text, back, &error));
-  CHECK(game::to_text(back) == text);
-  const ProjectSettings& p = back.project;
+  CHECK(error.empty() && game::to_text(back) == text);
+  const ProjectSettings& p = back.settings;
   CHECK(p.set && p.renderer.shadows && p.renderer.shadow.resolution == 2048 && p.renderer.shadow.extent == 110 && p.renderer.shadow.bias == 0.0014f);
   CHECK(p.renderer.ao.quality == AoQuality::medium && !p.renderer.ao.half_resolution && p.renderer.bloom.enabled && p.renderer.grade);
   CHECK(p.mobile_set && p.mobile_shadow.resolution == 1024 && p.mobile_shadow.bias == 0.0016f && p.mobile_shadow.filter == 4 && p.mobile_ao.quality == AoQuality::low);
   CHECK(p.heap_reserve_mb == 320);
-  // The member alone, as a program carries it (kern_project_text): a phone's part takes the desktop's shadows
-  // where it names none; nothing, or no object, is no settings.
+  CHECK(back.name == "Probe" && back.levels.size() == 2 && back.start_level == "levels/wald.klevel" && back.first_level() == "levels/wald.klevel");
+  CHECK(back.blueprints.size() == 2 && back.blueprints[0].name == "Spiel" && back.blueprints[1].logic.library && back.blueprint("Mathe") == &back.blueprints[1]);
+  back.start_level.clear();
+  CHECK(back.first_level() == "levels/start.klevel");
+  // The settings as a program carries them (kern_project_text: the whole project file): a phone's part takes the
+  // desktop's shadows where it names none; no text, or a project without settings, is none; a text that is no project
+  // is an error.
   ProjectSettings q;
-  CHECK(project_from_text("{\"renderer\":{\"shadow\":{\"extent\":90}},\"mobile\":{\"ao\":{\"quality\":\"low\"}},\"heapReserveMb\":64}", q));
+  CHECK(project_settings_from_text("{\"format\":\"kern-project\",\"settings\":{\"renderer\":{\"shadow\":{\"extent\":90}},\"mobile\":{\"ao\":{\"quality\":\"low\"}},\"heapReserveMb\":64}}", q));
   CHECK(q.set && q.renderer.shadow.extent == 90 && q.mobile_set && q.mobile_shadow.extent == 90 && q.mobile_ao.quality == AoQuality::low && q.heap_reserve_mb == 64);
-  CHECK(!project_from_text("", q) && !q.set);
-  CHECK(!project_from_text("[1]", q) && !q.set);
-  CHECK(!project_from_text("{broken", q) && !q.set);
-  CHECK(project_from_text("{\"heapReserveMb\":-5}", q) && q.heap_reserve_mb == 0);
+  CHECK(project_settings_from_text("", q) && !q.set);
+  CHECK(project_settings_from_text("{\"format\":\"kern-project\"}", q) && !q.set);
+  CHECK(!project_settings_from_text("{\"heapReserveMb\":64}", q, &error) && !q.set && error.find("kern-project") != std::string::npos);
+  CHECK(!project_settings_from_text("{broken", q) && !q.set);
+  CHECK(project_settings_from_text("{\"format\":\"kern-project\",\"settings\":{\"heapReserveMb\":-5}}", q) && q.heap_reserve_mb == 0);
+  // a level is a world: its old member "project" is an error with the place
+  game::Level l = game::basic_level();
+  const std::string level = game::to_text(l);
+  CHECK(level.find("\"project\"") == std::string::npos);
+  std::string old = level;
+  old.insert(old.find("\"world\""), "\"project\": {\"heapReserveMb\": 1},\n  ");
+  game::Level was;
+  CHECK(!game::from_text(old, was, &error) && error.find("project:") == 0 && error.find(".kproject") != std::string::npos);
+}
+
+// A project that does not read says where and why.
+TEST(game_project_errors) {
+  const auto why = [](const std::string& text) {
+    game::Project p;
+    std::string error;
+    p.name = "kept";
+    const bool ok = game::from_text(text, p, &error);
+    CHECK(!ok && p.name == "kept");   // (nothing read on failure)
+    return error;
+  };
+  const std::string head = "{\"format\":\"kern-project\",";
+  CHECK(why("{broken") == "the project is not JSON");
+  CHECK(why("[1]") == "a project must be a JSON object");
+  CHECK(why("{\"format\":\"kern-level\"}").find("format:") == 0);
+  CHECK(why(head + "\"version\":2}").find("version:") == 0);
+  CHECK(why(head + "\"settings\":3}") == "settings: must be an object");
+  CHECK(why(head + "\"levels\":\"a.klevel\"}") == "levels: must be a list of paths");
+  CHECK(why(head + "\"levels\":[\"a.klevel\",\"\"]}") == "levels[1]: must be the path of a level");
+  CHECK(why(head + "\"levels\":[\"a.klevel\",\"a.klevel\"]}") == "levels[1] \"a.klevel\": named twice (also levels[0])");
+  CHECK(why(head + "\"levels\":[\"a.klevel\"],\"startLevel\":\"b.klevel\"}") == "startLevel \"b.klevel\": is none of the project's levels");
+  CHECK(why(head + "\"blueprints\":{}}") == "blueprints: must be a list");
+  CHECK(why(head + "\"blueprints\":[{\"logic\":{}}]}") == "blueprints[0]: has no name");
+  CHECK(why(head + "\"blueprints\":[{\"name\":\"A\"}]}") == "blueprints[0] \"A\": has no logic (its Blueprint)");
+  CHECK(why(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{}},{\"name\":\"A\",\"logic\":{}}]}") ==
+        "blueprints[1] \"A\": the name stands twice (also blueprints[0])");
+  CHECK(why(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{\"uses\":[\"X\",\"X\"]}}]}") == "blueprints[0] \"A\": logic graph: the library \"X\" is used twice");
+  game::Project ok;
+  CHECK(game::from_text(head + "\"blueprints\":[{\"name\":\"A\",\"logic\":{}}]}", ok) && ok.blueprints.size() == 1 && ok.levels.empty());
 }
 
 TEST(game_level_round_trip_and_validation) {
@@ -8050,12 +8104,49 @@ TEST(node_type_of_an_object) {
   program.end();
 }
 
-// The App of a program built from a level (kern/game/level_app.h): of its level, as the program carries it (text), the
-// Blueprints of the folder its project names (project.program) run in one logic runtime of their own - before the renderer starts, as
-// kern_app_start asks for the App first; no world, so no tick -, and the App is the engine's object of the one
-// Blueprint there that implements App. The engine calls it as any App: extensions before the renderer, then start,
-// update, stop - in this order. The level's own graph and the actors outside Program are the world's (not run here).
-TEST(app_from_the_level) {
+// Where a Blueprint finds its libraries (kern/docs/project.md, 5.): a program Blueprint in the project alone; a
+// world's in its level, then in the project; a name in both is an error with both places, and the world does not start.
+TEST(game_project_library_search) {
+  game::Project pr;
+  game::ProgramBlueprint math;
+  math.name = "Mathe";
+  math.logic.library = true;
+  pr.blueprints.push_back(math);
+  game::Level l = game::basic_level();
+  game::Actor lib;
+  lib.name = "Wald";
+  lib.logic = logic::Graph{};
+  lib.logic->library = true;
+  l.add(lib);
+  const logic::Blueprints program = game::program_blueprints(pr);
+  CHECK(program("Mathe") == &pr.blueprints[0].logic && program("Wald") == nullptr);
+  const logic::Blueprints world = game::world_blueprints(l, &pr);
+  CHECK(world("Mathe") == &pr.blueprints[0].logic && world("Wald") == &*l.actors.back().logic && world("Keiner") == nullptr);
+  CHECK(game::world_blueprints(l, nullptr)("Mathe") == nullptr);
+  CHECK(game::library_conflicts(l, pr).empty());
+  // the same name in the level and in the project
+  game::Actor twin;
+  twin.name = "Mathe";
+  twin.logic = logic::Graph{};
+  const game::ActorId id = l.add(twin).id;
+  const std::vector<std::string> c = game::library_conflicts(l, pr);
+  CHECK(c.size() == 1 && c[0] == "the Blueprint Mathe stands in the level (actor " + std::to_string(id) + ") and in the project (blueprints[0]) - rename one");
+  // a world of that level with the project does not start, and says so; without the project it does
+  GameFixture f;
+  f.world->set_project(&pr);
+  CHECK(!f.world->start(l, game::SimMode::play));
+  CHECK(std::string(last_error()).find("the Blueprint Mathe stands in the level") != std::string::npos);
+  f.world->set_project(nullptr);
+  CHECK(f.world->start(l, game::SimMode::play));
+  f.world->stop();
+}
+
+// The program's runtime from the project (kern/game/program.h, kern/docs/project.md 3./4.): of its project, as the
+// program carries it (text), the program Blueprints run in one logic runtime of their own, in their order - before the
+// renderer starts, as kern_app_start asks for the App first; no world, so no tick -, and the App is the engine's
+// object of the one Blueprint there that implements App. The engine calls it as any App: extensions before the
+// renderer, then start, update, stop - in this order. A library of the project is found (only there) and not run.
+TEST(program_from_the_project) {
   auto graph = [](const char* cpp) {
     logic::Graph g;
     std::string error;
@@ -8076,14 +8167,11 @@ TEST(app_from_the_level) {
                   "  }\n"
                   "};\n").c_str());
   };
-  // the program: Main (implements App) and Second in the folder Program; the world: the level's graph and World
-  game::Level l;
-  l.project.set = true;
-  l.project.program = "Program";   // (the project says which folder is the program)
-  l.logic = ticks("Level");
-  game::Actor main;
+  // the program: Main (implements App), Second, and the library Helper that Second uses
+  game::Project pr;
+  pr.name = "Probe";
+  game::ProgramBlueprint main;
   main.name = "Main";
-  main.folder = "Program";
   main.logic = graph("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
                      "  // ---- types ----\n"
                      "  KERN_STRUCT(Frame) {\n"
@@ -8112,29 +8200,30 @@ TEST(app_from_the_level) {
                      "    debug_print(\"begin Main\", false);\n"
                      "  }\n"
                      "};\n");
-  CHECK(main.logic && main.logic->implements == "App");
-  game::Actor second;
+  CHECK(main.logic.implements == "App");
+  game::ProgramBlueprint helper;   // (a library: found in the project - program_blueprints -, never an instance)
+  helper.name = "Helper";
+  helper.logic.library = true;
+  game::ProgramBlueprint second;
   second.name = "Second";
-  second.folder = "Program";
   second.logic = ticks("Second");
-  game::Actor world;
-  world.name = "World";
-  world.logic = ticks("World");
-  l.actors.push_back(main);
-  l.actors.push_back(world);
-  l.actors.push_back(second);
-  for (game::Actor& a : l.actors) a.id = l.next_id++;
-  const std::string text = game::to_text(l);
+  second.logic.uses = {"Helper"};
+  pr.blueprints = {main, helper, second};
+  const std::string text = game::to_text(pr);
 
-  CHECK(game::program_runtime() == nullptr);
-  App* const app = game::start_program_level(text);
-  CHECK(app != nullptr);
-  logic::Runtime* const rt = game::program_runtime();
-  CHECK(rt != nullptr);
+  game::Program program;
+  std::string error;
+  CHECK(!program.running() && program.app() == nullptr && program.runtime() == nullptr && program.project() == nullptr);
+  CHECK(program.start(text, &error) && error.empty());
+  App* const app = program.app();
+  logic::Runtime* const rt = program.runtime();
+  CHECK(app != nullptr && rt != nullptr);
   if (!app || !rt) return;
-  CHECK(game::start_program_level(text) == app);   // (started once)
-  CHECK(game::level_app(*rt) == app);
-  // only the Blueprints of the folder Program, in the order of the level - not the level's graph, not World
+  // a second start while it runs is refused with the reason - it does not keep the first and drop the second silently
+  CHECK(!program.start(text, &error) && error == "the program of the project Probe runs already - end it first");
+  CHECK(program.app() == app && game::program_app(*rt) == app);
+  CHECK(program.project() && program.project()->name == "Probe");
+  // the program Blueprints in the order of the project - the library is none
   CHECK(rt->instances().size() == 2 && rt->instances()[0]->name() == "Main" && rt->instances()[1]->name() == "Second");
   Renderer renderer;
   RendererOptions o;
@@ -8147,27 +8236,33 @@ TEST(app_from_the_level) {
   app->update(engine, f);
   app->stop(engine);
   // Begin Play of the program (Main, Second), then start, update, stop - no tick: the program has no world
-  const std::vector<std::string> said = game::program_said();
+  const std::vector<std::string> said = program.said();
   const std::vector<std::string> want{"begin Main", "begin Second", "start", "update", "stop"};
   CHECK(said == want);
   if (said != want)
-    for (const std::string& s : said) std::printf("  app_from_the_level: %s\n", s.c_str());
-  game::end_program_level();
-  CHECK(game::program_runtime() == nullptr);
-  // no Blueprint that implements App, two of them, or the App outside Program: no App, and no logic is kept
-  game::Level none = l;
-  none.actors[0].logic->implements.clear();
-  CHECK(game::start_program_level(game::to_text(none)) == nullptr && game::program_runtime() == nullptr);
-  game::Level two = l;
-  two.actors[2].logic = two.actors[0].logic;
-  CHECK(game::start_program_level(game::to_text(two)) == nullptr && game::program_runtime() == nullptr);
-  game::Level unnamed = l;   // (the project names no program: no folder is one by its name)
-  unnamed.project.program.clear();
-  CHECK(game::start_program_level(game::to_text(unnamed)) == nullptr && game::program_runtime() == nullptr);
-  game::Level outside = l;
-  outside.actors[0].folder.clear();
-  CHECK(game::start_program_level(game::to_text(outside)) == nullptr && game::program_runtime() == nullptr);
-  CHECK(game::start_program_level("{ broken") == nullptr);
+    for (const std::string& s : said) std::printf("  program_from_the_project: %s\n", s.c_str());
+  program.end();
+  CHECK(!program.running() && program.runtime() == nullptr && program.project() == nullptr);
+  // no Blueprint that implements App, two of them, no program Blueprints, a text that is no project: no App, nothing
+  // is kept, and the reason names them
+  game::Project none = pr;
+  none.blueprints[0].logic.implements.clear();
+  CHECK(!program.start(none, &error) && !program.running());
+  CHECK(error == "no Blueprint of the project Probe implements App");
+  game::Project two = pr;
+  two.blueprints[2].logic = two.blueprints[0].logic;
+  CHECK(!program.start(two, &error) && !program.running());
+  CHECK(error == "more than one Blueprint of the project Probe implements App: Main, Second");
+  game::Project empty;
+  CHECK(!program.start(empty, &error) && error == "the project Untitled has no program Blueprints (\"blueprints\")");
+  CHECK(!program.start("{ broken", &error) && error == "the program's project: the project is not JSON");
+  // it starts again after an end
+  CHECK(program.start(pr, &error) && program.app() != nullptr);
+  program.end();
+  // the app runtime's door: the project file's text; its one program, asked once - a second ask is refused
+  CHECK(kern_project_app(nullptr, 0) == nullptr);
+  CHECK(kern_project_app(text.data(), static_cast<unsigned>(text.size())) != nullptr);
+  CHECK(kern_project_app(text.data(), static_cast<unsigned>(text.size())) == nullptr);
   renderer.shutdown();
 }
 

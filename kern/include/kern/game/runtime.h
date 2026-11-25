@@ -24,6 +24,7 @@
 #include "kern/physics/physics.h"
 
 namespace kern::game {
+struct Project;  // kern/game/project.h
 
 /// Lit night windows on city buildings, driven by the buildings' wall records.
 /// Register it with Renderer::init; GameWorld sets its night factor.
@@ -205,8 +206,13 @@ class GameWorld {
   void present(f64 now_ms, Vec3 eye);
 
   // ---- simulation ----
-  /// Builds the Box3D world from `level` and starts Simulate or Play.
+  /// Builds the Box3D world from `level` and starts Simulate or Play. With a project (set_project), a name that
+  /// stands in the level and in the project (library_conflicts) keeps it from starting.
   bool start(const Level& level, SimMode mode);
+  /// The project the level belongs to (kern/game/project.h; null: none): its Blueprints' libraries are found in the
+  /// level first, then in the project. It must outlive the world's runs.
+  void set_project(const Project* project) { project_ = project; }
+  const Project* project() const { return project_; }
   void stop();
   bool running() const { return mode_ != SimMode::none; }
   /// Counts start() calls (restart included): listeners notice a fresh run.
@@ -561,6 +567,7 @@ class GameWorld {
 
   // presentation
   Level level_;                  // edited level (sync) or the running copy (start)
+  const Project* project_ = nullptr;  // where the libraries the level does not have are found (set_project)
   Level edit_level_;             // what sync() last saw (restored by stop())
   std::unordered_map<ActorId, std::unique_ptr<Visual>> visuals_;
   std::unordered_map<ActorId, std::unique_ptr<CityVisual>> cities_;

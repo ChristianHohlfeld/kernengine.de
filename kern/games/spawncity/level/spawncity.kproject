@@ -1,0 +1,51 @@
+{
+  "format": "kern-project",
+  "version": 1,
+  "name": "SpawnCity",
+  "settings": {
+    "renderer": {
+      "shadows": true,
+      "shadow": {
+        "resolution": 2048,
+        "extent": 110,
+        "bias": 0.0014,
+        "filter": 9
+      },
+      "bloom": {
+        "enabled": true,
+        "forced": false
+      },
+      "ao": {
+        "enabled": true,
+        "quality": "medium",
+        "halfResolution": false,
+        "radius": 1.6,
+        "power": 2.2,
+        "adaptive": true
+      },
+      "grade": true
+    },
+    "mobile": {
+      "shadow": {
+        "resolution": 1024,
+        "extent": 70,
+        "bias": 0.0016,
+        "filter": 4
+      },
+      "ao": {
+        "enabled": true,
+        "quality": "low",
+        "halfResolution": true,
+        "radius": 1.6,
+        "power": 2.2,
+        "adaptive": true
+      }
+    },
+    "heapReserveMb": 320
+  },
+  "levels": [
+    "spawncity.klevel"
+  ],
+  "startLevel": "spawncity.klevel",
+  "blueprints": []
+}

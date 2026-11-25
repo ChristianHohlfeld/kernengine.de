@@ -1,14 +1,13 @@
 // The project's settings the engine applies when a program starts: the renderer on the desktop and on a phone,
-// and the heap taken ahead (a level's "project", kern/docs/book/12-your-own-games.md "Project settings").
+// and the heap taken ahead - the member "settings" of the project file (kern/game/project.h, kern/docs/project.md).
 //
-// The level carries them (game::Level::project, the key "project" after "name"); a game built from a level
-// hands them to the engine as the text of that member (kern_project_text(), written by the build - SpawnCity:
-// tools/embed_level.py). kern_app_start (src/app/app.cpp) reads them before App::configure() and App::start(): with settings,
-// the renderer starts with theirs, the heap is grown once, and with the launch argument mobile=1 the phone's
-// shadows and ambient occlusion replace the desktop's - all before the App starts. Without, the App decides
-// (configure(), start()) as before.
+// A program hands the engine its project file as text (kern_project_text(), written by the build - SpawnCity:
+// tools/embed_level.py). kern_app_start (src/app/app.cpp) reads its settings before App::configure() and App::start():
+// with settings, the renderer starts with theirs, the heap is grown once, and with the launch argument mobile=1 the
+// phone's shadows and ambient occlusion replace the desktop's - all before the App starts. Without, the App decides
+// (configure(), start()).
 //
-// Header only: the level (kern/src/game) and the app runtime (kern/src/app) both read it, and either is built
+// Header only: the project (kern/src/game) and the app runtime (kern/src/app) both read it, and either is built
 // without the other.
 #pragma once
 
@@ -23,14 +22,12 @@
 namespace kern {
 
 struct ProjectSettings {
-  bool set = false;            // the level names its settings (else the App's configure() and start() decide)
+  bool set = false;            // the project names its settings (else the App's configure() and start() decide)
   RendererOptions renderer;    // the renderer at start (width and height are the page's)
   bool mobile_set = false;     // a phone's renderer differs (the launch argument mobile=1)
   ShadowOptions mobile_shadow;
   AoOptions mobile_ao;
   u32 heap_reserve_mb = 0;     // taken once and given back before start: the allocator keeps it (wasm memory never shrinks)
-  std::string program;         // the folder of the level whose Blueprints are the program's logic, not the world's - the App
-                               // among them (kern/game/level_app.h); "": the level says none (the program makes its App)
 };
 
 namespace project_json {
@@ -88,7 +85,7 @@ inline void ao_from(const json::Value& v, AoOptions& a) {
 }
 }  // namespace project_json
 
-/// The settings as the level file holds them (the member "project").
+/// The settings as the project file holds them (the member "settings").
 inline json::Value project_to_json(const ProjectSettings& p) {
   using namespace project_json;
   json::Value o = json::Value::object();
@@ -109,11 +106,10 @@ inline json::Value project_to_json(const ProjectSettings& p) {
     o.set("mobile", std::move(m));
   }
   o.set("heapReserveMb", p.heap_reserve_mb);
-  if (!p.program.empty()) o.set("program", p.program);
   return o;
 }
 
-/// Reads the member "project" (an object; anything else: no settings). Missing keys keep their defaults.
+/// Reads the member "settings" (an object; anything else: no settings). Missing keys keep their defaults.
 inline bool project_from_json(const json::Value& v, ProjectSettings& out) {
   using namespace project_json;
   out = ProjectSettings{};
@@ -141,16 +137,21 @@ inline bool project_from_json(const json::Value& v, ProjectSettings& out) {
   }
   const f64 mb = v["heapReserveMb"].as_number(0);
   out.heap_reserve_mb = mb > 0 && mb < 4096 ? static_cast<u32>(mb) : 0;
-  out.program = v["program"].is_string() ? v["program"].as_string() : std::string();
   return true;
 }
 
-/// The settings from the text of the member "project" (kern_project_text()); empty or broken: none.
-inline bool project_from_text(std::string_view text, ProjectSettings& out) {
+/// The settings of a project file's text (kern_project_text()): its member "settings". Empty text: none. False - `error`
+/// says why - for a text that is not a project; a project without "settings" is none and true.
+inline bool project_settings_from_text(std::string_view text, ProjectSettings& out, std::string* error = nullptr) {
   out = ProjectSettings{};
-  if (text.empty()) return false;
+  if (text.empty()) return true;
   json::Value v;
-  return json::parse(text, v) && project_from_json(v, out);
+  if (!json::parse(text, v) || !v.is_object() || v["format"].as_string() != "kern-project") {
+    if (error) *error = "the program's project is not a Kern project (format must be \"kern-project\")";
+    return false;
+  }
+  if (const json::Value* s = v.find("settings")) project_from_json(*s, out);
+  return true;
 }
 
 }  // namespace kern
