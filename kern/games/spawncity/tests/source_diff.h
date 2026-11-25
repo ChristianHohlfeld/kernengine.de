@@ -33,6 +33,9 @@
 #include <utility>
 #include <vector>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include "converted.h"
 #include "kern/core/fields.h"
 #include "kern/core/map.h"
@@ -991,6 +994,7 @@ struct Builds {
   static constexpr int kCalls = Tally::kCalls;
   struct Call {
     bool defined = false;
+    bool died = false;   // (the program did not survive it - Builds::alone)
     long asks = 0;
     std::vector<std::pair<std::string, std::string>> parts;
   };
@@ -1043,6 +1047,7 @@ struct Builds {
       while (text(field, j, head)) {
         Call c;
         c.defined = head[0] == 1;
+        c.died = head[0] == 2;
         std::memcpy(&c.asks, head.data() + 1, sizeof c.asks);
         u32 parts = 0;
         std::memcpy(&parts, head.data() + 1 + sizeof c.asks, sizeof parts);
@@ -1060,6 +1065,67 @@ struct Builds {
     return at < old.size();
   }
   void part(std::string name, Bytes b) { now.parts.emplace_back(std::move(name), std::move(b.b)); }
+  /// One call, alone: in a process of its own (fork), which gives back what it gave and left. The whole program runs
+  /// in each call - the drawn object holds objects of other files (the game's terrain, its grids) whose own code reads
+  /// what the draws give it -: where that program reads outside what it holds or dies (the sanitizers end it), C++
+  /// leaves open what the call gives, as with a guard - the call is not compared (Tally: "outside"), the test goes on
+  /// and says so once. What the call changes in the program besides (what it made, statics) ends with it: each call
+  /// starts from the same program.
+  template <class F> bool alone(F&& f, long& asks) {
+    std::fflush(stdout);
+    std::fflush(stderr);
+    int fd[2];
+    SC_CHECK(::pipe(fd) == 0, "%s: no pipe for a call alone", function.c_str());
+    const pid_t pid = ::fork();
+    SC_CHECK(pid >= 0, "%s: no process for a call alone", function.c_str());
+    if (pid == 0) {
+      ::close(fd[0]);
+      now = Call{};
+      long a = 0;
+      const bool d = f(a);
+      std::string out;
+      out.push_back(d ? 1 : 0);
+      out.append(reinterpret_cast<const char*>(&a), sizeof a);
+      for (const auto& [name, bytes] : now.parts) {
+        text(out, name);
+        text(out, bytes);
+      }
+      std::fflush(stdout);
+      for (std::size_t k = 0; k < out.size();) {
+        const ssize_t n = ::write(fd[1], out.data() + k, out.size() - k);
+        if (n <= 0) ::_exit(3);
+        k += static_cast<std::size_t>(n);
+      }
+      ::_exit(0);   // (no exit handlers: the leak check is the parent's)
+    }
+    ::close(fd[1]);
+    std::string in;
+    char buf[65536];
+    for (ssize_t n; (n = ::read(fd[0], buf, sizeof buf)) > 0;) in.append(buf, static_cast<std::size_t>(n));
+    ::close(fd[0]);
+    int status = 0;
+    ::waitpid(pid, &status, 0);
+    now.parts.clear();
+    asks = 0;
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0 || in.size() < 1 + sizeof(long)) {
+      if (!died_said) {
+        std::printf("  note: %s: a call the program does not survive (%s %d): C++ leaves open what it gives - not compared\n", function.c_str(),
+                    WIFEXITED(status) ? "exit" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
+        died_said = true;
+      }
+      ++died;
+      now_died = true;
+      return false;
+    }
+    const bool d = in[0] == 1;
+    std::memcpy(&asks, in.data() + 1, sizeof asks);
+    std::size_t k = 1 + sizeof asks;
+    std::string name, bytes;
+    while (text(in, k, name) && text(in, k, bytes)) now.parts.emplace_back(name, bytes);
+    return d;
+  }
+  bool died_said = false, now_died = false;
+  int died = 0, died_old = 0, died_new = 0;
   /// An object a call leaves: as one part (what it holds, every field, compared as a whole - an object held twice is
   /// the same object), and - where the test has its fields' names - each field once more as a part of its own, so that
   /// where it differs the test says which fields do.
@@ -1074,12 +1140,28 @@ struct Builds {
   void take(bool defined, long asks, int call) {
     now.defined = defined;
     now.asks = defined ? asks : 0;
+    now.died = now_died;
     if (writing) {
+      now_died = false;
       if (defined) ++defined_old;
       old.push_back(std::move(now));
       return;
     }
     const Call& was = old[at++];
+    // (one program survives a call, the other does not: a difference, not what C++ leaves open - with the call, whose drawn
+    // input is the same in both programs: the call-th draw of this function)
+    died_old += was.died;
+    died_new += now_died;
+    if (now_died != was.died && (was.defined || defined)) {
+      const bool new_died = now_died;
+      now_died = false;
+      ++compared;
+      ++wrong;
+      std::printf("  %s, call %d: only the %s program survives it (it gives a value there; the input: the call-th draw of the test)\n", function.c_str(), call,
+                  new_died ? "old" : "new");
+      return;
+    }
+    now_died = false;
     if (!defined || !was.defined) {
       ++outside;
       return;
@@ -1100,7 +1182,7 @@ struct Builds {
     if (writing) {
       std::string field;
       for (const Call& c : old) {
-        std::string head(1, c.defined ? 1 : 0);
+        std::string head(1, c.defined ? 1 : c.died ? 2 : 0);
         head.append(reinterpret_cast<const char*>(&c.asks), sizeof c.asks);
         const u32 parts = static_cast<u32>(c.parts.size());   // (an object of ~250 fields: a part each - more than a byte counts)
         head.append(reinterpret_cast<const char*>(&parts), sizeof parts);
@@ -1125,8 +1207,12 @@ struct Builds {
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
     SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
              compared, most_new, with_old);
-    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
-    std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
+    // (a proof compares two thirds of the calls at least: where the program does not survive more of the drawn calls, the
+    // draws must give it what it lives with - not a lower bar)
+    SC_CHECK(compared * 3 >= kCalls * 2, "%s: only %d of %d calls could be compared (in %d C++ leaves open what they give; of those the program did not "
+             "survive %d in the old, %d in the new)", function.c_str(), compared, kCalls, outside, died_old, died_new);
+    std::printf("  %s: drawn %zu, compared %d, left open %d (the program did not survive: old %d, new %d)\n", function.c_str(), old.size(), compared, outside,
+                died_old, died_new);
   }
 };
 
