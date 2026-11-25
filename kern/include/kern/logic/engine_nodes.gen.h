@@ -131,6 +131,7 @@ struct S_audio_Stats;
 struct S_audio_SynthPatch;
 struct S_game_Actor;
 struct S_game_AudioComponent;
+struct S_game_BlueprintRunning;
 struct S_game_BodyComponent;
 struct S_game_BodyPlan;
 struct S_game_CityBox;
@@ -946,6 +947,19 @@ struct S_game_AudioComponent {
     ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::pitch_by_speed), decltype(B::pitch_by_speed), &kern::game::AudioComponent::pitch_by_speed, &B::pitch_by_speed> pitch_by_speed;
     ev::Field<D, ev::Float, C, B, decltype(kern::game::AudioComponent::delay), decltype(B::delay), &kern::game::AudioComponent::delay, &B::delay> delay;
     explicit Fields(D* kern_d) : sound(kern_d), volume(kern_d), pitch(kern_d), the_loop(kern_d), autoplay(kern_d), spatial(kern_d), min_distance(kern_d), max_distance(kern_d), rolloff(kern_d), bus(kern_d), doppler(kern_d), pitch_by_speed(kern_d), delay(kern_d) { (void)kern_d; }
+  };
+};
+struct S_game_BlueprintRunning {
+  template <class B> static void from(EngineObjects& o, const B& b, kern::game::BlueprintRunning& x) { const auto& [f0, f1, f2, f3, f4] = b; ev::Direct<ev::Text>::from(o, f0, x.name); ev::Direct<ev::Text>::from(o, f1, x.tier); ev::Direct<ev::Int>::from(o, f2, x.functions); ev::Direct<ev::Int>::from(o, f3, x.nodes); ev::Direct<ev::Bool>::from(o, f4, x.disabled); }
+  template <class B> static B make(EngineObjects& o, const kern::game::BlueprintRunning& x) { B b{ev::made<ev::Text>(o, x.name), ev::made<ev::Text>(o, x.tier), ev::made<ev::Int>(o, x.functions), ev::made<ev::Int>(o, x.nodes), ev::made<ev::Bool>(o, x.disabled)}; [[maybe_unused]] const auto& [f0, f1, f2, f3, f4] = b; return b; }
+  template <class C> static void pass(EngineObjects& o, const C& x) { ev::Direct<ev::Text>::pass(o, x.name); ev::Direct<ev::Text>::pass(o, x.tier); ev::Direct<ev::Int>::pass(o, x.functions); ev::Direct<ev::Int>::pass(o, x.nodes); ev::Direct<ev::Bool>::pass(o, x.disabled); }
+  template <class D, class C, class B> struct Fields {
+    ev::Field<D, ev::Text, C, B, decltype(kern::game::BlueprintRunning::name), decltype(B::name), &kern::game::BlueprintRunning::name, &B::name> name;
+    ev::Field<D, ev::Text, C, B, decltype(kern::game::BlueprintRunning::tier), decltype(B::tier), &kern::game::BlueprintRunning::tier, &B::tier> tier;
+    ev::Field<D, ev::Int, C, B, decltype(kern::game::BlueprintRunning::functions), decltype(B::functions), &kern::game::BlueprintRunning::functions, &B::functions> functions;
+    ev::Field<D, ev::Int, C, B, decltype(kern::game::BlueprintRunning::nodes), decltype(B::nodes), &kern::game::BlueprintRunning::nodes, &B::nodes> nodes;
+    ev::Field<D, ev::Bool, C, B, decltype(kern::game::BlueprintRunning::disabled), decltype(B::disabled), &kern::game::BlueprintRunning::disabled, &B::disabled> disabled;
+    explicit Fields(D* kern_d) : name(kern_d), tier(kern_d), functions(kern_d), nodes(kern_d), disabled(kern_d) { (void)kern_d; }
   };
 };
 struct S_game_BodyComponent {
@@ -8413,6 +8427,19 @@ template <class Core> struct EngineNodesOf : Core {
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
     return kern_G(this->kern_engine("engine.game_world.art_stats", {to_value(game_world)}, {PinType::structure})[0]);
+  }
+  /// The Blueprints a logic runs, in the order it runs them (logic::Runtime::instances): what a Blueprint or a tool shows of them - the node engine.blueprints_running.
+  using kern_given_engine_game_blueprints_running = ::kern::logic::engine_values::Given<::kern::logic::engine_values::List<::kern::logic::engine_values::Struct<::kern::logic::engine_direct::S_game_BlueprintRunning>>, decltype(kern::game::blueprints_running(std::declval<kern::logic::Runtime const&>()))>;
+  kern_given_engine_game_blueprints_running engine_game_blueprints_running(Int logic) const {
+    using kern_G = kern_given_engine_game_blueprints_running;
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      kern::logic::Runtime* const kern_a0 = ::kern::logic::engine_values::object_of<kern::logic::Runtime>(*kern_o, static_cast<::kern::i64>(logic), "logic");
+      if (!kern_a0) { this->kern_engine_failed("engine.game.blueprints_running"); return kern_G(*kern_o); }
+      decltype(auto) kern_r = kern::game::blueprints_running(*kern_a0);
+      return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
+    }
+    return kern_G(this->kern_engine("engine.game.blueprints_running", {to_value(logic)}, {PinType::structure_list})[0]);
   }
   void engine_sound_bank_mixer(Int sound_bank) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

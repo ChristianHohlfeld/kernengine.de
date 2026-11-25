@@ -1506,6 +1506,12 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.
 
+**Die Blueprints der Welt.** Was eine Logik laufen lässt, sieht ein Blueprint mit dem Knoten der Engine
+`engine.game.blueprints_running` (`kern::game::blueprints_running(const logic::Runtime&)`, das Handle aus
+`engine.game_world.logic_runtime`): je Blueprint Name, Stufe, Zahl der Funktionen und Knoten seines Graphen, ob er
+angehalten ist (`game_BlueprintRunning`), in der Reihenfolge der Logik. Die Sprache selbst (`kern::logic::`) hat keine
+Knoten; was ein Programm von ihr zeigt, geht durch diese Funktion. Geprüft: `engine_blueprints_running`.
+
 ### Formeln
 
 Eine Formel ist der Ausdruck selbst, als Lambda über ihre Eingänge. Operatoren, die in C++ etwas

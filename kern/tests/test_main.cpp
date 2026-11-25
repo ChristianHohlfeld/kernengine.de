@@ -7448,6 +7448,30 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
+// The Blueprints a logic runs, as a Blueprint sees them (engine.game.blueprints_running): each one's name, how it runs, how
+// many functions and nodes its graph has, whether it stopped - in the order the logic runs them; through the door the same.
+TEST(engine_blueprints_running) {
+  FakeLogicHost host;
+  logic::Runtime rt(host);
+  logic::Graph water, game;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && logic::from_cpp(blueprint_native::kImplementsGame, game, nullptr, &error));
+  rt.add(water, 11, "Water");
+  rt.add(game, 12, "Running");
+  rt.begin();
+  const std::vector<game::BlueprintRunning> shown = game::blueprints_running(rt);
+  CHECK(shown.size() == 2 && shown[0].name == "Water" && shown[1].name == "Running" && shown[0].tier == "interpreter");
+  CHECK(shown.size() == 2 && shown[0].functions == water.functions.size() && shown[1].nodes == game.nodes.size() && !shown[0].disabled && !shown[1].disabled);
+  logic::EngineObjects objects;
+  std::vector<logic::Value> out{logic::Value::zero(logic::PinType::structure_list)};
+  CHECK(logic::call_engine(objects, "engine.game.blueprints_running", {logic::Value::integer(objects.adopt(rt))}, out) && out[0].size() == 2);
+  if (out[0].size() == 2) {
+    const logic::Value first = out[0].item(0);
+    CHECK(first.field(0) && first.field(0)->as_text() == "Water" && first.field(2) && first.field(2)->as_int() == static_cast<i64>(water.functions.size()));
+  }
+  objects.clear();
+}
+
 // Blueprints as objects of interfaces of the engine (kern/docs/blueprint_cpp.md, "Schnittstellen der Engine"): the engine's
 // object of each (the adapter tools/engine_api.py writes) calls the Blueprint's function of the name the engine calls -
 // what it hands over as values, its objects as handles, what the Blueprint gives back as the C++ the engine takes; where
