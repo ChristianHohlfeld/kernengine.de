@@ -14162,8 +14162,13 @@ class TestWriter:
                 continue   # (`known`: what an earlier try handed on already - the first try's stands, see convert_unit)
             if id(f) not in listed and f.decl.get("id") not in self.tree.body and f.decl.get("id") not in self.tree.template_of:
                 continue   # (one whose body this file does not hold: its own file hands it on)
-            if id(f) not in listed and not (f.wait or "").startswith("its test cannot compare it yet"):
-                continue   # (of those not written, the ones only their test holds back: a Blueprint is written of their source)
+            why = re.sub(r" \(it went round with [^()]*\)$", "", f.wait or "")
+            if id(f) not in listed and not (why.startswith("its test cannot compare it yet") or follow_on(why)):
+                # (of those not written, the ones only their test holds back, and the ones that only wait on another - in a
+                # circle of functions over files each waits on the other: the test of each needs the other's source, and a
+                # Blueprint is written of it once the circle is (pin_circles). One that waits for a reason of its own is not
+                # handed on: what calls it waits on it.)
+                continue
             try:
                 G = self.gather([f.decl["id"]], refer=True)
                 held = self.items(G)
