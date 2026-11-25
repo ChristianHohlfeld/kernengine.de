@@ -990,6 +990,16 @@ template <class T> struct Self {
 /// One compared function in one program: SC_LOWERED_BUILDS=write:<file> (the old program) or check:<file> (the new).
 /// The old draws calls until kCalls of them are ones C++ says what they give (or twenty times as many were drawn) and
 /// writes them all; the new draws exactly as many - the same draws - and compares those both programs say.
+/// The clock of the engine in the form "two builds" (kern::now_ms, kern::wall_ms - KERN_CLOCK, kern/core/base.h): the
+/// same on both sides, set by the test before every call (run_tests.sh links each side with --wrap of the two). What a
+/// call measures with it (a duration, a time stamp) is then the same in both programs - as the game's tests set their
+/// clock, not the machine's.
+inline double clock_ms = 0;
+}  // namespace sc::lowered
+extern "C" __attribute__((weak, used)) double __wrap__ZN4kern6now_msEv() { return ::sc::lowered::clock_ms; }
+extern "C" __attribute__((weak, used)) double __wrap__ZN4kern7wall_msEv() { return 1.7e12 + ::sc::lowered::clock_ms; }
+namespace sc::lowered {
+
 struct Builds {
   static constexpr int kCalls = Tally::kCalls;
   struct Call {

@@ -991,6 +991,10 @@ class Module:
             if exact:
                 out.append((o, exact[0], {}))
                 continue
+            adapted = [n for n in named if o.c_name and n.c_name and lengths_after_pointers(o, n) is not None]
+            if adapted:
+                out.append((o, adapted[0], {}))   # (an export that takes the length after a pointer too: BuildsWriter's adapter)
+                continue
             found = None
             for n in named:
                 extra = self.extra(o, n, state_old)
@@ -1834,6 +1838,49 @@ class Writer:
 # new (tests/lowered/builds/<file>/old/...) and the names of those the old did not have (.../gone): run_tests.sh makes
 # the old tree from them, with no git.
 
+def export_contracts(test_dir):
+    """The page's contract of the exports (tests/lowered/exports.txt): how many entries the page reads where an export
+    gives a pointer (`<export> gives <C++>`), how many it hands where it hands a pointer (`<export> <param> <C++>`),
+    and the range it hands a number in (`<export> <param> range <lo> <hi>`) - C++ over the export's parameters by
+    their names (and `r`, the pointer it gave). What the function's type does not say, the page says: so the test."""
+    out = {}
+    path = os.path.join(test_dir, "exports.txt")
+    if not os.path.exists(path):
+        return out
+    for line in open(path, encoding="utf-8"):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        name, what, rest = (line.split(None, 2) + ["", ""])[:3]
+        c = out.setdefault(name, {"gives": None, "sizes": {}, "ranges": {}})
+        if what == "gives":
+            c["gives"] = rest
+        elif rest.startswith("range "):
+            lo, hi = rest.split()[1:3]
+            c["ranges"][what] = (lo, hi)
+        else:
+            c["sizes"][what] = rest
+    return out
+
+
+def lengths_after_pointers(o, n):
+    """An export whose new text hands the length after a pointer (`const u8* rgba` -> `const u8* rgba, u32 length`):
+    the new's parameters that are such lengths, by their place - else None."""
+    po, pn = o.param_types(), n.param_types()
+    def fit(i, k):   # (the old's i-th and the new's k-th on: a length after a pointer is taken before a same type)
+        if k == len(pn):
+            return [] if i == len(po) else None
+        if k > 0 and re.search(r"\*\s*$", pn[k - 1]) and re.fullmatch(r"unsigned int|int|unsigned long|unsigned long long", pn[k]):
+            got = fit(i, k + 1)
+            if got is not None:
+                return [k] + got
+        if i < len(po) and pn[k] == po[i]:
+            return fit(i + 1, k + 1)
+        return None
+    got = fit(0, 0)
+    return got or None
+
+
 def spans_files(m):
     """Whether a class a changed method of the file belongs to has methods whose bodies stand in other files (a class
     of many files: its two texts cannot both be in one program)."""
@@ -1925,11 +1972,19 @@ class BuildsWriter(Writer):
             return planned
         pairs, tested, covered = planned
         m = self.m
+        self.contracts = export_contracts(self.out_dir)
+        self.adapters = {}
         for o, n, e in tested:
+            if n.c_name and o.c_name and not e and o.param_types() != n.param_types() and plain(o.ret) == plain(n.ret):
+                got = lengths_after_pointers(o, n)
+                if got is not None and all(n.params[k - 1][0] in self.contracts.get(n.name, {}).get("sizes", {}) for k in got):
+                    # (an adapter: both draw the old's parameters; the new is handed the length of the drawn entries too)
+                    self.adapters[n.name] = got
+                    continue
             if e or o.template or n.template or o.param_types() != n.param_types() or plain(o.ret) != plain(n.ret) or o.kind != n.kind:
                 raise Stop(f"{o.label()} -> {n.label()}: the form \"two builds\" compares a function with its counterpart of the same signature - "
                            "one that changed its parameters (the state made explicit, a template made functions) is not compared in it yet")
-            if n.c_name and re.search(r"\*\s*$", plain(n.ret)) and not re.search(r"\bchar\s*\*\s*$", plain(n.ret)):
+            if n.c_name and re.search(r"\*\s*$", plain(n.ret)) and not re.search(r"\bchar\s*\*\s*$", plain(n.ret)) and not self.contracts.get(n.name, {}).get("gives"):
                 raise Stop(f"{n.label()} gives a pointer to data whose length the page knows (not the function's type): "
                            "the form \"two builds\" compares a text by its characters, not such data yet")
             if n.local or o.local:
@@ -2171,7 +2226,7 @@ class BuildsWriter(Writer):
                 out.append(f"template <> struct Values<::{q}> {{ static constexpr long long all[] = {{{', '.join(str(v) for _, v in values)}}}; }};")
         out += ["}  // namespace sc::lowered", "", f"namespace {m.namespace} {{", f"SC_TEST(lowered_{key}_cpp) {{"]
         for j, (o, n, e) in enumerate(tested):
-            out += self.builds_case(j, n, calls.get(j))
+            out += self.builds_case(j, n, calls.get(j), o)
         out += ["}", f"}}  // namespace {m.namespace}", ""]
         return "\n".join(out)
 
@@ -2191,22 +2246,42 @@ class BuildsWriter(Writer):
                 hidden = access != "public"
         return bool(hidden)
 
-    def builds_case(self, j, n, robbed):
+    def builds_case(self, j, n, robbed, o=None):
         label = n.label()
         T = f"::{n.owner}" if n.owner else None
         body = [f"  {{  // {label}", f"    ::sc::lowered::Builds rec({C.text_literal(label)});", "    ::sc::converted::Draw draw;",
                 "    for (int call = 0; rec.more(call); ++call) {"]
-        inner = []
+        inner = ["::sc::lowered::clock_ms = 1000.0 * call;"]   # (the engine's clock, alike on both sides - source_diff.h)
         method = n.method and not n.static and n.kind in ("CXXMethodDecl", "CXXDestructorDecl")
         if method:
             inner += [f"::sc::lowered::Self<{T}> self;", "if (draw.flag()) ::sc::lowered::draw(draw, *self);"]
         args, writes = [], []
+        con = self.contracts.get(n.name, {"gives": None, "sizes": {}, "ranges": {}}) if n.c_name else {"gives": None, "sizes": {}, "ranges": {}}
+        lens = set(self.adapters.get(n.name, ()))
+        old_args, buffers = [], []
         for k, (pn, pt, pd) in enumerate(n.params):
             t = pd or pt
+            if k in lens:
+                args.append(f"static_cast<{t}>(b{k - 1}.size())")   # (the adapter: the length of the drawn entries)
+                continue
+            if pn in con["sizes"]:
+                buffers.append((k, pn, t))   # (a pointer the page hands: as many entries as its contract says, drawn after the numbers)
+                args.append(f"b{k}.data()")
+                old_args.append(f"b{k}.data()")
+                continue
             inner += [f"::sc::lowered::Arg<{t}> a{k};", f"::sc::lowered::draw(draw, a{k});"]
+            if pn in con["ranges"]:
+                lo, hi = con["ranges"][pn]
+                inner.append(f"{{ const long long lo = {lo}, span = ({hi}) - lo + 1; a{k}.v = static_cast<std::remove_cvref_t<decltype(a{k}.v)>>(lo + ((static_cast<long long>(a{k}.v) % span) + span) % span); }}")
+            if con["sizes"] or con["gives"]:
+                inner.append(f"[[maybe_unused]] auto& {pn} = a{k}.v;")
             args.append(f"a{k}.get()")
+            old_args.append(f"a{k}.get()")
             if re.search(r"&\s*$", t) and not re.match(r"^const\b", t.strip()):
                 writes.append((f"its parameter {pn}", f"a{k}.v"))
+        for k, pn, t in buffers:
+            inner += [f"std::vector<std::remove_cv_t<std::remove_pointer_t<{t}>>> b{k}(static_cast<std::size_t>({con['sizes'][pn]}));",
+                      f"for (auto& x : b{k}) ::sc::lowered::draw(draw, x);"]
         for q, t in self.within:
             inner.append(f"::sc::lowered::draw(draw, ::{q});")
             writes.append((f"the variable {q} of the file", f"::{q}"))
@@ -2224,6 +2299,10 @@ class BuildsWriter(Writer):
             call = f"{robbed}({a})" if robbed else f"self->{n.name}({a})"
         elif n.owner:
             call = f"{T}::{n.name}({a})"
+        elif n.c_name and lens:
+            # (the adapter: the one text takes the length after the pointer, the other not - each side calls what it has)
+            g = f"[](auto&&... x) -> decltype({n.name}(static_cast<decltype(x)&&>(x)...)) {{ return {n.name}(static_cast<decltype(x)&&>(x)...); }}"
+            call = (f"[&](auto g) -> decltype(auto) {{ if constexpr (requires {{ g({a}); }}) return g({a}); else return g({', '.join(old_args)}); }}({g})")
         elif n.c_name:
             call = f"{n.name}({a})"   # (an export: ::sc_x in one text, sc::sc_x in the other - the test stands in sc, it finds either)
         else:
@@ -2234,7 +2313,12 @@ class BuildsWriter(Writer):
         # (each call alone, in a process of its own - Builds::alone: a call the program does not survive is one C++ leaves open)
         inner += ["long asks = 0;", "const bool defined = rec.alone([&](long& asks) {",
                   f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
-        if ret:
+        if ret and con["gives"]:
+            # (a pointer to entries: as many as the page reads - its contract - compared, the whole buffer)
+            inner += ["  {", "    const auto* rp = *r;", "    using E = std::remove_cv_t<std::remove_pointer_t<std::remove_cvref_t<decltype(rp)>>>;",
+                      f"    const std::size_t len = rp ? static_cast<std::size_t>([&](const auto* r) {{ return {con['gives']}; }}(rp)) : 0;",
+                      '    rec.part("what it returns (as many entries as the page reads)", ::sc::lowered::bytes_of(rp ? std::vector<E>(rp, rp + len) : std::vector<E>{}));', "  }"]
+        elif ret:
             inner.append('  rec.part("what it returns", ::sc::lowered::bytes_of(r));')
         if method and n.kind != "CXXDestructorDecl":
             inner.append('  rec.object("its object", *self);')
