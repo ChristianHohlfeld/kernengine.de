@@ -609,7 +609,16 @@ const levelText = await (await fetch(base + "/kern/games/spawncity/level/spawnci
 let withBlueprint = [];
 for (const whole of [true, false]) {
   const file = JSON.parse(levelText);
-  if (!whole) file.actors = file.actors.filter(a => a.folder !== "Source");
+  if (!whole) {
+    // (but the libraries the Blueprints that stay use, through `uses`, one after the other - as tools/embed_level.py
+    // --without keeps them: those of "Program" call libraries of "Source")
+    const byName = new Map(file.actors.map(a => [a.name, a]));
+    const kept = new Set(file.actors.filter(a => a.folder !== "Source").map(a => a.name));
+    for (const todo = [...kept]; todo.length;)
+      for (const used of byName.get(todo.pop())?.components?.logic?.uses || [])
+        if (!kept.has(used) && byName.has(used)) { kept.add(used); todo.push(used); }
+    file.actors = file.actors.filter(a => kept.has(a.name));
+  }
   const text = JSON.stringify(file);
   const what = whole ? "the whole project" : "the level the game carries";
   const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});
