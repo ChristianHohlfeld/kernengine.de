@@ -1,0 +1,80 @@
+    Rng::seeded (1): written
+    Rng::next (1): written
+    Rng::unit (1): written
+    Rng::range (1): written
+    Rng::gaussian (8): written
+    cast (10): written
+engine_math_math                2 /    2 functions       10 /     10 lines   (what the program calls of it)
+    Quat::axis_angle (5): written
+    Quat::rotate (5): written
+engine_physics_physics          1 /    1 functions        1 /      1 lines   (what the program calls of it)
+    QueryFilter::QueryFilter (1): written
+facades                         1 /    1 functions        1 /      1 lines
+    Facades::name (1): written
+facades_cpp                     7 /    7 functions       70 /     70 lines
+    Facades::attributes (1): written
+    Facades::vertex_declarations (1): written
+    Facades::vertex (1): written
+    Facades::fragment_declarations (8): written
+    Facades::fragment_surface (57): written
+    Facades::bind (1): written
+    Facades::frame_uniforms (1): written
+mvt                             4 /    4 functions        4 /      4 lines
+    Decoder::done (1): written
+    Decoder::failed (1): written
+    Decoder::tile (1): a name for a place - written where it is called
+    Writer::bytes (1): a name for a place - written where it is called
+mvt_cpp                        30 /   30 functions      304 /    304 lines
+    Reader::more (1): written
+    Reader::varint (13): written
+    Reader::sub (7): written
+    Reader::text (7): written
+    Reader::skip (10): written
+    Reader::le32 (1): written
+    Reader::fixed64 (6): written
+    Reader::fixed32 (6): written
+    zigzag (1): written
+    read_value (18): written
+    read_geometry (21): written
+    Layer::tag (5): written
+    Layer::text (4): written
+    Layer::number (4): written
+    Tile::layer (5): written
+    ring_area (6): written
+    wanted_layer (6): written
+    open_layer (15): written
+    read_feature (22): written
+    Decoder::begin (25): written
+    Decoder::step (30): written
+    decode (7): written
+    put_varint (4): written
+    put_key (1): written
+    put_bytes (5): written
+    put_bytes (5): written
+    zz (1): written
+    Writer::begin_layer (5): written
+    Writer::feature (42): written
+    Writer::end_layer (21): written
+water_look                      1 /    1 functions        1 /      1 lines
+    WaterLook::name (1): written
+water_look_cpp                  7 /    7 functions       36 /     36 lines
+    (test_water_look: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_facades: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    (test_water_look_cpp: compiles with 1 kind(s) of warning, as in the suite: unused variable 'draw' [-Wunused-variable])
+    WaterLook::attributes (1): written
+    WaterLook::vertex_declarations (1): written
+    WaterLook::vertex (1): written
+    WaterLook::fragment_declarations (9): written
+    WaterLook::fragment_surface (22): written
+    WaterLook::bind (1): written
+    WaterLook::frame_uniforms (1): written
+
+68 of 68 functions of the program are written as Blueprints (467 of 467 lines), and 3 of the engine's headers that they call: 11 Blueprints - 3 of source files, 0 of states, 8 of headers and of shapes
+69 functions of the Blueprints are compared with their source, bit for bit, by the tests in tests/converted - each once, in the Blueprint it stands in
+
+what the others wait for: functions (lines)
+
+real	1m15,832s
+user	3m20,312s
+sys	0m12,322s

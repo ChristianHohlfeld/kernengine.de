@@ -1,0 +1,4 @@
+  cost: Facades_attributes: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  cost: WaterLook_attributes: in 300 of 300 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  cost: Writer_end_layer: in 124 of 300 calls the class asks for memory more often than the source (up to 28 times instead of 19)
+  cost: Writer_feature: in 226 of 300 calls the class asks for memory more often than the source (up to 17 times instead of 14)
