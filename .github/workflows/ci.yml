@@ -47,7 +47,7 @@ jobs:
           set +e
           KERN_JOBS=4 CLANGXX=clang++ FUNCTIONS=1 TEST_ERRORS=1 python3 ../../../tools/cpp_to_blueprint.py --convert sc --program firmware=fc,hwcontract \
             -I../../include -I../../third_party/box3d/include -Isrc --level "$W/pt/l.klevel" --test "$W/pt/converted" --texts "$W/texts" -- $SOURCES > "$W/convert.log" 2>&1
-          rc=$?; tail -n 200 "$W/convert.log"; echo "convert rc=$rc"; exit $rc
+          rc=$?; tail -n 200 "$W/convert.log"; grep -E "Game::(rebase_origin|update_net|update_town|minimap_json|handle_shots|step_cop|step_soldier) " "$W/convert.log" | cut -c1-1500; echo "convert rc=$rc"; exit $rc
       - uses: actions/upload-artifact@v4
         if: always()
         with:
