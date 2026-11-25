@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "equipment.h"
-#include "level_blueprints.h"  // the Blueprints the game calls as their classes: gps_live
+#include "gps_live.h"
 #include "kern/audio/audio.h"
 #include "settings.h"
 
@@ -27,7 +27,7 @@ struct UiState {
   f32 collider_clock = 0;
   i32 world_military = -1, world_zombies = -1;  // WORLD switches last passed to the combat systems  // the drone of this flight got its hover height
   // start (start_location.mjs, auto_flight_start.mjs, gps_live_mode.mjs)
-  blueprints::gps_live::GpsLive gps;  // (the Blueprint gps_live's struct: its functions are called as its class)
+  GpsLive gps;
   u32 moves = 0;            // how often the world moved to another start place
   std::string place;        // name of the start place the page chose ("" = GPS / default)
   Vec3 gps_cam_eye, gps_cam_look;

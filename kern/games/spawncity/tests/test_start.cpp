@@ -1,43 +1,30 @@
 // LIVE GPS (gps_live_mode.mjs): weak fixes and jumps are rejected, the track glides, activity from speed.
-// The filter is the level's Blueprint gps_live_cpp (its struct and the functions on it: gps_live), called as
-// its class - as the game calls it (level_blueprints.h), with the game's loop guard.
-#include "../src/blueprint_call.h"
-#include "level_blueprints.h"
-#include "rule_blueprint.h"
+#include "../src/gps_live.h"
 #include "test_util.h"
 
 using namespace sc;
 
 SC_TEST(start_gps_live_filter) {
-  RuleBlueprint gps_rules("gps_live_cpp", nullptr, true, {"gps_live"});
-  gps_rules.rt.budget = rules::kLoopBudget;
-  SC_CHECK(gps_rules.problems.empty() && kern::logic::bind_blueprint<blueprints::gps_live_cpp>(gps_rules.rt) && kern::logic::bind_blueprint<blueprints::gps_live>(gps_rules.rt),
-           "gps_live_cpp and gps_live run as their classes: %s", gps_rules.problems.c_str());
-  auto& filter = kern::logic::blueprint<blueprints::gps_live_cpp>();
-  auto& track = kern::logic::blueprint<blueprints::gps_live>();
-  blueprints::gps_live::GpsLive g;
-  SC_CHECK(!filter.GpsLive_fix(g, 0, 0, 0, 5).Result, "off: no fixes");
-  filter.GpsLive_start(g, 0);
-  SC_CHECK(!filter.GpsLive_fix(g, 0, 0, 0, 80).Result && g.rejected == 1, "accuracy over 65 m is rejected");
-  SC_CHECK(filter.GpsLive_fix(g, 0, 0, 0, 5).Result && track.GpsLive_has_fix(g).Result, "first fix");
+  GpsLive g;
+  SC_CHECK(!g.fix(0, 0, 0, 5), "off: no fixes");
+  g.start(0);
+  SC_CHECK(!g.fix(0, 0, 0, 80) && g.rejected == 1, "accuracy over 65 m is rejected");
+  SC_CHECK(g.fix(0, 0, 0, 5) && g.has_fix(), "first fix");
   // Jogging north at 3 m/s, a fix every second.
   f64 t = 0;
   for (int i = 1; i <= 20; ++i) {
-    for (int k = 0; k < 10; ++k) filter.GpsLive_frame(g, t + k * 0.1, 0.1);
+    for (int k = 0; k < 10; ++k) g.frame(t + k * 0.1, 0.1f);
     t = i;
-    filter.GpsLive_fix(g, t, 0, 3.0 * i, 5, 3.0, 0);
+    g.fix(t, 0, 3.0f * i, 5, 3.0f, 0);
   }
-  for (int k = 0; k < 60; ++k) filter.GpsLive_frame(g, t + 0.01 * k, 0.1);
-  const Vec3 shown = track.GpsLive_shown(g).Result;
-  SC_CHECK(std::fabs(shown.y - 60) < 4 && std::fabs(shown.x) < 0.5f, "follows the track (%.1f %.1f)", shown.x, shown.y);
-  SC_CHECK(filter.GpsLive_activity(g).Result == blueprints::gps_live::GpsLive_Activity::run, "3 m/s is running (%.2f m/s)", static_cast<f64>(track.GpsLive_speed(g).Result));
-  SC_CHECK(std::fabs(track.GpsLive_heading(g).Result) < 0.1, "heading north");
-  const f64 distance = track.GpsLive_distance(g).Result;
-  SC_CHECK(distance > 50 && distance < 70, "distance %.1f m", distance);
-  SC_CHECK(!filter.GpsLive_fix(g, t + 1, 500, 60, 20).Result, "a 500 m jump in a second is rejected");
+  for (int k = 0; k < 60; ++k) g.frame(t + 0.01 * k, 0.1f);
+  SC_CHECK(std::fabs(g.shown().y - 60) < 4 && std::fabs(g.shown().x) < 0.5f, "follows the track (%.1f %.1f)", g.shown().x, g.shown().y);
+  SC_CHECK(g.activity() == GpsLive::Activity::run, "3 m/s is running (%.2f m/s)", g.speed());
+  SC_CHECK(std::fabs(g.heading()) < 0.1f, "heading north");
+  SC_CHECK(g.distance() > 50 && g.distance() < 70, "distance %.1f m", g.distance());
+  SC_CHECK(!g.fix(t + 1, 500, 60, 20), "a 500 m jump in a second is rejected");
   // A long gap (screen off) starts cleanly at the new place.
-  SC_CHECK(filter.GpsLive_fix(g, t + 30, 200, 300, 5).Result, "after a gap");
-  filter.GpsLive_frame(g, t + 30, 0.1);
-  const Vec3 again = track.GpsLive_shown(g).Result;
-  SC_CHECK(std::fabs(again.x - 200) < 1 && std::fabs(again.y - 300) < 1, "re-acquired at the new place");
+  SC_CHECK(g.fix(t + 30, 200, 300, 5), "after a gap");
+  g.frame(t + 30, 0.1f);
+  SC_CHECK(std::fabs(g.shown().x - 200) < 1 && std::fabs(g.shown().y - 300) < 1, "re-acquired at the new place");
 }
