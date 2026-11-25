@@ -916,14 +916,15 @@ aus der der Konverter den Blueprint schreibt, und der Vergleichstest hält beide
 Das Projekt ist die Datei des Levels: `level/spawncity.klevel` mit den Actors, ihren Blueprints,
 den Typen des Projekts und den Daten – dazu das Seitenmodul (`web/`: Ansicht, Menüs, Ton).
 
-- [ ] Der Editor öffnet die Datei wie jedes Level (Kern Studio: Open); jeder Blueprint ist im
+- [x] Der Editor öffnet die Datei wie jedes Level (Kern Studio: Open); jeder Blueprint ist im
   Blueprint-Editor als Graph und als C++ zu sehen und zu ändern.
-  **Wieder offen seit 25.11.2026:** mit dem ganzen Level (158 Blueprints im Ordner „Source“, darunter Game mit den
-  Funktionen von ~40 Dateien) endet `kern/tests/e2e/blueprint_e2e.mjs` nicht in den 30 Minuten der CI (Lauf
-  45613904805: bis `game_world` in Sekunden je Blueprint, danach kein Fortschritt mehr). Die CI öffnet darum das Level,
-  wie das gebaute Spiel es trägt (ohne „Source“, s. `build.sh`); `KERN_E2E_WHOLE_LEVEL=1` öffnet das ganze Projekt.
-  Zu klären und zu beheben, bevor dieser Punkt wieder gilt: welcher Blueprint hängt (vermutlich Game), und warum
-  (Laden, Prüfen oder Zeichnen im Editor).
+  **25.11.2026:** `kern/tests/e2e/blueprint_e2e.mjs` öffnet das ganze Projekt – alle 175 Blueprints (109.289 Knoten),
+  keiner über 20 s; der langsamste, Game (36.373 Knoten, 823 Funktionen), in 15,5 s (CI 45662141502). Davor hing der
+  Editor an Game: sein Zustand suchte je Pin alle Drähte und lief je Aufruf alle Funktionskörper ab. Jetzt: ein
+  Verzeichnis der Drähte und ein Gang über alle Körper (`Graph::bodies`); ein Blueprint über 2.000 Knoten zeigt den
+  Körper einer Funktion auf einmal (Blätter: `logicSheet`, `logicReveal`, `logicFind`), die Listen, die alle Knoten
+  teilen, stehen einmal im Zustand (Test `studio_blueprint_sheets`). Offen für den Schritt Geschwindigkeit: die Prüfung
+  des mit seinen Bibliotheken verknüpften Blueprints bei jedem Zustand (der Rest der 15 s von Game).
 - [x] `tools/blueprint_cpp.sh level.klevel out.cpp` schreibt die Blueprints als Klassen;
   `tools/export_game.sh level.klevel spiel.html` baut daraus das eigenständige Spiel.
 - [ ] Das Projekt nennt sein Seitenmodul und die Einstellungen der Laufzeit (Schleifenwächter,

@@ -1,6 +1,8 @@
 // Kern Studio: editing logic graphs (the level's and the actors'). Every edit is
 // a level edit (one undo step); the page draws what logic_json() describes.
 #include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
 #include <cctype>
 #include <cmath>
@@ -443,6 +445,8 @@ bool libraries_follow(game::Level& level, u32 owner, logic::Graph& g, std::strin
   }
   return true;
 }
+/// The most nodes a canvas shows at once: a Blueprint with more shows one function's body at a time (logic_json).
+constexpr std::size_t kCanvasNodes = 2000;
 /// What is wrong with a Blueprint. One that uses libraries is judged as the one graph it is
 /// with them (logic::link): the rules that follow calls see what a library's function does.
 std::vector<logic::Issue> whole_issues(const game::Level& level, const logic::Graph& g) {
@@ -524,7 +528,44 @@ json::Value Studio::logic_json() const {
   }
   for (const logic::Issue& i : issues) by_node[i.node].push_back(&i);
   json::Value nodes = json::Value::array();
+  // (asked for every pin and every call below - once here, so a Blueprint of tens of thousands of nodes opens:
+  // which pins have a wire, and the function each node stands in)
+  auto pin_key = [](u32 node, const std::string& pin, bool output) { return std::to_string(node) + (output ? ">" : "<") + pin; };
+  std::unordered_set<std::string> wired;
+  wired.reserve(g->links.size() * 2);
+  for (const logic::Link& l : g->links) {
+    wired.insert(pin_key(l.from, l.out, true));
+    wired.insert(pin_key(l.to, l.in, false));
+  }
+  const std::unordered_map<u32, std::string> body_names = g->bodies(lib);
+  // Sheets. A canvas with tens of thousands of nodes serves nobody: a Blueprint above kCanvasNodes shows one
+  // function's body at a time (logic_sheet_; "" = what stands in no function - the events), a smaller one all of
+  // it at once. What the page needs of the nodes it does not get is counted here (counts) or asked (logicFind,
+  // logicReveal).
+  const bool sheets = g->nodes.size() > kCanvasNodes;
+  std::string sheet = sheets ? logic_sheet_ : std::string();
+  if (sheets && !sheet.empty() && !g->function(sheet)) sheet.clear();   // (renamed or removed: the events)
+  auto shown = [&](u32 id) {
+    if (!sheets) return true;
+    const auto it = body_names.find(id);
+    return it == body_names.end() ? sheet.empty() : it->second == sheet;
+  };
+  // (lists of choices that are the same for every node of the Blueprint - its functions, variables, machines,
+  // the level's events and sounds, the types a parameter takes: said once, in "choices"; a parameter names its list)
+  json::Value shared = json::Value::object();
+  std::unordered_map<const logic::ParamDef*, std::string> type_lists;
+  std::unordered_map<std::string, u32> calls, variable_refs, type_refs;
   for (const logic::Node& n : g->nodes) {
+    const logic::NodeDef* d = lib.find(n.type);
+    if (n.type == "func.call" || n.type == "func.pure" || n.type == "func.call_on") ++calls[n.param("function")];
+    if (d)
+      for (const logic::ParamDef& pd : d->params) {
+        if (pd.kind == logic::ParamDef::Kind::type) ++type_refs[n.param(pd.key, pd.def)];
+        if (pd.key == "variable" && n.param("scope").empty()) ++variable_refs[n.param("variable")];
+      }
+  }
+  for (const logic::Node& n : g->nodes) {
+    if (!shown(n.id)) continue;
     const logic::NodeDef* d = lib.find(n.type);
     json::Value x = json::Value::object();
     x.set("id", n.id);
@@ -565,10 +606,7 @@ json::Value Studio::logic_json() const {
           for (std::string_view w : logic::kWidthNames) types += " " + std::string(w) + "_list";
           pj.set("generic", types);
         }
-        bool linked = false;
-        for (const logic::Link& l : g->links)
-          if ((output && l.from == n.id && l.out == p.id) || (!output && l.to == n.id && l.in == p.id)) linked = true;
-        pj.set("linked", linked);
+        pj.set("linked", wired.count(pin_key(n.id, p.id, output)) != 0);
         if (!output && p.type != logic::PinType::exec) {
           const json::Value* v = n.value(p.id);
           pj.set("value", logic::Value::from_json(v ? *v : p.def, p.type, *g, p.of).to_json(*g, p.of));
@@ -597,6 +635,19 @@ json::Value Studio::logic_json() const {
           choices.push(std::move(c));
         };
         using K = logic::ParamDef::Kind;
+        // (a list every node of the Blueprint shares: built the first time a node asks, named ever after)
+        std::string list;
+        if (pd.kind == K::machine) list = "machine";
+        if (pd.kind == K::function) list = "function";
+        if (pd.kind == K::event) list = "event";
+        if (pd.kind == K::sound) list = "sound";
+        if (pd.kind == K::variable && !g->function(n.param("scope"))) list = "variable";
+        if (pd.kind == K::type) list = type_lists.try_emplace(&pd, "type" + std::to_string(type_lists.size())).first->second;
+        if (!list.empty() && shared.has(list)) {
+          pj.set("list", list);
+          params.push(std::move(pj));
+          continue;
+        }
         if (pd.kind == K::choice)
           for (std::size_t i = 0; i + 1 < pd.choices.size(); i += 2) choice(pd.choices[i], pd.choices[i + 1]);
         if (pd.kind == K::type)
@@ -630,13 +681,15 @@ json::Value Studio::logic_json() const {
           for (const audio::BuiltinSound& b : audio::builtin_sounds()) choice(std::string("builtin:") + b.name, b.label);
           for (const game::SoundAsset& sa : level_.sounds) choice(sa.id, sa.name);
         }
-        pj.set("choices", std::move(choices));
+        if (list.empty()) pj.set("choices", std::move(choices));
+        else { shared.set(list, std::move(choices)); pj.set("list", list); }
         params.push(std::move(pj));
       }
       // A call of a function with reference inputs: for each, the place the call gives it - a
       // variable (of the Blueprint, or of the function the call stands in) and the path from it.
       if (const logic::Function* called = n.type == "func.call" || n.type == "func.pure" ? g->function(n.param("function")) : nullptr) {
-        const logic::Function* body = g->function(g->body_of(n.id, lib));
+        const auto in_body = body_names.find(n.id);
+        const logic::Function* body = in_body == body_names.end() ? nullptr : g->function(in_body->second);
         for (const logic::FunctionPin& in : called->inputs) {
           if (!in.ref) continue;
           json::Value variable = json::Value::object(), path = json::Value::object(), choices = json::Value::array();
@@ -678,8 +731,43 @@ json::Value Studio::logic_json() const {
     nodes.push(std::move(x));
   }
   o.set("nodes", std::move(nodes));
+  o.set("choices", std::move(shared));
+  {
+    json::Value counts = json::Value::object();
+    auto put = [&](const char* key, const std::unordered_map<std::string, u32>& of) {
+      json::Value m = json::Value::object();
+      for (const auto& [name, n] : of) m.set(name, n);
+      counts.set(key, std::move(m));
+    };
+    put("calls", calls);
+    put("variables", variable_refs);
+    put("types", type_refs);
+    counts.set("nodes", static_cast<u32>(g->nodes.size()));
+    counts.set("links", static_cast<u32>(g->links.size()));
+    o.set("counts", std::move(counts));
+  }
+  if (sheets) {
+    // (the sheets: each function with a body - how many nodes, and the node it starts at)
+    std::unordered_map<std::string, u32> size;
+    u32 events = static_cast<u32>(g->nodes.size());
+    for (const auto& [id, name] : body_names) { ++size[name]; --events; }
+    json::Value list = json::Value::array();
+    for (const logic::Node& n : g->nodes) {
+      if (n.type != "func.entry") continue;
+      json::Value x = json::Value::object();
+      const std::string name = n.param("function");
+      x.set("name", name);
+      x.set("nodes", size[name]);
+      x.set("entry", n.id);
+      list.push(std::move(x));
+    }
+    o.set("sheets", std::move(list));
+    o.set("sheet", sheet);
+    o.set("sheetEvents", events);
+  }
   json::Value links = json::Value::array();
   for (const logic::Link& l : g->links) {
+    if (sheets && !(shown(l.from) && shown(l.to))) continue;
     json::Value x = json::Value::array();
     x.push(l.from);
     x.push(l.out);
@@ -771,7 +859,23 @@ json::Value Studio::logic_json() const {
     o.set("otherTypes", std::move(types));
   }
   o.set("machines", graph["machines"]);
-  o.set("comments", graph["comments"].is_array() ? graph["comments"] : json::Value::array());
+  if (!sheets) o.set("comments", graph["comments"].is_array() ? graph["comments"] : json::Value::array());
+  else {
+    // (a comment box stands on the sheet of the nodes in it; one around nothing, on the events' sheet)
+    json::Value boxes = json::Value::array();
+    for (const logic::CommentBox& c : g->comments) {
+      bool any = false, mine = false;
+      for (const logic::Node& n : g->nodes) {
+        if (n.x < c.x || n.y < c.y || n.x > c.x + c.w || n.y > c.y + c.h) continue;
+        any = true;
+        if (shown(n.id)) { mine = true; break; }
+      }
+      if (!(mine || (!any && sheet.empty()))) continue;
+      const json::Value& all = graph["comments"];
+      for (const json::Value& j : all.items()) if (static_cast<u32>(j["id"].as_number()) == c.id) boxes.push(j);
+    }
+    o.set("comments", std::move(boxes));
+  }
   json::Value iss = json::Value::array();
   if (const std::string conflict = project_type_conflict(level_, logic_owner_, *g); !conflict.empty()) {
     json::Value x = json::Value::object();
@@ -834,6 +938,7 @@ void Studio::check_logic_breakpoints() {
       logic_owner_ = owner;
       logic_open_ = true;
       logic_view_ = "graph";
+      logic_sheet_.clear();
       const logic::Graph* g = owner ? (a && a->logic ? &*a->logic : nullptr) : &level_.logic;
       const logic::Node* n = g ? g->find(node) : nullptr;
       report("Breakpoint: " + (n ? logic::library().title(*n) : std::string("node")) + " ran - the game is paused (Resume continues)", "warn");
@@ -1292,6 +1397,7 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     logic_owner_ = owner;
     logic_open_ = true;
     logic_view_ = "graph";
+    logic_sheet_.clear();
     touch();
     return ok_result();
   }
@@ -1304,6 +1410,61 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
     logic_view_ = str("view").empty() ? "graph" : str("view");
     touch();
     return ok_result();
+  }
+  if (name == "logicSheet") {
+    // The function whose body the graph view shows ("" = the events) - in a Blueprint that has sheets (logic_json).
+    logic_view_ = "graph";
+    logic_sheet_ = str("function");
+    touch();
+    return ok_result();
+  }
+  if (name == "logicReveal") {
+    // Shows the sheet a node stands on (a result of Find, a compiler message): the page then moves to the node.
+    const logic::Graph* g = graph_of(level_, logic_owner_);
+    const u32 node = static_cast<u32>(num("node"));
+    if (!g || !g->find(node)) return fail_result("no such node");
+    const auto bodies = g->bodies(logic::library());
+    const auto it = bodies.find(node);
+    logic_view_ = "graph";
+    logic_sheet_ = it == bodies.end() ? std::string() : it->second;
+    touch();
+    return ok_result();
+  }
+  if (name == "logicFind") {
+    // Find in the whole Blueprint, also on the sheets that are not shown: nodes by title, comment, category and
+    // parameter values. At most 200 hits - "more" says there are others.
+    const logic::Graph* g = graph_of(level_, logic_owner_);
+    json::Value r = ok_result();
+    json::Value hits = json::Value::array();
+    std::string q = str("query");
+    for (char& ch : q) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    bool more = false;
+    if (g && !q.empty()) {
+      const logic::Library& lib = logic::library();
+      const auto bodies = g->bodies(lib);
+      for (const logic::Node& n : g->nodes) {
+        const logic::NodeDef* d = lib.find(n.type);
+        const std::string title = lib.title(n);
+        std::string hay = title + " " + n.comment + " " + (d ? d->category : std::string());
+        for (const auto& [k, v] : n.params) hay += " " + v;
+        std::vector<logic::PinDef> in, out;
+        lib.pins(n, *g, in, out);
+        for (const logic::PinDef& pin : in) hay += " " + pin.label;
+        for (const logic::PinDef& pin : out) hay += " " + pin.label;
+        for (char& ch : hay) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+        if (hay.find(q) == std::string::npos) continue;
+        if (hits.size() >= 200) { more = true; break; }
+        json::Value h = json::Value::object();
+        h.set("node", n.id);
+        h.set("title", title);
+        if (d) { h.set("category", d->category); h.set("kind", kind_name(d->kind)); }
+        if (const auto it = bodies.find(n.id); it != bodies.end()) h.set("sheet", it->second);
+        hits.push(std::move(h));
+      }
+    }
+    r.set("hits", std::move(hits));
+    r.set("more", more);
+    return r;
   }
   if (name == "logicPalette") return logic_palette(c);
   if (name == "logicBreakpoint") {

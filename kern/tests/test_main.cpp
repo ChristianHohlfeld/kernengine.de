@@ -11931,6 +11931,97 @@ TEST(micro_duck_example_level_runs) {
   CHECK(f.world->walker_state(l.world.player) != "Idle");  // autonomous
 }
 
+// A Blueprint too large for one canvas (logic_edit.cpp, kCanvasNodes) shows one function's body at a time: the
+// editor's state has the nodes and wires of that sheet only, the lists every node shares once, and what the page
+// needs of the others as counts. Opening such a Blueprint took time with the square of its nodes before.
+TEST(studio_blueprint_sheets) {
+  StudioFixture f;
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  // 60 functions of 42 nodes each (F(x) = x * 2 * 2 ...), and the events: Begin calls F0.
+  json::Value g = json::Value::object(), fns = json::Value::array(), nodes = json::Value::array(), links = json::Value::array();
+  auto node = [&](u32 id, const char* type, const char* key = nullptr, const std::string& value = {}) {
+    json::Value n = json::Value::object();
+    n.set("id", id);
+    n.set("type", type);
+    if (key) { json::Value p = json::Value::object(); p.set(key, value); n.set("params", std::move(p)); }
+    nodes.push(std::move(n));
+  };
+  auto link = [&](u32 from, const char* out, u32 to, const char* in) {
+    json::Value l = json::Value::array();
+    l.push(from); l.push(out); l.push(to); l.push(in);
+    links.push(std::move(l));
+  };
+  for (u32 k = 0; k < 60; ++k) {
+    const std::string name = "F" + std::to_string(k);
+    json::Value fn, in, out;
+    json::parse(R"({"pure":true})", fn);
+    json::parse(R"([{"name":"x","type":"float","value":0}])", in);
+    json::parse(R"([{"name":"result","type":"float","value":0}])", out);
+    fn.set("name", name); fn.set("inputs", std::move(in)); fn.set("outputs", std::move(out));
+    fns.push(std::move(fn));
+    const u32 base = 1000 + k * 100;
+    node(base, "func.entry", "function", name);
+    for (u32 i = 1; i <= 40; ++i) {
+      node(base + i, "math.mul");
+      link(base + i - 1, i == 1 ? "x" : "result", base + i, "a");
+    }
+    node(base + 41, "func.return", "function", name);
+    link(base, "then", base + 41, "exec");
+    link(base + 40, "result", base + 41, "result");
+  }
+  node(1, "event.begin");
+  node(2, "func.pure", "function", "F0");
+  g.set("functions", std::move(fns)); g.set("nodes", std::move(nodes)); g.set("links", std::move(links));
+  json::Value level;
+  CHECK(json::parse(game::to_text(f.s->level()), level));
+  level.set("logic", std::move(g));
+  json::Value open = json::Value::object();
+  open.set("cmd", "open"); open.set("text", json::stringify(level)); open.set("name", "sheets.klevel");
+  CHECK(f.s->command(open)["ok"].as_bool());
+  CHECK(f.s->level().logic.nodes.size() == 60 * 42 + 2);
+  CHECK(no_errors(logic::check(f.s->level().logic)));
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  json::Value l = f.s->state()["logic"];
+  // the events' sheet: the two nodes that stand in no function
+  CHECK(l["sheets"].size() == 60 && l["sheet"].as_string().empty() && l["nodes"].size() == 2 && l["links"].size() == 0);
+  CHECK(l["sheets"][7]["name"].as_string() == "F7" && l["sheets"][7]["nodes"].as_number() == 42 && l["sheets"][7]["entry"].as_number() == 1700);
+  CHECK(l["counts"]["nodes"].as_number() == 60 * 42 + 2 && l["counts"]["links"].as_number() == 60 * 42);
+  CHECK(l["counts"]["calls"]["F0"].as_number() == 1 && l["counts"]["calls"]["F1"].is_null());
+  CHECK(l["functions"].size() == 60);  // (every function is listed, whatever is shown)
+  // the function a call names: one list for all nodes
+  CHECK(l["choices"]["function"].size() == 60);
+  bool listed = false;
+  for (const json::Value& n : l["nodes"].items())
+    for (const json::Value& p : n["params"].items()) listed = listed || (p["key"].as_string() == "function" && p["list"].as_string() == "function" && p["choices"].is_null());
+  CHECK(listed);
+  // a function's sheet: its body and the wires in it
+  CHECK(f.cmd(R"({"cmd":"logicSheet","function":"F7"})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["sheet"].as_string() == "F7" && l["view"].as_string() == "graph" && l["nodes"].size() == 42 && l["links"].size() == 42);
+  bool own = true, wired = false;
+  for (const json::Value& n : l["nodes"].items()) {
+    own = own && n["id"].as_number() >= 1700 && n["id"].as_number() <= 1741 && !n["title"].as_string().empty();
+    if (n["id"].as_number() == 1705) wired = n["inputs"][0]["linked"].as_bool() && !n["inputs"][1]["linked"].as_bool();
+  }
+  CHECK(own && wired);
+  // a node of another sheet is found and shown
+  json::Value found = f.cmd(R"({"cmd":"logicFind","query":"begin"})");
+  CHECK(found["hits"].size() == 1 && found["hits"][0]["node"].as_number() == 1 && found["hits"][0]["sheet"].is_null());
+  found = f.cmd(R"({"cmd":"logicFind","query":"multiply"})");
+  CHECK(found["hits"].size() == 200 && found["more"].as_bool() && found["hits"][0]["sheet"].as_string() == "F0");
+  CHECK(f.cmd(R"({"cmd":"logicReveal","node":4320})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["sheet"].as_string() == "F33");
+  CHECK(f.cmd(R"({"cmd":"logicReveal","node":1})")["ok"].as_bool());
+  CHECK(f.s->state()["logic"]["sheet"].as_string().empty());
+  CHECK(!f.cmd(R"({"cmd":"logicReveal","node":999999})")["ok"].as_bool());
+  // a small Blueprint shows all of itself: no sheets
+  CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicOpen","owner":0})")["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicTemplate","template":"robot_avoid"})")["ok"].as_bool());
+  l = f.s->state()["logic"];
+  CHECK(l["sheets"].is_null() && l["nodes"].size() == 9 && l["counts"]["nodes"].as_number() == 9);
+}
+
 TEST(studio_robot_template_compiles) {
   StudioFixture f;
   CHECK(f.cmd(R"({"cmd":"new","template":"basic"})")["ok"].as_bool());
@@ -13499,8 +13590,9 @@ TEST(studio_logic_structs) {
   // (its settings: the variable, and the path from it to the place - a text on the node)
   std::string variables, path_kind, path_value;
   const json::Value tuned = node(tune);
+  const json::Value shared = f.s->state()["logic"]["choices"];   // (the lists every node shares: a parameter names its list)
   for (const json::Value& p : tuned["params"].items()) {
-    for (const json::Value& ch : p["choices"].items())
+    for (const json::Value& ch : (p["choices"].is_null() ? shared[p["list"].as_string()] : p["choices"]).items())
       if (p["key"].as_string() == "variable") variables += ch[0].as_string() + " ";
     if (p["key"].as_string() == "path") path_kind = p["kind"].as_string(), path_value = p["value"].as_string();
   }

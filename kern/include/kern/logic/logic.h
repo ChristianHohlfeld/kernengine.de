@@ -674,6 +674,10 @@ struct Graph {
   /// exec wires - or to a step that reads it. Empty: none does (an event's path, nothing), or
   /// more than one. Where the places a call names are looked up (the call's setting "scope").
   std::string body_of(u32 node, const class Library& lib) const;
+  /// body_of for every node at once: the function each node of a body stands in. A node that is in no body, or in the
+  /// bodies of two functions, is not in the map - body_of gives "" for it. One walk over each body, where asking
+  /// body_of node by node walks every body for every node.
+  std::unordered_map<u32, std::string> bodies(const class Library& lib) const;
   StateMachine* machine(u32 id);
   const StateMachine* machine(std::string_view name) const;
   const Function* function(std::string_view name) const;
