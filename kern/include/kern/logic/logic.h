@@ -1520,6 +1520,7 @@ class Instance {
   int active_ = 0;                    // chains of this instance that are running (nested: events, calls)
   bool stopping_ = false;             // the loop guard: disabled when its outermost chain is over
   bool disabled_ = false;
+  i64 engine_object_ = 0;   // (the object of the engine it is, once asked for: Runtime::engine_object)
   bool begun_ = false;
   bool ended_ = false;                // End Play has run (Runtime::end, remove)
 };
@@ -1595,6 +1596,12 @@ class Runtime {
   /// Has Blueprint: does `target` (0: the Level) have a Blueprint that runs - one without errors that
   /// has not been stopped? What Call on Actor and Get Variable on Actor reach when it has one.
   bool has_blueprint(ActorRef target);
+  /// Engine Object of Blueprint: the object of the engine the Blueprint of `target` (0: the Level's) is - of the
+  /// interface its graph implements (Graph::implements: App, ShaderExtension ...) - as its handle in the host's
+  /// objects (Host::engine_objects), which own it; made once per Blueprint, the same handle every time. 0: no
+  /// Blueprint that runs there, it implements none, the host has no objects of the engine or this build no adapter
+  /// of the interface (engine_implement). What the engine is handed where it takes such an object (App::extensions).
+  i64 engine_object(ActorRef target);
   /// For a Blueprint's class (NativeBlueprint): its node with the id `node` waits `seconds`; then
   /// the runtime runs it again (NativeBlueprint::run with `entry`) - the waits of every tier are
   /// kept and served in one place. cancel_waits: the node's waits are off.

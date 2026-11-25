@@ -7905,6 +7905,54 @@ TEST(engine_interface_a_blueprint_implements) {
   objects.clear();
 }
 
+// Engine Object of Blueprint (func.engine_object, Runtime::engine_object): the object of the engine another Blueprint is -
+// what an App gives the engine as its extensions (`&facades()` of the program: the Blueprint Facades) - its handle in the
+// host's objects, made once: the same handle every time; 0 where there is no Blueprint that runs, one that implements
+// nothing, or a host without objects of the engine.
+TEST(engine_object_of_a_blueprint) {
+  struct Host : FakeLogicHost {
+    logic::EngineObjects objects;
+    bool has = true;
+    logic::EngineObjects* engine_objects() override { return has ? &objects : nullptr; }
+    logic::ActorRef find_actor(std::string_view name) override { return name == "Water" ? 11 : name == "Asks" ? 12 : 0; }
+  } host;
+  logic::Runtime rt(host);
+  logic::Graph water, asks;
+  std::string error;
+  CHECK(logic::from_cpp(blueprint_native::kImplementsWater, water, nullptr, &error) && water.implements == "ShaderExtension");
+  CHECK(logic::from_cpp("struct Asks : kern::Blueprint {\n"
+                        "  // ---- functions ----\n"
+                        "  struct waterResult { Int result = 0; };\n"
+                        "  waterResult water() {\n"
+                        "    return {func_engine_object(actor_find(\"Water\"))};\n"
+                        "  }\n"
+                        "\n"
+                        "  struct selfResult { Int result = 0; };\n"
+                        "  selfResult self() {\n"
+                        "    return {func_engine_object(actor_find(\"Asks\"))};\n"
+                        "  }\n"
+                        "};\n", asks, nullptr, &error));
+  CHECK(no_errors(logic::check(asks)));
+  logic::Instance* const w = rt.add(water, 11, "Water");
+  logic::Instance* const a = rt.add(asks, 12, "Asks");
+  rt.begin();
+  CHECK(w && a);
+  if (!w || !a) return;
+  std::vector<logic::Value> got;
+  CHECK(a->call("water", {}, got) && got.size() == 1);
+  const i64 h = got.empty() ? 0 : got[0].as_int();
+  ShaderExtension* const ext = host.objects.get<ShaderExtension>(h);
+  CHECK(h != 0 && ext && std::string(ext->name()) == "water");
+  CHECK(rt.engine_object(11) == h && rt.engine_object(11) == h);   // (made once)
+  CHECK(a->call("self", {}, got) && got.size() == 1 && got[0].as_int() == 0);   // (it implements nothing)
+  CHECK(rt.engine_object(99) == 0);   // (no Blueprint there)
+  host.has = false;
+  logic::Runtime other(host);
+  other.add(water, 11, "Water");
+  CHECK(other.engine_object(11) == 0);   // (a host without objects of the engine)
+  host.objects.clear();
+}
+
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
 // the entry its input names, read and set through the door as C++ reads and sets it; an index outside the array
 // names no entry - C++ leaves such a call open, the engine refuses it and says so (and sets nothing).

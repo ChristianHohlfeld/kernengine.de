@@ -491,6 +491,9 @@ sie **auf einem Actor** auf.
 - **Ob er einen hat:** der Wert-Knoten **Has Blueprint** (unter *Functions*) sagt, ob Target – ohne
   Target das Level – einen Blueprint hat, der läuft (ohne Fehler, nicht gestoppt): den, den Call on
   Actor und Get Variable on Actor dann erreichen.
+- **Sein Objekt der Engine:** der Wert-Knoten **Engine Object of Blueprint** (unter *Functions*) gibt das Objekt der Engine,
+  das der Blueprint auf Target ist (seine Schnittstelle, z. B. eine Shader Extension), als Handle – das, was eine App der Engine
+  als ihre Extensions gibt; 0, wenn Target keinen laufenden Blueprint hat oder dieser keine Schnittstelle implementiert.
 
 ### Typen des Projekts (Aufzählungen und Strukturen, die mehrere Blueprints haben)
 

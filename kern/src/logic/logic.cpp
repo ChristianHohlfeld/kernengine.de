@@ -1,6 +1,7 @@
 // Kern Logic: values, graph data, the node library, checking and the interpreter.
 #include "kern/logic/logic.h"
 #include "kern/logic/engine_api.h"
+#include "kern/logic/engine_host.h"
 
 #include <unordered_set>
 #include <unordered_map>
@@ -3829,6 +3830,14 @@ bool Runtime::get_on(ActorRef target, std::string_view name, PinType as, Value& 
 bool Runtime::has_blueprint(ActorRef target) {
   const Instance* i = find(target);
   return i && !i->disabled_;
+}
+
+i64 Runtime::engine_object(ActorRef target) {
+  Instance* i = find(target);
+  if (!i || i->disabled_) return 0;
+  if (i->engine_object_ == 0)
+    if (EngineObjects* objects = host_.engine_objects()) i->engine_object_ = engine_implement(*objects, *i);
+  return i->engine_object_;
 }
 
 void Runtime::call_on(Instance& caller, std::string_view function, ActorRef target, const std::vector<Value>& args, std::vector<Value>& results) {

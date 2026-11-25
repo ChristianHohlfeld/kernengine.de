@@ -220,6 +220,9 @@ struct BlueprintCore : logic::PureNodes {
   /// Has Blueprint: does `target` (Actor{0}: the Level) have a Blueprint that runs - what Call on Actor
   /// and Get Variable on Actor reach? func_has_blueprint(actor_find("Wanted")).
   Bool func_has_blueprint(Actor target) const { return kern_world.runtime && kern_world.runtime->has_blueprint(target.id); }
+  /// Engine Object of Blueprint: the handle of the object of the engine the Blueprint of `target` is (the interface
+  /// it implements; Runtime::engine_object) - func_engine_object(actor_find("Facades")).
+  Int func_engine_object(Actor target) const { return kern_world.runtime ? kern_world.runtime->engine_object(target.id) : 0; }
 
   // ---- random ----
   /// Where the Random nodes start from: the instance's seed (a class without a world: its host's
