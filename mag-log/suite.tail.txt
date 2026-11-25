@@ -1,0 +1,80 @@
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/converted/test_water_look_cpp.cpp:209:21: warning: unused variable 'draw' [-Wunused-variable]
+  209 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/converted/test_water_look_cpp.cpp:229:21: warning: unused variable 'draw' [-Wunused-variable]
+  229 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+1 warning generated.
+8 warnings generated.
+1 warning generated.
+1 warning generated.
+time: built test_touch_play_cpp.cpp in 32 s
+5 warnings generated.
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/converted/test_world_traffic_cpp.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/converted/test_world_traffic_cpp.cpp:223:78: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  223 |               if (!dup) converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                              ^
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/converted/test_world_traffic_cpp.cpp:661:21: warning: unused variable 'draw' [-Wunused-variable]
+  661 |     converted::Draw draw;   // (every function its own arguments, the same in every run)
+      |                     ^~~~
+time: built test_tiles_cpp.cpp in 39 s
+3 warnings generated.
+time: built test_wire.cpp in 30 s
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:174:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  174 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:222:85: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  222 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g->width});
+      |                                                                                     ^
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:610:39: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  610 |         n.arms.push_back({dir, l.width});
+      |                                       ^
+/dev/shm/spawncity-jobs-chris/d5057e23-spiel-142414-6430/kern/games/spawncity/tests/lowered/test_world_traffic_lowered.cpp:659:84: warning: missing field 'pole' initializer [-Wmissing-field-initializers]
+  659 |               if (!dup) ::sc::converted::at(nodes, ni).arms.push_back({dir, g.width});
+      |                                                                                    ^
+4 warnings generated.
+time: built test_net_session_lowered.cpp in 37 s
+time: built test_terrain_cpp.cpp in 87 s
+time: built test_life_lowered.cpp in 49 s
+time: built test_world_marks_cpp.cpp in 61 s
+time: the objects built (1788 s since the start)
+time: the tests linked (1809 s since the start)
+  time: Blueprint Game: 63.6 s before its first call (read from the level, linked, checked and started - the interpreter and the class; so far in the test: read 2.4 s, linked 2.9 s, checked 23.1 s, added 34.9 s, begun 0.0 s)
+  time: mp_local_ready: 1.1 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1035911 values given and held, 0 loop passes of the class (up to 0 in a call)
+  cost: voice_mic_on: in 12 of 20 calls the class asks for memory more often than the source (up to 4 times instead of 0)
+  cost: world_rule_locked: in 5 of 20 calls the class asks for memory more often than the source (up to 1 times instead of 0)
+  time: net_world_rules: 1.1 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 0.8 s, drawing and the source 0.1 s) - 20 calls drawn, 20 compared; 1035911 values given and held, 167 loop passes of the class (up to 26 in a call)
+  cost: world_rules_json: in 16 of 20 calls the class asks for memory more often than the source (up to 6 times instead of 5)
+  cost: my_state: in 20 of 20 calls the class asks for memory more often than the source (up to 203 times instead of 0)
+  time: update_nav: 1.4 s (the class 0.0 s, the interpreter 0.0 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.4 s) - 55 calls drawn, 20 compared; 1127562 values given and held, 63 loop passes of the class (up to 51 in a call)
+  time: mp_input: 1.1 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1106889 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: voice_capture: 1.2 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 1.0 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1100983 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: mix_voice: 1.1 s (the class 0.0 s, the interpreter 0.0 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1100983 values given and held, 0 loop passes of the class (up to 0 in a call)
+  time: remote_on_segment: 1.1 s (the class 0.0 s, the interpreter 0.0 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1092186 values given and held, 41 loop passes of the class (up to 8 in a call)
+  cost: remote_on_segment: in 5 of 20 calls the class asks for memory more often than the source (up to 4 times instead of 0)
+  time: hit_remotes: 1.2 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 1.0 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1092186 values given and held, 72 loop passes of the class (up to 34 in a call)
+  cost: hit_remotes: in 6 of 20 calls the class asks for memory more often than the source (up to 209 times instead of 0)
+[spawncity net] message type 5 (30 bytes) was not sent
+  time: blast_shown: 1.2 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1093550 values given and held, 38 loop passes of the class (up to 6 in a call)
+  cost: blast_shown: in 1 of 20 calls the class asks for memory more often than the source (up to 67 times instead of 65)
+  time: blast_remotes: 1.1 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1069455 values given and held, 55 loop passes of the class (up to 8 in a call)
+  cost: blast_remotes: in 1 of 20 calls the class asks for memory more often than the source (up to 60 times instead of 0)
+  time: draw_remote_people: 1.6 s (the class 0.0 s, the interpreter 0.6 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 23 calls drawn, 20 compared; 1188973 values given and held, 4536 loop passes of the class (up to 1129 in a call)
+  cost: draw_remote_people: in 10 of 20 calls the class asks for memory more often than the source (up to 152 times instead of 8)
+  time: draw_remote_vehicles: 1.5 s (the class 0.0 s, the interpreter 0.4 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 23 calls drawn, 20 compared; 1188973 values given and held, 1996 loop passes of the class (up to 789 in a call)
+  cost: draw_remote_vehicles: in 19 of 20 calls the class asks for memory more often than the source (up to 506 times instead of 0)
+  time: mp_hud_json: 1.7 s (the class 0.0 s, the interpreter 0.6 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 28 calls drawn, 20 compared; 1447288 values given and held, 5305 loop passes of the class (up to 1218 in a call)
+  cost: mp_hud_json: in 15 of 20 calls the class asks for memory more often than the source (up to 683 times instead of 4)
+  time: bigmap_json: 2.1 s (the class 0.0 s, the interpreter 0.3 s, the Blueprints' variables and comparing 1.0 s, drawing and the source 0.8 s) - 89 calls drawn, 20 compared; 2221632 values given and held, 2388 loop passes of the class (up to 628 in a call)
+  cost: bigmap_json: in 10 of 20 calls the class asks for memory more often than the source (up to 430 times instead of 6)
+  time: net_command: 1.2 s (the class 0.0 s, the interpreter 0.1 s, the Blueprints' variables and comparing 0.9 s, drawing and the source 0.2 s) - 20 calls drawn, 20 compared; 1116995 values given and held, 0 loop passes of the class (up to 0 in a call)
+ok   converted_Game__game_net_cpp (87.3 s, CPU 87.2 s)
+1 tests, 44 checks, 0 failures (CPU of the tests 87.2 s, 1 at once)
+time: the first pass (the engine's stand-in) (1897 s since the start)
+
+real	31m36,578s
+user	259m52,541s
+sys	3m40,025s
