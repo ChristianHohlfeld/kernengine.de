@@ -555,6 +555,15 @@ Commits seit `main`). Drei Festlegungen, damit er nicht wieder verrutscht:
 Der Vergleich gegen die Engine selbst (nicht nur gegen ihren Stellvertreter) läuft seit 15.11. im
 Test mit (`SC_ENGINE=real`).
 
+**Stand 25.11.2026, 15:30 (Abschluss 1: `work` = der bewiesene Stand, live).** Voller Lauf auf mag
+`work-abschluss1-voll-130718-2` (convert, suite, engine rc=0) und CI-Lauf 45621562516 (alle Jobs grün, die
+Spiel-Suite in 24 Teil-Läufen): 1.763 von 1.847 Funktionen des Programms sind als Blueprints geschrieben (24.611 von
+30.990 Zeilen), 158 Blueprints; 1.718 Funktionen sind mit ihrem Quelltext Bit für Bit verglichen – gegen den
+Stellvertreter der Engine und gegen die Engine selbst. Offen für Abschluss 2 (aus `convert.log` dieses Laufs): 126
+Grundursachen mit 4.798 Zeilen, davon 31 Funktionen (2.769 Zeilen) „its source does not compile with a Blueprint's
+numbers yet“ (Test-Schreiber) und 13 Funktionen von Game mit Zeigern; dazu 711 `cost:`-Zeilen (die Klasse fordert
+öfter Speicher an als die Quelle). Der Abschnitt darunter ist der Stand vom 14.11.
+
 **Stand 14.11.2026, 23:35 (Schlusslauf auf `work`).** 1.360 von 1.817 Funktionen des Programms
 (11.947 von 30.758 Zeilen) stehen als Blueprints im Level – 155 Blueprints (70 von Quelldateien,
 `Game` als ein Zustand, 84 von Headern und Formen); 1.316 Funktionen vergleicht der Test Bit für Bit
