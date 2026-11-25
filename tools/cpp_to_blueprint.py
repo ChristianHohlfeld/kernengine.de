@@ -2377,8 +2377,10 @@ class Unit:
         g.pure = bool(fn.get("pure"))
         # (what it asks the engine: whether its Blueprint - or one it uses - has a node of the engine; see invoke)
         g.asks_engine = info["engine"]
+        g.class_defaults = []   # (what an input is where a call leaves it out: its default, as the level holds it)
         for i, p in enumerate(fn.get("inputs", [])):
             pt, count = self.class_pin(lib, p)
+            g.class_defaults.append(None if p.get("ref") else self.level_value(p.get("value"), pt, count, f"the default of the input {p['name']} of {lib}::{name}()"))
             g.params.append((p["name"], pt))
             g.kinds.append("ref" if p.get("ref") is True else "const" if p.get("ref") == "const" else "")
             if count:
@@ -7232,7 +7234,13 @@ class Emit:
         lib, name = self.class_call(n)
         g = self.u.class_function(lib, name)
         self.f.on_actors.append((lib, None))
-        return self.invoke(g, kids(n)[1:])
+        args = list(kids(n)[1:])
+        for i, a in enumerate(args):   # (an input the call leaves out: the default its Blueprint gives it)
+            if a.get("kind") == "CXXDefaultArgExpr":
+                if i >= len(g.params) or g.class_defaults[i] is None:
+                    raise Wait(f"a call of {g.name}() that leaves out an input without a default")
+                args[i] = {"kind": "_Text", "_text": g.class_defaults[i], "_type": g.params[i][1], "_bt": g.params[i][1]}
+        return self.invoke(g, args)
 
     def language_value(self, n):
         """Is this a value of one of the language's own types as a Blueprint's class holds it (kern::logic::Sized, Whole,
@@ -9811,6 +9819,12 @@ class Emit:
             if ref.get("kind") == "EnumConstantDecl":
                 d = self.tree.decl.get(i)
                 q = d.get("_enum") if d else None
+                if q is None and CLASS_TYPE.fullmatch(self.ctype(b) or ""):
+                    # (a value of an enum of a Blueprint's class - blueprints::person_hit::BodyPart::head: that enum's value)
+                    e = self.tp(b)
+                    if e not in u.enum_values or ref.get("name") not in u.enum_values[e]:
+                        raise Wait(f"the value {ref.get('name')} of the enum {e} of a Blueprint's class, which the level does not have")
+                    return f"{e}::{ref['name']}", e
                 if q is None:
                     raise Wait("an enum value of an enum without a name")
                 e = u.enum(q)
