@@ -57,8 +57,8 @@ The list of `kern_gl` functions is exactly what the engine uses. A new entry poi
 
 | Symbol | Meaning |
 |---|---|
-| `extern "C" u32 kern_game_extensions(ShaderExtension*** out)` | A game in the module can supply its shader extensions; weak default version: none (`src/api/c_api.cpp`). Queried by `kern_renderer_init`. |
-| `kern::App* kern_create_app()` | Must be defined by a game built with `--app` (`include/kern/app/app.h`); `kern_app_start` calls it. |
+| `extern "C" int kern_main()` | The program's one entry, defined by a game built with `--app` (`include/kern/app/run.h`); the platform layer calls it once before `kern_app_start`; it hands over the App with `kern::run`. |
+| `int kern::run(App&, const ProjectSettings& = {})` | Hands the app runtime the App and the project's settings, once (a second call: 1). `kern::run(const game::Project&)` (`include/kern/game/program.h`): the App of the project's program. |
 | `extern "C" void kern_set_native_height_sampler(f64 (*)(f64, f64))` | **native only**: replaces the `terrain_height` import (tests, tools). |
 
 ---
@@ -79,7 +79,7 @@ All functions act on the process-wide renderer `c_api_renderer()` (used by `Kern
 
 | Function | Description |
 |---|---|
-| `i32 kern_renderer_init(const u32* d)` | initialization from a `KERN_ID_*` descriptor; queries `kern_game_extensions` |
+| `i32 kern_renderer_init(const u32* d)` | initialization from a `KERN_ID_*` descriptor (no shader extensions: those are an App's) |
 | `void kern_renderer_shutdown()` | tear down the renderer |
 | `i32 kern_renderer_resize(i32 w, i32 h)` | size of the drawing buffer |
 | `u32 kern_material_key_count()`, `const char* kern_material_key(u32 i)` | names of the extensions' material parameters |
@@ -229,7 +229,7 @@ Driven by the host `kern/web/app.mjs` ([Chapter 12](12-your-own-games.md)).
 | Function | Description |
 |---|---|
 | `void kern_app_set_args(const char* text, u32 length)` | start parameters before the start (`k=v&k2=v2`, URL-encoded) |
-| `i32 kern_app_start(i32 width, i32 height)` | `kern_create_app()`, `configure()`, renderer init, `start()` |
+| `i32 kern_app_start(i32 width, i32 height)` | the App `kern_main` gave: `configure()`, renderer init, `start()` |
 | `i32 kern_app_frame(f64 now_ms, i32 page_hidden)` | one frame: `update()` (dt clamped to 0…0.1 s), then rendering; 0 if rendering fails |
 | `i32 kern_app_resize(i32 width, i32 height)` | size; calls `resized()` |
 | `void kern_app_key(u32 key, i32 down)` | key (`kern::Key`) |

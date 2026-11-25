@@ -77,16 +77,22 @@ Ein Programm hat **genau einen**, ausdrücklichen Einstieg und keine schwachen S
 int kern_main() { static MeinSpiel app; return kern::run(app); }
 
 // ein Spiel aus seinem Projekt (die App ist ein Programm-Blueprint)
-int kern_main() { return kern::run(kern::Project::embedded()); }
+int kern_main() { return kern::run(kern::game::embedded_project()); }
 ```
 
-- `kern::run(App&)` übergibt der App-Laufzeit die App. Sie ruft configure/extensions vor dem Renderer, danach start,
-  update in jedem Frame und stop.
-- `kern::run(Project)` startet die Programm-Laufzeit des Projekts. Die App ist das Objekt der Engine des **einen**
-  Programm-Blueprints, der `App` implementiert (`kern::Implements<"App">`). Gibt es keinen oder zwei, bricht der Start
-  ab und meldet den Grund mit Namen.
-- Der Bau eines Spiels aus seinem Projekt erzeugt den Einstieg und bettet das Projekt samt seiner Levels ein
-  (`kern::Project::embedded()`). Die Daten sind Daten des Projekts und keine eigenen Symbole.
+- `kern_main()` (`kern/app/run.h`) definiert das Programm; die Plattformschicht (`kern/web/app.mjs`) ruft ihn einmal,
+  vor `kern_app_start`. Ein Modul ohne ihn startet keine App, die Seite sagt es („module has no kern_main“). Die
+  Engine fragt nach keiner Fabrik, und kein Symbol ist schwach.
+- `kern::run(App&, settings)` übergibt der App-Laufzeit die App und die Einstellungen des Projekts (Vorgabe: die der
+  Engine). Sie wendet die Einstellungen vor dem Renderer an, ruft extensions, startet den Renderer, danach start,
+  update in jedem Frame und stop. Ein zweites `run` wird abgewiesen (1, mit Grund im Log); die erste App bleibt.
+- `kern::run(Project)` (`kern/game/program.h`) startet die Programm-Laufzeit des Projekts. Die App ist das Objekt der
+  Engine des **einen** Programm-Blueprints, der `App` implementiert (`kern::Implements<"App">`). Gibt es keinen oder
+  zwei, bricht der Start ab und meldet den Grund mit Namen. Hält die App an (`kern_app_stop`), endet das Programm nach
+  `App::stop`; startet sie wieder, startet es neu aus dem Projekt.
+- Der Bau eines Spiels aus seinem Projekt bettet das Projekt samt seiner Levels ein (`kern/tools/embed_project.py`):
+  `kern::game::embedded_project()` (`kern/game/embedded.h`) ist das gelesene Projekt. Die Daten sind Daten des
+  Projekts und keine eigenen Symbole. Geprüft: `run_the_program_of_a_project`.
 
 ## 5. Bibliotheken finden
 
@@ -171,7 +177,8 @@ Eingang **World** (Int, der Handle einer GameWorld):
 - Gebaut (Teil 1b): der Editor „Projekt“ (`kern/src/studio/project.cpp`, docs/studio.md „Das Projekt“): öffnen,
   speichern, Levels und Start-Level, Einstellungen, Programm-Blueprints im Blueprint-Editor; Studio-Test
   `studio_project`, e2e im Modul-Bau.
-- Noch nach diesem Entwurf zu ersetzen:
-  - schwache `kern_create_app`/`kern_project_app`/`kern_project_text` (Teil 3: `kern::run`)
+- Gebaut (Teil 3): der eine Einstieg `kern_main()` mit `kern::run(App&, settings)` / `kern::run(Project)`; die
+  schwachen Symbole `kern_create_app`, `kern_project_app`, `kern_project_text` und `kern_game_extensions` sind
+  ersatzlos entfernt (Test `run_the_program_of_a_project`).
 - Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) fester Schritt der Welt (Knotentypen entfallen),
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

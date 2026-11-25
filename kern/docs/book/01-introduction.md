@@ -185,7 +185,8 @@ Kern ships in four forms. All four consist of the same C++ code, assembled diffe
 
 ### A Game Entirely in C++ (`--app`)
 
-A game derives from `kern::App` and defines `kern_create_app()`. The platform layer
+A game derives from `kern::App` and defines its one entry `kern_main()`, which hands the engine the App
+(`kern::run(app)`, `include/kern/app/run.h`). The platform layer
 `kern/web/app.mjs` (`runKernApp`) drives it: frame loop, drawing-buffer size, input, context loss and
 a status channel. The smallest example is `kern/examples/hello/hello.cpp`:
 
@@ -211,9 +212,9 @@ class Hello final : public App {
   // update(): camera, instances, picking, engine.set_status(...)
 };
 
-App* kern_create_app() {
+int kern_main() {
   static Hello app;
-  return &app;
+  return kern::run(app);
 }
 ```
 

@@ -6,8 +6,8 @@
 The project (kern/game/project.h, kern/docs/project.md) is read and checked: it must be a Kern project, and each
 level its "levels" name (relative to the project file) a Kern level - one that still holds the project's settings
 (the member "project") stops the build with the place and the reason. The source defines
-  kern::game::embedded_project(), kern::game::embedded_level(path)   (kern/game/embedded.h)
-  kern_project_text()                                                  (the project the app runtime reads, src/app/app.cpp)
+  kern::game::embedded_project_text(), kern::game::embedded_level(path)   (kern/game/embedded.h)
+- data of the project, no entry: the program's kern_main() hands it to the engine (kern::run(embedded_project())).
 --level <path> <file>: embed `file` as the level `path` of the project (a build that carries a level other than the
 one the project file names - e.g. one with fewer actors). The output is only rewritten when it changes, so nothing
 recompiles for an unchanged project.
@@ -92,19 +92,13 @@ const char project[] =
 
 namespace kern::game {{
 
-std::string_view embedded_project() {{ return {{project, sizeof project - 1}}; }}
+std::string_view embedded_project_text() {{ return {{project, sizeof project - 1}}; }}
 
 std::string_view embedded_level(std::string_view path) {{
 {level_cases}  return {{}};
 }}
 
 }}  // namespace kern::game
-
-// The project for the app runtime (kern_app_start: its settings; kern/app/project.h).
-extern "C" const char* kern_project_text(unsigned* length) {{
-  *length = sizeof project - 1;
-  return project;
-}}
 """
 if not out.exists() or out.read_text(encoding="utf-8") != source:
     out.write_text(source, encoding="utf-8")

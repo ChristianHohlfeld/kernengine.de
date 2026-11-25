@@ -8293,11 +8293,58 @@ TEST(program_from_the_project) {
   // it starts again after an end
   CHECK(program.start(pr, &error) && program.app() != nullptr);
   program.end();
-  // the app runtime's door: the project file's text; its one program, asked once - a second ask is refused
-  CHECK(kern_project_app(nullptr, 0) == nullptr);
-  CHECK(kern_project_app(text.data(), static_cast<unsigned>(text.size())) != nullptr);
-  CHECK(kern_project_app(text.data(), static_cast<unsigned>(text.size())) == nullptr);
   renderer.shutdown();
+}
+
+// The one entry (kern/docs/project.md 4., kern/app/app.h): the program's kern_main hands the engine its App once -
+// kern::run(project) starts the project's program and gives the app runtime its App; the platform then starts it
+// (kern_app_start), drives its frames and stops it - the program ends with the app and starts again with it. A
+// second kern::run (of a project or of a C++ App) is refused: the first App stays. (One app runtime per process:
+// this is the only test that hands it an App.)
+extern "C" i32 kern_app_start(i32 width, i32 height);
+extern "C" i32 kern_app_frame(f64 now_ms, i32 page_hidden);
+extern "C" void kern_app_stop();
+TEST(run_the_program_of_a_project) {
+  logic::Graph main;
+  std::string error;
+  CHECK(logic::from_cpp("struct Main : kern::Blueprint, kern::Implements<\"App\"> {\n"
+                        "  struct startResult { Bool result = false; };\n"
+                        "  startResult start(Int engine = 0) {\n"
+                        "    return {true};\n"
+                        "  }\n"
+                        "\n"
+                        "  KERN_STRUCT(Frame) {\n"
+                        "    Float time = 0.0;\n"
+                        "    Float dt = 0.0;\n"
+                        "    Int64 index = Int64{0x0};\n"
+                        "  };\n"
+                        "\n"
+                        "  void update(Int engine = 0, Frame frame = Frame{0.0, 0.0, Int64{0x0}}) {\n"
+                        "  }\n"
+                        "};\n", main, nullptr, &error));
+  CHECK(error.empty() && main.implements == "App");
+  game::Project pr;
+  pr.name = "Run";
+  pr.blueprints.push_back({"Main", main});
+  // no App before kern_main: the start is refused and says what is missing
+  CHECK(!kern_app_start(64, 48) && std::string(last_error()).find("kern_main") != std::string::npos);
+  // a project whose program does not start: no App is given (the reason is the program's)
+  game::Project none = pr;
+  none.blueprints[0].logic.implements.clear();
+  CHECK(run(none) == 1);
+  CHECK(run(pr) == 0);
+  CHECK(run(pr) == 1);   // (its program runs already)
+  struct Other final : App {
+    bool start(Engine&) override { return true; }
+    void update(Engine&, const Frame&) override {}
+  } other;
+  CHECK(run(other) == 1);   // (an App was given already: the first stays)
+  CHECK(kern_app_start(64, 48) == 1);
+  CHECK(kern_app_frame(0, 0) == 1 && kern_app_frame(16, 0) == 1);
+  kern_app_stop();
+  // started again: its program again, from the project
+  CHECK(kern_app_start(64, 48) == 1);
+  kern_app_stop();
 }
 
 // A place of an entry of an array the object holds (kern::audio::Mixer::bus(Bus): `return buses_[b];`): the node binds
@@ -15298,9 +15345,6 @@ TEST(app_input_and_args) {
 }
 
 }  // namespace
-
-// The app runtime is linked into the test binary; it needs an app factory.
-App* kern_create_app() { return nullptr; }
 
 int main(int argc, char** argv) {
   // kern_tests --emit-native <dir>: Blueprints as their C++ text, calls to them and the

@@ -6,9 +6,12 @@
 //     bool start(kern::Engine& engine) override { ...create meshes... }
 //     void update(kern::Engine& engine, const kern::Frame& frame) override { ...move things... }
 //   };
-//   kern::App* kern_create_app() { static MyGame game; return &game; }
+//   int kern_main() { static MyGame game; return kern::run(game); }
 //
-// update() runs once per display frame; the engine renders right after it.
+// kern_main() is the program's one entry (kern/app/run.h, kern/docs/project.md 4.): the platform layer calls it once,
+// before the app starts; it hands the engine the App (kern::run - or kern::run(project) of kern/game/program.h for a
+// game whose App is a Blueprint of its project). update() runs once per display frame; the engine renders right
+// after it.
 #pragma once
 
 #include <string>
@@ -194,6 +197,3 @@ class App {
 };
 
 }  // namespace kern
-
-/// Implemented by the game: returns its App instance (called once).
-kern::App* kern_create_app();

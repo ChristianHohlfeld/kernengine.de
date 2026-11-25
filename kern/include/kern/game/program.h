@@ -6,9 +6,8 @@
 // The App of a program built from its project: the engine's object of the ONE program Blueprint that implements the
 // interface App (kern::Implements<"App">, Graph::implements) - Engine Object of Blueprint (Runtime::engine_object).
 // The engine calls it as any App (configure/extensions before the renderer starts, start, update each frame, stop).
-// A program that defines kern_create_app() makes its App itself (that one wins); one that does not gets the app
-// runtime's own (kern/src/app/app.cpp, weak), which asks kern_project_app (here) with the project the program
-// carries (kern_project_text(), written by the build - SpawnCity: tools/embed_level.py).
+// A game built from its project starts it from its entry: `int kern_main() { return kern::run(kern::game::embedded_project()); }`
+// (kern/docs/project.md 4.; kern/game/embedded.h).
 #pragma once
 
 #include <string>
@@ -16,6 +15,7 @@
 #include <vector>
 
 #include "kern/app/app.h"
+#include "kern/app/run.h"
 #include "kern/game/project.h"
 
 namespace kern {
@@ -61,9 +61,11 @@ class Program {
 };
 
 }  // namespace game
-}  // namespace kern
 
-/// The App of the program's project (Program::start with the project file's text) - of the one Program of the app
-/// runtime, started once: a second call while it runs gives null and logs why. What the app runtime's own
-/// kern_create_app gives.
-extern "C" kern::App* kern_project_app(const char* project_text, unsigned length);
+/// The entry of a game whose App is a Blueprint of its project (kern/docs/project.md 4.): starts the program of
+/// `project` (one Program of the app runtime) and hands the app runtime its App with the project's settings
+/// (kern::run(App&, ProjectSettings)). When the app stops, the program ends after App::stop. Returns 0; when the
+/// program does not start (Program::start says why, in the log) or an App was given already: 1.
+int run(const game::Project& project);
+
+}  // namespace kern

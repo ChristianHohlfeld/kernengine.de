@@ -727,7 +727,7 @@ class OrbRun final : public App {
 
 }  // namespace
 
-App* kern_create_app() {
+int kern_main() {
   static OrbRun game;
-  return &game;
+  return kern::run(game);
 }

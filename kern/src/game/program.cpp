@@ -129,10 +129,41 @@ void Program::end() {
 
 }  // namespace kern::game
 
-extern "C" kern::App* kern_project_app(const char* text, unsigned length) {
-  // (the app runtime's one program, kept to the end of the process: it asks once, at kern_app_start)
-  static kern::game::Program* const program = new kern::game::Program;
-  if (!text || !length) return nullptr;
-  if (!program->start(std::string_view(text, length))) return nullptr;
-  return program->app();
+namespace kern {
+namespace {
+/// The App the app runtime runs for a program started by kern::run(project): the program's App, and at the end the
+/// program's end (after App::stop - its Blueprints end with it). An app started again starts its program again.
+class ProgramApp final : public App {
+ public:
+  game::Project project;
+  game::Program program;
+  /// The program's App - started again from the project if it ended (null: it does not start; the log says why).
+  App* app() {
+    if (!program.running()) program.start(project);
+    return program.app();
+  }
+  RendererOptions configure() override { App* a = app(); return a ? a->configure() : RendererOptions{}; }
+  Span<ShaderExtension* const> extensions() override { App* a = app(); return a ? a->extensions() : Span<ShaderExtension* const>{}; }
+  bool start(Engine& engine) override { App* a = app(); return a && a->start(engine); }
+  void update(Engine& engine, const Frame& frame) override { if (App* a = program.app()) a->update(engine, frame); }
+  void resized(Engine& engine) override { if (App* a = program.app()) a->resized(engine); }
+  void stop(Engine& engine) override {
+    if (App* a = program.app()) a->stop(engine);
+    program.end();
+  }
+};
+}  // namespace
+
+int run(const game::Project& project) {
+  // (the app runtime's one program, kept to the end of the process: the app runtime holds its App)
+  static ProgramApp* const app = new ProgramApp;
+  if (app->program.running()) {
+    log(LogLevel::error, "kern::run: the program of the project %s runs already - kern_main starts one program, once", app->program.project()->name.c_str());
+    return 1;
+  }
+  if (!app->program.start(project)) return 1;
+  app->project = project;
+  return run(*app, project.settings);
 }
+
+}  // namespace kern

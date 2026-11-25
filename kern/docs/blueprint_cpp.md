@@ -1552,9 +1552,8 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   seiner Welt mit `GameWorld::set_fixed_step`; die Welt ruft `fixed_step(dt)` in jedem festen Schritt nach der Physik
   und vor dem Event Tick der Blueprints. Geprüft: `game_world_fixed_step`. (Die frühere Anmeldung eines Knotentyps aus
   einem Objekt, `register_node_type`, ist entfernt.)
-- **Die App aus dem Projekt** (`kern/game/program.h`, `kern/docs/project.md`): ein Programm ohne eigenes
-  `kern_create_app()` bekommt das der App-Laufzeit (schwach, bis `kern::run`): `kern_project_app` liest das Projekt, das
-  das Programm trägt (`kern_project_text()`), und startet ein `kern::game::Program`: EINE Logik-Laufzeit der
+- **Die App aus dem Projekt** (`kern/game/program.h`, `kern/docs/project.md` 4.): der Einstieg des Programms
+  `int kern_main() { return kern::run(kern::game::embedded_project()); }` startet ein `kern::game::Program`: EINE Logik-Laufzeit der
   Programm-Blueprints des Projekts (`"blueprints"`), in ihrer Reihenfolge – ohne Welt, ohne Renderer; ihre Bibliotheken
   findet sie nur im Projekt. Begin Play läuft, die App ist das Objekt der Engine des einen Blueprints, der `App`
   implementiert. Keine Programm-Blueprints, keiner oder zwei mit `App` (mit Namen), ein zweiter Start, solange es läuft:

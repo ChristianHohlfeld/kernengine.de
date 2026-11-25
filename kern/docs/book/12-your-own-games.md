@@ -194,7 +194,8 @@ the renderer, geometry, particles and math).
 Page (app.mjs)                        Module (src/app/app.cpp)
 ---------------------------------------------------------------------------
 kern_app_set_args("?time=0.6")   ->   Engine::set_args
-kern_app_start(w, h)             ->   kern_create_app(), configure(), Renderer::init, start()
+kern_main()                      ->   kern::run(app, settings)  (the program's entry)
+kern_app_start(w, h)             ->   configure(), Renderer::init, start()
 keyboard / mouse / touch         ->   kern_app_key / _pointer / _wheel / _touch / _focus
 requestAnimationFrame:
   kern_app_frame(now, hidden)    ->   update(engine, frame); input.end_frame(); render()
@@ -351,13 +352,15 @@ into the instance buffer.
 on z = 0, and its vertex color is orange). White tints leave this color unchanged.
 
 ```cpp
-App* kern_create_app() {
+int kern_main() {
   static Hello app;
-  return &app;
+  return kern::run(app);
 }
 ```
 
-Every game must define this one free function. The runtime calls it exactly once at startup. The static
+Every game must define this one entry (`include/kern/app/run.h`): the platform layer calls it exactly once, before
+the app starts, and it hands the engine its App with `kern::run` (a second `run` is refused). There is no other way
+to give the engine an App - no factory the engine asks for, no symbol the linker picks. The static
 object lives as long as the module.
 
 The accompanying page (`kern/examples/hello/index.html`) is short:
@@ -584,7 +587,7 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
 ### 12.2.6 Creating your own game
 
 1. Create a folder, for example `mygame/`, with `mygame.cpp` (a class that inherits from `App`, and
-   `kern_create_app()`) and `index.html` (as for hello, with the path to `app.mjs`).
+   `kern_main()`) and `index.html` (as for hello, with the path to `app.mjs`).
 2. Build: `kern/build.sh --app mygame/mygame.wasm mygame/mygame.cpp`. If you want to use Box3D directly,
    add `--physics` ([Chapter 6](06-physics.md)); if you need levels and the game runtime, `--game`
    ([Chapter 8](08-game-runtime.md)).
@@ -612,12 +615,13 @@ with the old member `"project"` is refused with the place and the reason.
 ```
 
 The build embeds the project and its levels (`kern/tools/embed_project.py <name.kproject> <out.cpp>`): the source
-it writes defines `kern::game::embedded_project()`, `kern::game::embedded_level(path)` (`include/kern/game/embedded.h`)
-and `extern "C" const char* kern_project_text(u32* length)`, the project file's text. `kern_app_start` reads its
-settings before anything of the App: with settings, the renderer starts with `renderer` instead of
+it writes defines `kern::game::embedded_project_text()` and `kern::game::embedded_level(path)` - data, no entry;
+`kern::game::embedded_project()` (`include/kern/game/embedded.h`) is the project read from it. The program's entry
+hands the engine the project's settings with its App: `kern::run(kern::game::embedded_project())` for a project whose
+App is a program Blueprint, `kern::run(app, kern::game::embedded_project().settings)` for an App of C++. `kern_app_start`
+applies them before anything of the App: with settings, the renderer starts with `renderer` instead of
 `App::configure()`; after its init the heap is reserved and, with `mobile=1`, the phone's shadows and ambient
-occlusion are set - then `App::start()` runs. Without (the default `kern_project_text()` returns nothing), the App
-decides. Missing keys keep the defaults of the engine's structs.
+occlusion are set - then `App::start()` runs. Without (`kern::run(app)`), the App decides. Missing keys keep the defaults of the engine's structs.
 
 ---
 

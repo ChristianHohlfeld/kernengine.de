@@ -390,7 +390,7 @@ That is, per color channel, the share of indirect light in the total light, alre
 
 ## 4.6 Shader Extensions
 
-A `ShaderExtension` (`gfx/shader.h`) supplies GLSL snippets for fixed insertion points and, optionally, its own vertex streams, uniforms and material parameters. The engine stays unchanged; the game hands in its extensions at `Renderer::init()` (in an `App` via `App::extensions()`, in the C ABI via `kern_game_extensions`).
+A `ShaderExtension` (`gfx/shader.h`) supplies GLSL snippets for fixed insertion points and, optionally, its own vertex streams, uniforms and material parameters. The engine stays unchanged; the game hands in its extensions at `Renderer::init()` (in an `App` via `App::extensions()`; the C ABI's `kern_renderer_init` starts the renderer without extensions).
 
 ### The Insertion Points
 

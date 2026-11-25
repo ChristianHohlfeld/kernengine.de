@@ -78,7 +78,7 @@ class Hello final : public App {
   f32 yaw_ = 0.6f, distance_ = 30;
 };
 
-App* kern_create_app() {
+int kern_main() {
   static Hello app;
-  return &app;
+  return kern::run(app);
 }

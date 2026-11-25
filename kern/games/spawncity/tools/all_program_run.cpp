@@ -16,8 +16,6 @@
 #include "kern/logic/logic.h"
 #include "level_blueprints.h"
 
-kern::App* kern_create_app() { return nullptr; }  // (the app runtime is linked in; it needs a factory)
-
 int main(int argc, char** argv) {
   using namespace kern;
   if (argc < 2) {

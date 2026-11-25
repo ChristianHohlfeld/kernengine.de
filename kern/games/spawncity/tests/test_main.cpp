@@ -206,10 +206,6 @@ static blueprint_native::Case jet_seats_case() {
   return c;
 }
 
-// The app runtime is linked in as the game links it (its Engine and Input are objects of the engine the source
-// calls - run_tests.sh); it asks the program for its App: the tests have none (main.cpp is the game's).
-kern::App* kern_create_app() { return nullptr; }
-
 int main(int argc, char** argv) {
   // spawncity_tests --emit-native <dir>: the Wanted Blueprint as its C++ text, calls to it and
   // the interpreter's answers (run_tests.sh compiles them into wanted_native_test).

@@ -13,7 +13,7 @@
   3. the engine calling the program: classes of the program's C++ made of a class of the engine
      (kern::App, kern::ShaderExtension ...: the engine calls their virtual functions) and function
      values (std::function, a lambda handed on as a C function pointer with its void* user data) - what a Blueprint cannot be today;
-  4. the entry: the C++ that makes the program's App (kern_create_app).
+  4. the entry: the C++ that hands the engine the program's App (kern_main, kern::run).
 
 Nothing is changed. The files the build writes from the level (--generated, default
 level_blueprints.cpp, level_blueprints.h, level_data.cpp) are no sources of the program.
@@ -29,7 +29,7 @@ import sys
 EXPORT = re.compile(r"KERN_EXPORT\((\w+)\)")
 MADE_OF_ENGINE = re.compile(r"\b(?:class|struct)\s+(\w+)(?:\s+final)?\s*:\s*(?:public\s+)?(?:virtual\s+)?(kern::[\w:]+)")
 FUNCTION_VALUE = re.compile(r"std::function<|\[[^\]]*\]\s*\(\s*(?:const\s+)?void\s*\*")   # (a function value; a function handed on as a C function pointer with its user data)
-ENTRY = re.compile(r"\bkern_create_app\s*\(\s*\)\s*\{")
+ENTRY = re.compile(r"\bkern_main\s*\(\s*\)\s*\{")
 UNIT = re.compile(r"^(\S+)\s+(\d+) /\s+(\d+) functions")
 FUNCTION = re.compile(r"^    (\S.*?) \((\d+)\): (.*)$")
 WRITTEN = ("written", "a name for a place - written where it is called")

@@ -82,12 +82,11 @@ cat "$out"/logs/*.log | grep 'error:' | sed -E 's/^[^ ]* error: //; s/kern_bluep
 
 if [ "${WEB:-}" = 1 ]; then
   # ---- the same for the browser: the level's runtime with every class compiled in (tools/export_game.sh's way)
-  # (the game's entry, kern_create_app, is still main.cpp's: in its place one that has no app - so the build says how
-  # large the rest is; the missing entry is reported)
-  printf '#include "kern/app/app.h"\nkern::App* kern_create_app() { return nullptr; }  // (all_program.sh: the entry is not a Blueprint yet)\n' > "$out/entry_missing.cpp"
-  echo "web build: the entry kern_create_app is not in the level yet (main.cpp) - built with one that has no app"
+  # (the game's entry, kern_main, is still main.cpp's: the module is built without one - so the build says how large
+  # the rest is; the missing entry is reported, and the page could not start it)
+  echo "web build: the entry kern_main is not in the level yet (main.cpp) - built without one"
   if KERN_JOBS="${LINK_JOBS:-3}" /usr/bin/time -f "web build: peak_kb=%M seconds=%e (the largest compiler of the build)" \
-       "$root/kern/build.sh" --app --studio --commercial "$out/all_program.wasm" "$out"/gen/*.cpp "$out/entry_missing.cpp" -I"$out/gen" > "$out/web.log" 2>&1; then
+       "$root/kern/build.sh" --app --studio --commercial "$out/all_program.wasm" "$out"/gen/*.cpp -I"$out/gen" > "$out/web.log" 2>&1; then
     echo "web build: $(du -h "$out/all_program.wasm" | cut -f1) ($(stat -c %s "$out/all_program.wasm") bytes); $(grep -o 'web build: peak.*' "$out/web.log")"
   else
     echo "web build fails: $(grep -c 'error' "$out/web.log") lines with an error"; grep -E 'error|undefined symbol' "$out/web.log" | sort | uniq -c | sort -rn | head -40

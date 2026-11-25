@@ -209,7 +209,8 @@ und `space`, `enter`, `escape`, `tab`, `backspace`, `shift_left`/`_right`, `cont
 Seite (app.mjs)                       Modul (src/app/app.cpp)
 ---------------------------------------------------------------------------
 kern_app_set_args("?time=0.6")   ->   Engine::set_args
-kern_app_start(w, h)             ->   kern_create_app(), configure(), Renderer::init, start()
+kern_main()                      ->   kern::run(app, settings)  (Einstieg des Programms)
+kern_app_start(w, h)             ->   configure(), Renderer::init, start()
 Tastatur / Maus / Touch          ->   kern_app_key / _pointer / _wheel / _touch / _focus
 requestAnimationFrame:
   kern_app_frame(now, hidden)    ->   update(engine, frame); input.end_frame(); render()
@@ -366,13 +367,16 @@ den Instanzpuffer kopiert.
 auf z = 0, ihre Vertexfarbe ist orange). Weiße Tints lassen diese Farbe unverändert.
 
 ```cpp
-App* kern_create_app() {
+int kern_main() {
   static Hello app;
-  return &app;
+  return kern::run(app);
 }
 ```
 
-Diese eine freie Funktion muss jedes Spiel definieren. Die Laufzeit ruft sie beim Start genau einmal auf.
+Diesen einen Einstieg muss jedes Spiel definieren (`include/kern/app/run.h`): die Plattformschicht ruft ihn vor dem
+Start der App genau einmal auf, und er gibt der Engine seine App mit `kern::run` (ein zweites `run` wird abgewiesen).
+Einen anderen Weg, der Engine eine App zu geben, gibt es nicht – keine Fabrik, nach der die Engine fragt, kein Symbol,
+das der Linker wählt.
 Das statische Objekt lebt so lange wie das Modul.
 
 Die Seite dazu (`kern/examples/hello/index.html`) ist kurz:
@@ -599,7 +603,7 @@ kern/build.sh --app kern/examples/orbrun/orbrun.wasm kern/examples/orbrun/orbrun
 ### 12.2.6 Ein eigenes Spiel anlegen
 
 1. Einen Ordner anlegen, etwa `meinspiel/`, mit `meinspiel.cpp` (eine Klasse, die von `App` erbt, und
-   `kern_create_app()`) und `index.html` (wie bei hello, mit dem Pfad zu `app.mjs`).
+   `kern_main()`) und `index.html` (wie bei hello, mit dem Pfad zu `app.mjs`).
 2. Bauen: `kern/build.sh --app meinspiel/meinspiel.wasm meinspiel/meinspiel.cpp`. Wer Box3D direkt nutzen
    will, nimmt `--physics` dazu ([Kapitel 6](06-physik.md)); wer Levels und die Spiel-Laufzeit braucht,
    `--game` ([Kapitel 8](08-spiel-laufzeit.md)).
@@ -618,9 +622,11 @@ dem Start einmal genommen und zurückgegeben wird (der Allokator behält ihn; da
 beim Spielen Stück für Stück wächst). Ein Level enthält nur seine Welt: eine Level-Datei mit dem alten Feld
 `"project"` wird mit Stelle und Grund abgelehnt.
 Der Bau bettet Projekt und Levels ein (`kern/tools/embed_project.py <name.kproject> <out.cpp>`): die Quelle definiert
-`kern::game::embedded_project()`, `kern::game::embedded_level(pfad)` (`include/kern/game/embedded.h`) und
-`extern "C" const char* kern_project_text(u32* length)`, den Text der Projekt-Datei. `kern_app_start` liest ihre
-Einstellungen vor allem anderen der App: mit Einstellungen startet der Renderer mit `renderer` statt
+`kern::game::embedded_project_text()` und `kern::game::embedded_level(pfad)` – Daten, kein Einstieg;
+`kern::game::embedded_project()` (`include/kern/game/embedded.h`) ist das daraus gelesene Projekt. Der Einstieg des
+Programms gibt der Engine die Einstellungen des Projekts mit seiner App: `kern::run(kern::game::embedded_project())` für
+ein Projekt, dessen App ein Programm-Blueprint ist, `kern::run(app, kern::game::embedded_project().settings)` für eine
+App aus C++. `kern_app_start` wendet sie vor allem anderen der App an: mit Einstellungen startet der Renderer mit `renderer` statt
 `App::configure()`, danach der Heap-Vorgriff und bei `mobile=1` Schatten und Verdeckung des Telefons – dann
 `App::start()`. Ohne entscheidet die App.
 
