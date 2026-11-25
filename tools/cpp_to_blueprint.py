@@ -3231,6 +3231,8 @@ class Const:
             if got is None:
                 raise Wait("sizeof")
             return self.fit(got[0], n)
+        if os.environ.get("DBG_CONST") and k == "StringLiteral":
+            import traceback; sys.stderr.write("DBG_CONST " + " <- ".join(f"{fr.name}:{fr.lineno}" for fr in traceback.extract_stack()[-9:-1]) + f" | {n.get('value')}\n")
         raise Wait(f"a constant written as {k}")
 
     def field_of(self, value, field_id):
