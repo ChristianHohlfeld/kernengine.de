@@ -62,10 +62,44 @@ class Program {
 
 }  // namespace game
 
+namespace detail {
+/// The App the app runtime runs for a program started by kern::run(project): the program's App, and at the end the
+/// program's end (after App::stop - its Blueprints end with it). An app started again starts its program again.
+class ProgramApp final : public App {
+ public:
+  game::Project project;
+  game::Program program;
+  /// The program's App - started again from the project if it ended (null: it does not start; the log says why).
+  App* app() {
+    if (!program.running()) program.start(project);
+    return program.app();
+  }
+  Span<ShaderExtension* const> extensions() override { App* a = app(); return a ? a->extensions() : Span<ShaderExtension* const>{}; }
+  bool start(Engine& engine) override { App* a = app(); return a && a->start(engine); }
+  void update(Engine& engine, const Frame& frame) override { if (App* a = program.app()) a->update(engine, frame); }
+  void resized(Engine& engine) override { if (App* a = program.app()) a->resized(engine); }
+  void stop(Engine& engine) override {
+    if (App* a = program.app()) a->stop(engine);
+    program.end();
+  }
+};
+}  // namespace detail
+
 /// The entry of a game whose App is a Blueprint of its project (kern/docs/project.md 4.): starts the program of
 /// `project` (one Program of the app runtime) and hands the app runtime its App with the project's settings
 /// (kern::run(App&, ProjectSettings)). When the app stops, the program ends after App::stop. Returns 0; when the
 /// program does not start (Program::start says why, in the log) or an App was given already: 1.
-int run(const game::Project& project);
+/// (Inline: a program that links the game runtime without the app runtime - a tool, a test - does not need run.)
+inline int run(const game::Project& project) {
+  // (the app runtime's one program, kept to the end of the process: the app runtime holds its App)
+  static detail::ProgramApp* const app = new detail::ProgramApp;
+  if (app->program.running()) {
+    log(LogLevel::error, "kern::run: the program of the project %s runs already - kern_main starts one program, once", app->program.project()->name.c_str());
+    return 1;
+  }
+  if (!app->program.start(project)) return 1;
+  app->project = project;
+  return run(*app, project.settings);
+}
 
 }  // namespace kern
