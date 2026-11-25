@@ -445,6 +445,9 @@ class Studio {
   u32 logic_owner_ = 0;
   bool logic_open_ = false;
   std::string logic_view_ = "graph";
+  /// The function whose body the graph view shows, in a Blueprint too large for one canvas (logic_edit.cpp,
+  /// kCanvasNodes): "" is what stands in no function - the events. A smaller Blueprint shows all of it at once.
+  std::string logic_sheet_;
   // Blueprint debugging: breakpoints (owner, node) pause the game after the step in which the node ran.
   std::vector<std::pair<u32, u32>> logic_breakpoints_;
   std::pair<u32, u32> logic_break_hit_{0, 0};
