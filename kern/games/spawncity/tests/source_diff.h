@@ -33,6 +33,9 @@
 #include <utility>
 #include <vector>
 
+#include <sys/wait.h>
+#include <unistd.h>
+
 #include "converted.h"
 #include "kern/core/fields.h"
 #include "kern/core/map.h"
@@ -1060,6 +1063,67 @@ struct Builds {
     return at < old.size();
   }
   void part(std::string name, Bytes b) { now.parts.emplace_back(std::move(name), std::move(b.b)); }
+  /// One call, alone: in a process of its own (fork), which gives back what it gave and left. The whole program runs
+  /// in each call - the drawn object holds objects of other files (the game's terrain, its grids) whose own code reads
+  /// what the draws give it -: where that program reads outside what it holds or dies (the sanitizers end it), C++
+  /// leaves open what the call gives, as with a guard - the call is not compared (Tally: "outside"), the test goes on
+  /// and says so once. What the call changes in the program besides (what it made, statics) ends with it: each call
+  /// starts from the same program.
+  template <class F> bool alone(F&& f, long& asks) {
+    std::fflush(stdout);
+    std::fflush(stderr);
+    int fd[2];
+    SC_CHECK(::pipe(fd) == 0, "%s: no pipe for a call alone", function.c_str());
+    const pid_t pid = ::fork();
+    SC_CHECK(pid >= 0, "%s: no process for a call alone", function.c_str());
+    if (pid == 0) {
+      ::close(fd[0]);
+      now = Call{};
+      long a = 0;
+      const bool d = f(a);
+      std::string out;
+      out.push_back(d ? 1 : 0);
+      out.append(reinterpret_cast<const char*>(&a), sizeof a);
+      for (const auto& [name, bytes] : now.parts) {
+        text(out, name);
+        text(out, bytes);
+      }
+      std::fflush(stdout);
+      for (std::size_t k = 0; k < out.size();) {
+        const ssize_t n = ::write(fd[1], out.data() + k, out.size() - k);
+        if (n <= 0) ::_exit(3);
+        k += static_cast<std::size_t>(n);
+      }
+      ::_exit(0);   // (no exit handlers: the leak check is the parent's)
+    }
+    ::close(fd[1]);
+    std::string in;
+    char buf[65536];
+    for (ssize_t n; (n = ::read(fd[0], buf, sizeof buf)) > 0;) in.append(buf, static_cast<std::size_t>(n));
+    ::close(fd[0]);
+    int status = 0;
+    ::waitpid(pid, &status, 0);
+    now.parts.clear();
+    asks = 0;
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0 || in.size() < 1 + sizeof(long)) {
+      if (!died_said) {
+        std::printf("  note: %s: a call the program does not survive (%s %d): C++ leaves open what it gives - not compared\n", function.c_str(),
+                    WIFEXITED(status) ? "exit" : "signal", WIFEXITED(status) ? WEXITSTATUS(status) : WTERMSIG(status));
+        died_said = true;
+      }
+      ++died;
+      now_died = true;
+      return false;
+    }
+    const bool d = in[0] == 1;
+    std::memcpy(&asks, in.data() + 1, sizeof asks);
+    std::size_t k = 1 + sizeof asks;
+    std::string name, bytes;
+    while (text(in, k, name) && text(in, k, bytes)) now.parts.emplace_back(name, bytes);
+    return d;
+  }
+  bool died_said = false, now_died = false;
+  int died = 0;
   /// An object a call leaves: as one part (what it holds, every field, compared as a whole - an object held twice is
   /// the same object), and - where the test has its fields' names - each field once more as a part of its own, so that
   /// where it differs the test says which fields do.
@@ -1080,6 +1144,14 @@ struct Builds {
       return;
     }
     const Call& was = old[at++];
+    if (now_died && was.defined) {
+      // (the old program said what this call gives; the new does not survive it: that is a difference, not what C++ leaves open)
+      now_died = false;
+      ++compared;
+      if (++wrong <= 3) std::printf("  %s, call %d: the new program does not survive a call the old one gives a value for\n", function.c_str(), call);
+      return;
+    }
+    now_died = false;
     if (!defined || !was.defined) {
       ++outside;
       return;
