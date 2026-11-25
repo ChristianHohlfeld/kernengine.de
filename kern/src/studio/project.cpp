@@ -79,7 +79,7 @@ bool Studio::load_project_text(std::string_view text, std::string* error) {
     return false;
   }
   project_ = std::move(p);
-  project_saved_ = game::to_text(project_);
+  project_rev_ = project_saved_rev_ = next_project_rev_++;
   program_view_stale_ = true;
   if (logic_program_) logic_open_ = false;
   logic_program_ = false;
@@ -123,7 +123,7 @@ json::Value Studio::project_command(const std::string& name, const json::Value& 
     game::Level start = game::empty_level();
     start.name = "start";
     project_ = std::move(p);
-    project_saved_.clear();  // not written yet
+    project_rev_ = next_project_rev_++;  // (not written yet: dirty)
     program_view_stale_ = true;
     if (logic_program_) logic_open_ = false;
     logic_program_ = false;
@@ -143,7 +143,7 @@ json::Value Studio::project_command(const std::string& name, const json::Value& 
     return r;
   }
   if (name == "projectSaved") {
-    project_saved_ = project_text();
+    project_saved_rev_ = project_rev_;
     report("Saved project " + project_.name);
     touch();
     return ok_result();
@@ -163,6 +163,7 @@ json::Value Studio::project_command(const std::string& name, const json::Value& 
     return ok_result(edit("Edit Project", [&](game::Level&) {
       project_ = std::move(p);
       program_view_stale_ = true;
+      project_touched_ = true;
       return true;
     }));
   }
@@ -186,6 +187,7 @@ json::Value Studio::project_command(const std::string& name, const json::Value& 
         nb.logic.library = library;
         project_.blueprints.push_back(std::move(nb));
         program_view_stale_ = true;
+        project_touched_ = true;
         return true;
       }));
     }
@@ -197,6 +199,7 @@ json::Value Studio::project_command(const std::string& name, const json::Value& 
       return ok_result(edit("Rename Program Blueprint", [&](game::Level&) {
         project_.blueprint(which)->name = to;
         program_view_stale_ = true;
+        project_touched_ = true;
         return true;
       }));
     }
@@ -207,6 +210,7 @@ json::Value Studio::project_command(const std::string& name, const json::Value& 
       const bool done = edit("Remove Program Blueprint", [&](game::Level&) {
         project_.blueprints.erase(project_.blueprints.begin() + static_cast<std::ptrdiff_t>(at));
         program_view_stale_ = true;
+        project_touched_ = true;
         return true;
       });
       if (done && logic_program_) {

@@ -236,6 +236,7 @@ bool Studio::load_level(game::Level level, bool reset_history) {
     e.label = "Open " + level_.name;
     e.level = level_;
     e.project = project_;
+    e.project_rev = project_rev_;
     e.serial = next_serial_++;
     history_.push_back(std::move(e));
     history_index_ = 0;
@@ -324,7 +325,9 @@ bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> 
   const std::string key = std::move(coalesce_), transaction = std::move(transaction_);
   coalesce_.clear();
   transaction_.clear();
-  const bool project_same = !project_before || game::to_text(*project_before) == game::to_text(project_);
+  const bool project_same = !project_before || !project_touched_;
+  project_touched_ = false;
+  if (!project_same) project_rev_ = next_project_rev_++;
   if (same_document(before, level_) && project_same) {  // nothing to undo (the selection may still have changed)
     changed();
     return false;
@@ -338,11 +341,11 @@ bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> 
     HistoryEntry& e = history_.back();
     e.level = level_;
     e.project = project_;
+    e.project_rev = project_rev_;
     e.selection_after = selection;
     e.serial = next_serial_++;
     // A continuous edit that ends where it started is no step at all.
-    if (same_document(history_[history_index_ - 1].level, level_) &&
-        game::to_text(history_[history_index_ - 1].project) == game::to_text(project_)) {
+    if (same_document(history_[history_index_ - 1].level, level_) && history_[history_index_ - 1].project_rev == project_rev_) {
       history_.pop_back();
       --history_index_;
     }
@@ -352,6 +355,7 @@ bool Studio::commit(const char* label, game::Level before, std::vector<ActorId> 
     e.label = label;
     e.level = level_;
     e.project = project_;
+    e.project_rev = project_rev_;
     e.selection_before = std::move(selection_before);
     e.selection_after = selection;
     e.merge_key = key;
@@ -381,12 +385,14 @@ void Studio::step_history(bool forward) {
     ++history_index_;
     level_ = history_[history_index_].level;
     project_ = history_[history_index_].project;
+    project_rev_ = history_[history_index_].project_rev;
     selection = history_[history_index_].selection_after;
   } else {
     selection = history_[history_index_].selection_before;
     --history_index_;
     level_ = history_[history_index_].level;
     project_ = history_[history_index_].project;
+    project_rev_ = history_[history_index_].project_rev;
   }
   level_.camera = camera;
   program_view_stale_ = true;

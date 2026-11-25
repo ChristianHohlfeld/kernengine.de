@@ -136,6 +136,7 @@ struct HistoryEntry {
   std::string label;
   game::Level level;                       // document after this step
   game::Project project;                   // the project after this step (its settings, levels, program Blueprints)
+  u64 project_rev = 0;                     // which state of the project that is (Studio::project_rev_)
   std::vector<ActorId> selection_before;   // selection when the step began (restored by undo)
   std::vector<ActorId> selection_after;    // selection after the step (restored by redo)
   std::string merge_key;                   // property edits: path + targets
@@ -288,7 +289,7 @@ class Studio {
   bool load_project_text(std::string_view text, std::string* error = nullptr);
   std::string project_text() const { return game::to_text(project_); }
   /// The project has changes since it was opened, made or saved.
-  bool project_dirty() const { return project_text() != project_saved_; }
+  bool project_dirty() const { return project_rev_ != project_saved_rev_; }
   /// Applies a modification as one undo step (label shows in the history). `fn`
   /// edits the level in place and may change the selection; returning false
   /// rolls both back. A change that leaves the document identical adds no step.
@@ -297,9 +298,11 @@ class Studio {
     game::Level before = level_;
     game::Project project_before = project_;
     std::vector<ActorId> selection_before = selection_;
+    project_touched_ = false;
     if (!fn(level_)) {
       level_ = std::move(before);
       project_ = std::move(project_before);
+      project_touched_ = false;
       program_view_stale_ = true;
       selection_ = std::move(selection_before);
       coalesce_.clear();
@@ -477,6 +480,7 @@ class Studio {
       if (!fn(program_view_)) return false;
       for (std::size_t i = 0; i < project_.blueprints.size() && i < program_view_.actors.size(); ++i)
         project_.blueprints[i].logic = *program_view_.actors[i].logic;
+      project_touched_ = true;
       return true;
     });
   }
@@ -541,7 +545,10 @@ class Studio {
   bool ready_ = false, player_only_ = false;
   game::Level level_;
   game::Project project_;
-  std::string project_saved_ = game::to_text(game::Project{});  // the project as it was opened, made or saved
+  // Which state the project is in: a new number for each change (an edit that touched it says so: project_touched_),
+  // so neither the history nor "dirty" compares projects (a program of many Blueprints is large).
+  bool project_touched_ = false;
+  u64 project_rev_ = 0, project_saved_rev_ = 0, next_project_rev_ = 1;
   std::vector<HistoryEntry> history_;
   std::size_t history_index_ = 0;
   std::string coalesce_;                  // merge key of the edit being committed

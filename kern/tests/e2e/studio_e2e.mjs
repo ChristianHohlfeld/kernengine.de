@@ -584,7 +584,7 @@ const vpCenter = async (page, i = 0) => {
   // The project (kern/docs/project.md) in the outliner: its program Blueprints added and opened in the Blueprint editor,
   // its levels and start level, saved and opened from a .kproject file; a wrong one says where and why.
   {
-    await page.click('#sideTabs .tab[data-pane="outliner"]');
+    // (on a desktop the outliner stands beside the viewport: no tabs)
     await page.click("#projectBox > summary");
     await cmd(page, {cmd: "projectSet", levels: ["levels/a.klevel", "levels/b.klevel"]});
     check(await until(() => page.locator('#projectBody input[name="projectStart"]').count() === 2), "project: the outliner lists its levels");
@@ -596,7 +596,6 @@ const vpCenter = async (page, i = 0) => {
     await page.click('#projectBody .prow[data-name="Spiel"] [data-act="openBp"]');
     check(await until(async () => { const l = (await state(page)).logic; return l?.open && l.program && l.ownerName === "Spiel"; }), "project: a click opens the program Blueprint in the Blueprint editor");
     await cmd(page, {cmd: "logicClose"});
-    await page.click('#sideTabs .tab[data-pane="outliner"]').catch(() => {});
     const saved = await cmd(page, {cmd: "projectSave"});
     check(saved.ok && saved.file === "Untitled.kproject" && JSON.parse(saved.text).blueprints[0].name === "Spiel", "project: Save gives the .kproject with its Blueprints");
     await page.fill("#projectBpName", "Spiel");
