@@ -16353,20 +16353,21 @@ def main(argv):
     # of another class that does stays where it is, and waits: it would need its object and the state's.)
     # (the state the program's variables are of: its one state that is no object of an interface of the engine -
     # an App, a ShaderExtension is the engine's object, called by the engine; its functions are its own)
+    # (a static local variable is kept by the program as a variable of a namespace is - but the one object
+    # of the state itself, `static Game g;`, is the Blueprint)
+    itself = {tuple(p) for r in surveys for q, places in r["statics"].items() if q in world.states for p in places}
+    # (a function that gives the one object and does nothing else - `Game& game() { static Game g; return g; }` - is
+    # no function of a Blueprint: what it gives is the state's Blueprint itself; who calls it reaches the state)
+    getters = {k for k, f in functions.items() if f.get("gives_state") and f.get("free") and world.program(f["file"])
+               and f.get("keeps") and all(tuple(p) in itself for p in f["keeps"])}
     holders = {b for q, b in world.states.items() if q not in world.state_implements}
+    world.getters = getters
     if len(holders) == 1:
         state = next(iter(holders))
         callers = collections.defaultdict(set)
         for k, f in functions.items():
             for c in f["calls"]:
                 callers[c].add(k)
-        # (a static local variable is kept by the program as a variable of a namespace is - but the one object
-        # of the state itself, `static Game g;`, is the Blueprint)
-        itself = {tuple(p) for r in surveys for q, places in r["statics"].items() if q in world.states for p in places}
-        # (a function that gives the one object and does nothing else - `Game& game() { static Game g; return g; }` - is
-        # no function of a Blueprint: what it gives is the state's Blueprint itself; who calls it reaches the state)
-        getters = {k for k, f in functions.items() if f.get("gives_state") and f.get("free") and world.program(f["file"])
-                   and f.get("keeps") and all(tuple(p) in itself for p in f["keeps"])}
         kept = {k for k, f in functions.items() if (f.get("shares") or any(tuple(p) not in itself for p in f.get("keeps", ()))
                                                     or any(c in getters for c in f["calls"])) and f.get("free") and world.program(f["file"]) and k not in getters}
         todo = list(kept)
