@@ -7566,15 +7566,35 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
-// What a function of the engine reports through a pointer that is null by default (`bool* changed = nullptr`):
-// a further output of its node - Renderer::update_instances says whether anything changed. (game::from_text,
-// which reported why a text is no level, is no node any more: game::Level is the engine's own type, not one
-// for Blueprints - KERN_BLUEPRINT_TYPE, kern/logic/engine_libraries.h.)
+// What a function of the engine reports through a pointer that is null by default (`f64* min_height = nullptr`):
+// a further output of its node - build_terrain_tile gives the lowest and the highest height of the tile it
+// built. Through its node the pointer is given; called without it, the function builds the same tile.
 TEST(engine_reports_through_an_optional_pointer) {
-  const logic::EngineFunction* f = logic::engine_function("engine.renderer.update_instances");
-  CHECK(f && f->outputs.size() == 2 && std::string(f->outputs[0].id) == "result" && std::string(f->outputs[1].id) == "changed" &&
-        f->outputs[1].type == logic::PinType::boolean);
-  CHECK(logic::engine_function("engine.game.from_text") == nullptr);
+  using logic::Value;
+  using logic::PinType;
+  const logic::EngineFunction* f = logic::engine_function("engine.build_terrain_tile");
+  CHECK(f && f->outputs.size() == 4 && std::string(f->outputs[2].id) == "min_height" && std::string(f->outputs[3].id) == "max_height");
+  struct Slope final : logic::Callable {  // (the heights: 2 + x / 2)
+    bool call(std::span<const Value> args, Value& result) const override {
+      result = Value::number(2 + args[0].as_number() * 0.5);
+      return true;
+    }
+  };
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(PinType::boolean), Value::zero(PinType::structure), Value::zero(PinType::number), Value::zero(PinType::number)};
+  CHECK(logic::call_engine(objects, "engine.build_terrain_tile",
+                           {Value::number(0), Value::number(0), Value::number(1), Value::integer(2), Value::zero(PinType::structure),
+                            Value::callback(std::make_shared<Slope>()), Value::zero(PinType::structure)},
+                           out));
+  CHECK(out.size() == 4 && out[0].as_bool() && out[2].as_number() == 2 && out[3].as_number() == 3);
+  // the pointer not given, and given: the same tile; given, it says the heights
+  const HeightSampler slope{[](void*, f64 x, f64) { return 2 + x * 0.5; }, nullptr};
+  MeshData alone, told;
+  f64 low = -1, high = -1;
+  CHECK(build_terrain_tile(0, 0, 1, 2, Rgb{}, slope, alone));
+  CHECK(build_terrain_tile(0, 0, 1, 2, Rgb{}, slope, told, &low, &high));
+  CHECK(alone.positions == told.positions && alone.indices == told.indices && !alone.positions.empty());
+  CHECK(low == 2 && high == 3);
 }
 
 // A list the engine holds behind a pointer and a size (FootprintStream::data/size): its node `values` gives every number
@@ -14862,6 +14882,14 @@ TEST(level_with_a_copy_of_the_engine_is_refused) {
   std::string error;
   CHECK(!game::from_text(text, l, &error));
   CHECK(error.find("actor \"Probe\"") == 0 && error.find("the struct physics_Pose is a copy of the engine's library engine_physics_physics") != std::string::npos);
+  // written with another engine (its mark): the message says what changed since
+  const std::string mark = logic::engine_library_mark("engine_physics_physics");
+  const std::size_t m = text.find(mark);
+  CHECK(m != std::string::npos);
+  text.replace(m, mark.size(), "0000");
+  error.clear();
+  CHECK(!game::from_text(text, l, &error));
+  CHECK(error.find("(engine_physics_physics: written with 0000, the engine has " + mark + ")") != std::string::npos);
   // an actor called like a library of the engine
   game::Level named = level_with_pose();
   named.actors[0].name = "engine_math_math";

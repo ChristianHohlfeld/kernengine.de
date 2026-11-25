@@ -1250,6 +1250,15 @@ enum class KERN_BLUEPRINT_TYPE BodyType : u8 { fixed, kinematic, dynamic };
 - Eine Bibliothek der Engine benutzt nur Bibliotheken der Engine. Paar-Typen, die die Engine braucht, stehen in ihr selbst
   und nie in `shapes` (Test `engine_libraries_use_no_library_of_a_level`).
 - Im Editor stehen sie unter „Engine“ und sind schreibgeschützt.
+- **Ihre Klassen gibt es einmal für alle Spiele:** `kern/logic/engine_libraries.gen.h` (mit dem Kleber in
+  `src/logic/engine_libraries_classes.gen.cpp`, geschrieben von `tools/blueprint_cpp --engine-classes`). Die Klassen der
+  Blueprints eines Levels binden diesen Header ein und nennen diese Klassen. Keine schreibt sie noch einmal, und die
+  Felder binden immer so, wie der Header der Engine sie deklariert.
+- `tools/engine_api.py --check <level | texte>` nennt, was ein Level oder ein Verzeichnis von Texten von den
+  Bibliotheken der Engine braucht, das diese nicht haben (Typen und Funktionen, mit wer sie nennt). Das geht ohne clang
+  und ohne vollen Lauf.
+- Ein Level notiert die Marken. Passt ein Blueprint beim Lesen nicht mehr zur Engine, nennt die Meldung, was sich seither
+  geändert hat (`engine_physics_physics: written with …, the engine has …`).
 
 ### Exporte: eine Funktion unter festem C-Namen
 Ein Programm gibt seinem Host (dem Skript einer Seite) Funktionen unter festen Namen – das C++ eines

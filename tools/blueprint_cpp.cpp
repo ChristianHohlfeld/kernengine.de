@@ -202,6 +202,10 @@ int main(int argc, char** argv) {
     std::printf("%a\n", f.evaluate(nullptr, 0));
     return 0;
   }
+  // --engine-classes: the classes of the engine's own libraries, once for every program (kern/logic/engine_libraries.h):
+  // the header every level's classes include, and the glue the engine links
+  const bool engine_classes = argc == 4 && std::string(argv[1]) == "--engine-classes";
+  if (engine_classes) argv += 1, argc -= 1;
   // --classes: only these actors' Blueprints and the libraries they use, as classes without glue
   std::set<std::string> only;
   const bool classes_only = argc >= 5 && std::string(argv[1]) == "--classes";
@@ -209,16 +213,29 @@ int main(int argc, char** argv) {
     for (int k = 4; k < argc; ++k) only.insert(argv[k]);
     argv += 1, argc -= 1;
   }
-  if (argc < 3 || (!classes_only && argc != 3 && argc != 5) || std::string(argv[1]) == "--apply") {
-    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp> [<out.h> <folder>]\n       blueprint_cpp --classes <level.klevel> <out.h> <actor> [<actor> ...]\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
+  if (!engine_classes && (argc < 3 || (!classes_only && argc != 3 && argc != 5) || std::string(argv[1]) == "--apply")) {
+    std::fprintf(stderr, "usage: blueprint_cpp <level.klevel> <out.cpp> [<out.h> <folder>]\n       blueprint_cpp --classes <level.klevel> <out.h> <actor> [<actor> ...]\n       blueprint_cpp --apply <level.klevel> <actor | Level> <text.cpp> [<actor> <text.cpp> ...]\n       blueprint_cpp --engine-classes <out.cpp> <out.h>\n       blueprint_cpp --node-names\n       blueprint_cpp --formula <formula without inputs>\n");
     return 2;
   }
   // (the header of the Blueprints the program calls by their classes, and the folder they stand in)
-  const char* header_path = !classes_only && argc == 5 ? argv[3] : nullptr;
-  const std::string called_folder = header_path ? argv[4] : "";
+  const char* header_path = engine_classes ? argv[2] : !classes_only && argc == 5 ? argv[3] : nullptr;
+  const std::string called_folder = engine_classes ? std::string() : header_path ? argv[4] : "";
   std::string text, why;
   json::Value doc;
-  if (!read_file(argv[1], text) || !json::parse(text, doc, &why)) {
+  if (engine_classes) {
+    // (a level of the engine's libraries alone: each one an actor, all of them in the header)
+    doc = json::Value::object();
+    json::Value actors = json::Value::array();
+    for (const std::string& n : logic::engine_library_names()) {
+      json::Value a = json::Value::object(), c = json::Value::object();
+      a.set("name", n);
+      a.set("folder", "Engine");
+      c.set("logic", logic::graph_to_json(*logic::engine_library(n)));
+      a.set("components", std::move(c));
+      actors.push(std::move(a));
+    }
+    doc.set("actors", std::move(actors));
+  } else if (!read_file(argv[1], text) || !json::parse(text, doc, &why)) {
     std::fprintf(stderr, "%s: %s\n", argv[1], why.empty() ? "cannot read it" : why.c_str());
     return 1;
   }
@@ -229,7 +246,7 @@ int main(int argc, char** argv) {
   for (const json::Value& a : doc["actors"].items())
     if (const json::Value* g = a["components"].find("logic"); g && g->is_object()) {
       found.push_back({"actor \"" + a["name"].as_string() + "\"", g});
-      if (header_path && a["folder"].as_string() == called_folder) called.insert(a["name"].as_string());
+      if (header_path && (engine_classes || a["folder"].as_string() == called_folder)) called.insert(a["name"].as_string());
     }
 
   std::string name = argv[1];
@@ -243,6 +260,7 @@ int main(int argc, char** argv) {
   if (header_path) {
     std::string included = header_path;
     if (const std::size_t slash = included.find_last_of("/\\"); slash != std::string::npos) included.erase(0, slash + 1);
+    if (engine_classes) included = "kern/logic/engine_libraries.gen.h";
     out += "#include \"" + included + "\"\n";
     header = "// Generated from " + name + " by tools/blueprint_cpp - do not edit: the Blueprints of the level's folder\n"
              "// \"" + called_folder + "\" - those the program's own C++ calls directly, as their classes - and the libraries\n"
@@ -250,7 +268,19 @@ int main(int argc, char** argv) {
              "// the build writes this file again.\n"
              "#pragma once\n\n"
              "#include \"kern/logic/blueprint.h\"\n"
-             "#include \"kern/logic/blueprint_class.h\"\n";
+             "#include \"kern/logic/blueprint_class.h\"\n"
+             "#include \"kern/logic/engine_libraries.gen.h\"  // (the classes of the engine's own libraries)\n";
+    if (engine_classes)
+      header = "// The classes of the engine's own libraries (kern/logic/engine_libraries.h), once for every program: written by\n"
+               "// tools/blueprint_cpp --engine-classes (tools/engine_api.py --libraries) - not edited by hand. The classes of a\n"
+               "// level's Blueprints include this header and name these classes; none writes them again.\n"
+               "#pragma once\n\n"
+               "#include \"kern/logic/blueprint.h\"\n"
+               "#include \"kern/logic/blueprint_class.h\"\n";
+    if (engine_classes)
+      out = "// The glue of the classes of the engine's own libraries (kern/logic/engine_libraries.gen.h): written by\n"
+            "// tools/blueprint_cpp --engine-classes - not edited by hand.\n"
+            "#include \"kern/logic/blueprint.h\"\n#include \"kern/logic/blueprint_class.h\"\n#include \"kern/logic/engine_libraries.gen.h\"\n";
   }
   // Every Blueprint of the level, by the name the others use it by (an actor's name).
   struct Held {
@@ -264,35 +294,27 @@ int main(int argc, char** argv) {
     h.owner = owner;
     h.name = owner == "the level" ? std::string("Level") : owner.substr(7, owner.size() - 8);
     std::string error;
-    if (!logic::graph_from_level_json(*json, h.g, &error)) {
+    if (!(engine_classes ? logic::graph_from_json(*json, h.g, &error) : logic::graph_from_level_json(*json, h.g, &error))) {
       std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], owner.c_str(), error.c_str());
       return 1;
     }
     if (h.g.empty()) continue;
-    logic::cpp_names(h.g);  // (as the level loader does for levels from before names had to be C++ names)
+    if (!engine_classes) logic::cpp_names(h.g);  // (as the level loader does for levels from before names had to be C++ names)
     held.push_back(std::move(h));
   }
   // The engine's libraries are the engine's (kern/logic/engine_libraries.h): no actor of a level is one, a
   // library of the engine a Blueprint uses is there without an actor, and each Blueprint is given what it uses
   // of them - as the level loader does. Their classes are written from the engine's graphs.
-  {
+  // The classes of the engine's libraries are the engine's (blueprint_cpp --engine-classes ->
+  // kern/logic/engine_libraries.gen.h, which the header includes): here they are named, not written again.
+  std::map<std::string, std::string> engine_classes_of;
+  if (!engine_classes) {
     for (const Held& h : held)
       if (h.owner != "the level" && logic::is_engine_library(h.name)) {
         std::fprintf(stderr, "%s: the Blueprint of %s is called like the engine's library %s - the engine's libraries are the engine's, a level does not hold them\n",
                      argv[1], h.owner.c_str(), h.name.c_str());
         return 1;
       }
-    for (std::size_t k = 0; k < held.size(); ++k) {
-      const std::vector<std::string> uses = held[k].g.uses;
-      for (const std::string& used : uses)
-        if (logic::is_engine_library(used) && std::none_of(held.begin(), held.end(), [&](const Held& o) { return o.owner != "the level" && o.name == used; })) {
-          Held e;
-          e.owner = "the engine's library " + used;
-          e.name = used;
-          e.g = *logic::engine_library(used);
-          held.push_back(std::move(e));
-        }
-    }
     const logic::Blueprints project = [&](std::string_view name) -> const logic::Graph* {
       for (const Held& h : held)
         if (h.owner != "the level" && h.name == name) return &h.g;
@@ -300,10 +322,22 @@ int main(int argc, char** argv) {
     };
     for (Held& h : held) {
       std::string why;
-      if (!logic::is_engine_library(h.name) && !logic::hold_engine(h.g, project, &why)) {
+      if (!logic::hold_engine(h.g, project, &why)) {
         std::fprintf(stderr, "%s: the Blueprint of %s: %s\n", argv[1], h.owner.c_str(), why.c_str());
         return 1;
       }
+    }
+    for (const std::string& n : logic::engine_library_names()) {
+      const logic::Graph& g = *logic::engine_library(n);
+      logic::Graph whole;
+      std::string why;
+      if (!logic::native_ready(g, &why) || !logic::link(g, project, whole, &why) || !logic::native_ready(whole, &why)) continue;  // (one with no class: a Blueprint that uses it runs in the interpreter, and says why below)
+      const std::string cls = logic::cpp_class_name(n, g);
+      u64 key = logic::graph_hash(whole);
+      for (unsigned char ch : cls) key = (key ^ ch) * 0x100000001b3ull;
+      char space[48];
+      std::snprintf(space, sizeof space, "kern_blueprint_%016llx", static_cast<unsigned long long>(key));
+      engine_classes_of[n] = std::string("::") + space + "::" + cls;
     }
   }
   const logic::Blueprints all = [&](std::string_view name) -> const logic::Graph* {
@@ -330,6 +364,7 @@ int main(int argc, char** argv) {
   }
   std::string aliases;  // (--classes: every class by its name)
   std::map<std::string, std::string> classes_of;  // a library that is written: its class, with its namespace
+  classes_of.insert(engine_classes_of.begin(), engine_classes_of.end());
   std::set<u64> written;
   int classes = 0;
   // What goes into the header: the Blueprints of the folder and, before them, the libraries they use - and
@@ -416,7 +451,7 @@ int main(int argc, char** argv) {
     ++classes;
   }
   if (classes_only) out += "\nnamespace blueprints {\n" + aliases + "}  // namespace blueprints\n";
-  if (header_path) {
+  if (header_path && !engine_classes) {
     for (const std::string& c : called)
       if (std::none_of(held.begin(), held.end(), [&](const Held& h) { return h.owner != "the level" && h.name == c; })) {
         std::fprintf(stderr, "%s: the actor %s of the folder %s has no Blueprint\n", argv[1], c.c_str(), called_folder.c_str());
@@ -448,8 +483,9 @@ int main(int argc, char** argv) {
     return true;
   };
   if (header_path && !write(header_path, header)) return 1;
-  if (!write(argv[2], out)) return 1;
-  std::printf("%s: %d of %zu Blueprint(s) as C++ classes", argv[2], classes, found.size());
+  const char* out_path = engine_classes ? argv[1] : argv[2];
+  if (!write(out_path, out)) return 1;
+  std::printf("%s: %d of %zu Blueprint(s) as C++ classes", out_path, classes, found.size());
   if (header_path) std::printf(" - %zu of them in %s, which the program calls (folder %s) and the libraries they use", named.size(), header_path, called_folder.c_str());
   std::printf("\n");
   return 0;

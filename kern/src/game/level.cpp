@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <map>
 #include <unordered_set>
 
 namespace kern::game {
@@ -939,7 +940,12 @@ bool actor_from_json(const json::Value& v, Actor& a, std::string* error) {
     }
     if (const json::Value* x = c.find("logic")) {
       logic::Graph g;
-      if (!logic::graph_from_level_json(*x, g, error)) return false;
+      std::map<std::string, std::string> marks;
+      if (!logic::graph_from_level_json(*x, g, error, &marks)) {
+        // (what of the engine changed since the level was written, by the marks it recorded)
+        if (const std::string changed = logic::engine_changes(marks); error && !changed.empty()) *error += " (" + changed + ")";
+        return false;
+      }
       logic::cpp_names(g);  // (levels from before a Blueprint's names had to be C++ names)
       a.logic = std::move(g);
     }
@@ -1136,7 +1142,21 @@ std::string to_text(const Level& level, i32 indent) { return json::stringify(to_
 namespace {
 /// The engine's libraries are the engine's (kern/logic/engine_libraries.h): a level does not hold one, and each
 /// Blueprint is given what it uses of them once it is read. False: an actor is called like one of them.
-bool hold_engine_libraries(Level& l, std::string* error) {
+/// What of the engine changed since the Blueprint of the actor `name` was written ("": nothing, or none).
+std::string engine_changed(const json::Value& doc, const std::string& name) {
+  for (const json::Value& v : doc["actors"].items()) {
+    if (v["name"].as_string() != name) continue;
+    std::map<std::string, std::string> marks;
+    if (const json::Value* e = v["components"].find("logic"); e && e->is_object())
+      if (const json::Value* m = e->find("engine"); m && m->is_object())
+        for (const auto& [lib, mark] : m->members()) marks[lib] = mark.as_string();
+    const std::string changed = logic::engine_changes(marks);
+    return changed.empty() ? "" : " (" + changed + ")";
+  }
+  return "";
+}
+
+bool hold_engine_libraries(Level& l, const json::Value& doc, std::string* error) {
   for (const Actor& a : l.actors)
     if (a.logic && logic::is_engine_library(a.name)) {
       if (error) *error = "actor \"" + a.name + "\": its Blueprint is called like the engine's library " + a.name + " - the engine's libraries are the engine's, a level does not hold them (a Blueprint names one in its uses)";
@@ -1154,7 +1174,7 @@ bool hold_engine_libraries(Level& l, std::string* error) {
   }
   for (Actor& a : l.actors)
     if (a.logic && !logic::hold_engine(*a.logic, project, &why)) {
-      if (error) *error = "actor \"" + a.name + "\": " + why;
+      if (error) *error = "actor \"" + a.name + "\": " + why + engine_changed(doc, a.name);
       return false;
     }
   return true;
@@ -1251,7 +1271,7 @@ bool from_json(const json::Value& doc, Level& out, std::string* error) {
       if (v["onnx"].is_string() && json::base64_decode(v["onnx"].as_string(), bytes) && !bytes.empty()) m.onnx = std::make_shared<const std::string>(std::move(bytes));
       l.motions.push_back(std::move(m));
     }
-  if (!hold_engine_libraries(l, error)) return false;
+  if (!hold_engine_libraries(l, doc, error)) return false;
   out = std::move(l);
   return true;
 }

@@ -3,7 +3,8 @@
 
   tools/engine_api.py [--list]
   tools/engine_api.py --check <level.klevel | texts dir>   what it names of the engine's libraries that they do not have
-  tools/engine_api.py --libraries    the engine's libraries (kern/logic/engine_libraries.h): src/logic/engine_libraries.gen.cpp
+  tools/engine_api.py --libraries    the engine's libraries (kern/logic/engine_libraries.h): src/logic/engine_libraries.gen.cpp,
+                                     their classes include/kern/logic/engine_libraries.gen.h (+ src/logic/engine_libraries_classes.gen.cpp)
 
 A function a header of the engine declares and does not define there is something only the engine
 can do: cast a ray through the physics world, draw a mesh, play a sound. Each is a node - for
@@ -1341,7 +1342,12 @@ def write_libraries():
     path = os.path.join(KERN, "src", "logic", "engine_libraries.gen.cpp")
     if not os.path.exists(path) or open(path).read() != text:
         open(path, "w").write(text)
-    print(f"the engine's libraries: {path}")
+    # their classes, once for every program: what a level's classes include (tools/blueprint_cpp --engine-classes)
+    r = subprocess.run([os.path.join(HERE, "blueprint_cpp.sh"), "--engine-classes", os.path.join(KERN, "src", "logic", "engine_libraries_classes.gen.cpp"),
+                        os.path.join(KERN, "include", "kern", "logic", "engine_libraries.gen.h")], capture_output=True, text=True)
+    if r.returncode != 0:
+        raise SystemExit("engine_api.py --libraries: the classes of the engine's libraries:\n" + (r.stdout + r.stderr)[-4000:])
+    print(f"the engine's libraries: {path}, their classes: kern/include/kern/logic/engine_libraries.gen.h")
 
 
 def built_libraries():
