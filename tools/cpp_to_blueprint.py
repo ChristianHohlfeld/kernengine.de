@@ -14655,6 +14655,9 @@ class TestWriter:
                         if x.lstrip().startswith(("In file included", "|")) or re.match(r"\s*\d+ \|", x):
                             continue
                         sys.stderr.write(f"--- {stem}: clang: {x[:400]}\n")
+                        at = re.match(re.escape(path) + r":(\d+):", x)
+                        if at and 0 < int(at.group(1)) <= len(head):   # (and the test's line there, as it was compiled)
+                            sys.stderr.write(f"--- {stem}: line {at.group(1)}: {head[int(at.group(1)) - 1].strip()[:400]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
             mine = re.compile(re.escape(path) + r":(\d+):")
