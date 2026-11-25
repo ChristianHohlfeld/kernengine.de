@@ -607,7 +607,16 @@ await cmd({cmd: "logicClose"});
 // level this test did not end within the CI's 30 minutes (run 45613904805, 25.11.2026).
 const whole = process.env.KERN_E2E_WHOLE_LEVEL === "1";
 const file = JSON.parse(await (await fetch(base + "/kern/games/spawncity/level/spawncity.klevel")).text());
-if (!whole) file.actors = file.actors.filter(a => a.folder !== "Source");
+if (!whole) {
+  // (but the libraries the Blueprints that stay use, through `uses`, one after the other - as tools/embed_level.py
+  // --without keeps them: those of "Program" call libraries of "Source")
+  const byName = new Map(file.actors.map(a => [a.name, a]));
+  const kept = new Set(file.actors.filter(a => a.folder !== "Source").map(a => a.name));
+  for (const todo = [...kept]; todo.length;)
+    for (const used of byName.get(todo.pop())?.components?.logic?.uses || [])
+      if (!kept.has(used) && byName.has(used)) { kept.add(used); todo.push(used); }
+  file.actors = file.actors.filter(a => kept.has(a.name));
+}
 const text = JSON.stringify(file);
 const opened = await cmd({cmd: "open", text, name: "spawncity.klevel"});
 check(opened?.ok !== false, "SpawnCity's level file opens in the editor" + (opened?.error ? ": " + opened.error : ""));
