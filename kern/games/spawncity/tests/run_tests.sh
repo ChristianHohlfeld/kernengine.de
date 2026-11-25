@@ -174,6 +174,8 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
   }
   oflags=(); for f in "${flags[@]}"; do [ "$f" = "-I$game/src" ] && oflags+=("-I$tree") || oflags+=("$f"); done
   engine=(); for f in "${cpp_objects[@]}"; do case "$f" in *_kern_src_*|*_kern_tests_gl_stub*|*_tests_test_main.cpp-*) engine+=("$f") ;; esac; done
+  # (the engine's clock - kern::now_ms, kern::wall_ms - is the test's on both sides: source_diff.h, clock_ms)
+  clock=(-Wl,--wrap=_ZN4kern6now_msEv -Wl,--wrap=_ZN4kern7wall_msEv)
   for side in new old; do
     if [ "$side" = new ]; then t="$game/src" d="$drv" sf=("${flags[@]}"); else t="$tree" d="$bout/tree/tests/${drv#"$here"/}" sf=("${oflags[@]}"); fi
     mapfile -t objs < <(side_objects "$t")
@@ -189,12 +191,15 @@ for drv in "$here"/lowered/builds/*/builds_*.cpp; do
       # object of that file, on each side; the test is no object of its own)
       k=0; for f in "$t"/*.cpp; do [ "$(basename "$f")" = main.cpp ] && continue; [ "$(basename "$f")" = "$within" ] && objs[$k]="$dobj"; k=$((k + 1)); done
       printf '#include "%s"\n#include "%s"\n' "$t/$within" "$d" > "$bout/within-$side.cpp"
-      "$cxx" "${sf[@]}" -c "$bout/within-$side.cpp" -o "$dobj"
-      "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "${objects[@]}" -lm -o "$bout/$side"
+      # (main.cpp is no source the tests link: within it, the test is one more object, and its kern_create_app - the
+      # tests' own is in test_main.cpp - goes by another name)
+      wf=(); [ "$within" = main.cpp ] && { wf=(-Dkern_create_app=sc_lowered_kern_create_app); objs+=("$dobj"); }
+      "$cxx" "${sf[@]}" "${wf[@]}" -c "$bout/within-$side.cpp" -o "$dobj"
+      "$cxx" "${link[@]}" "${clock[@]}" "${engine[@]}" "${objs[@]}" "${objects[@]}" -lm -o "$bout/$side"
       continue
     fi
     "$cxx" "${sf[@]}" -c "$d" -o "$dobj"
-    "$cxx" "${link[@]}" "${engine[@]}" "${objs[@]}" "$dobj" "${objects[@]}" -lm -o "$bout/$side"
+    "$cxx" "${link[@]}" "${clock[@]}" "${engine[@]}" "${objs[@]}" "$dobj" "${objects[@]}" -lm -o "$bout/$side"
   done
   rm -f "$bout/record"
   echo "two builds: $name (base $(sed -n 's#^// base: ##p' "$drv"))"

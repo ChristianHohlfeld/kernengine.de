@@ -990,10 +990,21 @@ template <class T> struct Self {
 /// One compared function in one program: SC_LOWERED_BUILDS=write:<file> (the old program) or check:<file> (the new).
 /// The old draws calls until kCalls of them are ones C++ says what they give (or twenty times as many were drawn) and
 /// writes them all; the new draws exactly as many - the same draws - and compares those both programs say.
+/// The clock of the engine in the form "two builds" (kern::now_ms, kern::wall_ms - KERN_CLOCK, kern/core/base.h): the
+/// same on both sides, set by the test before every call (run_tests.sh links each side with --wrap of the two). What a
+/// call measures with it (a duration, a time stamp) is then the same in both programs - as the game's tests set their
+/// clock, not the machine's.
+inline double clock_ms = 0;
+}  // namespace sc::lowered
+extern "C" __attribute__((weak, used)) double __wrap__ZN4kern6now_msEv() { return ::sc::lowered::clock_ms; }
+extern "C" __attribute__((weak, used)) double __wrap__ZN4kern7wall_msEv() { return 1.7e12 + ::sc::lowered::clock_ms; }
+namespace sc::lowered {
+
 struct Builds {
   static constexpr int kCalls = Tally::kCalls;
   struct Call {
     bool defined = false;
+    bool died = false;   // (the program did not survive it - Builds::alone)
     long asks = 0;
     std::vector<std::pair<std::string, std::string>> parts;
   };
@@ -1046,6 +1057,7 @@ struct Builds {
       while (text(field, j, head)) {
         Call c;
         c.defined = head[0] == 1;
+        c.died = head[0] == 2;
         std::memcpy(&c.asks, head.data() + 1, sizeof c.asks);
         u32 parts = 0;
         std::memcpy(&parts, head.data() + 1 + sizeof c.asks, sizeof parts);
@@ -1123,7 +1135,7 @@ struct Builds {
     return d;
   }
   bool died_said = false, now_died = false;
-  int died = 0;
+  int died = 0, died_old = 0, died_new = 0;
   /// An object a call leaves: as one part (what it holds, every field, compared as a whole - an object held twice is
   /// the same object), and - where the test has its fields' names - each field once more as a part of its own, so that
   /// where it differs the test says which fields do.
@@ -1138,17 +1150,25 @@ struct Builds {
   void take(bool defined, long asks, int call) {
     now.defined = defined;
     now.asks = defined ? asks : 0;
+    now.died = now_died;
     if (writing) {
+      now_died = false;
       if (defined) ++defined_old;
       old.push_back(std::move(now));
       return;
     }
     const Call& was = old[at++];
-    if (now_died && was.defined) {
-      // (the old program said what this call gives; the new does not survive it: that is a difference, not what C++ leaves open)
+    // (one program survives a call, the other does not: a difference, not what C++ leaves open - with the call, whose drawn
+    // input is the same in both programs: the call-th draw of this function)
+    died_old += was.died;
+    died_new += now_died;
+    if (now_died != was.died && (was.defined || defined)) {
+      const bool new_died = now_died;
       now_died = false;
       ++compared;
-      if (++wrong <= 3) std::printf("  %s, call %d: the new program does not survive a call the old one gives a value for\n", function.c_str(), call);
+      ++wrong;
+      std::printf("  %s, call %d: only the %s program survives it (it gives a value there; the input: the call-th draw of the test)\n", function.c_str(), call,
+                  new_died ? "old" : "new");
       return;
     }
     now_died = false;
@@ -1172,7 +1192,7 @@ struct Builds {
     if (writing) {
       std::string field;
       for (const Call& c : old) {
-        std::string head(1, c.defined ? 1 : 0);
+        std::string head(1, c.defined ? 1 : c.died ? 2 : 0);
         head.append(reinterpret_cast<const char*>(&c.asks), sizeof c.asks);
         const u32 parts = static_cast<u32>(c.parts.size());   // (an object of ~250 fields: a part each - more than a byte counts)
         head.append(reinterpret_cast<const char*>(&parts), sizeof parts);
@@ -1197,8 +1217,12 @@ struct Builds {
     SC_CHECK(wrong == 0, "%s: %d of %d calls differ", function.c_str(), wrong, compared);
     SC_CHECK(costlier == 0, "%s: in %d of %d calls the new asks for memory more often than the old (up to %ld times instead of %ld)", function.c_str(), costlier,
              compared, most_new, with_old);
-    SC_CHECK(compared >= 20, "%s: only %d calls could be compared (in %d C++ leaves open what they give)", function.c_str(), compared, outside);
-    std::printf("  %s: %d calls compared, %d not (C++ leaves them open)\n", function.c_str(), compared, outside);
+    // (a proof compares two thirds of the calls at least: where the program does not survive more of the drawn calls, the
+    // draws must give it what it lives with - not a lower bar)
+    SC_CHECK(compared * 3 >= kCalls * 2, "%s: only %d of %d calls could be compared (in %d C++ leaves open what they give; of those the program did not "
+             "survive %d in the old, %d in the new)", function.c_str(), compared, kCalls, outside, died_old, died_new);
+    std::printf("  %s: drawn %zu, compared %d, left open %d (the program did not survive: old %d, new %d)\n", function.c_str(), old.size(), compared, outside,
+                died_old, died_new);
   }
 };
 

@@ -35,6 +35,7 @@ it compares through its callers."""
 
 import argparse
 import importlib.util
+import json
 import os
 import re
 import shutil
@@ -142,6 +143,17 @@ class Fn:
         self.const = bool(re.search(r"\)\s*const\b", sig))
         self.params = [(p.get("name") or f"p{k}", (p.get("type") or {}).get("qualType", ""), C.qtype(p)) for k, p in enumerate(x for x in kids(node) if x.get("kind") == "ParmVarDecl")]
         self.body = next((c for c in kids(node) if c.get("kind") == "CompoundStmt"), None)
+        # (extern "C" - an export, KERN_EXPORT(name): one function of its C name in the program, whatever its namespace)
+        self.c_name = owner is None and (bool(node.get("_c_linkage")) or self._spelled_c(version))
+
+    def _spelled_c(self, v):
+        if not self.at or self.at[0] is None:
+            return False
+        a = self.at[0]
+        head = v.text(self.file)[max(0, a - 200):a + 200]
+        k = min(200, a)
+        before, at = head[:k], head[k:]
+        return bool(re.match(r'\s*(KERN_EXPORT\s*\(\s*\w+\s*\)|extern\s+"C")', at) or re.search(r'(KERN_EXPORT\s*\(\s*\w+\s*\)|extern\s+"C")\s*$', before))
 
     @property
     def cpp_scope(self):
@@ -192,10 +204,42 @@ class Version:
         self.program_ns = namespace   # (the namespace of the program around this side: the old program's for the old)
         self.variables = []     # (qualified name, node) - the variables of the source file's namespaces
         self.decl_by_id = {}
+        self.scope_by_id = {}   # id -> the namespaces around a declaration
         for o in self.dumps:
             self._ids(o, [namespace])
         for o in self.dumps:
             self._visit(o, [namespace], None)
+        self._c_exports(cpp, flags, namespace)
+
+    def _c_exports(self, cpp, flags, namespace):
+        """The exports of the file that stand outside the program's namespace (extern "C" at the top, ::sc_x): the
+        compiler's tree of the namespace does not hold them - a run of its own for their names."""
+        text = self.text(self.cpp)
+        names = set(re.findall(r"KERN_EXPORT\s*\(\s*(\w+)\s*\)", text)) | set(re.findall(r'extern\s+"C"\s+[^;{()]*?\b(\w+)\s*\(', text))
+        have = {f.name for f in self.functions if f.c_name}
+        names -= have
+        if not names:
+            return
+        pre = os.path.commonprefix(sorted(names))
+        for flt in ([pre] if len(pre) >= 3 else sorted(names)):
+            cmd = [os.environ.get("CLANGXX", "clang++"), "-std=c++20", "-fsyntax-only", "-Xclang", "-ast-dump=json", "-Xclang", "-ast-dump-filter", "-Xclang", flt, *flags, cpp]
+            r = subprocess.run(cmd, capture_output=True, text=True)
+            s, dec, i, dumps = r.stdout, json.JSONDecoder(), 0, []
+            while True:
+                j = s.find("{", i)
+                if j < 0:
+                    break
+                o, i = dec.raw_decode(s, j)
+                dumps.append(o)
+            st = {"file": ""}
+            for o in dumps:
+                C.annotate(o, st)
+            for o in dumps:
+                if o.get("kind") == "FunctionDecl" and o.get("name") in names and o.get("name") not in have and self.mine(o):
+                    f = self._function(o, [], None, None)
+                    if f is not None and f.c_name:
+                        self.functions.append(f)
+                        have.add(f.name)
 
     def text(self, file):
         f = os.path.abspath(file)
@@ -212,7 +256,11 @@ class Version:
         k = n.get("kind")
         if "id" in n:
             self.decl_by_id[n["id"]] = n
-        if k == "NamespaceDecl":
+            self.scope_by_id[n["id"]] = scope
+        if k == "LinkageSpecDecl":
+            for c in kids(n):
+                self._ids(c, scope)   # (extern "C" { ... } / KERN_EXPORT: its functions stand in the scope around it)
+        elif k == "NamespaceDecl":
             for c in kids(n):
                 self._ids(c, scope + [n.get("name") or "(anonymous)"])
         elif k in ("CXXRecordDecl", "ClassTemplateDecl") and n.get("name"):
@@ -234,7 +282,13 @@ class Version:
     def _visit(self, n, scope, owner):
         k = n.get("kind")
         q = lambda name: "::".join(s for s in scope + [name] if s != "(anonymous)")
-        if k == "NamespaceDecl":
+        if k == "LinkageSpecDecl":
+            # (extern "C" - an export of the program, KERN_EXPORT: its C name is the function, wherever its namespace)
+            for c in kids(n):
+                if c.get("kind") in FUNCTIONS and n.get("language") == "C":
+                    c["_c_linkage"] = True
+                self._visit(c, scope, owner)
+        elif k == "NamespaceDecl":
             for c in kids(n):
                 self._visit(c, scope + [n.get("name") or "(anonymous)"], None)
         elif k in ("CXXRecordDecl", "EnumDecl") and n.get("parentDeclContextId") in self.record_ids and n.get("parentDeclContextId") != (scope and self._scope_id(scope)):
@@ -409,6 +463,48 @@ class Version:
 
     def actors(self):
         return [(q, self.actor_of(n)) for q, n, _ in self.variables if self.actor_of(n) is not None]
+
+    def objects(self):
+        """Of each function, the objects of the program it reaches through a function of another file that gives one
+        (`Game& game()`: the one object of the program) - itself or through what it calls in the file: {(accessor, class)}."""
+        by_id = {f.node["id"]: f for f in self.functions}
+        def scope_of(r):
+            sc = self.scope_by_id.get(r.get("id"))
+            if sc is None:   # (a node of another run of the compiler: the declaration of that name and type)
+                t = (r.get("type") or {}).get("qualType")
+                sc = next((self.scope_by_id.get(i) for i, d in self.decl_by_id.items()
+                           if d.get("kind") == "FunctionDecl" and d.get("name") == r.get("name") and (d.get("type") or {}).get("qualType") == t), None)
+            return sc
+        direct, calls = {}, {}
+        for f in self.functions:
+            got, called = set(), set()
+            for x in walk(f.body):
+                r = x.get("referencedDecl") or {}
+                if x.get("kind") == "DeclRefExpr" and r.get("kind") == "FunctionDecl" and r.get("id") not in by_id:
+                    m = re.fullmatch(r"(?:struct |class )?([\w:]+)\s*&\s*\(\)", (r.get("type") or {}).get("qualType", ""))
+                    sc = scope_of(r) if m else None
+                    if sc is not None:
+                        sc = [y for y in sc if y != "(anonymous)"]
+                        rec = next((q for q in ["::".join(sc[:k] + [m.group(1)]) for k in range(len(sc), -1, -1)] if q in self.records), None)
+                        if rec is not None:
+                            got.add(("::".join(sc + [r["name"]]), rec))
+                if x.get("kind") in ("DeclRefExpr", "MemberExpr"):
+                    rid = r.get("id") if x.get("kind") == "DeclRefExpr" else x.get("referencedMemberDecl")
+                    if rid in by_id:
+                        called.add(rid)
+            direct[f.node["id"]], calls[f.node["id"]] = got, called
+        out = {}
+        for f in self.functions:
+            seen, todo, got = set(), [f.node["id"]], set()
+            while todo:
+                i = todo.pop()
+                if i in seen:
+                    continue
+                seen.add(i)
+                got |= direct.get(i, set())
+                todo += list(calls.get(i, ()))
+            out[f.node["id"]] = got
+        return out
 
     def users(self):
         """Of each function, the variables of the file it reads or changes - itself or through what it calls in the file."""
@@ -865,6 +961,8 @@ class Module:
         state_old = [q for q, _ in self.old.state()]
         out, alone = [], []
         def place(f):
+            if f.c_name:
+                return ('extern "C"', None, f.kind)   # (::sc_x and sc::sc_x: the same C name, the same export)
             return (f.cpp_scope, f.owner.split("::")[-1] if f.owner else None, f.kind)
         self.bindings, self.binding_gets, self.plans = [], [], {}
         for o in olds:
@@ -892,6 +990,10 @@ class Module:
             exact = [n for n in exact if const(n) == const(o)] or exact
             if exact:
                 out.append((o, exact[0], {}))
+                continue
+            adapted = [n for n in named if o.c_name and n.c_name and lengths_after_pointers(o, n) is not None]
+            if adapted:
+                out.append((o, adapted[0], {}))   # (an export that takes the length after a pointer too: BuildsWriter's adapter)
                 continue
             found = None
             for n in named:
@@ -1736,6 +1838,49 @@ class Writer:
 # new (tests/lowered/builds/<file>/old/...) and the names of those the old did not have (.../gone): run_tests.sh makes
 # the old tree from them, with no git.
 
+def export_contracts(test_dir):
+    """The page's contract of the exports (tests/lowered/exports.txt): how many entries the page reads where an export
+    gives a pointer (`<export> gives <C++>`), how many it hands where it hands a pointer (`<export> <param> <C++>`),
+    and the range it hands a number in (`<export> <param> range <lo> <hi>`) - C++ over the export's parameters by
+    their names (and `r`, the pointer it gave). What the function's type does not say, the page says: so the test."""
+    out = {}
+    path = os.path.join(test_dir, "exports.txt")
+    if not os.path.exists(path):
+        return out
+    for line in open(path, encoding="utf-8"):
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        name, what, rest = (line.split(None, 2) + ["", ""])[:3]
+        c = out.setdefault(name, {"gives": None, "sizes": {}, "ranges": {}})
+        if what == "gives":
+            c["gives"] = rest
+        elif rest.startswith("range "):
+            lo, hi = rest.split()[1:3]
+            c["ranges"][what] = (lo, hi)
+        else:
+            c["sizes"][what] = rest
+    return out
+
+
+def lengths_after_pointers(o, n):
+    """An export whose new text hands the length after a pointer (`const u8* rgba` -> `const u8* rgba, u32 length`):
+    the new's parameters that are such lengths, by their place - else None."""
+    po, pn = o.param_types(), n.param_types()
+    def fit(i, k):   # (the old's i-th and the new's k-th on: a length after a pointer is taken before a same type)
+        if k == len(pn):
+            return [] if i == len(po) else None
+        if k > 0 and re.search(r"\*\s*$", pn[k - 1]) and re.fullmatch(r"unsigned int|int|unsigned long|unsigned long long", pn[k]):
+            got = fit(i, k + 1)
+            if got is not None:
+                return [k] + got
+        if i < len(po) and pn[k] == po[i]:
+            return fit(i + 1, k + 1)
+        return None
+    got = fit(0, 0)
+    return got or None
+
+
 def spans_files(m):
     """Whether a class a changed method of the file belongs to has methods whose bodies stand in other files (a class
     of many files: its two texts cannot both be in one program)."""
@@ -1827,10 +1972,21 @@ class BuildsWriter(Writer):
             return planned
         pairs, tested, covered = planned
         m = self.m
+        self.contracts = export_contracts(self.out_dir)
+        self.adapters = {}
         for o, n, e in tested:
+            if n.c_name and o.c_name and not e and o.param_types() != n.param_types() and plain(o.ret) == plain(n.ret):
+                got = lengths_after_pointers(o, n)
+                if got is not None and all(n.params[k - 1][0] in self.contracts.get(n.name, {}).get("sizes", {}) for k in got):
+                    # (an adapter: both draw the old's parameters; the new is handed the length of the drawn entries too)
+                    self.adapters[n.name] = got
+                    continue
             if e or o.template or n.template or o.param_types() != n.param_types() or plain(o.ret) != plain(n.ret) or o.kind != n.kind:
                 raise Stop(f"{o.label()} -> {n.label()}: the form \"two builds\" compares a function with its counterpart of the same signature - "
                            "one that changed its parameters (the state made explicit, a template made functions) is not compared in it yet")
+            if n.c_name and re.search(r"\*\s*$", plain(n.ret)) and not re.search(r"\bchar\s*\*\s*$", plain(n.ret)) and not self.contracts.get(n.name, {}).get("gives"):
+                raise Stop(f"{n.label()} gives a pointer to data whose length the page knows (not the function's type): "
+                           "the form \"two builds\" compares a text by its characters, not such data yet")
             if n.local or o.local:
                 raise Stop(f"{o.label()}: only its own file can call it - the form \"two builds\" calls what the program's other files can call")
         for label in covered:
@@ -1852,6 +2008,18 @@ class BuildsWriter(Writer):
             if plain(t_old) != plain(t_new):
                 raise Stop(f"the variable {q} of the file has another type in the old text ({t_old} -> {t_new})")
             self.within.append((q, t_new))
+        # the one objects of the program a compared function reaches through a function of another file (`Game&
+        # game()` - an export of main.cpp acts on the game): drawn before every call, alike on both sides, as a method's
+        # object is, and compared after it. Each is reached so in both texts (else it is no longer the same object).
+        objs, new_objs = m.old.objects(), m.new.objects()
+        self.objects = []
+        for o, n, e in tested:
+            a, b = objs.get(o.node["id"], set()), new_objs.get(n.node["id"], set())
+            if a != b and a and b:
+                raise Stop(f"{o.label()} reaches {sorted(a)} in the old text and {sorted(b)} in the new: the form \"two builds\" compares an object with itself")
+            for x in sorted(a | b):
+                if x not in self.objects:
+                    self.objects.append(x)
         if any(True for _ in m.old.actors()) or any(self.logic_param(t) for o, n, _ in tested for _, t, _ in o.params + n.params):
             raise Stop("the file binds Blueprints of actors: the form \"two builds\" does not run a logic for them yet")
         self.reached = {}       # qualified name -> (side "sc"/"kern", record) of the classes the test draws or writes
@@ -1861,7 +2029,7 @@ class BuildsWriter(Writer):
             if n.owner:
                 roots.append(n.owner)
             roots += [t for _, t, _ in n.params] + [t for _, _, t in n.params] + [n.ret or ""]
-        roots += [t for _, t in self.within]
+        roots += [t for _, t in self.within] + [t for _, t in self.objects]
         self.reach(roots)
         self.check_same()
         text = self.driver(tested)
@@ -2015,7 +2183,9 @@ class BuildsWriter(Writer):
                f"// as they stood at the base, old/ and gone beside it) and into the program as it stands; the old writes what every changed",
                "// function gives and leaves, call for call, the new draws the same calls and compares, bit for bit.",
                f"// base: {m.base}"]
-        if self.within:
+        if self.within or os.path.basename(m.src) == "main.cpp":
+            # (main.cpp is no source the tests link - its kern_create_app is the tests' own: the test is compiled within it,
+            # and run_tests.sh renames its kern_create_app)
             out.append(f"// within: {os.path.basename(m.src)} (appended to its text on each side: the test reaches the variables of the file)")
         out += [f'#include "{h}"' for h in sorted(headers)]
         out += ['#include "../../../source_diff.h"', ""]
@@ -2056,7 +2226,7 @@ class BuildsWriter(Writer):
                 out.append(f"template <> struct Values<::{q}> {{ static constexpr long long all[] = {{{', '.join(str(v) for _, v in values)}}}; }};")
         out += ["}  // namespace sc::lowered", "", f"namespace {m.namespace} {{", f"SC_TEST(lowered_{key}_cpp) {{"]
         for j, (o, n, e) in enumerate(tested):
-            out += self.builds_case(j, n, calls.get(j))
+            out += self.builds_case(j, n, calls.get(j), o)
         out += ["}", f"}}  // namespace {m.namespace}", ""]
         return "\n".join(out)
 
@@ -2076,25 +2246,48 @@ class BuildsWriter(Writer):
                 hidden = access != "public"
         return bool(hidden)
 
-    def builds_case(self, j, n, robbed):
+    def builds_case(self, j, n, robbed, o=None):
         label = n.label()
         T = f"::{n.owner}" if n.owner else None
         body = [f"  {{  // {label}", f"    ::sc::lowered::Builds rec({C.text_literal(label)});", "    ::sc::converted::Draw draw;",
                 "    for (int call = 0; rec.more(call); ++call) {"]
-        inner = []
+        inner = ["::sc::lowered::clock_ms = 1000.0 * call;"]   # (the engine's clock, alike on both sides - source_diff.h)
         method = n.method and not n.static and n.kind in ("CXXMethodDecl", "CXXDestructorDecl")
         if method:
             inner += [f"::sc::lowered::Self<{T}> self;", "if (draw.flag()) ::sc::lowered::draw(draw, *self);"]
         args, writes = [], []
+        con = self.contracts.get(n.name, {"gives": None, "sizes": {}, "ranges": {}}) if n.c_name else {"gives": None, "sizes": {}, "ranges": {}}
+        lens = set(self.adapters.get(n.name, ()))
+        old_args, buffers = [], []
         for k, (pn, pt, pd) in enumerate(n.params):
             t = pd or pt
+            if k in lens:
+                args.append(f"static_cast<{t}>(b{k - 1}.size())")   # (the adapter: the length of the drawn entries)
+                continue
+            if pn in con["sizes"]:
+                buffers.append((k, pn, t))   # (a pointer the page hands: as many entries as its contract says, drawn after the numbers)
+                args.append(f"b{k}.data()")
+                old_args.append(f"b{k}.data()")
+                continue
             inner += [f"::sc::lowered::Arg<{t}> a{k};", f"::sc::lowered::draw(draw, a{k});"]
+            if pn in con["ranges"]:
+                lo, hi = con["ranges"][pn]
+                inner.append(f"{{ const long long lo = {lo}, span = ({hi}) - lo + 1; a{k}.v = static_cast<std::remove_cvref_t<decltype(a{k}.v)>>(lo + ((static_cast<long long>(a{k}.v) % span) + span) % span); }}")
+            if con["sizes"] or con["gives"]:
+                inner.append(f"[[maybe_unused]] auto& {pn} = a{k}.v;")
             args.append(f"a{k}.get()")
+            old_args.append(f"a{k}.get()")
             if re.search(r"&\s*$", t) and not re.match(r"^const\b", t.strip()):
                 writes.append((f"its parameter {pn}", f"a{k}.v"))
+        for k, pn, t in buffers:
+            inner += [f"std::vector<std::remove_cv_t<std::remove_pointer_t<{t}>>> b{k}(static_cast<std::size_t>({con['sizes'][pn]}));",
+                      f"for (auto& x : b{k}) ::sc::lowered::draw(draw, x);"]
         for q, t in self.within:
             inner.append(f"::sc::lowered::draw(draw, ::{q});")
             writes.append((f"the variable {q} of the file", f"::{q}"))
+        for acc, t in self.objects:
+            # (the one object of the program, as Self makes a method's: what the engine makes given, then drawn)
+            inner += [f"::sc::lowered::give_engine_made(::{acc}());", f"if (draw.flag()) ::sc::lowered::draw(draw, ::{acc}());"]
         a = ", ".join(args)
         ret = n.ret and plain(n.ret) != "void" and n.kind not in ("CXXConstructorDecl", "CXXDestructorDecl")
         if n.kind == "CXXDestructorDecl":
@@ -2106,6 +2299,12 @@ class BuildsWriter(Writer):
             call = f"{robbed}({a})" if robbed else f"self->{n.name}({a})"
         elif n.owner:
             call = f"{T}::{n.name}({a})"
+        elif n.c_name and lens:
+            # (the adapter: the one text takes the length after the pointer, the other not - each side calls what it has)
+            g = f"[](auto&&... x) -> decltype({n.name}(static_cast<decltype(x)&&>(x)...)) {{ return {n.name}(static_cast<decltype(x)&&>(x)...); }}"
+            call = (f"[&](auto g) -> decltype(auto) {{ if constexpr (requires {{ g({a}); }}) return g({a}); else return g({', '.join(old_args)}); }}({g})")
+        elif n.c_name:
+            call = f"{n.name}({a})"   # (an export: ::sc_x in one text, sc::sc_x in the other - the test stands in sc, it finds either)
         else:
             call = f"::{n.cpp_scope}::{n.name}({a})" if n.cpp_scope else f"::{n.name}({a})"
         if ret:
@@ -2114,10 +2313,17 @@ class BuildsWriter(Writer):
         # (each call alone, in a process of its own - Builds::alone: a call the program does not survive is one C++ leaves open)
         inner += ["long asks = 0;", "const bool defined = rec.alone([&](long& asks) {",
                   f"const bool defined = ::sc::lowered::run([&] {{ {call}; }}, asks);", "if (defined) {"]
-        if ret:
+        if ret and con["gives"]:
+            # (a pointer to entries: as many as the page reads - its contract - compared, the whole buffer)
+            inner += ["  {", "    const auto* rp = *r;", "    using E = std::remove_cv_t<std::remove_pointer_t<std::remove_cvref_t<decltype(rp)>>>;",
+                      f"    const std::size_t len = rp ? static_cast<std::size_t>([&](const auto* r) {{ return {con['gives']}; }}(rp)) : 0;",
+                      '    rec.part("what it returns (as many entries as the page reads)", ::sc::lowered::bytes_of(rp ? std::vector<E>(rp, rp + len) : std::vector<E>{}));', "  }"]
+        elif ret:
             inner.append('  rec.part("what it returns", ::sc::lowered::bytes_of(r));')
         if method and n.kind != "CXXDestructorDecl":
             inner.append('  rec.object("its object", *self);')
+        for acc, t in self.objects:
+            inner.append(f'  rec.object({C.text_literal("the object of " + acc + "()")}, ::{acc}());')
         if n.kind == "CXXConstructorDecl":
             inner.append('  rec.part("the object it makes", ::sc::lowered::bytes_of(made));')
         for what, x in writes:

@@ -1,0 +1,16 @@
+# The page's contract of the exports (tools/source_diff.py, the form "two builds"): what the function's type does not
+# say - how many entries the page reads where an export gives a pointer, how many it hands with a pointer, the range of
+# a number it hands. C++ over the export's parameters by their names; `r`: the pointer the export gave.
+#   <export> gives <C++>            <export> <param> <C++>            <export> <param> range <lo> <hi>
+# web/mp_host.mjs: head = Uint32Array(ptr, 3); the datagram is ptr + 12, head[0] bytes
+sc_net_take      gives   12 + reinterpret_cast<const kern::u32*>(r)[0]
+# web/host.mjs: new Float32Array(memory, ptr, frames * 2)
+sc_audio_render  gives   frames * 2
+sc_audio_render  frames  range 0 1024
+# web/host.mjs: the RGBA pixels of the tile's bitmap (getImageData: width * height * 4 bytes); images are 64 x 64
+sc_dem_data      rgba    width * height * 4
+sc_dem_data      width   range 1 64
+sc_dem_data      height  range 1 64
+sc_image_data    rgba    width * height * 4
+sc_image_data    width   range 64 64
+sc_image_data    height  range 64 64
