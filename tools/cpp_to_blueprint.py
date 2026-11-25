@@ -80,7 +80,7 @@ makes of a field itself too, and of the fields of a value inside it -, and it is
 the value, in the reverse order: at the end of the block of a local variable, where what owns such a value
 (std::unique_ptr, std::optional) gets another one or is reset. The struct's default is the handle 0. The
 one object of a state is made when its Blueprint begins (Begin Play calls its constructor - the one it
-declares, or C++'s own where it declares none: own_maker), before anything else of it: in the order of the fields,
+declares, also `= default` where it is defined outside the class), before anything else of it: in the order of the fields,
 what C++ makes of them - and a field whose initializer is computed, no constant (`T* p[2] = {&a(), &b()};`, a call),
 starts at zero and is set there (Unit.computed_init) -, then the constructor's body. What C++ does
 with such values that one handle cannot do the same way - a copy, a move or a temporary of one, one handed
@@ -1411,16 +1411,6 @@ def defaulted_maker(d):
             and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)))
 
 
-def own_maker(d, tree, world):
-    """C++'s own constructor of a state (one the class does not declare - the compiler's, defined where the program
-    makes the one object): what C++ does when it makes the object - the fields' initializers, in their order, then
-    nothing - is a step like a declared constructor's: it runs when the state's Blueprint begins (Begin Play), before
-    anything else of it. (A constant initializer is the variable's default; a computed one - `&getter()`, a call - is
-    set there: Unit.computed_init.)"""
-    return (d.get("kind") == "CXXConstructorDecl" and d.get("isImplicit") and tree.owner.get(d["id"]) in world.states
-            and not any(p.get("kind") == "ParmVarDecl" for p in kids(d)) and any(c.get("kind") == "CompoundStmt" for c in kids(d)))
-
-
 def ends_itself(d):
     """Does this destructor do something of its own: a body with statements (not `= default`, not C++'s)?"""
     if d.get("kind") != "CXXDestructorDecl" or d.get("isImplicit") or d.get("explicitlyDefaulted"):
@@ -2744,6 +2734,11 @@ class Unit:
             t = self.place(qtype(c))
             init = kids(c)[-1] if kids(c) and c.get("hasInClassInitializer") else None
             computed = init is not None and self.computed_init(c)   # (set where the object is made: its constructor)
+            if computed and self.state in self.tree.records and self.state not in self.world.defaulted and not any(
+                    k.get("kind") == "CXXConstructorDecl" and not k.get("isImplicit") for k in kids(self.tree.records[self.state])):
+                # (C++'s own constructor, which the class does not write down, is no function of the program: the step
+                # has no place - the class declares one, `S() = default;` defined outside it, and it is written there)
+                raise Wait(f"it starts with what is computed when the object is made, and the state {self.name} has no constructor of its own (declare one: `{self.state.split('::')[-1]}();` ... `= default`)")
             default = Const(self).literal(init, t) if init is not None and not computed and not self.made_by_cpp(qtype(c), init) else self.zero(t)
         except Wait as w:
             raise Wait(f"the variable {name} of {self.name}: {w}")
@@ -15981,7 +15976,7 @@ def convert_unit(job):
         # the functions of its header that need the source file), then the source file's
         # (a constructor `= default` is C++'s own - but the one of a state: what runs when its Blueprint begins)
         mine = [d for i, d in tree.body.items() if i == d["id"] and d.get("_file") and d.get("kind") != "VarDecl"
-                and not ((d.get("isImplicit") and not own_maker(d, tree, world)) or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
+                and not (d.get("isImplicit") or (d.get("explicitlyDefaulted") and not (defaulted_maker(d) and tree.owner.get(d["id"]) in world.states))
                          or (d.get("kind") == "CXXDestructorDecl" and not ends_itself(d))) and world.part_of_function(tree, d) == part
                 and not tree.records.get(tree.owner.get(d["id"], ""), {}).get("_local")   # (a method of a type of a function's body: of that function)
                 and function_key(tree, d) not in world.getters]   # (the getter of a state's one object: that Blueprint itself - main)
