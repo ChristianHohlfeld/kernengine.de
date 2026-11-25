@@ -12691,6 +12691,26 @@ class TestWriter:
         return (f"{ret} {d['name']}({', '.join(a + b for a, b in params)}){const}{said};",
                 f"inline {ret} {cls + '::' if cls else ''}{d['name']}({', '.join(a for a, _ in params)}){const} {{ {' '.join(body)} }}")
 
+    def overridden(self, q):
+        """The virtual functions of the class `q` of the engine that a function of a class of the program the test holds
+        overrides (by name, as `override` finds it): [declaration], in their order in q."""
+        tree, held = self.tree, getattr(self, "held_members", set())
+        names = set()
+        for i in held:
+            m = tree.decl.get(i) or tree.body.get(i) or {}
+            owner = tree.owner.get(i) or tree.owner.get(m.get("id"))
+            if m.get("kind") != "CXXMethodDecl" or not owner or owner not in tree.records:
+                continue
+            for b in tree.records[owner].get("bases", []) or []:
+                try:
+                    bq = self.u.find_type(self.u.clean(qtype(b)))
+                except Wait:
+                    bq = None
+                if bq == q:
+                    names.add(m.get("name"))
+        return [v for v in kids(tree.records[q]) if v.get("kind") == "CXXMethodDecl" and v.get("virtual") and v.get("name") in names
+                and not v.get("isImplicit") and v.get("_at", (None, None))[1] is not None]
+
     def engine_bases(self, q):
         """The classes of the engine the class `q` of the engine derives from that are objects of it too."""
         out = []
@@ -12786,6 +12806,17 @@ class TestWriter:
                     continue   # (the one function, which the source and a piece of another file name by two declarations of it)
                 decls.append("  " + a)
                 defs.append((("object", q), b))
+            # an interface of the engine a class of the program implements (kern::App, ShaderExtension): its virtual functions
+            # the test's copy of that class overrides, as the engine's header declares them - virtual, with their body there (or
+            # `= 0`) -, so that `override` in the copy has its function. (One the source also calls is that declaration, virtual.)
+            for v in self.overridden(q):
+                called = re.compile(r"\b" + re.escape(v["name"]) + r"\s*\(")
+                if any(called.search(x) for x in decls):
+                    decls = [("  virtual " + x.lstrip()) if called.search(x) and not re.match(r"\s*virtual\b", x) else x for x in decls]
+                    continue
+                text = tree.source(v).strip()
+                if text:
+                    decls.append("  " + (text if re.match(r"virtual\b", text) else "virtual " + text) + ("" if text.endswith(("}", ";")) else ";"))
             if any(f.get("role") in ("make", "release") for f in by_class.get(q, [])) and not made:
                 decls.insert(0, f"  {name}() = default;")   # (the test's own objects of it - see converted::engine_object)
             over = ", ".join(f"public {self.object_name(b)}" for b in self.engine_bases(q)) or "converted::EngineObject"
@@ -14339,6 +14370,8 @@ class TestWriter:
         for q in top:
             members[q], left_out = self.members_of(q, functions, templates, G.kept)
             unconverted.update(("member", i) for i in left_out)
+        # (the members the test holds: the stand-in of an interface of the engine has the virtual functions they override)
+        self.held_members = {m["id"] for ms in members.values() for m in ms} - {i for _, i in unconverted}
         # the names the program gives types (`using Bytes32 = ...`), where the test's source uses them
         foreign_texts = [p.get("text") or "".join(t for t, _, _ in p.get("segments", ())) for p in G.foreign.values()]
         texts = [text for _, _, text in [*enum_chunks, *const_chunks, *fn_chunks]] + [self.piece(tree.records[q]) for q in top] + foreign_texts
