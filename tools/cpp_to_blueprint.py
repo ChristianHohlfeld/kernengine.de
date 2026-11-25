@@ -3703,6 +3703,18 @@ class Emit:
                 x.get("kind") == "MemberExpr" and (u.state_fields.get(x.get("name")) or (None, None, {}))[2].get("mutable") and self.is_this(kids(x)[0] if kids(x) else {"kind": "CXXThisExpr"})
                 for x in walk(d))
             # (what it keeps from one call to the next, or of the file - changed or not: it may be)
+            if not method and not f.mutates:
+                # (a function of its Blueprint that is no method - an export of main - changes the one object where it
+                # sets a field of it, reached through the object's getter: `game().pad.lx = lx`)
+                def written(x):
+                    if x.get("kind") == "CompoundAssignOperator" or (x.get("kind") == "BinaryOperator" and x.get("opcode") == "=") or \
+                            (x.get("kind") == "UnaryOperator" and x.get("opcode") in ("++", "--")):
+                        n = kids(x)[0] if kids(x) else {}
+                        while bare(n).get("kind") in ("MemberExpr", "ArraySubscriptExpr", "ImplicitCastExpr") and kids(bare(n)):
+                            n = kids(bare(n))[0]
+                        return n is not kids(x)[0] and self.is_this(n)
+                    return False
+                f.mutates = any(written(x) for x in walk(d))
             f.mutates = f.mutates or any(x.get("kind") == "VarDecl" and x.get("storageClass") == "static" and not x.get("constexpr") and not re.search(r"\bconst\b", qtype(x)) for x in walk(d)) \
                 or any(i in self.names and self.names[i] in {n for n, _ in u.state_statics.values()} for i in self.assigned(d))
             if f.mutates:
