@@ -15536,6 +15536,11 @@ class TestWriter:
                         at = re.match(re.escape(path) + r":(\d+):", x)
                         if at and 0 < int(at.group(1)) <= len(head):   # (and the test's line there, as it was compiled)
                             sys.stderr.write(f"--- {stem}: line {at.group(1)}: {head[int(at.group(1)) - 1].strip()[:400]}\n")
+                        name = re.search(r"error: (?:use of undeclared identifier|no member named|unexpected namespace name|unknown type name) '(\w+)'", x)
+                        if name:   # (and where the test declares that name, if it does: the first few places)
+                            decl = re.compile(r"\b(?:namespace|struct|class|enum(?:\s+class)?|using)\s+" + name.group(1) + r"\b|\b" + name.group(1) + r"\s*[({=;]")
+                            for k in [k for k, line in enumerate(head) if decl.search(line)][:4]:
+                                sys.stderr.write(f"--- {stem}: has {name.group(1)} at line {k + 1}: {head[k].strip()[:300]}\n")
             # a complaint counts for the line of the test it is about: its own, or the one it was "required from"
             out = r.stderr.split("\n")
             mine = re.compile(re.escape(path) + r":(\d+):")
