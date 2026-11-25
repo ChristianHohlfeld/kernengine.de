@@ -11,7 +11,7 @@
 # run does): the Blueprints of the engine's headers they use are written anew. LINK=1 then compiles every file and the
 # engine, links them with tools/all_program_run.cpp and plays the level without a window (Begin and TICKS steps); a link
 # that fails says which symbols are missing. WEB=1 (WASI_SDK set) builds the same as a game for the browser, as
-# tools/export_game.sh does (kern/build.sh --studio with the classes): its size, and the memory of its compilers.
+# tools/export_game.sh does (kern/build.sh --studio with the classes; --app: they call kern::Engine of the app runtime): its size, and the memory of its compilers.
 #
 # CI: workflow_dispatch of ci.yml with probe="all_program".
 set -uo pipefail
@@ -83,7 +83,7 @@ cat "$out"/logs/*.log | grep 'error:' | sed -E 's/^[^ ]* error: //; s/kern_bluep
 if [ "${WEB:-}" = 1 ]; then
   # ---- the same for the browser: the level's runtime with every class compiled in (tools/export_game.sh's way)
   if KERN_JOBS="${LINK_JOBS:-3}" /usr/bin/time -f "web build: peak_kb=%M seconds=%e (the largest compiler of the build)" \
-       "$root/kern/build.sh" --studio --commercial "$out/all_program.wasm" "$out"/gen/*.cpp -I"$out/gen" > "$out/web.log" 2>&1; then
+       "$root/kern/build.sh" --app --studio --commercial "$out/all_program.wasm" "$out"/gen/*.cpp -I"$out/gen" > "$out/web.log" 2>&1; then
     echo "web build: $(du -h "$out/all_program.wasm" | cut -f1) ($(stat -c %s "$out/all_program.wasm") bytes); $(grep -o 'web build: peak.*' "$out/web.log")"
   else
     echo "web build fails: $(grep -c 'error' "$out/web.log") lines with an error"; grep -E 'error|undefined symbol' "$out/web.log" | sort | uniq -c | sort -rn | head -40
