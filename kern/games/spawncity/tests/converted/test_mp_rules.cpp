@@ -71,7 +71,7 @@ struct StructField : converted::EngineObject {
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 namespace mp { constexpr f64 kInterpolationDelayMs = 90; }
 namespace mp { struct PoseTimeline {
  public:

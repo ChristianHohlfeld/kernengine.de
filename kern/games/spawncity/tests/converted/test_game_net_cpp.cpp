@@ -10,10 +10,10 @@
 #include <algorithm>
 #include "../../src/game.h"
 #include "../../src/game_world.h"
+#include "level_blueprints.h"
 #include "../../src/person_hit.h"
 #include "../../src/mp_art.h"
 #include "../../src/mp_rules.h"
-#include "../../src/qr_code.h"
 #include "../../src/tiles.h"
 #include "../converted.h"
 
@@ -49,6 +49,7 @@ enum class Key : u8 {
   count
 };
 namespace weapons { enum class Id : u8 { smg, glock, sniper, grenade_launcher, rocket, fists, knife, hand_grenade, drone_gun, drone_rockets, drone_guided, jet_cannon, jet_missile, jet_bomb }; }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
 std::string esc(const std::string& s) {
   std::string o;
   for (char c : s) {

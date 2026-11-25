@@ -55,7 +55,7 @@ struct StructField : converted::EngineObject {
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 namespace spawn { bool bind(::kern::logic::Runtime& logic); }
 namespace spawn { f32 default_far(); }
 namespace spawn { struct Viewer {

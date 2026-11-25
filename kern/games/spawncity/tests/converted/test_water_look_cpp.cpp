@@ -9,6 +9,7 @@
 #include <vector>
 #include "../../src/water_look.h"
 #include "kern/gfx/program.h"
+#include "kern/gfx/renderer.h"
 #include "../converted.h"
 
 namespace converted_water_look_cpp {
@@ -34,9 +35,11 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #pragma GCC diagnostic ignored "-Wunused-but-set-variable"
 #define private public
 #define protected public
+struct Bvh;
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Renderer;
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -53,7 +56,9 @@ struct Program : converted::EngineObject {
 };
 struct UniformCache : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  void set_float(const unsigned int& location, const double& v) const;
 };
+struct Renderer;
 struct ExtensionAttribute {
   const char* key;   // name used by hosts to supply the stream (e.g. "facade")
   u32 size;          // 1..4 floats per vertex
@@ -72,10 +77,25 @@ struct WaterLook final {
   const char* fragment_declarations() const;
   const char* fragment_surface() const;
   void bind(const Program& p);
-  
+  void frame_uniforms(UniformCache& cache, const Renderer&);
 
  private:
   u32 u_time_ = 0;
+};
+struct SunShadowMap : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BloomPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct AmbientOcclusionPass : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Renderer : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
 };
 constexpr ExtensionAttribute kWater[] = {{"water", 3, "aWater"}};
 Span<const ExtensionAttribute> WaterLook::attributes() const { return {kWater, 1}; }
@@ -113,6 +133,7 @@ const char* WaterLook::fragment_surface() const {
 )GLSL";
 }
 void WaterLook::bind(const Program& p) { u_time_ = p.location("uWaterTime"); }
+void WaterLook::frame_uniforms(UniformCache& cache, const Renderer&) { cache.set_float(u_time_, time); }
 #undef private
 #undef protected
 #pragma GCC diagnostic pop
@@ -141,6 +162,7 @@ void WaterLook::bind(const Program& p) { u_time_ = p.location("uWaterTime"); }
 [[maybe_unused]] static std::string text(const WaterLook& s) { return std::string("{") + text(s.time) + ", " + text(s.u_time_) + "}"; }
 [[maybe_unused]] static void take(WaterLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<double>(s.time, (*v.rows)[0]); converted::take_as<unsigned int>(s.u_time_, (*v.rows)[1]); }
 inline unsigned int Program::location(const char* name) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.program.location", {converted::value_of(*this), converted::value_of(name)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
+inline void UniformCache::set_float(const unsigned int& location, const double& v) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.uniform_cache.set_float", {converted::value_of(*this), converted::value_of(location), converted::value_of(v)}); }
 
 SC_TEST(converted_water_look_cpp) {
   converted::Blueprint bp("water_look_cpp");
@@ -259,6 +281,29 @@ SC_TEST(converted_water_look_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {});
+    }
+  }
+  {  // WaterLook::frame_uniforms
+    converted::Tally tally("WaterLook_frame_uniforms");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    const auto run = [&]([[maybe_unused]] WaterLook& a0, [[maybe_unused]] UniformCache& a1, [[maybe_unused]] const Renderer& a2) { converted::counted([&] { return a0.frame_uniforms(a1, a2); }); return std::move(a0); };
+    for (int i = 0; tally.more(i); ++i) {
+      WaterLook a0 = draw_WaterLook(draw);
+      UniformCache& a1 = *converted::engine_object<UniformCache>(1 + draw.below(6));
+      const Renderer& a2 = *converted::engine_object<Renderer>(1 + draw.below(6));
+      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;

@@ -1050,7 +1050,7 @@ namespace logic { enum class TriggerKind : u8 { event, timer, condition, automat
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1064,6 +1064,9 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {

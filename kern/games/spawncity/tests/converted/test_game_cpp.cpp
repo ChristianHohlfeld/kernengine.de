@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include "../../src/blueprint_call.h"
 #include "../../src/gaps_rules.h"
 #include "../../src/jet_seats.h"
 #include "../../src/lamps.h"
@@ -18,6 +19,7 @@
 #include "../../src/world_traffic.h"
 #include "../../src/game_world.h"
 #include "../../src/game_life.h"
+#include "level_blueprints.h"
 #include "kern/core/base.h"
 #include "kern/core/json.h"
 #include "kern/logic/logic.h"
@@ -202,6 +204,18 @@ namespace logic { struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   
   
@@ -232,6 +246,11 @@ namespace logic { struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   
   
   
@@ -249,7 +268,10 @@ namespace logic { struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
@@ -289,7 +311,13 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
+struct BlueprintWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -670,6 +698,8 @@ struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace net { namespace Fx { enum Kind : u8 { shot, explosion, impact, rocket, cow_death, push, lamp, strike, flyover, mil_tracer, mil_shell, npc_death, melee, kLast = melee }; } }
+namespace net { namespace Session { enum class Role : u8 { none, host, client }; } }
+namespace town { enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 }; }
 namespace WorldLife { namespace TowTruck { enum class State : u8 { to_job, hook, tow, depot }; } }
 enum class Key : u8 {
   unknown = 0,
@@ -704,6 +734,295 @@ namespace People { enum class State : u8 { walk, wait, flee, down, gone, officer
 enum class Mode : u8 { foot, drone, car, jet, parachute };
 const char* mode_name(Mode m);
 namespace Game { enum class BlastBy : u8 { other, weapon, missile }; }
+namespace jobs { using Fn = void (*)(Span<const u8> input, std::vector<u8>& output); }
+struct EngineObjects : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Sink : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+struct PureNodes : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace PureNodes_types { using Bool = bool; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace PureNodes_types { using Text = std::string; } }
+struct Chars : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct String : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ColliderShape { using type = game::ColliderShape; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_Motion { using type = game::Motion; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_game_WeaponKind { using type = game::WeaponKind; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+struct P_engine_mixer_bus : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_bus_types { using In = std::tuple<std::remove_cvref_t<audio::Bus>>; } } }
+struct P_engine_game_world_hud_mut : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_hud_mut_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_events : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_events_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_sound_cues : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_sound_cues_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_shots : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using In = std::tuple<>; } } }
+struct P_engine_building_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_building_builder_chunks_types { using In = std::tuple<>; } } }
+struct P_engine_road_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_road_builder_chunks_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_visible : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_layers : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_layers_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_pick_bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_pick_bvh_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_linear_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_linear_colors_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_material : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_texture : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_texture_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_positions : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_positions_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_normals_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_colors_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_uvs : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_uvs_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_indices : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_indices_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_joints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_joints_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_weights : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_weights_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_bones : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_bones_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_transforms : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_tints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_tints_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_instance_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_normals_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_instance_count : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_count_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_mirror : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_mirror_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_local_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_local_bounds_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_world_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_world_bounds_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_gpu : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_gpu_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_sort_distance : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_sort_distance_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_live_index : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_live_index_types { using In = std::tuple<>; } } }
+struct P_engine_shader_extension_material_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_material_base_types { using In = std::tuple<>; } } }
+struct P_engine_shader_extension_attribute_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_attribute_base_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_width_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_height_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_mipmaps : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_mipmaps_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_repeat : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_repeat_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_nearest : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_nearest_types { using In = std::tuple<>; } } }
+struct P_engine_mixer_speed_of_sound : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_speed_of_sound_types { using In = std::tuple<>; } } }
+struct P_engine_mixer_doppler_factor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_doppler_factor_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_logic_native : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_logic_native_types { using In = std::tuple<>; } } }
+struct P_engine_property_change_actor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_property_change_actor_types { using In = std::tuple<>; } } }
+struct P_engine_property_change_path : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_property_change_path_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_duration_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_keys : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_keys_types { using In = std::tuple<>; } } }
+struct P_engine_night_windows_night : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_night_windows_night_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_id_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_duration_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_id_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_width_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_height_types { using In = std::tuple<>; } } }
+struct P_engine_simulator_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_simulator_settings_types { using In = std::tuple<>; } } }
+struct P_engine_character_mover_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_character_mover_settings_types { using In = std::tuple<>; } } }
+struct Machine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Layout : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BlueprintCore : public PureNodes {
+  using PureNodes::PureNodes;
+};
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace BlueprintCore_types { using Text = ::kern::logic::Text; }
+struct GameWorld;
+namespace game { namespace nodes { using Bool = bool; } }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Text = std::string; } }
+namespace game { namespace nodes { using Actor = ::kern::logic::ActorHandle; } }
+namespace game { namespace nodes { using Self = ::kern::logic::ActorRef; } }
+struct ShaderExtension;
+struct Renderer;
 Vec3 car_color(u32 i) {
   static const Vec3 c[] = {{0.62, 0.05, 0.04}, {0.08, 0.16, 0.42}, {0.85, 0.85, 0.86}, {0.06, 0.06, 0.07}, {0.45, 0.47, 0.5},
                            {0.12, 0.32, 0.18}, {0.9, 0.62, 0.08}, {0.3, 0.5, 0.75}, {0.55, 0.36, 0.22}, {0.7, 0.7, 0.66}};
@@ -734,7 +1053,7 @@ game::Actor vehicle_actor(const char* name, const RigidSpec& spec, Vec3 pos, f32
       default: cc.shape = ColliderShape::hull; break;
     }
     cc.center = c.center;
-    cc.rotation = quat_to_euler(c.rotation);
+    cc.rotation = game::quat_to_euler(c.rotation);
     cc.size = c.size;
     cc.radius = c.radius;
     cc.length = c.length;
@@ -1272,15 +1591,17 @@ namespace logic { using converted::arg; using converted::same; using converted::
   s.external = draw.flag();
   s.remote = draw.word();
   s.from = draw.word();
+  s.exported = draw.word();
+  s.wire = draw.word();
   s.help = draw.word();
   return s;
 }
 namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const logic::Function& s) { return converted::Value::structure({arg(s.name), arg(s.inputs), arg(s.outputs), arg(s.locals), arg(s.pure), arg(s.external), arg(s.remote), arg(s.from), arg(s.help)}); }
-[[maybe_unused]] static bool same(const logic::Function& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.inputs, (*got.rows)[1]), ".inputs") && converted::at_place(same(want.outputs, (*got.rows)[2]), ".outputs") && converted::at_place(same(want.locals, (*got.rows)[3]), ".locals") && converted::at_place(same(want.pure, (*got.rows)[4]), ".pure") && converted::at_place(same(want.external, (*got.rows)[5]), ".external") && converted::at_place(same(want.remote, (*got.rows)[6]), ".remote") && converted::at_place(same(want.from, (*got.rows)[7]), ".from") && converted::at_place(same(want.help, (*got.rows)[8]), ".help"); }
-[[maybe_unused]] static bool defined(const logic::Function& s) { return defined(s.name) && defined(s.inputs) && defined(s.outputs) && defined(s.locals) && defined(s.pure) && defined(s.external) && defined(s.remote) && defined(s.from) && defined(s.help); }
-[[maybe_unused]] static std::string text(const logic::Function& s) { return std::string("{") + text(s.name) + ", " + text(s.inputs) + ", " + text(s.outputs) + ", " + text(s.locals) + ", " + text(s.pure) + ", " + text(s.external) + ", " + text(s.remote) + ", " + text(s.from) + ", " + text(s.help) + "}"; }
-[[maybe_unused]] static void take(logic::Function& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<std::vector<FunctionPin>>(s.inputs, (*v.rows)[1]); converted::take_as<std::vector<FunctionPin>>(s.outputs, (*v.rows)[2]); converted::take_as<std::vector<FunctionPin>>(s.locals, (*v.rows)[3]); converted::take_as<bool>(s.pure, (*v.rows)[4]); converted::take_as<bool>(s.external, (*v.rows)[5]); converted::take_as<std::string>(s.remote, (*v.rows)[6]); converted::take_as<std::string>(s.from, (*v.rows)[7]); converted::take_as<std::string>(s.help, (*v.rows)[8]); }
+[[maybe_unused]] static converted::Value arg(const logic::Function& s) { return converted::Value::structure({arg(s.name), arg(s.inputs), arg(s.outputs), arg(s.locals), arg(s.pure), arg(s.external), arg(s.remote), arg(s.from), arg(s.exported), arg(s.wire), arg(s.help)}); }
+[[maybe_unused]] static bool same(const logic::Function& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.inputs, (*got.rows)[1]), ".inputs") && converted::at_place(same(want.outputs, (*got.rows)[2]), ".outputs") && converted::at_place(same(want.locals, (*got.rows)[3]), ".locals") && converted::at_place(same(want.pure, (*got.rows)[4]), ".pure") && converted::at_place(same(want.external, (*got.rows)[5]), ".external") && converted::at_place(same(want.remote, (*got.rows)[6]), ".remote") && converted::at_place(same(want.from, (*got.rows)[7]), ".from") && converted::at_place(same(want.exported, (*got.rows)[8]), ".exported") && converted::at_place(same(want.wire, (*got.rows)[9]), ".wire") && converted::at_place(same(want.help, (*got.rows)[10]), ".help"); }
+[[maybe_unused]] static bool defined(const logic::Function& s) { return defined(s.name) && defined(s.inputs) && defined(s.outputs) && defined(s.locals) && defined(s.pure) && defined(s.external) && defined(s.remote) && defined(s.from) && defined(s.exported) && defined(s.wire) && defined(s.help); }
+[[maybe_unused]] static std::string text(const logic::Function& s) { return std::string("{") + text(s.name) + ", " + text(s.inputs) + ", " + text(s.outputs) + ", " + text(s.locals) + ", " + text(s.pure) + ", " + text(s.external) + ", " + text(s.remote) + ", " + text(s.from) + ", " + text(s.exported) + ", " + text(s.wire) + ", " + text(s.help) + "}"; }
+[[maybe_unused]] static void take(logic::Function& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<std::vector<FunctionPin>>(s.inputs, (*v.rows)[1]); converted::take_as<std::vector<FunctionPin>>(s.outputs, (*v.rows)[2]); converted::take_as<std::vector<FunctionPin>>(s.locals, (*v.rows)[3]); converted::take_as<bool>(s.pure, (*v.rows)[4]); converted::take_as<bool>(s.external, (*v.rows)[5]); converted::take_as<std::string>(s.remote, (*v.rows)[6]); converted::take_as<std::string>(s.from, (*v.rows)[7]); converted::take_as<std::string>(s.exported, (*v.rows)[8]); converted::take_as<std::string>(s.wire, (*v.rows)[9]); converted::take_as<std::string>(s.help, (*v.rows)[10]); }
 }
 [[maybe_unused]] static logic::EnumType draw_kern__logic__EnumType(converted::Draw& draw) {
   logic::EnumType s{};
@@ -1345,14 +1666,15 @@ namespace logic { using converted::arg; using converted::same; using converted::
   s.next_id = static_cast<unsigned int>(draw.below(40));
   s.library = draw.flag();
   s.uses = draw_list(draw, [&]() -> std::string { return draw.word(); });
+  s.implements = draw.word();
   return s;
 }
 namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const logic::Graph& s) { return converted::Value::structure({arg(s.nodes), arg(s.links), arg(s.variables), arg(s.machines), arg(s.functions), arg(s.enums), arg(s.structs), arg(s.comments), arg(s.next_id), arg(s.library), arg(s.uses)}); }
-[[maybe_unused]] static bool same(const logic::Graph& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.nodes, (*got.rows)[0]), ".nodes") && converted::at_place(same(want.links, (*got.rows)[1]), ".links") && converted::at_place(same(want.variables, (*got.rows)[2]), ".variables") && converted::at_place(same(want.machines, (*got.rows)[3]), ".machines") && converted::at_place(same(want.functions, (*got.rows)[4]), ".functions") && converted::at_place(same(want.enums, (*got.rows)[5]), ".enums") && converted::at_place(same(want.structs, (*got.rows)[6]), ".structs") && converted::at_place(same(want.comments, (*got.rows)[7]), ".comments") && converted::at_place(same(want.next_id, (*got.rows)[8]), ".next_id") && converted::at_place(same(want.library, (*got.rows)[9]), ".library") && converted::at_place(same(want.uses, (*got.rows)[10]), ".uses"); }
-[[maybe_unused]] static bool defined(const logic::Graph& s) { return defined(s.nodes) && defined(s.links) && defined(s.variables) && defined(s.machines) && defined(s.functions) && defined(s.enums) && defined(s.structs) && defined(s.comments) && defined(s.next_id) && defined(s.library) && defined(s.uses); }
-[[maybe_unused]] static std::string text(const logic::Graph& s) { return std::string("{") + text(s.nodes) + ", " + text(s.links) + ", " + text(s.variables) + ", " + text(s.machines) + ", " + text(s.functions) + ", " + text(s.enums) + ", " + text(s.structs) + ", " + text(s.comments) + ", " + text(s.next_id) + ", " + text(s.library) + ", " + text(s.uses) + "}"; }
-[[maybe_unused]] static void take(logic::Graph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<std::vector<logic::Node>>(s.nodes, (*v.rows)[0]); converted::take_as<std::vector<logic::Link>>(s.links, (*v.rows)[1]); converted::take_as<std::vector<Variable>>(s.variables, (*v.rows)[2]); converted::take_as<std::vector<logic::StateMachine>>(s.machines, (*v.rows)[3]); converted::take_as<std::vector<logic::Function>>(s.functions, (*v.rows)[4]); converted::take_as<std::vector<logic::EnumType>>(s.enums, (*v.rows)[5]); converted::take_as<std::vector<logic::StructType>>(s.structs, (*v.rows)[6]); converted::take_as<std::vector<logic::CommentBox>>(s.comments, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id, (*v.rows)[8]); converted::take_as<bool>(s.library, (*v.rows)[9]); converted::take_as<std::vector<std::string>>(s.uses, (*v.rows)[10]); }
+[[maybe_unused]] static converted::Value arg(const logic::Graph& s) { return converted::Value::structure({arg(s.nodes), arg(s.links), arg(s.variables), arg(s.machines), arg(s.functions), arg(s.enums), arg(s.structs), arg(s.comments), arg(s.next_id), arg(s.library), arg(s.uses), arg(s.implements)}); }
+[[maybe_unused]] static bool same(const logic::Graph& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.nodes, (*got.rows)[0]), ".nodes") && converted::at_place(same(want.links, (*got.rows)[1]), ".links") && converted::at_place(same(want.variables, (*got.rows)[2]), ".variables") && converted::at_place(same(want.machines, (*got.rows)[3]), ".machines") && converted::at_place(same(want.functions, (*got.rows)[4]), ".functions") && converted::at_place(same(want.enums, (*got.rows)[5]), ".enums") && converted::at_place(same(want.structs, (*got.rows)[6]), ".structs") && converted::at_place(same(want.comments, (*got.rows)[7]), ".comments") && converted::at_place(same(want.next_id, (*got.rows)[8]), ".next_id") && converted::at_place(same(want.library, (*got.rows)[9]), ".library") && converted::at_place(same(want.uses, (*got.rows)[10]), ".uses") && converted::at_place(same(want.implements, (*got.rows)[11]), ".implements"); }
+[[maybe_unused]] static bool defined(const logic::Graph& s) { return defined(s.nodes) && defined(s.links) && defined(s.variables) && defined(s.machines) && defined(s.functions) && defined(s.enums) && defined(s.structs) && defined(s.comments) && defined(s.next_id) && defined(s.library) && defined(s.uses) && defined(s.implements); }
+[[maybe_unused]] static std::string text(const logic::Graph& s) { return std::string("{") + text(s.nodes) + ", " + text(s.links) + ", " + text(s.variables) + ", " + text(s.machines) + ", " + text(s.functions) + ", " + text(s.enums) + ", " + text(s.structs) + ", " + text(s.comments) + ", " + text(s.next_id) + ", " + text(s.library) + ", " + text(s.uses) + ", " + text(s.implements) + "}"; }
+[[maybe_unused]] static void take(logic::Graph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<std::vector<logic::Node>>(s.nodes, (*v.rows)[0]); converted::take_as<std::vector<logic::Link>>(s.links, (*v.rows)[1]); converted::take_as<std::vector<Variable>>(s.variables, (*v.rows)[2]); converted::take_as<std::vector<logic::StateMachine>>(s.machines, (*v.rows)[3]); converted::take_as<std::vector<logic::Function>>(s.functions, (*v.rows)[4]); converted::take_as<std::vector<logic::EnumType>>(s.enums, (*v.rows)[5]); converted::take_as<std::vector<logic::StructType>>(s.structs, (*v.rows)[6]); converted::take_as<std::vector<logic::CommentBox>>(s.comments, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id, (*v.rows)[8]); converted::take_as<bool>(s.library, (*v.rows)[9]); converted::take_as<std::vector<std::string>>(s.uses, (*v.rows)[10]); converted::take_as<std::string>(s.implements, (*v.rows)[11]); }
 }
 [[maybe_unused]] static game::Actor draw_kern__game__Actor(converted::Draw& draw) {
   game::Actor s{};

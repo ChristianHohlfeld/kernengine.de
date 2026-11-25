@@ -292,7 +292,7 @@ namespace logic { enum class TriggerKind : u8 { event, timer, condition, automat
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -306,6 +306,9 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -5832,6 +5835,82 @@ void CombatArt::tank(const Mat4& m, f32 turret, bool wreck) {
 namespace combat { namespace combat_rules_cpp_local { std::vector<EnemySpec> g_enemies; } }
 namespace combat { namespace combat_rules_cpp_local { const EnemySpec kNoEnemy = {"", 1, 0, 0, 1, 1, 0, 0, 0, 1, {}, {}}; } }
 namespace combat { const EnemySpec& enemy_spec(EnemyType t) { return static_cast<std::size_t>(t) < combat::combat_rules_cpp_local::g_enemies.size() ? converted::at(combat::combat_rules_cpp_local::g_enemies, static_cast<std::size_t>(t)) : combat::combat_rules_cpp_local::kNoEnemy; } }
+namespace mp { void Scoreboard::ensure(u8 slot) {
+  for (const Score& s : rows_) if (s.slot == slot) return;
+  rows_.push_back({slot, 0, 0});
+} }
+namespace mp { void Scoreboard::died(u8 victim, i32 by) {
+  ensure(victim);
+  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
+  if (by >= 0 && by != victim) {
+    ensure(static_cast<u8>(by));
+    for (Score& s : rows_) if (s.slot == by) ++s.kills;
+  }
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
+namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
+namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
+namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
+  std::stable_sort(members.begin(), members.end());
+  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
+} } }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
+  mp::mp_rules_cpp_local::roster(current);
+  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
+  return b.status;
+} }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
+  Ballot::Status did = b.status;
+  return cast_vote(b, voter, approve, std::move(current), now, did);
+} }
+namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
+  mp::mp_rules_cpp_local::roster(members);
+  bool created = false;
+  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
+  return created;
+} }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
+  HitVerdict verdict = HitVerdict::applied;
+  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
+  return verdict;
+} }
+namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
+namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
+namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct I16 { i16 v = 0; }; }
 namespace wire { struct U32 { u32 v = 0; }; }
@@ -5961,82 +6040,6 @@ namespace wire { struct Reader {
   /// Every number was there, and the message has no more.
   
 }; }
-namespace mp { void Scoreboard::ensure(u8 slot) {
-  for (const Score& s : rows_) if (s.slot == slot) return;
-  rows_.push_back({slot, 0, 0});
-} }
-namespace mp { void Scoreboard::died(u8 victim, i32 by) {
-  ensure(victim);
-  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
-  if (by >= 0 && by != victim) {
-    ensure(static_cast<u8>(by));
-    for (Score& s : rows_) if (s.slot == by) ++s.kills;
-  }
-} }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
-namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
-namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
-namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
-namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
-  std::stable_sort(members.begin(), members.end());
-  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
-} } }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
-  mp::mp_rules_cpp_local::roster(current);
-  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
-  return b.status;
-} }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
-  Ballot::Status did = b.status;
-  return cast_vote(b, voter, approve, std::move(current), now, did);
-} }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
-  mp::mp_rules_cpp_local::roster(members);
-  bool created = false;
-  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
-  return created;
-} }
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  HitVerdict verdict = HitVerdict::applied;
-  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
-  return verdict;
-} }
-namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
-namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
-namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
 namespace net { namespace net_session_cpp_local { enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,

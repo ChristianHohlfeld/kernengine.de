@@ -11,10 +11,10 @@
 #include <algorithm>
 #include "../../src/game.h"
 #include "../../src/game_world.h"
+#include "level_blueprints.h"
 #include "../../src/person_hit.h"
 #include "../../src/mp_art.h"
 #include "../../src/mp_rules.h"
-#include "../../src/qr_code.h"
 #include "../../src/tiles.h"
 #include "../converted.h"
 
@@ -465,7 +465,6 @@ struct Car {
 struct KeyIndex : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace detail { namespace KeyIndex_types { static constexpr std::size_t npos = static_cast<std::size_t>(-1); } }
 struct BuildingBuilder : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1245,6 +1244,18 @@ namespace logic { struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   
   
@@ -1275,6 +1286,11 @@ namespace logic { struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   
   
   
@@ -1292,7 +1308,10 @@ namespace logic { struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
@@ -1332,7 +1351,13 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
+struct BlueprintWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -3088,6 +3113,15 @@ namespace game { struct ControllerComponent {
 namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
 namespace game { enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score }; }
+struct TextureAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MotionAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -5294,7 +5328,7 @@ struct PoliceDrone {
 struct Game {
  public:
   
-  
+  ~Game();
   
   
   
@@ -5946,6 +5980,311 @@ struct Game {
   LookState look_;
   std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
+namespace jobs { using Fn = void (*)(Span<const u8> input, std::vector<u8>& output); }
+namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData sphere(const double& radius, const unsigned int& segments = 24, const unsigned int& rings = 16, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData torus(const double& major, const double& minor, const unsigned int& segments = 24, const unsigned int& tube_segments = 8, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
+namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
+struct EngineObjects : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace EngineObjects_types { using Kind = const void*; } }
+struct Sink : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace texts { inline constexpr std::size_t npos = std::string_view::npos; } }
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+struct PureNodes : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace PureNodes_types { using Bool = bool; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace PureNodes_types { using Text = std::string; } }
+struct Chars : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct String : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_BloomState { using type = BloomState; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_LogLevel { using type = LogLevel; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Wave { using type = audio::Wave; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameStatus { using type = game::GameStatus; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_net_ChannelType { using type = net::ChannelType; } } }
+namespace logic { namespace engine_direct { namespace E_net_ClientState { using type = net::ClientState; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+struct P_engine_mixer_bus : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_bus_types { using In = std::tuple<std::remove_cvref_t<audio::Bus>>; } } }
+struct P_engine_game_world_hud_mut : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_hud_mut_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_events : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_events_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_sound_cues : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_sound_cues_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_shots : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using In = std::tuple<>; } } }
+struct P_engine_building_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_building_builder_chunks_types { using In = std::tuple<>; } } }
+struct P_engine_road_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_road_builder_chunks_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_visible : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_layers : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_layers_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_pick_bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_pick_bvh_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_linear_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_linear_colors_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_material : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_texture : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_texture_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_positions : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_positions_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_normals_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_colors_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_uvs : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_uvs_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_indices : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_indices_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_joints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_joints_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_weights : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_weights_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_bones : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_bones_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_transforms : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_tints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_tints_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_instance_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_normals_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_instance_count : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_count_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_mirror : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_mirror_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_local_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_local_bounds_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_world_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_world_bounds_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_gpu : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_gpu_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_sort_distance : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_sort_distance_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_live_index : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_live_index_types { using In = std::tuple<>; } } }
+struct P_engine_shader_extension_material_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_material_base_types { using In = std::tuple<>; } } }
+struct P_engine_shader_extension_attribute_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_attribute_base_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_width_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_height_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_mipmaps : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_mipmaps_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_repeat : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_repeat_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_nearest : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_nearest_types { using In = std::tuple<>; } } }
+struct P_engine_mixer_speed_of_sound : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_speed_of_sound_types { using In = std::tuple<>; } } }
+struct P_engine_mixer_doppler_factor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_doppler_factor_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_logic_native : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_logic_native_types { using In = std::tuple<>; } } }
+struct P_engine_property_change_actor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_property_change_actor_types { using In = std::tuple<>; } } }
+struct P_engine_property_change_path : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_property_change_path_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_duration_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_keys : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_keys_types { using In = std::tuple<>; } } }
+struct P_engine_night_windows_night : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_night_windows_night_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_id_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_duration_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_id_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_width_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_height_types { using In = std::tuple<>; } } }
+struct P_engine_simulator_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_simulator_settings_types { using In = std::tuple<>; } } }
+struct P_engine_character_mover_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_character_mover_settings_types { using In = std::tuple<>; } } }
+struct Machine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Layout : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BlueprintCore : public PureNodes {
+  using PureNodes::PureNodes;
+};
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace BlueprintCore_types { using U16 = ::kern::logic::Sized<u16>; }
+namespace BlueprintCore_types { using U32 = ::kern::logic::Sized<u32>; }
+namespace BlueprintCore_types { using I8 = ::kern::logic::Sized<i8>; }
+namespace BlueprintCore_types { using I16 = ::kern::logic::Sized<i16>; }
+namespace BlueprintCore_types { using I32 = ::kern::logic::Sized<i32>; }
+namespace BlueprintCore_types { using Text = ::kern::logic::Text; }
+struct GameWorld;
+namespace game { namespace nodes { using Bool = bool; } }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Text = std::string; } }
+namespace game { namespace nodes { using Actor = ::kern::logic::ActorHandle; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
+struct ShaderExtension;
+struct Renderer;
 enum class BodyPart : u8 { none, legs, torso, head };
 namespace person_hit { constexpr f32 kHipZ = 0.92, kHeadUp = 0.73, kHeadR = 0.155; }
 namespace person_hit { inline f32 lean(f32 speed) { return std::clamp(speed - 2.5, 0.0, 5.0) * 0.035; } }
@@ -5985,25 +6324,14 @@ namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 f
   const Vec3 hip = feet + up * (kHipZ * scale);
   BodyPart best = BodyPart::none;
   f32 bt = 2, t;
-  if (sphere_entry(from, seg, hip + bz * (kHeadUp * scale), kHeadR * pad * scale, t) && t < bt) { bt = t; best = BodyPart::head; }
+  if (person_hit::sphere_entry(from, seg, hip + bz * (kHeadUp * scale), kHeadR * pad * scale, t) && t < bt) { bt = t; best = BodyPart::head; }
   // torso 0.24 x 0.42 x 0.6 from the hip up, with the arms beside it (to 0.33 either side)
-  if (box_entry(from, seg, hip + bz * (0.29 * scale), bx, fy, bz, Vec3{0.15, 0.31, 0.31} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::torso; }
+  if (person_hit::box_entry(from, seg, hip + bz * (0.29 * scale), bx, fy, bz, Vec3{0.15, 0.31, 0.31} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::torso; }
   // the legs, hip to shoe
-  if (box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
+  if (person_hit::box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
   t_out = bt;
   return best;
 } }
-namespace qr { struct Code {
-  i32 version = 0, size = 0;
-  std::vector<u8> modules;  // size * size, 1 = dark, row major
-  bool dark(i32 x, i32 y) const { return x >= 0 && y >= 0 && x < size && y < size && converted::at(modules, static_cast<std::size_t>(converted::plus(converted::times(y, size), x))); }
-}; }
-namespace qr { bool encode(const std::string& text, Code& out); }
-namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
-namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
-namespace primitives { MeshData sphere(const double& radius, const unsigned int& segments = 24, const unsigned int& rings = 16, const Vec3& color = {1, 1, 1}); }
-namespace primitives { MeshData torus(const double& major, const double& minor, const unsigned int& segments = 24, const unsigned int& tube_segments = 8, const Vec3& color = {1, 1, 1}); }
-namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
 void Car::detach() {
   if (!rig_world_) return;
   World& w = *rig_world_;
@@ -6081,6 +6409,74 @@ namespace mp { std::string zone_name(Zone z) {
   std::string out;
   mp::mp_rules_cpp_local::g_rules.call("ZoneName", std::tie(out), z);
   return out;
+} }
+namespace mp { void Scoreboard::died(u8 victim, i32 by) {
+  ensure(victim);
+  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
+  if (by >= 0 && by != victim) {
+    ensure(static_cast<u8>(by));
+    for (Score& s : rows_) if (s.slot == by) ++s.kills;
+  }
+} }
+namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
+namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
+namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
+  std::stable_sort(members.begin(), members.end());
+  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
+} } }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
+  mp::mp_rules_cpp_local::roster(current);
+  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
+  return b.status;
+} }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
+  Ballot::Status did = b.status;
+  return cast_vote(b, voter, approve, std::move(current), now, did);
+} }
+namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
+  mp::mp_rules_cpp_local::roster(members);
+  bool created = false;
+  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
+  return created;
+} }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
+  HitVerdict verdict = HitVerdict::applied;
+  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
+  return verdict;
+} }
+namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
+namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
+namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
 } }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct I16 { i16 v = 0; }; }
@@ -6211,74 +6607,6 @@ namespace wire { struct Reader {
   /// Every number was there, and the message has no more.
   
 }; }
-namespace mp { void Scoreboard::died(u8 victim, i32 by) {
-  ensure(victim);
-  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
-  if (by >= 0 && by != victim) {
-    ensure(static_cast<u8>(by));
-    for (Score& s : rows_) if (s.slot == by) ++s.kills;
-  }
-} }
-namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
-namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
-namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
-  std::stable_sort(members.begin(), members.end());
-  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
-} } }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
-  mp::mp_rules_cpp_local::roster(current);
-  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
-  return b.status;
-} }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
-  Ballot::Status did = b.status;
-  return cast_vote(b, voter, approve, std::move(current), now, did);
-} }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
-  mp::mp_rules_cpp_local::roster(members);
-  bool created = false;
-  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
-  return created;
-} }
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  HitVerdict verdict = HitVerdict::applied;
-  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
-  return verdict;
-} }
-namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
-namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
-namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
 namespace net { namespace net_session_cpp_local { enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
@@ -6743,174 +7071,6 @@ namespace net { void Session::send_ping(bool on, Vec3 p, u32 color) {
   wire::put_u32(w, color);
   to_host(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kPingMsg, w);
 } }
-namespace qr { namespace qr_code_cpp_local { constexpr i32 kEccPerBlock[41] = {-1, 7, 10, 15, 20, 26, 18, 20, 24, 30, 18, 20, 24, 26, 30, 22, 24, 28, 30, 28, 28, 28, 28, 30, 30, 26, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30}; } }
-namespace qr { namespace qr_code_cpp_local { constexpr i32 kBlocks[41] = {-1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 4, 4, 4, 4, 4, 6, 6, 6, 6, 7, 8, 8, 9, 9, 10, 12, 12, 12, 13, 14, 15, 16, 17, 18, 19, 19, 20, 21, 22, 24, 25}; } }
-namespace qr { namespace qr_code_cpp_local { constexpr u32 kLevelL = 1; } }
-namespace qr { namespace qr_code_cpp_local { i32 raw_modules(i32 v) {
-  i32 r = converted::plus(converted::times((converted::plus(converted::times(16, v), 128)), v), 64);
-  if (v >= 2) {
-    const i32 n = converted::plus(v / 7, 2);
-    converted::minus_to(r, converted::minus(converted::times((converted::minus(converted::times(25, n), 10)), n), 55));
-    if (v >= 7) converted::minus_to(r, 36);
-  }
-  return r;
-} } }
-namespace qr { namespace qr_code_cpp_local { i32 data_codewords(i32 v) { return converted::minus(raw_modules(v) / 8, converted::times(converted::at(kEccPerBlock, v), converted::at(kBlocks, v))); } } }
-namespace qr { namespace qr_code_cpp_local { u8 gf_mul(u8 x, u8 y) {
-  u32 z = 0;
-  for (i32 i = 7; i >= 0; converted::pre_dec(i)) {
-    z = (z << 1) ^ ((z >> 7) * 0x11D);
-    z ^= ((converted::shr(y, i)) & 1u) * x;
-  }
-  return static_cast<u8>(z);
-} } }
-namespace qr { namespace qr_code_cpp_local { std::vector<u8> rs_divisor(i32 degree) {
-  std::vector<u8> r(converted::count(static_cast<std::size_t>(degree)), 0);
-  converted::back(r) = 1;
-  u8 root = 1;
-  for (i32 i = 0; i < degree; converted::pre_inc(i)) {
-    for (std::size_t j = 0; j < r.size(); converted::pre_inc(j)) {
-      converted::at(r, j) = gf_mul(converted::at(r, j), root);
-      if (converted::plus(j, 1) < r.size()) converted::at(r, j) ^= converted::at(r, converted::plus(j, 1));
-    }
-    root = gf_mul(root, 2);
-  }
-  return r;
-} } }
-namespace qr { namespace qr_code_cpp_local { std::vector<u8> rs_remainder(const std::vector<u8>& data, const std::vector<u8>& div) {
-  std::vector<u8> r(converted::count(div.size()), 0);
-  for (u8 b : data) {
-    const u8 f = b ^ converted::at(r, 0);
-    converted::erase(r, r.begin());
-    r.push_back(0);
-    for (std::size_t i = 0; i < r.size(); converted::pre_inc(i)) converted::at(r, i) ^= gf_mul(converted::at(div, i), f);
-  }
-  return r;
-} } }
-namespace qr { namespace qr_code_cpp_local { std::vector<i32> alignment_positions(i32 v) {
-  if (v == 1) return {};
-  const i32 n = converted::plus(v / 7, 2), size = converted::plus(converted::times(v, 4), 17);
-  const i32 step = v == 32 ? 26 : converted::times(converted::quot((converted::plus(converted::plus(converted::times(v, 4), converted::times(n, 2)), 1)), (converted::minus(converted::times(n, 2), 2))), 2);
-  std::vector<i32> r(converted::count(static_cast<std::size_t>(n)));
-  converted::at(r, 0) = 6;
-  for (i32 i = converted::minus(n, 1), pos = converted::minus(size, 7); i >= 1; converted::pre_dec(i), converted::minus_to(pos, step)) converted::at(r, static_cast<std::size_t>(i)) = pos;
-  return r;
-} } }
-namespace qr { namespace qr_code_cpp_local { struct Grid {
-  i32 size;
-  std::vector<u8> m, fn;
-  void set(i32 x, i32 y, bool dark) { converted::at(m, static_cast<std::size_t>(converted::plus(converted::times(y, size), x))) = dark; converted::at(fn, static_cast<std::size_t>(converted::plus(converted::times(y, size), x))) = 1; }
-}; } }
-namespace qr { namespace qr_code_cpp_local { void finder(Grid& g, i32 cx, i32 cy) {
-  for (i32 dy = -4; dy <= 4; converted::pre_inc(dy))
-    for (i32 dx = -4; dx <= 4; converted::pre_inc(dx)) {
-      const i32 x = converted::plus(cx, dx), y = converted::plus(cy, dy);
-      if (x < 0 || y < 0 || x >= g.size || y >= g.size) continue;
-      const i32 d = std::max(std::abs(dx), std::abs(dy));
-      g.set(x, y, d != 2 && d != 4);
-    }
-} } }
-namespace qr { namespace qr_code_cpp_local { void format_bits(Grid& g, u32 mask) {
-  const u32 data = kLevelL << 3 | mask;
-  u32 rem = data;
-  for (i32 i = 0; i < 10; converted::pre_inc(i)) rem = (rem << 1) ^ ((rem >> 9) * 0x537);
-  const u32 bits = (data << 10 | rem) ^ 0x5412;
-  auto bit = [&](i32 i) { return ((converted::shr(bits, i)) & 1) != 0; };
-  for (i32 i = 0; i <= 5; converted::pre_inc(i)) g.set(8, i, bit(i));
-  g.set(8, 7, bit(6));
-  g.set(8, 8, bit(7));
-  g.set(7, 8, bit(8));
-  for (i32 i = 9; i < 15; converted::pre_inc(i)) g.set(converted::minus(14, i), 8, bit(i));
-  for (i32 i = 0; i < 8; converted::pre_inc(i)) g.set(converted::minus(converted::minus(g.size, 1), i), 8, bit(i));
-  for (i32 i = 8; i < 15; converted::pre_inc(i)) g.set(8, converted::plus(converted::minus(g.size, 15), i), bit(i));
-  g.set(8, converted::minus(g.size, 8), true);  // the dark module
-} } }
-namespace qr { bool encode(const std::string& text, Code& out) { using qr::qr_code_cpp_local::Grid;
-  const i32 n = static_cast<i32>(text.size());
-  i32 v = 1;
-  for (; v <= 40; converted::pre_inc(v)) {
-    const i32 count_bits = v <= 9 ? 8 : 16;
-    if (converted::plus(converted::plus(4, count_bits), converted::times(8, n)) <= converted::times(qr::qr_code_cpp_local::data_codewords(v), 8) && (count_bits == 16 || n < 256)) break;
-  }
-  if (v > 40) return false;
-  // Data bits: byte mode, length, bytes, terminator, padding.
-  std::vector<bool> bits;
-  auto put = [&](u32 val, i32 len) { for (i32 i = converted::minus(len, 1); i >= 0; converted::pre_dec(i)) bits.push_back(((converted::shr(val, i)) & 1) != 0); };
-  put(4, 4);
-  put(static_cast<u32>(n), v <= 9 ? 8 : 16);
-  for (unsigned char c : text) put(c, 8);
-  const std::size_t cap = converted::times(static_cast<std::size_t>(qr::qr_code_cpp_local::data_codewords(v)), 8);
-  put(0, static_cast<i32>(std::min<std::size_t>(4, converted::minus(cap, bits.size()))));
-  while (converted::rem(bits.size(), 8)) bits.push_back(false);
-  for (u8 pad = 0xEC; bits.size() < cap; pad ^= 0xEC ^ 0x11) put(pad, 8);
-  std::vector<u8> data(converted::count(converted::quot(bits.size(), 8)), 0);
-  for (std::size_t i = 0; i < bits.size(); converted::pre_inc(i)) if (converted::at(bits, i)) converted::at(data, converted::shr(i, 3)) |= static_cast<u8>(converted::shl(1, (converted::minus(7, (i & 7)))));
-  // Error correction per block and interleaving.
-  const i32 blocks = converted::at(qr::qr_code_cpp_local::kBlocks, v), ecc = converted::at(qr::qr_code_cpp_local::kEccPerBlock, v), raw = qr::qr_code_cpp_local::raw_modules(v) / 8;
-  const i32 short_blocks = converted::minus(blocks, converted::rem(raw, blocks)), short_len = converted::quot(raw, blocks);
-  const std::vector<u8> div = qr::qr_code_cpp_local::rs_divisor(ecc);
-  std::vector<std::vector<u8>> bl;
-  for (i32 i = 0, k = 0; i < blocks; converted::pre_inc(i)) {
-    const i32 len = converted::plus(converted::minus(short_len, ecc), (i < short_blocks ? 0 : 1));
-    std::vector<u8> d(data.begin() + k, data.begin() + k + len);
-    converted::plus_to(k, len);
-    const std::vector<u8> e = qr::qr_code_cpp_local::rs_remainder(d, div);
-    if (i < short_blocks) d.push_back(0);
-    d.insert(d.end(), e.begin(), e.end());
-    bl.push_back(d);
-  }
-  std::vector<u8> words;
-  for (std::size_t i = 0; i < converted::at(bl, 0).size(); converted::pre_inc(i))
-    for (std::size_t j = 0; j < bl.size(); converted::pre_inc(j))
-      if (i != static_cast<std::size_t>(converted::minus(short_len, ecc)) || j >= static_cast<std::size_t>(short_blocks)) words.push_back(converted::at(converted::at(bl, j), i));
-  // Function patterns.
-  Grid g{converted::plus(converted::times(v, 4), 17), {}, {}};
-  g.m.assign(converted::count(static_cast<std::size_t>(converted::times(g.size, g.size))), 0);
-  g.fn.assign(converted::count(g.m.size()), 0);
-  for (i32 i = 0; i < g.size; converted::pre_inc(i)) { g.set(6, i, i % 2 == 0); g.set(i, 6, i % 2 == 0); }
-  qr::qr_code_cpp_local::finder(g, 3, 3);
-  qr::qr_code_cpp_local::finder(g, converted::minus(g.size, 4), 3);
-  qr::qr_code_cpp_local::finder(g, 3, converted::minus(g.size, 4));
-  const std::vector<i32> al = qr::qr_code_cpp_local::alignment_positions(v);
-  for (std::size_t i = 0; i < al.size(); converted::pre_inc(i))
-    for (std::size_t j = 0; j < al.size(); converted::pre_inc(j)) {
-      if ((i == 0 && j == 0) || (i == 0 && j == converted::minus(al.size(), 1)) || (i == converted::minus(al.size(), 1) && j == 0)) continue;
-      for (i32 dy = -2; dy <= 2; converted::pre_inc(dy))
-        for (i32 dx = -2; dx <= 2; converted::pre_inc(dx)) g.set(converted::plus(converted::at(al, i), dx), converted::plus(converted::at(al, j), dy), std::max(std::abs(dx), std::abs(dy)) != 1);
-    }
-  qr::qr_code_cpp_local::format_bits(g, 0);  // reserve (the real bits follow after masking)
-  if (v >= 7) {
-    u32 rem = static_cast<u32>(v);
-    for (i32 i = 0; i < 12; converted::pre_inc(i)) rem = (rem << 1) ^ ((rem >> 11) * 0x1F25);
-    const u32 vb = static_cast<u32>(v) << 12 | rem;
-    for (i32 i = 0; i < 18; converted::pre_inc(i)) {
-      const bool b = ((converted::shr(vb, i)) & 1) != 0;
-      const i32 a = converted::plus(converted::minus(g.size, 11), i % 3), c = i / 3;
-      g.set(a, c, b);
-      g.set(c, a, b);
-    }
-  }
-  // Codewords in the zig-zag, then mask 0 ((x + y) even) on the data modules.
-  std::size_t i = 0;
-  for (i32 right = converted::minus(g.size, 1); right >= 1; converted::minus_to(right, 2)) {
-    if (right == 6) right = 5;
-    for (i32 vert = 0; vert < g.size; converted::pre_inc(vert))
-      for (i32 j = 0; j < 2; converted::pre_inc(j)) {
-        const i32 x = converted::minus(right, j);
-        const bool up = ((converted::plus(right, 1)) & 2) == 0;
-        const i32 y = up ? converted::minus(converted::minus(g.size, 1), vert) : vert;
-        const std::size_t at = static_cast<std::size_t>(converted::plus(converted::times(y, g.size), x));
-        if (converted::at(g.fn, at)) continue;
-        if (i < converted::times(words.size(), 8)) { converted::at(g.m, at) = (converted::shr(converted::at(words, converted::shr(i, 3)), (converted::minus(7, (i & 7))))) & 1; converted::pre_inc(i); }
-        if ((converted::plus(x, y)) % 2 == 0) converted::at(g.m, at) ^= 1;
-      }
-  }
-  qr::qr_code_cpp_local::format_bits(g, 0);
-  out.version = v;
-  out.size = g.size;
-  out.modules = std::move(g.m);
-  return true;
-} }
 bool Game::gaps_riding() const { return gaps_ && converted::present(gaps_)->riding; }
 bool Game::gaps_ride_car() const { return gaps_ && converted::present(gaps_)->riding && converted::present(gaps_)->ride_car; }
 bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
@@ -6921,6 +7081,10 @@ bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
   if (r.state.mode == net::PlayerMode::jet || r.state.mode == net::PlayerMode::car) { p = r.shown; q = r.shown_rotation; return true; }
   if (r.state.flags & net::kJetOut) { p = r.state.jet_pos; q = r.state.jet_rot; return true; }
   return false;
+}
+Game::~Game() {
+  life_.reset();
+  swarm_cruiser_.reset();
 }
 using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
   Mat4 m;
@@ -8639,13 +8803,14 @@ std::string Game::net_command(const std::string& cmd) {
     return on ? "set" : "cleared";
   }
   if (starts("qr ")) {
-    // The share panel's join code (qr_pairing.mjs renderQr): rows of 0 / 1.
-    qr::Code c;
-    if (!qr::encode(cmd.substr(3), c)) return "{}";
+    // The share panel's join code (qr_pairing.mjs renderQr): rows of 0 / 1. The encoder is the level's
+    // Blueprint qr_code_cpp (its code: qr_code), called as its class.
+    blueprints::qr_code::qr_Code c;
+    if (!::kern::logic::blueprint<blueprints::qr_code_cpp>().encode(cmd.substr(3), c).Result) return "{}";
     std::string o = "{\"size\":" + std::to_string(c.size) + ",\"version\":" + std::to_string(c.version) + ",\"rows\":[";
-    for (i32 y = 0; y < c.size; converted::pre_inc(y)) {
+    for (i64 y = 0; y < c.size; converted::pre_inc_bits(y)) {
       o += y ? ",\"" : "\"";
-      for (i32 x = 0; x < c.size; converted::pre_inc(x)) o += c.dark(x, y) ? '1' : '0';
+      for (i64 x = 0; x < c.size; converted::pre_inc_bits(x)) o += ::kern::logic::blueprint<blueprints::qr_code>().Code_dark(c, x, y).Result ? '1' : '0';
       o += "\"";
     }
     return o + "]}";
@@ -14749,12 +14914,12 @@ inline physics::RayHit World::cast_ray(const Vec3& origin, const Vec3& translati
 inline physics::Pose World::pose(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.pose", {converted::value_of(*this), converted::value_of(body)}); physics::Pose kern_result = converted::quiet<physics::Pose>(); converted::take_as<physics::Pose>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::linear_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.linear_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::angular_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.angular_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
-inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 namespace primitives { inline void append(MeshData& dst, const MeshData& src, const Mat4& m) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.append", {converted::value_of(dst), converted::value_of(src), converted::value_of(m)}); converted::take_as<MeshData>(dst, kern_out[0]); } }
 namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cylinder", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 namespace primitives { inline MeshData sphere(const double& radius, const unsigned int& segments, const unsigned int& rings, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.sphere", {converted::value_of(radius), converted::value_of(segments), converted::value_of(rings), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 namespace primitives { inline MeshData torus(const double& major, const double& minor, const unsigned int& segments, const unsigned int& tube_segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.torus", {converted::value_of(major), converted::value_of(minor), converted::value_of(segments), converted::value_of(tube_segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.box", {converted::value_of(size), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 struct Out_mix_voice { State_Game State; std::vector<double> out; };
 [[maybe_unused]] static bool same(const Out_mix_voice& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_mix_voice& s) { return defined(s.State) && defined(s.out); }
@@ -14785,11 +14950,13 @@ struct Out_net_command { State_Game State; std::string Result; };
 [[maybe_unused]] static std::string text(const Out_net_command& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_Game__game_net_cpp) {
-  converted::Blueprint bp("Game", {"JetSeats", "Multiplayer", "Settings", "Wanted"});
+  converted::Blueprint bp("Game", {"JetSeats", "Multiplayer", "Settings", "Wanted", "qr_code", "qr_code_cpp"});
   mp::mp_rules_cpp_local::g_rules.bind(bp.source_logic());
   seats::jet_seats_cpp_local::g_rules.bind(bp.source_logic());
   wanted::wanted_cpp_local::g_rules.bind(bp.source_logic());
   settings_cpp_local::g_rules.bind(bp.source_logic());
+  SC_CHECK(kern::logic::bind_blueprint<blueprints::qr_code>(bp.source_logic()), "the Blueprint qr_code runs as its class");
+  SC_CHECK(kern::logic::bind_blueprint<blueprints::qr_code_cpp>(bp.source_logic()), "the Blueprint qr_code_cpp runs as its class");
   {  // Game::mp_local_ready
     converted::Tally tally("mp_local_ready");
     converted::Draw draw;   // (every function its own arguments, the same in every run)

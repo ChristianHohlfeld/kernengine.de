@@ -56,11 +56,11 @@ struct Quat {
 
 
 
-  
-
-
-
-
+  Vec3 rotate(Vec3 v) const {
+    const Vec3 q{x, y, z};
+    const Vec3 t = cross(q, v) * 2.0;
+    return v + t * w + cross(q, t);
+  }
 };
 struct Mat4 {
   f32 m[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
@@ -275,6 +275,7 @@ struct World : converted::EngineObject {
   void apply_linear_impulse(const physics::Body& body, const Vec3& impulse, const Vec3& point) const;
   bool body_valid(const physics::Body& body) const;
   void destroy_body(const physics::Body& body) const;
+  void apply_linear_impulse_to_center(const physics::Body& body, const Vec3& impulse) const;
   bool joint_valid(const physics::Joint& joint) const;
   void destroy_joint(const physics::Joint& joint, const bool& wake_bodies = true) const;
   physics::Pose pose(const physics::Body& body) const;
@@ -379,7 +380,7 @@ struct Car {
   /// tyres at 60 Hz as the original (world_rigid_body_runtime.mjs FIXED_DT 1/60) and holds them
   /// over Kern's 240 Hz steps in between (game.cpp drive_traffic).
   
-  
+  const CarSpec& spec() const { return s_; }
   
   
   
@@ -1092,17 +1093,197 @@ struct Callable : converted::EngineObject {
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { struct Node {
+  u32 id = 0;
+  std::string type;                                   // registry key, e.g. "flow.branch"
+  f32 x = 0, y = 0;                                   // canvas position (px)
+  std::vector<std::pair<std::string, Value>> values;  // literals of unlinked inputs, by pin id
+  std::vector<std::pair<std::string, std::string>> params;  // node settings (variable name, event name, key...)
+  std::string comment;
+  
+  
+  
+  
+}; }
+namespace logic { struct Link {
+  u32 from = 0;          // node id
+  std::string out;       // output pin id
+  u32 to = 0;
+  std::string in;        // input pin id
+  
+}; }
 struct Variable : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { struct EnumType {
+  std::string name;
+  std::vector<std::string> values;
+  std::string help;
+  /// A type of the project: every Blueprint of the level that has a project type of this name has
+  /// it the same (the editor keeps them so; a level in which they differ does not check). Such a
+  /// value means the same in every Blueprint that takes or gives it.
+  bool project = false;
+  /// A type of a library the Blueprint uses (Graph::uses): the name of the library that declares
+  /// it. The Blueprint has the type because it uses the library - it does not declare it, and
+  /// its C++ does not show it again (there it is the library's type itself, so a reference binds).
+  std::string from{};
+}; }
 struct StructField : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { struct StructType {
+  static constexpr std::size_t kMaxFields = 96;
+  std::string name;
+  std::vector<StructField> fields;
+  std::string help;
+  bool project = false;  // a type of the project (see EnumType::project)
+  std::string from{};    // a type of the library of that name (see EnumType::from)
+  /// The place of the field called `name`, or -1.
+  
+}; }
 namespace logic { enum class TriggerKind : u8 { event, timer, condition, automatic }; }
+namespace logic { struct State {
+  u32 id = 0;
+  std::string name;
+  f32 x = 0, y = 0;
+  bool initial = false;
+}; }
+namespace logic { struct Transition {
+  u32 id = 0;
+  u32 from = 0, to = 0;  // state ids (from 0 = from any state)
+  TriggerKind trigger = TriggerKind::event;
+  std::string event;     // event: custom event name that switches
+  f32 seconds = 1;       // timer: seconds in the from state
+  std::string variable;  // condition: boolean variable that must be true
+  std::string label;
+}; }
+namespace logic { struct StateMachine {
+  u32 id = 0;
+  std::string name = "State Machine";
+  std::vector<State> states;
+  std::vector<Transition> transitions;
+  
+  
+}; }
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { struct Function {
+  std::string name;
+  std::vector<FunctionPin> inputs, outputs;
+  /// Its local variables: each call starts with their defaults, and they are gone when the call
+  /// is over (after a Return, at the end of its path, at a wait). In the Blueprint's C++ they are
+  /// the locals at the top of the function's body. The variable nodes name one with their
+  /// setting "scope" (the function); two functions may each have a local of one name.
+  std::vector<FunctionPin> locals;
+  bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
+  /// A function of another Blueprint: this one says what it looks like (name, inputs, outputs)
+  /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
+  /// KERN_EXTERN FnResult Fn(Float x = 0.0);
+  bool external = false;
+  /// Of a function of another Blueprint: the name that Blueprint has it under, where this one calls it
+  /// by another (empty: the same) - two actors' Blueprints with a function of one name that looks
+  /// different in each: KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);
+  std::string remote{};
+  /// A function of a library the Blueprint uses (Graph::uses): the library's name. This one says
+  /// what the function looks like - its name here is "Library::function", as the call writes it
+  /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
+  /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
+  std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
+  std::string help;
+  
+  
+  
+  
+}; }
+namespace logic { struct CommentBox {
+  u32 id = 0;
+  f32 x = 0, y = 0, w = 400, h = 200;  // canvas px
+  std::string text = "Comment";
+  u32 color = 0;                       // 0xRRGGBB, 0 = the default grey
+}; }
+namespace logic { struct Graph {
+  std::vector<Node> nodes;
+  std::vector<Link> links;
+  std::vector<Variable> variables;
+  std::vector<StateMachine> machines;
+  std::vector<Function> functions;
+  std::vector<EnumType> enums;         // the types it declares
+  std::vector<StructType> structs;     // (a struct after the structs its fields are of)
+  std::vector<CommentBox> comments;    // editor only: no effect on what runs
+  u32 next_id = 1;
+  /// A library: a Blueprint that keeps nothing - no variables but constants, no events or state
+  /// machines, and no node that keeps something between two calls. It has types and functions; the Blueprints
+  /// that use it call them directly and have its types. In C++:
+  /// struct Random : virtual kern::Blueprint { ... };
+  bool library = false;
+  /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
+  /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
+  std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /// The variable a node's settings name: a variable of the Blueprint, or - with the setting
+  /// "scope" - a local variable of that function. `out` holds it (a local as a Variable).
+  
+  /// What a node's variable is, where its settings name one under `prefix` ("": the node's own
+  /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
+  /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
+  /// the node stands in, or one of that function's inputs. `out` holds it.
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
+  
+  /// Can what the node names there be changed (a variable, a local variable, a reference input
+  /// that is not const)?
+  
+  /// The place a node's settings name: its variable (variable_of) and from there the path of the
+  /// setting "path" - fields and list entries (logic::path_steps). `out` holds what is there, as
+  /// a Variable: its type, its default (a field's declared one, the zero of a list's entry), and
+  /// as its name the place as C++ writes it ("Cars[].Speed").
+  /// A node without a path names its variable. False: no such variable, or the path leads
+  /// through something the variable has not - `why` then says what.
+  
+  /// A node's path as its steps (logic::path_steps), and for every step that is a field the
+  /// struct that has it (its name) - empty for a list entry, and from where the path stops
+  /// leading through the variable's type. What renaming a field has to go by. False: the node
+  /// names no variable, or its path is none.
+  
+  /// The function in whose body a node stands: the one whose Function Entry leads to it along
+  /// exec wires - or to a step that reads it. Empty: none does (an event's path, nothing), or
+  /// more than one. Where the places a call names are looked up (the call's setting "scope").
+  
+  
+  
+  
+  
+    // via JSON
+}; }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1115,7 +1296,11 @@ struct Library : converted::EngineObject {
 struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -2810,13 +2995,13 @@ namespace lamps { struct Field {
   /// Lamp i (one of all()) gets the state, remembered for re-placement - set_state once worse() has said yes.
   void set(i32 i, u8 state);
   /// The lit head nearest along the segment a -> b within 0.38 m (onTracer), or -1.
-  
+  i32 shot(Vec3 a, Vec3 b) const;
   struct BlastHit { i32 lamp; u8 state; Vec2 dir; f32 speed; };
   /// onExplosion: r = max(3, radius); inside 0.6 r the post goes down, else the head.
   std::vector<BlastHit> blast(Vec3 p, f32 radius) const;
   /// checkCars: a post inside the vehicle's footprint (half length / width). Fills what happens.
   struct CarHit { i32 lamp = -1; bool topple = false; Vec3 impulse; bool clang = false; };
-  
+  std::vector<CarHit> car(Vec3 pos, f32 yaw, Vec3 vel, f32 half_len, f32 half_w, f32 mass) const;
   void reset_broken() { broken_.clear(); for (Lamp& l : lamps_) l.state = 0; }
   /// Every broken lamp there is, placed here or not (cell key, state), sorted by key - the state a
   /// player who joins a session gets (game_townsync.cpp).
@@ -2916,6 +3101,9 @@ struct GameWorld : converted::EngineObject {
   void play_sound(const std::string& sound, const Vec3& at, const double& volume, const double& pitch, const bool& spatial, const unsigned int& actor = 0) const;
   World& physics() const;
   double sim_time() const;
+  std::vector<game::ShotEvent>& shots();
+  bool actor_alive(const unsigned int& id) const;
+  physics::Body actor_body(const unsigned int& actor) const;
 };
 struct GapsState {
   // police_sirens.mjs: one voice for the nearest cruiser, one for the nearest police drone; each is
@@ -5002,8 +5190,8 @@ struct Game {
   
   
   
-  
-  
+  physics::Body body(game::ActorId a) const { return converted::present(world_)->actor_body(a); }
+  BodyState state_of(game::ActorId a) const { return read_body(converted::present(world_)->physics(), body(a)); }
   
   
   
@@ -5411,7 +5599,7 @@ struct Game {
   void gaps_lamp_break(i32 i, u8 state, Vec2 dir, f32 speed, bool net);
   void gaps_lamps_remote(const net::Fx& f);
   void gaps_lamps_blast(Vec3 at, f32 radius);
-  
+  void gaps_lamps_update(f32 dt);
   void gaps_lamps_reset();
   void gaps_lamps_draw();
   
@@ -5624,6 +5812,18 @@ struct Game {
 namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
 namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
 namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
+void Car::detach() {
+  if (!rig_world_) return;
+  World& w = *rig_world_;
+  for (Rig& g : rig_) {
+    // (destroying the body takes its joints along)
+    if (g.body.valid() && w.body_valid(g.body)) w.destroy_body(g.body);
+    g = Rig{};
+  }
+  rig_world_ = nullptr;
+  rig_chassis_ = {};
+  has_last_ = false;
+}
 void Ragdolls::release(Doll& d) {
   if (!world_) return;
   for (u32 b = 0; b < kBones; ++b) {
@@ -5639,18 +5839,6 @@ void Ragdolls::clear() {
   for (Doll& d : dolls_) { release(d); d.active = false; }
   dolls_.clear();
   ups_.clear();
-}
-void Car::detach() {
-  if (!rig_world_) return;
-  World& w = *rig_world_;
-  for (Rig& g : rig_) {
-    // (destroying the body takes its joints along)
-    if (g.body.valid() && w.body_valid(g.body)) w.destroy_body(g.body);
-    g = Rig{};
-  }
-  rig_world_ = nullptr;
-  rig_chassis_ = {};
-  has_last_ = false;
 }
 f32 Game::view_zoom() const {
   // on foot: the view's field (FOV setting) against the one drawn (ADS, the scope); the vehicles'
@@ -5764,19 +5952,6 @@ bool Terrain::water_at(f32 x, f32 y) const {
   if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
   return bridges_.empty() || !on_bridge(x, y);
 }
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
 namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
   using ActorBlueprint::ActorBlueprint;
 }; }
@@ -5796,6 +5971,53 @@ namespace lamps { std::vector<i32> Field::near(f32 x, f32 y, f32 r) const {
     }
   return out;
 } }
+namespace lamps { i32 Field::shot(Vec3 a, Vec3 b) const {
+  const f32 L = converted::wide::length(b - a), mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+  i32 best = -1;
+  f64 first = 1e9;
+  for (i32 k : near(mx, my, L / 2 + 2)) {
+    const Lamp& l = converted::at(lamps_, static_cast<std::size_t>(k));
+    // (the Blueprint's ShotAt: does the round pass this lamp's head, and how far down its path)
+    bool hit = false;
+    f64 along = 0;
+    lamps::lamps_cpp_local::g_rules.call("ShotAt", std::tie(hit, along), a, b, Vec3{l.head.x, l.head.y, l.foot.z + kHeadZ}, l.state);
+    if (!hit) continue;
+    if (along < first) { first = along; best = k; }
+  }
+  return best;
+} }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+using rules::decimal; namespace lamps { std::vector<Field::CarHit> Field::car(Vec3 pos, f32 yaw, Vec3 v, f32 hl, f32 hw, f32 m) const {
+  std::vector<CarHit> out;
+  for (i32 k : near(pos.x, pos.y, hl + 1)) {
+    const Lamp& l = converted::at(lamps_, static_cast<std::size_t>(k));
+    bool hit = false;
+    CarHit h;
+    lamps::lamps_cpp_local::g_rules.call("CarFate", std::tie(hit, h.topple, h.impulse, h.clang), l.foot, l.state, pos, decimal(yaw), v, decimal(hl), decimal(hw), decimal(m));
+    if (!hit) continue;
+    h.lamp = k;
+    out.push_back(h);
+  }
+  return out;
+} }
+void Game::osfx(const char* fn, Vec3 at, f32 a, f32 b, f32 c) {
+  if (!web_audio_ || osfx_.size() > converted::times(256, 1024)) return;  // nobody drains it: never grow without bound
+  char buf[192];
+  std::snprintf(buf, sizeof buf, "%s[\"%s\",%.2f,%.2f,%.2f,%.5g,%.5g,%.5g]", osfx_.empty() ? "" : ",", fn, static_cast<double>(at.x), static_cast<double>(at.y), static_cast<double>(at.z), static_cast<double>(a), static_cast<double>(b), static_cast<double>(c));
+  osfx_ += buf;
+}
 using rules::decimal; namespace lamps { std::vector<Field::BlastHit> Field::blast(Vec3 p, f32 radius) const {
   std::vector<BlastHit> out;
   f64 blast_reach = 0;
@@ -5830,12 +6052,66 @@ void Game::townsync_lamp(i64 key, u8 state) {
     converted::present(townsync_)->lamps_out.push_back({key, state});
   }
 }
-void Game::osfx(const char* fn, Vec3 at, f32 a, f32 b, f32 c) {
-  if (!web_audio_ || osfx_.size() > converted::times(256, 1024)) return;  // nobody drains it: never grow without bound
-  char buf[192];
-  std::snprintf(buf, sizeof buf, "%s[\"%s\",%.2f,%.2f,%.2f,%.5g,%.5g,%.5g]", osfx_.empty() ? "" : ",", fn, static_cast<double>(at.x), static_cast<double>(at.y), static_cast<double>(at.z), static_cast<double>(a), static_cast<double>(b), static_cast<double>(c));
-  osfx_ += buf;
-}
+namespace mp { void Scoreboard::ensure(u8 slot) {
+  for (const Score& s : rows_) if (s.slot == slot) return;
+  rows_.push_back({slot, 0, 0});
+} }
+namespace mp { void Scoreboard::died(u8 victim, i32 by) {
+  ensure(victim);
+  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
+  if (by >= 0 && by != victim) {
+    ensure(static_cast<u8>(by));
+    for (Score& s : rows_) if (s.slot == by) ++s.kills;
+  }
+} }
+namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
+namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
+namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
+namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
+  std::stable_sort(members.begin(), members.end());
+  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
+} } }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
+  mp::mp_rules_cpp_local::roster(current);
+  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
+  return b.status;
+} }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
+  Ballot::Status did = b.status;
+  return cast_vote(b, voter, approve, std::move(current), now, did);
+} }
+namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
+  mp::mp_rules_cpp_local::roster(members);
+  bool created = false;
+  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
+  return created;
+} }
+namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
+  HitVerdict verdict = HitVerdict::applied;
+  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
+  return verdict;
+} }
+namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
+namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
+namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct I16 { i16 v = 0; }; }
 namespace wire { struct U32 { u32 v = 0; }; }
@@ -5965,66 +6241,6 @@ namespace wire { struct Reader {
   /// Every number was there, and the message has no more.
   
 }; }
-namespace mp { void Scoreboard::ensure(u8 slot) {
-  for (const Score& s : rows_) if (s.slot == slot) return;
-  rows_.push_back({slot, 0, 0});
-} }
-namespace mp { void Scoreboard::died(u8 victim, i32 by) {
-  ensure(victim);
-  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
-  if (by >= 0 && by != victim) {
-    ensure(static_cast<u8>(by));
-    for (Score& s : rows_) if (s.slot == by) ++s.kills;
-  }
-} }
-namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
-namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
-namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
-namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
-  std::stable_sort(members.begin(), members.end());
-  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
-} } }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
-  mp::mp_rules_cpp_local::roster(current);
-  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
-  return b.status;
-} }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
-  Ballot::Status did = b.status;
-  return cast_vote(b, voter, approve, std::move(current), now, did);
-} }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
-  mp::mp_rules_cpp_local::roster(members);
-  bool created = false;
-  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
-  return created;
-} }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  HitVerdict verdict = HitVerdict::applied;
-  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
-  return verdict;
-} }
-namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
-namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
-namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
 namespace net { namespace net_session_cpp_local { enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
@@ -6609,6 +6825,39 @@ void Game::gaps_lamps_remote(const net::Fx& f) {
 void Game::gaps_lamps_blast(Vec3 at, f32 radius) {
   if (!gaps_) return;
   for (const lamps::Field::BlastHit& h : converted::present(gaps_)->lamps.blast(at, radius)) gaps_lamp_break(h.lamp, h.state, h.dir, h.speed, false);
+}
+void Game::gaps_lamps_update(f32 dt) {
+  (void)dt;
+  if (!gaps_ || !world_placed_ || !show_lamps_) return;
+  GapsState& g = *converted::present(gaps_);
+  const f32 now = converted::present(world_)->sim_time();
+  // rounds from the player on foot (the foot tracer)
+  for (const game::ShotEvent& s : converted::present(world_)->shots()) {
+    if (s.shooter != soldier_) continue;
+    const i32 hit = g.lamps.shot(s.from, s.to);
+    if (hit >= 0) gaps_lamp_break(hit, 1, {}, 0, true);
+  }
+  // cars: every 66 ms
+  if (now - g.lamp_car_check >= 0.066 || now < g.lamp_car_check) {
+    g.lamp_car_check = now;
+    for (TrafficCar& c : cars_) {
+      if (!c.placed || !converted::present(world_)->actor_alive(c.actor)) continue;
+      const bool bus = converted::present(c.car)->spec().radius > 0.4;
+      const BodyState s = state_of(c.actor);
+      const Vec3 f = s.rotation.rotate({1, 0, 0});
+      for (const lamps::Field::CarHit& h : g.lamps.car(s.position, kern::math::atan2(f.y, f.x), s.velocity, bus ? 4.05 : 1.88, bus ? 1.25 : 0.86, converted::present(c.car)->spec().mass)) {
+        converted::present(world_)->physics().apply_linear_impulse_to_center(body(c.actor), h.impulse);
+        if (h.topple) gaps_lamp_break(h.lamp, 2, {s.velocity.x, s.velocity.y}, hypot_bp(s.velocity.x, s.velocity.y), true);
+        else if (h.clang) {
+          gaps_lamps_sounds();
+          const f32 vol = std::fmax(0.0, 1 - converted::wide::length(s.position - cam_.eye) / 90) * 0.5 * 0.5;
+          if (vol > 0) converted::present(world_)->play_sound("sc:lampclang", cam_.eye, vol, 1, false);
+          osfx("street_lamps.clang", converted::at(g.lamps.all(), static_cast<std::size_t>(h.lamp)).foot + Vec3{0, 0, 0.5}, 0.5);
+        }
+      }
+    }
+  }
+  if (g.lamps_dirty) gaps_lamps_mirror();
 }
 void Game::gaps_lamps_reset() {
   if (!gaps_) return;
@@ -12589,6 +12838,9 @@ inline bool Renderer::update_instances(const unsigned int& id, converted::wide::
 inline void GameWorld::play_sound(const std::string& sound, const Vec3& at, const double& volume, const double& pitch, const bool& spatial, const unsigned int& actor) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.play_sound", {converted::value_of(*this), converted::value_of(sound), converted::value_of(at), converted::value_of(volume), converted::value_of(pitch), converted::value_of(spatial), converted::value_of(actor)}); }
 inline World& GameWorld::physics() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.physics", {converted::value_of(*this)}); World& kern_result = *converted::engine_object<World>(kern_out[0].as_int()); return kern_result; }
 inline double GameWorld::sim_time() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.sim_time", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
+inline std::vector<game::ShotEvent>& GameWorld::shots() { return converted::engine_place<std::vector<game::ShotEvent>, std::vector<game::ShotEvent>>("engine.game_world.shots", {converted::value_of(*this)}); }
+inline bool GameWorld::actor_alive(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_alive", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline physics::Body GameWorld::actor_body(const unsigned int& actor) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_body", {converted::value_of(*this), converted::value_of(actor)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
 inline void SoundBank::request(const std::string_view& ref) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.sound_bank.request", {converted::value_of(*this), converted::value_of(ref)}); }
 inline bool SoundBank::set_pcm(const std::string_view& id, const double* data, const u32& samples, const unsigned int& channels, const unsigned int& rate) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.sound_bank.set_pcm", {converted::value_of(*this), converted::value_of(id), converted::value_of(std::vector<double>(data, data + converted::room(data, 1 * static_cast<std::size_t>(samples)))), converted::value_of(samples), converted::value_of(channels), converted::value_of(rate)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool Client::connected() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connected", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
@@ -12601,6 +12853,7 @@ inline physics::Shape World::create_shape(const physics::Body& body, const physi
 inline void World::apply_linear_impulse(const physics::Body& body, const Vec3& impulse, const Vec3& point) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_linear_impulse", {converted::value_of(*this), converted::value_of(body), converted::value_of(impulse), converted::value_of(point)}); }
 inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
+inline void World::apply_linear_impulse_to_center(const physics::Body& body, const Vec3& impulse) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_linear_impulse_to_center", {converted::value_of(*this), converted::value_of(body), converted::value_of(impulse)}); }
 inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_joint(const physics::Joint& joint, const bool& wake_bodies) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_joint", {converted::value_of(*this), converted::value_of(joint), converted::value_of(wake_bodies)}); }
 inline physics::Pose World::pose(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.pose", {converted::value_of(*this), converted::value_of(body)}); physics::Pose kern_result = converted::quiet<physics::Pose>(); converted::take_as<physics::Pose>(kern_result, kern_out[0]); return kern_result; }
@@ -12634,6 +12887,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12657,6 +12911,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12680,6 +12935,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12703,6 +12959,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12731,6 +12988,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12755,6 +13013,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12780,6 +13039,32 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::gaps_lamps_update
+    converted::Tally tally("gaps_lamps_update");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] double& a0) { converted::counted([&] { return s->gaps_lamps_update(std::move(a0)); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12803,6 +13088,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12826,6 +13112,7 @@ SC_TEST(converted_Game__game_lamps_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

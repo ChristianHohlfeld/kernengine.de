@@ -7,10 +7,10 @@
 #include <string>
 #include <type_traits>
 #include <vector>
-#include <cstdint>
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include "../../src/blueprint_call.h"
 #include "../../src/gaps_rules.h"
 #include "../../src/jet_seats.h"
 #include "../../src/lamps.h"
@@ -19,32 +19,12 @@
 #include "../../src/world_traffic.h"
 #include "../../src/game_world.h"
 #include "../../src/game_life.h"
+#include "level_blueprints.h"
 #include "kern/core/base.h"
 #include "kern/core/json.h"
 #include "kern/logic/logic.h"
 #include "../../src/rules.h"
 #include "../converted.h"
-#ifndef FC_SBUS_YAW
-#define FC_SBUS_YAW 3
-#endif
-#ifndef FC_SBUS_THROTTLE
-#define FC_SBUS_THROTTLE 2
-#endif
-#ifndef FC_SBUS_ROLL
-#define FC_SBUS_ROLL 0
-#endif
-#ifndef FC_SBUS_PITCH
-#define FC_SBUS_PITCH 1
-#endif
-#ifndef FC_SBUS_ARM
-#define FC_SBUS_ARM 4
-#endif
-#ifndef FC_IMU_ROTATION
-#define FC_IMU_ROTATION 0
-#endif
-#ifndef FC_IMU_FLIPPED
-#define FC_IMU_FLIPPED 0
-#endif
 
 namespace converted_Game__game_cpp {
 namespace converted = ::sc::converted;
@@ -59,57 +39,6 @@ using converted::wide::distance; using converted::wide::distance_sq; using conve
 using converted::wide::vmin; using converted::wide::vmax; using converted::wide::normalize; using converted::wide::hex_color; using converted::wide::Span;
 using converted::wide::hypot_bp; using converted::wide::ldexp_bp; using converted::wide::tanh_bp; using converted::wide::sinh_bp; using converted::wide::cosh_bp;
 using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted::wide::log10_bp; using converted::wide::cbrt_bp;
-inline std::vector<std::pair<const unsigned char*, const unsigned char*>> converted_pointed_lists;
-template <class T> const T& converted_pointed(const T* p, long long i) {
-  const auto at = reinterpret_cast<std::uintptr_t>(p);
-  bool held = false;
-  for (const auto& [first, last] : converted_pointed_lists) {
-    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
-    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
-    held = true;
-    const long long e = static_cast<long long>((at - a) / sizeof(T)) + i;
-    if (e >= 0 && e < static_cast<long long>((b - a) / sizeof(T))) return reinterpret_cast<const T*>(first)[e];
-    break;
-  }
-  if (p != nullptr && !held) return p[i];
-  converted::open_read();
-  static T none;
-  none = converted::none_entry<T>();
-  return none;
-}
-// p + n of a pointer into a list the test handed over: a place in it or just past its end (what C++ defines);
-// any other is marked (C++ leaves it open) and stands at p - a range up to it is empty, nothing is read there.
-template <class T, class N> const T* converted_pointed_end(const T* p, N n) {
-  const auto at = reinterpret_cast<std::uintptr_t>(p);
-  const long long k = static_cast<long long>(n);
-  for (const auto& [first, last] : converted_pointed_lists) {
-    const auto a = reinterpret_cast<std::uintptr_t>(first), b = reinterpret_cast<std::uintptr_t>(last);
-    if (at < a || at > b || (at - a) % sizeof(T) != 0) continue;
-    const long long e = static_cast<long long>((at - a) / sizeof(T)) + k;
-    if (e >= 0 && e <= static_cast<long long>((b - a) / sizeof(T))) return p + k;
-    converted::open_read();
-    return p;
-  }
-  if (p != nullptr || k == 0) return p + k;
-  converted::open_read();
-  return p;
-}
-template <class T, class N> requires (!std::is_const_v<T>) T* converted_pointed_end(T* p, N n) { return const_cast<T*>(converted_pointed_end(static_cast<const T*>(p), n)); }
-// n entries from p, as a value of the library is made of them (`std::string_view s(p, n)`): where they do not all
-// stand in the list p points into, the call is marked (C++ leaves it open) and the value has none of them.
-template <class T> struct converted_pointed_range_t {
-  const T* p;
-  std::size_t n;
-  template <class V> requires (!std::is_pointer_v<V> && std::is_constructible_v<V, const T*, std::size_t>) operator V() const { return V(p, n); }
-};
-template <class T, class N> converted_pointed_range_t<T> converted_pointed_range(const T* p, N n) {
-  if ((std::is_signed_v<N> && static_cast<long long>(n) < 0) || static_cast<unsigned long long>(n) > 0x7fffffffffffffffull) {
-    converted::open_read();   // (more entries than any list has)
-    return {p, 0};
-  }
-  const T* e = converted_pointed_end(p, static_cast<long long>(n));
-  return {p, static_cast<std::size_t>(e - p)};
-}
 
 // ---- game.cpp and what it uses, as it stands ----
 #pragma GCC diagnostic push
@@ -121,8 +50,6 @@ template <class T, class N> converted_pointed_range_t<T> converted_pointed_range
 #define private public
 #define protected public
 enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
-double now_ms();
-double wall_ms();
 constexpr f32 kPi = 3.14159265358979323846;
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
@@ -185,20 +112,20 @@ struct Mat4 {
 
 
   static Mat4 translate(Vec3 t) { Mat4 r; r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; return r; }
-  
+  static Mat4 scale(Vec3 s) { Mat4 r; r.m[0] = s.x; r.m[5] = s.y; r.m[10] = s.z; return r; }
 
   /// Translation * rotation * scale.
-  
-
-
-
-
-
-
-
-
-
-
+  static Mat4 trs(Vec3 t, Quat q, Vec3 s) {
+    const f32 x2 = q.x + q.x, y2 = q.y + q.y, z2 = q.z + q.z;
+    const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
+    const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
+    Mat4 r;
+    r.m[0] = (1 - yy - zz) * s.x; r.m[1] = (xy + wz) * s.x; r.m[2] = (xz - wy) * s.x; r.m[3] = 0;
+    r.m[4] = (xy - wz) * s.y; r.m[5] = (1 - xx - zz) * s.y; r.m[6] = (yz + wx) * s.y; r.m[7] = 0;
+    r.m[8] = (xz + wy) * s.z; r.m[9] = (yz - wx) * s.z; r.m[10] = (1 - xx - yy) * s.z; r.m[11] = 0;
+    r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; r.m[15] = 1;
+    return r;
+  }
 
   
 
@@ -305,75 +232,10 @@ namespace physics { struct WorldSettings {
   f32 contact_hertz = 30, contact_damping_ratio = 10, contact_speed = 3;  // Hz, -, m/s
   f32 maximum_linear_speed = 400;  // m/s
 }; }
-namespace physics { struct BodySettings {
-  BodyType type = BodyType::dynamic;
-  Vec3 position;
-  Quat rotation;
-  Vec3 linear_velocity, angular_velocity;
-  f32 linear_damping = 0, angular_damping = 0, gravity_scale = 1;
-  bool enable_sleep = true, awake = true, enabled = true, bullet = false;
-  u64 user = 0;  // returned by World::body_user
-}; }
 namespace physics { struct QueryFilter {
   u64 mask_bits = ~0ull, category_bits = ~0ull;
   QueryFilter() = default;
   QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
-}; }
-namespace physics { struct ShapeMaterial {
-  f32 density = 1;            // kg/m^3
-  f32 friction = 0.6;
-  f32 restitution = 0;        // 0..1
-  f32 rolling_resistance = 0; // spheres, capsules, hulls (Box3D: a quarter of the inner radius)
-  bool sensor = false;
-  u64 category_bits = 1, mask_bits = ~0ull;
-  i32 group_index = 0;
-  bool contact_events = true, sensor_events = true, hit_events = false;
-  u64 user = 0;               // returned by World::shape_user
-  Surface surface = Surface::none;
-}; }
-namespace physics { struct ShapeSettings {
-  ShapeKind kind = ShapeKind::box;
-  Vec3 center;               // body-local placement of the shape
-  Quat rotation;
-  Vec3 size{1, 1, 1};        // box: full extents
-  f32 radius = 0.5;         // sphere, capsule
-  f32 length = 1;            // capsule: distance between the hemisphere centres, along the shape's Z
-  Span<const Vec3> points;   // hull: points in shape space (4..128 after hull reduction); mesh: vertices
-  Span<const u32> indices;   // mesh: 3 per triangle, counter-clockwise (static bodies only)
-  ShapeMaterial material;
-}; }
-namespace physics { struct JointSettings {
-  JointType type = JointType::revolute;
-  Body body_a, body_b;
-  Pose frame_a, frame_b;         // in body-local space
-  bool collide_connected = false;
-  // springs: revolute, prismatic, distance, spherical, wheel (suspension), parallel
-  bool enable_spring = false;
-  f32 hertz = 0, damping_ratio = 0;
-  // limits: revolute (radians), prismatic and wheel (metres), distance (min/max length), spherical (cone angle = upper)
-  bool enable_limit = false;
-  f32 lower = 0, upper = 0;
-  // motors: revolute and wheel use torque, prismatic and distance use force, spherical uses torque + motor_velocity
-  bool enable_motor = false;
-  f32 motor_speed = 0, max_motor_torque = 0, max_motor_force = 0;
-  Vec3 motor_velocity;
-  f32 length = 1;                // distance joint rest length
-  // weld joint softness (0 hertz = rigid)
-  f32 linear_hertz = 0, angular_hertz = 0, linear_damping_ratio = 1, angular_damping_ratio = 1;
-  // motor joint: velocity drive and spring towards frame alignment
-  Vec3 linear_velocity, angular_velocity;
-  f32 max_velocity_force = 0, max_velocity_torque = 0, max_spring_force = 0, max_spring_torque = 0;
-  // wheel joint steering (Box3D b3WheelJointDef): the wheel turns about the suspension axis towards
-  // `target_steering` (radians) with a spring-damper servo of at most `max_steering_torque`;
-  // without it the wheel is fixed forward
-  bool enable_steering = false, enable_steering_limit = false;
-  f32 steering_hertz = 0, steering_damping_ratio = 0, target_steering = 0, max_steering_torque = 0;
-  f32 steering_lower = 0, steering_upper = 0;
-  // parallel joint
-  f32 max_torque = 0;
-  // Joint softness of the solver (0 = Box3D defaults); keep below half the sub-step rate.
-  f32 constraint_hertz = 0, constraint_damping_ratio = 0;
-  u64 user = 0;
 }; }
 namespace physics { struct RayHit {
   bool hit = false;
@@ -389,29 +251,13 @@ struct World : converted::EngineObject {
   Vec3 linear_velocity(const physics::Body& body) const;
   double mass(const physics::Body& body) const;
   void apply_force_to_center(const physics::Body& body, const Vec3& force) const;
-  void set_pose(const physics::Body& body, const physics::Pose& pose) const;
   physics::RayHit cast_sphere(const Vec3& origin, const double& radius, const Vec3& translation, const physics::QueryFilter& filter = {}, const physics::Body& ignore = {}) const;
   bool joint_valid(const physics::Joint& joint) const;
   void destroy_joint(const physics::Joint& joint, const bool& wake_bodies = true) const;
   void destroy_body(const physics::Body& body) const;
-  void set_body_type(const physics::Body& body, const physics::BodyType& type) const;
-  void set_mass_data(const physics::Body& body, const double& mass, const Vec3& center, const double* inertia) const;
-  void set_body_masks(const physics::Body& body, converted::wide::Span<const u64> masks) const;
-  void body_masks(const physics::Body& body, std::vector<u64>& out) const;
-  physics::BodyType body_type(const physics::Body& body) const;
-  void set_linear_velocity(const physics::Body& body, const Vec3& v) const;
-  void set_angular_velocity(const physics::Body& body, const Vec3& w) const;
   physics::Pose pose(const physics::Body& body) const;
   Vec3 angular_velocity(const physics::Body& body) const;
   physics::RayHit cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter = {}, const physics::Body& ignore = {}) const;
-  void apply_force(const physics::Body& body, const Vec3& force, const Vec3& point) const;
-  void apply_torque(const physics::Body& body, const Vec3& torque) const;
-  void set_wheel_steering(const physics::Joint& joint, const double& target) const;
-  double wheel_steering(const physics::Joint& joint) const;
-  physics::Body create_body(const physics::BodySettings& settings) const;
-  physics::Shape create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const;
-  physics::Joint create_joint(const physics::JointSettings& settings) const;
-  void set_target_pose(const physics::Body& body, const physics::Pose& target, const double& dt) const;
 };
 struct MouseGrab : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -419,34 +265,21 @@ struct MouseGrab : converted::EngineObject {
 struct CharacterMover : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-constexpr f32 kG = 9.80665;
 constexpr f32 kDeg = kPi / 180.0;
 enum : u64 { kCatWorld = 1, kCatVehicle = 2, kCatDrone = 4, kCatQuery = 8 };
 inline f32 clampf(f32 v, f32 lo, f32 hi) { return v < lo ? lo : (v > hi ? hi : v); }
-inline f32 sign0(f32 v) { return v > 0 ? 1.0 : (v < 0 ? -1.0 : 0.0); }
-inline f32 rate_limit(f32 cur, f32 target, f32 max_step) { return cur + clampf(target - cur, -max_step, max_step); }
 inline f32 damp_alpha(f32 rate, f32 dt) { return rate > 0 && dt > 0 ? 1.0 - kern::math::exp(-rate * dt) : 0.0; }
 inline f32 wrap_pi(f32 a) {
   while (a > kPi) a -= 2 * kPi;
   while (a < -kPi) a += 2 * kPi;
   return a;
 }
-inline Quat conj(Quat q) { return {-q.x, -q.y, -q.z, q.w}; }
-inline Vec3 to_local(Quat q, Vec3 v) { return conj(q).rotate(v); }
 inline Quat qnormalize(Quat q) {
   const f32 l = kern::math::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
   return l > 1e-9 ? Quat{q.x / l, q.y / l, q.z / l, q.w / l} : Quat{};
 }
 inline Quat yaw_quat(f32 yaw) { return Quat::axis_angle({0, 0, 1}, yaw); }
 inline f32 heading_of(Vec3 axis) { return kern::math::atan2(axis.y, axis.x); }
-inline Quat slerp(Quat a, Quat b, f32 t) {
-  f32 d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
-  if (d < 0) { b = {-b.x, -b.y, -b.z, -b.w}; d = -d; }
-  if (d > 0.9995) return qnormalize({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t});
-  const f32 th = kern::math::acos(d), s = kern::math::sin(th);
-  const f32 wa = kern::math::sin((1 - t) * th) / s, wb = kern::math::sin(t * th) / s;
-  return {a.x * wa + b.x * wb, a.y * wa + b.y * wb, a.z * wa + b.z * wb, a.w * wa + b.w * wb};
-}
 struct BodyState {
   Vec3 position, velocity, angular;
   Quat rotation;
@@ -465,16 +298,16 @@ struct Rng {
   
   u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
   f32 unit() { return static_cast<f32>(next() >> 8) * (1.0 / 16777216.0); }
-  f32 range(f32 a, f32 b) { return a + (b - a) * unit(); }
+  
   /// Standard normal (Box-Muller), as SpawnCity's sensor noise.
-  f32 gaussian() {
-    if (has_spare_) { has_spare_ = false; return spare_; }
-    const f32 u = std::fmax(1e-12, unit()), v = unit();
-    const f32 r = kern::math::sqrt(-2.0 * kern::math::log(u));
-    spare_ = r * kern::math::sin(2 * kPi * v);
-    has_spare_ = true;
-    return r * kern::math::cos(2 * kPi * v);
-  }
+  
+
+
+
+
+
+
+
 };
 struct RayResult {
   bool hit = false;
@@ -609,6 +442,18 @@ namespace logic { struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   
   
@@ -639,6 +484,11 @@ namespace logic { struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   
   
   
@@ -656,7 +506,10 @@ namespace logic { struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
@@ -702,7 +555,13 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
+struct BlueprintWorld : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -711,6 +570,9 @@ struct Instance : converted::EngineObject {
 struct Context : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
 namespace gaps { struct SirenVoice {
   bool have_d = false;
   f32 last_d = 0, doppler = 1, gain = 0;
@@ -741,10 +603,10 @@ namespace gaps { struct SmokeField {
 
 
   /// startWorldCriticalDamage: returns the time it goes off (an existing effect keeps its clock).
-  f32 start(const std::string& id, Vec3 at, f32 scale, f32 delay_s, f32 now);
+  
   /// accelerateWorldCriticalDamage: never later, at least 0.18 s from now.
-  bool accelerate(const std::string& id, f32 expires_at, f32 now);
-  void stop(const std::string& id);
+  
+  
   
   
   /// Emits (interval 155 - 72 * progress ms, a second puff after 76 %) and ages the puffs.
@@ -758,18 +620,23 @@ namespace gaps { struct SmokeField {
   
 
  private:
-  void emit(SmokeEffect& e, f32 now);
+  
   std::vector<SmokeEffect> effects_;
   std::vector<Puff> puffs_;
 }; }
-namespace gaps { u32 hash_text(const std::string& s); }
-namespace gaps { f32 unit_hash(u32 seed); }
 namespace gaps { enum class Organic : u8 { person, animal, bird }; }
+namespace gaps { struct VisualProfile {
+  f32 offset_rate, rotation_rate, soft_pos, max_pos, pos_recovery, soft_rot, max_rot, rot_recovery;
+}; }
+namespace gaps { constexpr VisualProfile kVisualFollow{9.0, 12.0, 0.025, 0.10, 9.0, 3 * kDeg, 10 * kDeg, 10.0}; }
+namespace gaps { constexpr VisualProfile kVisualThird{5.2, 7.0, 0.050, 0.18, 7.0, 5 * kDeg, 14 * kDeg, 7.5}; }
+namespace gaps { Quat slerp(Quat a, Quat b, f32 t); }
+namespace gaps { f32 quat_angle(Quat a, Quat b); }
 namespace gaps { struct VisualPose {
  public:
-  
+  void invalidate() { init_ = false; }
   /// mode 1 follow, 2 third. Returns the pose to draw (position, rotation).
-  
+  void update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32 dt, Vec3& out_p, Quat& out_q);
 
  private:
   bool init_ = false;
@@ -783,16 +650,16 @@ namespace seats { enum class Result : u8 { ok, unchanged, invalid, owner_only_pi
 namespace seats { struct Row { u8 owner = kNone, pilot = kNone, passenger = kNone; }; }
 namespace seats { struct Table {
  public:
-  Result claim(u8 owner, u8 player, Seat seat);
-  Result release(u8 owner, u8 player, Seat seat);
+  
+  
   /// A player left: his jet's row goes, his passenger seat elsewhere is freed. True: changed.
   
   /// The row of `owner`'s jet (all kNone when nobody sits in it).
-  Row get(u8 owner) const;
+  
   /// Where `player` sits: the row (owner) and the seat; false when he sits nowhere.
   
-  const std::vector<Row>& rows() const { return rows_; }
-  u32 revision() const { return revision_; }
+  
+  
   /// Replace with the authority's snapshot (validated like JetSeatTable.load).
   
   
@@ -879,6 +746,8 @@ struct Bvh : converted::EngineObject {
 };
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  bool set_visible(const unsigned int& id, const bool& visible) const;
+  bool update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed = nullptr) const;
 };
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
 namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
@@ -986,8 +855,8 @@ struct Terrain {
   
   
   bool water_at(f32 x, f32 y) const;  // open water here (not under a bridge)
-  f32 water_level(f32 x, f32 y) const { return elevation(x, y) + kWaterLevel; }
-  Vec2 flow_at(f32 x, f32 y) const;
+  
+  
   /// Ground surface kind for tyres etc. (groundSurfaceAt): 0 ground, 1 water, 2 soil (crater).
   
 
@@ -1421,45 +1290,6 @@ namespace lamps { struct Field {
   converted::wide::Map<i64, u8> broken_;
   converted::wide::Map<i64, std::vector<i32>> grid_;
 }; }
-namespace spawn { f32 default_far(); }
-namespace spawn { struct Viewer {
-  Vec3 eye, forward{1, 0, 0};  // forward: unit
-  f32 half_angle = kPi / 2;
-  f32 far = 1500;
-  bool local = false;          // the presented camera (frustum sphere test as well as the cone)
-}; }
-namespace spawn { f32 cone_half_angle(f32 vertical_fov, f32 aspect); }
-namespace spawn { bool can_spawn(const std::vector<Viewer>& viewers, Vec3 point, f32 far_entry, f32 height); }
-namespace spawn { struct Footprint { Vec2 center; f32 yaw = 0; Vec2 half; }; }
-namespace spawn { bool footprints_overlap(const Footprint& a, const Footprint& b, f32 margin = 0.35); }
-struct ColliderSpec {
-  physics::ShapeKind kind = physics::ShapeKind::box;
-  Vec3 center;               // body frame
-  Quat rotation;
-  Vec3 size{1, 1, 1};        // box: full extents
-  f32 radius = 0.5, length = 1;  // sphere, capsule (along the shape's Z)
-  std::vector<Vec3> points;  // hull
-  f32 friction = 0.6, restitution = 0;
-};
-struct MassSpec {
-  f32 mass = 1;
-  Vec3 center;               // centre of mass, body frame
-  f32 inertia[6] = {1, 1, 1, 0, 0, 0};  // about the centre of mass: xx yy zz xy xz yz
-};
-struct RigidSpec {
-  std::vector<ColliderSpec> colliders;
-  MassSpec mass;
-  f32 linear_damping = 0, angular_damping = 0;
-  bool bullet = false;
-};
-inline void box_inertia(f32 m, Vec3 s, MassSpec& mass) {
-  mass.inertia[0] = m * (s.y * s.y + s.z * s.z) / 12;
-  mass.inertia[1] = m * (s.x * s.x + s.z * s.z) / 12;
-  mass.inertia[2] = m * (s.x * s.x + s.y * s.y) / 12;
-  mass.inertia[3] = 0;
-  mass.inertia[4] = 0;
-  mass.inertia[5] = 0;
-}
 struct CarSpec {
   const char* kind = "car";
   Vec3 half{1.78, 0.82, 0.36};
@@ -1477,8 +1307,8 @@ struct CarSpec {
   std::vector<Vec2> upper_profile{{-1.02, 0.8}, {-0.64, 1.37}, {0.3, 1.37}, {0.86, 0.8}};
   f32 upper_half_width = 0.71, upper_dz = 0.54;
 
-  
-  
+  static CarSpec car() { return {}; }
+  static CarSpec bus();
 };
 struct CarInput {
   f32 pedal = 0;      // -1..1: throttle forward / brake / reverse (automatic)
@@ -1494,7 +1324,7 @@ struct WheelState {
 };
 struct Car {
  public:
-  
+  explicit Car(const CarSpec& s = {}) : s_(s) {}
   ~Car() { detach(); }
   
   
@@ -1503,26 +1333,26 @@ struct Car {
   void detach();
   
   /// A car somebody else drives (shown only): its steering angle, and its wheels rolling at `v`.
+  void show(f32 steer) { steer_ = steer; }
   
-  void roll(f32 v, f32 dt) { for (WheelState& w : w_) { w.omega = v / s_.radius; w.angle = kern::math::mod(w.angle + w.omega * dt, 2 * kPi); } }
   /// What a hit on a wheel reports as the shape's user (the game: the car's actor, so a round
   /// into a tyre is a hit on the car).
   u64 hit_user = 0;
   /// One wheel body of the rig (valid while rigged): for whoever must know it (a ray's ignore).
   
-  static RigidSpec rigid_spec(const CarSpec& s);
+  
   /// Height of the chassis centre above flat ground at rest.
   static f32 ground_offset(const CarSpec& s) { return s.radius - s.attach_z - s.sag; }
 
-  void reset();
-  void step(World& world, physics::Body body, f32 h, const CarInput& in);
+  
+  
   /// The forces of the last step() again, in the chassis frame (no rays): AI traffic runs its
   /// tyres at 60 Hz as the original (world_rigid_body_runtime.mjs FIXED_DT 1/60) and holds them
   /// over Kern's 240 Hz steps in between (game.cpp drive_traffic).
-  void reapply(World& world, physics::Body body) const;
+  
   const CarSpec& spec() const { return s_; }
-  
-  
+  const WheelState& wheel(int i) const { return converted::at(w_, i); }
+  f32 steer_angle() const { return steer_; }
   f32 forward_speed() const { return vf_; }
   
   /// Engine load 0..1 and the wheel speed for the engine sound.
@@ -1537,7 +1367,7 @@ struct Car {
   struct Applied { Vec3 p, f; i32 on; };  // chassis-local point and force; on: wheel 0..3, or -1 the chassis' centre
   Applied applied_[6];
   i32 n_applied_ = 0;
-  void push(World& world, physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, i32 on);
+  
   // the wheels on their joints
   struct Rig { physics::Body body; physics::Joint joint, strut; };
   Rig rig_[4];
@@ -1545,11 +1375,10 @@ struct Car {
   physics::Body rig_chassis_;
   Vec3 last_pos_;
   bool has_last_ = false;
-  void attach(World& world, physics::Body chassis);
-  void place(World& world, const BodyState& st);
-  bool ensure_rig(World& world, physics::Body chassis, f32 dt);
+  
+  
+  
 };
-CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed);
 struct Facades final {
  public:
   f32 night = 0;  // 0 day .. 1 night (game_look.cpp)
@@ -1701,51 +1530,36 @@ namespace combat_audio { constexpr u32 kSampleRate = 44100; }
 namespace combat_audio { constexpr u32 kVariants[] = {3, 4, 4, 4, 2, 4, 2, 3, 4, 3, 2}; }
 namespace combat_audio { const char* kind_name(Kind k); }
 namespace combat_audio { std::vector<f32> render(Kind k, u32 variant, u32 rate = kSampleRate); }
-namespace fc { constexpr double kPi = 3.14159265358979323846; }
 namespace fc { constexpr uint16_t kEscMinUs = 1000; }
 namespace fc { constexpr uint16_t kEscIdleUs = 1050; }
 namespace fc { constexpr uint16_t kEscMaxUs = 2000; }
-namespace fc { constexpr uint32_t kNominalDtUs = 1000; }
 namespace fc { constexpr uint32_t kMinDtUs = 600; }
 namespace fc { constexpr uint32_t kMaxDtUs = 1600; }
 namespace fc { constexpr uint32_t kRcTimeoutUs = 100000; }
 namespace fc { constexpr uint32_t kCalibrationSamples = 2000; }
-namespace fc { template <class T>
-constexpr T clamp(T v, T lo, T hi) {
-    return v < lo ? lo : (v > hi ? hi : v);
-} }
 namespace fc { struct V3 {
     double x{}, y{}, z{};
-}; }
-namespace fc { inline double mag(V3 v) {
-    return kern::math::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
-} }
-namespace fc { inline bool finite(V3 v) {
-    return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z);
-} }
-namespace fc { struct Imu {
-    V3 a{}, g{};
 }; }
 namespace fc { struct PT1 {
 public:
     explicit PT1(double cutoff_hz) : cutoff_hz_(cutoff_hz) {}
 
-    double run(double x, double dt) {
-        if (!initialized_ || !(dt > 0.0) || !std::isfinite(dt)) {
-            y_ = x;
-            initialized_ = true;
-            return y_;
-        }
-        const double rc = 1.0 / (2.0 * kPi * cutoff_hz_);
-        const double k = clamp(dt / (rc + dt), 0.0, 1.0);
-        y_ += k * (x - y_);
-        return y_;
-    }
+    
 
-    void reset() {
-        y_ = 0.0;
-        initialized_ = false;
-    }
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
 
 private:
     double cutoff_hz_;
@@ -1756,53 +1570,53 @@ namespace fc { struct Filters {
     std::array<PT1, 3> gyro{PT1(100.0), PT1(100.0), PT1(100.0)};
     std::array<PT1, 3> accel{PT1(30.0), PT1(30.0), PT1(30.0)};
 
-    Imu run(Imu s, double dt) {
-        return {{accel[0].run(s.a.x, dt), accel[1].run(s.a.y, dt), accel[2].run(s.a.z, dt)},
-                {gyro[0].run(s.g.x, dt), gyro[1].run(s.g.y, dt), gyro[2].run(s.g.z, dt)}};
-    }
+    
+
+
+
 }; }
 namespace fc { struct Attitude {
     double roll{}, pitch{}, yaw{};
 
-    void reset(V3 a) {
-        roll = kern::math::atan2(a.y, a.z) * 180.0 / kPi;
-        pitch = kern::math::atan2(-a.x, kern::math::sqrt(a.y * a.y + a.z * a.z)) * 180.0 / kPi;
-        yaw = 0.0;
-    }
+    
 
-    void run(Imu s, double dt) {
-        const double phi = roll * kPi / 180.0;
-        const double theta = pitch * kPi / 180.0;
-        const double sin_phi = kern::math::sin(phi);
-        const double cos_phi = kern::math::cos(phi);
-        const double sin_theta = kern::math::sin(theta);
-        double cos_theta = kern::math::cos(theta);
-        if (std::fabs(cos_theta) < 0.05)
-            cos_theta = kern::math::copysign(0.05, cos_theta == 0.0 ? 1.0 : cos_theta);
-        const double tan_theta = sin_theta / cos_theta;
 
-        const double roll_rate = s.g.x + sin_phi * tan_theta * s.g.y +
-                                cos_phi * tan_theta * s.g.z;
-        const double pitch_rate = cos_phi * s.g.y - sin_phi * s.g.z;
-        const double yaw_rate = (sin_phi / cos_theta) * s.g.y +
-                               (cos_phi / cos_theta) * s.g.z;
 
-        roll += roll_rate * dt;
-        pitch += pitch_rate * dt;
-        yaw += yaw_rate * dt;
-        while (yaw > 180.0) yaw -= 360.0;
-        while (yaw < -180.0) yaw += 360.0;
 
-        const double n = mag(s.a);
-        if (n > 0.8 && n < 1.2) {
-            const double accel_roll = kern::math::atan2(s.a.y, s.a.z) * 180.0 / kPi;
-            const double accel_pitch = kern::math::atan2(-s.a.x, kern::math::sqrt(s.a.y * s.a.y + s.a.z * s.a.z)) * 180.0 / kPi;
-            const double tau = 1.0 / (2.0 * kPi * 0.02);
-            const double k = clamp(dt / (tau + dt), 0.0, 0.02);
-            roll += k * (accel_roll - roll);
-            pitch += k * (accel_pitch - pitch);
-        }
-    }
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 }; }
 namespace fc { struct Gains {
     double kp, ki, kd, integral_limit, output_limit, d_cutoff_hz;
@@ -1811,30 +1625,30 @@ namespace fc { struct PID {
 public:
     explicit PID(Gains gains) : gains_(gains), d_filter_(gains.d_cutoff_hz) {}
 
-    double run(double setpoint, double measurement, double dt, bool integrate) {
-        if (!(dt > 0.0) || !std::isfinite(setpoint) || !std::isfinite(measurement)) return 0.0;
-        const double error = setpoint - measurement;
-        double derivative = have_previous_ ? -(measurement - previous_) / dt : 0.0;
-        previous_ = measurement;
-        have_previous_ = true;
-        derivative = d_filter_.run(derivative, dt);
+    
 
-        const double pre = gains_.kp * error + integral_ + gains_.kd * derivative;
-        if (integrate && !((pre >= gains_.output_limit && error > 0.0) ||
-                           (pre <= -gains_.output_limit && error < 0.0))) {
-            integral_ = clamp(integral_ + gains_.ki * error * dt,
-                              -gains_.integral_limit, gains_.integral_limit);
-        }
-        return clamp(gains_.kp * error + integral_ + gains_.kd * derivative,
-                     -gains_.output_limit, gains_.output_limit);
-    }
 
-    void reset() {
-        integral_ = 0.0;
-        previous_ = 0.0;
-        have_previous_ = false;
-        d_filter_.reset();
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
 
     
 
@@ -1850,146 +1664,49 @@ namespace fc { struct RC {
     bool lost{}, failsafe{}, valid{};
     u64 us{};
 }; }
-namespace fc { inline bool sbus_end(uint8_t b) {
-    return b == 0x00 || b == 0x04 || b == 0x14 || b == 0x24 || b == 0x34;
-} }
-namespace fc { inline bool decode_sbus(const uint8_t* p, RC& out) {
-    if (!p || converted_pointed(p, 0) != 0x0f || !sbus_end(converted_pointed(p, 24))) return false;
-    out.ch[0] = (converted_pointed(p, 1) | converted_pointed(p, 2) << 8) & 0x7ff;
-    out.ch[1] = (converted_pointed(p, 2) >> 3 | converted_pointed(p, 3) << 5) & 0x7ff;
-    out.ch[2] = (converted_pointed(p, 3) >> 6 | converted_pointed(p, 4) << 2 | converted_pointed(p, 5) << 10) & 0x7ff;
-    out.ch[3] = (converted_pointed(p, 5) >> 1 | converted_pointed(p, 6) << 7) & 0x7ff;
-    out.ch[4] = (converted_pointed(p, 6) >> 4 | converted_pointed(p, 7) << 4) & 0x7ff;
-    out.ch[5] = (converted_pointed(p, 7) >> 7 | converted_pointed(p, 8) << 1 | converted_pointed(p, 9) << 9) & 0x7ff;
-    out.ch[6] = (converted_pointed(p, 9) >> 2 | converted_pointed(p, 10) << 6) & 0x7ff;
-    out.ch[7] = (converted_pointed(p, 10) >> 5 | converted_pointed(p, 11) << 3) & 0x7ff;
-    out.ch[8] = (converted_pointed(p, 12) | converted_pointed(p, 13) << 8) & 0x7ff;
-    out.ch[9] = (converted_pointed(p, 13) >> 3 | converted_pointed(p, 14) << 5) & 0x7ff;
-    out.ch[10] = (converted_pointed(p, 14) >> 6 | converted_pointed(p, 15) << 2 | converted_pointed(p, 16) << 10) & 0x7ff;
-    out.ch[11] = (converted_pointed(p, 16) >> 1 | converted_pointed(p, 17) << 7) & 0x7ff;
-    out.ch[12] = (converted_pointed(p, 17) >> 4 | converted_pointed(p, 18) << 4) & 0x7ff;
-    out.ch[13] = (converted_pointed(p, 18) >> 7 | converted_pointed(p, 19) << 1 | converted_pointed(p, 20) << 9) & 0x7ff;
-    out.ch[14] = (converted_pointed(p, 20) >> 2 | converted_pointed(p, 21) << 6) & 0x7ff;
-    out.ch[15] = (converted_pointed(p, 21) >> 5 | converted_pointed(p, 22) << 3) & 0x7ff;
-    out.lost = (converted_pointed(p, 23) & 0x04) != 0;
-    out.failsafe = (converted_pointed(p, 23) & 0x08) != 0;
-    out.valid = !out.lost && !out.failsafe;
-    return true;
-} }
-namespace fc { inline double centered(uint16_t v) {
-    return clamp((static_cast<double>(v) - 992.0) / 820.0, -1.0, 1.0);
-} }
-namespace fc { inline double throttle(uint16_t v) {
-    return clamp((static_cast<double>(v) - 172.0) / (1811.0 - 172.0), 0.0, 1.0);
-} }
-namespace fc { inline double shape(double x, double deadband, double expo) {
-    const double a = std::fabs(x);
-    if (a <= deadband) return 0.0;
-    const double t = (a - deadband) / (1.0 - deadband);
-    const double v = t * (1.0 - expo) + t * t * t * expo;
-    return kern::math::copysign(clamp(v, 0.0, 1.0), x);
-} }
-namespace fc { struct Command {
-    double roll{}, pitch{}, throttle{}, yaw{};
-    bool arm{};
-}; }
-namespace fc { inline bool finite(Command c) {
-    return std::isfinite(c.roll) && std::isfinite(c.pitch) &&
-           std::isfinite(c.throttle) && std::isfinite(c.yaw);
-} }
-namespace fc { inline Command sanitize(Command c) {
-    c.roll = clamp(c.roll, -1.0, 1.0);
-    c.pitch = clamp(c.pitch, -1.0, 1.0);
-    c.throttle = clamp(c.throttle, 0.0, 1.0);
-    c.yaw = clamp(c.yaw, -1.0, 1.0);
-    return c;
-} }
-namespace fc { constexpr double kManualMaxAttitudeDeg = 32.0; }
 namespace fc { constexpr double kInnerMaxAttitudeDeg = 40.0; }
-namespace fc { constexpr double kManualAttitudeCommandScale = kManualMaxAttitudeDeg / kInnerMaxAttitudeDeg; }
-namespace fc { inline Command command(const RC& r) {
-    return {shape(centered(r.ch[FC_SBUS_ROLL]), 0.035, 0.3) * kManualAttitudeCommandScale,
-            -shape(centered(r.ch[FC_SBUS_PITCH]), 0.035, 0.3) * kManualAttitudeCommandScale,
-            throttle(r.ch[FC_SBUS_THROTTLE]),
-            shape(centered(r.ch[FC_SBUS_YAW]), 0.045, 0.2),
-            r.ch[FC_SBUS_ARM] > 1300};
-} }
-namespace fc { struct Mix {
-    std::array<double, 4> motor{};
-}; }
-namespace fc { constexpr double kMixFlightCollective = 0.05; }
-namespace fc { inline Mix mix(double t, double roll, double pitch, double yaw) {
-    t = clamp(t, 0.0, 1.0);
-    std::array<double, 4> correction{{pitch - roll - 0.65 * yaw,
-                                      pitch + roll + 0.65 * yaw,
-                                      -pitch + roll - 0.65 * yaw,
-                                      -pitch - roll + 0.65 * yaw}};
-    double cmax = correction[0], cmin = correction[0];
-    for (double v : correction) { cmax = std::max(cmax, v); cmin = std::min(cmin, v); }
-    double scale_factor = 1.0;
-    if (t > kMixFlightCollective) {
-        const double range = cmax - cmin;
-        if (range > 1.0) scale_factor = 1.0 / range;
-        const double hi = cmax * scale_factor, lo = cmin * scale_factor;
-        if (t + hi > 1.0) t = 1.0 - hi;
-        if (t + lo < 0.0) t = -lo;
-    } else {
-        for (double v : correction) {
-            if (v > 0.0) scale_factor = std::min(scale_factor, (1.0 - t) / v);
-            else if (v < 0.0) scale_factor = std::min(scale_factor, t / -v);
-        }
-        scale_factor = clamp(scale_factor, 0.0, 1.0);
-    }
-    Mix out;
-    for (size_t i = 0; i < 4; converted::pre_inc(i)) converted::at(out.motor, i) = clamp(t + scale_factor * converted::at(correction, i), 0.0, 1.0);
-    return out;
-} }
-namespace fc { constexpr uint16_t pulse(double value, bool armed) {
-    return armed ? static_cast<uint16_t>(converted::fits<unsigned short>(kEscIdleUs + clamp(value, 0.0, 1.0) * (converted::minus(kEscMaxUs, kEscIdleUs)) + 0.5))
-                 : kEscMinUs;
-} }
 namespace fc { struct ArmState {
 public:
     struct Result {
         bool armed{}, armed_now{}, disarmed_now{};
     };
 
-    Result run(u64 us, bool control_valid, Command cmd, bool imu_ok, double roll, double pitch) {
-        Result result{armed_, false, false};
-        if (!control_valid) {
-            result.disarmed_now = armed_;
-            armed_ = false;
-            saw_low_ = false;
-            since_us_ = 0;
-            result.armed = false;
-            return result;
-        }
-        if (!cmd.arm) {
-            saw_low_ = true;
-            since_us_ = 0;
-            result.disarmed_now = armed_;
-            armed_ = false;
-            result.armed = false;
-            return result;
-        }
-        if (armed_) return result;
+    
 
-        const bool ok = saw_low_ && cmd.throttle <= 0.035 &&
-                        std::fabs(cmd.roll) < 0.12 && std::fabs(cmd.pitch) < 0.12 &&
-                        std::fabs(cmd.yaw) < 0.15 && std::fabs(roll) < 20.0 &&
-                        std::fabs(pitch) < 20.0 && imu_ok;
-        if (!ok) {
-            since_us_ = 0;
-            return result;
-        }
-        if (!since_us_) since_us_ = us;
-        if (us - since_us_ >= 1000000) {
-            armed_ = true;
-            result.armed = true;
-            result.armed_now = true;
-        }
-        return result;
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 private:
     bool armed_{};
@@ -2000,22 +1717,22 @@ namespace fc { struct Controller {
 public:
     Attitude attitude;
 
-    void reset() {
-        roll_pid_.reset();
-        pitch_pid_.reset();
-        yaw_pid_.reset();
-    }
+    
 
-    Mix run(Imu s, Command cmd, double dt, bool integrate) {
-        constexpr double kAngleToRate = 4.5;
-        const double roll_rate = clamp((cmd.roll * kInnerMaxAttitudeDeg - attitude.roll) * kAngleToRate, -240.0, 240.0);
-        const double pitch_rate = clamp((cmd.pitch * kInnerMaxAttitudeDeg - attitude.pitch) * kAngleToRate, -240.0, 240.0);
-        const double yaw_rate = cmd.yaw * 180.0;
-        return mix(cmd.throttle,
-                   roll_pid_.run(roll_rate, s.g.x, dt, integrate),
-                   pitch_pid_.run(pitch_rate, s.g.y, dt, integrate),
-                   yaw_pid_.run(yaw_rate, s.g.z, dt, integrate));
-    }
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
 
 private:
     PID roll_pid_{Gains{0.0030, 0.0007, 0.000010, 0.18, 0.38, 55.0}};
@@ -2036,22 +1753,6 @@ namespace fc { enum FaultCode : uint8_t {
     kFaultTiming = 3,
     kFaultRate = 4,
     kFaultTilt = 5,
-}; }
-namespace fc { struct RuntimeInput {
-    Imu raw{};
-    RC rc{};
-    u64 now_us{};
-    uint32_t dt_us{kNominalDtUs};
-    uint32_t missed_samples{};
-    bool imu_valid{true};
-    bool rc_fresh{};
-}; }
-namespace fc { struct RuntimeOutput {
-    std::array<uint16_t, 4> motor_us{kEscMinUs, kEscMinUs, kEscMinUs, kEscMinUs};
-    std::array<int16_t, 3> attitude_cdeg{};
-    uint16_t state{};
-    FaultCode fault{kFaultNone};
-    bool armed{};
 }; }
 namespace fc { struct Runtime {
 public:
@@ -2075,86 +1776,86 @@ public:
     // Receiver/SBUS is only an input adapter. Once decoded, the flight runtime
     // operates on a physical normalized Command. Higher-level controllers use
     // step_command() directly instead of fabricating receiver frames.
-    RuntimeOutput step(const RuntimeInput& input) {
-        RC rc = input.rc;
-        rc.valid = rc.valid && input.rc_fresh;
-        return step_command(input, command(rc), rc.valid);
-    }
+    
 
-    RuntimeOutput step_command(const RuntimeInput& input, Command cmd, bool command_valid = true) {
-        RuntimeOutput out;
-        if (fault_ != kFaultNone) return finalize(out, false, false);
 
-        if (!input.imu_valid || !finite(input.raw.a) || !finite(input.raw.g)) {
-            set_fault(kFaultImu);
-            return finalize(out, command_valid, false);
-        }
-        if (command_valid && !finite(cmd)) {
-            set_fault(kFaultProtocol);
-            return finalize(out, false, true);
-        }
-        cmd = command_valid ? sanitize(cmd) : Command{};
 
-        const double dt = (input.dt_us > 0 && input.dt_us < 100000)
-                             ? static_cast<double>(input.dt_us) * 1.0e-6
-                             : 0.001;
 
-        if (!calibrated_) {
-            calibrate(input.raw);
-            (void)arm_.run(input.now_us, command_valid, cmd, false, 0.0, 0.0);
-            return finalize(out, command_valid, true);
-        }
-
-        if (armed_) {
-            if (input.dt_us < kMinDtUs || input.dt_us > kMaxDtUs || input.missed_samples > 2) {
-                ++bad_timing_;
-                if (bad_timing_ >= 5) set_fault(kFaultTiming);
-            } else {
-                bad_timing_ = 0;
-            }
-        } else {
-            bad_timing_ = 0;
-        }
-        if (fault_ != kFaultNone) return finalize(out, command_valid, true);
-
-        Imu corrected = input.raw;
-        corrected.g.x -= gyro_bias_.x;
-        corrected.g.y -= gyro_bias_.y;
-        corrected.g.z -= gyro_bias_.z;
-        const Imu imu = filters_.run(corrected, dt);
-        if (!finite(imu.a) || !finite(imu.g) ||
-            std::fabs(imu.g.x) > 1750.0 || std::fabs(imu.g.y) > 1750.0 ||
-            std::fabs(imu.g.z) > 1750.0) {
-            set_fault(kFaultRate);
-            return finalize(out, command_valid, true);
-        }
-
-        controller_.attitude.run(imu, dt);
-        const bool accel_ok = mag(imu.a) > 0.7 && mag(imu.a) < 1.3;
-        const auto arm_result = arm_.run(input.now_us, command_valid, cmd, accel_ok,
-                                         controller_.attitude.roll, controller_.attitude.pitch);
-        armed_ = arm_result.armed;
-
-        if (!armed_) controller_.reset();
-        if (armed_) {
-            // Large attitude is recoverable flight state. Angle alone must never
-            // hard-cut every motor; retain attitude authority so the aircraft can
-            // right itself. Explicit disarm/KILL, RC loss and genuine IMU/rate/
-            // timing/protocol faults retain their existing hard-stop behavior.
-            Mix mixed{};
-            if (cmd.throttle <= 0.02) {
-                controller_.reset();
-            } else {
-                mixed = controller_.run(imu, cmd, dt, cmd.throttle > 0.05);
-            }
-            for (size_t i = 0; i < 4; converted::pre_inc(i)) converted::at(out.motor_us, i) = pulse(converted::at(mixed.motor, i), true);
-        }
-
-        return finalize(out, command_valid, true);
-    }
 
     
-    bool armed() const { return armed_; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+    
     
 
     
@@ -2170,69 +1871,69 @@ public:
 
 
 private:
-    void calibrate(const Imu& sample) {
-        gyro_sum_.x += sample.g.x;
-        gyro_sum_.y += sample.g.y;
-        gyro_sum_.z += sample.g.z;
-        gyro_sq_sum_.x += sample.g.x * sample.g.x;
-        gyro_sq_sum_.y += sample.g.y * sample.g.y;
-        gyro_sq_sum_.z += sample.g.z * sample.g.z;
-        accel_sum_.x += sample.a.x;
-        accel_sum_.y += sample.a.y;
-        accel_sum_.z += sample.a.z;
-        ++calibration_count_;
-        if (calibration_count_ < kCalibrationSamples) return;
+    
 
-        const double k = 1.0 / static_cast<double>(calibration_count_);
-        gyro_bias_ = {gyro_sum_.x * k, gyro_sum_.y * k, gyro_sum_.z * k};
-        const V3 accel_mean{accel_sum_.x * k, accel_sum_.y * k, accel_sum_.z * k};
-        const V3 gyro_sd{
-            kern::math::sqrt(std::max(0.0, gyro_sq_sum_.x * k - gyro_bias_.x * gyro_bias_.x)),
-            kern::math::sqrt(std::max(0.0, gyro_sq_sum_.y * k - gyro_bias_.y * gyro_bias_.y)),
-            kern::math::sqrt(std::max(0.0, gyro_sq_sum_.z * k - gyro_bias_.z * gyro_bias_.z))};
 
-        const bool still = std::fabs(gyro_bias_.x) < 15.0 &&
-                           std::fabs(gyro_bias_.y) < 15.0 &&
-                           std::fabs(gyro_bias_.z) < 15.0 &&
-                           gyro_sd.x < 0.8 && gyro_sd.y < 0.8 && gyro_sd.z < 0.8 &&
-                           mag(accel_mean) > 0.85 && mag(accel_mean) < 1.15;
-        if (!still) {
-            set_fault(kFaultImu);
-            return;
-        }
-        filters_ = Filters{};
-        controller_ = Controller{};
-        controller_.attitude.reset(accel_mean);
-        calibrated_ = true;
-    }
 
-    void set_fault(FaultCode fault) {
-        if (fault_ == kFaultNone) fault_ = fault;
-        armed_ = false;
-    }
 
-    static int16_t to_cdeg(double degrees) {
-        const double value = clamp(degrees * 100.0, -32767.0, 32767.0);
-        return static_cast<int16_t>(std::lround(value));
-    }
 
-    RuntimeOutput finalize(RuntimeOutput out, bool control_ok, bool imu_ok) const {
-        out.armed = armed_ && fault_ == kFaultNone;
-        out.fault = fault_;
-        if (out.armed) out.state |= kStateArmed;
-        if (!calibrated_) out.state |= kStateCalibrating;
-        if (fault_ != kFaultNone) {
-            out.state |= kStateFault;
-            out.state |= static_cast<uint16_t>(fault_) << 8;
-            out.motor_us = {kEscMinUs, kEscMinUs, kEscMinUs, kEscMinUs};
-        }
-        if (control_ok) out.state |= kStateRcValid;
-        if (imu_ok) out.state |= kStateImuValid;
-        out.attitude_cdeg = {to_cdeg(controller_.attitude.roll),
-                             to_cdeg(controller_.attitude.pitch),
-                             to_cdeg(controller_.attitude.yaw)};
-        return out;
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+    
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     Filters filters_{};
     Controller controller_{};
@@ -2247,17 +1948,10 @@ private:
     FaultCode fault_{kFaultNone};
     bool armed_{};
 }; }
-namespace fc { constexpr int kStateClearanceChannel = 5; }
-namespace fc { constexpr int kStateModeChannel = 6; }
-namespace fc { constexpr int kStateBodyPitchChannel = 7; }
 namespace fc { constexpr uint16_t kStateNavigationValid = 1u << 5; }
 namespace fc { constexpr uint16_t kStateGameMode = 1u << 6; }
 namespace fc { constexpr uint16_t kStateNavigationDegraded = 1u << 7; }
 namespace fc { constexpr double kStateMaxHorizontalSpeedMps = 25.0; }
-namespace fc { constexpr double kStateMaxYawRateDps = 140.0; }
-namespace fc { constexpr double kStateMaxBodyPitchDeg = 25.0; }
-namespace fc { constexpr double kStateMinClearanceM = 0.50; }
-namespace fc { constexpr double kStateMaxClearanceM = 120.00; }
 namespace fc { struct NavigationState {
     V3 velocity_world_mps{};
     double agl_m{};
@@ -2267,64 +1961,6 @@ namespace fc { struct NavigationState {
     double heading_deg{};
     bool heading_valid{};
 }; }
-namespace fc { inline bool navigation_velocity_valid(const NavigationState& n) {
-    return (n.velocity_valid || n.valid) && finite(n.velocity_world_mps);
-} }
-namespace fc { inline bool navigation_agl_valid(const NavigationState& n) {
-    return (n.agl_valid || n.valid) && std::isfinite(n.agl_m) && n.agl_m >= 0.0 && n.agl_m < 1000.0;
-} }
-namespace fc { inline bool navigation_heading_valid(const NavigationState& n) {
-    return n.heading_valid && std::isfinite(n.heading_deg) && n.heading_deg >= -180.0 && n.heading_deg <= 180.0;
-} }
-namespace fc { inline double wrap_degrees(double value) {
-    while (value > 180.0) value -= 360.0;
-    while (value < -180.0) value += 360.0;
-    return value;
-} }
-namespace fc { struct StateIntent {
-    double right_mps{};
-    double forward_mps{};
-    double yaw_rate_dps{};
-    double body_pitch_deg{};
-    double clearance_m{2.0};
-    bool arm{};
-    bool game_mode{};
-}; }
-namespace fc { inline StateIntent state_intent(const RC& rc) {
-    // One radial 2-D velocity vector: stick direction is preserved and full stick
-    // has the same speed magnitude forward/backward/left/right/diagonal.
-    double right = centered(rc.ch[FC_SBUS_ROLL]);
-    double forward = centered(rc.ch[FC_SBUS_PITCH]);
-    double magnitude = kern::math::sqrt(forward * forward + right * right);
-    if (magnitude > 1.0) {
-        forward /= magnitude;
-        right /= magnitude;
-        magnitude = 1.0;
-    }
-    if (magnitude > 1.0e-6) {
-        const double shaped_magnitude = shape(magnitude, 0.035, 0.25);
-        const double radial_scale = shaped_magnitude / magnitude;
-        forward *= radial_scale;
-        right *= radial_scale;
-    } else {
-        forward = 0.0;
-        right = 0.0;
-    }
-
-    const double clearance01 = throttle(rc.ch[kStateClearanceChannel]);
-    // Positive input is physical nose-up pitch in the same Euler convention
-    // reported by the FC. It remains separate from translation velocity intent.
-    const double body_pitch_deg = shape(centered(rc.ch[kStateBodyPitchChannel]), 0.045, 0.20) * kStateMaxBodyPitchDeg;
-    return {
-        right * kStateMaxHorizontalSpeedMps,
-        forward * kStateMaxHorizontalSpeedMps,
-        shape(centered(rc.ch[FC_SBUS_YAW]), 0.045, 0.20) * kStateMaxYawRateDps,
-        body_pitch_deg,
-        kStateMinClearanceM + clearance01 * (kStateMaxClearanceM - kStateMinClearanceM),
-        rc.ch[FC_SBUS_ARM] > 1300,
-        rc.ch[kStateModeChannel] > 1300,
-    };
-} }
 namespace fc { struct StateControllerDebug {
     double desired_forward_mps{};
     double measured_forward_mps{};
@@ -2356,257 +1992,257 @@ public:
         debug_ = {};
     }
 
-    void leave_mode() {
-        active_ = false;
-        heading_source_valid_ = false;
-        manual_pitch_active_ = false;
-        reset_horizontal_state();
-        reset_command_targets();
-        debug_ = {};
-    }
+    
 
-    Command run(const RC& receiver, const NavigationState& nav, double yaw_deg,
-                bool inner_armed, double dt, bool agl_valid = true) {
-        const StateIntent intent = state_intent(receiver);
-        const bool absolute_heading_valid = navigation_heading_valid(nav);
-        const double measured_yaw_deg = wrap_degrees(absolute_heading_valid ? nav.heading_deg : yaw_deg);
-        // World-frame navigation velocity cannot be projected into body forward/right
-        // indefinitely from a 6-DoF gyro yaw: yaw has no absolute observable and drifts.
-        // NAV heading closes that missing degree of freedom. On source transitions we
-        // rebase the target to the current physical heading and clear frame-dependent
-        // horizontal estimator/integral state, avoiding a discontinuous yaw command.
-        if (!active_ || heading_source_valid_ != absolute_heading_valid) {
-            target_yaw_deg_ = measured_yaw_deg;
-            heading_source_valid_ = absolute_heading_valid;
-            manual_pitch_active_ = false;
-            reset_horizontal_state();
-            reset_command_targets();
-            active_ = true;
-        }
 
-        dt = clamp(dt, 0.0002, 0.02);
-        target_yaw_deg_ = wrap_degrees(target_yaw_deg_ + intent.yaw_rate_dps * dt);
 
-        const double yaw_rad = measured_yaw_deg * kPi / 180.0;
-        const double c = kern::math::cos(yaw_rad);
-        const double s = kern::math::sin(yaw_rad);
-        const double measured_forward = -c * nav.velocity_world_mps.x - s * nav.velocity_world_mps.y;
-        const double measured_right = -s * nav.velocity_world_mps.x + c * nav.velocity_world_mps.y;
 
-        if (!inner_armed) {
-            agl_estimate_valid_ = false;
-            reset_horizontal_state();
-            reset_command_targets();
-            manual_pitch_active_ = false;
-            target_yaw_deg_ = measured_yaw_deg;
-            heading_source_valid_ = absolute_heading_valid;
-            debug_ = {intent.forward_mps, measured_forward,
-                      intent.right_mps, measured_right,
-                      target_yaw_deg_, measured_yaw_deg,
-                      intent.clearance_m, nav.agl_m,
-                      0.0, 0.0, 0.0, 0.0, 0.0,
-                      0.0, 0.0, 0.0};
-            return Command{0.0, 0.0, 0.0, 0.0, intent.arm};
-        }
 
-        const bool manual_pitch_active = std::fabs(intent.body_pitch_deg) >= kManualPitchOverrideThresholdDeg;
-        const bool manual_pitch_released = manual_pitch_active_ && !manual_pitch_active;
-        manual_pitch_active_ = manual_pitch_active;
 
-        // GAME exposes two independent pilot intents on the forward axis: a
-        // velocity target (left stick) and physical body pitch (right stick).
-        // They must never fight each other. While body pitch is held, the pilot
-        // owns longitudinal attitude and the automatic forward velocity loop is
-        // transparent. On release, rebase the velocity target at the aircraft's
-        // actual speed and clear acceleration history so control hands back without
-        // an artificial reverse kick.
-        if (manual_pitch_released) {
-            commanded_forward_mps_ = measured_forward;
-            horizontal_target_initialized_ = true;
-            acceleration_estimator_valid_ = false;
-            acceleration_sample_dt_s_ = 0.0;
-            previous_velocity_world_mps_ = nav.velocity_world_mps;
-            measured_acceleration_world_mps2_ = {};
-            horizontal_integral_forward_mps2_ = 0.0;
-        }
 
-        update_command_targets(intent, dt);
-        if (manual_pitch_active) {
-            commanded_forward_mps_ = measured_forward;
-            horizontal_integral_forward_mps2_ = 0.0;
-        }
-        update_acceleration_estimator(nav.velocity_world_mps, dt);
-        const double measured_forward_accel = -c * measured_acceleration_world_mps2_.x - s * measured_acceleration_world_mps2_.y;
-        const double measured_right_accel = -s * measured_acceleration_world_mps2_.x + c * measured_acceleration_world_mps2_.y;
 
-        // Rangefinder dropouts (beyond its slant range, steep bank, no return over a
-        // gap) must not freeze the pilot's height command. Real FCs bridge them with
-        // the inertial/baro vertical channel: the last measured AGL is propagated with
-        // the navigation vertical velocity until the rangefinder returns. Without this
-        // the altitude law commanded vz = 0 and climb/sink input simply hung.
-        bool agl_usable = agl_valid;
-        double agl_m = nav.agl_m;
-        if (agl_valid) {
-            agl_estimate_m_ = nav.agl_m;
-            agl_estimate_valid_ = true;
-        } else if (agl_estimate_valid_ && std::isfinite(nav.velocity_world_mps.z)) {
-            agl_estimate_m_ += nav.velocity_world_mps.z * dt;
-            agl_m = agl_estimate_m_;
-            agl_usable = true;
-        }
-        const double agl_error = agl_usable ? intent.clearance_m - agl_m : 0.0;
-        // Climb and descent need asymmetric envelopes. High upward authority is
-        // useful for takeoff/recovery; descent is a real "sink with power" up to
-        // 9 m/s. Braking a descent uses the full upward reserve (50 m/s^2) and the
-        // AGL slope (2/s) starts braking 4.5 m above the target at full sink, so
-        // the momentum is always removed before a low AGL target.
-        // Kinematic altitude law (square-root controller): linear close to the
-        // target, sqrt(2·a·e) further out, so the commanded vertical speed can
-        // always be braked to zero exactly at the target with the real thrust
-        // margin (climb braking = thrust cut, descent braking = thrust surplus).
-        // No overshoot after a full-power climb, no float after a hard sink.
-        const double target_vz = agl_usable
-            ? clamp(kinematic_vertical_speed(agl_error), -kMaxVerticalDescentSpeedMps, kMaxVerticalSpeedMps)
-            : 0.0;
-        const double vz_error = target_vz - nav.velocity_world_mps.z;
-        // The altitude/vertical-speed cascade is critically damped on descent.
-        // kAglToVerticalSpeed=2 and kVerticalDescentVelocityGain=8 give zeta=1
-        // for the unsaturated second-order descent loop (s^2 + 8s + 16).
-        // Climb keeps the previous gain, so takeoff authority and feel are unchanged.
-        const double vertical_velocity_gain = target_vz < 0.0
-            ? kVerticalDescentVelocityGain
-            : kVerticalVelocityGain;
-        // Downward acceleration is separately bounded so the aircraft never
-        // trades away the motor/attitude reserve merely to chase a falling AGL
-        // target. Positive braking/recovery acceleration keeps the full ceiling.
-        const double requested_vertical_accel = clamp(vertical_velocity_gain * vz_error,
-                                                     -kMaxVerticalDescentAccelerationMps2,
-                                                     kMaxVerticalAccelerationMps2);
-        const double vertical_accel = limit_vertical_accel_jerk(requested_vertical_accel, dt);
-        const double specific_up = clamp(kGravityMps2 + vertical_accel,
-                                        kMinSpecificUpMps2, kMaxSpecificUpMps2);
+    
 
-        const double forward_error = commanded_forward_mps_ - measured_forward;
-        const double right_error = commanded_right_mps_ - measured_right;
-        const double pilot_horizontal_speed = kern::math::sqrt(intent.forward_mps * intent.forward_mps +
-                                                       intent.right_mps * intent.right_mps);
-        // Neutral is an immediate zero-velocity target. Clear all cruise state
-        // before the P/D law computes braking so the vehicle stops where the pilot
-        // released the stick instead of floating through a synthetic release ramp.
-        if (pilot_horizontal_speed <= kHorizontalIntegralNeutralTargetMps) {
-            horizontal_integral_forward_mps2_ = 0.0;
-            horizontal_integral_right_mps2_ = 0.0;
-        }
 
-        // The baseline feedback law remains equivalent to these direct intent expressions:
-        // kHorizontalVelocityGain * (intent.forward_mps - measured_forward)
-        // kHorizontalVelocityGain * (intent.right_mps - measured_right)
-        const double neutral_damping_scale = pilot_horizontal_speed <= kHorizontalIntegralNeutralTargetMps
-                                                ? kHorizontalNeutralDampingScale
-                                                : 1.0;
-        const double forward_feedback_unsat = kHorizontalVelocityGain * (commanded_forward_mps_ - measured_forward) + horizontal_integral_forward_mps2_ -
-                                             kHorizontalAccelerationDamping * neutral_damping_scale * measured_forward_accel;
-        const double right_unsat = kHorizontalVelocityGain * (commanded_right_mps_ - measured_right) + horizontal_integral_right_mps2_ -
-                                  kHorizontalAccelerationDamping * neutral_damping_scale * measured_right_accel;
 
-        // A real body-pitch command is direct longitudinal attitude authority.
-        // Automatic forward acceleration/damping is therefore zero on that axis;
-        // otherwise the velocity loop would physically pitch against the pilot.
-        double forward_accel = manual_pitch_active ? 0.0 : forward_feedback_unsat;
-        double right_accel = right_unsat;
-        // Use the full horizontal controller authority up to the independently
-        // bounded 25-degree automatic translation envelope. This removes the
-        // redundant 4 m/s² softness while retaining the physical tilt safety cap.
-        const double allowed_horizontal_accel = std::min(kMaxHorizontalAccelerationMps2,
-                                                        specific_up * kMaxAutoTranslationTiltTangent);
-        const double horizontal_accel = kern::math::sqrt(forward_accel * forward_accel + right_accel * right_accel);
-        if (horizontal_accel > allowed_horizontal_accel && horizontal_accel > 1.0e-6) {
-            const double vector_scale = allowed_horizontal_accel / horizontal_accel;
-            forward_accel *= vector_scale;
-            right_accel *= vector_scale;
-        }
 
-        // The horizontal I path is intentionally dormant in the stable envelope;
-        // no stored propulsion may build up and kick the vehicle later.
-        if (pilot_horizontal_speed > kHorizontalIntegralNeutralTargetMps) {
-            if (!manual_pitch_active) {
-                horizontal_integral_forward_mps2_ +=
-                    (kHorizontalIntegralGain * forward_error +
-                     kHorizontalAntiWindupGain * (forward_accel - forward_feedback_unsat)) * dt;
-            }
-            horizontal_integral_right_mps2_ +=
-                (kHorizontalIntegralGain * right_error +
-                 kHorizontalAntiWindupGain * (right_accel - right_unsat)) * dt;
-            clamp_horizontal_integral();
-        }
 
-        const double auto_pitch_target_deg = -kern::math::atan2(forward_accel, specific_up) * 180.0 / kPi;
-        const double pitch_target_deg = clamp(auto_pitch_target_deg + intent.body_pitch_deg,
-                                             -kMaxTiltDeg, kMaxTiltDeg);
-        const double roll_target_deg = -kern::math::atan2(
-            right_accel, kern::math::sqrt(specific_up * specific_up + forward_accel * forward_accel)) *
-            180.0 / kPi;
-        const double roll_command = clamp(roll_target_deg / kInnerAttitudeRangeDeg,
-                                         -kMaxAttitudeCommand, kMaxAttitudeCommand);
-        const double pitch_command = clamp(pitch_target_deg / kInnerAttitudeRangeDeg,
-                                          -kMaxAttitudeCommand, kMaxAttitudeCommand);
 
-        const double yaw_error = wrap_degrees(target_yaw_deg_ - measured_yaw_deg);
-        const double desired_yaw_rate = clamp(intent.yaw_rate_dps + kHeadingKp * yaw_error,
-                                             -180.0, 180.0);
-        const double yaw_command = desired_yaw_rate / 180.0;
-        // Learn the hover throttle only while (nearly) hovering, as real FCs do:
-        // adapting through a commanded climb/sink transient winds the trim up/down
-        // (a long full sink drove it to the floor and the aircraft could not brake).
-        const bool hovering = std::fabs(target_vz) < 1.5;
-        const bool cannot_lift = target_vz > 0.0 && vz_error > 0.0 && nav.velocity_world_mps.z < 0.5;
-        if (agl_usable && (hovering || cannot_lift)) {
-            hover_trim_ = clamp(hover_trim_ + kHoverAdapt * vz_error * dt,
-                                kMinHoverTrim, kMaxHoverTrim);
-        }
-        const double roll_rad = roll_target_deg * kPi / 180.0;
-        const double pitch_rad = pitch_target_deg * kPi / 180.0;
-        const double vertical_thrust_fraction = std::max(0.35, kern::math::cos(roll_rad) * kern::math::cos(pitch_rad));
-        const double required_specific_force = specific_up / vertical_thrust_fraction;
-        const double thrust_ratio = required_specific_force / kGravityMps2;
-        const double hover_motor_command = kEscCommandOffset + kEscCommandScale * hover_trim_;
-        const double required_motor_command = hover_motor_command * kern::math::sqrt(thrust_ratio);
-        const double throttle_command = clamp(
-            (required_motor_command - kEscCommandOffset) / kEscCommandScale,
-            kMinFlightThrottle, kMaxFlightThrottle);
 
-        debug_ = {commanded_forward_mps_, measured_forward,
-                  commanded_right_mps_, measured_right,
-                  target_yaw_deg_, measured_yaw_deg,
-                  intent.clearance_m, agl_m,
-                  target_vz, throttle_command,
-                  roll_command, pitch_command, yaw_command,
-                  forward_accel, right_accel, vertical_accel};
-        return sanitize(Command{roll_command, pitch_command, throttle_command, yaw_command, intent.arm});
-    }
 
-    Command degraded_attitude_command(const RC& receiver) const {
-        const StateIntent intent = state_intent(receiver);
-        const double right_unit = clamp(intent.right_mps / kStateMaxHorizontalSpeedMps, -1.0, 1.0);
-        const double forward_unit = clamp(intent.forward_mps / kStateMaxHorizontalSpeedMps, -1.0, 1.0);
-        const double roll_target_deg = -right_unit * kDegradedMaxTiltDeg;
-        const double pitch_target_deg = clamp(-forward_unit * kDegradedMaxTiltDeg +
-                                             intent.body_pitch_deg * kDegradedBodyPitchScale,
-                                             -kDegradedMaxTiltDeg, kDegradedMaxTiltDeg);
-        const double roll_command = clamp(roll_target_deg / kInnerAttitudeRangeDeg,
-                                         -kMaxAttitudeCommand, kMaxAttitudeCommand);
-        const double pitch_command = clamp(pitch_target_deg / kInnerAttitudeRangeDeg,
-                                          -kMaxAttitudeCommand, kMaxAttitudeCommand);
-        const double vertical_fraction = std::max(0.50,
-            kern::math::cos(roll_target_deg * kPi / 180.0) * kern::math::cos(pitch_target_deg * kPi / 180.0));
-        const double hover_motor_command = kEscCommandOffset + kEscCommandScale * hover_trim_;
-        const double required_motor_command = hover_motor_command / kern::math::sqrt(vertical_fraction);
-        const double throttle_command = clamp(
-            (required_motor_command - kEscCommandOffset) / kEscCommandScale,
-            kMinFlightThrottle, kMaxFlightThrottle);
-        return sanitize(Command{roll_command, pitch_command, throttle_command,
-                                intent.yaw_rate_dps / 180.0, intent.arm});
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     
     
@@ -2672,14 +2308,14 @@ private:
     // min(linear, braking curve): the braking curve v = -a·tau + sqrt((a·tau)^2 + 2·a·e)
     // already budgets the vertical-velocity loop's own lag tau = 1/gain, so a
     // full-rate sink is stopped at the target, not below it.
-    static double kinematic_vertical_speed(double agl_error) {
-        const bool up = agl_error >= 0.0;
-        const double a = up ? kClimbBrakeAccelerationMps2 : kDescentBrakeAccelerationMps2;
-        const double tau = 1.0 / (up ? kVerticalVelocityGain : kVerticalDescentVelocityGain);
-        const double e = std::fabs(agl_error), at = a * tau;
-        const double v = std::min(kAglToVerticalSpeed * e, -at + kern::math::sqrt(at * at + 2.0 * a * e));
-        return up ? v : -v;
-    }
+    
+
+
+
+
+
+
+
 
     void reset_horizontal_state() {
         acceleration_estimator_valid_ = false;
@@ -2698,65 +2334,65 @@ private:
         vertical_accel_state_mps2_ = 0.0;
     }
 
-    void update_command_targets(const StateIntent& intent, double) {
-        commanded_forward_mps_ = intent.forward_mps;
-        commanded_right_mps_ = intent.right_mps;
-        horizontal_target_initialized_ = true;
-    }
+    
 
-    double limit_vertical_accel_jerk(double requested_accel, double dt) {
-        if (!vertical_accel_initialized_) {
-            vertical_accel_state_mps2_ = requested_accel;
-            vertical_accel_initialized_ = true;
-            return vertical_accel_state_mps2_;
-        }
-        const double max_delta = kVerticalJerkLimitMps3 * dt;
-        vertical_accel_state_mps2_ += clamp(requested_accel - vertical_accel_state_mps2_,
-                                            -max_delta, max_delta);
-        return vertical_accel_state_mps2_;
-    }
 
-    void clamp_horizontal_integral() {
-        const double magnitude = kern::math::sqrt(horizontal_integral_forward_mps2_ * horizontal_integral_forward_mps2_ +
-                                          horizontal_integral_right_mps2_ * horizontal_integral_right_mps2_);
-        if (magnitude > kHorizontalIntegralLimitMps2 && magnitude > 1.0e-6) {
-            const double scale = kHorizontalIntegralLimitMps2 / magnitude;
-            horizontal_integral_forward_mps2_ *= scale;
-            horizontal_integral_right_mps2_ *= scale;
-        }
-    }
 
-    void update_acceleration_estimator(V3 velocity_world_mps, double dt) {
-        if (!acceleration_estimator_valid_) {
-            previous_velocity_world_mps_ = velocity_world_mps;
-            acceleration_estimator_valid_ = true;
-            acceleration_sample_dt_s_ = 0.0;
-            return;
-        }
 
-        acceleration_sample_dt_s_ = std::min(acceleration_sample_dt_s_ + dt, 0.05);
-        const double dx = velocity_world_mps.x - previous_velocity_world_mps_.x;
-        const double dy = velocity_world_mps.y - previous_velocity_world_mps_.y;
-        const double dz = velocity_world_mps.z - previous_velocity_world_mps_.z;
-        if (dx * dx + dy * dy + dz * dz < 1.0e-10 || acceleration_sample_dt_s_ < 0.002) return;
 
-        const double sample_dt = acceleration_sample_dt_s_;
-        const double inv_dt = 1.0 / sample_dt;
-        const V3 sample{dx * inv_dt, dy * inv_dt, dz * inv_dt};
-        previous_velocity_world_mps_ = velocity_world_mps;
-        acceleration_sample_dt_s_ = 0.0;
+    
 
-        const double horizontal_sample = kern::math::sqrt(sample.x * sample.x + sample.y * sample.y);
-        if (!finite(sample) || horizontal_sample > kMaxNavigationAccelSampleMps2) {
-            measured_acceleration_world_mps2_ = {};
-            return;
-        }
 
-        const double alpha = clamp(sample_dt / (kMeasuredAccelerationFilterTauS + sample_dt), 0.0, 1.0);
-        measured_acceleration_world_mps2_.x += alpha * (sample.x - measured_acceleration_world_mps2_.x);
-        measured_acceleration_world_mps2_.y += alpha * (sample.y - measured_acceleration_world_mps2_.y);
-        measured_acceleration_world_mps2_.z += alpha * (sample.z - measured_acceleration_world_mps2_.z);
-    }
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     bool active_{};
     bool heading_source_valid_{};
@@ -2776,10 +2412,6 @@ private:
     double hover_trim_{kInitialHoverThrottle};
     StateControllerDebug debug_{};
 }; }
-namespace fc { struct StateRuntimeInput {
-    RuntimeInput flight{};
-    NavigationState navigation{};
-}; }
 namespace fc { struct StateRuntime {
 public:
     StateRuntime() { reset(); }
@@ -2791,59 +2423,59 @@ public:
         game_active_ = false;
     }
 
-    RuntimeOutput step(StateRuntimeInput input) {
-        const StateIntent intent = state_intent(input.flight.rc);
-        if (!intent.game_mode) {
-            if (game_active_) state_controller_.leave_mode();
-            game_active_ = false;
-            RuntimeOutput out = runtime_.step(input.flight);
-            update_attitude(out);
-            return out;
-        }
+    
 
-        game_active_ = true;
-        const bool receiver_valid = input.flight.rc.valid && input.flight.rc_fresh;
-        if (!receiver_valid) {
-            state_controller_.leave_mode();
-            RuntimeOutput out = runtime_.step_command(input.flight, Command{}, false);
-            out.state |= kStateGameMode;
-            update_attitude(out);
-            return out;
-        }
 
-        const bool velocity_valid = navigation_velocity_valid(input.navigation);
-        const bool agl_valid = navigation_agl_valid(input.navigation);
-        const bool heading_valid = navigation_heading_valid(input.navigation);
-        const bool horizontal_navigation = velocity_valid && heading_valid;
-        const bool full_navigation = horizontal_navigation && agl_valid;
 
-        if (!runtime_.armed() && !full_navigation) {
-            state_controller_.leave_mode();
-            RuntimeOutput out = runtime_.step_command(input.flight, Command{}, false);
-            out.state |= kStateGameMode | kStateNavigationDegraded;
-            update_attitude(out);
-            return out;
-        }
 
-        const double dt = (input.flight.dt_us > 0 && input.flight.dt_us < 100000)
-                             ? static_cast<double>(input.flight.dt_us) * 1.0e-6
-                             : 0.001;
-        Command physical_command{};
-        if (horizontal_navigation) {
-            physical_command = state_controller_.run(
-                input.flight.rc, input.navigation, last_yaw_deg_, runtime_.armed(), dt, agl_valid);
-        } else {
-            state_controller_.leave_mode();
-            physical_command = state_controller_.degraded_attitude_command(input.flight.rc);
-        }
 
-        RuntimeOutput out = runtime_.step_command(input.flight, physical_command, true);
-        out.state |= kStateGameMode;
-        if (full_navigation) out.state |= kStateNavigationValid;
-        else out.state |= kStateNavigationDegraded;
-        update_attitude(out);
-        return out;
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     
     
@@ -2851,149 +2483,16 @@ public:
     
 
 private:
-    void update_attitude(const RuntimeOutput& out) {
-        last_yaw_deg_ = static_cast<double>(out.attitude_cdeg[2]) * 0.01;
-    }
+    
+
+
 
     Runtime runtime_{};
     StateController state_controller_{};
     double last_yaw_deg_{};
     bool game_active_{};
 }; }
-namespace hwcontract { constexpr uint32_t kNavigationMagic = 0x3156414eu; }
-namespace hwcontract { constexpr uint16_t kNavigationVersion = 1; }
-namespace hwcontract { constexpr uint16_t kNavigationVelocityValid = 1u << 0; }
-namespace hwcontract { constexpr uint16_t kNavigationAglValid = 1u << 1; }
-namespace hwcontract { constexpr uint16_t kNavigationHeadingValid = 1u << 2; }
-namespace hwcontract { constexpr uint16_t kNavigationHeadingShift = 3; }
-namespace hwcontract { constexpr uint16_t kNavigationHeadingMask = 0x7ff8u; }
-namespace hwcontract { constexpr uint16_t kNavigationSplitValidity = 1u << 15; }
-namespace hwcontract { constexpr uint16_t kNavigationValid = kNavigationVelocityValid; }
 namespace hwcontract { constexpr uint32_t kNavigationTimeoutUs = 60000; }
-namespace hwcontract { struct NavigationWireFrame {
-    uint32_t magic{kNavigationMagic};
-    uint16_t version{kNavigationVersion};
-    uint16_t sequence{};
-    int16_t vx_cms{};
-    int16_t vy_cms{};
-    int16_t vz_cms{};
-    uint16_t agl_mm{};
-    uint16_t flags{};
-    uint16_t crc16{};
-}; }
-namespace hwcontract { inline uint16_t crc16_ccitt(const void* data, size_t length) {
-    const auto* bytes = static_cast<const uint8_t*>(data);
-    uint16_t crc = 0xffffu;
-    for (size_t i = 0; i < length; converted::pre_inc(i)) {
-        crc ^= static_cast<uint16_t>(converted_pointed(bytes, i)) << 8;
-        for (unsigned bit = 0; bit < 8; ++bit)
-            crc = static_cast<uint16_t>((crc << 1) ^ ((crc & 0x8000u) ? 0x1021u : 0u));
-    }
-    return crc;
-} }
-namespace hwcontract { inline int16_t read_be_i16(const uint8_t* p) {
-    return static_cast<int16_t>((static_cast<uint16_t>(converted_pointed(p, 0)) << 8) | converted_pointed(p, 1));
-} }
-namespace hwcontract { inline fc::V3 orient_target(fc::V3 value) {
-    fc::V3 out{};
-#if FC_IMU_ROTATION == 0
-    out = value;
-#elif FC_IMU_ROTATION == 90
-    out = {-value.y, value.x, value.z};
-#elif FC_IMU_ROTATION == 180
-    out = {-value.x, -value.y, value.z};
-#else
-    out = {value.y, -value.x, value.z};
-#endif
-#if FC_IMU_FLIPPED
-    out.y = -out.y;
-    out.z = -out.z;
-#endif
-    return out;
-} }
-namespace hwcontract { inline bool decode_icm42688_registers(const uint8_t raw[14], fc::Imu& out) {
-    if (!raw) return false;
-    const int16_t bad = std::numeric_limits<int16_t>::min();
-    const int16_t ax = read_be_i16(converted_pointed_end(raw, 2));
-    const int16_t ay = read_be_i16(converted_pointed_end(raw, 4));
-    const int16_t az = read_be_i16(converted_pointed_end(raw, 6));
-    const int16_t gx = read_be_i16(converted_pointed_end(raw, 8));
-    const int16_t gy = read_be_i16(converted_pointed_end(raw, 10));
-    const int16_t gz = read_be_i16(converted_pointed_end(raw, 12));
-    if (ax == bad || ay == bad || az == bad || gx == bad || gy == bad || gz == bad) return false;
-    out.a = orient_target({ax / 2048.0, ay / 2048.0, az / 2048.0});
-    out.g = orient_target({gx / 16.4, gy / 16.4, gz / 16.4});
-    return fc::finite(out.a) && fc::finite(out.g);
-} }
-namespace hwcontract { inline bool decode_navigation_wire(const NavigationWireFrame& frame, fc::NavigationState& out) {
-    if (frame.magic != kNavigationMagic || frame.version != kNavigationVersion) return false;
-    if (crc16_ccitt(&frame, offsetof(NavigationWireFrame, crc16)) != frame.crc16) return false;
-    out.velocity_world_mps = {frame.vx_cms * 0.01,
-                              frame.vy_cms * 0.01,
-                              frame.vz_cms * 0.01};
-    out.agl_m = frame.agl_mm * 0.001;
-    const bool split = (frame.flags & kNavigationSplitValidity) != 0;
-    if (split) {
-        out.velocity_valid = (frame.flags & kNavigationVelocityValid) != 0;
-        out.agl_valid = (frame.flags & kNavigationAglValid) != 0;
-    } else {
-        const bool legacy_valid = (frame.flags & kNavigationValid) != 0;
-        out.velocity_valid = legacy_valid;
-        out.agl_valid = legacy_valid;
-    }
-    out.heading_valid = split && (frame.flags & kNavigationHeadingValid) != 0;
-    out.heading_deg = 0.0;
-    if (out.heading_valid) {
-        const uint16_t code = static_cast<uint16_t>(converted::shr((frame.flags & kNavigationHeadingMask), kNavigationHeadingShift));
-        if (code >= 3600u) return false;
-        out.heading_deg = static_cast<double>(code) * 0.1;
-        if (out.heading_deg >= 180.0) out.heading_deg -= 360.0;
-    }
-    out.valid = out.velocity_valid && out.agl_valid;
-    return (!out.velocity_valid || fc::finite(out.velocity_world_mps)) &&
-           (!out.agl_valid || (std::isfinite(out.agl_m) && out.agl_m >= 0.0)) &&
-           (!out.heading_valid || fc::navigation_heading_valid(out));
-} }
-namespace hwcontract { inline NavigationWireFrame encode_navigation_wire(uint16_t sequence,
-                                                  double vx_mps, double vy_mps, double vz_mps,
-                                                  double agl_m, bool velocity_valid, bool agl_valid,
-                                                  double heading_deg = 0.0, bool heading_valid = false) {
-    auto s16 = [](double value) {
-        const long rounded = std::lround(value * 100.0);
-        return static_cast<int16_t>(fc::clamp<long>(rounded, -32767l, 32767l));
-    };
-    NavigationWireFrame frame{};
-    frame.sequence = sequence;
-    frame.vx_cms = s16(vx_mps);
-    frame.vy_cms = s16(vy_mps);
-    frame.vz_cms = s16(vz_mps);
-    const long mm = std::lround(std::max(0.0, agl_m) * 1000.0);
-    frame.agl_mm = static_cast<uint16_t>(fc::clamp<long>(mm, 0l, 65535l));
-    frame.flags = kNavigationSplitValidity |
-        (velocity_valid ? kNavigationVelocityValid : 0u) |
-        (agl_valid ? kNavigationAglValid : 0u);
-    if (heading_valid && std::isfinite(heading_deg)) {
-        double wrapped = kern::math::mod(heading_deg, 360.0);
-        if (wrapped < 0.0) wrapped += 360.0;
-        long code = std::lround(wrapped * 10.0);
-        if (code >= 3600l) converted::minus_to(code, 3600l);
-        frame.flags |= kNavigationHeadingValid |
-            static_cast<uint16_t>((converted::shl(static_cast<uint16_t>(code), kNavigationHeadingShift)) & kNavigationHeadingMask);
-    }
-    frame.crc16 = crc16_ccitt(&frame, offsetof(NavigationWireFrame, crc16));
-    return frame;
-} }
-namespace fc { struct HardwareFrame {
-    u64 now_us{};
-    uint32_t dt_us{kNominalDtUs};
-    uint32_t missed_samples{};
-    std::array<uint8_t, 14> imu_registers{};
-    std::array<uint8_t, 25> sbus_frame{};
-    hwcontract::NavigationWireFrame navigation_frame{};
-    bool imu_present{};
-    bool sbus_present{};
-    bool navigation_present{};
-}; }
 namespace fc { struct FirmwareRuntime {
 public:
     FirmwareRuntime() { reset(); }
@@ -3007,59 +2506,59 @@ public:
         have_navigation_sequence_ = false;
     }
 
-    RuntimeOutput step(const HardwareFrame& hardware) {
-        if (hardware.sbus_present) {
-            RC decoded{};
-            if (decode_sbus(hardware.sbus_frame.data(), decoded)) {
-                decoded.us = hardware.now_us;
-                rc_snapshot_ = decoded;
-            }
-        }
+    
 
-        if (hardware.navigation_present) {
-            NavigationState decoded{};
-            if (hwcontract::decode_navigation_wire(hardware.navigation_frame, decoded)) {
-                // Reject an exact duplicate/out-of-order sequence at the firmware
-                // boundary. A real UART retransmission must never refresh freshness.
-                const uint16_t seq = hardware.navigation_frame.sequence;
-                const bool newer = !have_navigation_sequence_ ||
-                    static_cast<uint16_t>(converted::minus(seq, last_navigation_sequence_)) < 0x8000u;
-                if (newer && (!have_navigation_sequence_ || seq != last_navigation_sequence_)) {
-                    navigation_snapshot_ = decoded;
-                    navigation_us_ = hardware.now_us;
-                    last_navigation_sequence_ = seq;
-                    have_navigation_sequence_ = true;
-                }
-            }
-        }
 
-        Imu imu{};
-        const bool imu_valid = hardware.imu_present &&
-            hwcontract::decode_icm42688_registers(hardware.imu_registers.data(), imu);
 
-        RC rc = rc_snapshot_;
-        const bool rc_fresh = rc.valid && hardware.now_us >= rc.us &&
-                              hardware.now_us - rc.us <= kRcTimeoutUs;
 
-        NavigationState navigation = navigation_snapshot_;
-        if (!have_navigation_sequence_ || hardware.now_us < navigation_us_ ||
-            hardware.now_us - navigation_us_ > hwcontract::kNavigationTimeoutUs) {
-            navigation.valid = false;
-            navigation.velocity_valid = false;
-            navigation.agl_valid = false;
-        }
 
-        StateRuntimeInput input{};
-        input.flight.raw = imu;
-        input.flight.rc = rc;
-        input.flight.now_us = hardware.now_us;
-        input.flight.dt_us = hardware.dt_us;
-        input.flight.missed_samples = hardware.missed_samples;
-        input.flight.imu_valid = imu_valid;
-        input.flight.rc_fresh = rc_fresh;
-        input.navigation = navigation;
-        return runtime_.step(input);
-    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     
     
@@ -3119,18 +2618,18 @@ struct Drone {
   void reset();
   /// One fixed physics step of `h` seconds: runs the firmware ticks and applies the forces for the
   /// coming Box3D step. Call it once per fixed step (after the previous step, before the next).
-  void step(World& world, physics::Body body, f32 h, const DroneSticks& sticks);
   
-  
-  
+  const DroneTelemetry& telemetry() const { return tele_; }
+  const DroneParams& params() const { return p_; }
+  Vec3 motor_position(int i) const { return converted::at(motor_pos_, i); }
   /// Rotor angle (radians) for drawing the props.
-  
+  f32 rotor_angle(int i) const { return converted::at(rotor_angle_, i); }
   /// The motors are stopped and the body is at rest (parked: nothing to simulate).
   
 
  private:
-  void motor_tick(f32 dt, const BodyState& s, f32 altitude, std::array<f32, 4>& thrust_out, std::array<f32, 4>& torque_out);
-  void imu_bytes(f32 dt, const BodyState& s, std::array<u8, 14>& out);
+  
+  
 
   DroneParams p_;
   fc::FirmwareRuntime fw_;  // the vendored FC stack: it reads the sensor bytes and gives the ESC pulses
@@ -3974,14 +3473,14 @@ struct GameWorld : converted::EngineObject {
   bool set_actor_velocity(const unsigned int& id, const Vec3& velocity) const;
   double sim_time() const;
   void set_alive(const unsigned int& id, const bool& alive) const;
+  void set_paused(const bool& paused) const;
   bool set_mode(const game::SimMode& mode) const;
-  bool actor_alive(const unsigned int& id) const;
   double camera_yaw() const;
+  bool actor_alive(const unsigned int& id) const;
   bool update_camera(Camera& camera, const double& dt, const game::PlayInput& input) const;
   Vec3 actor_velocity(const unsigned int& id) const;
   game::Level level() const;
   physics::Body actor_body(const unsigned int& actor) const;
-  void play_sound(const std::string& sound, const Vec3& at, const double& volume, const double& pitch, const bool& spatial, const unsigned int& actor = 0) const;
   GameWorld(const GameWorld&) = default;
   GameWorld(GameWorld&&) = default;
   GameWorld& operator=(const GameWorld&) = default;
@@ -4104,10 +3603,10 @@ struct Interiors {
   /// the next storey's stairs), "interior roof". A command that moves the player gives where to
   /// in `go` (the caller teleports and says "ok", or "not on foot") and leaves `out` as it is.
   
-  bool active() const { return active_; }
   
   
-  const Plan& plan() const { return plan_; }
+  
+  
 
  private:
   
@@ -4600,45 +4099,37 @@ struct LookState {
 struct MpArt {
  public:
   
-  
+  void begin();
   /// A ping at `foot` (scale grows with distance so it stays readable), fade 0..1, bob/spin time.
-  
+  void ping(Vec3 foot, f32 scale, Vec3 color, f32 fade, f32 now);
   /// A tracer segment (centre, direction, length) in a player's colour.
-  
+  void tracer(Vec3 at, Vec3 dir, f32 length, Vec3 color);
   /// A growing, fading fire ball (t 0..1 over its life).
-  
+  void flash(Vec3 at, f32 radius, f32 t);
   /// Canopy and LED ring of a mate's drone (body frame as the drone art).
-  
+  void drone_accent(const Mat4& body, Vec3 color);
   /// A bubble around a protected player.
-  
-  
-  
+  void shield(Vec3 center, f32 radius, f32 now);
+  void end();
+  bool ready() const { return r_ != nullptr; }
 
  private:
   struct Part { u32 id = 0; std::vector<f32> transforms, tints; };
   
-  
+  void put(Part& p, const Mat4& m, Vec3 tint);
   /// A part's instances: none at the start of a frame (begin), handed to the renderer at its end (end).
-  
-  
+  static void clear(Part& p);
+  void upload(Part& p);
   Renderer* r_ = nullptr;
   Part post_, gem_, ring_, tracer_, flash_, canopy_, led_, shield_;
 };
 namespace mp { constexpr f64 kInterpolationDelayMs = 90; }
-namespace mp { constexpr f64 kMaxExtrapolationMs = 100; }
-namespace mp { constexpr f64 kStaleHoldMs = 3000; }
-namespace mp { struct PoseSample {
-  Vec3 p;
-  Quat q;
-  f64 age_ms = 0;
-  bool stale = false, extrapolated = false, valid = false;
-}; }
 namespace mp { struct PoseTimeline {
  public:
   
   /// `has_v`: the sender's velocity is known (it is blended 70/30 with the measured one).
   
-  PoseSample sample(f64 now_ms) const;
+  
   
   
   
@@ -4662,21 +4153,22 @@ namespace mp { struct NavTimeline {
   struct Snap { Vec3 p; f32 heading; u8 mode; f64 at; };
   std::vector<Snap> snaps_;
 }; }
+namespace mp { inline Vec3 rgb(u32 c) { return {((c >> 16) & 255) / 255.0, ((c >> 8) & 255) / 255.0, (c & 255) / 255.0}; } }
+namespace mp { u32 hash_id(const std::string& id); }
+namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& sorted_ids); }
+namespace mp { u32 color_of(const std::string& id); }
 namespace mp { enum class Zone : u8 { torso, head, legs }; }
 namespace mp { enum class Weapon : u8 { other, smg, glock, sniper, fists, knife, launcher, rocket, grenade, drone_gun, drone_rocket, jet_gun, jet_missile, jet_bomb, explosion }; }
-namespace mp { f64 spawn_protect_ms(); }
-namespace mp { f32 voice_radius(); }
 namespace mp { enum class HitVerdict : u8 { applied, unknown_player, friendly_fire_off, protected_target, already_down }; }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now_ms, f64 protected_until_ms, f32 target_hp); }
 namespace mp { struct Score { u8 slot = 0; u16 kills = 0, deaths = 0; }; }
 namespace mp { struct Scoreboard {
  public:
   
-  void ensure(u8 slot);
+  
   
   /// A death: the victim's deaths +1, the killer's kills +1 (not for an accident or suicide).
-  void died(u8 victim, i32 by);
-  const std::vector<Score>& rows() const { return rows_; }
+  
+  
   
   
   /// Sorted as the board shows them: most kills first, then fewest deaths.
@@ -4696,9 +4188,6 @@ namespace mp { struct Ballot {
   /// nothing; invalid: no ballot)
   enum class Status : u8 { pending, approved, rejected, cancelled, ignored, invalid } status = Status::pending;
 }; }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now_ms); }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms, Ballot::Status& did); }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current_members, f64 now_ms); }
 namespace mp { constexpr u32 kVoiceRate = 8000; }
 namespace mp { struct VoiceStream {
  public:
@@ -4728,7 +4217,7 @@ namespace mp { struct VoiceCapture {
   std::vector<std::vector<u8>> frames_;
   f64 phase_ = 0;
 }; }
-namespace mp { struct Turn { enum class Dir : u8 { none, left, right, u_turn } dir = Dir::none; f32 distance = 0, angle_deg = 0; }; }
+namespace mp { namespace Turn { enum class Dir : u8 { none, left, right, u_turn }; } }
 namespace mp { struct Ping { u8 owner = 0; Vec3 p; u32 color = 0; f64 at_ms = 0; }; }
 namespace mp { struct PingBoard {
  public:
@@ -4738,9 +4227,9 @@ namespace mp { struct PingBoard {
   
   
   
-  
+  const std::vector<Ping>& all() const { return pings_; }
   /// 1 while fresh, fading over the last 4 s.
-  
+  static f32 fade(const Ping& p, f64 now_ms);
 
  private:
   std::vector<Ping> pings_;
@@ -4802,8 +4291,6 @@ struct Client : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   Client() = default;
   ~Client();
-  bool connected() const;
-  bool send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
   Client(const Client&) = default;
   Client(Client&&) = default;
   Client& operator=(const Client&) = default;
@@ -4813,9 +4300,6 @@ struct Server : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   Server() = default;
   ~Server();
-  int max_clients() const;
-  bool client_connected(const int& index) const;
-  bool send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const;
   Server(const Server&) = default;
   Server(Server&&) = default;
   Server& operator=(const Server&) = default;
@@ -4891,6 +4375,13 @@ namespace net { struct Remote {
   f64 speaking_until = 0;
 }; }
 namespace net { enum class SwarmKind : u8 { zombie = 0, heli = 1, tank = 2, soldier = 3, officer = 4, cruiser = 5, police_drone = 6, enemy = 7, kLast = enemy }; }
+namespace net { enum SwarmFlag : u8 {
+  kUnitDead = 0x80,                              // officer, enemy: he went down (the body lies there)
+  kOfficerAims = 1, kOfficerSkinShift = 1,       // officer: bit 0 aims, bits 1..3 his skin
+  kCruiserLights = 1, kCruiserWreck = 2, kCruiserBurns = 4,  // cruiser: the light bar runs, burnt out, burning
+  kDroneEmp = 1,                                 // police drone: knocked out, falling
+  kEnemyTypeMask = 3, kEnemyAims = 4,            // enemy: bits 0..1 COP / SWAT / HEAVY, bit 2 aims
+}; }
 namespace net { constexpr std::size_t kSwarmPerMessage = 64; }
 namespace net { constexpr std::size_t kSwarmMaxUnits = 127 * kSwarmPerMessage; }
 namespace net { struct SwarmUnit {
@@ -4910,7 +4401,7 @@ namespace net { struct Session {
   
   
   bool active() const { return role_ != Role::none; }
-  bool hosting() const { return role_ == Role::host; }
+  
   
   /// lan_vs.mjs getAuthorityId: a client whose host is gone (the connection dropped, or the host
   /// silent for 6 s after we were in). The session then goes on under the successor.
@@ -4954,8 +4445,8 @@ namespace net { struct Session {
   
   /// Jet seats (jet_seat_coordinator.mjs): ask the authority to claim / release a seat in
   /// `owner`'s jet (alone the table is local). The answer arrives with the table.
-  void seat_request(bool claim, u8 owner, seats::Seat seat);
-  const seats::Table& seats() const { return seats_; }
+  
+  
   
 
   // ---- incoming (since the last call) ----
@@ -4974,8 +4465,8 @@ namespace net { struct Session {
   
   /// The town's state and what is done to it (game_townsync.cpp, town_sync.h), reliable: a client's
   /// hits on the host's cars and passers-by and his changes to the host; the host's state to all / one.
-  void town_to_host(const std::vector<u8>& blob);
-  void town_to_all(const std::vector<u8>& blob);
+  
+  
   
   
   /// Thrown things (game_toss.cpp): the thrower's machine streams their bodies; the host relays.
@@ -4995,7 +4486,7 @@ namespace net { struct Session {
   i32 remote_index(u8 slot) const;
   /// The participants (sorted slots, ourselves included) and their colours (vs_multiplayer.mjs).
   std::vector<u8> roster() const;
-  
+  u32 color_of(u8 slot) const;
   /// "P1".."P9": the player's place in the roster.
   
   
@@ -5007,7 +4498,7 @@ namespace net { struct Session {
   
   
   
-  f64 now_ms() const { return time_ * 1000; }
+  
   /// The vote everybody sees: text, and whether our answer is missing.
   
   
@@ -5021,21 +4512,21 @@ namespace net { struct Session {
  private:
   enum class Role : u8 { none, host, client };
   
-  void dispatch(u8 from, u16 type, const std::vector<u8>& data);  // host: from a client (or ourselves)
+    // host: from a client (or ourselves)
              // a message from the host to us
-  void to_client(u8 slot, int channel, u16 type, const std::vector<u8>& data);
-  void to_all(int channel, u16 type, const std::vector<u8>& data, u8 except);
-  void to_host(int channel, u16 type, const std::vector<u8>& data);
-  void judge(u8 shooter, const Hit& h);
-  void begin_ballot(bool value);
-  void finish_ballot(mp::Ballot::Status s);
-  void send_rules();
-  void send_scores();
   
-  void send_seats();
-  void judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat);
-  Vec3 focus_of(u8 slot) const;
-  f32 hp_of(u8 slot) const;
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
   Role role_ = Role::none;
   HostTransport transport_;
@@ -5069,7 +4560,7 @@ namespace net { struct Session {
   struct SwarmParts { u8 owner = 0, serial = 0; u64 have[2] = {0, 0}; int last = -1; std::vector<SwarmUnit> units; };
   std::vector<SwarmParts> swarm_parts_;
   u8 swarm_serial_ = 0;
-  void swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units);
+  
   u16 world_rules_ = 0;
   bool have_world_rules_ = false;  // world_options.mjs friendlyFire: def false, the first player decides
   std::vector<std::pair<u8, f64>> protected_;  // slot, until (ms)
@@ -5078,7 +4569,7 @@ namespace net { struct Session {
   std::string vote_text_ = "Aenderungen nur einstimmig";
   u32 sent_poses_ = 0;
   u32 send_refused_ = 0, refused_said_ = 0;
-  void refused(u16 type, std::size_t bytes);
+  
   seats::Table seats_;
   f64 seats_clock_ = 0;
 }; }
@@ -5144,12 +4635,7 @@ struct TossState {
 namespace town { enum class Kind : u8 { none = 0, car_hit = 1, person_hit = 2, lamps = 3, plank_step = 4, planks = 5, state = 6, ask = 7 }; }
 namespace town { enum class Cause : u8 { other = 0, round = 1, blast = 2, kLast = blast }; }
 namespace town { struct LampRec { i64 key = 0; u8 state = 0; bool operator==(const LampRec&) const = default; }; }
-namespace town { struct PlankRec { i64 key = 0; u8 door = 0, doors = 0, planks = 0; bool operator==(const PlankRec&) const = default; }; }
-namespace town { struct PlankStep { i64 key = 0; u8 door = 0, doors = 0; i8 step = 0; }; }
 namespace town { struct MarkRec { Vec3 at; f32 radius = 0, strength = 0; }; }
-namespace town { constexpr u8 kPlanksMax = 6, kDoorsMax = 64; }
-namespace town { std::vector<u8> pack(const PlankStep& s); }
-namespace town { std::vector<u8> pack(const PlankRec& r); }
 struct TownSync {
   u32 epoch = 1;                          // the host's (a client: the one he has; 0 none yet)
   bool was_active = false, hosting = false;
@@ -5252,25 +4738,25 @@ struct TrafficRules {
   
   /// Takes the distances and times of the bound Blueprint (zeros where none runs).
   
-  void rebuild(const std::vector<Lane>& lanes);
+  
   u64 built_from = ~0ull;
   /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session
   /// the host's): the lights are a function of it and of the junction's place alone.
   f32 lights_time = -1;  // (-1: not set - the caller's time)
   
   /// 0 green, 1 amber, 2 red for traffic moving along `heading` into junction j at `now`.
-  i32 light(const Junction& j, Vec2 heading, f32 now) const;
+  
   /// The highest speed car `car` may drive now (1e9: free). `cars`: positions of all cars (index
   /// = car id; z < -1e8 = not on the road); `people`: standing / walking people's feet.
-  f32 limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 now, const std::vector<Vec3>& cars, const std::vector<Vec2>& people, Vec2 player,
-            bool player_on_foot, View& view);
+  
+
   /// The driver's target (world_procedural_population.mjs: sampleRoadRoute at the nearest point of
   /// his route + the lookahead): the point `look` metres on along the lane from where the car is,
   /// `off` to the right of its line - never beyond the lane's end. `index`: the lane point ahead
   /// of the car driving in `dir` (+1 / -1). `tangent`: the lane's direction there; `passed`: the
   /// car is at or past lane point `index`; `end`: how far the lane's end is along the lane.
   struct Pursuit { Vec2 target, tangent{1, 0}; bool passed = false; f32 end = 0; };
-  static Pursuit pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off);
+  
   /// A vehicle on the road as the drivers behind see it.
   struct Vehicle { Vec2 p; bool bus = false, there = false; };
   /// world_procedural_population.mjs driveSpeed: the speed the free way ahead allows vehicle
@@ -5278,9 +4764,9 @@ struct TrafficRules {
   /// lies 1..40 m ahead and no further to the side than half the own body (1.25 m, bus 1.6 m) +
   /// 0.6 m; the gap is the distance between the centres less both half lengths (1.9 m, bus 4 m);
   /// 2.5 m of it are kept, the rest is driven at 1.6 s headway. `limiter`: who it is (or -1).
-  f32 gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const;
+  
   /// Junctions near p (drawing).
-  void near(Vec2 p, f32 r, std::vector<i32>& out) const;
+  
 
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
@@ -5378,7 +4864,7 @@ struct Jet {
 
   void reset();
   /// Computes and applies the forces for the coming Box3D step (call once per fixed step).
-  void step(World& world, physics::Body body, f32 h, const JetInput& in);
+  
   
   
   
@@ -5390,16 +4876,16 @@ struct Jet {
   f32 fuel = 1;                   // 0..1 (HUD); the SpawnCity jet does not burn fuel
   const JetTelemetry& telemetry() const { return tele_; }
   
+  bool gear_down() const { return gear_down_; }
   
-  f32 gear_impact() const { return gear_impact_; }
+  f32 nozzle() const { return nozzle_; }
+  f32 thrust() const { return thrust_; }
   
-  
-  
-  
+  const JetSpec& spec() const { return s_; }
 
  private:
   struct Aero { f32 qbar, alpha, beta, CL, CD, CY; Vec3 moment; };
-  Aero aero(Vec3 vb, Vec3 wb, f32 V, f32 rho, f32 de, f32 da, f32 dr) const;
+  
 
   JetSpec s_;
   Mode mode_ = Mode::hover;
@@ -5411,7 +4897,6 @@ struct Jet {
   f32 gear_impact_ = 0;
   JetTelemetry tele_;
 };
-f32 air_density(f32 h);
 enum class Key : u8 {
   unknown = 0,
   a, b, c, d, e, f, g, h, i, j, k, l, m, n, o, p, q, r, s, t, u, v, w, x, y, z,
@@ -5427,6 +4912,7 @@ struct Engine : converted::EngineObject {
   double arg_number(const char* key, const double& fallback) const;
   bool has_arg(const char* key) const;
   const char* arg(const char* key, const char* fallback = nullptr) const;
+  void set_status(const char* text) const;
   double aspect() const;
   bool xr() const;
 };
@@ -5470,7 +4956,6 @@ struct SoundBank : converted::EngineObject {
   ~SoundBank();
   SoundBank(Mixer& mixer);
   void request_level(const game::Level& level) const;
-  bool prepare(const double& budget_ms = 4) const;
   void request(const std::string_view& ref) const;
   bool set_pcm(const std::string_view& id, const double* data, const u32& samples, const unsigned int& channels, const unsigned int& rate) const;
   SoundBank(const SoundBank&) = default;
@@ -5669,7 +5154,7 @@ struct PeopleArt {
   /// A person's hair colour (the dead's dull, a zombie's grey-green).
   
   /// A light bar on a car roof (chassis frame), flashing when `on`.
-  
+  void light_bar(const Mat4& chassis, bool on, f32 now);
   /// A muzzle flash / tracer stub is Kern's (ShotEvent); this is a burning wreck's glow.
   
   /// A police drone (dark quad, blue / red strobes; `lights` off when knocked out).
@@ -5689,7 +5174,7 @@ struct PeopleArt {
     bool tinted = false;
   };
   
-  
+  void put(Part& p, const Mat4& m, Vec3 tint = {1, 1, 1});
   /// A part's instances: none at the start of a frame (begin), handed to the renderer at its end (end).
   
   
@@ -5702,16 +5187,16 @@ struct PeopleArt {
 struct RoadGraph {
  public:
   /// Rebuilds from the live lanes (cheap; call when the lane set changed).
-  void rebuild(const std::vector<Lane>& lanes);
+  
   
   
   /// The node closest to `p` (-1 when the graph is empty or nothing lies within `max_m`).
-  i32 nearest(Vec2 p, f32 max_m = 80) const;
+  
   /// A* from the street closest to `from` to the one closest to `to`; `out` gets the points
   /// (starting at `from`'s projection, ending at `to`). False when no route exists.
-  bool path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const;
+  
   /// Pure pursuit: the point `look` metres further along `path` from the projection of `p`.
-  static Vec2 pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look);
+  
   /// Signature of the lane set it was built from (rebuild when it differs).
   u64 built_from = ~0ull;
 
@@ -5720,11 +5205,10 @@ struct RoadGraph {
     Vec2 p;
     std::vector<std::pair<i32, f32>> edges;  // neighbour, length
   };
-  i32 node_at(Vec2 p);
+  
   std::vector<Node> nodes_;
   converted::wide::Map<u64, i32> cells_;
 };
-u64 lane_signature(const std::vector<Lane>& lanes);
 struct SoundFx {
  public:
   bool init(Mixer& mixer);
@@ -6004,17 +5488,17 @@ struct VehicleArt {
  public:
   
   /// Starts a frame: forget last frame's instances.
-  
+  void begin();
   /// A car or bus: chassis pose, body colour, wheels (hub world positions from the suspension).
-  
+  void car(const Mat4& chassis, const Car& c, Vec3 color, bool cockpit_view, bool brake_lights);
   /// The jet (body frame +Y nose) with gear when down.
-  
+  void jet(const Mat4& body, bool gear_down, f32 nozzle, f32 thrust01, bool cockpit_view);
   /// The quad (body frame -X nose); rotor angles per motor.
-  
+  void drone(const Mat4& body, const std::array<Vec3, 4>& motors, const std::array<f32, 4>& rotor_angles, f32 prop_d, bool armed, bool fpv_view);
   /// A pilot under the canopy (open: the chute is out).
-  
+  void parachute(Vec3 pilot, f32 heading, bool open);
   /// Uploads all instance lists.
-  
+  void end();
 
  private:
   struct Part {
@@ -6023,10 +5507,10 @@ struct VehicleArt {
     bool tinted = false;
   };
   
-  
+  void put(Part& p, const Mat4& m, Vec3 tint = {1, 1, 1});
   /// A part's instances: none at the start of a frame (begin), handed to the renderer at its end (end).
-  
-  
+  static void clear(Part& p);
+  void upload(Part& p);
 
   Renderer* r_ = nullptr;
   Part car_body_, car_glass_, car_lights_, car_tail_, wheel_, bus_body_, bus_glass_;
@@ -6102,9 +5586,9 @@ struct Game {
   ~Game();
   
   
-  
+  void stop();
   /// One fixed physics step (called by the game's logic node after Box3D's step).
-  void fixed_step(f32 h);
+  
 
   // ---- host interface (exports.cpp) ----
   
@@ -6142,7 +5626,7 @@ struct Game {
   void switch_mode(Mode m, i32 vehicle = -1);
   void hide_soldier();
   void show_soldier(Vec3 at, f32 yaw_deg);
-  void try_enter();
+  
   void exit_vehicle();
   void eject();
   void toggle_drone();
@@ -6170,12 +5654,12 @@ struct Game {
   
 
   // simulation pieces
-  void drive_traffic(f32 h);
-  void manage_traffic();
+  
+  
   // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
   struct WorldParts { u32 t_ms = 0; u64 mask = 0; };  // the parts of the host's list that came (game_worldsync.cpp)
-  f64 life_epoch() const;
-  void car_body_dynamic(TrafficCar& c);
+  
+  
   
   // destruction sync (game_destruction_sync.cpp): craters and broken buildings, the host's
   
@@ -6207,7 +5691,7 @@ struct Game {
   
   
   
-  void townsync_plank(i64 key, u8 door, u8 doors, i32 step);
+  
   
   /// A blast's scorch, soot and breaches (world_marks.h), remembered for a player who joins later.
   
@@ -6220,8 +5704,8 @@ struct Game {
   std::unique_ptr<TownSync> townsync_;
   
   
-  std::vector<Vec3> mate_foci() const;
-  bool puppet_car_step(TrafficCar& c, std::size_t i, f32 h);
+  
+  
   bool puppet_world_ = false;
   f32 world_send_clock_ = 0, people_send_clock_ = 0;
   f64 world_send_real_ = 0;
@@ -6312,7 +5796,7 @@ struct Game {
      // a mate's helicopter, tank, cruiser or police drone on the line
     // a mate's zombie / soldier: the hit goes to him
              // helicopters, tanks, the enemies' stripes (combat art)
-    // cruisers (vehicle art)
+  void swarm_draw_vehicles();  // cruisers (vehicle art)
         // light bars, wreck fires, police drones (people art)
   /// A blast everybody sees and runs on his own units though no player set it off (a wreck going up).
   
@@ -6337,7 +5821,7 @@ struct Game {
   
   
   
-  
+  void draw_remote_vehicles();
   // combat and events (game_military.cpp, game_events.cpp) - hooked into update, draw, hud_json,
   // command, handle_shots and explosion
   
@@ -6383,7 +5867,7 @@ struct Game {
   
   // SpawnCity's synthesised combat sounds (combat_audio.cpp) registered as "sc:<kind><n>"
   void combat_audio_init();
-  const char* combat_sfx(combat_audio::Kind k);
+  
   // world dressing
   
   
@@ -6392,7 +5876,7 @@ struct Game {
   // animals and street life, interiors, ragdolls. State lives in WorldLife (game_world.h).
   
   
-  void step_world(f32 h);
+  
   
   
   
@@ -6411,15 +5895,15 @@ struct Game {
      // fists / knife on animals
        // cow deaths and pushes from the other players
   // traffic (game_traffic.cpp, M3): junction rules, the driver getting out, the tow service
-  f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
+  
   /// The speed the vehicle ahead leaves car `car` (world_traffic.h gap_speed); `limiter`: the car
   /// it is (an index into cars_), or -1.
-  f32 traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32& limiter);
+  
     // how far it is off its lane's line (tests)
   void eject_driver(i32 car);
   
-  void step_tow(f32 h);
   
+  void draw_world_vehicles();
   
   
 
@@ -6491,17 +5975,17 @@ struct Game {
   
   
   // far traffic (game_traffic_far.cpp, PHYS_NEAR_M / PHYS_FAR_M)
-  void traffic_far_switch();
-  void traffic_far_step(TrafficCar& c, std::size_t i, f32 h);
-  void traffic_make_far(TrafficCar& c);
-  bool traffic_make_near(TrafficCar& c, std::size_t i);
-  void traffic_solid(TrafficCar& c);
+  
+  
+  
+  
+  
   /// Where a car stands at rest on the ground at (x, y) heading `yaw`: every wheel on the ground at
   /// its ride height - the chassis pitched and rolled with the ground under its wheels.
   physics::Pose car_rest_pose(const CarSpec& s, f32 x, f32 y, f32 yaw) const;
   void traffic_advance(TrafficCar& c);
   // cars and buses as the original (game_vehicle_damage.cpp)
-  f32 car_max_hp(const TrafficCar& c) const;
+  
   
   /// police_only: a mate's blast (Fx::explosion) - our cruisers are ours to damage, the town's cars
   /// took it on the machine that fired.
@@ -6518,19 +6002,19 @@ struct Game {
   
   
   void gaps_camera(Camera& c);
-  bool gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const;
+  
   /// Who watches arrivals now (gaps_can_spawn's viewers); false: nobody - anything may appear.
-  bool gaps_spawn_viewers(std::vector<spawn::Viewer>& vs) const;
-  bool gaps_vehicle_spawn_ok(i32 car, Vec3 pos, f32 yaw) const;
-  bool car_towed(i32 car) const;  // a tow truck has it as its job (game_traffic.cpp)
   
   
-  void gaps_jet_damage(f32 amount);
+    // a tow truck has it as its job (game_traffic.cpp)
   
+  
+  
+  Mat4 gaps_drone_matrix();
   // zombie barricades (game_barricades.cpp, zombie_nights.mjs)
-  bool gaps_barricade_doors(std::vector<GapsState::DoorView>& out);
   
-  bool gaps_repair_barricade();
+  
+  
   
   
   // street lamps (game_lamps.cpp, street_lamps.mjs)
@@ -6551,17 +6035,17 @@ struct Game {
   bool gaps_ride_car() const;
   bool gaps_riding() const;
   bool gaps_ride_pose(Vec3& p, Quat& q) const;
-  bool gaps_seat_press();
-  i32 gaps_boardable(f32& dist) const;
   
-  void gaps_leave_ride();
+  
+  
+  
   
   bool gaps_ride_camera(Camera& c);
   std::unique_ptr<GapsState> gaps_;
 
   // presentation
   void update_camera(Engine& e, f32 dt);
-  
+  void draw_vehicles();
   
 
   Engine* engine_ = nullptr;
@@ -6736,7 +6220,7 @@ struct Game {
   // the original's sound on the page (game_audio_web.cpp): events and state for web/audio.mjs
   bool web_audio_ = false;
   std::string osfx_;
-  void osfx(const char* fn, Vec3 at, f32 a = 0, f32 b = 0, f32 c = 0);
+  
   bool shot_flesh_ = false;  // hit_scan's last round struck a person or a player
   
   
@@ -6751,6 +6235,304 @@ struct Game {
   LookState look_;
   std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
+namespace jobs { using Fn = void (*)(Span<const u8> input, std::vector<u8>& output); }
+struct EngineObjects : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace EngineObjects_types { using Kind = const void*; } }
+struct Sink : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+struct PureNodes : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace PureNodes_types { using Bool = bool; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace PureNodes_types { using Text = std::string; } }
+struct Chars : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct String : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_BloomState { using type = BloomState; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_LogLevel { using type = LogLevel; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Wave { using type = audio::Wave; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ColliderShape { using type = game::ColliderShape; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameStatus { using type = game::GameStatus; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_Motion { using type = game::Motion; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_game_WeaponKind { using type = game::WeaponKind; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_net_ClientState { using type = net::ClientState; } } }
+namespace logic { namespace engine_direct { namespace E_physics_BodyType { using type = physics::BodyType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+struct P_engine_mixer_bus : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_bus_types { using In = std::tuple<std::remove_cvref_t<audio::Bus>>; } } }
+struct P_engine_game_world_hud_mut : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_hud_mut_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_events : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_events_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_sound_cues : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_sound_cues_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_shots : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using In = std::tuple<>; } } }
+struct P_engine_building_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_building_builder_chunks_types { using In = std::tuple<>; } } }
+struct P_engine_road_builder_chunks : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_road_builder_chunks_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_visible : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_layers : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_layers_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_pick_bvh : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_pick_bvh_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_linear_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_linear_colors_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_material : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_texture : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_texture_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_positions : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_positions_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_normals_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_colors : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_colors_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_uvs : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_uvs_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_indices : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_indices_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_joints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_joints_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_weights : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_weights_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_bones : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_bones_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_transforms : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_tints : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_tints_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_instance_normals : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_normals_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_instance_count : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_count_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_mirror : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_mirror_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_local_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_local_bounds_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_world_bounds : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_world_bounds_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_gpu : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_gpu_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_sort_distance : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_sort_distance_types { using In = std::tuple<>; } } }
+struct P_engine_mesh_live_index : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mesh_live_index_types { using In = std::tuple<>; } } }
+struct P_engine_shader_extension_material_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_material_base_types { using In = std::tuple<>; } } }
+struct P_engine_shader_extension_attribute_base : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_attribute_base_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_width_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_height_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_mipmaps : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_mipmaps_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_repeat : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_repeat_types { using In = std::tuple<>; } } }
+struct P_engine_texture_desc_nearest : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_nearest_types { using In = std::tuple<>; } } }
+struct P_engine_mixer_speed_of_sound : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_speed_of_sound_types { using In = std::tuple<>; } } }
+struct P_engine_mixer_doppler_factor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_mixer_doppler_factor_types { using In = std::tuple<>; } } }
+struct P_engine_game_world_logic_native : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_game_world_logic_native_types { using In = std::tuple<>; } } }
+struct P_engine_property_change_actor : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_property_change_actor_types { using In = std::tuple<>; } } }
+struct P_engine_property_change_path : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_property_change_path_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_duration_types { using In = std::tuple<>; } } }
+struct P_engine_motion_asset_keys : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_keys_types { using In = std::tuple<>; } } }
+struct P_engine_night_windows_night : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_night_windows_night_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_id_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_sound_asset_duration : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_duration_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_id : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_id_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_name : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_name_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_width : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_width_types { using In = std::tuple<>; } } }
+struct P_engine_texture_asset_height : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_height_types { using In = std::tuple<>; } } }
+struct P_engine_simulator_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_simulator_settings_types { using In = std::tuple<>; } } }
+struct P_engine_character_mover_settings : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+namespace logic { namespace engine_direct { namespace P_engine_character_mover_settings_types { using In = std::tuple<>; } } }
+struct Machine : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct Layout : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct BlueprintCore : public PureNodes {
+  using PureNodes::PureNodes;
+};
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace BlueprintCore_types { using Text = ::kern::logic::Text; }
+struct GameWorld;
+namespace game { namespace nodes { using Bool = bool; } }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Text = std::string; } }
+namespace game { namespace nodes { using Actor = ::kern::logic::ActorHandle; } }
+namespace game { namespace nodes { using Self = ::kern::logic::ActorRef; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
+struct ShaderExtension;
+struct Renderer;
 void Ragdolls::release(Doll& d) {
   if (!world_) return;
   for (u32 b = 0; b < kBones; ++b) {
@@ -7501,60 +7283,344 @@ void Game::combat_audio_init() {
   }
   combat_audio_ready_ = true;
 }
-namespace combat { } using namespace ::converted_Game__game_cpp::combat; namespace game_controls_cpp_local { constexpr f32 kRad = 180.0 / 3.14159265358979; }
-namespace combat { } using namespace ::converted_Game__game_cpp::combat; void Game::ctl_camera(Camera& c) {
-  const ControlsState& C = ctl_;
-  if (mode_ == Mode::foot || mode_ == Mode::car) return;
-  if (engine_ && engine_->xr()) return;  // VR: the head looks
-  if (C.look.yaw_deg == 0 && C.look.pitch_deg == 0) return;
-  const Vec3 d = c.target - c.eye;
-  const f32 len = converted::wide::length(d);
-  if (len < 1e-4) return;
-  const Vec3 f = d * (1 / len);
-  const f32 yaw = -C.look.yaw_deg / game_controls_cpp_local::kRad, pitch = C.look.pitch_deg / game_controls_cpp_local::kRad;
-  const Vec3 turned = Quat::axis_angle({0, 0, 1}, yaw).rotate(f);
-  Vec3 side = converted::wide::cross(turned, {0, 0, 1});
-  side = converted::wide::normalize(side, {1, 0, 0});
-  const Vec3 out = Quat::axis_angle(side, pitch).rotate(turned);
-  c.target = c.eye + out * len;
+void VehicleArt::clear(Part& p) {
+  p.transforms.clear();
+  p.tints.clear();
 }
-namespace net { i32 Session::remote_index(u8 slot) const {
-  for (std::size_t i = 0; i < remotes_.size(); converted::pre_inc(i)) if (converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
-  return -1;
+void VehicleArt::begin() {
+  clear(car_body_);
+  clear(car_glass_);
+  clear(car_lights_);
+  clear(car_tail_);
+  clear(wheel_);
+  clear(bus_body_);
+  clear(bus_glass_);
+  clear(jet_body_);
+  clear(jet_glass_);
+  clear(jet_gear_);
+  clear(jet_flame_);
+  clear(drone_frame_);
+  clear(drone_motor_);
+  clear(drone_prop_a_);
+  clear(drone_prop_b_);
+  clear(drone_led_);
+  clear(chute_);
+  clear(chute_lines_);
+  clear(pilot_);
+}
+namespace vehicle_art_cpp_local { Mat4 rot(Vec3 axis, f32 a) { return Mat4::trs({}, Quat::axis_angle(axis, a), {1, 1, 1}); } }
+namespace vehicle_art_cpp_local { Mat4 at(Vec3 p) { return Mat4::translate(p); } }
+void VehicleArt::put(Part& p, const Mat4& m, Vec3 tint) {
+  p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
+  if (p.tinted) p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
+}
+void VehicleArt::car(const Mat4& chassis, const Car& c, Vec3 color, bool cockpit_view, bool brake_lights) {
+  const bool bus = c.spec().radius > 0.4;
+  if (bus) {
+    put(bus_body_, chassis, color);
+    put(bus_glass_, chassis);
+  } else {
+    // From the driver's seat only the glass is around the eye; the body and lamps stay outside the view.
+    put(car_glass_, chassis);
+    if (!cockpit_view) {
+      put(car_body_, chassis, color);
+      put(car_lights_, chassis);
+      put(car_tail_, chassis, brake_lights ? Vec3{3, 1, 1} : Vec3{1, 1, 1});
+    }
+  }
+  if (cockpit_view && !bus) return;
+  const f32 r = c.spec().radius, w = c.spec().wheel_width;
+  for (int i = 0; i < 4; converted::pre_inc(i)) {
+    const WheelState& ws = c.wheel(i);
+    // On its axle in the (interpolated) chassis frame: the suspension travel of the last step.
+    const CarSpec& s = c.spec();
+    const f32 travel = clampf(ws.travel, s.susp_lower, s.susp_upper);
+    const f32 steer = converted::at(s.wheels, i).front ? c.steer_angle() : 0;
+    const Mat4 m = chassis * vehicle_art_cpp_local::at({converted::at(s.wheels, i).x, converted::at(s.wheels, i).y, s.attach_z + travel}) * vehicle_art_cpp_local::rot({0, 0, 1}, steer) * vehicle_art_cpp_local::rot({0, 1, 0}, ws.angle) * Mat4::scale({r, w / 0.62, r});
+    put(wheel_, m);
+  }
+}
+void VehicleArt::jet(const Mat4& body, bool gear_down, f32 nozzle, f32 thrust01, bool cockpit_view) {
+  // the cockpit camera shows no airframe at all (glass, gear, flame neither): only the world ahead
+  if (cockpit_view) return;
+  put(jet_body_, body);
+  put(jet_glass_, body * vehicle_art_cpp_local::at({0, 3.2, 0.75}) * Mat4::scale({0.62, 1.7, 0.55}));
+  if (gear_down) {
+    const JetSpec s;
+    for (const auto& g : s.gear) put(jet_gear_, body * vehicle_art_cpp_local::at(g.p + Vec3{0, 0, -1.45}));
+  }
+  if (thrust01 > 0.02) {
+    // Nozzle direction: aft (0) .. down (pi/2) in the body's Y-Z plane; the cone's +Z points out.
+    const Mat4 n = body * vehicle_art_cpp_local::at({0, -7.3, 0}) * vehicle_art_cpp_local::rot({1, 0, 0}, kPi / 2 + nozzle) * Mat4::scale({1, 1, 1.0 + 4.0 * thrust01});
+    put(jet_flame_, n);
+  }
+}
+void VehicleArt::drone(const Mat4& body, const std::array<Vec3, 4>& motors, const std::array<f32, 4>& rotor_angles, f32 prop_d, bool armed, bool fpv_view) {
+  if (fpv_view) return;
+  put(drone_frame_, body);
+  for (int i = 0; i < 4; converted::pre_inc(i)) {
+    put(drone_motor_, body * vehicle_art_cpp_local::at(converted::at(motors, i) + Vec3{0, 0, -0.004}));
+    const Mat4 p = body * vehicle_art_cpp_local::at(converted::at(motors, i) + Vec3{0, 0, 0.018}) * vehicle_art_cpp_local::rot({0, 0, 1}, converted::at(rotor_angles, i)) * Mat4::scale({prop_d, 1, 1});
+    if (i % 2) put(drone_prop_b_, p);
+    else put(drone_prop_a_, p);
+  }
+  put(drone_led_, body * vehicle_art_cpp_local::at({0.06, 0, 0.018}), armed ? Vec3{4, 0.2, 0.1} : Vec3{0.3, 0.3, 0.3});
+}
+namespace gaps { namespace gaps_rules_cpp_local { f32 damping(f32 rate, f32 dt) { const f32 r = std::fmax(0.0, rate), d = clampf(dt, 0, 0.1); return r > 0 && d > 0 ? 1 - kern::math::exp(-r * d) : 0; } } }
+namespace gaps { namespace gaps_rules_cpp_local { Quat normalized(Quat q) {
+  const f32 l = kern::math::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+  if (!(l > 1e-9)) return Quat{};
+  return Quat{q.x / l, q.y / l, q.z / l, q.w / l};
+} } }
+namespace gaps { Quat slerp(Quat a, Quat b, f32 t) {
+  f32 d = a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+  if (d < 0) { d = -d; b = Quat{-b.x, -b.y, -b.z, -b.w}; }
+  d = clampf(d, -1, 1);
+  if (d > 0.9995) return gaps::gaps_rules_cpp_local::normalized(Quat{a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t, a.w + (b.w - a.w) * t});
+  const f32 th = kern::math::acos(d), s = kern::math::sin(th), wa = kern::math::sin((1 - t) * th) / s, wb = kern::math::sin(t * th) / s;
+  return gaps::gaps_rules_cpp_local::normalized(Quat{a.x * wa + b.x * wb, a.y * wa + b.y * wb, a.z * wa + b.z * wb, a.w * wa + b.w * wb});
 } }
-bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
-  if (!gaps_ || !converted::present(gaps_)->riding) return false;
-  const i32 at = net_.remote_index(converted::present(gaps_)->ride_owner);
-  if (at < 0) return false;
-  const net::Remote& r = converted::at(net_.remotes(), static_cast<std::size_t>(at));
-  if (r.state.mode == net::PlayerMode::jet || r.state.mode == net::PlayerMode::car) { p = r.shown; q = r.shown_rotation; return true; }
-  if (r.state.flags & net::kJetOut) { p = r.state.jet_pos; q = r.state.jet_rot; return true; }
-  return false;
-}
-bool Game::gaps_ride_camera(Camera& c) {
-  if (gaps_ && converted::present(gaps_)->ride_car) return false;  // a car's passenger looks (and aims) as on foot
+namespace gaps { f32 quat_angle(Quat a, Quat b) { return 2 * kern::math::acos(clampf(std::fabs(a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w), -1, 1)); } }
+namespace gaps { void VisualPose::update(Vec3 position, Quat rotation, Vec3 anchor, i32 mode, f32 dt, Vec3& out_p, Quat& out_q) {
+  const VisualProfile& p = mode == 2 ? kVisualThird : kVisualFollow;
+  const Quat target = gaps::gaps_rules_cpp_local::normalized(rotation);
+  const Vec3 raw = position - anchor;
+  if (!init_ || mode_ != mode) {
+    offset_ = raw;
+    q_ = target;
+    mode_ = mode;
+    init_ = true;
+    out_p = position;
+    out_q = q_;
+    return;
+  }
+  const f32 step = clampf(dt, 0, 0.1);
+  offset_ += (raw - offset_) * gaps::gaps_rules_cpp_local::damping(p.offset_rate, step);
+  Vec3 e = raw - offset_;
+  f32 err = converted::wide::length(e);
+  if (err > p.soft_pos) offset_ += e * ((err - p.soft_pos) * gaps::gaps_rules_cpp_local::damping(p.pos_recovery, step) / err);
+  e = raw - offset_;
+  err = converted::wide::length(e);
+  if (err > p.max_pos) offset_ += e * ((err - p.max_pos) / err);
+  q_ = gaps::slerp(q_, target, gaps::gaps_rules_cpp_local::damping(p.rotation_rate, step));
+  f32 ang = gaps::quat_angle(q_, target);
+  if (ang > p.soft_rot) q_ = gaps::slerp(q_, target, clampf((ang - p.soft_rot) * gaps::gaps_rules_cpp_local::damping(p.rot_recovery, step) / ang, 0, 1));
+  ang = gaps::quat_angle(q_, target);
+  if (ang > p.max_rot) q_ = gaps::slerp(q_, target, 1 - p.max_rot / ang);
+  out_p = anchor + offset_;
+  out_q = q_;
+} }
+Mat4 Game::gaps_drone_matrix() {
+  const Mat4 raw = matrix_of(drone_actor_);
+  if (!gaps_ || mode_ != Mode::drone || drone_cam_ == 0) { if (gaps_) converted::present(gaps_)->drone_visual.invalidate(); return raw; }
+  // the external cameras draw the airframe on the camera anchor with a damped offset and rotation
   Vec3 p;
   Quat q;
-  if (!gaps_ride_pose(p, q)) return false;
-  const i32 owner_at = gaps_ ? net_.remote_index(converted::present(gaps_)->ride_owner) : -1;
-  if (owner_at >= 0 && converted::at(net_.remotes(), static_cast<std::size_t>(owner_at)).state.mode == net::PlayerMode::car) {
-    // the passenger seat: right of the driver (the car's frame: x forward, y left), looking ahead
-    c.eye = p + q.rotate({0.04, -0.36, 0.7});
-    c.target = c.eye + q.rotate({1, 0, 0}) * 10.0;
-    c.up = q.rotate({0, 0, 1});
-    c.fov = 80 * kDeg;
-    c.near = 0.04;
-    c.far = 2400;
-    return true;
+  converted::present(gaps_)->drone_visual.update(raw.translation(), state_of(drone_actor_).rotation, cam_anchor_, drone_cam_ == 2 ? 2 : 1, converted::present(gaps_)->frame_dt, p, q);
+  return Mat4::trs(p, q, {1, 1, 1});
+}
+void VehicleArt::parachute(Vec3 pilot, f32 heading, bool open) {
+  // the pilot himself is the player's character (jet_mode.mjs makeChute buildCharacter, arms up to
+  // the risers): Game::draw_remote_people draws him with the people
+  const Mat4 base = vehicle_art_cpp_local::at(pilot) * vehicle_art_cpp_local::rot({0, 0, 1}, heading);
+  if (!open) return;
+  // Canopy 4.6 m above the harness, risers from the shoulders to its rim.
+  const Vec3 top{0, 0, 4.6};
+  put(chute_, base * vehicle_art_cpp_local::at(top) * Mat4::scale({3.4, 2.5, 0.9}));
+  for (Vec2 rim : {Vec2{3.1, 2.1}, Vec2{-3.1, 2.1}, Vec2{3.1, -2.1}, Vec2{-3.1, -2.1}}) {
+    const Vec3 a{rim.x * 0.08, rim.y * 0.08, 0.55}, b{rim.x, rim.y, top.z - 0.3};
+    const Vec3 d = b - a;
+    const f32 len = converted::wide::length(d);
+    const Vec3 n = d * (1.0 / len), axis = converted::wide::cross(Vec3{0, 0, 1}, n);
+    const f32 ang = kern::math::acos(clampf(n.z, -1, 1));
+    put(chute_lines_, base * vehicle_art_cpp_local::at((a + b) * 0.5) * vehicle_art_cpp_local::rot(converted::wide::normalize(axis, {1, 0, 0}), ang) * Mat4::scale({1, 1, len}));
   }
-  // applyPassengerCamera: (0.48, 2.5, 1.25) in the jet's frame, looking along its nose
-  c.eye = p + q.rotate({0.48, 2.5, 1.25});
-  c.target = c.eye + q.rotate({0, 1, 0}) * 10.0;
-  c.up = q.rotate({0, 0, 1});
-  c.fov = 72 * kDeg;
-  c.near = 0.5;
-  c.far = 6000;
-  return true;
+}
+void MpArt::clear(Part& p) {
+  p.transforms.clear();
+  p.tints.clear();
+}
+void MpArt::begin() {
+  clear(post_);
+  clear(gem_);
+  clear(ring_);
+  clear(tracer_);
+  clear(flash_);
+  clear(canopy_);
+  clear(led_);
+  clear(shield_);
+}
+CarSpec CarSpec::bus() {
+  CarSpec s;
+  s.kind = "bus";
+  s.half = {4, 1.17, 1.2};
+  s.mass = 9200; s.com_z = -0.52; s.com_x = 0;
+  s.radius = 0.46; s.wheel_width = 0.3; s.wheel_mass = 85; s.attach_z = -1.1;
+  s.wheels[0] = {2.6, 1.08, true}; s.wheels[1] = {2.6, -1.08, true}; s.wheels[2] = {-2.55, 1.08, false}; s.wheels[3] = {-2.55, -1.08, false};
+  s.susp_lower = -0.18; s.susp_upper = 0.14; s.sag = 0.08;
+  s.torque_front = 0; s.torque_rear = 4200; s.power = 230000;
+  s.steer_lag = 0.06; s.steer_damp_speed = 20; s.drag_area = 6.2; s.rolling_resistance = 0.008; s.wheel_inertia = 14;
+  s.brake = 9500; s.handbrake = 12000; s.coast = 200; s.steer_lock = 0.44; s.steer_hand = 2600; s.steer_assist = 5200; s.steer_assist_speed = 6;
+  s.friction = 1.0; s.rack_rate = 1.45; s.steer_servo = 6000;
+  s.upper_mass = 450;
+  s.upper_profile = {{-4, 2.6}, {-4, 2.9}, {-3.85, 3.05}, {3.8, 3.05}, {4, 2.85}, {4, 2.6}};
+  s.upper_half_width = 1.21; s.upper_dz = 1.48;
+  return s;
+}
+namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
+namespace mp { u32 hash_id(const std::string& id) {
+  u32 h = 2166136261u;
+  for (unsigned char c : id) { h ^= c; h *= 16777619u; }
+  return h;
+} }
+namespace mp { std::vector<u32> assign_colors(const std::vector<std::string>& ids) {
+  std::vector<u32> numbers;  // (each id's hash: a whole number the Blueprint takes as it is)
+  for (const std::string& id : ids) numbers.push_back(hash_id(id));
+  std::vector<u32> out;
+  mp::mp_rules_cpp_local::g_rules.call("ColorSlots", std::tie(out), numbers);
+  return out;
+} }
+namespace mp { u32 color_of(const std::string& id) {
+  const std::vector<u32> one = assign_colors({id});
+  return one.empty() ? 0 : converted::at(one, 0);
+} }
+namespace net { std::vector<u8> Session::roster() const {
+  std::vector<u8> r{self_slot_};
+  for (const Remote& x : remotes_) r.push_back(x.state.slot);
+  std::stable_sort(r.begin(), r.end());
+  converted::erase(r, std::unique(r.begin(), r.end()), r.end());
+  return r;
+} }
+namespace net { u32 Session::color_of(u8 slot) const {
+  const std::vector<u8> r = roster();
+  std::vector<std::string> ids;
+  for (u8 s : r) ids.push_back(std::to_string(s));
+  const std::vector<u32> c = mp::assign_colors(ids);
+  for (std::size_t i = 0; i < r.size(); converted::pre_inc(i)) if (converted::at(r, i) == slot) return converted::at(c, i);
+  return mp::color_of(std::to_string(slot));
+} }
+void MpArt::put(Part& p, const Mat4& m, Vec3 t) {
+  p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
+  p.tints.insert(p.tints.end(), {t.x, t.y, t.z, 1});
+}
+void MpArt::drone_accent(const Mat4& body, Vec3 c) {
+  put(canopy_, body * Mat4::translate({0.005, 0, 0.027}), c);
+  put(led_, body * Mat4::translate({0.005, 0, 0.042}), c);
+}
+namespace people_art_cpp_local { Mat4 at(Vec3 p) { return Mat4::translate(p); } }
+void PeopleArt::put(Part& p, const Mat4& m, Vec3 tint) {
+  p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
+  if (p.tinted) p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
+}
+void PeopleArt::light_bar(const Mat4& chassis, bool on, f32 now) {
+  const Mat4 m = chassis * people_art_cpp_local::at({-0.2, 0, 0.86});
+  put(bar_, m);
+  put(door_, chassis);
+  // flashLights: 110 ms slots in sixes - red in 0 and 2, blue in 3 and 5 (police_ground_units.mjs)
+  const i32 slot = static_cast<i32>(converted::fits<int>(std::floor(now * 1000 / 110))) % 6;
+  const bool red = on && (slot == 0 || slot == 2), blue = on && (slot == 3 || slot == 5);
+  put(lamp_, m * people_art_cpp_local::at({0, 0.25, 0.05}), blue ? Vec3{0.16, 0.42, 3.0} : Vec3{0.024, 0.063, 0.18});
+  put(lamp_, m * people_art_cpp_local::at({0, -0.25, 0.05}), red ? Vec3{3.0, 0.1, 0.16} : Vec3{0.2, 0.024, 0.03});
+}
+void MpArt::shield(Vec3 center, f32 radius, f32 now) {
+  const f32 r = radius * (1 + 0.04 * kern::math::sin(now * 9));
+  put(shield_, Mat4::trs(center, Quat{}, {r, r, r * 1.3}), {0.6, 0.85, 1});
+}
+void MpArt::tracer(Vec3 at, Vec3 dir, f32 len, Vec3 c) {
+  // The cylinder stands along +Z: turn Z onto the flight direction.
+  const f32 dl = converted::wide::length(dir);
+  if (dl < 1e-6) return;
+  const Vec3 d = dir * (1 / dl);
+  const Vec3 axis{-d.y, d.x, 0};  // cross(z, d)
+  const f32 s = converted::wide::length(axis), a = kern::math::atan2(s, d.z);
+  const Quat q = s > 1e-5 ? Quat::axis_angle(axis * (1 / s), a) : (d.z < 0 ? Quat::axis_angle({1, 0, 0}, kPi) : Quat{});
+  put(tracer_, Mat4::trs(at, q, {1, 1, len}), c);
+}
+void MpArt::flash(Vec3 at, f32 radius, f32 t) {
+  const f32 r = radius * (0.35 + 0.65 * t);
+  put(flash_, Mat4::trs(at, Quat{}, {r, r, r}), Vec3{1, 1, 1} * std::fmax(0.0, 1 - t));
+}
+void MpArt::ping(Vec3 foot, f32 s, Vec3 c, f32 fade, f32 now) {
+  const Vec3 t = c * fade;
+  put(post_, Mat4::trs(foot, Quat{}, {s, s, 2.2 * s}), Vec3{1, 1, 1} * fade);
+  const f32 bob = kern::math::sin(now / 0.3) * 0.15 * s;
+  put(gem_, Mat4::trs(foot + Vec3{0, 0, 2.6 * s + bob}, yaw_quat(now / 0.7), {s, s, 1.5 * s}), t);
+  const f32 rs = s * (1 + 0.25 * kern::math::sin(now / 0.22));
+  put(ring_, Mat4::trs(foot + Vec3{0, 0, 0.05}, Quat{}, {rs, rs, 0.3 * rs}), t);
+}
+namespace mp { f32 PingBoard::fade(const Ping& p, f64 now_ms) { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.number("PingFade", now_ms - p.at_ms)); } }
+void MpArt::upload(Part& p) {
+  if (!p.id) return;
+  if (p.transforms.empty()) { r_->set_visible(p.id, false); return; }
+  r_->update_instances(p.id, Span<const f32>(p.transforms), Span<const f32>(p.tints));
+  r_->set_visible(p.id, true);
+}
+void MpArt::end() {
+  upload(post_);
+  upload(gem_);
+  upload(ring_);
+  upload(tracer_);
+  upload(flash_);
+  upload(canopy_);
+  upload(led_);
+  upload(shield_);
+}
+namespace game_net_cpp_local { const Vec3 kCarColors[] = {{0.85, 0.2, 0.15}, {0.15, 0.45, 0.85}, {0.95, 0.75, 0.1}, {0.2, 0.7, 0.3}, {0.7, 0.3, 0.8}, {0.95, 0.5, 0.15},
+                           {0.1, 0.75, 0.75}, {0.9, 0.9, 0.9}}; }
+void Game::draw_remote_vehicles() {
+  if (!mp_) return;
+  MpLocal& m = *converted::present(mp_);
+  const f64 now_ms = time_ * 1000;
+  const f32 now = static_cast<f32>(time_);
+  if (m.art.ready()) m.art.begin();
+  if (net_.active()) {
+    if (!remote_car_) remote_car_ = std::make_unique<Car>(CarSpec::car());
+    if (!remote_bus_) remote_bus_ = std::make_unique<Car>(CarSpec::bus());
+    std::array<Vec3, 4> motors;
+    std::array<f32, 4> angles;
+    for (const net::Remote& r : net_.remotes()) {
+      const Vec3 color = mp::rgb(net_.color_of(r.state.slot));
+      auto drone_at = [&](const Mat4& mtx, bool armed) {
+        for (int i = 0; i < 4; converted::pre_inc(i)) {
+          converted::at(motors, i) = drone_.motor_position(i);
+          converted::at(angles, i) = armed ? now * 160.0 * (i % 2 ? 1.0 : -1.0) : 0;
+        }
+        art_.drone(mtx, motors, angles, drone_.params().prop_d, armed, false);
+        if (m.art.ready()) m.art.drone_accent(mtx, color);
+      };
+      const bool dead = r.state.flags & net::kDead;
+      const Mat4 mtx = Mat4::trs(r.shown, r.shown_rotation, {1, 1, 1});
+      if (!dead) switch (r.state.mode) {
+          case net::PlayerMode::car: {
+            const bool bus = r.state.flags & net::kBus;
+            const Vec3 body = r.state.flags & net::kPoliceCar ? Vec3{0.93, 0.94, 0.96} : bus ? Vec3{0.92, 0.78, 0.1} : converted::at(game_net_cpp_local::kCarColors, r.state.color % 8);
+            art_.car(mtx, bus ? *converted::present(remote_bus_) : *converted::present(remote_car_), body, false, false);
+            if (r.state.flags & net::kPoliceCar) people_art_.light_bar(mtx, false, converted::present(world_)->sim_time());
+            break;
+          }
+          case net::PlayerMode::jet: art_.jet(mtx, r.state.flags & net::kGearDown, 0, clampf(r.state.thrust, 0.05, 1), false); break;
+          case net::PlayerMode::drone: drone_at(mtx, r.state.flags & net::kArmed); break;
+          case net::PlayerMode::parachute: art_.parachute(r.shown - Vec3{0, 0, 0.85}, r.state.yaw, true); break;
+          case net::PlayerMode::foot: break;
+        }
+      // Parked craft: the drone where it stands, the jet where it was left (player_vehicle_runtime_v2.mjs ja).
+      if (r.state.flags & net::kDroneOut) drone_at(Mat4::trs(r.state.drone_pos, r.state.drone_rot, {1, 1, 1}), false);
+      if (r.state.flags & net::kJetOut) art_.jet(Mat4::trs(r.state.jet_pos, r.state.jet_rot, {1, 1, 1}), true, 0, 0, false);
+      if ((r.state.flags & net::kProtected) && m.art.ready()) {
+        const Vec3 c = r.state.mode == net::PlayerMode::foot ? r.person_shown + Vec3{0, 0, 0.9} : r.shown;
+        m.art.shield(c, r.state.mode == net::PlayerMode::foot ? 0.9 : 2.5, now);
+      }
+    }
+  }
+  if (m.art.ready()) {
+    for (const MpLocal::Tracer& t : m.tracers) m.art.tracer(t.p, t.v, 2.2, mp::rgb(t.color) * 2.0 + Vec3{0.6, 0.5, 0.2});
+    for (const MpLocal::Flash& f : m.flashes) m.art.flash(f.p, f.r, static_cast<f32>((now_ms - f.born) / f.life));
+    for (const mp::Ping& p : m.pings.all()) {
+      const f32 d = converted::wide::length(cam_.eye - p.p);
+      m.art.ping(p.p, clampf(d / 22, 1, 40), mp::rgb(p.color), mp::PingBoard::fade(p, now_ms), now);
+    }
+    m.art.end();
+  }
 }
 namespace terrain_cpp_local { u64 key2(i32 i, i32 j) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(i)), 32)) | static_cast<u32>(j); } }
 f32 crater_profile(f32 r, f32 radius, f32 depth, f32 rim) {
@@ -7660,6 +7726,130 @@ bool Terrain::water_at(f32 x, f32 y) const {
   if (!water_cell(static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell))))) return false;
   return bridges_.empty() || !on_bridge(x, y);
 }
+physics::Pose Game::car_rest_pose(const CarSpec& s, f32 x, f32 y, f32 yaw) const {
+  // the ground under the four wheels: the axles' mean heights give the pitch, the sides' the roll
+  const f32 cy = kern::math::cos(yaw), sy = kern::math::sin(yaw);
+  f32 h[4];
+  for (int i = 0; i < 4; converted::pre_inc(i)) {
+    const f32 wx = x + cy * converted::at(s.wheels, i).x - sy * converted::at(s.wheels, i).y, wy = y + sy * converted::at(s.wheels, i).x + cy * converted::at(s.wheels, i).y;
+    converted::at(h, i) = city_.ground_height(wx, wy);
+  }
+  // (wheels: front left, front right, rear left, rear right - car.h)
+  const f32 front = (h[0] + h[1]) / 2, rear = (h[2] + h[3]) / 2, left = (h[0] + h[2]) / 2, right = (h[1] + h[3]) / 2;
+  const f32 xf = s.wheels[0].x, xr = s.wheels[2].x, track = s.wheels[0].y - s.wheels[1].y;
+  const f32 pitch = kern::math::atan2(front - rear, xf - xr), roll = kern::math::atan2(left - right, track);  // nose up, left side up
+  // the ground's height under the chassis' origin; the origin stands over (x, y) at its ride
+  // height from the ground's plane (measured along the chassis' up: straight up it is 1 / up.z more)
+  const f32 z0 = rear + (front - rear) * (0 - xr) / (xf - xr);
+  const Quat q = qnormalize(yaw_quat(yaw) * Quat::axis_angle({0, 1, 0}, -pitch) * Quat::axis_angle({1, 0, 0}, roll));
+  return {Vec3{x, y, z0 + Car::ground_offset(s) / std::fmax(0.5, q.rotate({0, 0, 1}).z)}, q};
+}
+namespace game_swarm_cpp_local { const Vec3 kCruiserWhite{0.93, 0.94, 0.96}, kWreckBlack{0.055, 0.05, 0.045}; }
+void Game::swarm_draw_vehicles() {
+  // the mates' cruisers: standing on our ground at their place and heading (as a car at rest stands)
+  for (auto& [owner, sw] : swarms_)
+    for (const RemoteUnit& u : sw.units) {
+      if (u.kind != net::SwarmKind::cruiser) continue;
+      if (!swarm_cruiser_) swarm_cruiser_ = std::make_unique<Car>(CarSpec::car());
+      const physics::Pose rest = car_rest_pose(converted::present(swarm_cruiser_)->spec(), u.p.x, u.p.y, u.yaw);
+      converted::present(swarm_cruiser_)->show(u.aux);
+      art_.car(Mat4::trs(rest.position, rest.rotation, {1, 1, 1}), *converted::present(swarm_cruiser_), u.flags & net::kCruiserWreck ? game_swarm_cpp_local::kWreckBlack : game_swarm_cpp_local::kCruiserWhite, false, false);
+    }
+}
+namespace game_traffic_cpp_local { const Vec3 kTowYellow = converted::wide::hex_color(0xf2b705); }
+void Game::draw_world_vehicles() {
+  if (!life_) return;
+  WorldLife& L = *converted::present(life_);
+  const World& w = converted::present(world_)->physics();
+  for (const WorldLife::TowTruck& t : L.trucks) {
+    if (!t.body.valid() || !w.body_valid(t.body)) continue;
+    const physics::Pose p = w.pose(t.body);
+    const Mat4 m = Mat4::trs(p.position, p.rotation, {1, 1, 1});
+    art_.car(m, *converted::present(t.car), game_traffic_cpp_local::kTowYellow, false, t.input.pedal < -0.05);
+  }
+}
+void VehicleArt::upload(Part& p) {
+  if (!p.id) return;
+  if (p.transforms.empty()) { r_->set_visible(p.id, false); return; }
+  r_->update_instances(p.id, Span<const f32>(p.transforms), Span<const f32>(p.tints));
+  r_->set_visible(p.id, true);
+}
+void VehicleArt::end() {
+  upload(car_body_);
+  upload(car_glass_);
+  upload(car_lights_);
+  upload(car_tail_);
+  upload(wheel_);
+  upload(bus_body_);
+  upload(bus_glass_);
+  upload(jet_body_);
+  upload(jet_glass_);
+  upload(jet_gear_);
+  upload(jet_flame_);
+  upload(drone_frame_);
+  upload(drone_motor_);
+  upload(drone_prop_a_);
+  upload(drone_prop_b_);
+  upload(drone_led_);
+  upload(chute_);
+  upload(chute_lines_);
+  upload(pilot_);
+}
+namespace combat { } using namespace ::converted_Game__game_cpp::combat; namespace game_controls_cpp_local { constexpr f32 kRad = 180.0 / 3.14159265358979; }
+namespace combat { } using namespace ::converted_Game__game_cpp::combat; void Game::ctl_camera(Camera& c) {
+  const ControlsState& C = ctl_;
+  if (mode_ == Mode::foot || mode_ == Mode::car) return;
+  if (engine_ && engine_->xr()) return;  // VR: the head looks
+  if (C.look.yaw_deg == 0 && C.look.pitch_deg == 0) return;
+  const Vec3 d = c.target - c.eye;
+  const f32 len = converted::wide::length(d);
+  if (len < 1e-4) return;
+  const Vec3 f = d * (1 / len);
+  const f32 yaw = -C.look.yaw_deg / game_controls_cpp_local::kRad, pitch = C.look.pitch_deg / game_controls_cpp_local::kRad;
+  const Vec3 turned = Quat::axis_angle({0, 0, 1}, yaw).rotate(f);
+  Vec3 side = converted::wide::cross(turned, {0, 0, 1});
+  side = converted::wide::normalize(side, {1, 0, 0});
+  const Vec3 out = Quat::axis_angle(side, pitch).rotate(turned);
+  c.target = c.eye + out * len;
+}
+namespace net { i32 Session::remote_index(u8 slot) const {
+  for (std::size_t i = 0; i < remotes_.size(); converted::pre_inc(i)) if (converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
+  return -1;
+} }
+bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
+  if (!gaps_ || !converted::present(gaps_)->riding) return false;
+  const i32 at = net_.remote_index(converted::present(gaps_)->ride_owner);
+  if (at < 0) return false;
+  const net::Remote& r = converted::at(net_.remotes(), static_cast<std::size_t>(at));
+  if (r.state.mode == net::PlayerMode::jet || r.state.mode == net::PlayerMode::car) { p = r.shown; q = r.shown_rotation; return true; }
+  if (r.state.flags & net::kJetOut) { p = r.state.jet_pos; q = r.state.jet_rot; return true; }
+  return false;
+}
+bool Game::gaps_ride_camera(Camera& c) {
+  if (gaps_ && converted::present(gaps_)->ride_car) return false;  // a car's passenger looks (and aims) as on foot
+  Vec3 p;
+  Quat q;
+  if (!gaps_ride_pose(p, q)) return false;
+  const i32 owner_at = gaps_ ? net_.remote_index(converted::present(gaps_)->ride_owner) : -1;
+  if (owner_at >= 0 && converted::at(net_.remotes(), static_cast<std::size_t>(owner_at)).state.mode == net::PlayerMode::car) {
+    // the passenger seat: right of the driver (the car's frame: x forward, y left), looking ahead
+    c.eye = p + q.rotate({0.04, -0.36, 0.7});
+    c.target = c.eye + q.rotate({1, 0, 0}) * 10.0;
+    c.up = q.rotate({0, 0, 1});
+    c.fov = 80 * kDeg;
+    c.near = 0.04;
+    c.far = 2400;
+    return true;
+  }
+  // applyPassengerCamera: (0.48, 2.5, 1.25) in the jet's frame, looking along its nose
+  c.eye = p + q.rotate({0.48, 2.5, 1.25});
+  c.target = c.eye + q.rotate({0, 1, 0}) * 10.0;
+  c.up = q.rotate({0, 0, 1});
+  c.fov = 72 * kDeg;
+  c.near = 0.5;
+  c.far = 6000;
+  return true;
+}
 void Game::gaps_camera(Camera& c) {
   if (gaps_ && converted::present(gaps_)->riding && gaps_ride_camera(c)) return;  // in a mate's jet (game_seats.cpp)
   if (!gaps_ || !world_placed_ || mode_ == Mode::jet || mode_ == Mode::parachute || mode_ == Mode::foot) return;  // the jet / chute camera is free in the sky
@@ -7681,2772 +7871,6 @@ void Game::gaps_camera(Camera& c) {
     }
     c.near = clampf(c.near, 0.045, 0.08);
   }
-}
-namespace wire { struct V3 { f32 x = 0, y = 0, z = 0; }; }
-std::vector<Vec3> Game::mate_foci() const {
-  std::vector<Vec3> out;
-  if (!net_.active()) return out;
-  for (const net::Remote& r : net_.remotes()) {
-    if (r.state.flags & net::kPassenger) continue;
-    out.push_back(r.state.mode == net::PlayerMode::foot || r.state.mode == net::PlayerMode::drone ? r.person_shown : r.shown);
-  }
-  return out;
-}
-bool Game::gaps_riding() const { return gaps_ && converted::present(gaps_)->riding; }
-bool Game::gaps_ride_car() const { return gaps_ && converted::present(gaps_)->riding && converted::present(gaps_)->ride_car; }
-namespace terrain_cpp_local { constexpr f32 kTile = 160; }
-bool Terrain::has_collision(f32 x, f32 y) const {
-  const u64 k = terrain_cpp_local::key2(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kTile))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kTile))));
-  return collision_.count(k) && !dirty_collision_.count(k);
-}
-RigidSpec Car::rigid_spec(const CarSpec& s) {
-  RigidSpec r;
-  ColliderSpec box;
-  box.kind = physics::ShapeKind::box;
-  box.size = s.half * 2.0;
-  box.friction = 0.6;
-  r.colliders.push_back(box);
-  ColliderSpec upper;
-  upper.kind = physics::ShapeKind::hull;
-  for (f32 y : {-s.upper_half_width, s.upper_half_width})
-    for (const Vec2& p : s.upper_profile) upper.points.push_back({p.x, y, p.y - s.upper_dz});
-  upper.friction = 0.5;
-  r.colliders.push_back(upper);
-  // The chassis alone (world_vehicle_dynamics.mjs: spec.mass with its upper body); the wheels are
-  // bodies of their own on the wheel joints.
-  const f32 total = s.mass;
-  r.mass.mass = total;
-  r.mass.center = {s.com_x, 0, s.com_z};
-  box_inertia(total, s.half * 2.0, r.mass);
-  r.linear_damping = 0;
-  r.angular_damping = 0.05;
-  return r;
-}
-void Car::reset() {
-  for (WheelState& w : w_) w = WheelState{};
-  steer_ = steer_eq_f_ = vf_ = throttle_ = 0;
-  gear_ = 1;
-  n_applied_ = 0;
-  has_last_ = false;  // wherever the chassis is now: the wheels are put under it again
-}
-namespace terrain_cpp_local { bool rect_in(const Vec4& in, const Vec4& out) { return in.x >= out.x && in.y >= out.y && in.z <= out.z && in.w <= out.w; } }
-bool Terrain::covers(const Vec4& rect) const {
-  if (!settled_) return false;
-  if (!dem_) return true;  // flat ground: known everywhere
-  if (!grid_ready_) return false;
-  if (terrain_cpp_local::rect_in(rect, interior(grid_))) return true;
-  for (const Grid& g : side_) if (terrain_cpp_local::rect_in(rect, interior(g))) return true;
-  return false;
-}
-bool Terrain::corridors_at(f32 x, f32 y) const { return !corridors_expected || corridor_set(x, y) >= 0; }
-bool Terrain::ground_ready(f32 x, f32 y) const {
-  // known ground (an interior: no later window changes it) with its collision standing
-  if (!covers({x, y, x, y}) || !corridors_at(x, y)) return false;
-  return has_collision(x, y);
-}
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
-namespace spawn { namespace spawn_guard_cpp_local { rules::Blueprint g_rules{"SpawnGuard"}; } }
-namespace spawn { namespace spawn_guard_cpp_local { struct Print {
-  Vec3 center;
-  f64 yaw = 0;
-  Vec3 half;
-}; } }
-namespace spawn { namespace spawn_guard_cpp_local { Print print_of(const Footprint& f) { return {Vec3{f.center.x, f.center.y, 0}, rules::decimal(f.yaw), Vec3{f.half.x, f.half.y, 0}}; } } }
-namespace spawn { bool footprints_overlap(const Footprint& a, const Footprint& b, f32 margin) { return spawn::spawn_guard_cpp_local::g_rules.flag("FootprintsOverlap", spawn::spawn_guard_cpp_local::print_of(a), spawn::spawn_guard_cpp_local::print_of(b), rules::decimal(margin)); } }
-namespace game_traffic_far_cpp_local { constexpr f32 kPhysNear = 150, kPhysFar = 180; }
-physics::Pose Game::car_rest_pose(const CarSpec& s, f32 x, f32 y, f32 yaw) const {
-  // the ground under the four wheels: the axles' mean heights give the pitch, the sides' the roll
-  const f32 cy = kern::math::cos(yaw), sy = kern::math::sin(yaw);
-  f32 h[4];
-  for (int i = 0; i < 4; converted::pre_inc(i)) {
-    const f32 wx = x + cy * converted::at(s.wheels, i).x - sy * converted::at(s.wheels, i).y, wy = y + sy * converted::at(s.wheels, i).x + cy * converted::at(s.wheels, i).y;
-    converted::at(h, i) = city_.ground_height(wx, wy);
-  }
-  // (wheels: front left, front right, rear left, rear right - car.h)
-  const f32 front = (h[0] + h[1]) / 2, rear = (h[2] + h[3]) / 2, left = (h[0] + h[2]) / 2, right = (h[1] + h[3]) / 2;
-  const f32 xf = s.wheels[0].x, xr = s.wheels[2].x, track = s.wheels[0].y - s.wheels[1].y;
-  const f32 pitch = kern::math::atan2(front - rear, xf - xr), roll = kern::math::atan2(left - right, track);  // nose up, left side up
-  // the ground's height under the chassis' origin; the origin stands over (x, y) at its ride
-  // height from the ground's plane (measured along the chassis' up: straight up it is 1 / up.z more)
-  const f32 z0 = rear + (front - rear) * (0 - xr) / (xf - xr);
-  const Quat q = qnormalize(yaw_quat(yaw) * Quat::axis_angle({0, 1, 0}, -pitch) * Quat::axis_angle({1, 0, 0}, roll));
-  return {Vec3{x, y, z0 + Car::ground_offset(s) / std::fmax(0.5, q.rotate({0, 0, 1}).z)}, q};
-}
-void Game::traffic_solid(TrafficCar& c) {
-  // its shapes collide again with what they did (a car that was far)
-  c.far = false;
-  if (c.solid_masks.empty()) return;
-  const physics::Body b = body(c.actor);
-  if (b.valid() && converted::present(world_)->physics().body_valid(b)) converted::present(world_)->physics().set_body_masks(b, Span<const u64>(c.solid_masks.data(), c.solid_masks.size()));
-  c.solid_masks.clear();
-}
-void Game::traffic_make_far(TrafficCar& c) {
-  World& w = converted::present(world_)->physics();
-  const physics::Body b = body(c.actor);
-  if (!b.valid() || !w.body_valid(b)) { c.far = false; return; }
-  if (c.solid_masks.empty()) {
-    w.body_masks(b, c.solid_masks);
-    const u64 nothing[1] = {kCatQuery};  // (no shape is of this category: found by rays and blasts, touched by nothing)
-    w.set_body_masks(b, Span<const u64>(nothing, 1));
-  }
-  if (w.body_type(b) != physics::BodyType::kinematic) w.set_body_type(b, physics::BodyType::kinematic);
-  w.set_linear_velocity(b, {});
-  w.set_angular_velocity(b, {});
-  converted::present(c.car)->detach();
-  c.far = true;
-}
-bool Game::traffic_make_near(TrafficCar& c, std::size_t i) {
-  World& w = converted::present(world_)->physics();
-  const physics::Body b = body(c.actor);
-  if (!b.valid() || !w.body_valid(b)) { c.far = false; return false; }
-  const BodyState s = read_body(w, b);
-  const Vec3 fwd = s.rotation.rotate({1, 0, 0});
-  const f32 yaw = kern::math::atan2(fwd.y, fwd.x);
-  // only on ground that stands (its collision built, its streets' corridors laid) ...
-  if (!city_.terrain().ground_ready(s.position.x, s.position.y)) return false;
-  // ... and where no car with physics stands (vehicleFootprintsOverlap): else it drives on without
-  // (it keeps its distance like every driver, so the place comes free) and is asked again
-  const Vec3 h = converted::present(c.car)->spec().half;
-  const spawn::Footprint me{{s.position.x, s.position.y}, yaw, {h.x, h.y}};
-  for (std::size_t k = 0; k < cars_.size(); converted::pre_inc(k)) {
-    const TrafficCar& o = converted::at(cars_, k);
-    if (k == i || !o.placed || o.far || !converted::present(world_)->actor_alive(o.actor)) continue;
-    const BodyState os = state_of(o.actor);
-    if (std::fabs(os.position.x - s.position.x) > 12 || std::fabs(os.position.y - s.position.y) > 12) continue;
-    const Vec3 of = os.rotation.rotate({1, 0, 0});
-    const Vec3 oh = converted::present(o.car)->spec().half;
-    if (spawn::footprints_overlap(me, {{os.position.x, os.position.y}, kern::math::atan2(of.y, of.x), {oh.x, oh.y}})) return false;
-  }
-  // (anything else in its place - a parked jet, a tank, a wreck's parts: a ray down through it)
-  if (cast(w, s.position + Vec3{0, 0, 3}, {0, 0, -1}, 3.2, b, ~static_cast<u64>(kCatWorld)).hit) return false;
-  const physics::Pose rest = car_rest_pose(converted::present(c.car)->spec(), s.position.x, s.position.y, yaw);
-  w.set_pose(b, rest);
-  w.set_body_type(b, physics::BodyType::dynamic);
-  const RigidSpec rs = Car::rigid_spec(converted::present(c.car)->spec());
-  w.set_mass_data(b, rs.mass.mass, rs.mass.center, rs.mass.inertia);
-  traffic_solid(c);
-  converted::present(c.car)->reset();
-  w.set_linear_velocity(b, rest.rotation.rotate({1, 0, 0}) * c.far_speed);
-  w.set_angular_velocity(b, {});
-  w.set_awake(b, true);
-  return true;
-}
-void Game::traffic_far_switch() {
-  // the hysteresis: physics on under 150 m, off beyond 180 m (driven cars, police, wrecks keep theirs)
-  World& w = converted::present(world_)->physics();
-  const Vec3 me = focus_position();
-  const std::vector<Vec3> mates = net_.hosting() ? mate_foci() : std::vector<Vec3>{};
-  for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
-    TrafficCar& c = converted::at(cars_, i);
-    const physics::Body b = body(c.actor);
-    if (!c.placed || !b.valid() || !w.body_valid(b)) { c.far = false; c.solid_masks.clear(); continue; }  // (no body, or a new one: solid)
-    if (puppet_world_ && i < car_net_.size() && converted::at(car_net_, i) >= 0) { traffic_solid(c); continue; }  // the host's car here: on his poses (game_worldsync.cpp)
-    const bool keep = c.police || c.wreck || c.burn_until >= 0 || static_cast<i32>(i) == car_index_ || (i < car_lent_.size() && converted::at(car_lent_, i));
-    const Vec3 p = matrix_of(c.actor).translation();
-    // near any player real physics (MP host: the ground and the buildings are loaded around the
-    // mates too - CityStream::extra_foci); never where no ground collision stands yet
-    f32 d = hypot_bp(p.x - me.x, p.y - me.y);
-    for (const Vec3& m : mates) d = std::fmin(d, hypot_bp(p.x - m.x, p.y - m.y));
-    if (d <= game_traffic_far_cpp_local::kPhysFar && !city_.terrain().has_collision(p.x, p.y)) d = game_traffic_far_cpp_local::kPhysFar + 1;
-    if (!c.far && !keep && d > game_traffic_far_cpp_local::kPhysFar) {
-      c.far_speed = c.driver ? std::fmax(0.0, converted::present(c.car)->forward_speed()) : 0;
-      traffic_make_far(c);
-    } else if (c.far && (keep || d < game_traffic_far_cpp_local::kPhysNear)) {
-      if (!traffic_make_near(c, i) && keep) {
-        // (one that must have physics - a cruiser, a wreck, the player's: it has it where it is)
-        w.set_body_type(b, physics::BodyType::dynamic);
-        const RigidSpec rs = Car::rigid_spec(converted::present(c.car)->spec());
-        w.set_mass_data(b, rs.mass.mass, rs.mass.center, rs.mass.inertia);
-        traffic_solid(c);
-        converted::present(c.car)->reset();
-        w.set_awake(b, true);
-      }
-    }
-  }
-}
-namespace game_vehicle_damage_cpp_local { bool is_bus(const TrafficCar& c) { return converted::present(c.car)->spec().radius > 0.4; } }
-f32 Game::car_max_hp(const TrafficCar& c) const {
-  // police CAR_HP 300; TARGET_HP car 180, bus 320
-  return c.police ? 300.0 : game_vehicle_damage_cpp_local::is_bus(c) ? 320.0 : 180.0;
-}
-bool Game::car_towed(i32 car) const {
-  if (!life_) return false;
-  for (const WorldLife::TowTruck& t : converted::present(life_)->trucks)
-    if (t.job == car) return true;
-  return false;
-}
-namespace spawn { namespace spawn_guard_cpp_local { struct Looker {
-  Vec3 eye, forward;
-  f64 half_angle = 0, far = 0;
-  bool local = false;
-}; } }
-namespace spawn { namespace spawn_guard_cpp_local { Looker looker_of(const Viewer& v) { return {v.eye, v.forward, rules::decimal(v.half_angle), rules::decimal(v.far), v.local}; } } }
-namespace spawn { bool can_spawn(const std::vector<Viewer>& viewers, Vec3 point, f32 far_entry, f32 height) { using spawn::spawn_guard_cpp_local::Looker;
-  std::vector<Looker> lookers;
-  for (const Viewer& v : viewers) lookers.push_back(spawn::spawn_guard_cpp_local::looker_of(v));
-  return spawn::spawn_guard_cpp_local::g_rules.flag("CanSpawn", lookers, point, rules::decimal(far_entry), rules::decimal(height));
-} }
-namespace spawn { f32 cone_half_angle(f32 vertical_fov, f32 aspect) { return static_cast<f32>(spawn::spawn_guard_cpp_local::g_rules.number("ConeHalfAngle", rules::decimal(vertical_fov), rules::decimal(aspect))); } }
-namespace spawn { f32 default_far() { return static_cast<f32>(spawn::spawn_guard_cpp_local::g_rules.get<f64>("DefaultFar")); } }
-namespace game_gaps_cpp_local { constexpr f32 kPeopleEntryM = 150, kPeopleEntryMobileM = 125, kVehicleEntryM = 600; }
-namespace game_gaps_cpp_local { constexpr f32 kSpawnGraceS = 6; }
-bool Game::gaps_spawn_viewers(std::vector<spawn::Viewer>& vs) const {
-  if (!gaps_ || !world_) return false;
-  if (converted::present(gaps_)->world_shown >= 0 && converted::present(world_)->sim_time() - converted::present(gaps_)->world_shown < game_gaps_cpp_local::kSpawnGraceS) return false;
-  // the presented camera, judged with the unscoped field of view (spawnViewFovDeg)
-  spawn::Viewer me;
-  me.eye = cam_.eye;
-  me.forward = converted::wide::normalize(cam_.target - cam_.eye, {1, 0, 0});
-  const f32 aspect = frame_w_ / std::fmax(1.0, frame_h_);
-  const f32 foot_fov = 2 * kern::math::atan(kern::math::tan(45 * kDeg) / std::fmax(0.2, aspect));  // Kern's soldier: 90 deg horizontal
-  me.half_angle = spawn::cone_half_angle(mode_ == Mode::foot ? std::fmax(cam_.fov, foot_fov) : cam_.fov, aspect);
-  me.far = std::fmax(200.0, cam_.far > 0 ? cam_.far : spawn::default_far());
-  me.local = true;
-  vs.push_back(me);
-  // the other players' views (collectPeerViewers: a drone looks along its nose, a person ahead)
-  for (const net::Remote& r : net_.remotes()) {
-    spawn::Viewer v;
-    v.half_angle = me.half_angle;
-    v.far = me.far;
-    const net::PlayerState& s = r.state;
-    switch (s.mode) {
-      case net::PlayerMode::foot:
-      case net::PlayerMode::parachute: v.eye = r.person_shown + Vec3{0, 0, 1.55}; v.forward = {kern::math::cos(s.avatar_yaw), kern::math::sin(s.avatar_yaw), 0}; break;
-      case net::PlayerMode::drone: v.eye = r.shown; v.forward = r.shown_rotation.rotate({-1, 0, 0}); break;
-      case net::PlayerMode::car: v.eye = r.shown + Vec3{0, 0, 1.2}; v.forward = r.shown_rotation.rotate({1, 0, 0}); break;
-      case net::PlayerMode::jet: v.eye = r.shown; v.forward = r.shown_rotation.rotate({0, 1, 0}); break;
-    }
-    v.forward = converted::wide::normalize(v.forward, {1, 0, 0});
-    vs.push_back(v);
-  }
-  return true;
-}
-bool Game::gaps_can_spawn(Vec3 p, f32 height, f32 far_entry) const {
-  std::vector<spawn::Viewer> vs;
-  if (!gaps_spawn_viewers(vs)) return true;
-  // (whether buildings hide the point is the Blueprint's own question to the world: a ray against the channel "World")
-  const bool ok = spawn::can_spawn(vs, p, far_entry, height);
-  ++(ok ? converted::present(gaps_)->spawn_allowed : converted::present(gaps_)->spawn_denied);
-  return ok;
-}
-bool Game::gaps_vehicle_spawn_ok(i32 car, Vec3 pos, f32 yaw) const {
-  // vehicle_spawn_clearance.mjs: no overlap with any placed vehicle (0.35 m margin), and nobody sees it appear
-  const Vec3 h = converted::present(converted::at(cars_, static_cast<std::size_t>(car)).car)->spec().half;
-  const spawn::Footprint me{{pos.x, pos.y}, yaw, {h.x, h.y}};
-  for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
-    const TrafficCar& o = converted::at(cars_, i);
-    if (static_cast<i32>(i) == car || !o.placed || !converted::present(world_)->actor_alive(o.actor)) continue;
-    const BodyState s = state_of(o.actor);
-    const Vec3 f = s.rotation.rotate({1, 0, 0});
-    const Vec3 oh = converted::present(o.car)->spec().half;
-    if (spawn::footprints_overlap(me, {{s.position.x, s.position.y}, kern::math::atan2(f.y, f.x), {oh.x, oh.y}})) { ++converted::present(gaps_)->overlap_denied; return false; }
-  }
-  return gaps_can_spawn(pos, 2.2, game_gaps_cpp_local::kVehicleEntryM);
-}
-void Game::car_body_dynamic(TrafficCar& c) {
-  // a car that was the host's puppet (a kinematic body on his poses) is driven here again
-  World& w = converted::present(world_)->physics();
-  const physics::Body b = body(c.actor);
-  if (!b.valid() || !w.body_valid(b) || w.body_type(b) == physics::BodyType::dynamic) return;
-  w.set_body_type(b, physics::BodyType::dynamic);
-  const RigidSpec rs = Car::rigid_spec(converted::present(c.car)->spec());
-  w.set_mass_data(b, rs.mass.mass, rs.mass.center, rs.mass.inertia);
-  w.set_awake(b, true);
-  converted::present(c.car)->reset();
-}
-namespace drone_cpp_local { constexpr f32 kBearingDrag = 1.5e-7; }
-namespace drone_cpp_local { constexpr f32 kMotorYawSign[4] = {-1, 1, -1, 1}; }
-namespace drone_cpp_local { constexpr f32 kNavRayMax = 215.0; }
-namespace drone_cpp_local { constexpr f32 kMinClearance = 0.5, kMaxClearance = 120.0; }
-namespace drone_cpp_local { f32 battery_ocv(f32 soc, f32 cells) {
-  const f32 s = clampf(soc, 0, 1);
-  return cells * std::fmin(4.2, 3.2625 + 0.9 * s + 0.0375 * tanh_bp((s - 0.12) * 18));
-} }
-namespace drone_cpp_local { f32 battery_under_load(f32 ocv, f32 amps, f32 r, f32 cells) {
-  return clampf(ocv - std::fmax(0.0, amps) * r, 3 * cells, 4.2 * cells);
-} }
-namespace drone_cpp_local { void encode_sbus(const std::array<u16, 16>& ch, std::array<u8, 25>& p) {
-  p.fill(0);
-  p[0] = 0x0F;
-  for (int c = 0; c < 16; converted::pre_inc(c))
-    for (int bit = 0; bit < 11; converted::pre_inc(bit))
-      if (converted::at(ch, c) & (converted::shl(1u, bit))) {
-        const int k = converted::plus(converted::plus(8, converted::times(c, 11)), bit);
-        converted::at(p, k / 8) |= static_cast<u8>(converted::shl(1u, (k % 8)));
-      }
-} }
-namespace drone_cpp_local { void put_be16(std::array<u8, 14>& out, u32 at, f32 v) {
-  const long r = std::lround(clampf(v, -32767, 32767));
-  const u16 u = static_cast<u16>(static_cast<int16_t>(r));
-  converted::at(out, at) = static_cast<u8>(u >> 8);
-  converted::at(out, at + 1) = static_cast<u8>(u & 0xff);
-} }
-namespace drone_cpp_local { f32 quat_yaw_deg(Quat q) {
-  return kern::math::atan2(2 * (q.w * q.z + q.x * q.y), 1 - 2 * (q.y * q.y + q.z * q.z)) / kDeg;
-} }
-void Drone::imu_bytes(f32 dt, const BodyState& s, std::array<u8, 14>& out) {
-  for (int i = 0; i < 3; converted::pre_inc(i)) {
-    converted::at(gyro_bias_, i) += noise_.gaussian() * 0.002 * kern::math::sqrt(dt);
-    converted::at(acc_bias_, i) += noise_.gaussian() * 0.00002 * kern::math::sqrt(dt);
-  }
-  const Vec3 omega_body = to_local(s.rotation, s.angular);
-  const Vec3 alpha = (omega_body - prev_omega_body_) * (1.0 / dt);
-  prev_omega_body_ = omega_body;
-  const Vec3 specific = to_local(s.rotation, world_accel_ - Vec3{0, 0, -kG});
-  const Vec3 off{0, 0, 0.008};
-  Vec3 accel = specific + converted::wide::cross(alpha, off) + converted::wide::cross(omega_body, converted::wide::cross(omega_body, off));
-  Vec3 gyro = omega_body * (1.0 / kDeg);
-  for (int i = 0; i < 3; converted::pre_inc(i)) {
-    accel[i] += converted::at(acc_bias_, i) * kG + noise_.gaussian() * 0.0025 * kG;
-    gyro[i] += converted::at(gyro_bias_, i) + noise_.gaussian() * 0.035;
-  }
-  out[0] = 0;
-  out[1] = 0;
-  drone_cpp_local::put_be16(out, 2, accel.x / kG * 2048);
-  drone_cpp_local::put_be16(out, 4, accel.y / kG * 2048);
-  drone_cpp_local::put_be16(out, 6, accel.z / kG * 2048);
-  drone_cpp_local::put_be16(out, 8, gyro.x * 16.4);
-  drone_cpp_local::put_be16(out, 10, gyro.y * 16.4);
-  drone_cpp_local::put_be16(out, 12, gyro.z * 16.4);
-}
-void Drone::motor_tick(f32 dt, const BodyState& s, f32 altitude, std::array<f32, 4>& thrust_out, std::array<f32, 4>& torque_out) {
-  const f32 ocv = drone_cpp_local::battery_ocv(soc_, p_.cells);
-  const f32 limit = std::fmin(p_.motor_limit_a, p_.esc_limit_a);
-  f32 total = 0;
-  for (int pass = 0; pass < 2; converted::pre_inc(pass)) {
-    total = 0;
-    for (int i = 0; i < 4; converted::pre_inc(i)) {
-      const f32 command = clampf((converted::at(pulses_, i) - 1000.0) / 1000.0, 0, 1);
-      const f32 volts = command * (pass ? vbatt_ : ocv);
-      converted::at(current_, i) = clampf((volts - back_emf_ * converted::at(omega_, i)) / p_.R, 0, limit);
-      total += converted::at(current_, i);
-    }
-    if (total > p_.battery_max_a && total > 1e-12) {
-      const f32 k = p_.battery_max_a / total;
-      for (f32& c : current_) c *= k;
-      total = p_.battery_max_a;
-    }
-    vbatt_ = drone_cpp_local::battery_under_load(ocv, total, p_.battery_r, p_.cells);
-  }
-  ibatt_ = total;
-  soc_ = clampf(soc_ - total * dt / (p_.capacity_ah * 3600), 0, 1);
-  const Vec3 local_v = to_local(s.rotation, s.velocity);
-  for (int i = 0; i < 4; converted::pre_inc(i)) {
-    const f32 rev = converted::at(omega_, i) / (2 * kPi);
-    const f32 prop_torque = p_.Cq * p_.rho * rev * rev * d5_;
-    const f32 motor_torque = back_emf_ * converted::at(current_, i);  // Kt = Ke in SI units
-    converted::at(motor_torque_, i) = motor_torque;
-    converted::at(prop_torque_, i) = prop_torque;
-    converted::at(omega_, i) = std::fmax(0.0, converted::at(omega_, i) + (motor_torque - prop_torque - drone_cpp_local::kBearingDrag * converted::at(omega_, i)) * dt / p_.J);
-    const f32 n = converted::at(omega_, i) / (2 * kPi);
-    f32 thrust = p_.Ct * p_.rho * n * n * d4_;
-    const f32 advance = local_v.z / std::fmax(1.0, n * p_.prop_d);
-    thrust *= clampf(1 - 0.12 * advance, 0.55, 1.25);
-    thrust *= 1 + p_.ground_effect * kern::math::exp(-altitude / std::fmax(0.02, 0.75 * p_.prop_d));
-    converted::at(thrust_out, i) += thrust;
-    converted::at(torque_out, i) += converted::at(drone_cpp_local::kMotorYawSign, i) * motor_torque;
-    converted::at(rotor_angle_, i) = kern::math::mod(converted::at(rotor_angle_, i) + (i % 2 ? -1.0 : 1.0) * converted::at(omega_, i) * dt, 2 * kPi);
-  }
-}
-void Drone::step(World& world, physics::Body body, f32 h, const DroneSticks& sticks) {
-  const BodyState s = read_body(world, body);
-  if (have_prev_ && h > 0) world_accel_ = (s.velocity - prev_velocity_) * (1.0 / h);
-  prev_velocity_ = s.velocity;
-  have_prev_ = true;
-
-  // Rangefinder: a Box3D ray along the body's -Z from just below the frame (groundRange).
-  const Vec3 down = s.rotation.rotate({0, 0, -1});
-  const f32 vertical = -down.z;
-  RayResult range;
-  // Like the original's filter (maskBits = COLLISION_TERRAIN) it sees only the fixed world - terrain
-  // and buildings: cars, pedestrians, ragdolls, animals and pigeons passing below do not make the
-  // altitude hold jump (each moving hit is stepped past).
-  if (vertical > 0.55) {
-    Vec3 o = s.position + s.rotation.rotate({0, 0, -0.018});
-    f32 travelled = 0;
-    for (int k = 0; k < 6; converted::pre_inc(k)) {
-      const physics::RayHit h = world.cast_ray(o, down * (drone_cpp_local::kNavRayMax - travelled), kCatWorld, body);
-      if (!h.hit) break;
-      const f32 d = h.fraction * (drone_cpp_local::kNavRayMax - travelled);
-      if (!h.body.valid() || world.body_type(h.body) == physics::BodyType::fixed) {
-        range.hit = true; range.distance = travelled + d; range.point = h.point; range.normal = h.normal;
-        break;
-      }
-      travelled += d + 0.02;
-      o = h.point + down * 0.02;
-      if (travelled >= drone_cpp_local::kNavRayMax) break;
-    }
-  }
-  const bool agl_valid = range.hit && range.distance >= 0.001;
-  const f32 true_agl = agl_valid ? range.distance * vertical : 999.0;
-  // Truth altitude above whatever is straight below (ground effect).
-  const RayResult below = cast(world, s.position, {0, 0, -1}, 50.0, body);
-  const f32 altitude = std::fmax(0.001, below.hit ? below.distance : 50.0);
-
-  // SBUS channels (simulator.mjs controls()).
-  std::array<u16, 16> ch;
-  for (u16& c : ch) c = 992;
-  auto centered = [](f32 v) { return static_cast<u16>(std::lround(992 + 820 * clampf(v, -1, 1))); };
-  ch[0] = centered(sticks.roll);
-  ch[1] = centered(sticks.pitch);
-  ch[3] = centered(sticks.yaw);
-  ch[4] = sticks.arm && !sticks.kill ? 1811 : 172;
-  if (sticks.game_mode) {
-    ch[2] = 172;
-    const f32 clearance = clampf(sticks.clearance, drone_cpp_local::kMinClearance, drone_cpp_local::kMaxClearance);
-    ch[5] = static_cast<u16>(std::lround(172 + 1639 * (clearance - drone_cpp_local::kMinClearance) / (drone_cpp_local::kMaxClearance - drone_cpp_local::kMinClearance)));
-    ch[6] = 1811;
-    ch[7] = centered(sticks.body_pitch);
-  } else {
-    ch[2] = static_cast<u16>(std::lround(172 + 1639 * clampf(sticks.throttle, 0, 1)));
-  }
-
-  const int ticks = std::max(1, static_cast<int>(std::lround(h * 1000.0)));
-  const f32 dt = h / static_cast<f32>(ticks);
-  std::array<f32, 4> thrust = {}, yaw_torque = {};
-  fc::RuntimeOutput out{};
-  for (int t = 0; t < ticks; converted::pre_inc(t)) {
-    fc::HardwareFrame hw{};
-    now_us_ += static_cast<f64>(dt) * 1e6;
-    hw.now_us = static_cast<u64>(converted::fits<converted::Whole>(now_us_));
-    hw.dt_us = static_cast<uint32_t>(std::lround(dt * 1e6));
-    imu_bytes(dt, s, hw.imu_registers);
-    hw.imu_present = true;
-    sbus_elapsed_ += dt;
-    if (sbus_elapsed_ >= 0.01) {
-      sbus_elapsed_ -= 0.01;
-      drone_cpp_local::encode_sbus(ch, hw.sbus_frame);
-      hw.sbus_present = true;
-    }
-    nav_elapsed_ += dt;
-    if (nav_elapsed_ >= 0.01) {
-      nav_elapsed_ -= 0.01;
-      for (int i = 0; i < 3; converted::pre_inc(i)) {
-        const f32 measured = s.velocity[i] + nav_noise_.gaussian() * 0.025;
-        nav_filtered_[i] += 0.42 * (measured - nav_filtered_[i]);
-      }
-      f32 agl = 0;
-      if (agl_valid) agl = std::fmax(0.0, range.distance + nav_noise_.gaussian() * 0.004) * vertical;
-      const f32 heading = drone_cpp_local::quat_yaw_deg(s.rotation) + heading_noise_.gaussian() * 0.12;
-      hw.navigation_frame = hwcontract::encode_navigation_wire(nav_seq_++, nav_filtered_.x, nav_filtered_.y, nav_filtered_.z, agl, true, agl_valid,
-                                                               heading, true);
-      hw.navigation_present = true;
-    }
-    if (reset_flag_) { fw_.reset(); reset_flag_ = false; }
-    out = fw_.step(hw);
-    for (int i = 0; i < 4; converted::pre_inc(i)) converted::at(pulses_, i) = sticks.kill ? 1000 : converted::at(out.motor_us, i);
-    motor_tick(dt, s, altitude, thrust, yaw_torque);
-  }
-
-  // A latched firmware fault on a disarmed airframe at rest (calibration while it was still
-  // settling, a crash): the pilot power-cycles it, as with the real quad - the FC boots and
-  // calibrates again.
-  if (out.fault != fc::kFaultNone && !out.armed && converted::wide::length(s.velocity) < 0.05 && converted::wide::length(s.angular) < 0.05) reset_flag_ = true;
-
-  // Parked (motors stopped, at rest for 0.5 s): no forces to apply.
-  bool commanded = false;
-  for (int i = 0; i < 4; converted::pre_inc(i)) commanded |= converted::at(pulses_, i) > 1000 || converted::at(omega_, i) > 1e-3;
-  if (commanded) parked_steps_ = 0, parked_ = false;
-  else if (converted::wide::length(s.velocity) < 2e-3 && converted::wide::length(s.angular) < 2e-3) parked_ = ++parked_steps_ > static_cast<u32>(converted::fits<unsigned int>(0.5 / h));
-  else parked_steps_ = 0, parked_ = false;
-
-  const f32 inv = 1.0 / static_cast<f32>(ticks);
-  if (commanded) {
-    for (int i = 0; i < 4; converted::pre_inc(i)) {
-      world.apply_force(body, s.rotation.rotate({0, 0, converted::at(thrust, i) * inv}), s.position + s.rotation.rotate(converted::at(motor_pos_, i)));
-      world.apply_torque(body, s.rotation.rotate({0, 0, converted::at(yaw_torque, i) * inv}));
-    }
-  }
-  const Vec3 rel = to_local(s.rotation, s.velocity - p_.wind);
-  const f32 hs = hypot_bp(rel.x, rel.y);
-  const Vec3 drag{-0.5 * p_.rho * cdA_.x * rel.x * hs, -0.5 * p_.rho * cdA_.y * rel.y * hs, -0.5 * p_.rho * cdA_.z * rel.z * std::fabs(rel.z)};
-  world.apply_force_to_center(body, s.rotation.rotate(drag));
-  const Vec3 w = to_local(s.rotation, s.angular);
-  world.apply_torque(body, s.rotation.rotate({-0.0012 * w.x * std::fabs(w.x), -0.0012 * w.y * std::fabs(w.y), -0.0012 * w.z * std::fabs(w.z)}));
-
-  tele_.state = out.state;
-  tele_.armed = out.armed;
-  tele_.calibrating = (out.state & fc::kStateCalibrating) != 0;
-  tele_.fault = (out.state & fc::kStateFault) != 0;
-  tele_.game = (out.state & fc::kStateGameMode) != 0;
-  tele_.nav_valid = (out.state & fc::kStateNavigationValid) != 0;
-  for (int i = 0; i < 4; converted::pre_inc(i)) { converted::at(tele_.pulses, i) = converted::at(pulses_, i); converted::at(tele_.omega, i) = converted::at(omega_, i); converted::at(tele_.motor_torque, i) = converted::at(motor_torque_, i); converted::at(tele_.prop_torque, i) = converted::at(prop_torque_, i); }
-  tele_.battery_v = vbatt_;
-  tele_.battery_soc = soc_;
-  tele_.current_a = ibatt_;
-  tele_.agl = agl_valid ? true_agl : -1;
-  tele_.speed = converted::wide::length(s.velocity);
-  tele_.vz = s.velocity.z;
-  for (int i = 0; i < 3; converted::pre_inc(i)) converted::at(tele_.attitude_deg, i) = converted::at(out.attitude_cdeg, i) * 0.01;
-}
-void Game::osfx(const char* fn, Vec3 at, f32 a, f32 b, f32 c) {
-  if (!web_audio_ || osfx_.size() > converted::times(256, 1024)) return;  // nobody drains it: never grow without bound
-  char buf[192];
-  std::snprintf(buf, sizeof buf, "%s[\"%s\",%.2f,%.2f,%.2f,%.5g,%.5g,%.5g]", osfx_.empty() ? "" : ",", fn, static_cast<double>(at.x), static_cast<double>(at.y), static_cast<double>(at.z), static_cast<double>(a), static_cast<double>(b), static_cast<double>(c));
-  osfx_ += buf;
-}
-namespace gaps { u32 hash_text(const std::string& s) {
-  u32 h = 2166136261u;
-  for (unsigned char c : s) { h ^= c; h *= 16777619u; }
-  return h;
-} }
-namespace gaps { f32 unit_hash(u32 x) {
-  x ^= x >> 16;
-  x *= 0x7feb352du;
-  x ^= x >> 15;
-  x *= 0x846ca68bu;
-  x ^= x >> 16;
-  return static_cast<f32>(static_cast<f64>(x) / 4294967295.0);
-} }
-namespace gaps { namespace gaps_rules_cpp_local { Vec3 rgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; } } }
-namespace gaps { f32 SmokeField::start(const std::string& id, Vec3 at, f32 scale, f32 delay_s, f32 now) {
-  for (SmokeEffect& e : effects_)
-    if (e.id == id) { e.at = at; return e.expires; }
-  SmokeEffect e;
-  e.id = id;
-  e.at = at;
-  e.scale = std::fmax(0.35, scale);
-  e.started = now;
-  e.expires = now + std::fmax(0.25, delay_s);
-  e.seed = hash_text(id);
-  effects_.push_back(e);
-  emit(converted::back(effects_), now);
-  converted::back(effects_).last_emit = now;
-  return e.expires;
-} }
-namespace gaps { void SmokeField::emit(SmokeEffect& e, f32 now) {
-  if (puffs_.empty()) return;
-  // choosePuff: a free one, else the oldest
-  i32 at = -1;  // (its place in puffs_)
-  for (std::size_t i = 0; i < puffs_.size(); converted::pre_inc(i))
-    if (!converted::at(puffs_, i).alive) { at = static_cast<i32>(i); break; }
-  if (at < 0) {
-    at = 0;
-    for (std::size_t i = 0; i < puffs_.size(); converted::pre_inc(i))
-      if (converted::at(puffs_, i).born < converted::at(puffs_, static_cast<std::size_t>(at)).born) at = static_cast<i32>(i);
-  }
-  const f32 progress = clampf((now - e.started) / std::fmax(1e-3, e.expires - e.started), 0, 1);
-  const u32 serial = e.serial;
-  e.serial += 1;
-  const u32 seed = hash_text(e.id + ":" + std::to_string(serial));
-  const f32 a = unit_hash(seed) * 2 * kPi, side = (unit_hash(seed + 17) - 0.5) * (0.22 + e.scale * 0.18);
-  const bool ember = progress > 0.67 && serial % 5 == 0;
-  Puff& p = converted::at(puffs_, static_cast<std::size_t>(at));
-  p.alive = true;
-  p.ember = ember;
-  p.pos = e.at + Vec3{kern::math::cos(a) * side, kern::math::sin(a) * side, 0};
-  p.vel = {kern::math::cos(a) * (0.07 + unit_hash(seed + 31) * 0.19), kern::math::sin(a) * (0.07 + unit_hash(seed + 47) * 0.19), 0.46 + unit_hash(seed + 61) * 0.40 + progress * 0.30};
-  p.born = now;
-  p.expires = now + (ember ? 0.42 : 1.25 + unit_hash(seed + 79) * 0.52);
-  p.s0 = e.scale * (ember ? 0.10 : 0.38 + unit_hash(seed + 97) * 0.19);
-  p.s1 = e.scale * (ember ? 0.035 : 1.32 + unit_hash(seed + 113) * 0.42);
-  p.serial = serial;
-  p.rotation = 0;
-  p.color = ember ? gaps::gaps_rules_cpp_local::rgb(0xff8a3d) : progress > 0.55 ? gaps::gaps_rules_cpp_local::rgb(0xb9bec6) : gaps::gaps_rules_cpp_local::rgb(0x8f949c);
-  p.opacity = ember ? 0.94 : 0.54 + progress * 0.18;
-} }
-namespace gaps { bool SmokeField::accelerate(const std::string& id, f32 expires_at, f32 now) {
-  for (SmokeEffect& e : effects_)
-    if (e.id == id) { e.expires = std::fmin(e.expires, std::fmax(now + 0.18, expires_at)); return true; }
-  return false;
-} }
-namespace gaps { void SmokeField::stop(const std::string& id) {
-  converted::erase(effects_, std::remove_if(effects_.begin(), effects_.end(), [&](const SmokeEffect& e) { return e.id == id; }), effects_.end());
-} }
-namespace game_gaps_cpp_local { constexpr f32 kJetHpMax = 400; }
-namespace game_gaps_cpp_local { constexpr f32 kJetBurnS = 12; }
-void Game::gaps_jet_damage(f32 amount) {
-  // jet_mode.mjs damageAirframe: HP 400; thrust .35 + hp / 200 * .65 (.35 .. 1); at 15 % it burns
-  // for 12 s, at 0 it breaks up at once.
-  if (!(amount > 0) || !jet_placed_) return;
-  if (amount > 8 && mode_ == Mode::jet) osfx("jet_mode.knock", matrix_of(jet_actor_).translation());  // damageAirframe: sfx("bounce", .3, .6)
-  GapsState& g = *converted::present(gaps_);
-  const f32 now = converted::present(world_)->sim_time();
-  jet_hp_ = std::fmax(0.0, std::fmin(jet_hp_, game_gaps_cpp_local::kJetHpMax) - amount);
-  jet_.thrust_scale = clampf(0.35 + jet_hp_ / (game_gaps_cpp_local::kJetHpMax * 0.5) * 0.65, 0.35, 1);
-  look_.shake.trauma = std::fmin(1.0, look_.shake.trauma + std::fmin(0.6, amount / 120));  // addTrauma
-  if (jet_hp_ <= game_gaps_cpp_local::kJetHpMax * 0.15 && jet_hp_ > 0 && !g.jet_burning) {
-    g.jet_burning = true;
-    g.smoke.start("jet", matrix_of(jet_actor_).translation(), 2.2, game_gaps_cpp_local::kJetBurnS, now);
-    toast_ = "JET BRENNT";
-    toast_age_ = 0;
-  }
-  if (jet_hp_ <= 0) {
-    g.jet_burning = true;
-    g.smoke.accelerate("jet", now, now);  // goes off on the next frame (at least 0.18 s)
-    g.smoke.stop("jet");
-  }
-}
-namespace jet_cpp_local { constexpr f32 G = 9.81; }
-namespace jet_cpp_local { constexpr f32 kSound = 340; }
-namespace jet_cpp_local { f32 wave_cd(f32 m) { const f32 x = (m - 1.02) / 0.16; return kern::math::exp(-(x * x)) * 0.012 + (m > 1.02 ? 0.006 : 0.0); } }
-namespace jet_cpp_local { Vec3 nrm(Vec3 a) { const f32 l = converted::wide::length(a); return l > 1e-9 ? a * (1.0 / l) : Vec3{}; } }
-f32 air_density(f32 h) { return 1.225 * kern::math::exp(-std::fmax(0.0, h) / 8500.0); }
-Jet::Aero Jet::aero(Vec3 vb, Vec3 wb, f32 V, f32 rho, f32 de, f32 da, f32 dr) const {
-  const JetSpec& s = s_;
-  Aero a{};
-  a.qbar = 0.5 * rho * V * V;
-  const f32 u = vb.y, vs = vb.x, wu = vb.z;
-  a.alpha = kern::math::atan2(-wu, u);
-  a.beta = V > 1e-3 ? kern::math::asin(clampf(vs / V, -1, 1)) : 0;
-  const f32 am = clampf(a.alpha, -1, 1);
-  const f32 sig = 1.0 / (1.0 + kern::math::exp(-(std::fabs(a.alpha) - s.alpha_stall) / 0.04));
-  const f32 CLlin = s.CL0 + s.CLa * am, CLfp = kern::math::sin(2 * a.alpha);
-  a.CL = (1 - sig) * CLlin + sig * CLfp;
-  const f32 sa = kern::math::sin(a.alpha);
-  a.CD = s.CD0 + jet_cpp_local::wave_cd(V / jet_cpp_local::kSound) + (1 - sig) * s.K * CLlin * CLlin + sig * 2 * sa * sa + (gear_down_ ? s.gear_CD : 0) + (speed_brake_ ? s.brake_CD : 0);
-  a.CY = s.CYb * a.beta;
-  const f32 hv = V > 1 ? 0.5 / V : 0;
-  const f32 qh = wb.x * s.chord * hv, ph = wb.y * s.span * hv, rh = -wb.z * s.span * hv;
-  const f32 Cm = s.Cm0 + s.Cma * am + s.Cmq * qh + s.Cmde * de;
-  const f32 Cl = s.Clb * a.beta + s.Clp * ph + s.Clr * rh + s.Clda * da;
-  const f32 Cn = s.Cnb * a.beta + s.Cnr * rh + s.Cnp * ph + s.Cndr * dr;
-  a.moment = {a.qbar * s.wing_area * s.chord * Cm, a.qbar * s.wing_area * s.span * Cl, -a.qbar * s.wing_area * s.span * Cn};
-  return a;
-}
-void Jet::step(World& world, physics::Body body, f32 dt, const JetInput& inp) {
-  const JetSpec& s = s_;
-  const BodyState st = read_body(world, body);
-  const f32 m = s.mass;
-  const Vec3 I = s.inertia;
-  const Quat q = st.rotation;
-  const Vec3 pos = st.position, v = st.velocity, w = st.angular;
-  const Vec3 fwd = q.rotate({0, 1, 0}), right = q.rotate({1, 0, 0}), up = q.rotate({0, 0, 1});
-  const Vec3 vb = to_local(q, v), wb = to_local(q, w);
-  const f32 V = converted::wide::length(v), rho = air_density(pos.z);
-  const f32 att_pitch = kern::math::asin(clampf(fwd.z, -1, 1)), att_roll = kern::math::atan2(-right.z, up.z), att_heading = kern::math::atan2(-fwd.x, fwd.y);
-  Vec3 force, torque;
-
-  // ---------------- landing gear (ray-cast struts)
-  gear_down_ = mode_ == Mode::hover || V < s.wing_borne_v || contacts_ > 0;
-  i32 contacts = 0;
-  f32 gear_impact = 0;
-  const f32 steer_target = V < 30 ? clampf(inp.yaw, -1, 1) * 0.5 : clampf(inp.yaw, -1, 1) * 0.08;
-  steer_ = rate_limit(steer_, steer_target, dt * 1.5);
-  if (gear_down_) {
-    const Vec3 down = -up;
-    RayResult hits[3];
-    i32 n_contact = 0;
-    for (int i = 0; i < 3; converted::pre_inc(i)) {
-      const Vec3 attach = pos + q.rotate(converted::at(s.gear, i).p);
-      const RayResult h = cast(world, attach, down, s.strut_rest + 0.4, body);
-      if (h.hit && h.distance < s.strut_rest) { converted::at(hits, i) = h; converted::pre_inc(n_contact); }
-    }
-    for (int i = 0; i < 3; converted::pre_inc(i)) {
-      if (!converted::at(hits, i).hit) continue;
-      const RayResult& hit = converted::at(hits, i);
-      const f32 comp = s.strut_rest - hit.distance;
-      const Vec3 n = jet_cpp_local::nrm(hit.normal);
-      const Vec3 rc = hit.point - pos;
-      const Vec3 vp = converted::wide::cross(w, rc) + v;
-      const f32 comp_rate = converted::wide::dot(vp, down);
-      const f32 share = converted::at(s.gear, i).load * m, k = share * jet_cpp_local::G / s.strut_static, c = 2 * s.strut_zeta * kern::math::sqrt(k * share);
-      const f32 stiff = comp > s.strut_max ? k * 12 * (comp - s.strut_max) : 0;
-      if (comp_rate > gear_impact) gear_impact = comp_rate;
-      const f32 N = std::fmax(0.0, k * comp + stiff + c * comp_rate);
-      converted::pre_inc(contacts);
-      Vec3 fw = jet_cpp_local::nrm(fwd - n * converted::wide::dot(fwd, n));
-      if (converted::at(s.gear, i).steer && steer_ != 0) {
-        const f32 cs = kern::math::cos(steer_), sn = kern::math::sin(steer_);
-        const Vec3 side = converted::wide::cross(fw, n);
-        fw = jet_cpp_local::nrm(fw * cs + side * sn);
-      }
-      const Vec3 sw = converted::wide::cross(fw, n);
-      const f32 vf = converted::wide::dot(vp, fw), vsd = converted::wide::dot(vp, sw);
-      auto m_at = [&](Vec3 d) {
-        const Vec3 u = to_local(q, converted::wide::cross(rc, d));
-        return 1.0 / (1.0 / m + u.x * u.x / I.x + u.y * u.y / I.y + u.z * u.z / I.z);
-      };
-      const f32 share3 = 0.8 / std::fmax(1.0, static_cast<f32>(n_contact));
-      const f32 stop_l = m_at(fw) * share3 / std::fmax(1e-3, dt), stop_s = m_at(sw) * share3 / std::fmax(1e-3, dt);
-      const f32 brake = clampf(inp.brake, 0, 1), long_max = (s.roll_mu + brake * s.brake_mu) * N, lat_max = s.tyre_mu * N;
-      const f32 Fl = -sign0(vf) * std::fmin(long_max, std::fabs(vf) * stop_l), Fs = -sign0(vsd) * std::fmin(lat_max, std::fabs(vsd) * stop_s);
-      const Vec3 F = n * N + fw * Fl + sw * Fs;
-      force += F;
-      torque += converted::wide::cross(rc, F);
-    }
-  }
-  gear_impact_ = contacts > 0 && contacts_ == 0 ? gear_impact : 0;
-  contacts_ = contacts;
-
-  // ---------------- flight computer
-  const RayResult radar = cast(world, pos, {0, 0, -1}, 400, body);
-  const f32 agl = radar.hit ? std::fmax(0.0, radar.distance - s.gear_height) : 400;
-  const bool pilot_ok = pilot && engine_on;
-  const f32 w_flight = clampf((V - s.hover_law_v) / (s.wing_borne_v - s.hover_law_v), 0, 1);
-  const bool on_ground = contacts >= 2;
-  const f32 nozzle_target = !engine_on ? nozzle_
-                            : mode_ == Mode::hover ? (V > s.hover_speed + 5 ? s.braking_nozzle : kPi / 2)
-                                                   : s.transition_nozzle * clampf(1 - V / (s.wing_borne_v - 5), 0, 1);
-  nozzle_ = rate_limit(nozzle_, nozzle_target, s.nozzle_rate * dt);
-  const f32 cn = kern::math::cos(nozzle_), sn = kern::math::sin(nozzle_);
-  const Vec3 thrust_dir = fwd * cn + up * sn;
-  const f32 lapse = kern::math::pow(rho / 1.225, 0.7) * clampf(thrust_scale, 0, 1), Tmax = s.thrust_max * lapse;
-  if (mode_ == Mode::flight && pilot_ok) lever_ = clampf(lever_ + inp.lift * dt * 0.55, 0, 1);
-  speed_brake_ = (mode_ == Mode::flight && lever_ <= 0.001 && inp.lift < -0.4) || (mode_ == Mode::hover && V > 30);
-  const f32 vz_want = mode_ == Mode::flight ? 0
-                      : inp.lift > 0 ? inp.lift * s.hover_climb
-                                     : std::fmax(inp.lift * s.hover_sink, -std::fmin(kern::math::sqrt(3 * agl) + 0.6, 0.6 * agl + 0.8));
-  vz_cmd_ = rate_limit(vz_cmd_valid_ ? vz_cmd_ : v.z, vz_want, 11 * dt);
-  vz_cmd_valid_ = true;
-  const f32 vz_cmd = vz_cmd_;
-  const f32 az_now = thrust_ * thrust_dir.z / m - jet_cpp_local::G, vz_err = vz_cmd - (v.z + 0.8 * s.spool_up * az_now);
-  const f32 tvert_raw = m * (jet_cpp_local::G + 2.4 * vz_err + vz_i_) / std::fmax(0.25, thrust_dir.z);
-  if (!on_ground && tvert_raw > 0 && tvert_raw < Tmax) vz_i_ = 0;
-  if (on_ground && inp.lift <= 0.05) { vz_i_ = 0; vz_cmd_ = 0; }
-  const f32 tvert = on_ground && inp.lift <= 0.05 ? 0 : clampf(tvert_raw, 0, Tmax);
-  const f32 tlever = (lever_ > 0.86 ? s.thrust_dry + (s.thrust_max - s.thrust_dry) * (lever_ - 0.86) / 0.14 : s.thrust_dry * lever_ / 0.86) * lapse;
-  const f32 support = mode_ == Mode::flight ? clampf(sn * 2.5, 0, 1) : 1;
-  thrust_cmd_ = !engine_on ? 0 : clampf(mode_ == Mode::flight ? tlever + support * std::fmax(0.0, tvert - tlever) : tvert, 0, Tmax);
-  thrust_ += (thrust_cmd_ - thrust_) * (1 - kern::math::exp(-dt / (thrust_cmd_ > thrust_ ? s.spool_up : s.spool_down)));
-  force += thrust_dir * thrust_;
-
-  // rate commands: hover law blended into the flight law
-  f32 pC = 0, qC = 0, rC = 0;
-  {
-    const f32 h = att_heading;
-    const Vec2 fh{-kern::math::sin(h), kern::math::cos(h)}, rh{kern::math::cos(h), kern::math::sin(h)};
-    const f32 vF = v.x * fh.x + v.y * fh.y, vR = v.x * rh.x + v.y * rh.y;
-    const f32 aF = clampf(1.1 * (-inp.pitch * s.hover_speed - vF), -4, 4), aR = clampf(1.1 * (inp.roll * s.hover_speed - vR), -4, 4);
-    const f32 tilt = s.hover_tilt * clampf(0.25 + agl / 8, 0, 1) * clampf((42 - V) / 20, 0.12, 1);
-    const bool trc = mode_ == Mode::hover;
-    const f32 pitch_cmd = trc ? clampf(-kern::math::atan(aF / jet_cpp_local::G) + inp.pitch * 0.07, -tilt, tilt) : 0.05 + inp.pitch * 0.3;
-    const f32 roll_cmd = trc ? clampf(kern::math::atan(aR / jet_cpp_local::G) + inp.roll * 0.33, -tilt, tilt) : inp.roll * 0.5;
-    const f32 hq = 2.6 * (pitch_cmd - att_pitch), hp = 2.6 * (roll_cmd - att_roll), hr = inp.yaw * 0.8;
-    pC += (1 - w_flight) * hp;
-    qC += (1 - w_flight) * hq;
-    rC += (1 - w_flight) * hr;
-  }
-  {
-    if (w_flight < 0.05) gamma_valid_ = false;
-    const f32 Vs = std::fmax(V, 30.0), gamma = V > 1 ? kern::math::asin(clampf(v.z / V, -1, 1)) : 0, phi = att_roll;
-    f32 qf;
-    if (std::fabs(inp.pitch) > 0.05) {
-      gamma_valid_ = false;
-      qf = inp.pitch > 0 ? inp.pitch * std::fmin(s.q_max, s.g_limit * jet_cpp_local::G / Vs) : inp.pitch * std::fmin(0.8, s.g_push * jet_cpp_local::G / Vs);
-    } else {
-      if (mode_ == Mode::hover) { gamma_hold_ = kern::math::asin(clampf(vz_cmd / Vs, -0.5, 0.5)); gamma_valid_ = true; }
-      else if (!gamma_valid_ || w_flight < 0.99) { gamma_hold_ = w_flight < 0.99 ? 0 : gamma; gamma_valid_ = true; }
-      const f32 level = std::fabs(phi) < 1.4 ? jet_cpp_local::G * kern::math::sin(phi) * kern::math::tan(clampf(phi, -1.3, 1.3)) / Vs : 0;
-      qf = std::fabs(phi) < 1.4 ? level + clampf(1.2 * (gamma_hold_ - gamma), -0.15, 0.15) * kern::math::cos(phi) : 0;
-    }
-    const f32 a = kern::math::atan2(-vb.z, std::fmax(0.5, vb.y));
-    if (a > s.alpha_limit) qf = std::fmin(qf, 2.5 * (s.alpha_limit - a));
-    if (a < -0.2) qf = std::fmax(qf, 2.5 * (-0.2 - a));
-    const f32 rf = jet_cpp_local::G * kern::math::sin(phi) * kern::math::cos(att_pitch) / Vs + inp.yaw * 0.35;
-    pC += w_flight * inp.roll * s.p_max;
-    qC += w_flight * qf;
-    rC += w_flight * rf;
-  }
-  const f32 p = wb.y, qq = wb.x, r = -wb.z;
-  f32 want_x = I.x * 4.5 * (qC - qq), want_y = I.y * 35 * (pC - p), want_z = -I.z * 3.2 * (rC - r);
-  const f32 beta = V > 1 ? kern::math::asin(clampf(vb.x / V, -1, 1)) : 0;
-  want_z += -I.z * w_flight * 1.8 * beta * std::fmin(1.0, V / 60);
-  const Vec3 Iw{I.x * wb.x, I.y * wb.y, I.z * wb.z}, gyro = converted::wide::cross(wb, Iw);
-  want_x += gyro.x;
-  want_y += gyro.y;
-  want_z += gyro.z;
-  const bool ctl = pilot_ok && !(on_ground && (mode_ == Mode::hover || V < 40));
-  const Aero base = aero(vb, wb, std::fmax(V, 1e-3), rho, 0, 0, 0);
-  const f32 qS = base.qbar * s.wing_area;
-  f32 deT = 0, daT = 0, drT = 0;
-  Vec3 rcs;
-  if (ctl) {
-    if (qS > 1) {
-      deT = clampf((want_x - base.moment.x) / (qS * s.chord * s.Cmde), -s.de_max, s.de_max);
-      daT = clampf((want_y - base.moment.y) / (qS * s.span * s.Clda), -s.da_max, s.da_max);
-      drT = clampf(-(want_z - base.moment.z) / (qS * s.span * s.Cndr), -s.dr_max, s.dr_max);
-    }
-    const f32 avail = kern::math::sin(nozzle_) * clampf(thrust_ / (0.4 * s.thrust_max), 0, 1);
-    const Vec3 left{want_x - base.moment.x - qS * s.chord * s.Cmde * deT, want_y - base.moment.y - qS * s.span * s.Clda * daT,
-                    want_z - base.moment.z + qS * s.span * s.Cndr * drT};
-    rcs = {clampf(left.x, -s.rcs_max.x * avail, s.rcs_max.x * avail), clampf(left.y, -s.rcs_max.y * avail, s.rcs_max.y * avail),
-           clampf(left.z, -s.rcs_max.z * avail, s.rcs_max.z * avail)};
-  }
-  de_ = rate_limit(de_, deT, s.surface_rate * dt);
-  da_ = rate_limit(da_, daT, s.surface_rate * dt);
-  dr_ = rate_limit(dr_, drT, s.surface_rate * dt);
-
-  // ---------------- aerodynamics with the real surface positions
-  Aero A{};
-  bool has_aero = false;
-  if (V > 0.5) {
-    A = aero(vb, wb, V, rho, de_, da_, dr_);
-    has_aero = true;
-    const Vec3 vh = v * (1.0 / V);
-    const f32 qS2 = A.qbar * s.wing_area;
-    const Vec3 lift_dir = jet_cpp_local::nrm(up - vh * converted::wide::dot(up, vh)), side_dir = jet_cpp_local::nrm(right - vh * converted::wide::dot(right, vh));
-    force += lift_dir * (qS2 * A.CL);
-    force += vh * (-qS2 * A.CD);
-    force += side_dir * (qS2 * A.CY);
-    torque += q.rotate(A.moment);
-  }
-  torque += q.rotate(rcs);
-
-  world.apply_force_to_center(body, force);
-  world.apply_torque(body, torque);
-
-  // ---------------- arcade handling (dogfights): the stick sets the rates directly and the flight
-  // path follows the nose - bank and it turns, pull and it comes round, the yaw in the hover is quick
-  if (arcade && pilot_ok && !on_ground) {
-    const f32 k = 1 - kern::math::exp(-dt * 9);
-    const f32 Vs = std::fmax(V, 30.0);
-    const f32 turn = w_flight * jet_cpp_local::G * kern::math::sin(att_roll) * kern::math::cos(att_pitch) / Vs;  // coordinated
-    Vec3 want = wb;
-    // flight: pitch 1.6 rad/s, roll 3.4 rad/s, yaw .7 rad/s + the bank's turn
-    want.x += w_flight * (clampf(inp.pitch, -1, 1) * 1.6 - wb.x);
-    want.y += w_flight * (clampf(inp.roll, -1, 1) * 3.4 - wb.y);
-    // the yaw everywhere: the hover turns on the spot at 1.5 rad/s
-    // in the hover the right stick's sideways turns it too (one thumb aims, as in arcade games)
-    const f32 yaw_rate = (1 - w_flight) * clampf(inp.yaw + inp.roll * 0.7, -1, 1) * 1.5 + w_flight * (clampf(inp.yaw, -1, 1) * 0.7 + turn);
-    want.z += (-yaw_rate - wb.z);
-    world.set_angular_velocity(body, q.rotate(wb + (want - wb) * k));
-    if (V > 20 && w_flight > 0) {
-      const Vec3 vd = v * (1.0 / V);
-      const f32 kv = 1 - kern::math::exp(-dt * 3.2 * w_flight);
-      const Vec3 nd = jet_cpp_local::nrm(vd + (fwd - vd) * kv);
-      if (converted::wide::dot(nd, nd) > 0.5) world.set_linear_velocity(body, nd * V);
-    }
-  }
-
-  landed_ = contacts >= 2 && V < 1.5 && mode_ == Mode::hover && inp.lift <= 0.15;
-  tele_.V = V;
-  tele_.agl = agl;
-  tele_.mach = V / jet_cpp_local::kSound;
-  tele_.alpha = has_aero ? A.alpha : 0;
-  tele_.beta = has_aero ? A.beta : 0;
-  tele_.nz = converted::wide::dot(force, up) / (m * jet_cpp_local::G);
-  tele_.thrust = thrust_;
-  tele_.nozzle = nozzle_;
-  tele_.contacts = contacts;
-  tele_.pitch = att_pitch;
-  tele_.roll = att_roll;
-  tele_.heading = att_heading;
-  tele_.w_flight = w_flight;
-}
-Vec2 Terrain::flow_at(f32 x, f32 y) const {
-  const i32 cx = static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), cy = static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell)));
-  auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
-  if (it == water_.end() || it->second.flow.empty() || !water_at(x, y)) return {};
-  const u32 idx = static_cast<u32>(converted::plus(converted::times((cy & 15), 16), (cx & 15)));
-  return converted::at(it->second.flow, idx) * converted::at(it->second.speed, idx);
-}
-u64 lane_signature(const std::vector<Lane>& lanes) {
-  u64 h = 1469598103934665603ull;
-  for (std::size_t i = 0; i < lanes.size(); converted::pre_inc(i)) {
-    h ^= (converted::shl_bits(static_cast<u64>(i), 1)) | (converted::at(lanes, i).alive ? 1u : 0u);
-    converted::times_bits_to(h, 1099511628211ull);
-  }
-  return h;
-}
-namespace road_graph_cpp_local { constexpr f32 kCell = 3.5; }
-namespace road_graph_cpp_local { u64 cell_key(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); } }
-namespace road_graph_cpp_local { f32 dist(Vec2 a, Vec2 b) { return hypot_bp(a.x - b.x, a.y - b.y); } }
-i32 RoadGraph::node_at(Vec2 p) {
-  const i32 cx = static_cast<i32>(converted::fits<int>(std::floor(p.x / road_graph_cpp_local::kCell))), cy = static_cast<i32>(converted::fits<int>(std::floor(p.y / road_graph_cpp_local::kCell)));
-  for (i32 dx = -1; dx <= 1; converted::pre_inc(dx))
-    for (i32 dy = -1; dy <= 1; converted::pre_inc(dy)) {
-      auto it = cells_.find(road_graph_cpp_local::cell_key(converted::plus(cx, dx), converted::plus(cy, dy)));
-      if (it != cells_.end() && road_graph_cpp_local::dist(converted::at(nodes_, it->second).p, p) < road_graph_cpp_local::kCell) return it->second;
-    }
-  const i32 id = static_cast<i32>(nodes_.size());
-  nodes_.push_back({p, {}});
-  cells_[road_graph_cpp_local::cell_key(cx, cy)] = id;
-  return id;
-}
-void RoadGraph::rebuild(const std::vector<Lane>& lanes) {
-  nodes_.clear();
-  cells_.clear();
-  for (const Lane& l : lanes) {
-    if (!l.alive || l.points.size() < 2) continue;
-    i32 prev = node_at(converted::at(l.points, 0));
-    for (std::size_t i = 1; i < l.points.size(); converted::pre_inc(i)) {
-      const i32 cur = node_at(converted::at(l.points, i));
-      if (cur == prev) continue;
-      const f32 len = road_graph_cpp_local::dist(converted::at(nodes_, prev).p, converted::at(nodes_, cur).p);
-      auto link = [&](i32 a, i32 b) {
-        for (auto& e : converted::at(nodes_, a).edges)
-          if (e.first == b) return;
-        converted::at(nodes_, a).edges.push_back({b, len});
-      };
-      link(prev, cur);
-      link(cur, prev);
-      prev = cur;
-    }
-  }
-  built_from = lane_signature(lanes);
-}
-namespace road_graph_cpp_local { using Item = std::pair<f32, i32>; }
-namespace road_graph_cpp_local { bool before(const Item& x, const Item& y) { return x.first < y.first || (!(y.first < x.first) && x.second < y.second); } }
-namespace road_graph_cpp_local { void heap_push(std::vector<Item>& h, Item x) {
-  std::size_t i = h.size();
-  h.push_back(x);
-  while (i > 0) {
-    const std::size_t up = converted::quot((converted::minus(i, 1)), 2);
-    if (!before(converted::at(h, i), converted::at(h, up))) break;
-    std::swap(converted::at(h, i), converted::at(h, up));
-    i = up;
-  }
-} }
-namespace road_graph_cpp_local { Item heap_pop(std::vector<Item>& h) {
-  const Item top = converted::at(h, 0);
-  converted::at(h, 0) = converted::back(h);
-  converted::pop_back(h);
-  std::size_t i = 0;
-  while (converted::plus(converted::times(2, i), 1) < h.size()) {
-    const std::size_t l = converted::plus(converted::times(2, i), 1), r = converted::plus(l, 1);
-    std::size_t m = before(converted::at(h, l), converted::at(h, i)) ? l : i;
-    if (r < h.size() && before(converted::at(h, r), converted::at(h, m))) m = r;
-    if (m == i) break;
-    std::swap(converted::at(h, i), converted::at(h, m));
-    i = m;
-  }
-  return top;
-} }
-i32 RoadGraph::nearest(Vec2 p, f32 max_m) const {
-  i32 best = -1;
-  f32 bd = max_m;
-  for (std::size_t i = 0; i < nodes_.size(); converted::pre_inc(i)) {
-    const f32 d = road_graph_cpp_local::dist(converted::at(nodes_, i).p, p);
-    if (d < bd) { bd = d; best = static_cast<i32>(i); }
-  }
-  return best;
-}
-bool RoadGraph::path(Vec2 from, Vec2 to, std::vector<Vec2>& out) const { using road_graph_cpp_local::Item;
-  out.clear();
-  const i32 a = nearest(from), b = nearest(to);
-  if (a < 0 || b < 0) return false;
-  const std::size_t n = nodes_.size();
-  std::vector<f32> g(converted::count(n), 1e30);
-  std::vector<i32> came(converted::count(n), -1);
-  std::vector<u8> closed(converted::count(n), 0);
-  std::vector<Item> open;
-  converted::at(g, a) = 0;
-  road_graph_cpp_local::heap_push(open, {road_graph_cpp_local::dist(converted::at(nodes_, a).p, converted::at(nodes_, b).p), a});
-  u32 expanded = 0;
-  while (!open.empty()) {
-    const i32 cur = road_graph_cpp_local::heap_pop(open).second;
-    if (converted::at(closed, cur)) continue;
-    converted::at(closed, cur) = 1;
-    if (cur == b || ++expanded > 20000) break;
-    for (const auto& [nb, len] : converted::at(nodes_, cur).edges) {
-      const f32 ng = converted::at(g, cur) + len;
-      if (ng < converted::at(g, nb)) {
-        converted::at(g, nb) = ng;
-        converted::at(came, nb) = cur;
-        road_graph_cpp_local::heap_push(open, {ng + road_graph_cpp_local::dist(converted::at(nodes_, nb).p, converted::at(nodes_, b).p), nb});
-      }
-    }
-  }
-  if (a != b && converted::at(came, b) < 0) return false;
-  std::vector<Vec2> rev;
-  for (i32 c = b; c >= 0; c = c == a ? -1 : converted::at(came, c)) rev.push_back(converted::at(nodes_, c).p);
-  out.push_back(from);
-  for (std::size_t k = 0; k < rev.size(); converted::pre_inc(k)) out.push_back(converted::at(rev, converted::minus(converted::minus(rev.size(), 1), k)));  // (from the start on)
-  out.push_back(to);
-  return true;
-}
-Vec2 RoadGraph::pursuit_point(const std::vector<Vec2>& path, Vec2 p, f32 look) {
-  if (path.empty()) return p;
-  if (path.size() < 2) return converted::at(path, 0);
-  std::size_t bi = 0;
-  f32 bt = 0, bd = 1e30;
-  for (std::size_t i = 0; converted::plus(i, 1) < path.size(); converted::pre_inc(i)) {
-    const Vec2 a = converted::at(path, i), b = converted::at(path, converted::plus(i, 1)), d = b - a;
-    const f32 l2 = std::fmax(1e-6, d.x * d.x + d.y * d.y);
-    const f32 t = clampf(((p.x - a.x) * d.x + (p.y - a.y) * d.y) / l2, 0, 1);
-    const f32 dd = road_graph_cpp_local::dist(p, a + d * t);
-    if (dd < bd) { bd = dd; bi = i; bt = t; }
-  }
-  f32 left = look, t = bt;
-  for (std::size_t i = bi; converted::plus(i, 1) < path.size(); converted::pre_inc(i)) {
-    const Vec2 a = converted::at(path, i), b = converted::at(path, converted::plus(i, 1));
-    const f32 l = std::fmax(1e-6, road_graph_cpp_local::dist(a, b)), rest = (1 - t) * l;
-    if (rest >= left) return a + (b - a) * (t + left / l);
-    left -= rest;
-    t = 0;
-  }
-  return converted::back(path);
-}
-CarInput ai_drive(Vec3 position, Vec3 forward, f32 vf, Vec3 target, f32 target_speed) {
-  CarInput in;
-  const f32 dx = target.x - position.x, dy = target.y - position.y, dist = hypot_bp(dx, dy);
-  if (dist < 0.4) {
-    in.pedal = -0.4 * sign0(vf);
-    in.max_speed = std::fmax(4.0, target_speed * 1.2);
-    in.max_reverse = 4;
-    return in;
-  }
-  const f32 cr = forward.x * dy - forward.y * dx, dt = forward.x * dx + forward.y * dy, err = kern::math::atan2(cr, dt);
-  const f32 steer = clampf(err * 1.9, -1, 1);
-  const f32 R = dist / std::fmax(1e-3, 2 * std::fabs(kern::math::sin(err))), v_bend = kern::math::sqrt(0.45 * 9.81 * R);
-  const f32 ce = kern::math::cos(err);
-  const f32 want = std::fmin(target_speed * std::fmax(0.25, ce * ce), std::fmax(2.5, v_bend));
-  const f32 pedal = clampf((want - vf) * 0.45, -1, 1);
-  const bool behind = dt < 0 && dist < 6;
-  in.pedal = behind ? -0.6 : pedal;
-  in.steer = behind ? -steer : steer;
-  in.max_speed = std::fmax(6.0, target_speed * 1.25);
-  in.max_reverse = 5;
-  return in;
-}
-namespace car_cpp_local { constexpr f32 kKappaPeak = 0.1, kSlideGrip = 0.78, kLoadSensitivity = 0.15, kVReg = 2, kTcsSlip = 0.11, kAbsSlip = 0.11; }
-namespace car_cpp_local { constexpr int kTyreSubsteps = 5; }
-namespace car_cpp_local { constexpr f32 kPneumaticTrail = 0.03, kCasterTrail = 0.025, kSteerJacking = 0.18, kTrailCollapse = 3; }
-namespace car_cpp_local { constexpr f32 kBodyDamping = 0.45; }
-namespace car_cpp_local { const f32 kAlphaPeak = kern::math::tan(6.5 * kPi / 180); }
-namespace car_cpp_local { constexpr f32 kAsphaltMu = 1.0; }
-namespace car_cpp_local { void tyre(f32 kappa, f32 tan_a, f32 muN, std::array<f32, 2>& out) {
-  const f32 sx = kappa / kKappaPeak, sy = tan_a / kAlphaPeak, s = hypot_bp(sx, sy);
-  if (s < 1e-6 || !(muN > 0)) {
-    out[0] = 0;
-    out[1] = 0;
-    return;
-  }
-  const f32 g = s < 1 ? s * (2 - s) : 1 - (1 - kSlideGrip) * std::fmin(1.0, (s - 1) / 2.5);
-  const f32 F = muN * g;
-  out[0] = F * sx / s;
-  out[1] = -F * sy / s;
-} }
-namespace car_cpp_local { f32 steer_torque_at(const CarSpec& s, f32 v) { const f32 x = v / s.steer_assist_speed; return s.steer_hand + s.steer_assist / (1 + x * x); } }
-namespace car_cpp_local { const Quat kWheelFrame{-0.5, -0.5, -0.5, 0.5}; }
-namespace car_cpp_local { constexpr f32 kSpringZeta = 0.06, kStrutShare = 0.15, kStrutM = 0.55, kRubberFriction = 0.9; }
-namespace car_cpp_local { struct Tuning { f32 hertz, damping_ratio; }; }
-namespace car_cpp_local { Tuning suspension_tuning(const CarSpec& s, f32 zeta, f32 k_share) {
-  const f32 q = s.mass / 4, m = s.wheel_mass * q / (s.wheel_mass + q), k = q * 9.81 / s.sag * k_share, w = kern::math::sqrt(k / m);
-  const f32 c = 2 * zeta * kern::math::sqrt(q * q * 9.81 / s.sag);
-  return {w / (2 * kPi), c / (2 * m * w)};
-} }
-void Car::attach(World& world, physics::Body chassis) { using car_cpp_local::Tuning;
-  detach();
-  const CarSpec& s = s_;
-  const BodyState st = read_body(world, chassis);
-  const f32 r = s.radius, volume = 4.0 / 3.0 * kPi * r * r * r;
-  for (int i = 0; i < 4; converted::pre_inc(i)) {
-    const Vec3 local{converted::at(s.wheels, i).x, converted::at(s.wheels, i).y, s.attach_z};
-    physics::BodySettings bs;
-    bs.type = physics::BodyType::dynamic;
-    // (the hub where the spring holds it under the standing car - `sag` up its travel -, or where
-    // it was: a car put down at its ride height has its tyres on the ground, not in it)
-    bs.position = st.position + st.rotation.rotate(local + Vec3{0, 0, clampf(converted::at(w_, i).has_travel ? converted::at(w_, i).travel : s.sag, s.susp_lower, s.susp_upper)});
-    bs.rotation = st.rotation;
-    bs.linear_velocity = st.velocity;
-    bs.angular_damping = 0.05;
-    bs.linear_damping = 0.02;
-    Rig& g = converted::at(rig_, i);
-    g.body = world.create_body(bs);
-    // Two shapes, one sphere: the tyre on the ground has no solver friction (its grip is the tyre
-    // model's: rubber x surface, slip, load); against everything else (other cars, props) the
-    // same tyre rubs with rubber's friction.
-    physics::ShapeSettings ground;
-    ground.kind = physics::ShapeKind::sphere;
-    ground.radius = r;
-    ground.material.density = s.wheel_mass / volume;
-    ground.material.friction = 0;
-    ground.material.restitution = 0;
-    ground.material.category_bits = kCatVehicle;
-    ground.material.mask_bits = kCatWorld;
-    ground.material.user = hit_user;
-    world.create_shape(g.body, ground);
-    physics::ShapeSettings rubber = ground;
-    rubber.material.density = 0;
-    rubber.material.friction = car_cpp_local::kRubberFriction;
-    rubber.material.restitution = 0.05;
-    rubber.material.mask_bits = ~static_cast<u64>(kCatWorld);
-    world.create_shape(g.body, rubber);
-    // the wheel joint: suspension axis, spring, bump stops, the spin held (the wheel's rotation is
-    // the tyre model's own degree of freedom), the steering servo on the front axle
-    physics::JointSettings js;
-    js.type = physics::JointType::wheel;
-    js.body_a = chassis;
-    js.body_b = g.body;
-    js.frame_a = {local, car_cpp_local::kWheelFrame};
-    js.frame_b = {{0, 0, 0}, car_cpp_local::kWheelFrame};
-    js.collide_connected = false;
-    const Tuning spring = car_cpp_local::suspension_tuning(s, car_cpp_local::kSpringZeta, 1 - car_cpp_local::kStrutShare);
-    js.enable_spring = true;
-    js.hertz = spring.hertz;
-    js.damping_ratio = spring.damping_ratio;
-    js.enable_limit = true;
-    js.lower = s.susp_lower;
-    js.upper = s.susp_upper;
-    js.enable_motor = true;
-    js.motor_speed = 0;
-    js.max_motor_torque = s.mass * 40;
-    if (converted::at(s.wheels, i).front) {
-      js.enable_steering = true;
-      js.steering_hertz = 9;
-      js.steering_damping_ratio = 0.95;
-      js.max_steering_torque = s.steer_servo;
-      js.target_steering = steer_;
-      js.enable_steering_limit = true;
-      js.steering_lower = -s.steer_lock;
-      js.steering_upper = s.steer_lock;
-    }
-    g.joint = world.create_joint(js);
-    // the damper strut: a chassis mount 0.55 m over the hub -> the hub, at rest at zero travel; a
-    // soft spring-damper (implicit: stable though the light hub reacts faster than a step) that
-    // carries the body damping and a share of the stiffness
-    physics::JointSettings ds;
-    ds.type = physics::JointType::distance;
-    ds.body_a = chassis;
-    ds.body_b = g.body;
-    ds.frame_a = {{local.x, local.y, local.z + car_cpp_local::kStrutM}, Quat{}};
-    ds.frame_b = {{0, 0, 0}, Quat{}};
-    ds.collide_connected = false;
-    ds.length = car_cpp_local::kStrutM;
-    const Tuning strut = car_cpp_local::suspension_tuning(s, std::fmax(0.0, car_cpp_local::kBodyDamping - car_cpp_local::kSpringZeta), car_cpp_local::kStrutShare);
-    ds.enable_spring = true;
-    ds.hertz = strut.hertz;
-    ds.damping_ratio = strut.damping_ratio;
-    ds.enable_limit = false;
-    ds.lower = car_cpp_local::kStrutM - s.susp_upper - 0.25;
-    ds.upper = car_cpp_local::kStrutM - s.susp_lower + 0.25;
-    g.strut = world.create_joint(ds);
-  }
-  rig_world_ = &world;
-  rig_chassis_ = chassis;
-  last_pos_ = st.position;
-  has_last_ = true;
-}
-void Car::place(World& world, const BodyState& st) {
-  // the wheels back under the chassis, moving with it (placeWheels: a teleport, a reset)
-  for (int i = 0; i < 4; converted::pre_inc(i)) {
-    const Rig& g = converted::at(rig_, i);
-    if (!g.body.valid() || !world.body_valid(g.body)) continue;
-    const Vec3 local{converted::at(s_.wheels, i).x, converted::at(s_.wheels, i).y, s_.attach_z + clampf(converted::at(w_, i).has_travel ? converted::at(w_, i).travel : s_.sag, s_.susp_lower, s_.susp_upper)};
-    const Vec3 arm = st.rotation.rotate(local);
-    world.set_pose(g.body, {st.position + arm, st.rotation});
-    world.set_linear_velocity(g.body, st.velocity + converted::wide::cross(st.angular, arm));
-    world.set_angular_velocity(g.body, st.angular);
-    world.set_awake(g.body, true);
-  }
-}
-bool Car::ensure_rig(World& world, physics::Body chassis, f32 dt) {
-  if (world.body_type(chassis) != physics::BodyType::dynamic) { detach(); return false; }  // moved by somebody else: no wheels to drive
-  bool whole = rig_world_ == &world && rig_chassis_ == chassis;
-  for (int i = 0; whole && i < 4; converted::pre_inc(i)) whole = converted::at(rig_, i).body.valid() && world.body_valid(converted::at(rig_, i).body) && world.joint_valid(converted::at(rig_, i).joint);
-  const BodyState st = read_body(world, chassis);
-  if (!whole) {
-    attach(world, chassis);
-    return true;
-  }
-  // The chassis was put somewhere else since the last step (a teleport, a respawn): the wheels go
-  // with it before the solver sees the joints stretched.
-  if (!has_last_ || converted::wide::length(st.position - last_pos_) > converted::wide::length(st.velocity) * std::fmax(dt, 1 / 240.0) * 2 + 0.6) place(world, st);
-  last_pos_ = st.position;
-  has_last_ = true;
-  return true;
-}
-void Car::push(World& world, physics::Body body, const Quat& q, Vec3 origin, Vec3 f, Vec3 p, i32 on) {
-  if (on < 0) world.apply_force_to_center(body, f);
-  else world.apply_force(converted::at(rig_, on).body, f, p);
-  if (n_applied_ < 6) converted::at(applied_, converted::post_inc(n_applied_)) = {to_local(q, p - origin), to_local(q, f), on};
-}
-void Car::step(World& world, physics::Body body, f32 dt, const CarInput& input) {
-  const CarSpec& spec = s_;
-  n_applied_ = 0;
-  if (!ensure_rig(world, body, dt)) return;
-  const BodyState st = read_body(world, body);
-  const Quat q = st.rotation;
-  const Vec3 forward = q.rotate({1, 0, 0}), left = q.rotate({0, 1, 0}), up = q.rotate({0, 0, 1});
-  const Vec3 com = st.position + q.rotate(Vec3{spec.com_x, 0, spec.com_z});
-  auto point_velocity = [&](Vec3 p) { return st.velocity + converted::wide::cross(st.angular, p - com); };
-  const f32 vf = converted::wide::dot(st.velocity, forward), speed = converted::wide::length(st.velocity);
-  const f32 r = spec.radius, pedal = clampf(input.pedal, -1, 1);
-  const bool handbrake = input.handbrake;
-  const f32 max_speed = clampf(input.max_speed, 3, 80), max_reverse = clampf(input.max_reverse, 1, 30);
-  const f32 stick = clampf(input.steer, -1, 1), rack = spec.rack_rate * dt;
-
-  // Automatic direction selector: D <-> R only when (nearly) stopped.
-  gear_ = gear_ == -1 ? -1 : 1;
-  enum { coast, drive, reverse, brake } mode = coast;
-  if (std::fabs(pedal) > 0.02) {
-    const i32 desired = pedal > 0 ? 1 : -1;
-    if (gear_ != desired) {
-      if (speed > 0.65) mode = brake;
-      else { gear_ = desired; mode = desired > 0 ? drive : reverse; }
-    } else mode = desired > 0 ? drive : reverse;
-  }
-  throttle_ = mode == drive || mode == reverse ? std::fabs(pedal) : 0;
-
-  const f32 drive_sum = 2 * (spec.torque_front + spec.torque_rear) > 0 ? 2 * (spec.torque_front + spec.torque_rear) : 1;
-  const f32 mq = spec.mass / 4;
-  const f32 k = mq * kG / spec.sag, c_damp = 2 * car_cpp_local::kBodyDamping * kern::math::sqrt(k * mq);
-  const f32 I = spec.wheel_inertia, h = dt / car_cpp_local::kTyreSubsteps;
-
-  // ---- the wheels: where each hub is on its suspension, and the load it carries (the
-  // suspension's own spring + damper force at that travel: what presses the tyre on the ground)
-  Vec3 patch[4], hub[4], normal[4];
-  for (int i = 0; i < 4; converted::pre_inc(i)) {
-    WheelState& w = converted::at(w_, i);
-    const Vec3 attach = st.position + q.rotate(Vec3{converted::at(spec.wheels, i).x, converted::at(spec.wheels, i).y, spec.attach_z});
-    converted::at(hub, i) = world.pose(converted::at(rig_, i).body).position;
-    const f32 travel = converted::wide::dot(converted::at(hub, i) - attach, up);
-    const f32 rate = w.has_travel ? clampf((travel - w.travel) / std::fmax(dt, 1e-4), -3, 3) : 0;
-    w.travel = travel;
-    w.has_travel = true;
-    f32 N = k * travel + c_damp * rate;
-    N = N > 0 ? N + spec.wheel_mass * kG : 0;
-    w.load = N;
-    w.contact = N > 0;
-    w.hub = converted::at(hub, i);
-    converted::at(normal, i) = up;
-    converted::at(patch, i) = converted::at(hub, i) - up * r;
-  }
-
-  // ---- steering: equilibrium of hand torque + assist against the aligning torque
-  struct Front { f32 pf, pl, N, muN, kappa; };
-  Front fronts[2];
-  int nf = 0;
-  for (int i = 0; i < 4; converted::pre_inc(i)) {
-    if (!converted::at(spec.wheels, i).front) continue;
-    WheelState& w = converted::at(w_, i);
-    const Vec3 pv = point_velocity(converted::at(patch, i));
-    if (w.load_f < 0) w.load_f = mq * kG;
-    w.load_f += (std::fmax(0.0, w.load) - w.load_f) * std::fmin(1.0, dt / 0.1);
-    const f32 N = w.load_f;
-    converted::at(fronts, converted::post_inc(nf)) = {converted::wide::dot(pv, forward), converted::wide::dot(pv, left), N, spec.friction * car_cpp_local::kAsphaltMu * kern::math::pow(clampf(N / (mq * kG), 0.2, 3), -car_cpp_local::kLoadSensitivity) * N,
-                    w.kappa};
-  }
-  auto align_at = [&](f32 d) {
-    f32 M = 0;
-    std::array<f32, 2> tf;
-    for (int i = 0; i < nf; converted::pre_inc(i)) {
-      const Front& f = converted::at(fronts, i);
-      const f32 ca = kern::math::cos(d), sa = kern::math::sin(d), vx = f.pf * ca + f.pl * sa, vy = -f.pf * sa + f.pl * ca, ta = vy / std::fmax(std::fabs(vx), car_cpp_local::kVReg);
-      car_cpp_local::tyre(f.kappa, ta, f.muN, tf);
-      M += (car_cpp_local::kCasterTrail + car_cpp_local::kPneumaticTrail * std::fmax(0.0, 1 - std::fabs(ta) / (car_cpp_local::kTrailCollapse * car_cpp_local::kAlphaPeak))) * tf[1] + f.N * car_cpp_local::kSteerJacking * kern::math::sin(d);
-    }
-    return M;
-  };
-  f32 steer_eq = 0;
-  if (nf && (std::fabs(stick) > 1e-3 || speed > 0.5)) {
-    const f32 T = stick * car_cpp_local::steer_torque_at(spec, speed), L = spec.steer_lock;
-    const int n = 40;
-    auto f = [&](f32 d) { return T - align_at(d); };
-    f32 prev_d = -L, prev = f(-L);
-    bool found = false;
-    f32 best = 0;
-    if (prev < 0) { best = -L; found = true; }
-    for (int i = 1; i <= n; converted::pre_inc(i)) {
-      const f32 d = -L + 2 * L * static_cast<f32>(i) / n, fd = f(d);
-      if (fd == 0 || sign0(fd) != sign0(prev)) {
-        f32 lo = prev_d, hi = d, flo = prev;
-        for (int it = 0; it < 12; converted::pre_inc(it)) {
-          const f32 m = (lo + hi) / 2, fm = f(m);
-          if (sign0(fm) == sign0(flo)) { lo = m; flo = fm; } else hi = m;
-        }
-        const f32 root = (lo + hi) / 2;
-        if (!found || std::fabs(root - steer_) < std::fabs(best - steer_)) best = root;
-        found = true;
-      }
-      prev_d = d;
-      prev = fd;
-    }
-    steer_eq = found ? best : (prev > 0 ? L : -L);
-  }
-  steer_eq_f_ += (steer_eq - steer_eq_f_) * std::fmin(1.0, dt / (spec.steer_lag * (1 + speed / spec.steer_damp_speed)));
-  steer_ += clampf(steer_eq_f_ - steer_, -rack, rack);
-
-  // ---- tyres
-  for (int i = 0; i < 4; converted::pre_inc(i)) {
-    WheelState& w = converted::at(w_, i);
-    const bool front = converted::at(spec.wheels, i).front;
-    const f32 N = w.load;
-    const f32 mu = spec.friction * car_cpp_local::kAsphaltMu * kern::math::pow(clampf(N / (mq * kG), 0.2, 3), -car_cpp_local::kLoadSensitivity), muN = mu * N;
-    if (front) world.set_wheel_steering(converted::at(rig_, i).joint, steer_);
-    const f32 sa_ = front ? world.wheel_steering(converted::at(rig_, i).joint) : 0, ca = kern::math::cos(sa_), sa = kern::math::sin(sa_);
-    const Vec3 n = converted::at(normal, i);
-    Vec3 fw = forward * ca + left * sa;
-    fw = converted::wide::normalize(fw - n * converted::wide::dot(fw, n));
-    const Vec3 lw = converted::wide::cross(n, fw);
-    const Vec3 pv = point_velocity(converted::at(patch, i));
-    const f32 vx = converted::wide::dot(pv, fw), vy = converted::wide::dot(pv, lw), V = std::fmax(std::fabs(vx), car_cpp_local::kVReg), tan_a = vy / V;
-    const f32 drive_t = front ? spec.torque_front : spec.torque_rear, share = drive_t / drive_sum;
-    f32 brake_t = (mode == brake ? spec.brake * std::fabs(pedal) : 0) + (drive_t > 0 && mode == coast ? spec.coast : 0) + spec.wheel_mass * 0.15;
-    if (handbrake && !front) brake_t = std::fmax(brake_t, spec.handbrake);
-    f32 om = w.omega, fx_sum = 0, fy_sum = 0;
-    std::array<f32, 2> tf, tf2;
-    for (int sub = 0; sub < car_cpp_local::kTyreSubsteps; converted::pre_inc(sub)) {
-      const f32 kap = (om * r - vx) / V;
-      f32 Td = 0;
-      if (drive_t > 0 && (mode == drive || mode == reverse)) {
-        const f32 dir = mode == drive ? 1.0 : -1.0, lim = mode == drive ? max_speed : max_reverse;
-        Td = dir * std::fabs(pedal) * std::fmin(drive_t * (dir < 0 ? 0.7 : 1.0), spec.power * share / std::fmax(4 / r, std::fabs(om)));
-        if (dir * om * r > lim) Td = 0;
-        const f32 ks = dir * kap;
-        if (ks > car_cpp_local::kTcsSlip) Td *= clampf(1 - (ks - car_cpp_local::kTcsSlip) / 0.12, 0, 1);
-      }
-      f32 Tb = brake_t;
-      const f32 sgn = sign0(om != 0 ? om : vx);
-      if (mode == brake && sgn * kap < -car_cpp_local::kAbsSlip) Tb *= clampf(1 - (-sgn * kap - car_cpp_local::kAbsSlip) / 0.12, 0.12, 1);
-      car_cpp_local::tyre(kap, tan_a, muN, tf);
-      const f32 fx0 = tf[0];
-      car_cpp_local::tyre(kap + 0.02 / V * r, tan_a, muN, tf2);
-      const f32 J = -(tf2[0] - fx0) / 0.02 * r;
-      f32 wn = om + h * (Td - fx0 * r) / (I - h * std::fmin(0.0, J));
-      const f32 db = h * Tb / I;
-      wn = std::fabs(wn) <= db ? 0 : wn - sign0(wn) * db;
-      om = wn;
-      car_cpp_local::tyre((om * r - vx) / V, tan_a, muN, tf);
-      fx_sum += tf[0];
-      fy_sum += tf[1];
-    }
-    w.omega = om;
-    w.angle = kern::math::mod(w.angle + om * dt, 2 * kPi);
-    f32 fx = fx_sum / car_cpp_local::kTyreSubsteps, fy = fy_sum / car_cpp_local::kTyreSubsteps;
-    const f32 lim_y = mq * std::fabs(vy) / dt + 60;
-    if (fx * vx < 0 && std::fabs(om * r) < std::fabs(vx)) {
-      const f32 lim_x = mq * std::fabs(vx) / dt + 60;
-      fx = clampf(fx, -lim_x, lim_x);
-    }
-    fy = clampf(fy, -lim_y, lim_y);
-    fx -= spec.rolling_resistance * N * tanh_bp(vx * 2);
-    w.fx = fx;
-    w.fy = fy;
-    w.kappa = (om * r - vx) / V;
-    w.alpha = kern::math::atan(tan_a);
-    // the tyre's force on the wheel at the contact patch; the joints carry it into the chassis
-    if (N > 0) push(world, body, q, st.position, fw * fx + lw * fy, converted::at(patch, i), i);
-  }
-  if (spec.drag_area > 0 && speed > 0.5) push(world, body, q, st.position, st.velocity * (-0.5 * 1.2 * spec.drag_area * speed), st.position, -1);
-  if (pedal != 0 || input.steer != 0 || handbrake || speed > 0.05) world.set_awake(body, true);
-  vf_ = vf;
-}
-namespace game_traffic_cpp_local { constexpr f32 kFlipS = 2.5, kStuckS = 9, kOffroadS = 7, kOffroadM = 9, kSpawnMin = 170, kSpawnMax = 320, kHookM = 7.5, kHookS = 1.8, kTowSpeed = 9,
-              kDriveSpeed = 14, kGiveUpS = 70; }
-void Game::step_tow(f32 h) {
-  if (!life_) return;
-  WorldLife& L = *converted::present(life_);
-  World& w = converted::present(world_)->physics();
-  const f32 now = converted::present(world_)->sim_time();
-  const Vec3 me = player_position();
-  if (roads_.built_from != lane_signature(city_.lanes())) roads_.rebuild(city_.lanes());
-  for (std::size_t ti = 0; ti < L.trucks.size();) {
-    WorldLife::TowTruck& t = converted::at(L.trucks, ti);
-    bool remove = !t.body.valid() || !w.body_valid(t.body);
-    if (!remove) {
-      const BodyState s = read_body(w, t.body);
-      const Vec3 fwd = s.rotation.rotate({1, 0, 0});
-      const f32 yaw = kern::math::atan2(fwd.y, fwd.x), sp = hypot_bp(s.velocity.x, s.velocity.y);
-      TrafficCar* job = t.job >= 0 && t.job < static_cast<i32>(cars_.size()) ? &converted::at(cars_, t.job) : nullptr;
-      CarInput in;
-      in.handbrake = true;
-      auto follow = [&](Vec2 goal, f32 speed) -> f32 {
-        const Vec2 p{s.position.x, s.position.y};
-        const f32 d = hypot_bp(goal.x - p.x, goal.y - p.y);
-        if (t.path.empty() || now - t.path_at > 2.5) {
-          if (!roads_.path(p, goal, t.path)) t.path = {p, goal};
-          t.path_at = now;
-        }
-        const Vec2 tp = RoadGraph::pursuit_point(t.path, p, std::fmax(7.0, sp * 1.1));
-        const f32 herr = wrap_pi(kern::math::atan2(tp.y - p.y, tp.x - p.x) - yaw);
-        if (now < t.recover_until) {
-          // backing out with the wheel turned (follow: recoverUntil)
-          if (std::fabs(herr) < 0.45 && now - t.recover_start > 0.5) t.recover_until = -1;
-          else { in = CarInput{}; in.pedal = -0.75; in.steer = -sign0(herr != 0 ? herr : 1); in.max_reverse = 4; return d; }
-        }
-        if (sp < 0.7 && d > 6) {
-          if (t.stuck_since < 0) t.stuck_since = now;
-          if (now - t.stuck_since > 2.2) { t.recover_start = now; t.recover_until = now + 1.7; t.stuck_since = -1; t.path.clear(); return d; }
-        } else t.stuck_since = -1;
-        const f32 want = d < 20 ? std::fmax(3.0, d * 0.5) : speed;
-        in = ai_drive(s.position, fwd, converted::present(t.car)->forward_speed(), {tp.x, tp.y, s.position.z}, std::fmin(speed, want));
-        return d;
-      };
-      // The player took the car the truck came for: the job is off.
-      if (job && t.state != WorldLife::TowTruck::State::depot && mode_ == Mode::car && car_index_ == t.job) { t.state = WorldLife::TowTruck::State::depot; t.towing = false; t.path.clear(); }
-      if (t.state != WorldLife::TowTruck::State::depot && now - t.born > game_traffic_cpp_local::kGiveUpS) { t.state = WorldLife::TowTruck::State::depot; t.towing = false; t.path.clear(); }
-      switch (t.state) {
-        case WorldLife::TowTruck::State::to_job: {
-          if (!job || !job->placed) { t.state = WorldLife::TowTruck::State::depot; break; }
-          const Vec3 cp = matrix_of(job->actor).translation();
-          if (follow({cp.x, cp.y}, game_traffic_cpp_local::kDriveSpeed) < game_traffic_cpp_local::kHookM) { in = CarInput{}; in.handbrake = true; in.pedal = -0.3 * sign0(converted::present(t.car)->forward_speed()); t.state = WorldLife::TowTruck::State::hook; t.state_at = now; }
-          break;
-        }
-        case WorldLife::TowTruck::State::hook:
-          in = CarInput{};
-          in.handbrake = true;
-          if (now - t.state_at > game_traffic_cpp_local::kHookS && job) {
-            t.towing = true;
-            job->driver = !t.wreck_job;
-            // the drop: 30 m on along its own lane (lanePose)
-            t.drop = {s.position.x, s.position.y};
-            t.drop_yaw = yaw;
-            if (!t.wreck_job && job->lane >= 0 && job->lane < static_cast<i32>(city_.lanes().size()) && converted::at(city_.lanes(), job->lane).alive) {
-              const Lane& l = converted::at(city_.lanes(), job->lane);
-              const i32 n = static_cast<i32>(l.points.size());
-              i32 k = std::clamp(job->index, 0, converted::minus(n, 1));
-              f32 left = 30;
-              while (left > 0 && converted::plus(k, job->dir) >= 0 && converted::plus(k, job->dir) < n) {
-                left -= hypot_bp(converted::at(l.points, converted::plus(k, job->dir)).x - converted::at(l.points, k).x, converted::at(l.points, converted::plus(k, job->dir)).y - converted::at(l.points, k).y);
-                converted::plus_to(k, job->dir);
-              }
-              const i32 prev = std::clamp(converted::minus(k, job->dir), 0, converted::minus(n, 1));
-              const Vec2 d = converted::at(l.points, k) - converted::at(l.points, prev);
-              const f32 dl = hypot_bp(d.x, d.y);
-              t.drop_yaw = dl > 1e-3 ? kern::math::atan2(d.y, d.x) : yaw;
-              const f32 off = std::fmin(l.width * 0.25, 1.8);
-              t.drop = {converted::at(l.points, k).x + kern::math::sin(t.drop_yaw) * off, converted::at(l.points, k).y - kern::math::cos(t.drop_yaw) * off};
-              job->index = std::clamp(converted::plus(k, job->dir), 0, converted::minus(n, 1));
-            }
-            t.state = WorldLife::TowTruck::State::tow;
-            t.path.clear();
-          }
-          break;
-        case WorldLife::TowTruck::State::tow: {
-          if (!job || !job->placed) { t.state = WorldLife::TowTruck::State::depot; t.towing = false; break; }
-          const Vec2 goal = t.wreck_job ? t.depot : Vec2{t.drop.x + kern::math::cos(t.drop_yaw) * 5.5, t.drop.y + kern::math::sin(t.drop_yaw) * 5.5};
-          const f32 d = follow(goal, game_traffic_cpp_local::kTowSpeed);
-          if (!t.wreck_job && d < 4.5 && sp < 2.5) {
-            // set it down upright on its lane; the driver carries on
-            t.towing = false;
-            const Vec3 back{s.position.x - kern::math::cos(yaw) * 5.1, s.position.y - kern::math::sin(yaw) * 5.1, 0};
-            const Vec3 rot{0, 0, yaw / kDeg};
-            const physics::Pose rest = car_rest_pose(converted::present(job->car)->spec(), back.x, back.y, yaw);
-            converted::present(world_)->teleport(job->actor, rest.position, &rot);
-            if (const physics::Body jb = body(job->actor); jb.valid()) w.set_pose(jb, rest);
-            converted::present(world_)->set_actor_velocity(job->actor, {});
-            converted::present(job->car)->reset();
-            t.state = WorldLife::TowTruck::State::depot;
-            t.state_at = now;
-            t.path.clear();
-            ++L.tow_done;
-            if (t.job < static_cast<i32>(L.watch.size())) converted::at(L.watch, t.job) = {now + 60};
-          } else if (t.wreck_job && (d < 12 || hypot_bp(s.position.x - me.x, s.position.y - me.y) > 220)) remove = true;
-          break;
-        }
-        case WorldLife::TowTruck::State::depot: {
-          if (now - t.state_at < 1.2) { in = CarInput{}; in.handbrake = true; break; }
-          const f32 d = follow(t.depot, game_traffic_cpp_local::kDriveSpeed);
-          if (d < 12 || hypot_bp(s.position.x - me.x, s.position.y - me.y) > 200) remove = true;
-          break;
-        }
-      }
-      if (t.towing && job) {
-        // the car hangs behind on the boom (front lifted a little)
-        const Vec3 back{s.position.x - kern::math::cos(yaw) * 5.1, s.position.y - kern::math::sin(yaw) * 5.1, 0};
-        const physics::Body jb = body(job->actor);
-        if (jb.valid()) {
-          const Quat q = yaw_quat(yaw) * Quat::axis_angle({0, 1, 0}, -0.08);
-          w.set_pose(jb, {{back.x, back.y, city_.ground_height(back.x, back.y) + Car::ground_offset(converted::present(job->car)->spec()) + 0.35}, q});
-          w.set_linear_velocity(jb, {s.velocity.x, s.velocity.y, 0});
-          w.set_angular_velocity(jb, {});
-        }
-      }
-      t.input = in;
-      converted::present(t.car)->step(w, t.body, h, in);
-      if (t.hp <= 0 && t.exploded) remove = true;
-    }
-    if (remove) {
-      if (t.towing && t.wreck_job && t.job >= 0 && t.job < static_cast<i32>(cars_.size())) {
-        // the wreck is gone with the truck: back into the pool
-        TrafficCar& c = converted::at(cars_, t.job);
-        converted::present(world_)->set_alive(c.actor, false);
-        c.placed = false;
-        c.wreck = false;
-        c.hp = car_max_hp(c);
-        ++L.tow_done;
-      }
-      if (t.body.valid() && w.body_valid(t.body)) w.destroy_body(t.body);
-      converted::erase(L.trucks, L.trucks.begin() + static_cast<std::ptrdiff_t>(ti));
-      continue;
-    }
-    converted::pre_inc(ti);
-  }
-}
-namespace game_world_cpp_local { constexpr f32 kWaterDensity = 1000; }
-using game::ActorId; void Game::step_world(f32 h) {
-  (void)h;
-  if (!life_) return;
-  WorldLife& L = *converted::present(life_);
-  const Terrain& t = city_.terrain();
-  World& w = converted::present(world_)->physics();
-  auto water = [&](u32 slot, ActorId a, Vec3 half, bool drone) {
-    if (slot >= 32 || !a || !converted::present(world_)->actor_alive(a)) return;
-    const physics::Body b = body(a);
-    if (!b.valid()) return;
-    const BodyState s = read_body(w, b);
-    f32 sub = 0;
-    if (t.water_at(s.position.x, s.position.y)) sub = clampf((t.water_level(s.position.x, s.position.y) - (s.position.z - half.z)) / (2 * half.z), 0, 1);
-    if (sub > 0) {
-      const f32 m = w.mass(b);
-      const Vec2 flow = t.flow_at(s.position.x, s.position.y);
-      const Vec3 rel{s.velocity.x - flow.x, s.velocity.y - flow.y, s.velocity.z};
-      const f32 speed = converted::wide::length(rel), k = sub * (1.6 + 0.9 * speed) * m * 0.35;
-      // SpawnCity gives the drone no buoyancy (its motors are its lift); the water still drags it.
-      const f32 volume = 8 * half.x * half.y * half.z;
-      const f32 lift = drone ? 0.0 : game_world_cpp_local::kWaterDensity * kG * volume * sub * 0.62;
-      w.apply_force_to_center(b, {-rel.x * k, -rel.y * k, lift - rel.z * k * 1.4});
-      w.apply_torque(b, {-s.angular.x * m * sub * 0.8, -s.angular.y * m * sub * 0.8, -s.angular.z * m * sub * 0.5});
-      if (converted::at(L.in_water, slot) <= 0 && std::fabs(s.velocity.z) > 1.5)
-        L.pending_splashes.push_back({{s.position.x, s.position.y, t.water_level(s.position.x, s.position.y)}, std::fmin(6.0, 0.4 * std::fabs(s.velocity.z) * (1 + half.x))});
-    }
-    converted::at(L.in_water, slot) = sub;
-  };
-  if (jet_placed_) water(0, jet_actor_, {0.8, 8.1, 0.8}, false);  // the fuselage hull (jet.cpp rigid_spec)
-  if (drone_out_) water(1, drone_actor_, {0.12, 0.12, 0.04}, true);
-  if (mode_ == Mode::parachute) water(2, chute_actor_, {0.3, 0.3, 0.85}, false);
-  for (std::size_t i = 0; i < cars_.size() && converted::plus(i, 3) < 32; converted::pre_inc(i))
-    if (converted::at(cars_, i).placed) water(static_cast<u32>(converted::plus(i, 3)), converted::at(cars_, i).actor, converted::present(converted::at(cars_, i).car)->spec().half, false);
-  step_tow(h);
-}
-namespace mp { namespace mp_rules_cpp_local { f64 clampd(f64 v, f64 lo, f64 hi) { return v < lo ? lo : (v > hi ? hi : v); } } }
-namespace mp { namespace mp_rules_cpp_local { Quat nlerp_slerp(Quat a, Quat b, f32 t) { return slerp(a, b, t); } } }
-namespace mp { PoseSample PoseTimeline::sample(f64 now) const {
-  PoseSample out;
-  if (snaps_.empty()) return out;
-  const Snap& latest = converted::back(snaps_);
-  out.valid = true;
-  out.age_ms = now > latest.received ? now - latest.received : 0;
-  out.stale = out.age_ms > kStaleHoldMs;
-  const f64 target = now - offset_ - delay_;
-  // the snapshots on both sides of the target time (their places in snaps_; no_right: none after it)
-  constexpr std::size_t no_right = static_cast<std::size_t>(-1);
-  std::size_t left_at = 0, right_at = no_right;
-  for (std::size_t i = 1; i < snaps_.size(); converted::pre_inc(i)) {
-    if (converted::at(snaps_, i).source >= target) { right_at = i; break; }
-    left_at = i;
-  }
-  if (right_at != no_right) {
-    const Snap& left = converted::at(snaps_, left_at);
-    const Snap& right = converted::at(snaps_, right_at);
-    const f64 span = std::max(0.001, right.source - left.source);
-    const f32 a = static_cast<f32>(mp::mp_rules_cpp_local::clampd((target - left.source) / span, 0, 1));
-    // Hermite through both snapshots with their velocities (Glenn Fiedler, "Snapshot
-    // Interpolation": the curve passes through both points and matches their velocities - no
-    // kink at the samples); a jump between them (a teleport) is not a flight: straight then
-    const f32 T = static_cast<f32>(span / 1000);
-    const Vec3 d = right.p - left.p;
-    const f32 flown = (converted::wide::length(left.v) + converted::wide::length(right.v)) * 0.5 * T;
-    if (T < 0.6 && converted::wide::length(d) <= flown * 2.5 + 0.5) {
-      const f32 a2 = a * a, a3 = a2 * a;
-      out.p = left.p * (2 * a3 - 3 * a2 + 1) + left.v * ((a3 - 2 * a2 + a) * T) + right.p * (-2 * a3 + 3 * a2) + right.v * ((a3 - a2) * T);
-    } else {
-      out.p = left.p + d * a;
-    }
-    out.q = mp::mp_rules_cpp_local::nlerp_slerp(left.q, right.q, a);
-    return out;
-  }
-  const f64 ex = mp::mp_rules_cpp_local::clampd(target - latest.source, 0, kMaxExtrapolationMs);
-  out.p = latest.p + latest.v * static_cast<f32>(ex / 1000);
-  out.q = latest.q;
-  out.extrapolated = ex > 0;
-  return out;
-} }
-bool Game::puppet_car_step(TrafficCar& c, std::size_t i, f32 h) {
-  // A car of the host's town: a kinematic body on his poses - where he had it a moment ago
-  // (mp::PoseTimeline: interpolated a jitter buffer behind his clock, a short extrapolation at
-  // most), place, height and tilt, exactly. It pushes what it meets here; what is done to it is
-  // done on his machine (he has every player's body there) and comes back with his next poses.
-  if (!puppet_world_ || i >= car_net_.size() || converted::at(car_net_, i) < 0 || static_cast<i32>(i) == car_index_) return false;
-  const physics::Body b = body(c.actor);
-  if (!b.valid() || i >= car_line_.size()) return true;
-  World& w = converted::present(world_)->physics();
-  const mp::PoseSample s = converted::at(car_line_, i).sample(now_ms());
-  if (!s.valid) return true;
-  if (w.body_type(b) != physics::BodyType::kinematic) w.set_body_type(b, physics::BodyType::kinematic);
-  const BodyState here = read_body(w, b);
-  if (converted::wide::length(s.p - here.position) > 8) {
-    w.set_pose(b, {s.p, s.q});  // far off (a jump of his): put there
-    w.set_linear_velocity(b, {});
-    w.set_angular_velocity(b, {});
-  } else {
-    w.set_target_pose(b, {s.p, s.q}, h);
-  }
-  converted::present(c.car)->roll(converted::wide::dot(w.linear_velocity(b), s.q.rotate({1, 0, 0})), h);
-  return true;
-}
-TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
-  Pursuit out;
-  const i32 n = static_cast<i32>(lane.points.size());
-  if (n < 2) { out.target = n ? converted::at(lane.points, 0) : pos; out.passed = true; return out; }
-  dir = dir < 0 ? -1 : 1;
-  i32 i = std::clamp(index, 0, converted::minus(n, 1));
-  if (converted::minus(i, dir) < 0 || converted::minus(i, dir) >= n) converted::plus_to(i, dir);  // (the lane's first point in this direction: the stretch after it)
-  Vec2 a = converted::at(lane.points, converted::minus(i, dir)), b = converted::at(lane.points, i);
-  auto along = [](Vec2 from, Vec2 to, Vec2& t) { const Vec2 d = to - from; const f32 l = hypot_bp(d.x, d.y); if (l > 1e-3) t = d * (1.0 / l); return l; };
-  Vec2 t{1, 0};
-  f32 len = along(a, b, t);
-  // where the car is along the stretch that leads to lane point `index`
-  const f32 at = (pos.x - a.x) * t.x + (pos.y - a.y) * t.y;
-  out.passed = i != std::clamp(index, 0, converted::minus(n, 1)) ? false : at >= len - 0.5;
-  const f32 s = clampf(at, 0, len);
-  Vec2 cur = a + t * s;
-  f32 left = len - s, want = std::fmax(0.0, look);
-  out.end = left;
-  for (i32 k = i; converted::plus(k, dir) >= 0 && converted::plus(k, dir) < n; converted::plus_to(k, dir)) out.end += hypot_bp(converted::at(lane.points, converted::plus(k, dir)).x - converted::at(lane.points, k).x, converted::at(lane.points, converted::plus(k, dir)).y - converted::at(lane.points, k).y);
-  while (want > left) {
-    if (converted::plus(i, dir) < 0 || converted::plus(i, dir) >= n) { want = left; break; }  // the lane ends here
-    want -= left;
-    cur = b;
-    a = b;
-    converted::plus_to(i, dir);
-    b = converted::at(lane.points, i);
-    left = along(a, b, t);
-  }
-  out.tangent = t;
-  out.target = cur + t * want + Vec2{t.y, -t.x} * off;
-  return out;
-}
-f64 Game::life_epoch() const {
-  // the clock the animals' rounds run on: the wall clock - in a session the host's (a client
-  // counts on from what the host last sent), so a dog is at the same place of its round everywhere
-  if (net_.active() && !net_.hosting() && host_epoch_ok_) return now_ms() / 1000 + host_epoch_off_;
-  return wall_ms() / 1000.0;
-}
-namespace world_traffic_cpp_local { constexpr f32 kCell = 40; }
-namespace world_traffic_cpp_local { constexpr f32 kMerge = 3; }
-namespace world_traffic_cpp_local { rules::Blueprint g_rules{"Traffic"}; }
-namespace world_traffic_cpp_local { u64 cell(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); } }
-void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
-  junctions_.clear();
-  grid_.clear();
-  blocked_.clear();
-  struct Node { Vec2 p; std::vector<Arm> arms; };
-  std::vector<Node> nodes;
-  converted::wide::Map<u64, std::vector<i32>> cells;
-  auto node_at = [&](Vec2 p) -> i32 {
-    const i32 cx = static_cast<i32>(converted::fits<int>(std::floor(p.x / world_traffic_cpp_local::kMerge))), cy = static_cast<i32>(converted::fits<int>(std::floor(p.y / world_traffic_cpp_local::kMerge)));
-    for (i32 dy = -1; dy <= 1; converted::pre_inc(dy))
-      for (i32 dx = -1; dx <= 1; converted::pre_inc(dx)) {
-        auto it = cells.find(world_traffic_cpp_local::cell(converted::plus(cx, dx), converted::plus(cy, dy)));
-        if (it == cells.end()) continue;
-        for (i32 i : it->second)
-          if (hypot_bp(converted::at(nodes, i).p.x - p.x, converted::at(nodes, i).p.y - p.y) < world_traffic_cpp_local::kMerge) return i;
-      }
-    nodes.push_back({p, {}});
-    cells[world_traffic_cpp_local::cell(cx, cy)].push_back(static_cast<i32>(converted::minus(nodes.size(), 1)));
-    return static_cast<i32>(converted::minus(nodes.size(), 1));
-  };
-  for (const Lane& l : lanes) {
-    if (!l.alive || l.points.size() < 2) continue;
-    for (std::size_t i = 0; i < l.points.size(); converted::pre_inc(i)) {
-      const Vec2 p = converted::at(l.points, i);
-      auto arm = [&](Vec2 q) {
-        const f32 d = hypot_bp(q.x - p.x, q.y - p.y);
-        if (d < 0.5) return;
-        Node& n = converted::at(nodes, node_at(p));
-        const Vec2 dir{(q.x - p.x) / d, (q.y - p.y) / d};
-        for (const Arm& a : n.arms)
-          if (a.dir.x * dir.x + a.dir.y * dir.y > 0.97) return;  // the same street again (tile border)
-        n.arms.push_back({dir, l.width});
-      };
-      if (i > 0) arm(converted::at(l.points, converted::minus(i, 1)));
-      if (converted::plus(i, 1) < l.points.size()) arm(converted::at(l.points, converted::plus(i, 1)));
-    }
-  }
-  // Streets that cross without a shared vertex (a tile cut, the stand-in town's straight streets
-  // laid across each other) meet where their segments intersect: that point is a node with an arm
-  // along each street in both directions.
-  {
-    struct Seg { Vec2 a, b; f32 width; u32 lane; };
-    std::vector<Seg> segs;
-    converted::wide::Map<u64, std::vector<u32>> buckets;
-    for (u32 li = 0; li < lanes.size(); ++li) {
-      const Lane& l = converted::at(lanes, li);
-      if (!l.alive || l.points.size() < 2) continue;
-      for (std::size_t i = 0; converted::plus(i, 1) < l.points.size(); converted::pre_inc(i)) {
-        const Seg s{converted::at(l.points, i), converted::at(l.points, converted::plus(i, 1)), l.width, li};
-        const u32 si = static_cast<u32>(segs.size());
-        segs.push_back(s);
-        const i32 x0 = static_cast<i32>(converted::fits<int>(std::floor(std::fmin(s.a.x, s.b.x) / world_traffic_cpp_local::kCell))), x1 = static_cast<i32>(converted::fits<int>(std::floor(std::fmax(s.a.x, s.b.x) / world_traffic_cpp_local::kCell)));
-        const i32 y0 = static_cast<i32>(converted::fits<int>(std::floor(std::fmin(s.a.y, s.b.y) / world_traffic_cpp_local::kCell))), y1 = static_cast<i32>(converted::fits<int>(std::floor(std::fmax(s.a.y, s.b.y) / world_traffic_cpp_local::kCell)));
-        for (i32 x = x0; x <= x1; converted::pre_inc(x))
-          for (i32 y = y0; y <= y1; converted::pre_inc(y)) buckets[world_traffic_cpp_local::cell(x, y)].push_back(si);
-      }
-    }
-    for (const auto& [key, list] : buckets) {
-      (void)key;
-      for (std::size_t m = 0; m < list.size(); converted::pre_inc(m))
-        for (std::size_t n = converted::plus(m, 1); n < list.size(); converted::pre_inc(n)) {
-          const Seg& s = converted::at(segs, converted::at(list, m));
-          const Seg& t = converted::at(segs, converted::at(list, n));
-          if (s.lane == t.lane) continue;
-          const Vec2 r = s.b - s.a, q = t.b - t.a;
-          const f32 den = r.x * q.y - r.y * q.x;
-          if (std::fabs(den) < 1e-6) continue;  // parallel
-          const Vec2 w = t.a - s.a;
-          const f32 u = (w.x * q.y - w.y * q.x) / den, v = (w.x * r.y - w.y * r.x) / den;
-          if (u < 0 || u > 1 || v < 0 || v > 1) continue;
-          const Vec2 p = s.a + r * u;
-          const i32 ni = node_at(p);
-          for (const u32 gi : {converted::at(list, m), converted::at(list, n)}) {  // (the two segments, by their place in segs)
-            const Seg& g = converted::at(segs, gi);
-            for (const Vec2 end : {g.a, g.b}) {
-              const f32 d = hypot_bp(end.x - p.x, end.y - p.y);
-              if (d < 0.5) continue;
-              const Vec2 dir{(end.x - p.x) / d, (end.y - p.y) / d};
-              bool dup = false;
-              for (const Arm& a : converted::at(nodes, ni).arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97;
-              if (!dup) converted::at(nodes, ni).arms.push_back({dir, g.width});
-            }
-          }
-        }
-    }
-  }
-  for (const Node& n : nodes) {
-    if (n.arms.size() < 3) continue;
-    Junction j;
-    j.p = n.p;
-    j.arms = n.arms;
-    f32 wmax = 0;
-    for (const Arm& a : n.arms) wmax = std::fmax(wmax, a.width);
-    j.lights = world_traffic_cpp_local::g_rules.flag("JunctionLights", rules::decimal(wmax));
-    j.radius = static_cast<f32>(world_traffic_cpp_local::g_rules.number("JunctionRadius", rules::decimal(wmax)));
-    // The axis: the widest arm (the main road); of several as wide, the one with the smallest
-    // bearing - the same on every machine, whatever order its streets came in
-    {
-      f32 best = 1e9;
-      for (const Arm& a : n.arms) {
-        if (a.width < wmax) continue;
-        f32 bearing = kern::math::atan2(a.dir.y, a.dir.x);
-        if (bearing < 0) bearing += 3.14159265;
-        if (bearing >= 3.14159265 - 1e-3) bearing = 0;
-        if (bearing < best) { best = bearing; j.axis = a.dir; }
-      }
-    }
-    // The signal posts: each on the kerb corner right of its arm's incoming traffic - between
-    // this arm and the next one round the junction, 1.2 m off both carriageways (never on a
-    // street: not on its own arm, not on the one crossing it).
-    for (std::size_t ai = 0; ai < j.arms.size(); converted::pre_inc(ai)) {
-      Arm& a = converted::at(j.arms, ai);
-      const f32 aa = kern::math::atan2(a.dir.y, a.dir.x);
-      f32 best = 6.2831853;
-      std::size_t next = j.arms.size();  // the next arm round the junction: its place in j.arms (none: j.arms.size())
-      for (std::size_t bi = 0; bi < j.arms.size(); converted::pre_inc(bi)) {
-        if (bi == ai) continue;
-        const Arm& b = converted::at(j.arms, bi);
-        f32 d = kern::math::atan2(b.dir.y, b.dir.x) - aa;
-        while (d <= 1e-4) d += 6.2831853;
-        if (d < best) { best = d; next = bi; }
-      }
-      const f32 half = best / 2;
-      if (next == j.arms.size() || best >= 3.1415927) {
-        // no arm on that side: abeam of the junction, beside the arm's own kerb
-        a.pole = Vec2{-a.dir.y, a.dir.x} * (a.width * 0.5 + 1.2);
-        a.has_pole = true;
-        continue;
-      }
-      const f32 s = kern::math::sin(half);
-      const f32 r = (std::fmax(a.width, converted::at(j.arms, next).width) * 0.5 + 1.2) / std::fmax(s, 0.05);
-      if (r > 30) continue;  // two arms nearly along each other: no corner to stand on
-      a.pole = Vec2{kern::math::cos(aa + half), kern::math::sin(aa + half)} * r;
-      a.has_pole = true;
-    }
-    const u32 h = static_cast<u32>(static_cast<i32>(std::lround(n.p.x / 3))) * 73856093u ^ static_cast<u32>(static_cast<i32>(std::lround(n.p.y / 3))) * 19349663u;
-    j.offset = static_cast<f32>(h % 3800) / 100.0;
-    junctions_.push_back(j);
-    const i32 id = static_cast<i32>(converted::minus(junctions_.size(), 1));
-    grid_[world_traffic_cpp_local::cell(static_cast<i32>(converted::fits<int>(std::floor(n.p.x / world_traffic_cpp_local::kCell))), static_cast<i32>(converted::fits<int>(std::floor(n.p.y / world_traffic_cpp_local::kCell))))].push_back(id);
-  }
-}
-void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
-  out.clear();
-  const i32 cx0 = static_cast<i32>(converted::fits<int>(std::floor((p.x - r) / world_traffic_cpp_local::kCell))), cx1 = static_cast<i32>(converted::fits<int>(std::floor((p.x + r) / world_traffic_cpp_local::kCell)));
-  const i32 cy0 = static_cast<i32>(converted::fits<int>(std::floor((p.y - r) / world_traffic_cpp_local::kCell))), cy1 = static_cast<i32>(converted::fits<int>(std::floor((p.y + r) / world_traffic_cpp_local::kCell)));
-  for (i32 y = cy0; y <= cy1; converted::pre_inc(y))
-    for (i32 x = cx0; x <= cx1; converted::pre_inc(x)) {
-      auto it = grid_.find(world_traffic_cpp_local::cell(x, y));
-      if (it == grid_.end()) continue;
-      for (i32 j : it->second)
-        if (hypot_bp(converted::at(junctions_, j).p.x - p.x, converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
-    }
-}
-i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
-  if (!j.lights) return -1;
-  i32 light = 0;
-  world_traffic_cpp_local::g_rules.call("Light", std::tie(light), rules::decimal(lights_time >= 0 ? lights_time : now), rules::decimal(j.offset), rules::decimal(heading.x * j.axis.x + heading.y * j.axis.y));
-  return light;
-}
-f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 now, const std::vector<Vec3>& cars, const std::vector<Vec2>& people, Vec2 player,
-                        bool player_on_foot, View& view) {
-  view = View{};
-  f32 lim = 1e9;
-  const f32 v = std::fmax(0.0, speed);
-  // 1. people in the corridor (yieldsToPedestrian)
-  {
-    const f32 reach = static_cast<f32>(world_traffic_cpp_local::g_rules.number("YieldReach", bus, rules::decimal(v))), half = static_cast<f32>(world_traffic_cpp_local::g_rules.number("YieldHalfWidth", bus));
-    auto in_lane = [&](Vec2 q) {
-      const f32 dx = q.x - pos.x, dy = q.y - pos.y, along = dx * fwd.x + dy * fwd.y;
-      return along >= -0.5 && along <= reach && std::fabs(-dx * fwd.y + dy * fwd.x) < half;
-    };
-    bool by_player = player_on_foot && in_lane(player);
-    bool yielding = by_player;
-    for (std::size_t i = 0; i < people.size() && !yielding; converted::pre_inc(i)) yielding = in_lane(converted::at(people, i));
-    Blocked& b = blocked_[car];
-    if (yielding) {
-      lim = 0;
-      view.yielding = true;
-      if (b.since < 0) b.since = now;
-      // honkCheck: the player sooner, a pedestrian after a while; then 9..16 s apart
-      // (how much later the next honk comes: a number 0..1 from the car and the second)
-      const f32 roll = static_cast<f32>((static_cast<u32>(car) * 2654435761u + static_cast<u32>(converted::fits<unsigned int>(now))) % 700) / 700;
-      f64 next = 0;
-      world_traffic_cpp_local::g_rules.call("Honk", std::tie(view.honk, next), by_player, rules::decimal(b.since), rules::decimal(b.next_honk), rules::decimal(now), rules::decimal(roll));
-      b.next_honk = static_cast<f32>(next);
-    } else b.since = -1;
-  }
-  // 2. the next junction ahead
-  std::vector<i32> cand;
-  near(pos + fwd * 25.0, 34, cand);
-  f32 best = 1e9;
-  for (i32 ji : cand) {
-    Junction& j = converted::at(junctions_, ji);
-    const Vec2 d{j.p.x - pos.x, j.p.y - pos.y};
-    const f32 along = d.x * fwd.x + d.y * fwd.y, lateral = std::fabs(-d.x * fwd.y + d.y * fwd.x);
-    const f32 dist = hypot_bp(d.x, d.y);
-    // inside: claim it (first come, first served) and drive on
-    if (dist < j.radius) {
-      if (j.claim < 0 || j.claim == car || now - j.claim_at > laws_.claim_s) { j.claim = car; j.claim_at = now; }
-      continue;
-    }
-    if (j.claim == car && dist > j.radius + 3) j.claim = -1;  // left it
-    if (along < 0 || lateral > j.radius + 2 || along >= best) continue;
-    best = along;
-    view.junction = ji;
-    view.distance = along - j.radius;
-  }
-  if (view.junction < 0) blocked_[car].wait_since = -1;
-  if (view.junction >= 0) {
-    Junction& j = converted::at(junctions_, view.junction);
-    const f32 stop = std::fmax(0.0, view.distance - laws_.stop_line);  // the stop line before the junction
-    bool must_stop = false;
-    view.light = light(j, fwd, now);
-    if (view.light >= 0) must_stop = world_traffic_cpp_local::g_rules.flag("MustStop", view.light, rules::decimal(stop), rules::decimal(v));  // red; amber: stop if it can
-    else if (view.distance < laws_.first_come) {
-      // Unsignalled: wait while someone else holds the junction (and is still in it).
-      if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < laws_.claim_s) {
-        const Vec3 c = converted::at(cars, j.claim);
-        if (c.z > -1e8 && hypot_bp(c.x - j.p.x, c.y - j.p.y) < j.radius + 3) must_stop = true;
-      }
-      // Right before left: a car close to the edge on the right goes first (after 4 s of waiting
-      // a driver goes anyway: four cars at a four-way junction would otherwise wait for ever).
-      Blocked& b = blocked_[car];
-      if (!must_stop && (b.wait_since < 0 || now - b.wait_since < laws_.patience_s))
-        for (std::size_t k = 0; k < cars.size(); converted::pre_inc(k)) {
-          if (static_cast<i32>(k) == car || converted::at(cars, k).z < -1e8) continue;
-          const Vec2 o{converted::at(cars, k).x - j.p.x, converted::at(cars, k).y - j.p.y};
-          const f32 od = hypot_bp(o.x, o.y);
-          if (od < j.radius || od > j.radius + 10 || od > view.distance + j.radius + 2) continue;
-          const Vec2 me{pos.x - j.p.x, pos.y - j.p.y};
-          if (me.x * o.y - me.y * o.x > 0 && std::fabs((me.x * o.x + me.y * o.y) / (hypot_bp(me.x, me.y) * od)) < 0.5) { must_stop = true; break; }
-        }
-    }
-    {
-      Blocked& b = blocked_[car];
-      if (must_stop && v < 0.5 && b.wait_since < 0) b.wait_since = now;
-      if (view.distance > laws_.first_come || view.light >= 0) b.wait_since = -1;
-    }
-    if (must_stop) {
-      view.wait = true;
-      lim = std::fmin(lim, static_cast<f32>(world_traffic_cpp_local::g_rules.number("StopSpeed", rules::decimal(stop))));
-    }
-  }
-  return lim;
-}
-namespace game_traffic_cpp_local { constexpr f32 kCacheS = 0.12; }
-f32 Game::traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed) {
-  if (!life_ || car < 0) return 1e9;
-  WorldLife& L = *converted::present(life_);
-  if (static_cast<i32>(L.car_limit.size()) <= car) { L.car_limit.resize(converted::count(converted::plus(car, 1)), 1e9); L.car_limit_at.resize(converted::count(converted::plus(car, 1)), -99); L.car_view.resize(converted::count(converted::plus(car, 1))); }
-  const f32 now = converted::present(world_)->sim_time();
-  L.rules.lights_time = static_cast<f32>(kern::math::mod(life_epoch(), 38.0 * 1000));
-  if (now - converted::at(L.car_limit_at, car) < game_traffic_cpp_local::kCacheS) return converted::at(L.car_limit, car);
-  converted::at(L.car_limit_at, car) = now;
-  if (L.rules.built_from != lane_signature(city_.lanes())) {
-    L.rules.rebuild(city_.lanes());
-    L.rules.built_from = lane_signature(city_.lanes());
-  }
-  std::vector<Vec3>& cars = L.car_positions;
-  cars.assign(converted::count(cars_.size()), Vec3{0, 0, -1e9});
-  for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i))
-    if (converted::at(cars_, i).placed && converted::present(world_)->actor_alive(converted::at(cars_, i).actor)) converted::at(cars, i) = matrix_of(converted::at(cars_, i).actor).translation();
-  const f32 fl = hypot_bp(fwd.x, fwd.y);
-  const Vec2 f2 = fl > 1e-4 ? Vec2{fwd.x / fl, fwd.y / fl} : Vec2{1, 0};
-  const Vec3 me = matrix_of(soldier_).translation();
-  const bool bus = converted::present(converted::at(cars_, car).car)->spec().radius > 0.4;
-  TrafficRules::View& v = converted::at(L.car_view, car);
-  const f32 lim = L.rules.limit(car, {pos.x, pos.y}, f2, speed, bus, now, cars, L.walkers, {me.x, me.y}, mode_ == Mode::foot && !player_dead_, v);
-  if (v.honk) L.honks.push_back(pos + Vec3{0, 0, 0.4});
-  converted::at(L.car_limit, car) = lim;
-  return lim;
-}
-f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const {
-  const f32 side = static_cast<f32>(world_traffic_cpp_local::g_rules.number("SideReach", bus)), far = laws_.ahead_max;
-  const f32 bodies[2] = {static_cast<f32>(world_traffic_cpp_local::g_rules.number("Bodies", bus, false)), static_cast<f32>(world_traffic_cpp_local::g_rules.number("Bodies", bus, true))};
-  f32 gap = 1e9;
-  i32 who = -1;
-  for (std::size_t i = 0; i < all.size(); converted::pre_inc(i)) {
-    const Vehicle& o = converted::at(all, i);
-    if (!o.there || static_cast<i32>(i) == self) continue;
-    const f32 dx = o.p.x - pos.x, dy = o.p.y - pos.y;
-    if (std::fabs(dx) > far || std::fabs(dy) > far) continue;
-    const f32 along = dx * fwd.x + dy * fwd.y;
-    if (along < laws_.ahead_min || along > far) continue;
-    if (std::fabs(-dx * fwd.y + dy * fwd.x) > side) continue;
-    const f32 g = along - converted::at(bodies, o.bus ? 1 : 0);
-    if (g < gap) { gap = g; who = static_cast<i32>(i); }
-  }
-  limiter = who;
-  if (who < 0) return 1e9;
-  return static_cast<f32>(world_traffic_cpp_local::g_rules.number("GapSpeed", rules::decimal(gap)));
-}
-f32 Game::traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32& limiter) {
-  limiter = -1;
-  if (!life_ || car < 0) return 1e9;
-  WorldLife& L = *converted::present(life_);
-  // every vehicle on the road, once a step: the cars (by index; with or without physics), then
-  // the tow trucks
-  if (L.vehicles_step != steps_) {
-    L.vehicles_step = steps_;
-    L.vehicles.assign(converted::count(converted::plus(cars_.size(), L.trucks.size())), TrafficRules::Vehicle{});
-    for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
-      const TrafficCar& c = converted::at(cars_, i);
-      if (!c.placed || !converted::present(world_)->actor_alive(c.actor)) continue;
-      const Vec3 p = matrix_of(c.actor).translation();
-      converted::at(L.vehicles, i) = {{p.x, p.y}, converted::present(c.car)->spec().radius > 0.4, true};
-    }
-    for (std::size_t k = 0; k < L.trucks.size(); converted::pre_inc(k)) {
-      const WorldLife::TowTruck& t = converted::at(L.trucks, k);
-      if (!t.body.valid() || !converted::present(world_)->physics().body_valid(t.body)) continue;
-      const Vec3 p = converted::present(world_)->physics().pose(t.body).position;
-      converted::at(L.vehicles, converted::plus(cars_.size(), k)) = {{p.x, p.y}, false, true};
-    }
-  }
-  const f32 fl = hypot_bp(fwd.x, fwd.y);
-  const Vec2 f2 = fl > 1e-4 ? Vec2{fwd.x / fl, fwd.y / fl} : Vec2{1, 0};
-  i32 who = -1;
-  const f32 v = L.rules.gap_speed(car, {pos.x, pos.y}, f2, converted::present(converted::at(cars_, static_cast<std::size_t>(car)).car)->spec().radius > 0.4, L.vehicles, who);
-  limiter = who >= 0 && who < static_cast<i32>(cars_.size()) ? who : -1;
-  return v;
-}
-void Game::traffic_far_step(TrafficCar& c, std::size_t i, f32 h) {
-  // the route without physics: towards the lane's next point, turning onto it, with the same lane
-  // changes and under the same rules as the AI driver (drive_traffic) - at 60 Hz like him
-  // (staggered over the cars; the kinematic body moves on at its velocity in between)
-  if (converted::rem_bits((converted::plus_bits(steps_, i)), 4) != 0) return;
-  const f32 dt = h * 4;
-  World& w = converted::present(world_)->physics();
-  const physics::Body b = body(c.actor);
-  const BodyState s = read_body(w, b);
-  const std::vector<Lane>& lanes = city_.lanes();
-  if (!c.driver || c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !converted::at(lanes, c.lane).alive || converted::at(lanes, c.lane).points.size() < 2) {
-    c.far_speed = 0;
-    c.want = 0;
-    c.ahead = -1;
-    w.set_target_pose(b, {s.position, s.rotation}, dt);
-    return;
-  }
-  const Lane& L = converted::at(lanes, c.lane);
-  const i32 n = static_cast<i32>(L.points.size());
-  c.index = std::clamp(c.index, 0, converted::minus(n, 1));
-  const Vec3 fwd3 = s.rotation.rotate({1, 0, 0});
-  const f32 fl = hypot_bp(fwd3.x, fwd3.y);
-  const Vec3 fwd = fl > 1e-4 ? Vec3{fwd3.x / fl, fwd3.y / fl, 0} : Vec3{1, 0, 0};
-  const f32 off = std::fmin(L.width * 0.25, 1.8);
-  // the same target as the driver with physics: a lookahead on along the lane, on its right
-  const TrafficRules::Pursuit pu = TrafficRules::pursuit(L, c.index, c.dir, {s.position.x, s.position.y}, std::fmax(7.0, c.target_speed * 1.3), off);
-  const Vec2 target = pu.target;
-  Vec2 to{target.x - s.position.x, target.y - s.position.y};
-  const f32 tl = hypot_bp(to.x, to.y);
-  if (converted::plus(c.index, c.dir) < 0 || converted::plus(c.index, c.dir) >= n ? pu.end < 2.5 : pu.passed) traffic_advance(c);
-  // speed: the car's own, slower towards the street's end, what the lights, the people and the
-  // vehicle ahead leave (as drive_traffic)
-  f32 want = c.target_speed;
-  if (pu.end < 18) want = std::fmin(want, 4.5 + pu.end * 0.3);
-  want = std::fmin(want, traffic_rules(static_cast<i32>(i), s.position, fwd, c.far_speed));
-  {
-    i32 limiter = -1;
-    const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, limiter);
-    c.ahead = free_way < 0.6 ? limiter : -1;
-    want = std::fmin(want, free_way);
-  }
-  c.want = want;
-  // (a driver's braking and pulling away: 4.5 and 3 m/s2)
-  c.far_speed = std::fmax(0.0, c.far_speed + clampf(want - c.far_speed, -4.5 * dt, 3 * dt));
-  const Vec2 dir = tl > 1e-3 ? to * (1.0 / tl) : Vec2{fwd.x, fwd.y};
-  // heading eases onto the direction of travel (about 1.5 rad/s, only while it rolls)
-  const f32 yaw = kern::math::atan2(fwd.y, fwd.x), want_yaw = kern::math::atan2(dir.y, dir.x);
-  f32 dy = want_yaw - yaw;
-  while (dy > kPi) dy -= 2 * kPi;
-  while (dy < -kPi) dy += 2 * kPi;
-  const f32 turn = 1.5 * dt * std::fmin(1.0, c.far_speed / 2);
-  const f32 ny = yaw + clampf(dy, -turn, turn);
-  const Vec2 np{s.position.x + dir.x * c.far_speed * dt, s.position.y + dir.y * c.far_speed * dt};
-  w.set_target_pose(b, car_rest_pose(converted::present(c.car)->spec(), np.x, np.y, ny), dt);
-}
-void Car::reapply(World& world, physics::Body body) const {
-  if (rig_world_ != &world || rig_chassis_ != body) return;
-  const BodyState st = read_body(world, body);
-  // (the chassis was put elsewhere in between: nothing is pushed until the next step has put the
-  // wheels under it again)
-  if (has_last_ && converted::wide::length(st.position - last_pos_) > converted::wide::length(st.velocity) / 60 * 2 + 0.6) return;
-  for (i32 i = 0; i < n_applied_; converted::pre_inc(i)) {
-    const Applied& a = converted::at(applied_, i);
-    const Vec3 f = st.rotation.rotate(a.f);
-    if (a.on < 0) world.apply_force_to_center(body, f);
-    else if (converted::at(rig_, a.on).body.valid() && world.body_valid(converted::at(rig_, a.on).body)) world.apply_force(converted::at(rig_, a.on).body, f, st.position + st.rotation.rotate(a.p));
-  }
-}
-namespace wire { struct U16 { u16 v = 0; }; }
-namespace wire { struct I16 { i16 v = 0; }; }
-namespace wire { struct U32 { u32 v = 0; }; }
-namespace wire { struct F32 { f32 v = 0; }; }
-namespace wire { inline std::array<u8, 4> f32_bytes(f32 v) { return converted::layout::bytes_of<4>(F32{v}, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.v); }); } }
-namespace wire { inline void put_u8(std::vector<u8>& b, u8 v) { b.push_back(v); } }
-namespace wire { inline void put_u16(std::vector<u8>& b, u16 v) {
-  const std::array<u8, 2> x = std::bit_cast<std::array<u8, 2>>(U16{v});
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace wire { inline void put_i16(std::vector<u8>& b, i16 v) {
-  const std::array<u8, 2> x = std::bit_cast<std::array<u8, 2>>(I16{v});
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace wire { inline void put_u32(std::vector<u8>& b, u32 v) {
-  const std::array<u8, 4> x = std::bit_cast<std::array<u8, 4>>(U32{v});
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace wire { inline void put_f32(std::vector<u8>& b, f32 v) {
-  const std::array<u8, 4> x = f32_bytes(v);
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace wire { inline void put_vec3(std::vector<u8>& b, Vec3 v) {
-  const std::array<u8, 12> x = converted::layout::bytes_of<12>(V3{v.x, v.y, v.z}, [](const auto& v_, u8* o_) { converted::layout::single_to(o_ + 0, v_.x); converted::layout::single_to(o_ + 4, v_.y); converted::layout::single_to(o_ + 8, v_.z); });
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace wire { inline void put_bytes(std::vector<u8>& b, const std::vector<u8>& v) {
-  put_u16(b, static_cast<u16>(v.size()));
-  b.insert(b.end(), v.begin(), v.end());
-} }
-namespace wire { struct Reader {
-  std::size_t at = 0;
-  bool ok = true;
-
-  u8 get_u8(const std::vector<u8>& b) {
-    if (converted::plus(at, 1) > b.size()) { ok = false; return 0; }
-    const u8 v = converted::at(b, at);
-    converted::plus_to(at, 1);
-    return v;
-  }
-  
-
-
-
-
-
-
-  u16 get_u16(const std::vector<u8>& b) {
-    if (converted::plus(at, 2) > b.size()) { ok = false; return 0; }
-    U16 x;
-    std::memcpy(&x, b.data() + at, sizeof x);
-    converted::plus_to(at, 2);
-    return x.v;
-  }
-  i16 get_i16(const std::vector<u8>& b) {
-    if (converted::plus(at, 2) > b.size()) { ok = false; return 0; }
-    I16 x;
-    std::memcpy(&x, b.data() + at, sizeof x);
-    converted::plus_to(at, 2);
-    return x.v;
-  }
-  u32 get_u32(const std::vector<u8>& b) {
-    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
-    U32 x;
-    std::memcpy(&x, b.data() + at, sizeof x);
-    converted::plus_to(at, 4);
-    return x.v;
-  }
-  
-
-
-
-
-
-
-  
-
-
-
-
-
-
-  
-
-
-
-
-
-
-  f32 get_f32(const std::vector<u8>& b) {
-    if (converted::plus(at, 4) > b.size()) { ok = false; return 0; }
-    F32 x;
-    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.v, p_ + 0); });
-    converted::plus_to(at, 4);
-    return x.v;
-  }
-  
-
-
-
-
-
-
-  Vec3 get_vec3(const std::vector<u8>& b) {
-    if (converted::plus(at, 12) > b.size()) { ok = false; return {}; }
-    V3 x;
-    converted::layout::of_bytes(x, b.data() + at, [](auto& v_, const u8* p_) { converted::layout::single_from(v_.x, p_ + 0); converted::layout::single_from(v_.y, p_ + 4); converted::layout::single_from(v_.z, p_ + 8); });
-    converted::plus_to(at, 12);
-    return {x.x, x.y, x.z};
-  }
-  
-
-
-
-
-
-
-  /// A list of bytes (put_bytes): empty where it is not all there.
-  std::vector<u8> get_bytes(const std::vector<u8>& b) {
-    const u16 n = get_u16(b);
-    if (!ok || converted::plus(at, n) > b.size()) { ok = false; return {}; }
-    std::vector<u8> v(b.begin() + static_cast<std::ptrdiff_t>(at), b.begin() + static_cast<std::ptrdiff_t>(converted::plus(at, n)));
-    converted::plus_to(at, n);
-    return v;
-  }
-  /// Every number was there, and the message has no more.
-  
-}; }
-namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
-namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
-namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
-namespace mp { void Scoreboard::ensure(u8 slot) {
-  for (const Score& s : rows_) if (s.slot == slot) return;
-  rows_.push_back({slot, 0, 0});
-} }
-namespace mp { void Scoreboard::died(u8 victim, i32 by) {
-  ensure(victim);
-  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
-  if (by >= 0 && by != victim) {
-    ensure(static_cast<u8>(by));
-    for (Score& s : rows_) if (s.slot == by) ++s.kills;
-  }
-} }
-namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
-namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
-namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
-namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
-  std::stable_sort(members.begin(), members.end());
-  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
-} } }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
-  mp::mp_rules_cpp_local::roster(current);
-  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
-  return b.status;
-} }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
-  Ballot::Status did = b.status;
-  return cast_vote(b, voter, approve, std::move(current), now, did);
-} }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
-  mp::mp_rules_cpp_local::roster(members);
-  bool created = false;
-  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
-  return created;
-} }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  HitVerdict verdict = HitVerdict::applied;
-  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
-  return verdict;
-} }
-namespace net { namespace net_session_cpp_local { enum : u16 {
-  kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
-  kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
-  kBallotResult = 21, kLeft = 22, kSeatReq = 23, kSeatState = 24, kSwarmMsg = 25, kSwarmHitMsg = 26, kWorldMsg = 27, kOriginMsg = 28, kDestroyMsg = 29, kTossMsg = 30, kProjMsg = 31, kTownMsg = 32,
-}; } }
-namespace net { namespace net_session_cpp_local { enum : int { kReliable = 0, kUnreliable = 1 }; } }
-namespace net { namespace net_session_cpp_local { bool sane(Vec3 v) { return std::isfinite(v.x) && std::isfinite(v.y) && std::isfinite(v.z) && std::fabs(v.x) < 1e6 && std::fabs(v.y) < 1e6 && std::fabs(v.z) < 1e5; } } }
-namespace net { namespace net_session_cpp_local { std::vector<u8> pack_swarm(u8 owner, u8 serial, u8 part, bool last, const std::vector<SwarmUnit>& units, std::size_t from, std::size_t n) {
-  std::vector<u8> w;
-  wire::put_u8(w, owner);
-  wire::put_u8(w, serial);
-  wire::put_u8(w, static_cast<u8>(part | (last ? 0x80 : 0)));
-  wire::put_u8(w, static_cast<u8>(n));
-  for (std::size_t i = 0; i < n; converted::pre_inc(i)) {
-    const SwarmUnit& u = converted::at(units, converted::plus(from, i));
-    const auto q16 = [](f32 v, f32 k) { return static_cast<std::int16_t>(std::clamp(std::lround(v * k), -32767L, 32767L)); };
-    wire::put_u16(w, u.id);
-    wire::put_u8(w, static_cast<u8>(u.kind));
-    wire::put_u8(w, u.flags);
-    wire::put_f32(w, u.p.x);
-    wire::put_f32(w, u.p.y);
-    wire::put_i16(w, q16(u.p.z, 10));
-    wire::put_i16(w, q16(u.yaw, 100));
-    wire::put_i16(w, q16(u.aux, 100));
-  }
-  return w;
-} } }
-namespace net { namespace net_session_cpp_local { bool unpack_swarm(const std::vector<u8>& b, u8& owner, u8& serial, u8& part, bool& last, std::vector<SwarmUnit>& units) {
-  wire::Reader r;
-  owner = r.get_u8(b);
-  serial = r.get_u8(b);
-  const u8 pt = r.get_u8(b);
-  part = pt & 0x7f;
-  last = pt & 0x80;
-  const u8 n = r.get_u8(b);
-  units.clear();
-  if (n > kSwarmPerMessage) return false;
-  for (u8 i = 0; i < n && r.ok; ++i) {
-    SwarmUnit u;
-    u.id = r.get_u16(b);
-    const u8 k = r.get_u8(b);
-    u.flags = r.get_u8(b);
-    u.p.x = r.get_f32(b);
-    u.p.y = r.get_f32(b);
-    u.p.z = r.get_i16(b) / 10.0;
-    u.yaw = r.get_i16(b) / 100.0;
-    u.aux = r.get_i16(b) / 100.0;
-    if (!r.ok || k > static_cast<u8>(SwarmKind::kLast) || !sane(u.p) || !std::isfinite(u.yaw) || !std::isfinite(u.aux)) return false;
-    u.kind = static_cast<SwarmKind>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 7}, k));
-    units.push_back(u);
-  }
-  return r.ok;
-} } }
-namespace net { namespace net_session_cpp_local { std::vector<u8> pack_swarm_hit(const SwarmHit& h) {
-  std::vector<u8> w;
-  wire::put_u8(w, h.from);
-  wire::put_u8(w, h.to);
-  wire::put_u16(w, h.id);
-  wire::put_u8(w, static_cast<u8>(h.kind));
-  wire::put_f32(w, h.damage);
-  return w;
-} } }
-namespace net { namespace net_session_cpp_local { bool unpack_swarm_hit(const std::vector<u8>& b, SwarmHit& h) {
-  wire::Reader r;
-  h.from = r.get_u8(b); h.to = r.get_u8(b); h.id = r.get_u16(b);
-  const u8 k = r.get_u8(b);
-  h.damage = r.get_f32(b);
-  h.kind = static_cast<SwarmKind>(converted::among({0, 1, 2, 3, 4, 5, 6, 7, 7}, k));
-  return r.ok && k <= static_cast<u8>(SwarmKind::kLast) && std::isfinite(h.damage) && h.damage > 0 && h.damage < 1e4;
-} } }
-namespace net { namespace net_session_cpp_local { std::vector<u8> pack_hit(const Hit& h) {
-  std::vector<u8> w;
-  wire::put_u8(w, h.target);
-  wire::put_u8(w, h.by);
-  wire::put_u8(w, h.weapon);
-  wire::put_u8(w, h.zone);
-  wire::put_f32(w, h.damage);
-  wire::put_vec3(w, h.from);
-  return w;
-} } }
-namespace net { namespace net_session_cpp_local { bool unpack_hit(const std::vector<u8>& b, Hit& h) {
-  wire::Reader r;
-  h.target = r.get_u8(b); h.by = r.get_u8(b); h.weapon = r.get_u8(b); h.zone = r.get_u8(b); h.damage = r.get_f32(b); h.from = r.get_vec3(b);
-  return r.ok && std::isfinite(h.damage) && h.damage > 0 && h.damage <= 100 && sane(h.from);
-} } }
-namespace net { namespace net_session_cpp_local { std::vector<u8> pack_fx(const Fx& f) {
-  std::vector<u8> w;
-  wire::put_u8(w, f.kind);
-  wire::put_u8(w, f.owner);
-  wire::put_vec3(w, f.p);
-  wire::put_vec3(w, f.dir);
-  wire::put_f32(w, f.a);
-  return w;
-} } }
-namespace net { namespace net_session_cpp_local { bool unpack_fx(const std::vector<u8>& b, Fx& f) {
-  wire::Reader r;
-  f.kind = r.get_u8(b); f.owner = r.get_u8(b); f.p = r.get_vec3(b); f.dir = r.get_vec3(b); f.a = r.get_f32(b);
-  return r.ok && f.kind <= Fx::kLast && sane(f.p) && sane(f.dir) && std::isfinite(f.a);
-} } }
-namespace net { std::vector<u8> Session::roster() const {
-  std::vector<u8> r{self_slot_};
-  for (const Remote& x : remotes_) r.push_back(x.state.slot);
-  std::stable_sort(r.begin(), r.end());
-  converted::erase(r, std::unique(r.begin(), r.end()), r.end());
-  return r;
-} }
-namespace net { Vec3 Session::focus_of(u8 slot) const {
-  if (slot == self_slot_) return me_.mode == PlayerMode::foot || me_.mode == PlayerMode::drone ? me_.avatar : me_.position;
-  const i32 at = remote_index(slot);
-  if (at < 0) return {};
-  const Remote& r = converted::at(remotes_, static_cast<std::size_t>(at));
-  return r.state.mode == PlayerMode::foot || r.state.mode == PlayerMode::drone ? r.person_shown : r.shown;
-} }
-namespace net { f32 Session::hp_of(u8 slot) const {
-  if (slot == self_slot_) return me_.flags & kDead ? 0 : me_.health;
-  const i32 at = remote_index(slot);
-  if (at < 0) return 0;
-  const Remote& r = converted::at(remotes_, static_cast<std::size_t>(at));
-  return r.state.flags & kDead ? 0 : r.state.health;
-} }
-namespace net { void Session::refused(u16 type, std::size_t bytes) {
-  ++send_refused_;
-  if (refused_said_ < 8) { ++refused_said_; std::fprintf(stderr, "[spawncity net] message type %u (%zu bytes) was not sent\n", static_cast<unsigned>(type), bytes); }
-} }
-namespace net { void Session::to_client(u8 slot, int ch, u16 type, const std::vector<u8>& data) {
-  if (role_ == Role::host && server_ && slot < converted::present(server_)->max_clients() && converted::present(server_)->client_connected(slot))
-    if (!converted::present(server_)->send(slot, ch, type, data)) refused(type, data.size());
-} }
-namespace net { void Session::to_all(int ch, u16 type, const std::vector<u8>& data, u8 except) {
-  if (role_ != Role::host || !server_) return;
-  for (int c = 0; c < converted::present(server_)->max_clients(); converted::pre_inc(c))
-    if (c != except && converted::present(server_)->client_connected(c))
-      if (!converted::present(server_)->send(c, ch, type, data)) refused(type, data.size());
-} }
-namespace net { void Session::to_host(int ch, u16 type, const std::vector<u8>& data) {
-  if (role_ == Role::host) dispatch(kHost, type, data);
-  else if (client_ && converted::present(client_)->connected()) converted::present(client_)->send(ch, type, data);
-} }
-namespace net { void Session::swarm_part(u8 owner, u8 serial, u8 part, bool last, std::vector<SwarmUnit>& units) {
-  i32 at = -1;
-  for (std::size_t i = 0; i < swarm_parts_.size(); converted::pre_inc(i)) if (converted::at(swarm_parts_, i).owner == owner) at = static_cast<i32>(i);
-  if (at < 0) {
-    swarm_parts_.push_back({});
-    at = converted::minus(static_cast<i32>(swarm_parts_.size()), 1);
-    converted::at(swarm_parts_, static_cast<std::size_t>(at)).owner = owner;
-    converted::at(swarm_parts_, static_cast<std::size_t>(at)).serial = static_cast<u8>(converted::minus(serial, 1));
-  }
-  SwarmParts& p = converted::at(swarm_parts_, static_cast<std::size_t>(at));
-  if (p.serial != serial) {
-    if (static_cast<i8>(converted::minus(serial, p.serial)) < 0) return;  // a part of an older snapshot, late
-    p = SwarmParts{};
-    p.owner = owner;
-    p.serial = serial;
-  }
-  const u64 mark = converted::shl_bits(u64{1}, (part & 63));
-  if (converted::at(p.have, part >> 6) & mark) return;  // (twice)
-  converted::at(p.have, part >> 6) |= mark;
-  p.units.insert(p.units.end(), units.begin(), units.end());
-  if (last) p.last = part;
-  if (p.last < 0) return;
-  for (int k = 0; k <= p.last; converted::pre_inc(k)) if (!(converted::at(p.have, k >> 6) & (converted::shl_bits(u64{1}, (k & 63))))) return;
-  swarms_.push_back({owner, std::move(p.units)});
-  p.units.clear();
-  p.last = -1;  // (handed on: its parts stay marked, so a duplicate does not start it again)
-} }
-namespace net { void Session::judge(u8 shooter, const Hit& req) {
-  const std::vector<u8> r = roster();
-  const bool target_known = std::find(r.begin(), r.end(), req.target) != r.end(), shooter_known = std::find(r.begin(), r.end(), shooter) != r.end();
-  f64 until = 0;
-  for (const auto& [s, u] : protected_) if (s == req.target) until = u;
-  const mp::HitVerdict v = mp::judge_hit(target_known, shooter_known, req.target == shooter, friendly_fire_, now_ms(), until, hp_of(req.target));
-  if (v != mp::HitVerdict::applied) return;
-  Hit h = req;
-  h.by = shooter;
-  const std::vector<u8> bytes = net::net_session_cpp_local::pack_hit(h);
-  if (h.target == self_slot_) hits_.push_back(h);
-  else to_client(h.target, net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kHitMsg, bytes);
-  if (shooter != h.target) {
-    if (shooter == self_slot_) confirms_.push_back(h);
-    else to_client(shooter, net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kConfirm, bytes);
-  }
-} }
-namespace net { void Session::send_scores() {
-  std::vector<u8> w;
-  wire::put_u8(w, static_cast<u8>(scores_.rows().size()));
-  for (const mp::Score& s : scores_.rows()) { wire::put_u8(w, s.slot); wire::put_u16(w, s.kills); wire::put_u16(w, s.deaths); }
-  to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kScores, w, kNobody);
-} }
-namespace net { void Session::send_rules() {
-  std::vector<u8> w;
-  wire::put_u8(w, static_cast<u8>(friendly_fire_));
-  if (have_world_rules_) wire::put_u16(w, world_rules_);
-  to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kRules, w, kNobody);
-} }
-namespace net { void Session::begin_ballot(bool value) {
-  if (role_ != Role::host || ballot_.id || value == friendly_fire_) return;
-  if (!mp::create_ballot(ballot_, ++ballot_serial_, 0, value, self_slot_, roster(), now_ms())) return;
-  std::vector<u8> w;
-  wire::put_u32(w, ballot_.id);
-  wire::put_u8(w, ballot_.key);
-  wire::put_u8(w, static_cast<u8>(value));
-  wire::put_u8(w, static_cast<u8>(ballot_.members.size()));
-  for (u8 m : ballot_.members) wire::put_u8(w, m);
-  to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kBallotMsg, w, kNobody);
-  char t[96];
-  std::snprintf(t, sizeof t, "FRIENDLY FIRE: %s - Abstimmung 1/%zu", value ? "EIN" : "AUS", ballot_.members.size());
-  vote_text_ = t;
-} }
-namespace net { void Session::finish_ballot(mp::Ballot::Status s) {
-  const u8 result = s == mp::Ballot::Status::approved ? 1 : s == mp::Ballot::Status::rejected ? 2 : 3;
-  if (s == mp::Ballot::Status::approved) { friendly_fire_ = ballot_.value; send_rules(); }
-  std::vector<u8> w;
-  wire::put_u32(w, ballot_.id);
-  wire::put_u8(w, result);
-  to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kBallotResult, w, kNobody);
-  vote_text_ = result == 1 ? "Einstimmig angenommen" : result == 2 ? "Abgelehnt" : "Abstimmung abgelaufen / Spielerwechsel";
-  ballot_ = mp::Ballot{};
-} }
-namespace net { void Session::seat_request(bool claim, u8 owner, seats::Seat seat) {
-  // no session: single-player runs locally; the host judges its own requests at once
-  if (role_ == Role::none) { const u8 me = self_slot_; claim ? seats_.claim(owner, me, seat) : seats_.release(owner, me, seat); return; }
-  if (role_ == Role::host) { judge_seat(self_slot_, claim, owner, seat); return; }
-  std::vector<u8> w;
-  wire::put_u8(w, static_cast<u8>(claim));
-  wire::put_u8(w, owner);
-  wire::put_u8(w, static_cast<u8>(seat));
-  to_host(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kSeatReq, w);
-} }
-namespace net { void Session::judge_seat(u8 from, bool claim, u8 owner, seats::Seat seat) {
-  const seats::Result r = claim ? seats_.claim(owner, from, seat) : seats_.release(owner, from, seat);
-  if (r == seats::Result::ok) send_seats();
-} }
-namespace net { void Session::send_seats() {
-  if (role_ != Role::host) return;
-  std::vector<u8> w;
-  wire::put_u32(w, seats_.revision());
-  wire::put_u8(w, static_cast<u8>(seats_.rows().size()));
-  for (const seats::Row& r : seats_.rows()) { wire::put_u8(w, r.owner); wire::put_u8(w, r.pilot); wire::put_u8(w, r.passenger); }
-  to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kSeatState, w, kNobody);
-} }
-namespace net { void Session::dispatch(u8 from, u16 type, const std::vector<u8>& d) {
-  switch (type) {
-    case net::net_session_cpp_local::kDestroyMsg: { if (role_ == Role::host && destroy_.size() < 64) destroy_.push_back({from, d}); return; }
-    case net::net_session_cpp_local::kTownMsg: { if (role_ == Role::host && from != self_slot_ && town_.size() < 512) town_.push_back({from, d}); return; }
-    case net::net_session_cpp_local::kProjMsg: {  // a client's rounds in flight: drawn here, and on to the others
-      if (role_ != Role::host) return;
-      if (proj_.size() < 64) proj_.push_back({from, d});
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_bytes(w, d);
-      to_all(net::net_session_cpp_local::kUnreliable, net::net_session_cpp_local::kProjMsg, w, from);
-      return;
-    }
-    case net::net_session_cpp_local::kTossMsg: {  // a client's thrown things: ours to drive, and on to the others
-      if (role_ != Role::host) return;
-      if (toss_.size() < 64) toss_.push_back({from, d});
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_bytes(w, d);
-      to_all(net::net_session_cpp_local::kUnreliable, net::net_session_cpp_local::kTossMsg, w, from);
-      return;
-    }
-    case net::net_session_cpp_local::kSeatReq: {
-      wire::Reader r;
-      const u8 claim = r.get_u8(d), owner = r.get_u8(d), seat = r.get_u8(d);
-      if (r.ok && seat <= 1) judge_seat(from, claim != 0, owner, static_cast<seats::Seat>(converted::among({0, 1}, seat)));
-      return;
-    }
-    case net::net_session_cpp_local::kFxMsg: {
-      Fx f;
-      if (!net::net_session_cpp_local::unpack_fx(d, f)) return;
-      f.owner = from;
-      if (from != self_slot_) fx_.push_back(f);
-      to_all(f.kind == Fx::shot ? net::net_session_cpp_local::kUnreliable : net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kFxMsg, net::net_session_cpp_local::pack_fx(f), from);
-      return;
-    }
-    case net::net_session_cpp_local::kSwarmMsg: {
-      // the host passes a player's units on to everybody else (the owner is who sent them)
-      u8 owner, serial, part;
-      bool last;
-      std::vector<SwarmUnit> units;
-      if (!net::net_session_cpp_local::unpack_swarm(d, owner, serial, part, last, units)) return;
-      to_all(net::net_session_cpp_local::kUnreliable, net::net_session_cpp_local::kSwarmMsg, net::net_session_cpp_local::pack_swarm(from, serial, part, last, units, 0, units.size()), from);
-      if (from != self_slot_) swarm_part(from, serial, part, last, units);
-      return;
-    }
-    case net::net_session_cpp_local::kSwarmHitMsg: {
-      SwarmHit h;
-      if (!net::net_session_cpp_local::unpack_swarm_hit(d, h)) return;
-      h.from = from;
-      if (h.to == self_slot_) swarm_hits_.push_back(h);
-      else if (h.to != kHost) to_client(h.to, net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kSwarmHitMsg, net::net_session_cpp_local::pack_swarm_hit(h));
-      return;
-    }
-    case net::net_session_cpp_local::kHitReq: {
-      Hit h;
-      if (net::net_session_cpp_local::unpack_hit(d, h)) judge(from, h);
-      return;
-    }
-    case net::net_session_cpp_local::kDeath: {
-      wire::Reader r;
-      Kill k{from, r.get_u8(d), r.get_u8(d), r.get_u8(d)};
-      if (!r.ok) return;
-      const std::vector<u8> ro = roster();
-      if (std::find(ro.begin(), ro.end(), k.by) == ro.end()) k.by = kNobody;
-      scores_.died(k.victim, k.by == kNobody ? -1 : k.by);
-      kills_.push_back(k);
-      std::vector<u8> w;
-      wire::put_u8(w, k.victim);
-      wire::put_u8(w, k.by);
-      wire::put_u8(w, k.weapon);
-      wire::put_u8(w, k.zone);
-      to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kKillMsg, w, kNobody);
-      send_scores();
-      return;
-    }
-    case net::net_session_cpp_local::kRespawn: {
-      const f64 protect_ms = mp::spawn_protect_ms();
-      const f64 until = now_ms() + protect_ms;
-      bool found = false;
-      for (auto& [s, u] : protected_) if (s == from) { u = until; found = true; }
-      if (!found) protected_.push_back({from, until});
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_f32(w, static_cast<f32>(protect_ms));
-      to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kProtect, w, kNobody);
-      return;
-    }
-    case net::net_session_cpp_local::kPingMsg: {
-      wire::Reader r;
-      r.get_u8(d);
-      PingEvent p{from, r.get_u8(d) != 0, r.get_vec3(d), r.get_u32(d)};
-      if (!r.ok || !net::net_session_cpp_local::sane(p.p)) return;
-      if (from != self_slot_) pings_.push_back(p);
-      std::vector<u8> w;
-      wire::put_u8(w, from);
-      wire::put_u8(w, static_cast<u8>(p.on));
-      wire::put_vec3(w, p.p);
-      wire::put_u32(w, p.color);
-      to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kPingMsg, w, from);
-      return;
-    }
-    case net::net_session_cpp_local::kVoice: {
-      wire::Reader r;
-      r.get_u8(d);
-      VoiceFrame v{from, r.get_u32(d), r.get_u8(d) != 0, r.get_bytes(d)};
-      if (!r.ok || v.data.size() < 4 || v.data.size() > 800) return;
-      // Only mates in range hear it (proximity_voice.mjs transmit), unless "everywhere".
-      const Vec3 at = focus_of(from);
-      const f32 radius = mp::voice_radius();
-      if (from != self_slot_ && (v.everywhere || converted::wide::length(focus_of(self_slot_) - at) <= radius)) voice_.push_back(v);
-      std::vector<u8> bytes;
-      wire::put_u8(bytes, from);
-      wire::put_u32(bytes, v.seq);
-      wire::put_u8(bytes, static_cast<u8>(v.everywhere));
-      wire::put_bytes(bytes, v.data);
-      for (const Remote& x : remotes_)
-        if (x.state.slot != from && (v.everywhere || converted::wide::length(focus_of(x.state.slot) - at) <= radius)) to_client(x.state.slot, net::net_session_cpp_local::kUnreliable, net::net_session_cpp_local::kVoice, bytes);
-      return;
-    }
-    case net::net_session_cpp_local::kPropose: {
-      wire::Reader r;
-      r.get_u8(d);
-      const bool value = r.get_u8(d) != 0;
-      if (r.ok) begin_ballot(value);
-      return;
-    }
-    case net::net_session_cpp_local::kVote: {
-      wire::Reader r;
-      const u32 id = r.get_u32(d);
-      const bool yes = r.get_u8(d) != 0;
-      if (!r.ok || !ballot_.id || id != ballot_.id) return;
-      const mp::Ballot::Status s = mp::cast_vote(ballot_, from, yes, roster(), now_ms());
-      if (s == mp::Ballot::Status::pending) {
-        char t[96];
-        std::snprintf(t, sizeof t, "FRIENDLY FIRE: %zu/%zu JA", ballot_.yes.size(), ballot_.members.size());
-        vote_text_ = t;
-      } else {
-        finish_ballot(s);
-      }
-      return;
-    }
-    default: return;
-  }
-} }
-namespace seats { Row Table::get(u8 owner) const {
-  Row row;
-  seats::jet_seats_cpp_local::g_rules.call("Get", std::tie(row), rows_, owner);
-  return row;
-} }
-namespace game_seats_cpp_local { constexpr f32 kBoardM = 9, kStaleS = 3.5, kPendingS = 3; }
-namespace game_seats_cpp_local { constexpr f32 kChuteAgl = 10; }
-i32 Game::gaps_boardable(f32& dist) const {
-  if (!gaps_ || !net_.active() || mode_ != Mode::foot || player_dead_ || converted::present(gaps_)->riding) return -1;
-  const Vec3 me = matrix_of(soldier_).translation();
-  i32 best = -1;
-  f32 bd = game_seats_cpp_local::kBoardM;
-  for (const net::Remote& r : net_.remotes()) {
-    if (r.state.flags & (net::kDead | net::kPassenger)) continue;
-    const bool jet = r.state.mode == net::PlayerMode::jet && (r.state.flags & net::kGearDown) && r.state.speed <= 4;
-    const bool car = r.state.mode == net::PlayerMode::car && r.state.speed <= 3;
-    if (!jet && !car) continue;
-    if (net_.seats().get(r.state.slot).pilot != r.state.slot) continue;
-    const f32 d = hypot_bp(r.shown.x - me.x, r.shown.y - me.y);
-    if (d < (car ? 5.5 : game_seats_cpp_local::kBoardM) && d < bd) { bd = d; best = r.state.slot; }
-  }
-  dist = bd;
-  return best;
-}
-bool Game::gaps_seat_press() {
-  if (!gaps_ || !net_.active()) return false;
-  GapsState& g = *converted::present(gaps_);
-  if (g.riding) { gaps_leave_ride(); return true; }
-  if (mode_ != Mode::foot || player_dead_ || g.seat_pending_until > converted::present(world_)->sim_time()) return false;
-  const Vec3 me = matrix_of(soldier_).translation();
-  f32 bd = game_seats_cpp_local::kBoardM;
-  const i32 best = gaps_boardable(bd);
-  if (best < 0) return false;
-  if (jet_placed_ && mode_ == Mode::foot) {
-    // our own (empty) jet clearly nearer: that one; a manned one of his right there: ride along
-    const Vec3 j = matrix_of(jet_actor_).translation();
-    if (hypot_bp(j.x - me.x, j.y - me.y) + 2 < bd) return false;
-  }
-  g.seat_pending_until = converted::present(world_)->sim_time() + game_seats_cpp_local::kPendingS;
-  g.pending_owner = static_cast<u8>(best);
-  net_.seat_request(true, g.pending_owner, seats::Seat::passenger);
-  return true;
-}
-void Game::gaps_leave_ride() {
-  GapsState& g = *converted::present(gaps_);
-  Vec3 p;
-  Quat q;
-  const bool have = gaps_ride_pose(p, q);
-  if (g.riding) net_.seat_request(false, g.ride_owner, seats::Seat::passenger);
-  g.riding = false;
-  g.ride_car = false;
-  if (!have) { p = matrix_of(soldier_).translation(); q = Quat{}; }
-  const i32 owner_at = net_.remote_index(g.ride_owner);
-  const bool in_car = owner_at >= 0 && converted::at(net_.remotes(), static_cast<std::size_t>(owner_at)).state.mode == net::PlayerMode::car;
-  const Vec3 nose = in_car ? q.rotate({1, 0, 0}) : q.rotate({0, 1, 0});
-  const f32 h = kern::math::atan2(nose.y, nose.x), agl = p.z - city_.ground_height(p.x, p.y);
-  if (in_car) {
-    // out of the passenger door: 2.2 m to the right of the car
-    Vec3 out = p + q.rotate({0, -2.2, 0});
-    show_soldier(Vec3{out.x, out.y, city_.ground_height(out.x, out.y)}, h / kDeg);
-    mode_ = Mode::foot;
-  } else if (agl > game_seats_cpp_local::kChuteAgl) {
-    // a controlled parachute instead of a jump to the ground mid-flight
-    converted::present(world_)->set_alive(chute_actor_, true);
-    converted::present(world_)->teleport(chute_actor_, p + Vec3{0, 0, 2});
-    converted::present(world_)->set_actor_velocity(chute_actor_, {});
-    chute_time_ = 0;
-    chute_open_ = false;
-    mode_ = Mode::parachute;
-    rig_init_ = false;
-  } else {
-    Vec3 out = p + Vec3{kern::math::cos(h), kern::math::sin(h), 0} * 5.0;
-    out.z = city_.ground_height(out.x, out.y);
-    show_soldier(out, h / kDeg);
-    mode_ = Mode::foot;
-  }
-  toast_ = "Ausgestiegen";
-  toast_age_ = 0;
-}
-namespace net { void Session::town_to_all(const std::vector<u8>& blob) {
-  if (role_ == Role::host) to_all(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kTownMsg, blob, kHost);
-} }
-namespace wire { struct I64 { i64 v = 0; }; }
-namespace wire { inline void put_i64(std::vector<u8>& b, i64 v) {
-  const std::array<u8, 8> x = std::bit_cast<std::array<u8, 8>>(I64{v});
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace town { std::vector<u8> pack(const PlankRec& r) {
-  std::vector<u8> o;
-  wire::put_u8(o, static_cast<u8>(Kind::planks));
-  wire::put_i64(o, r.key);
-  wire::put_u8(o, r.door);
-  wire::put_u8(o, r.doors);
-  wire::put_u8(o, r.planks);
-  return o;
-} }
-namespace net { void Session::town_to_host(const std::vector<u8>& blob) {
-  if (role_ == Role::client && client_ && converted::present(client_)->connected() && !converted::present(client_)->send(net::net_session_cpp_local::kReliable, net::net_session_cpp_local::kTownMsg, blob)) refused(net::net_session_cpp_local::kTownMsg, blob.size());
-} }
-namespace wire { struct I8 { i8 v = 0; }; }
-namespace wire { inline void put_i8(std::vector<u8>& b, i8 v) {
-  const std::array<u8, 1> x = std::bit_cast<std::array<u8, 1>>(I8{v});
-  b.insert(b.end(), x.begin(), x.end());
-} }
-namespace town { std::vector<u8> pack(const PlankStep& s) {
-  std::vector<u8> o;
-  wire::put_u8(o, static_cast<u8>(Kind::plank_step));
-  wire::put_i64(o, s.key);
-  wire::put_u8(o, s.door);
-  wire::put_u8(o, s.doors);
-  wire::put_i8(o, s.step);
-  return o;
-} }
-void Game::townsync_plank(i64 key, u8 door, u8 doors, i32 step) {
-  if (!net_.active() || !gaps_ || doors < 1 || doors > town::kDoorsMax || door >= doors) return;
-  if (net_.hosting()) net_.town_to_all(town::pack(town::PlankRec{key, door, doors, converted::at(converted::present(gaps_)->planks[key], door)}));
-  else net_.town_to_host(town::pack(town::PlankStep{key, door, doors, static_cast<i8>(step)}));
-}
-const char* Game::combat_sfx(combat_audio::Kind k) {
-  // playCombatAudio: the variants take turns.
-  const u8 i = static_cast<u8>(k);
-  const u32 v = converted::rem(converted::at(sfx_cursor_, i)++, converted::at(combat_audio::kVariants, i));
-  return game_details_cpp_local::sfx_id(k, v).c_str();
-}
-namespace game_barricades_cpp_local { constexpr i32 kPlanks = 6; }
-namespace game_barricades_cpp_local { constexpr i32 kRepairCost = 10; }
-namespace game_barricades_cpp_local { constexpr f32 kRepairM = 3.2; }
-namespace game_barricades_cpp_local { i64 building_key(const Interiors::Plan& p) {
-  if (p.outer.empty()) return 0;
-  return (static_cast<i64>(std::lround(converted::at(p.outer, 0).x * 10)) << 32) ^ (static_cast<i64>(std::lround(converted::at(p.outer, 0).y * 10)) & 0xffffffffll) ^ static_cast<i64>(p.outer.size());
-} }
-bool Game::gaps_barricade_doors(std::vector<GapsState::DoorView>& out) {
-  out.clear();
-  if (!gaps_ || !glife_ || !converted::present(glife_)->interiors.active()) return false;
-  const Interiors::Plan& p = converted::present(glife_)->interiors.plan();
-  if (p.doors.empty()) return false;
-  const i64 key = game_barricades_cpp_local::building_key(p);
-  std::vector<u8>& st = converted::present(gaps_)->planks[key];
-  if (st.size() != p.doors.size()) st.assign(converted::count(p.doors.size()), game_barricades_cpp_local::kPlanks);
-  if (converted::present(gaps_)->planks.size() > 400) {  // plankState: at most 400 buildings remembered
-    for (auto it = converted::present(gaps_)->planks.begin(); it != converted::present(gaps_)->planks.end(); ++it)
-      if (it->first != key) { converted::present(gaps_)->planks.erase(it); break; }
-  }
-  for (std::size_t i = 0; i < p.doors.size(); converted::pre_inc(i)) {
-    const Interiors::Door& d = converted::at(p.doors, i);
-    out.push_back({static_cast<i32>(i), d.c, d.d, d.n, static_cast<i32>(converted::at(st, i)), p.levels.empty() ? p.base : converted::at(p.levels, 0), key});
-  }
-  return true;
-}
-bool Game::gaps_repair_barricade() {
-  // repairNearest: the door within 3.2 m, a plank missing, 10 points
-  if (!gaps_ || !combat_.zombies.active) return false;
-  std::vector<GapsState::DoorView> doors;
-  if (!gaps_barricade_doors(doors)) return false;
-  const Vec3 me = player_position();
-  std::size_t nearest = doors.size();  // (its place in doors; none: the end)
-  f32 bd = game_barricades_cpp_local::kRepairM;
-  for (std::size_t i = 0; i < doors.size(); converted::pre_inc(i)) {
-    const f32 k = hypot_bp(me.x - converted::at(doors, i).c.x, me.y - converted::at(doors, i).c.y);
-    if (k < bd) { bd = k; nearest = i; }
-  }
-  if (nearest == doors.size() || converted::at(doors, nearest).planks >= game_barricades_cpp_local::kPlanks || combat_.zombies.points < game_barricades_cpp_local::kRepairCost) return false;
-  const GapsState::DoorView& best = converted::at(doors, nearest);
-  ++converted::at(converted::present(gaps_)->planks[best.key], static_cast<std::size_t>(best.i));
-  townsync_plank(best.key, static_cast<u8>(best.i), static_cast<u8>(converted::present(gaps_)->planks[best.key].size()), 1);
-  converted::minus_to(combat_.zombies.points, game_barricades_cpp_local::kRepairCost);
-  converted::present(world_)->play_sound(combat_sfx(combat_audio::Kind::bounce), cam_.eye, 0.4, 0.7, false);  // playCombatAudio "bounce" .4 / .7
-  osfx("zombie_nights.repairKnock", cam_.eye);
-  return true;
 }
 namespace wanted { namespace wanted_cpp_local { rules::Blueprint g_rules{"Wanted"}; } }
 namespace wanted { void report(Crime c, bool witnessed) { wanted::wanted_cpp_local::g_rules.call("Report", std::tie(), static_cast<i32>(c), witnessed); } }
@@ -10530,6 +7954,31 @@ void Game::eject_driver(i32 ci) {
   }
   ++converted::present(life_)->ejected;
 }
+namespace terrain_cpp_local { constexpr f32 kTile = 160; }
+namespace terrain_cpp_local { bool rect_in(const Vec4& in, const Vec4& out) { return in.x >= out.x && in.y >= out.y && in.z <= out.z && in.w <= out.w; } }
+bool Terrain::covers(const Vec4& rect) const {
+  if (!settled_) return false;
+  if (!dem_) return true;  // flat ground: known everywhere
+  if (!grid_ready_) return false;
+  if (terrain_cpp_local::rect_in(rect, interior(grid_))) return true;
+  for (const Grid& g : side_) if (terrain_cpp_local::rect_in(rect, interior(g))) return true;
+  return false;
+}
+bool Terrain::corridors_at(f32 x, f32 y) const { return !corridors_expected || corridor_set(x, y) >= 0; }
+bool Terrain::ground_ready(f32 x, f32 y) const {
+  // known ground (an interior: no later window changes it) with its collision standing
+  if (!covers({x, y, x, y}) || !corridors_at(x, y)) return false;
+  return has_collision(x, y);
+}
+bool Terrain::has_collision(f32 x, f32 y) const {
+  const u64 k = terrain_cpp_local::key2(static_cast<i32>(converted::fits<int>(std::floor(x / terrain_cpp_local::kTile))), static_cast<i32>(converted::fits<int>(std::floor(y / terrain_cpp_local::kTile))));
+  return collision_.count(k) && !dirty_collision_.count(k);
+}
+bool Game::gaps_riding() const { return gaps_ && converted::present(gaps_)->riding; }
+namespace drone_cpp_local { f32 battery_ocv(f32 soc, f32 cells) {
+  const f32 s = clampf(soc, 0, 1);
+  return cells * std::fmin(4.2, 3.2625 + 0.9 * s + 0.0375 * tanh_bp((s - 0.12) * 18));
+} }
 void Drone::reset() {
   fw_.reset();
   for (int i = 0; i < 4; converted::pre_inc(i)) { converted::at(omega_, i) = converted::at(current_, i) = converted::at(motor_torque_, i) = converted::at(prop_torque_, i) = 0; converted::at(pulses_, i) = 1000; }
@@ -10590,6 +8039,7 @@ bool CityStream::street_point(Rng& rng, Vec3 near, f32 radius, Vec3& point, f32&
   }
   return false;
 }
+bool Game::gaps_ride_car() const { return gaps_ && converted::present(gaps_)->riding && converted::present(gaps_)->ride_car; }
 Drone::Drone(const DroneParams& p) : p_(p) {
   const f32 a = p_.span / (2 * kern::math::sqrt(2.0));
   motor_pos_[0] = {-a, -a, 0};
@@ -10626,13 +8076,22 @@ namespace controls { void Devices::input(Event e) {
   set(now_desktop);
   pad = now_pad;
 } }
-constexpr f32 kEnterCar = 5.2, kEnterJet = 9;
 constexpr f32 kDroneAhead = 2.9;
 constexpr f32 kChuteOpen = 1.1, kChuteSink = 6.5, kChuteSteer = 4, kEjectUp = 28;
 Game::Game() = default;
 Game::~Game() {
   life_.reset();
   swarm_cruiser_.reset();
+}
+void Game::stop() {
+  // everything with bodies in the world goes before it, in the order ~Game would end it
+  glife_.reset();  // M3 life: its bodies live in the world
+  remote_bus_.reset();
+  remote_car_.reset();
+  cars_.clear();
+  life_.reset();   // the world's state: the cars of its tow trucks have bodies in the world
+  swarm_cruiser_.reset();
+  world_.reset();
 }
 using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
   Mat4 m;
@@ -10862,24 +8321,6 @@ void Game::switch_mode(Mode m, i32 vehicle) {
   rig_init_ = false;
   head_yaw_ = head_pitch_ = 0;
 }
-void Game::try_enter() {
-  if (gaps_seat_press()) return;  // a mate's jet as passenger, or out of it (game_seats.cpp)
-  if (gaps_repair_barricade()) return;  // zombie night: F boards a door up again (game_barricades.cpp)
-  const Vec3 me = matrix_of(soldier_).translation();
-  i32 best = -1;
-  f32 best_d = kEnterCar;
-  for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
-    if (!converted::at(cars_, i).placed) continue;
-    const Vec3 p = matrix_of(converted::at(cars_, i).actor).translation();
-    const f32 d = hypot_bp(p.x - me.x, p.y - me.y) - (converted::present(converted::at(cars_, i).car)->spec().half.x - 1.78);
-    if (d < best_d) { best_d = d; best = static_cast<i32>(i); }
-  }
-  if (jet_placed_) {
-    const Vec3 j = matrix_of(jet_actor_).translation();
-    if (hypot_bp(j.x - me.x, j.y - me.y) < kEnterJet && (best < 0 || hypot_bp(j.x - me.x, j.y - me.y) < best_d)) { switch_mode(Mode::jet); return; }
-  }
-  if (best >= 0) switch_mode(Mode::car, best);
-}
 void Game::exit_vehicle() {
   if (mode_ == Mode::car && car_index_ >= 0) {
     TrafficCar& c = converted::at(cars_, car_index_);
@@ -10924,126 +8365,6 @@ void Game::eject() {
   rig_init_ = false;
   toast_ = "Schleudersitz!";
   toast_age_ = 0;
-}
-void Game::fixed_step(f32 h) {
-  if (!world_ || !world_placed_) return;
-  converted::pre_inc_bits(steps_);
-  spawn_guard_step();  // a player put down stands on the final ground (game.cpp)
-  World& w = converted::present(world_)->physics();
-  if (drone_out_) {
-    const physics::Body b = body(drone_actor_);
-    if (b.valid()) drone_.step(w, b, h, sticks_);
-  }
-  if (jet_placed_) {
-    const physics::Body b = body(jet_actor_);
-    JetInput in = mode_ == Mode::jet ? jet_in_ : JetInput{};
-    if (mode_ != Mode::jet && jet_.telemetry().contacts > 0) in.brake = 1;  // parked: brakes on
-    if (b.valid()) {
-      // jet_mode.mjs onPhysicsImpact: what the step took off its speed beyond the flight forces
-      // (a wall, a roof, the ground nose first) - over 5 m/s it hurts, (dv - 5)^1.7 * 4; a hard
-      // landing (gear sink over 4 m/s) (gi - 4) * 80; a parked jet that never flew is spared
-      const Vec3 v_now = w.linear_velocity(b);
-      if (mode_ == Mode::jet) jet_flown_ = true;
-      if (jet_flown_ && jet_v_valid_) {
-        const f32 dv = converted::wide::length(v_now - jet_v_ctrl_);
-        if (dv > 5) gaps_jet_damage(kern::math::pow(dv - 5, 1.7) * 4);
-        if (mode_ == Mode::jet && dv > 2) look_.shake.trauma = std::fmin(1.0, look_.shake.trauma + dv / 15);
-      }
-      jet_.step(w, b, h, in);
-      if (jet_flown_ && jet_.gear_impact() > 4) gaps_jet_damage((jet_.gear_impact() - 4) * 80);
-      jet_v_ctrl_ = w.linear_velocity(b);
-      jet_v_valid_ = true;
-    }
-  }
-  drive_traffic(h);
-  step_world(h);  // M3 world: buoyancy, water drag (game_world.cpp)
-  if (mode_ == Mode::parachute) step_parachute(h);
-}
-void Game::drive_traffic(f32 h) {
-  World& w = converted::present(world_)->physics();
-  const std::vector<Lane>& lanes = city_.lanes();
-  for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
-    TrafficCar& c = converted::at(cars_, i);
-    // (a car nobody drives here - not placed, removed, moved by a mate or by the host, without
-    // physics far away - has no wheels on joints: car.h detach; Car::step puts them on)
-    if (!c.placed || !converted::present(world_)->actor_alive(c.actor)) { converted::present(c.car)->detach(); continue; }
-    const physics::Body b = body(c.actor);
-    if (!b.valid() || !w.body_valid(b)) { converted::present(c.car)->detach(); continue; }
-    converted::present(c.car)->hit_user = static_cast<u64>(c.actor);
-    if (i < car_lent_.size() && converted::at(car_lent_, i)) { converted::present(c.car)->detach(); continue; }  // MP host: a mate drives it (game_worldsync.cpp)
-    if (puppet_car_step(c, i, h)) { converted::present(c.car)->detach(); continue; }             // MP client: the host's car (game_worldsync.cpp)
-    if (c.far) { converted::present(c.car)->detach(); traffic_far_step(c, i, h); continue; }  // no physics far away (game_traffic_far.cpp)
-    if (life_) {
-      // hanging on a tow truck's boom (game_traffic.cpp puts it there every step): not driven
-      bool towed = false;
-      for (const WorldLife::TowTruck& t : converted::present(life_)->trucks) towed = towed || (t.towing && t.job == static_cast<i32>(i));
-      if (towed) { converted::present(c.car)->detach(); continue; }
-    }
-    car_body_dynamic(c);  // (it was the host's puppet a moment ago: driven here now)
-    if ((static_cast<i32>(i) == car_index_ && mode_ == Mode::car) || (c.police && c.unit >= 0 && !c.wreck)) {
-      converted::present(c.car)->step(w, b, h, c.input);
-      continue;
-    }
-    if (c.wreck || !c.driver || c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !converted::at(lanes, c.lane).alive) {
-      CarInput parked;
-      parked.handbrake = true;
-      parked.pedal = c.driver ? -0.3 * sign0(converted::present(c.car)->forward_speed()) : 0;
-      converted::present(c.car)->step(w, b, h, parked);
-      continue;
-    }
-    // AI traffic at 60 Hz (world_rigid_body_runtime.mjs FIXED_DT 1/60): its tyres are solved every 4th
-    // 240 Hz step (staggered over the cars), the forces held in between
-    if (converted::rem_bits((converted::plus_bits(steps_, i)), 4) != 0) { converted::present(c.car)->reapply(w, b); continue; }
-    // AI driver: follow the lane on its right-hand side (SpawnCity aiInput) at the speed the
-    // lights, the people and the vehicle ahead leave him.
-    const Lane& L = converted::at(lanes, c.lane);
-    const BodyState s = read_body(w, b);
-    const Vec3 fwd = s.rotation.rotate({1, 0, 0});
-    const i32 n = static_cast<i32>(L.points.size());
-    c.index = std::clamp(c.index, 0, converted::minus(n, 1));
-    const f32 off = std::fmin(L.width * 0.25, 1.8);
-    // his target (world_procedural_population.mjs): the point a lookahead on along his lane from
-    // where he is - max(7 m, 1.3 s at his speed) -, on its right-hand side
-    const TrafficRules::Pursuit pu = TrafficRules::pursuit(L, c.index, c.dir, {s.position.x, s.position.y}, std::fmax(7.0, c.target_speed * 1.3), off);
-    const Vec3 target{pu.target.x, pu.target.y, 0};
-    // the lane point ahead is reached: the next one; within 2.5 m of the lane's end on to a street
-    // that starts there, else round (traffic_advance)
-    if (converted::plus(c.index, c.dir) < 0 || converted::plus(c.index, c.dir) >= n ? pu.end < 2.5 : pu.passed) traffic_advance(c);
-    // Approaching the end of the street (a junction): slow down to turn (SpawnCity aiInput).
-    f32 want_speed = c.target_speed;
-    if (pu.end < 18) want_speed = std::fmin(want_speed, 4.5 + pu.end * 0.3);
-    {
-      // the bend ahead (driveSpeed): the lane's direction at the target against his own
-      f32 turn = kern::math::atan2(pu.tangent.y, pu.tangent.x) - kern::math::atan2(fwd.y, fwd.x);
-      while (turn > kPi) turn -= 2 * kPi;
-      while (turn < -kPi) turn += 2 * kPi;
-      turn = std::fabs(turn);
-      if (turn > 0.12) {
-        const f32 look = std::fmax(6.0, hypot_bp(target.x - s.position.x, target.y - s.position.y));
-        const f32 R = look / (2 * kern::math::sin(std::fmin(turn, 1.5) / 2) + 1e-3);
-        want_speed = std::fmin(want_speed, std::fmax(3.2, kern::math::sqrt(3.5 * R)));
-      }
-    }
-    want_speed = std::fmin(want_speed, traffic_rules(static_cast<i32>(i), s.position, fwd, converted::present(c.car)->forward_speed()));  // M3 lights / right of way
-    // the vehicle ahead (world_procedural_population.mjs driveSpeed): a speed to aim for - the
-    // driver brakes down to a stop behind it and never backs off (what stands for good is the tow
-    // service's: game_traffic.cpp)
-    {
-      i32 limiter = -1;
-      const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, limiter);
-      c.ahead = free_way < 0.6 ? limiter : -1;
-      want_speed = std::fmin(want_speed, free_way);
-    }
-    c.want = want_speed;
-    const CarInput in = ai_drive(s.position, fwd, converted::present(c.car)->forward_speed(), target, want_speed);
-    c.input = in;
-    converted::present(c.car)->step(w, b, h * 4, in);
-    {
-      const f32 lift = s.position.z - city_.ground_height(s.position.x, s.position.y) - Car::ground_offset(converted::present(c.car)->spec());
-      c.peak_up = std::fmax(c.peak_up, s.velocity.z);
-      c.peak_lift = std::fmax(c.peak_lift, lift);
-    }
-  }
 }
 void Game::traffic_advance(TrafficCar& c) {
   // the next lane point; at the end of the street on to a street that starts here, else turn round
@@ -11090,104 +8411,6 @@ void Game::step_parachute(f32 h) {
     f.y += m * 0.8 * (want.y - s.velocity.y);
   }
   w.apply_force_to_center(b, f);
-}
-void Game::manage_traffic() {
-  if (puppet_world_) return;  // MP client in the host's town: his traffic (game_worldsync.cpp)
-  const std::vector<Lane>& lanes = city_.lanes();
-  const Vec3 me = focus_position();
-  // MP host: the traffic lives around every player - placed near one of them, taken away only
-  // when it is far from all (game_worldsync.cpp sends it)
-  const std::vector<Vec3> mates = net_.hosting() ? mate_foci() : std::vector<Vec3>{};
-  auto nearest = [&](Vec3 p) {
-    f32 d = hypot_bp(p.x - me.x, p.y - me.y);
-    for (const Vec3& m : mates) d = std::fmin(d, hypot_bp(p.x - m.x, p.y - m.y));
-    return d;
-  };
-  i32 alive_lanes = 0;
-  for (const Lane& l : lanes) converted::plus_to(alive_lanes, l.alive ? 1 : 0);
-  if (alive_lanes == 0) return;
-  traffic_far_switch();  // physics only near the focus (game_traffic_far.cpp)
-  for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
-    TrafficCar& c = converted::at(cars_, i);
-    if (static_cast<i32>(i) == car_index_) continue;
-    if (i < car_lent_.size() && converted::at(car_lent_, i)) continue;  // a mate drives it
-    if (c.police) {
-      // An abandoned cruiser far away is put back into the pool.
-      if (c.placed && c.unit < 0 && hypot_bp(matrix_of(c.actor).translation().x - me.x, matrix_of(c.actor).translation().y - me.y) > 420) {
-        converted::present(world_)->set_alive(c.actor, false);
-        c.placed = false;
-        c.wreck = false;
-        c.hp = car_max_hp(c);
-      }
-      continue;
-    }
-    bool replace = !c.placed;
-    if (c.placed) {
-      const Vec3 p = matrix_of(c.actor).translation();
-      const f32 d = nearest(p);
-      // Far away (and so out of sight), fallen through, or its street unloaded: bring it back.
-      // VEHICLE_RELOCATE_M 330 (world_procedural_population.mjs)
-      replace = d > 330 || p.z < city_.ground_height(p.x, p.y) - 5 || (c.driver && (c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !converted::at(lanes, c.lane).alive) && d > 120);
-      // A burnt-out wreck no tow truck came for is cleared after 45 s (the street is free again);
-      // it comes back as a whole car somewhere else.
-      if (c.wreck && converted::present(world_)->sim_time() - c.wreck_at > 45 && !car_towed(static_cast<i32>(i))) replace = true;
-      // An abandoned car stays where it was left (SpawnCity: 180 s).
-    }
-    if (!replace) continue;
-    for (int attempt = 0; attempt < 24; converted::pre_inc(attempt)) {
-      const i32 li = static_cast<i32>(converted::rem(rng_.next(), lanes.size()));
-      const Lane& L = converted::at(lanes, li);
-      if (!L.alive || L.points.size() < 2) continue;
-      const i32 k = static_cast<i32>(converted::rem(rng_.next(), (converted::minus(L.points.size(), 1))));
-      const Vec2 a = converted::at(L.points, k), bpt = converted::at(L.points, converted::plus(k, 1));
-      const f32 seg = hypot_bp(bpt.x - a.x, bpt.y - a.y);
-      if (seg < 8) continue;
-      // a spot along the segment (a long street segment's middle can be far away while the street
-      // itself runs right past the player: the synthetic test town, long OSM ways)
-      f32 along = seg * 0.5;
-      if (seg > 16) {
-        const Vec3 around = mates.empty() || converted::rem(attempt, (converted::plus(mates.size(), 1))) == 0 ? me : converted::at(mates, converted::minus(converted::rem(attempt, (converted::plus(mates.size(), 1))), 1));
-        const f32 t0 = clampf(((around.x - a.x) * (bpt.x - a.x) + (around.y - a.y) * (bpt.y - a.y)) / seg, 0, seg);  // nearest to the player
-        along = clampf(t0 + (rng_.unit() < 0.5 ? -1.0 : 1.0) * rng_.range(45, 240), 4, seg - 4);
-      }
-      const Vec2 mid = a + (bpt - a) * (along / seg);
-      const f32 d = nearest({mid.x, mid.y, 0});
-      if (d < 45 || d > 240) continue;  // VEHICLE_PLACE_MIN_M / VEHICLE_PLACE_MAX_M (from the nearest player)
-      const i32 dir = rng_.unit() < 0.5 ? 1 : -1;
-      const Vec2 dv = (dir > 0 ? bpt - a : a - bpt) * (1.0 / seg);
-      const f32 off = std::fmin(L.width * 0.25, 1.8);
-      const Vec3 pos{mid.x + dv.y * off, mid.y - dv.x * off, city_.ground_height(mid.x, mid.y) + Car::ground_offset(converted::present(c.car)->spec()) + 0.05};
-      // Nothing in the way (another car, a building corner).
-      if (cast(converted::present(world_)->physics(), pos + Vec3{0, 0, 3}, {0, 0, -1}, 3.2, {}).hit) continue;
-      if (!gaps_vehicle_spawn_ok(static_cast<i32>(i), pos, kern::math::atan2(dv.y, dv.x))) continue;  // no overlap, unseen (game_gaps.cpp)
-      if (!converted::present(world_)->actor_alive(c.actor)) { converted::present(world_)->set_alive(c.actor, true); c.far = false; c.solid_masks.clear(); }  // (a new body: solid)
-      const f32 yaw = kern::math::atan2(dv.y, dv.x);
-      const Vec3 rot{0, 0, yaw / kDeg};
-      converted::present(world_)->teleport(c.actor, pos, &rot);
-      converted::present(world_)->set_actor_velocity(c.actor, {});
-      converted::present(c.car)->reset();
-      c.placed = true;
-      c.driver = true;
-      c.hp = car_max_hp(c);
-      c.wreck = false;
-      c.hit_by_player = false;
-      c.burn_until = -1;
-      c.lane = li;
-      c.dir = dir;
-      c.index = dir > 0 ? converted::plus(k, 1) : k;
-      c.want = 0;
-      c.ahead = -1;
-      c.far_speed = 0;
-      // with physics only near a player and on ground that stands (game_traffic_far.cpp); there
-      // it rests on its wheels as the ground lies
-      if (d < 150 && city_.terrain().ground_ready(pos.x, pos.y)) {
-        traffic_solid(c);
-        car_body_dynamic(c);  // (it was without physics where it stood before)
-        if (const physics::Body cb = body(c.actor); cb.valid()) converted::present(world_)->physics().set_pose(cb, car_rest_pose(converted::present(c.car)->spec(), pos.x, pos.y, yaw));
-      } else traffic_make_far(c);
-      break;
-    }
-  }
 }
 void Game::update_camera(Engine& e, f32 dt) {
   Camera c = cam_;
@@ -11337,6 +8560,33 @@ void Game::update_camera(Engine& e, f32 dt) {
   ctl_camera(c);  // the shared head look in the drone, jet and parachute (game_controls.cpp)
   gaps_camera(c);  // camera_collision_guard.mjs, riding in a mate's jet (game_gaps.cpp)
   cam_ = c;
+}
+void Game::draw_vehicles() {
+  art_.begin();
+  if (world_placed_) {
+    for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
+      const TrafficCar& c = converted::at(cars_, i);
+      if (!c.placed || !converted::present(world_)->actor_alive(c.actor)) continue;
+      const bool mine = static_cast<i32>(i) == car_index_ && mode_ == Mode::car;
+      // a wreck is burnt out: charred, no lights - nobody takes it for a car still to be shot
+      art_.car(matrix_of(c.actor), *converted::present(c.car), c.wreck ? Vec3{0.055, 0.05, 0.045} : c.color, mine && car_cockpit_, !c.wreck && c.input.pedal < -0.05);
+    }
+    if (jet_placed_) {
+      art_.jet(matrix_of(jet_actor_), jet_.gear_down(), jet_.nozzle(), jet_.thrust() / jet_.spec().thrust_max, mode_ == Mode::jet && jet_cockpit_);
+    }
+    if (drone_out_) {
+      std::array<Vec3, 4> motors;
+      std::array<f32, 4> angles;
+      for (int i = 0; i < 4; converted::pre_inc(i)) { converted::at(motors, i) = drone_.motor_position(i); converted::at(angles, i) = drone_.rotor_angle(i); }
+      art_.drone(gaps_drone_matrix(), motors,  // visual_pose_stabilization.mjs (game_gaps.cpp)
+                 angles, drone_.params().prop_d, drone_.telemetry().armed, mode_ == Mode::drone && drone_cam_ == 0);
+    }
+    if (mode_ == Mode::parachute) art_.parachute(matrix_of(chute_actor_).translation() - Vec3{0, 0, 0.85}, converted::present(world_)->camera_yaw() * kDeg, chute_open_);
+    draw_remote_vehicles();
+    swarm_draw_vehicles();  // the mates' cruisers (game_swarm.cpp)
+    draw_world_vehicles();  // M3: tow trucks (game_traffic.cpp)
+  }
+  art_.end();
 }
 bool Game::audio_init(u32 rate) {
   if (mixer_.ready()) return true;
@@ -11892,7 +9142,7 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static std::string text(const Car::Rig& s) { return std::string("{") + text(s.body) + ", " + text(s.joint) + ", " + text(s.strut) + "}"; }
 [[maybe_unused]] static void take(Car::Rig& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<physics::Body>(s.body, (*v.rows)[0]); converted::take_as<physics::Joint>(s.joint, (*v.rows)[1]); converted::take_as<physics::Joint>(s.strut, (*v.rows)[2]); }
 [[maybe_unused]] static Car draw_Car(converted::Draw& draw) {
-  Car s{};
+  Car s = Car(draw_CarSpec(draw));
   s.hit_user = static_cast<u64>(draw.bits());
   s.s_ = draw_CarSpec(draw);
   converted::fill_array(s.w_, [&]() -> WheelState { return draw_WheelState(draw); });
@@ -17622,15 +14872,17 @@ namespace logic { using converted::arg; using converted::same; using converted::
   s.external = draw.flag();
   s.remote = draw.word();
   s.from = draw.word();
+  s.exported = draw.word();
+  s.wire = draw.word();
   s.help = draw.word();
   return s;
 }
 namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const logic::Function& s) { return converted::Value::structure({arg(s.name), arg(s.inputs), arg(s.outputs), arg(s.locals), arg(s.pure), arg(s.external), arg(s.remote), arg(s.from), arg(s.help)}); }
-[[maybe_unused]] static bool same(const logic::Function& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.inputs, (*got.rows)[1]), ".inputs") && converted::at_place(same(want.outputs, (*got.rows)[2]), ".outputs") && converted::at_place(same(want.locals, (*got.rows)[3]), ".locals") && converted::at_place(same(want.pure, (*got.rows)[4]), ".pure") && converted::at_place(same(want.external, (*got.rows)[5]), ".external") && converted::at_place(same(want.remote, (*got.rows)[6]), ".remote") && converted::at_place(same(want.from, (*got.rows)[7]), ".from") && converted::at_place(same(want.help, (*got.rows)[8]), ".help"); }
-[[maybe_unused]] static bool defined(const logic::Function& s) { return defined(s.name) && defined(s.inputs) && defined(s.outputs) && defined(s.locals) && defined(s.pure) && defined(s.external) && defined(s.remote) && defined(s.from) && defined(s.help); }
-[[maybe_unused]] static std::string text(const logic::Function& s) { return std::string("{") + text(s.name) + ", " + text(s.inputs) + ", " + text(s.outputs) + ", " + text(s.locals) + ", " + text(s.pure) + ", " + text(s.external) + ", " + text(s.remote) + ", " + text(s.from) + ", " + text(s.help) + "}"; }
-[[maybe_unused]] static void take(logic::Function& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<std::vector<FunctionPin>>(s.inputs, (*v.rows)[1]); converted::take_as<std::vector<FunctionPin>>(s.outputs, (*v.rows)[2]); converted::take_as<std::vector<FunctionPin>>(s.locals, (*v.rows)[3]); converted::take_as<bool>(s.pure, (*v.rows)[4]); converted::take_as<bool>(s.external, (*v.rows)[5]); converted::take_as<std::string>(s.remote, (*v.rows)[6]); converted::take_as<std::string>(s.from, (*v.rows)[7]); converted::take_as<std::string>(s.help, (*v.rows)[8]); }
+[[maybe_unused]] static converted::Value arg(const logic::Function& s) { return converted::Value::structure({arg(s.name), arg(s.inputs), arg(s.outputs), arg(s.locals), arg(s.pure), arg(s.external), arg(s.remote), arg(s.from), arg(s.exported), arg(s.wire), arg(s.help)}); }
+[[maybe_unused]] static bool same(const logic::Function& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.inputs, (*got.rows)[1]), ".inputs") && converted::at_place(same(want.outputs, (*got.rows)[2]), ".outputs") && converted::at_place(same(want.locals, (*got.rows)[3]), ".locals") && converted::at_place(same(want.pure, (*got.rows)[4]), ".pure") && converted::at_place(same(want.external, (*got.rows)[5]), ".external") && converted::at_place(same(want.remote, (*got.rows)[6]), ".remote") && converted::at_place(same(want.from, (*got.rows)[7]), ".from") && converted::at_place(same(want.exported, (*got.rows)[8]), ".exported") && converted::at_place(same(want.wire, (*got.rows)[9]), ".wire") && converted::at_place(same(want.help, (*got.rows)[10]), ".help"); }
+[[maybe_unused]] static bool defined(const logic::Function& s) { return defined(s.name) && defined(s.inputs) && defined(s.outputs) && defined(s.locals) && defined(s.pure) && defined(s.external) && defined(s.remote) && defined(s.from) && defined(s.exported) && defined(s.wire) && defined(s.help); }
+[[maybe_unused]] static std::string text(const logic::Function& s) { return std::string("{") + text(s.name) + ", " + text(s.inputs) + ", " + text(s.outputs) + ", " + text(s.locals) + ", " + text(s.pure) + ", " + text(s.external) + ", " + text(s.remote) + ", " + text(s.from) + ", " + text(s.exported) + ", " + text(s.wire) + ", " + text(s.help) + "}"; }
+[[maybe_unused]] static void take(logic::Function& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<std::vector<FunctionPin>>(s.inputs, (*v.rows)[1]); converted::take_as<std::vector<FunctionPin>>(s.outputs, (*v.rows)[2]); converted::take_as<std::vector<FunctionPin>>(s.locals, (*v.rows)[3]); converted::take_as<bool>(s.pure, (*v.rows)[4]); converted::take_as<bool>(s.external, (*v.rows)[5]); converted::take_as<std::string>(s.remote, (*v.rows)[6]); converted::take_as<std::string>(s.from, (*v.rows)[7]); converted::take_as<std::string>(s.exported, (*v.rows)[8]); converted::take_as<std::string>(s.wire, (*v.rows)[9]); converted::take_as<std::string>(s.help, (*v.rows)[10]); }
 }
 [[maybe_unused]] static logic::EnumType draw_kern__logic__EnumType(converted::Draw& draw) {
   logic::EnumType s{};
@@ -17695,14 +14947,15 @@ namespace logic { using converted::arg; using converted::same; using converted::
   s.next_id = static_cast<unsigned int>(draw.below(40));
   s.library = draw.flag();
   s.uses = draw_list(draw, [&]() -> std::string { return draw.word(); });
+  s.implements = draw.word();
   return s;
 }
 namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const logic::Graph& s) { return converted::Value::structure({arg(s.nodes), arg(s.links), arg(s.variables), arg(s.machines), arg(s.functions), arg(s.enums), arg(s.structs), arg(s.comments), arg(s.next_id), arg(s.library), arg(s.uses)}); }
-[[maybe_unused]] static bool same(const logic::Graph& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.nodes, (*got.rows)[0]), ".nodes") && converted::at_place(same(want.links, (*got.rows)[1]), ".links") && converted::at_place(same(want.variables, (*got.rows)[2]), ".variables") && converted::at_place(same(want.machines, (*got.rows)[3]), ".machines") && converted::at_place(same(want.functions, (*got.rows)[4]), ".functions") && converted::at_place(same(want.enums, (*got.rows)[5]), ".enums") && converted::at_place(same(want.structs, (*got.rows)[6]), ".structs") && converted::at_place(same(want.comments, (*got.rows)[7]), ".comments") && converted::at_place(same(want.next_id, (*got.rows)[8]), ".next_id") && converted::at_place(same(want.library, (*got.rows)[9]), ".library") && converted::at_place(same(want.uses, (*got.rows)[10]), ".uses"); }
-[[maybe_unused]] static bool defined(const logic::Graph& s) { return defined(s.nodes) && defined(s.links) && defined(s.variables) && defined(s.machines) && defined(s.functions) && defined(s.enums) && defined(s.structs) && defined(s.comments) && defined(s.next_id) && defined(s.library) && defined(s.uses); }
-[[maybe_unused]] static std::string text(const logic::Graph& s) { return std::string("{") + text(s.nodes) + ", " + text(s.links) + ", " + text(s.variables) + ", " + text(s.machines) + ", " + text(s.functions) + ", " + text(s.enums) + ", " + text(s.structs) + ", " + text(s.comments) + ", " + text(s.next_id) + ", " + text(s.library) + ", " + text(s.uses) + "}"; }
-[[maybe_unused]] static void take(logic::Graph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<std::vector<logic::Node>>(s.nodes, (*v.rows)[0]); converted::take_as<std::vector<logic::Link>>(s.links, (*v.rows)[1]); converted::take_as<std::vector<Variable>>(s.variables, (*v.rows)[2]); converted::take_as<std::vector<logic::StateMachine>>(s.machines, (*v.rows)[3]); converted::take_as<std::vector<logic::Function>>(s.functions, (*v.rows)[4]); converted::take_as<std::vector<logic::EnumType>>(s.enums, (*v.rows)[5]); converted::take_as<std::vector<logic::StructType>>(s.structs, (*v.rows)[6]); converted::take_as<std::vector<logic::CommentBox>>(s.comments, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id, (*v.rows)[8]); converted::take_as<bool>(s.library, (*v.rows)[9]); converted::take_as<std::vector<std::string>>(s.uses, (*v.rows)[10]); }
+[[maybe_unused]] static converted::Value arg(const logic::Graph& s) { return converted::Value::structure({arg(s.nodes), arg(s.links), arg(s.variables), arg(s.machines), arg(s.functions), arg(s.enums), arg(s.structs), arg(s.comments), arg(s.next_id), arg(s.library), arg(s.uses), arg(s.implements)}); }
+[[maybe_unused]] static bool same(const logic::Graph& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.nodes, (*got.rows)[0]), ".nodes") && converted::at_place(same(want.links, (*got.rows)[1]), ".links") && converted::at_place(same(want.variables, (*got.rows)[2]), ".variables") && converted::at_place(same(want.machines, (*got.rows)[3]), ".machines") && converted::at_place(same(want.functions, (*got.rows)[4]), ".functions") && converted::at_place(same(want.enums, (*got.rows)[5]), ".enums") && converted::at_place(same(want.structs, (*got.rows)[6]), ".structs") && converted::at_place(same(want.comments, (*got.rows)[7]), ".comments") && converted::at_place(same(want.next_id, (*got.rows)[8]), ".next_id") && converted::at_place(same(want.library, (*got.rows)[9]), ".library") && converted::at_place(same(want.uses, (*got.rows)[10]), ".uses") && converted::at_place(same(want.implements, (*got.rows)[11]), ".implements"); }
+[[maybe_unused]] static bool defined(const logic::Graph& s) { return defined(s.nodes) && defined(s.links) && defined(s.variables) && defined(s.machines) && defined(s.functions) && defined(s.enums) && defined(s.structs) && defined(s.comments) && defined(s.next_id) && defined(s.library) && defined(s.uses) && defined(s.implements); }
+[[maybe_unused]] static std::string text(const logic::Graph& s) { return std::string("{") + text(s.nodes) + ", " + text(s.links) + ", " + text(s.variables) + ", " + text(s.machines) + ", " + text(s.functions) + ", " + text(s.enums) + ", " + text(s.structs) + ", " + text(s.comments) + ", " + text(s.next_id) + ", " + text(s.library) + ", " + text(s.uses) + ", " + text(s.implements) + "}"; }
+[[maybe_unused]] static void take(logic::Graph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<std::vector<logic::Node>>(s.nodes, (*v.rows)[0]); converted::take_as<std::vector<logic::Link>>(s.links, (*v.rows)[1]); converted::take_as<std::vector<Variable>>(s.variables, (*v.rows)[2]); converted::take_as<std::vector<logic::StateMachine>>(s.machines, (*v.rows)[3]); converted::take_as<std::vector<logic::Function>>(s.functions, (*v.rows)[4]); converted::take_as<std::vector<logic::EnumType>>(s.enums, (*v.rows)[5]); converted::take_as<std::vector<logic::StructType>>(s.structs, (*v.rows)[6]); converted::take_as<std::vector<logic::CommentBox>>(s.comments, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id, (*v.rows)[8]); converted::take_as<bool>(s.library, (*v.rows)[9]); converted::take_as<std::vector<std::string>>(s.uses, (*v.rows)[10]); converted::take_as<std::string>(s.implements, (*v.rows)[11]); }
 }
 [[maybe_unused]] static game::Actor draw_kern__game__Actor(converted::Draw& draw) {
   game::Actor s{};
@@ -17803,129 +15056,6 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static std::string text(const physics::RayHit& s) { return std::string("{") + text(s.hit) + ", " + text(s.shape) + ", " + text(s.body) + ", " + text(s.point) + ", " + text(s.normal) + ", " + text(s.fraction) + "}"; }
 [[maybe_unused]] static void take(physics::RayHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.hit, (*v.rows)[0]); converted::take_as<physics::Shape>(s.shape, (*v.rows)[1]); converted::take_as<physics::Body>(s.body, (*v.rows)[2]); converted::take_as<Vec3>(s.point, (*v.rows)[3]); converted::take_as<Vec3>(s.normal, (*v.rows)[4]); converted::take_as<double>(s.fraction, (*v.rows)[5]); }
 }
-[[maybe_unused]] static physics::BodySettings draw_kern__physics__BodySettings(converted::Draw& draw) {
-  physics::BodySettings s{};
-  s.type = converted::enum_value<physics::BodyType>(draw.below(3));
-  s.position = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.linear_velocity = draw.vector();
-  s.angular_velocity = draw.vector();
-  s.linear_damping = draw.number();
-  s.angular_damping = draw.number();
-  s.gravity_scale = draw.number();
-  s.enable_sleep = draw.flag();
-  s.awake = draw.flag();
-  s.enabled = draw.flag();
-  s.bullet = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::BodySettings& s) { return converted::Value::structure({arg(s.type), arg(s.position), arg(s.rotation), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.linear_damping), arg(s.angular_damping), arg(s.gravity_scale), arg(s.enable_sleep), arg(s.awake), arg(s.enabled), arg(s.bullet), arg(converted::shaped<converted::Whole>(s.user))}); }
-[[maybe_unused]] static bool same(const physics::BodySettings& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.type, (*got.rows)[0]), ".type") && converted::at_place(same(want.position, (*got.rows)[1]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.linear_velocity, (*got.rows)[3]), ".linear_velocity") && converted::at_place(same(want.angular_velocity, (*got.rows)[4]), ".angular_velocity") && converted::at_place(same(want.linear_damping, (*got.rows)[5]), ".linear_damping") && converted::at_place(same(want.angular_damping, (*got.rows)[6]), ".angular_damping") && converted::at_place(same(want.gravity_scale, (*got.rows)[7]), ".gravity_scale") && converted::at_place(same(want.enable_sleep, (*got.rows)[8]), ".enable_sleep") && converted::at_place(same(want.awake, (*got.rows)[9]), ".awake") && converted::at_place(same(want.enabled, (*got.rows)[10]), ".enabled") && converted::at_place(same(want.bullet, (*got.rows)[11]), ".bullet") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[12]), ".user"); }
-[[maybe_unused]] static bool defined(const physics::BodySettings& s) { return defined(s.type) && defined(s.position) && defined(s.rotation) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.linear_damping) && defined(s.angular_damping) && defined(s.gravity_scale) && defined(s.enable_sleep) && defined(s.awake) && defined(s.enabled) && defined(s.bullet) && defined(converted::shaped<converted::Whole>(s.user)); }
-[[maybe_unused]] static std::string text(const physics::BodySettings& s) { return std::string("{") + text(s.type) + ", " + text(s.position) + ", " + text(s.rotation) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.linear_damping) + ", " + text(s.angular_damping) + ", " + text(s.gravity_scale) + ", " + text(s.enable_sleep) + ", " + text(s.awake) + ", " + text(s.enabled) + ", " + text(s.bullet) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
-[[maybe_unused]] static void take(physics::BodySettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<physics::BodyType>(s.type, (*v.rows)[0]); converted::take_as<Vec3>(s.position, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[3]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[4]); converted::take_as<double>(s.linear_damping, (*v.rows)[5]); converted::take_as<double>(s.angular_damping, (*v.rows)[6]); converted::take_as<double>(s.gravity_scale, (*v.rows)[7]); converted::take_as<bool>(s.enable_sleep, (*v.rows)[8]); converted::take_as<bool>(s.awake, (*v.rows)[9]); converted::take_as<bool>(s.enabled, (*v.rows)[10]); converted::take_as<bool>(s.bullet, (*v.rows)[11]); converted::take_as<converted::Whole>(s.user, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeMaterial draw_kern__physics__ShapeMaterial(converted::Draw& draw) {
-  physics::ShapeMaterial s{};
-  s.density = draw.number();
-  s.friction = draw.number();
-  s.restitution = draw.number();
-  s.rolling_resistance = draw.number();
-  s.sensor = draw.flag();
-  s.category_bits = static_cast<u64>(draw.bits());
-  s.mask_bits = static_cast<u64>(draw.bits());
-  s.group_index = static_cast<int>(draw.whole());
-  s.contact_events = draw.flag();
-  s.sensor_events = draw.flag();
-  s.hit_events = draw.flag();
-  s.user = static_cast<u64>(draw.bits());
-  s.surface = converted::enum_value<physics::Surface>(draw.below(4));
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeMaterial& s) { return converted::Value::structure({arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.sensor), arg(converted::shaped<converted::Whole>(s.category_bits)), arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(s.group_index), arg(s.contact_events), arg(s.sensor_events), arg(s.hit_events), arg(converted::shaped<converted::Whole>(s.user)), arg(s.surface)}); }
-[[maybe_unused]] static bool same(const physics::ShapeMaterial& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.density, (*got.rows)[0]), ".density") && converted::at_place(same(want.friction, (*got.rows)[1]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[2]), ".restitution") && converted::at_place(same(want.rolling_resistance, (*got.rows)[3]), ".rolling_resistance") && converted::at_place(same(want.sensor, (*got.rows)[4]), ".sensor") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[5]), ".category_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[6]), ".mask_bits") && converted::at_place(same(want.group_index, (*got.rows)[7]), ".group_index") && converted::at_place(same(want.contact_events, (*got.rows)[8]), ".contact_events") && converted::at_place(same(want.sensor_events, (*got.rows)[9]), ".sensor_events") && converted::at_place(same(want.hit_events, (*got.rows)[10]), ".hit_events") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[11]), ".user") && converted::at_place(same(want.surface, (*got.rows)[12]), ".surface"); }
-[[maybe_unused]] static bool defined(const physics::ShapeMaterial& s) { return defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.sensor) && defined(converted::shaped<converted::Whole>(s.category_bits)) && defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(s.group_index) && defined(s.contact_events) && defined(s.sensor_events) && defined(s.hit_events) && defined(converted::shaped<converted::Whole>(s.user)) && defined(s.surface); }
-[[maybe_unused]] static std::string text(const physics::ShapeMaterial& s) { return std::string("{") + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.sensor) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + ", " + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(s.group_index) + ", " + text(s.contact_events) + ", " + text(s.sensor_events) + ", " + text(s.hit_events) + ", " + text(converted::shaped<converted::Whole>(s.user)) + ", " + text(s.surface) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeMaterial& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<double>(s.density, (*v.rows)[0]); converted::take_as<double>(s.friction, (*v.rows)[1]); converted::take_as<double>(s.restitution, (*v.rows)[2]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[3]); converted::take_as<bool>(s.sensor, (*v.rows)[4]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[5]); converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[6]); converted::take_as<int>(s.group_index, (*v.rows)[7]); converted::take_as<bool>(s.contact_events, (*v.rows)[8]); converted::take_as<bool>(s.sensor_events, (*v.rows)[9]); converted::take_as<bool>(s.hit_events, (*v.rows)[10]); converted::take_as<converted::Whole>(s.user, (*v.rows)[11]); converted::take_as<physics::Surface>(s.surface, (*v.rows)[12]); }
-}
-[[maybe_unused]] static physics::ShapeSettings draw_kern__physics__ShapeSettings(converted::Draw& draw) {
-  physics::ShapeSettings s{};
-  s.kind = converted::enum_value<physics::ShapeKind>(draw.below(5));
-  s.center = draw.vector();
-  s.rotation = draw_kern__Quat(draw);
-  s.size = draw.vector();
-  s.radius = draw.number();
-  s.length = draw.number();
-  static std::deque<std::vector<Vec3>> kept_points;
-  kept_points.push_back(draw_list(draw, [&]() -> Vec3 { return draw.vector(); }));
-  s.points = {kept_points.back().data(), kept_points.back().size()};
-  static std::deque<std::vector<unsigned int>> kept_indices;
-  kept_indices.push_back(draw_list(draw, [&]() -> unsigned int { return static_cast<unsigned int>(draw.below(40)); }));
-  s.indices = {kept_indices.back().data(), kept_indices.back().size()};
-  s.material = draw_kern__physics__ShapeMaterial(draw);
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::ShapeSettings& s) { return converted::Value::structure({arg(s.kind), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(std::vector<Vec3>(s.points.begin(), s.points.end())), arg(std::vector<unsigned int>(s.indices.begin(), s.indices.end())), arg(s.material)}); }
-[[maybe_unused]] static bool same(const physics::ShapeSettings& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.size, (*got.rows)[3]), ".size") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.length, (*got.rows)[5]), ".length") && converted::at_place(same(std::vector<Vec3>(want.points.begin(), want.points.end()), (*got.rows)[6]), ".points") && converted::at_place(same(std::vector<unsigned int>(want.indices.begin(), want.indices.end()), (*got.rows)[7]), ".indices") && converted::at_place(same(want.material, (*got.rows)[8]), ".material"); }
-[[maybe_unused]] static bool defined(const physics::ShapeSettings& s) { return defined(s.kind) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(std::vector<Vec3>(s.points.begin(), s.points.end())) && defined(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) && defined(s.material); }
-[[maybe_unused]] static std::string text(const physics::ShapeSettings& s) { return std::string("{") + text(s.kind) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(std::vector<Vec3>(s.points.begin(), s.points.end())) + ", " + text(std::vector<unsigned int>(s.indices.begin(), s.indices.end())) + ", " + text(s.material) + "}"; }
-[[maybe_unused]] static void take(physics::ShapeSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<physics::ShapeKind>(s.kind, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Quat>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<physics::ShapeMaterial>(s.material, (*v.rows)[8]); }
-}
-[[maybe_unused]] static physics::JointSettings draw_kern__physics__JointSettings(converted::Draw& draw) {
-  physics::JointSettings s{};
-  s.type = converted::enum_value<physics::JointType>(draw.below(9));
-  s.body_a = draw_kern__physics__Body(draw);
-  s.body_b = draw_kern__physics__Body(draw);
-  s.frame_a = draw_kern__physics__Pose(draw);
-  s.frame_b = draw_kern__physics__Pose(draw);
-  s.collide_connected = draw.flag();
-  s.enable_spring = draw.flag();
-  s.hertz = draw.number();
-  s.damping_ratio = draw.number();
-  s.enable_limit = draw.flag();
-  s.lower = draw.number();
-  s.upper = draw.number();
-  s.enable_motor = draw.flag();
-  s.motor_speed = draw.number();
-  s.max_motor_torque = draw.number();
-  s.max_motor_force = draw.number();
-  s.motor_velocity = draw.vector();
-  s.length = draw.number();
-  s.linear_hertz = draw.number();
-  s.angular_hertz = draw.number();
-  s.linear_damping_ratio = draw.number();
-  s.angular_damping_ratio = draw.number();
-  s.linear_velocity = draw.vector();
-  s.angular_velocity = draw.vector();
-  s.max_velocity_force = draw.number();
-  s.max_velocity_torque = draw.number();
-  s.max_spring_force = draw.number();
-  s.max_spring_torque = draw.number();
-  s.enable_steering = draw.flag();
-  s.enable_steering_limit = draw.flag();
-  s.steering_hertz = draw.number();
-  s.steering_damping_ratio = draw.number();
-  s.target_steering = draw.number();
-  s.max_steering_torque = draw.number();
-  s.steering_lower = draw.number();
-  s.steering_upper = draw.number();
-  s.max_torque = draw.number();
-  s.constraint_hertz = draw.number();
-  s.constraint_damping_ratio = draw.number();
-  s.user = static_cast<u64>(draw.bits());
-  return s;
-}
-namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
-[[maybe_unused]] static converted::Value arg(const physics::JointSettings& s) { return converted::Value::structure({arg(s.type), arg(s.body_a), arg(s.body_b), arg(s.frame_a), arg(s.frame_b), arg(s.collide_connected), arg(s.enable_spring), arg(s.hertz), arg(s.damping_ratio), arg(s.enable_limit), arg(s.lower), arg(s.upper), arg(s.enable_motor), arg(s.motor_speed), arg(s.max_motor_torque), arg(s.max_motor_force), arg(s.motor_velocity), arg(s.length), arg(s.linear_hertz), arg(s.angular_hertz), arg(s.linear_damping_ratio), arg(s.angular_damping_ratio), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.max_velocity_force), arg(s.max_velocity_torque), arg(s.max_spring_force), arg(s.max_spring_torque), arg(s.enable_steering), arg(s.enable_steering_limit), arg(s.steering_hertz), arg(s.steering_damping_ratio), arg(s.target_steering), arg(s.max_steering_torque), arg(s.steering_lower), arg(s.steering_upper), arg(s.max_torque), arg(s.constraint_hertz), arg(s.constraint_damping_ratio), arg(converted::shaped<converted::Whole>(s.user))}); }
-[[maybe_unused]] static bool same(const physics::JointSettings& want, const converted::Value& got) { return converted::rows_of(got, 40) && converted::at_place(same(want.type, (*got.rows)[0]), ".type") && converted::at_place(same(want.body_a, (*got.rows)[1]), ".body_a") && converted::at_place(same(want.body_b, (*got.rows)[2]), ".body_b") && converted::at_place(same(want.frame_a, (*got.rows)[3]), ".frame_a") && converted::at_place(same(want.frame_b, (*got.rows)[4]), ".frame_b") && converted::at_place(same(want.collide_connected, (*got.rows)[5]), ".collide_connected") && converted::at_place(same(want.enable_spring, (*got.rows)[6]), ".enable_spring") && converted::at_place(same(want.hertz, (*got.rows)[7]), ".hertz") && converted::at_place(same(want.damping_ratio, (*got.rows)[8]), ".damping_ratio") && converted::at_place(same(want.enable_limit, (*got.rows)[9]), ".enable_limit") && converted::at_place(same(want.lower, (*got.rows)[10]), ".lower") && converted::at_place(same(want.upper, (*got.rows)[11]), ".upper") && converted::at_place(same(want.enable_motor, (*got.rows)[12]), ".enable_motor") && converted::at_place(same(want.motor_speed, (*got.rows)[13]), ".motor_speed") && converted::at_place(same(want.max_motor_torque, (*got.rows)[14]), ".max_motor_torque") && converted::at_place(same(want.max_motor_force, (*got.rows)[15]), ".max_motor_force") && converted::at_place(same(want.motor_velocity, (*got.rows)[16]), ".motor_velocity") && converted::at_place(same(want.length, (*got.rows)[17]), ".length") && converted::at_place(same(want.linear_hertz, (*got.rows)[18]), ".linear_hertz") && converted::at_place(same(want.angular_hertz, (*got.rows)[19]), ".angular_hertz") && converted::at_place(same(want.linear_damping_ratio, (*got.rows)[20]), ".linear_damping_ratio") && converted::at_place(same(want.angular_damping_ratio, (*got.rows)[21]), ".angular_damping_ratio") && converted::at_place(same(want.linear_velocity, (*got.rows)[22]), ".linear_velocity") && converted::at_place(same(want.angular_velocity, (*got.rows)[23]), ".angular_velocity") && converted::at_place(same(want.max_velocity_force, (*got.rows)[24]), ".max_velocity_force") && converted::at_place(same(want.max_velocity_torque, (*got.rows)[25]), ".max_velocity_torque") && converted::at_place(same(want.max_spring_force, (*got.rows)[26]), ".max_spring_force") && converted::at_place(same(want.max_spring_torque, (*got.rows)[27]), ".max_spring_torque") && converted::at_place(same(want.enable_steering, (*got.rows)[28]), ".enable_steering") && converted::at_place(same(want.enable_steering_limit, (*got.rows)[29]), ".enable_steering_limit") && converted::at_place(same(want.steering_hertz, (*got.rows)[30]), ".steering_hertz") && converted::at_place(same(want.steering_damping_ratio, (*got.rows)[31]), ".steering_damping_ratio") && converted::at_place(same(want.target_steering, (*got.rows)[32]), ".target_steering") && converted::at_place(same(want.max_steering_torque, (*got.rows)[33]), ".max_steering_torque") && converted::at_place(same(want.steering_lower, (*got.rows)[34]), ".steering_lower") && converted::at_place(same(want.steering_upper, (*got.rows)[35]), ".steering_upper") && converted::at_place(same(want.max_torque, (*got.rows)[36]), ".max_torque") && converted::at_place(same(want.constraint_hertz, (*got.rows)[37]), ".constraint_hertz") && converted::at_place(same(want.constraint_damping_ratio, (*got.rows)[38]), ".constraint_damping_ratio") && converted::at_place(same(converted::shaped<converted::Whole>(want.user), (*got.rows)[39]), ".user"); }
-[[maybe_unused]] static bool defined(const physics::JointSettings& s) { return defined(s.type) && defined(s.body_a) && defined(s.body_b) && defined(s.frame_a) && defined(s.frame_b) && defined(s.collide_connected) && defined(s.enable_spring) && defined(s.hertz) && defined(s.damping_ratio) && defined(s.enable_limit) && defined(s.lower) && defined(s.upper) && defined(s.enable_motor) && defined(s.motor_speed) && defined(s.max_motor_torque) && defined(s.max_motor_force) && defined(s.motor_velocity) && defined(s.length) && defined(s.linear_hertz) && defined(s.angular_hertz) && defined(s.linear_damping_ratio) && defined(s.angular_damping_ratio) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.max_velocity_force) && defined(s.max_velocity_torque) && defined(s.max_spring_force) && defined(s.max_spring_torque) && defined(s.enable_steering) && defined(s.enable_steering_limit) && defined(s.steering_hertz) && defined(s.steering_damping_ratio) && defined(s.target_steering) && defined(s.max_steering_torque) && defined(s.steering_lower) && defined(s.steering_upper) && defined(s.max_torque) && defined(s.constraint_hertz) && defined(s.constraint_damping_ratio) && defined(converted::shaped<converted::Whole>(s.user)); }
-[[maybe_unused]] static std::string text(const physics::JointSettings& s) { return std::string("{") + text(s.type) + ", " + text(s.body_a) + ", " + text(s.body_b) + ", " + text(s.frame_a) + ", " + text(s.frame_b) + ", " + text(s.collide_connected) + ", " + text(s.enable_spring) + ", " + text(s.hertz) + ", " + text(s.damping_ratio) + ", " + text(s.enable_limit) + ", " + text(s.lower) + ", " + text(s.upper) + ", " + text(s.enable_motor) + ", " + text(s.motor_speed) + ", " + text(s.max_motor_torque) + ", " + text(s.max_motor_force) + ", " + text(s.motor_velocity) + ", " + text(s.length) + ", " + text(s.linear_hertz) + ", " + text(s.angular_hertz) + ", " + text(s.linear_damping_ratio) + ", " + text(s.angular_damping_ratio) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.max_velocity_force) + ", " + text(s.max_velocity_torque) + ", " + text(s.max_spring_force) + ", " + text(s.max_spring_torque) + ", " + text(s.enable_steering) + ", " + text(s.enable_steering_limit) + ", " + text(s.steering_hertz) + ", " + text(s.steering_damping_ratio) + ", " + text(s.target_steering) + ", " + text(s.max_steering_torque) + ", " + text(s.steering_lower) + ", " + text(s.steering_upper) + ", " + text(s.max_torque) + ", " + text(s.constraint_hertz) + ", " + text(s.constraint_damping_ratio) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
-[[maybe_unused]] static void take(physics::JointSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 40) return; converted::take_as<physics::JointType>(s.type, (*v.rows)[0]); converted::take_as<physics::Body>(s.body_a, (*v.rows)[1]); converted::take_as<physics::Body>(s.body_b, (*v.rows)[2]); converted::take_as<physics::Pose>(s.frame_a, (*v.rows)[3]); converted::take_as<physics::Pose>(s.frame_b, (*v.rows)[4]); converted::take_as<bool>(s.collide_connected, (*v.rows)[5]); converted::take_as<bool>(s.enable_spring, (*v.rows)[6]); converted::take_as<double>(s.hertz, (*v.rows)[7]); converted::take_as<double>(s.damping_ratio, (*v.rows)[8]); converted::take_as<bool>(s.enable_limit, (*v.rows)[9]); converted::take_as<double>(s.lower, (*v.rows)[10]); converted::take_as<double>(s.upper, (*v.rows)[11]); converted::take_as<bool>(s.enable_motor, (*v.rows)[12]); converted::take_as<double>(s.motor_speed, (*v.rows)[13]); converted::take_as<double>(s.max_motor_torque, (*v.rows)[14]); converted::take_as<double>(s.max_motor_force, (*v.rows)[15]); converted::take_as<Vec3>(s.motor_velocity, (*v.rows)[16]); converted::take_as<double>(s.length, (*v.rows)[17]); converted::take_as<double>(s.linear_hertz, (*v.rows)[18]); converted::take_as<double>(s.angular_hertz, (*v.rows)[19]); converted::take_as<double>(s.linear_damping_ratio, (*v.rows)[20]); converted::take_as<double>(s.angular_damping_ratio, (*v.rows)[21]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[22]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[23]); converted::take_as<double>(s.max_velocity_force, (*v.rows)[24]); converted::take_as<double>(s.max_velocity_torque, (*v.rows)[25]); converted::take_as<double>(s.max_spring_force, (*v.rows)[26]); converted::take_as<double>(s.max_spring_torque, (*v.rows)[27]); converted::take_as<bool>(s.enable_steering, (*v.rows)[28]); converted::take_as<bool>(s.enable_steering_limit, (*v.rows)[29]); converted::take_as<double>(s.steering_hertz, (*v.rows)[30]); converted::take_as<double>(s.steering_damping_ratio, (*v.rows)[31]); converted::take_as<double>(s.target_steering, (*v.rows)[32]); converted::take_as<double>(s.max_steering_torque, (*v.rows)[33]); converted::take_as<double>(s.steering_lower, (*v.rows)[34]); converted::take_as<double>(s.steering_upper, (*v.rows)[35]); converted::take_as<double>(s.max_torque, (*v.rows)[36]); converted::take_as<double>(s.constraint_hertz, (*v.rows)[37]); converted::take_as<double>(s.constraint_damping_ratio, (*v.rows)[38]); converted::take_as<converted::Whole>(s.user, (*v.rows)[39]); }
-}
 [[maybe_unused]] static audio::SynthPatch draw_kern__audio__SynthPatch(converted::Draw& draw) {
   audio::SynthPatch s{};
   s.wave = converted::enum_value<audio::Wave>(draw.below(7));
@@ -17969,6 +15099,7 @@ inline BuildingBuilder& BuildingBuilder::operator=(BuildingBuilder&& o) noexcept
 inline double Engine::arg_number(const char* key, const double& fallback) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.engine.arg_number", {converted::value_of(*this), converted::value_of(key), converted::value_of(fallback)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 inline bool Engine::has_arg(const char* key) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.engine.has_arg", {converted::value_of(*this), converted::value_of(key)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline const char* Engine::arg(const char* key, const char* fallback) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.engine.arg", {converted::value_of(*this), converted::value_of(key), converted::value_of(fallback)}); const char* kern_result = converted::quiet<const char*>(); converted::take_as<const char*>(kern_result, kern_out[0]); return kern_result; }
+inline void Engine::set_status(const char* text) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.engine.set_status", {converted::value_of(*this), converted::value_of(text)}); }
 inline double Engine::aspect() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.engine.aspect", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 inline bool Engine::xr() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.engine.xr", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline FootprintStream::~FootprintStream() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.footprint_stream.release", {converted::value_of(*this)}); }
@@ -17976,6 +15107,8 @@ inline FootprintStream& FootprintStream::operator=(FootprintStream&& o) noexcept
 inline LightPool::LightPool(const unsigned int& max_lights, const unsigned int& max_requests) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.light_pool.make", {converted::value_of(max_lights), converted::value_of(max_requests)}); converted::take_made(*this, kern_out[0]); }
 inline LightPool::~LightPool() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.light_pool.release", {converted::value_of(*this)}); }
 inline LightPool& LightPool::operator=(LightPool&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.light_pool.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
+inline bool Renderer::set_visible(const unsigned int& id, const bool& visible) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_visible", {converted::value_of(*this), converted::value_of(id), converted::value_of(visible)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline bool Renderer::update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.update_instances", {converted::value_of(*this), converted::value_of(id), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); if (changed) converted::take_as<bool>(*changed, kern_out[1]); return kern_result; }
 inline RoadBuilder::~RoadBuilder() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_builder.release", {converted::value_of(*this)}); }
 inline RoadBuilder& RoadBuilder::operator=(RoadBuilder&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_builder.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline RoadStream::~RoadStream() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_stream.release", {converted::value_of(*this)}); }
@@ -17998,68 +15131,44 @@ inline bool GameWorld::teleport(const unsigned int& id, const Vec3& position, co
 inline bool GameWorld::set_actor_velocity(const unsigned int& id, const Vec3& velocity) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.set_actor_velocity", {converted::value_of(*this), converted::value_of(id), converted::value_of(velocity)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline double GameWorld::sim_time() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.sim_time", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 inline void GameWorld::set_alive(const unsigned int& id, const bool& alive) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.set_alive", {converted::value_of(*this), converted::value_of(id), converted::value_of(alive)}); }
+inline void GameWorld::set_paused(const bool& paused) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.set_paused", {converted::value_of(*this), converted::value_of(paused)}); }
 inline bool GameWorld::set_mode(const game::SimMode& mode) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.set_mode", {converted::value_of(*this), converted::value_of(mode)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline bool GameWorld::actor_alive(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_alive", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline double GameWorld::camera_yaw() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.camera_yaw", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
+inline bool GameWorld::actor_alive(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_alive", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool GameWorld::update_camera(Camera& camera, const double& dt, const game::PlayInput& input) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.update_camera", {converted::value_of(*this), converted::value_of(camera), converted::value_of(dt), converted::value_of(input)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); converted::take_as<Camera>(camera, kern_out[1]); return kern_result; }
 inline Vec3 GameWorld::actor_velocity(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_velocity", {converted::value_of(*this), converted::value_of(id)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline game::Level GameWorld::level() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.level", {converted::value_of(*this)}); game::Level kern_result = converted::quiet<game::Level>(); converted::take_as<game::Level>(kern_result, kern_out[0]); return kern_result; }
 inline physics::Body GameWorld::actor_body(const unsigned int& actor) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_body", {converted::value_of(*this), converted::value_of(actor)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
-inline void GameWorld::play_sound(const std::string& sound, const Vec3& at, const double& volume, const double& pitch, const bool& spatial, const unsigned int& actor) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.play_sound", {converted::value_of(*this), converted::value_of(sound), converted::value_of(at), converted::value_of(volume), converted::value_of(pitch), converted::value_of(spatial), converted::value_of(actor)}); }
 inline GameWorld& GameWorld::operator=(GameWorld&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.game_world.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline SoundBank::~SoundBank() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.sound_bank.release", {converted::value_of(*this)}); }
 inline SoundBank::SoundBank(Mixer& mixer) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.sound_bank.make", {converted::value_of(mixer)}); converted::take_made(*this, kern_out[0]); }
 inline void SoundBank::request_level(const game::Level& level) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.sound_bank.request_level", {converted::value_of(*this), converted::value_of(level)}); }
-inline bool SoundBank::prepare(const double& budget_ms) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.sound_bank.prepare", {converted::value_of(*this), converted::value_of(budget_ms)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void SoundBank::request(const std::string_view& ref) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.sound_bank.request", {converted::value_of(*this), converted::value_of(ref)}); }
 inline bool SoundBank::set_pcm(const std::string_view& id, const double* data, const u32& samples, const unsigned int& channels, const unsigned int& rate) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.sound_bank.set_pcm", {converted::value_of(*this), converted::value_of(id), converted::value_of(std::vector<double>(data, data + converted::room(data, 1 * static_cast<std::size_t>(samples)))), converted::value_of(samples), converted::value_of(channels), converted::value_of(rate)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline SoundBank& SoundBank::operator=(SoundBank&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.sound_bank.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline Client::~Client() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.client.release", {converted::value_of(*this)}); }
-inline bool Client::connected() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.connected", {converted::value_of(*this)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline bool Client::send(const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.client.send", {converted::value_of(*this), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline Client& Client::operator=(Client&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.client.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline HostTransport::HostTransport(const net::Address& self) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.host_transport.make", {converted::value_of(self)}); converted::take_made(*this, kern_out[0]); }
 inline HostTransport::~HostTransport() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.host_transport.release", {converted::value_of(*this)}); }
 inline HostTransport& HostTransport::operator=(HostTransport&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.host_transport.release", {arg(*this)}); Transport::operator=(std::move(o)); return *this; }
 inline Server::~Server() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.server.release", {converted::value_of(*this)}); }
-inline int Server::max_clients() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.max_clients", {converted::value_of(*this)}); int kern_result = converted::quiet<int>(); converted::take_as<int>(kern_result, kern_out[0]); return kern_result; }
-inline bool Server::client_connected(const int& index) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.client_connected", {converted::value_of(*this), converted::value_of(index)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline bool Server::send(const int& client, const int& channel, const unsigned short& type, const std::vector<unsigned char>& data) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.server.send", {converted::value_of(*this), converted::value_of(client), converted::value_of(channel), converted::value_of(type), converted::value_of(data)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline Server& Server::operator=(Server&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.server.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::set_awake(const physics::Body& body, const bool& awake) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_awake", {converted::value_of(*this), converted::value_of(body), converted::value_of(awake)}); }
 inline Vec3 World::linear_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.linear_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline double World::mass(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.mass", {converted::value_of(*this), converted::value_of(body)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 inline void World::apply_force_to_center(const physics::Body& body, const Vec3& force) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_force_to_center", {converted::value_of(*this), converted::value_of(body), converted::value_of(force)}); }
-inline void World::set_pose(const physics::Body& body, const physics::Pose& pose) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_pose", {converted::value_of(*this), converted::value_of(body), converted::value_of(pose)}); }
 inline physics::RayHit World::cast_sphere(const Vec3& origin, const double& radius, const Vec3& translation, const physics::QueryFilter& filter, const physics::Body& ignore) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.cast_sphere", {converted::value_of(*this), converted::value_of(origin), converted::value_of(radius), converted::value_of(translation), converted::value_of(filter), converted::value_of(ignore)}); physics::RayHit kern_result = converted::quiet<physics::RayHit>(); converted::take_as<physics::RayHit>(kern_result, kern_out[0]); return kern_result; }
 inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_joint(const physics::Joint& joint, const bool& wake_bodies) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_joint", {converted::value_of(*this), converted::value_of(joint), converted::value_of(wake_bodies)}); }
 inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
-inline void World::set_body_type(const physics::Body& body, const physics::BodyType& type) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_body_type", {converted::value_of(*this), converted::value_of(body), converted::value_of(type)}); }
-inline void World::set_mass_data(const physics::Body& body, const double& mass, const Vec3& center, const double* inertia) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_mass_data", {converted::value_of(*this), converted::value_of(body), converted::value_of(mass), converted::value_of(center), converted::value_of((inertia ? std::vector<double>(inertia, inertia + 6) : std::vector<double>{}))}); }
-inline void World::set_body_masks(const physics::Body& body, converted::wide::Span<const u64> masks) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_body_masks", {converted::value_of(*this), converted::value_of(body), converted::value_of(converted::shaped<std::vector<converted::Whole>>(converted::as_list(masks)))}); }
-inline void World::body_masks(const physics::Body& body, std::vector<u64>& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_masks", {converted::value_of(*this), converted::value_of(body), converted::value_of(converted::shaped<std::vector<converted::Whole>>(out))}); converted::take_as<std::vector<converted::Whole>>(out, kern_out[0]); }
-inline physics::BodyType World::body_type(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_type", {converted::value_of(*this), converted::value_of(body)}); physics::BodyType kern_result = converted::quiet<physics::BodyType>(); converted::take_as<physics::BodyType>(kern_result, kern_out[0]); return kern_result; }
-inline void World::set_linear_velocity(const physics::Body& body, const Vec3& v) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_linear_velocity", {converted::value_of(*this), converted::value_of(body), converted::value_of(v)}); }
-inline void World::set_angular_velocity(const physics::Body& body, const Vec3& w) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_angular_velocity", {converted::value_of(*this), converted::value_of(body), converted::value_of(w)}); }
 inline physics::Pose World::pose(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.pose", {converted::value_of(*this), converted::value_of(body)}); physics::Pose kern_result = converted::quiet<physics::Pose>(); converted::take_as<physics::Pose>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::angular_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.angular_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline physics::RayHit World::cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter, const physics::Body& ignore) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.cast_ray", {converted::value_of(*this), converted::value_of(origin), converted::value_of(translation), converted::value_of(filter), converted::value_of(ignore)}); physics::RayHit kern_result = converted::quiet<physics::RayHit>(); converted::take_as<physics::RayHit>(kern_result, kern_out[0]); return kern_result; }
-inline void World::apply_force(const physics::Body& body, const Vec3& force, const Vec3& point) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_force", {converted::value_of(*this), converted::value_of(body), converted::value_of(force), converted::value_of(point)}); }
-inline void World::apply_torque(const physics::Body& body, const Vec3& torque) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.apply_torque", {converted::value_of(*this), converted::value_of(body), converted::value_of(torque)}); }
-inline void World::set_wheel_steering(const physics::Joint& joint, const double& target) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_wheel_steering", {converted::value_of(*this), converted::value_of(joint), converted::value_of(target)}); }
-inline double World::wheel_steering(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.wheel_steering", {converted::value_of(*this), converted::value_of(joint)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
-inline physics::Body World::create_body(const physics::BodySettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_body", {converted::value_of(*this), converted::value_of(settings)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
-inline physics::Shape World::create_shape(const physics::Body& body, const physics::ShapeSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_shape", {converted::value_of(*this), converted::value_of(body), converted::value_of(settings)}); physics::Shape kern_result = converted::quiet<physics::Shape>(); converted::take_as<physics::Shape>(kern_result, kern_out[0]); return kern_result; }
-inline physics::Joint World::create_joint(const physics::JointSettings& settings) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.create_joint", {converted::value_of(*this), converted::value_of(settings)}); physics::Joint kern_result = converted::quiet<physics::Joint>(); converted::take_as<physics::Joint>(kern_result, kern_out[0]); return kern_result; }
-inline void World::set_target_pose(const physics::Body& body, const physics::Pose& target, const double& dt) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_target_pose", {converted::value_of(*this), converted::value_of(body), converted::value_of(target), converted::value_of(dt)}); }
 namespace audio { inline void mix_into(std::vector<double>& dst, const std::vector<double>& src, const double& offset_seconds, const unsigned int& rate, const double& gain) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.mix_into", {converted::value_of(dst), converted::value_of(src), converted::value_of(offset_seconds), converted::value_of(rate), converted::value_of(gain)}); converted::take_as<std::vector<double>>(dst, kern_out[0]); } }
 namespace audio { inline std::vector<double> synthesize(const audio::SynthPatch& patch, const unsigned int& rate) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.synthesize", {converted::value_of(patch), converted::value_of(rate)}); std::vector<double> kern_result = converted::quiet<std::vector<double>>(); converted::take_as<std::vector<double>>(kern_result, kern_out[0]); return kern_result; } }
 namespace audio { inline void make_seamless(std::vector<double>& samples, const unsigned int& rate, const double& crossfade) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.make_seamless", {converted::value_of(samples), converted::value_of(rate), converted::value_of(crossfade)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
 namespace audio { inline void normalize(std::vector<double>& samples, const double& peak) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.audio.normalize", {converted::value_of(samples), converted::value_of(peak)}); converted::take_as<std::vector<double>>(samples, kern_out[0]); } }
-inline double now_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.now_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
-inline double wall_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.wall_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 struct Out_clear_spot { bool Result; Game::Spot out; };
 [[maybe_unused]] static bool same(const Out_clear_spot& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.Result, (*got.rows)[0]), ".Result") && converted::at_place(same(want.out, (*got.rows)[1]), ".out"); }
 [[maybe_unused]] static bool defined(const Out_clear_spot& s) { return defined(s.Result) && defined(s.out); }
@@ -18078,10 +15187,7 @@ struct Out_audio_render { State_Game State; std::vector<double> Result; };
 [[maybe_unused]] static std::string text(const Out_audio_render& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
 
 SC_TEST(converted_Game__game_cpp) {
-  converted::Blueprint bp("Game", {"Controls", "JetSeats", "Multiplayer", "SpawnGuard", "Traffic", "Wanted"});
-  spawn::spawn_guard_cpp_local::g_rules.bind(bp.source_logic());
-  world_traffic_cpp_local::g_rules.bind(bp.source_logic());
-  seats::jet_seats_cpp_local::g_rules.bind(bp.source_logic());
+  converted::Blueprint bp("Game", {"Controls", "Multiplayer", "Wanted"});
   mp::mp_rules_cpp_local::g_rules.bind(bp.source_logic());
   wanted::wanted_cpp_local::g_rules.bind(bp.source_logic());
   controls::controls_cpp_local::g_rules.bind(bp.source_logic());
@@ -18117,6 +15223,29 @@ SC_TEST(converted_Game__game_cpp) {
     for (int i = 0; tally.more(i); ++i) {
       made_state.reset();
       s = converted::quiet_static<Game>();
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::stop
+    converted::Tally tally("stop");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]() { converted::counted([&] { return s->stop(); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
       const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
       const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
       const converted::Watch watch;
@@ -18303,6 +15432,29 @@ SC_TEST(converted_Game__game_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
     }
   }
+  {  // Game::toggle_drone
+    converted::Tally tally("toggle_drone");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]() { converted::counted([&] { return s->toggle_drone(); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
   {  // Game::hide_soldier
     converted::Tally tally("hide_soldier");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -18374,29 +15526,6 @@ SC_TEST(converted_Game__game_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
     }
   }
-  {  // Game::toggle_drone
-    converted::Tally tally("toggle_drone");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { converted::counted([&] { return s->toggle_drone(); }); return State_Game{s.get()}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run())> held([&] { return run(); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
   {  // Game::switch_mode
     converted::Tally tally("switch_mode");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -18415,29 +15544,6 @@ SC_TEST(converted_Game__game_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
-  {  // Game::try_enter
-    converted::Tally tally("try_enter");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { converted::counted([&] { return s->try_enter(); }); return State_Game{s.get()}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
@@ -18515,30 +15621,6 @@ SC_TEST(converted_Game__game_cpp) {
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0}, &vars, true);
     }
   }
-  {  // Game::drive_traffic
-    converted::Tally tally("drive_traffic");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] double& a0) { converted::counted([&] { return s->drive_traffic(std::move(a0)); }); return State_Game{s.get()}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      double a0 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
   {  // Game::step_parachute
     converted::Tally tally("step_parachute");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -18556,53 +15638,6 @@ SC_TEST(converted_Game__game_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
-  {  // Game::fixed_step
-    converted::Tally tally("fixed_step");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] double& a0) { converted::counted([&] { return s->fixed_step(std::move(a0)); }); return State_Game{s.get()}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      double a0 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
-  {  // Game::manage_traffic
-    converted::Tally tally("manage_traffic");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { converted::counted([&] { return s->manage_traffic(); }); return State_Game{s.get()}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;
@@ -18628,6 +15663,29 @@ SC_TEST(converted_Game__game_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::draw_vehicles
+    converted::Tally tally("draw_vehicles");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]() { converted::counted([&] { return s->draw_vehicles(); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;

@@ -1107,6 +1107,18 @@ namespace logic { struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   
   
@@ -1137,6 +1149,11 @@ namespace logic { struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   
   
   
@@ -1154,7 +1171,10 @@ namespace logic { struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
@@ -1193,8 +1213,10 @@ struct Library : converted::EngineObject {
 struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -2949,6 +2971,15 @@ namespace game { struct ControllerComponent {
 namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
 namespace game { enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score }; }
+struct TextureAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MotionAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -5039,7 +5070,7 @@ struct PoliceDrone {
 struct Game {
  public:
   
-  
+  ~Game();
   
   
   
@@ -5728,6 +5759,105 @@ const char* mode_name(Mode m) {
     case Mode::parachute: return "parachute";
   }
   return "?";
+}
+namespace jobs { using Fn = void (*)(Span<const u8> input, std::vector<u8>& output); }
+namespace logic { namespace EngineObjects_types { using Kind = const void*; } }
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace logic { namespace PureNodes_types { using Bool = bool; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace PureNodes_types { using Text = std::string; } }
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_BloomState { using type = BloomState; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_LogLevel { using type = LogLevel; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Wave { using type = audio::Wave; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameStatus { using type = game::GameStatus; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_net_ClientState { using type = net::ClientState; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_bus_types { using In = std::tuple<std::remove_cvref_t<audio::Bus>>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_hud_mut_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_events_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_sound_cues_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_building_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_road_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_layers_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_pick_bvh_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_linear_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_texture_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_positions_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_uvs_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_indices_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_joints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_weights_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_bones_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_tints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_count_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_mirror_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_local_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_world_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_gpu_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_sort_distance_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_live_index_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_material_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_attribute_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_mipmaps_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_repeat_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_nearest_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_speed_of_sound_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_doppler_factor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_logic_native_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_actor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_path_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_keys_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_night_windows_night_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_simulator_settings_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_character_mover_settings_types { using In = std::tuple<>; } } }
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace BlueprintCore_types { using Text = ::kern::logic::Text; }
+namespace game { namespace nodes { using Bool = bool; } }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Text = std::string; } }
+namespace game { namespace nodes { using Actor = ::kern::logic::ActorHandle; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
+Game::~Game() {
+  life_.reset();
+  swarm_cruiser_.reset();
 }
 using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
   Mat4 m;

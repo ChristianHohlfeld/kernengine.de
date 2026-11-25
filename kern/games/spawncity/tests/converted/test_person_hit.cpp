@@ -73,11 +73,11 @@ namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 f
   const Vec3 hip = feet + up * (kHipZ * scale);
   BodyPart best = BodyPart::none;
   f32 bt = 2, t;
-  if (sphere_entry(from, seg, hip + bz * (kHeadUp * scale), kHeadR * pad * scale, t) && t < bt) { bt = t; best = BodyPart::head; }
+  if (person_hit::sphere_entry(from, seg, hip + bz * (kHeadUp * scale), kHeadR * pad * scale, t) && t < bt) { bt = t; best = BodyPart::head; }
   // torso 0.24 x 0.42 x 0.6 from the hip up, with the arms beside it (to 0.33 either side)
-  if (box_entry(from, seg, hip + bz * (0.29 * scale), bx, fy, bz, Vec3{0.15, 0.31, 0.31} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::torso; }
+  if (person_hit::box_entry(from, seg, hip + bz * (0.29 * scale), bx, fy, bz, Vec3{0.15, 0.31, 0.31} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::torso; }
   // the legs, hip to shoe
-  if (box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
+  if (person_hit::box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
   t_out = bt;
   return best;
 } }

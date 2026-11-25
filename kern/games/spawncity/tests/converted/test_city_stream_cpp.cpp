@@ -268,6 +268,7 @@ struct RoadBuilder : converted::EngineObject {
   RoadBuilder();
   bool begin(const double* stream, const u32& length, const RoadOptions& options, const HeightSampler& heights) const;
   bool step(const double& budget_ms) const;
+  std::vector<GeoChunk>& chunks();
   RoadBuilder(const RoadBuilder&) = default;
   RoadBuilder(RoadBuilder&&) = default;
   RoadBuilder& operator=(const RoadBuilder&) = default;
@@ -3416,6 +3417,7 @@ inline RoadBuilder::~RoadBuilder() { if (kern_owned && kern_handle && !converted
 inline RoadBuilder::RoadBuilder() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_builder.make", {}); converted::take_made(*this, kern_out[0]); }
 inline bool RoadBuilder::begin(const double* stream, const u32& length, const RoadOptions& options, const HeightSampler& heights) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_builder.begin", {converted::value_of(*this), converted::value_of(std::vector<double>(stream, stream + converted::room(stream, 1 * static_cast<std::size_t>(length)))), converted::value_of(length), converted::value_of(options), converted::value_of(heights)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool RoadBuilder::step(const double& budget_ms) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_builder.step", {converted::value_of(*this), converted::value_of(budget_ms)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline std::vector<GeoChunk>& RoadBuilder::chunks() { return converted::engine_place<std::vector<GeoChunk>, std::vector<GeoChunk>>("engine.road_builder.chunks", {converted::value_of(*this)}); }
 inline RoadBuilder& RoadBuilder::operator=(RoadBuilder&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_builder.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
 inline RoadStream::~RoadStream() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.road_stream.release", {converted::value_of(*this)}); }
 inline RoadStream::RoadStream() { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.road_stream.make", {}); converted::take_made(*this, kern_out[0]); }
@@ -3516,6 +3518,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3536,6 +3539,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3556,6 +3560,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3577,6 +3582,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3598,6 +3604,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3621,6 +3628,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3643,6 +3651,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3664,6 +3673,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<converted::Whole>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3684,6 +3694,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3708,6 +3719,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3730,6 +3742,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3751,6 +3764,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3777,6 +3791,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3800,6 +3815,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3823,6 +3839,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3845,6 +3862,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3866,6 +3884,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3890,6 +3909,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3912,6 +3932,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3935,6 +3956,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3958,6 +3980,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -3980,6 +4003,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4002,6 +4026,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4023,6 +4048,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4045,6 +4071,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4067,6 +4094,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<std::vector<converted::Whole>>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4089,6 +4117,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4111,6 +4140,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4136,6 +4166,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4158,6 +4189,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4181,6 +4213,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4203,6 +4236,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4226,6 +4260,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4251,6 +4286,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4273,6 +4309,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4296,6 +4333,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4319,6 +4357,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4340,6 +4379,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4363,6 +4403,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4386,6 +4427,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4410,6 +4452,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4432,6 +4475,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4458,6 +4502,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4, a5))> held([&] { return run(a0, a1, a2, a3, a4, a5); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4482,6 +4527,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3))> held([&] { return run(a0, a1, a2, a3); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4504,6 +4550,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = converted::shaped<std::vector<converted::Whole>>(made);
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4529,6 +4576,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2, a3, a4))> held([&] { return run(a0, a1, a2, a3, a4); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4551,6 +4599,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4574,6 +4623,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -4595,6 +4645,7 @@ SC_TEST(converted_city_stream_cpp) {
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);

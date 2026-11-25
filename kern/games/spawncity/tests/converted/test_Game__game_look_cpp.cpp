@@ -54,10 +54,10 @@ struct Quat {
     const f32 s = kern::math::sin(radians * 0.5);
     return {a.x * s, a.y * s, a.z * s, kern::math::cos(radians * 0.5)};
   }
-  
-
-
-
+  Quat operator*(const Quat& b) const {
+    return {w * b.x + x * b.w + y * b.z - z * b.y, w * b.y - x * b.z + y * b.w + z * b.x,
+            w * b.z + x * b.y - y * b.x + z * b.w, w * b.w - x * b.x - y * b.y - z * b.z};
+  }
   Vec3 rotate(Vec3 v) const {
     const Vec3 q{x, y, z};
     const Vec3 t = cross(q, v) * 2.0;
@@ -77,43 +77,43 @@ struct Mat4 {
 
 
 
+  Mat4 operator*(const Mat4& b) const {
+    Mat4 r;
+    for (int c = 0; c < 4; converted::pre_inc(c)) {
+      const f32 b0 = converted::at(b.m, converted::times(4, c)), b1 = converted::at(b.m, converted::plus(converted::times(4, c), 1)), b2 = converted::at(b.m, converted::plus(converted::times(4, c), 2)), b3 = converted::at(b.m, converted::plus(converted::times(4, c), 3));
+      for (int k = 0; k < 4; converted::pre_inc(k))
+        converted::at(r.m, converted::plus(converted::times(4, c), k)) = converted::at(m, k) * b0 + converted::at(m, converted::plus(4, k)) * b1 + converted::at(m, converted::plus(8, k)) * b2 + converted::at(m, converted::plus(12, k)) * b3;
+    }
+    return r;
+  }
+  Vec3 transform_point(Vec3 p) const {
+    return {m[0] * p.x + m[4] * p.y + m[8] * p.z + m[12], m[1] * p.x + m[5] * p.y + m[9] * p.z + m[13],
+            m[2] * p.x + m[6] * p.y + m[10] * p.z + m[14]};
+  }
+  
+
+
+
   
 
 
 
 
-
-
-
-
-  
-
-
-
-  
-
-
-
-  
-
-
-
-
-  
-  
+  static Mat4 translate(Vec3 t) { Mat4 r; r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; return r; }
+  static Mat4 scale(Vec3 s) { Mat4 r; r.m[0] = s.x; r.m[5] = s.y; r.m[10] = s.z; return r; }
 
   /// Translation * rotation * scale.
-  
-
-
-
-
-
-
-
-
-
-
+  static Mat4 trs(Vec3 t, Quat q, Vec3 s) {
+    const f32 x2 = q.x + q.x, y2 = q.y + q.y, z2 = q.z + q.z;
+    const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
+    const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
+    Mat4 r;
+    r.m[0] = (1 - yy - zz) * s.x; r.m[1] = (xy + wz) * s.x; r.m[2] = (xz - wy) * s.x; r.m[3] = 0;
+    r.m[4] = (xy - wz) * s.y; r.m[5] = (1 - xx - zz) * s.y; r.m[6] = (yz + wx) * s.y; r.m[7] = 0;
+    r.m[8] = (xz + wy) * s.z; r.m[9] = (yz - wx) * s.z; r.m[10] = (1 - xx - yy) * s.z; r.m[11] = 0;
+    r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; r.m[15] = 1;
+    return r;
+  }
 
   
 
@@ -192,6 +192,13 @@ struct Material {
 };
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
+  unsigned int vertex_count() const;
+  unsigned int id{};
+  Material material{};
+  std::vector<double> transforms{};
+  bool visible{};
+  static void kern_sync(void* o, bool set) { Mesh& s = *static_cast<Mesh*>(o); converted::field_sync<unsigned int, unsigned int>("engine.mesh.id", s, s.id, set); converted::field_sync<Material, Material>("engine.mesh.material", s, s.material, set); converted::field_sync<std::vector<double>, std::vector<double>>("engine.mesh.transforms", s, s.transforms, set); converted::field_sync<bool, bool>("engine.mesh.visible", s, s.visible, set); }
+  converted::FieldSync kern_fields{this, &Mesh::kern_sync};
 };
 struct MeshData {
   std::vector<f32> positions, normals, colors, uvs;
@@ -237,12 +244,37 @@ namespace physics { struct Pose {
   Vec3 position;
   Quat rotation;
 }; }
+namespace physics { struct WorldSettings {
+  Vec3 gravity{0, 0, -9.80665};
+  bool enable_sleep = true;
+  bool enable_continuous = true;
+  f32 restitution_threshold = 1;  // m/s; slower impacts do not bounce
+  i32 restitution_iterations = 2; // 0..63
+  bool restitution_propagation = false;
+  f32 hit_event_threshold = 1;    // m/s
+  // Contact softness (Box3D "World Definition"): stiffness, bounciness and the cap on overlap push-out.
+  f32 contact_hertz = 30, contact_damping_ratio = 10, contact_speed = 3;  // Hz, -, m/s
+  f32 maximum_linear_speed = 400;  // m/s
+}; }
+namespace physics { struct QueryFilter {
+  u64 mask_bits = ~0ull, category_bits = ~0ull;
+  QueryFilter() = default;
+  QueryFilter(u64 mask, u64 category = ~0ull) : mask_bits(mask), category_bits(category) {}
+}; }
+namespace physics { struct RayHit {
+  bool hit = false;
+  Shape shape;
+  Body body;
+  Vec3 point, normal;
+  f32 fraction = 0;
+}; }
 struct World : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   bool body_valid(const physics::Body& body) const;
   void destroy_body(const physics::Body& body) const;
   bool joint_valid(const physics::Joint& joint) const;
   void destroy_joint(const physics::Joint& joint, const bool& wake_bodies = true) const;
+  physics::RayHit cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter = {}, const physics::Body& ignore = {}) const;
 };
 struct MouseGrab : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -274,6 +306,21 @@ struct Rng {
 
 
 };
+struct RayResult {
+  bool hit = false;
+  f32 distance = 0;
+  Vec3 point, normal{0, 0, 1};
+};
+inline RayResult cast(const World& w, Vec3 origin, Vec3 dir, f32 max_len, physics::Body self, u64 mask = ~0ull) {
+  const physics::RayHit h = w.cast_ray(origin, dir * max_len, mask, self);
+  RayResult r;
+  if (!h.hit) return r;
+  r.hit = true;
+  r.distance = h.fraction * max_len;
+  r.point = h.point;
+  r.normal = h.normal;
+  return r;
+}
 struct CarSpec {
   const char* kind = "car";
   Vec3 half{1.78, 0.82, 0.36};
@@ -403,6 +450,15 @@ struct UniformCache : converted::EngineObject {
 struct SunShadowMap : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct SkyState {
+  Vec3 sun{-0.45, -0.52, 0.72};
+  Vec3 moon{0.4, 0.5, 0.76};
+  f32 night = 0;
+  bool clouds = true;
+  Vec3 blast_direction{0, 0, -1};
+  f32 blast_age = -1;          // < 0: no shock wave in the clouds
+  Vec2 wind{0.012, 0.004};
+};
 enum class BloomState : u8 { off = 0, active = 1, disabled_slow_device = 2, unsupported = 3 };
 struct BloomPass : converted::EngineObject {
   using converted::EngineObject::EngineObject;
@@ -426,11 +482,39 @@ struct ShaderExtension : converted::EngineObject {
 struct Bvh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+struct Lighting {
+  Vec3 sun_direction{-0.45, -0.52, 0.72};
+  Vec3 sun_color{2.8, 2.47, 2.11};
+  Vec3 sky_color{0.469, 0.609, 0.85};
+  Vec3 ground_color{0.125, 0.094, 0.054};
+  Vec3 fog_color{0.474, 0.584, 0.716};
+  f32 fog_density = 0.00085;
+  f32 exposure = 1;
+  f32 env_intensity = 0.9;
+  Vec3 env_zenith{0.05, 0.2, 0.62};
+  Vec3 env_horizon{0.52, 0.66, 0.86};
+  Vec3 env_ground{0.105, 0.127, 0.084};
+  // Atmosphere. All 0 = the uniform FogExp2 of three.js (unchanged look).
+  f32 fog_height_falloff = 0;  // per world unit (z up): fog thins with height, e.g. 0.012
+  f32 fog_sun_scatter = 0;     // 0..1: fog brightens toward the sun (in-scattering)
+  f32 fog_horizon = 0;         // 0..1: the sky fades into the fog colour at the horizon
+};
+struct PointLights {
+  u32 count = 0;
+  f32 pos_range[kMaxPointLights * 4] = {};        // xyz position, w range
+  f32 color_intensity[kMaxPointLights * 4] = {};  // rgb colour, w intensity
+};
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   void set_shadow_filter(const int& taps) const;
   void set_ambient_occlusion(const AoOptions& options) const;
+  Lighting lighting() const;
+  SkyState sky() const;
+  void set_lighting(const Lighting& lighting) const;
+  void set_sky(const SkyState& sky) const;
   void set_shadow_distance(const double& metres) const;
+  PointLights point_lights() const;
+  bool set_point_lights(const PointLights& lights) const;
   unsigned int allocate_id() const;
   void release_id(const unsigned int& id) const;
   bool set_visible(const unsigned int& id, const bool& visible) const;
@@ -727,7 +811,7 @@ struct CityStream {
   
 
   // ---- gameplay queries ----
-  
+  const std::vector<Lane>& lanes() const { return lanes_; }
   /// A point on a drivable street within `radius` of `near` (heading along the street).
   
   /// Ground height: the terrain's static surface (elevation, water basins, craters).
@@ -1058,17 +1142,197 @@ struct Callable : converted::EngineObject {
 struct EngineValue : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { struct Node {
+  u32 id = 0;
+  std::string type;                                   // registry key, e.g. "flow.branch"
+  f32 x = 0, y = 0;                                   // canvas position (px)
+  std::vector<std::pair<std::string, Value>> values;  // literals of unlinked inputs, by pin id
+  std::vector<std::pair<std::string, std::string>> params;  // node settings (variable name, event name, key...)
+  std::string comment;
+  
+  
+  
+  
+}; }
+namespace logic { struct Link {
+  u32 from = 0;          // node id
+  std::string out;       // output pin id
+  u32 to = 0;
+  std::string in;        // input pin id
+  
+}; }
 struct Variable : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { struct EnumType {
+  std::string name;
+  std::vector<std::string> values;
+  std::string help;
+  /// A type of the project: every Blueprint of the level that has a project type of this name has
+  /// it the same (the editor keeps them so; a level in which they differ does not check). Such a
+  /// value means the same in every Blueprint that takes or gives it.
+  bool project = false;
+  /// A type of a library the Blueprint uses (Graph::uses): the name of the library that declares
+  /// it. The Blueprint has the type because it uses the library - it does not declare it, and
+  /// its C++ does not show it again (there it is the library's type itself, so a reference binds).
+  std::string from{};
+}; }
 struct StructField : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { struct StructType {
+  static constexpr std::size_t kMaxFields = 96;
+  std::string name;
+  std::vector<StructField> fields;
+  std::string help;
+  bool project = false;  // a type of the project (see EnumType::project)
+  std::string from{};    // a type of the library of that name (see EnumType::from)
+  /// The place of the field called `name`, or -1.
+  
+}; }
 namespace logic { enum class TriggerKind : u8 { event, timer, condition, automatic }; }
+namespace logic { struct State {
+  u32 id = 0;
+  std::string name;
+  f32 x = 0, y = 0;
+  bool initial = false;
+}; }
+namespace logic { struct Transition {
+  u32 id = 0;
+  u32 from = 0, to = 0;  // state ids (from 0 = from any state)
+  TriggerKind trigger = TriggerKind::event;
+  std::string event;     // event: custom event name that switches
+  f32 seconds = 1;       // timer: seconds in the from state
+  std::string variable;  // condition: boolean variable that must be true
+  std::string label;
+}; }
+namespace logic { struct StateMachine {
+  u32 id = 0;
+  std::string name = "State Machine";
+  std::vector<State> states;
+  std::vector<Transition> transitions;
+  
+  
+}; }
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { struct Function {
+  std::string name;
+  std::vector<FunctionPin> inputs, outputs;
+  /// Its local variables: each call starts with their defaults, and they are gone when the call
+  /// is over (after a Return, at the end of its path, at a wait). In the Blueprint's C++ they are
+  /// the locals at the top of the function's body. The variable nodes name one with their
+  /// setting "scope" (the function); two functions may each have a local of one name.
+  std::vector<FunctionPin> locals;
+  bool pure = false;     // offered as a pure node (no exec pins): runs whenever an output is read
+  /// A function of another Blueprint: this one says what it looks like (name, inputs, outputs)
+  /// and calls it on an actor (Call on Actor) - it has no body here. In the Blueprint's C++:
+  /// KERN_EXTERN FnResult Fn(Float x = 0.0);
+  bool external = false;
+  /// Of a function of another Blueprint: the name that Blueprint has it under, where this one calls it
+  /// by another (empty: the same) - two actors' Blueprints with a function of one name that looks
+  /// different in each: KERN_EXTERN_AS("Update") ZombiesUpdateResult Zombies_Update(...);
+  std::string remote{};
+  /// A function of a library the Blueprint uses (Graph::uses): the library's name. This one says
+  /// what the function looks like - its name here is "Library::function", as the call writes it
+  /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
+  /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
+  std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
+  std::string help;
+  
+  
+  
+  
+}; }
+namespace logic { struct CommentBox {
+  u32 id = 0;
+  f32 x = 0, y = 0, w = 400, h = 200;  // canvas px
+  std::string text = "Comment";
+  u32 color = 0;                       // 0xRRGGBB, 0 = the default grey
+}; }
+namespace logic { struct Graph {
+  std::vector<Node> nodes;
+  std::vector<Link> links;
+  std::vector<Variable> variables;
+  std::vector<StateMachine> machines;
+  std::vector<Function> functions;
+  std::vector<EnumType> enums;         // the types it declares
+  std::vector<StructType> structs;     // (a struct after the structs its fields are of)
+  std::vector<CommentBox> comments;    // editor only: no effect on what runs
+  u32 next_id = 1;
+  /// A library: a Blueprint that keeps nothing - no variables but constants, no events or state
+  /// machines, and no node that keeps something between two calls. It has types and functions; the Blueprints
+  /// that use it call them directly and have its types. In C++:
+  /// struct Random : virtual kern::Blueprint { ... };
+  bool library = false;
+  /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
+  /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
+  std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  /// The variable a node's settings name: a variable of the Blueprint, or - with the setting
+  /// "scope" - a local variable of that function. `out` holds it (a local as a Variable).
+  
+  /// What a node's variable is, where its settings name one under `prefix` ("": the node's own
+  /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
+  /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
+  /// the node stands in, or one of that function's inputs. `out` holds it.
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
+  
+  /// Can what the node names there be changed (a variable, a local variable, a reference input
+  /// that is not const)?
+  
+  /// The place a node's settings name: its variable (variable_of) and from there the path of the
+  /// setting "path" - fields and list entries (logic::path_steps). `out` holds what is there, as
+  /// a Variable: its type, its default (a field's declared one, the zero of a list's entry), and
+  /// as its name the place as C++ writes it ("Cars[].Speed").
+  /// A node without a path names its variable. False: no such variable, or the path leads
+  /// through something the variable has not - `why` then says what.
+  
+  /// A node's path as its steps (logic::path_steps), and for every step that is a field the
+  /// struct that has it (its name) - empty for a list entry, and from where the path stops
+  /// leading through the variable's type. What renaming a field has to go by. False: the node
+  /// names no variable, or its path is none.
+  
+  /// The function in whose body a node stands: the one whose Function Entry leads to it along
+  /// exec wires - or to a step that reads it. Empty: none does (an event's path, nothing), or
+  /// more than one. Where the places a call names are looked up (the call's setting "scope").
+  
+  
+  
+  
+  
+    // via JSON
+}; }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1081,7 +1345,11 @@ struct Library : converted::EngineObject {
 struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -2794,8 +3062,103 @@ namespace lamps { struct Field {
   converted::wide::Map<i64, std::vector<i32>> grid_;
 }; }
 namespace game { using ActorId = u32; }
+namespace game { struct Transform {
+  Vec3 position;
+  Vec3 rotation;        // Euler degrees (x roll, y pitch, z yaw)
+  Vec3 scale{1, 1, 1};
+}; }
 namespace game { enum class Shape : u8 { box, sphere, cylinder, cone, capsule, plane, torus, ramp, mesh }; }
+namespace game { struct MaterialDesc {
+  Vec3 color{0.8, 0.8, 0.8};  // sRGB
+  f32 roughness = 0.6, metalness = 0;
+  Vec3 emissive{0, 0, 0};       // sRGB colour, multiplied by emissive_strength
+  f32 emissive_strength = 0;
+  f32 opacity = 1;              // < 1: alpha blended
+  bool unlit = false, cast_shadow = true, double_sided = false;
+  std::string texture;          // texture asset id ("" = none)
+  f32 tiling = 1;               // texture repeats per metre (planes, boxes) or per surface
+}; }
+namespace game { struct MeshComponent {
+  Shape shape = Shape::box;
+  Vec3 size{1, 1, 1};           // box, plane (x, y), ramp
+  f32 radius = 0.5;            // sphere, cylinder, cone, capsule, torus (major)
+  f32 height = 1;               // cylinder, cone, capsule (total), torus (minor radius)
+  i32 segments = 24;
+  std::string asset;            // mesh: a built-in mesh ("duck/xl330", kern/game/builtin_meshes.h), scaled by size
+  bool collision = true;        // generates a fitted collider when the actor has no explicit one
+  // The physical material of that fitted collider (Box3D surface material; touching materials
+  // combine friction as sqrt(a x b)): beside the render material, as the object's physics.
+  f32 friction = 0.6, restitution = 0, rolling_resistance = 0;
+  std::string surface;          // what it is made of, where a pair has its own friction: "", cloth, tpu, floor (physics::Surface)
+  MaterialDesc material;
+}; }
+namespace game { struct LightComponent {
+  Vec3 color{1, 0.95, 0.85};
+  f32 intensity = 20;
+  f32 range = 12;
+}; }
+namespace game { enum class Motion : u8 { fixed, kinematic, dynamic }; }
+namespace game { struct BodyComponent {
+  Motion motion = Motion::dynamic;
+  f32 mass = 0;                 // kg; 0 = from the colliders' densities
+  f32 linear_damping = 0, angular_damping = 0.05, gravity_scale = 1;
+  bool bullet = false, start_awake = true, allow_sleep = true;
+  bool lock_linear[3] = {false, false, false};
+  bool lock_angular[3] = {false, false, false};
+  Vec3 linear_velocity, angular_velocity;  // initial; angular in degrees per second
+  std::string impact_sound = "builtin:impact";  // played on hard hits ("" = silent)
+  f32 impact_threshold = 2.5;  // m/s approach speed for an impact sound
+  // Explicit mass properties (imported robots, MJCF / URDF): the centre of mass (actor-local) and
+  // the inertia tensor about it in actor axes (kg*m^2: xx yy zz xy xz yz). Used together with
+  // `mass` when the diagonal is positive; otherwise the colliders' shapes and densities decide.
+  Vec3 center_of_mass;
+  f32 inertia[6] = {0, 0, 0, 0, 0, 0};
+  
+}; }
+namespace game { enum class ColliderShape : u8 { automatic, box, sphere, capsule, hull }; }
+namespace game { struct ColliderComponent {
+  ColliderShape shape = ColliderShape::automatic;  // automatic: fitted to the mesh
+  Vec3 center;                  // actor-local offset
+  Vec3 rotation;                // Euler degrees
+  Vec3 size{1, 1, 1};           // box
+  f32 radius = 0.5, length = 1;  // sphere, capsule (length between the cap centres, along Z)
+  std::vector<Vec3> points;     // hull: its points (actor-local); empty = the hull of the actor's mesh
+  f32 density = 1000, friction = 0.6, restitution = 0, rolling_resistance = 0;
+  std::string surface;          // "", cloth, tpu, floor: a pair of these has its own friction (physics::Surface)
+  bool sensor = false;
+  u32 category = 1, mask = 0xffffffffu;  // collision channels
+  i32 group = 0;
+  /// Played when this collider hits something: "auto" = its body's impact sound, "" / "none" =
+  /// silent. Lets parts of one body sound different (a sole steps, a plastic shell taps).
+  std::string impact_sound = "auto";
+}; }
 namespace game { enum class JointKind : u8 { hinge, slider, ball, fixed, distance, wheel, motor, parallel, no_collision }; }
+namespace game { struct JointComponent {
+  JointKind kind = JointKind::hinge;
+  ActorId target = 0;           // the other actor (0 = the world)
+  Vec3 anchor;                  // actor-local
+  Vec3 axis{0, 0, 1};           // actor-local: hinge/ball/parallel axis, slider/wheel direction
+  bool collide_connected = false;
+  bool enable_limit = false;
+  f32 lower = -45, upper = 45;  // hinge, ball cone (upper): degrees; slider, wheel: metres; distance: min/max length
+  f32 reference = 0;            // hinge: the angle (degrees) the joint reads in the pose the level builds it in
+  bool enable_motor = false;
+  f32 motor_speed = 0;          // degrees per second (hinge, wheel) or m/s (slider, distance)
+  f32 max_motor_force = 100;    // N or N*m
+  bool enable_spring = false;
+  f32 spring_hertz = 4, spring_damping = 0.5;
+  f32 length = 0;               // distance joint rest length, 0 = the distance at start
+  f32 break_force = 0, break_torque = 0;  // N / N*m, 0 = unbreakable
+  // Hinge servo (a position-controlled motor, like a Dynamixel): torque
+  //   servo_stiffness x (servo_target - angle) - servo_damping x speed, at most max_motor_force N*m,
+  // with servo_friction N*m of joint friction. Box3D's joint spring and motor (GameWorld::drive_servos).
+  bool servo = false;
+  f32 servo_target = 0;          // degrees
+  f32 servo_stiffness = 50;      // N*m/rad
+  f32 servo_damping = 2;         // N*m*s/rad
+  f32 servo_friction = 0.1;     // N*m
+  std::string break_sound = "builtin:break";  // played when the joint breaks ("" = silent)
+}; }
 namespace game { enum class ControlMode : u8 { hovercar, rolling, character, flyer, vehicle, soldier, walker }; }
 namespace game { enum class CameraMode : u8 { chase, first_person, top_down }; }
 namespace game { struct ControllerComponent {
@@ -2831,9 +3194,158 @@ namespace game { struct ControllerComponent {
   // Its servos' command latency (real seconds; the device profile, game/servo.h).
   f32 servo_delay = 0.02;
 }; }
+namespace game { enum class WeaponKind : u8 { rifle, pistol, shotgun, sniper }; }
+namespace game { struct WeaponComponent {
+  WeaponKind kind = WeaponKind::rifle;
+  f32 damage = 24;              // per hit (per pellet for shotguns)
+  f32 fire_rate = 600;          // rounds per minute
+  bool automatic = true;        // hold to fire
+  i32 magazine = 30;
+  i32 reserve = 120;            // spare rounds
+  f32 reload_time = 2.0;       // seconds
+  f32 spread = 1.2;            // degrees, hip fire while standing
+  f32 aim_spread = 0.15;       // degrees aiming down sights
+  f32 recoil = 0.8;            // degrees of view kick per shot
+  f32 range = 300;              // m
+  f32 headshot = 2.5;          // damage multiplier on head colliders
+  f32 impulse = 4;              // N*s on dynamic bodies that are hit
+  i32 pellets = 1;              // shotgun: rays per shot
+  f32 aim_fov = 42;             // degrees aiming down sights
+  std::string fire_sound = "builtin:smg";
+  std::string reload_sound = "builtin:reload";
+}; }
+namespace game { struct HealthComponent {
+  f32 max_health = 100;
+  f32 armor = 0;                // absorbs damage first
+  f32 regen_delay = 5;          // seconds after the last damage, 0 = no regeneration
+  f32 regen_rate = 12;          // hit points per second
+  bool respawn = true;          // players respawn at their spawn; others reappear in place
+  f32 respawn_delay = 3;        // seconds
+  f32 points = 10;              // score for the player who brings it down
+  std::string hit_sound = "builtin:hit";
+  std::string death_sound = "builtin:down";
+  f32 explode_radius = 0;       // > 0: blows up when destroyed (impulse and damage around it)
+  f32 explode_damage = 80;      // damage at the centre, falling off to 0 at the radius
+}; }
+namespace game { struct PickupComponent {
+  f32 points = 1;
+  Vec3 burst_color{0.55, 1.0, 0.92};
+  f32 respawn = 0;              // seconds, 0 = gone for this run
+  std::string sound = "builtin:pickup";
+  f32 heal = 0;                 // health given to the collector
+  i32 ammo = 0;                 // rounds added to the collector's reserve
+}; }
 namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
+namespace game { struct TriggerComponent {
+  TriggerAction action = TriggerAction::goal;
+  std::string message;
+  bool once = true;
+  std::string sound = "auto";   // "auto" = the action's default sound, "" = silent
+  f32 strength = 12;            // launch: m/s upwards (plus forward along the trigger's X); damage: hit points
+  u32 target = 0;               // teleport: the actor to arrive at
+}; }
+namespace game { struct AudioComponent {
+  std::string sound = "builtin:hum";  // "builtin:<name>" or an imported sound asset id
+  f32 volume = 1;               // linear gain (0..4)
+  f32 pitch = 1;                // playback rate
+  bool loop = true;
+  bool autoplay = true;         // starts with Play / Simulate
+  bool spatial = true;          // 3D at the actor (false: plays 2D on its bus)
+  f32 min_distance = 2;         // full volume inside (m)
+  f32 max_distance = 40;        // silent beyond (m)
+  audio::Rolloff rolloff = audio::Rolloff::inverse;
+  audio::Bus bus = audio::Bus::sfx;
+  f32 doppler = 1;              // 0 = no Doppler shift
+  f32 pitch_by_speed = 0;       // extra pitch per m/s of the actor's body
+  f32 delay = 0;                // seconds after the start
+}; }
+namespace game { struct RotatorComponent {
+  Vec3 rate{0, 0, 60};          // degrees per second about the actor's local axes
+}; }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
+namespace game { struct MoverComponent {
+  Vec3 offset{0, 0, 1};         // metres, relative to the start position (parent space)
+  f32 period = 2;               // seconds per cycle
+  f32 phase = 0;                // 0..1
+  MoverMode mode = MoverMode::sine;
+}; }
+namespace game { struct CityComponent {
+  u32 seed = 20261022;
+  i32 blocks = 7;               // blocks per side
+  f32 pitch = 80;               // metres from street to street
+  f32 street = 16;              // street width
+  f32 max_height = 84;          // tallest building in the centre
+  bool trees = true;
+  i32 traffic = 22;             // cars on the lanes
+  bool night_windows = true;    // lit windows at night (shader extension)
+}; }
+namespace game { struct Actor {
+  ActorId id = 0;
+  std::string name;
+  ActorId parent = 0;
+  std::string folder;           // outliner folder ("" = top level)
+  bool hidden = false;          // hidden in the editor and in game
+  bool locked = false;          // not selectable in the viewport
+  Transform transform;          // relative to the parent
+  std::vector<std::string> tags;
+  std::optional<MeshComponent> mesh;
+  std::optional<LightComponent> light;
+  std::optional<BodyComponent> body;
+  std::vector<ColliderComponent> colliders;
+  std::vector<JointComponent> joints;
+  std::optional<ControllerComponent> controller;
+  std::optional<PickupComponent> pickup;
+  std::optional<TriggerComponent> trigger;
+  std::optional<RotatorComponent> rotator;
+  std::optional<MoverComponent> mover;
+  std::optional<CityComponent> city;
+  std::optional<AudioComponent> audio;
+  std::optional<WeaponComponent> weapon;
+  std::optional<HealthComponent> health;
+  std::optional<logic::Graph> logic;   // the actor's own logic graph (Self = this actor)
+}; }
 namespace game { enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score }; }
+namespace game { struct WorldSettings {
+  /// The names of the level's collision channels, separated by commas: the first is bit 1 of a
+  /// collider's category and mask (Box3D's category bits: "they should represent your application
+  /// object types"), the second bit 2, the third bit 4 ... up to 32. A new collider is of the
+  /// first channel and collides with all.
+  std::string channels = "World";
+  Vec3 gravity{0, 0, -9.80665};
+  i32 substeps = 4;
+  f32 step_hz = 60;
+  f32 time_of_day = 0.42;      // 0..1 (0.25 sunrise, 0.5 noon, 0.75 sunset)
+  f32 day_length = 0;           // seconds per full day while playing, 0 = frozen
+  f32 sun_azimuth = 210;        // degrees, where the sun stands at noon
+  f32 fog_density = 0.0009;
+  f32 exposure = 1;
+  f32 ao_radius = 1.6;
+  f32 shadow_distance = 80;     // metres of the view the sun's shadow map covers (smaller: sharper)         // ambient occlusion reach in metres (scene scale), 0 = none
+  bool clouds = true;
+  Vec3 ground_color{0.19, 0.27, 0.15};  // the endless ground plane under everything
+  bool ground = true;
+  // Contact physics (Box3D): the endless ground's material (two touching materials combine as
+  // sqrt(a x b), Box3D's rule) and the contact softness - stiffness (Hz), damping ratio, push-out
+  // speed cap (m/s), Box3D's world definition.
+  f32 ground_friction = 0.7, ground_restitution = 0;
+  std::string ground_surface;  // "" or floor (physics::Surface)
+  f32 contact_hertz = 30, contact_damping = 10, contact_speed = 3;
+  f32 kill_z = -50;             // a player below this height respawns / loses
+  std::string title;
+  GameGoal goal = GameGoal::none;
+  f32 time_limit = 0;           // seconds, 0 = none
+  f32 score_target = 0;         // GameGoal::score
+  u32 player = 0;               // the actor the player controls (0 = the first with a Player Controller)
+  bool observer = false;        // Play starts with a free camera: fly and watch, drag bodies (F8 takes over the player)
+  // audio
+  f32 master_volume = 1;
+  std::string music;            // looping 2D track on the music bus ("" = none)
+  f32 music_volume = 0.6;
+  std::string ambience;         // looping 2D bed on the ambience bus
+  f32 ambience_volume = 0.6;
+  f32 reverb = 0.25;           // master reverb amount 0..1
+  f32 doppler = 1;              // Doppler scale for every 3D sound
+}; }
 struct TextureAsset : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -2843,6 +3355,37 @@ struct SoundAsset : converted::EngineObject {
 struct MotionAsset : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
+namespace game { struct EditorCamera {
+  Vec3 position{-24, -30, 18};
+  f32 yaw = 51, pitch = -24;    // degrees
+}; }
+namespace game { struct Level; }
+namespace game { struct Level {
+  std::string name = "Untitled";
+  WorldSettings world;
+  std::vector<Actor> actors;
+  std::vector<TextureAsset> textures;
+  std::vector<SoundAsset> sounds;
+  std::vector<MotionAsset> motions;  // what the Lehrer taught the level's Micro Ducks
+  logic::Graph logic;            // the level graph (Self = none; sees every actor's events)
+  EditorCamera camera;
+  ActorId next_id = 1;
+
+  
+  
+         // assigns an id when actor.id == 0
+  /// Children of `parent` in document order (0 = top level).
+  
+  /// Matrix from actor space to world space (parents applied).
+  
+  /// The nearest ancestor (or the actor itself) with a body, 0 = none.
+  
+  
+  
+  
+  
+  
+}; }
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -2850,6 +3393,7 @@ struct LightPool : converted::EngineObject {
   LightPool(const unsigned int& max_lights = kMaxPointLights, const unsigned int& max_requests = 64);
   ~LightPool();
   bool request(const Vec3& position, const Vec3& color, const double& intensity, const double& range) const;
+  PointLights resolve(const Vec3& eye) const;
   LightPool(const LightPool&) = default;
   LightPool(LightPool&&) = default;
   LightPool& operator=(const LightPool&) = default;
@@ -2880,6 +3424,32 @@ namespace game { struct PlayInput {
 }; }
 namespace game { enum class SimMode : u8 { none, simulate, play, replica }; }
 namespace game { enum class GameStatus : u8 { inactive, playing, won, lost }; }
+namespace game { struct Hud {
+  GameStatus status = GameStatus::inactive;
+  std::string title, message;
+  f32 message_age = 0;            // seconds since the message appeared
+  f32 score = 0;
+  u32 pickups = 0, pickups_total = 0;
+  f32 elapsed = 0, remaining = -1; // remaining < 0: no time limit
+  f32 speed = 0;                  // m/s of the player
+  f32 boost = -1;                 // 0..1, < 0: the controller has no boost
+  bool boosting = false;          // the player's boost or lift thrusters fire
+  bool interior = false;          // the low interior view is on
+  f32 best = 0;                   // best finishing time of this session (0 = none)
+  // soldier (first-person shooter) state of the local player
+  bool soldier = false;
+  f32 health = -1, max_health = 100, armor = 0;  // health < 0: no health
+  i32 ammo = -1, magazine = 0, reserve = 0;      // ammo < 0: no weapon
+  f32 reload = -1;                // 0..1 while reloading
+  f32 spread = 0;                 // current spread in degrees (crosshair size)
+  f32 hit_age = 99;               // seconds since our last hit (hit marker)
+  bool hit_head = false, hit_kill = false;
+  f32 damage_age = 99;            // seconds since we took damage (vignette)
+  f32 damage_yaw = 0;             // direction the damage came from, relative to the view (degrees)
+  f32 respawn_in = -1;            // seconds until respawn while dead
+  bool aiming = false;
+  f32 fov = 60;                   // current vertical field of view (degrees)
+}; }
 namespace game { struct ShotEvent {
   Vec3 from, to;
   ActorId shooter = 0, hit = 0;
@@ -2890,7 +3460,15 @@ namespace game { struct ShotEvent {
 struct GameWorld : converted::EngineObject {
   using converted::EngineObject::EngineObject;
   Vec3 actor_velocity(const unsigned int& id) const;
+  game::Level level() const;
   double sim_time() const;
+  std::vector<game::ShotEvent>& shots();
+  void shake_camera(const double& amount) const;
+  bool actor_alive(const unsigned int& id) const;
+  game::Hud hud() const;
+  World& physics() const;
+  bool actor_matrix(const unsigned int& id, Mat4& out) const;
+  physics::Body actor_body(const unsigned int& actor) const;
 };
 struct GapsState {
   // police_sirens.mjs: one voice for the nearest cruiser, one for the nearest police drone; each is
@@ -3389,6 +3967,7 @@ namespace look { struct Shake {
   /// forward) and offsets (right, up). False when there is nothing to apply.
   bool sample(f32 dt, f64 time_s, f32 scale, Vec3& angles, Vec2& offset);
 }; }
+namespace look { f32 weapon_trauma(bool full_auto, bool heavy, bool drone, f32& cap); }
 namespace look { f32 blast_trauma(f32 distance, f32 radius); }
 namespace look { inline f32 impact_trauma(f32 dv) { return dv < 2.5 ? 0.0 : clampf((dv - 2.5) / 14, 0, 0.7); } }
 namespace look { void shake_camera(Camera& c, Vec3 angles, Vec2 offset); }
@@ -3414,7 +3993,14 @@ namespace look { struct SpeedLines {
   
 }; }
 namespace look { constexpr f32 kDayLength = 480; }
+namespace look { f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Lighting& l, SkyState& sky); }
 namespace look { f32 follow_phase(f32 mine, f32 authority); }
+namespace look { bool parse_time(const char* text, f32& phase); }
+namespace look { f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref); }
+namespace look { Vec3 hex_linear(u32 rgb); }
+namespace look { int police_flash(f32 now_s); }
+namespace look { int drone_flash(f32 now_s, int index); }
+namespace look { inline f32 lamp_glow(f32 night) { return clampf((night - 0.15) / 0.5, 0, 1); } }
 namespace perf { enum class Slot : u8 { logic, physics, stream, draw, count }; }
 namespace perf { struct Tier {
   const char* name;
@@ -3474,7 +4060,7 @@ namespace perf { struct Governor {
   bool automatic() const { return auto_; }
   /// Fixed level (auto off) or back to automatic (keeps the current level).
   void set_fixed(i32 tier);
-  
+  void set_auto() { auto_ = true; since_change_ = 0; low_ = high_ = 0; }
   f32 fps() const { return avg_dt_ > 0 ? 1.0 / avg_dt_ : 0; }
   u32 changes() const { return changes_; }
   /// Seconds until `tier` may be tried again (0 = free).
@@ -3650,6 +4236,7 @@ namespace mp { struct VoiceCapture {
   std::vector<std::vector<u8>> frames_;
   f64 phase_ = 0;
 }; }
+namespace mp { namespace Turn { enum class Dir : u8 { none, left, right, u_turn }; } }
 namespace mp { struct Ping { u8 owner = 0; Vec3 p; u32 color = 0; f64 at_ms = 0; }; }
 namespace mp { struct PingBoard {
  public:
@@ -3747,6 +4334,17 @@ namespace seats { struct Table {
 namespace net { enum class PlayerMode : u8 { foot, drone, car, jet, parachute }; }
 namespace net { constexpr u8 kHost = 255; }
 namespace net { constexpr u8 kNobody = 254; }
+namespace net { enum PlayerFlag : u16 {
+  kDead = 1, kArmed = 2, kBus = 4, kGearDown = 8, kPoliceCar = 16,
+  kDroneOut = 32,     // the drone is out (drone_* holds it unless it is the active body)
+  kJetOut = 64,       // the jet is placed (jet_* holds it unless it is the active body)
+  kProtected = 128,   // spawn protection
+  kTalking = 256,     // the microphone is live
+  kCockpit = 512,
+  kJetpack = 1024,    // the jetpack burns (jetpack_audio.mjs: the others hear it in 3-D; game_equipment.cpp)
+  kPassenger = 2048,  // rides in a mate's jet (jet_mode.mjs passenger): not drawn on foot
+  kSeated = 4096,     // a car's passenger: seated in the mate's car (drawn and hit there, his weapon out)
+}; }
 namespace net { struct PlayerState {
   u8 slot = 0;
   PlayerMode mode = PlayerMode::foot;
@@ -3901,9 +4499,9 @@ namespace net { struct Session {
   
 
   std::vector<Remote>& remotes() { return remotes_; }
-  
+  const std::vector<Remote>& remotes() const { return remotes_; }
   /// The place of the player in `slot` among remotes(), -1: no such player here.
-  
+  i32 remote_index(u8 slot) const;
   /// The participants (sorted slots, ourselves included) and their colours (vs_multiplayer.mjs).
   
   
@@ -4965,7 +5563,7 @@ struct PoliceDrone {
 struct Game {
  public:
   
-  
+  ~Game();
   
   
   
@@ -4998,11 +5596,11 @@ struct Game {
   
   
   
+  physics::Body body(game::ActorId a) const { return converted::present(world_)->actor_body(a); }
   
-  
-  
-  
-  
+  Mat4 matrix_of(game::ActorId a) const;
+  Vec3 player_position() const;
+  Vec3 focus_position() const;
 
   // modes
   
@@ -5320,13 +5918,13 @@ struct Game {
   void look_begin(Engine& e, const Frame& f);
   void look_lap(perf::Slot s);
   void look_camera(f32 dt);
-  
+  void look_lighting(f32 dt);
   
   void look_blast(Vec3 at, f32 radius);
   void look_apply_tier();
-  
+  void look_view_models(f32 dt);
   i32 look_people_budget() const;
-  
+  bool look_command(const std::string& cmd, std::string& out);
   std::string look_hud_json();
 
   // sc-m3-gaps (game_gaps.cpp, PARITY.md): sirens, police dispatch, critical smoke, organic hit
@@ -5414,9 +6012,9 @@ struct Game {
   
   
   // riding along in a mate's jet (game_seats.cpp, jet_mode.mjs passenger, jet_seats.h)
-  
-  
-  
+  bool gaps_ride_car() const;
+  bool gaps_riding() const;
+  bool gaps_ride_pose(Vec3& p, Quat& q) const;
   
   
   
@@ -5617,6 +6215,9 @@ struct Game {
   LookState look_;
   std::unique_ptr<GameLife> glife_;  // M3 life (last: destroyed before world_)
 };
+namespace primitives { MeshData box(const Vec3& size, const Vec3& color = {1, 1, 1}); }
+namespace primitives { MeshData cylinder(const double& radius, const double& height, const unsigned int& segments = 20, const Vec3& color = {1, 1, 1}); }
+namespace primitives { void append(MeshData& dst, const MeshData& src, const Mat4& m); }
 void Car::detach() {
   if (!rig_world_) return;
   World& w = *rig_world_;
@@ -5629,6 +6230,32 @@ void Car::detach() {
   rig_chassis_ = {};
   has_last_ = false;
 }
+namespace look { bool parse_time(const char* text, f32& phase) {
+  std::size_t at = 0;  // (where the reading stands)
+  while (text[at] == ' ') ++at;
+  if (!text[at]) return false;
+  char* end = nullptr;
+  const f64 a = std::strtod(text + at, &end);
+  if (end == text + at) return false;
+  if (*end == ':') {
+    const f64 m = std::strtod(end + 1, &end);
+    if (a < 0 || a > 24 || m < 0 || m >= 60) return false;
+    phase = static_cast<f32>(kern::math::mod((a + m / 60) / 24, 1.0));
+    return true;
+  }
+  if (a < 0) return false;
+  // Up to 1: a phase; otherwise hours.
+  phase = static_cast<f32>(a <= 1 ? kern::math::mod(a, 1.0) : kern::math::mod(a / 24, 1.0));
+  return true;
+} }
+namespace perf { void Governor::set_fixed(i32 tier) {
+  auto_ = false;
+  tier_ = tier < 0 ? 0 : (tier >= kTiers ? converted::minus(kTiers, 1) : tier);
+} }
+namespace look { void Shake::add(f32 amount, f32 cap) {
+  if (!(amount > 0)) return;
+  trauma = std::fmax(trauma, std::fmin(cap, trauma + amount));
+} }
 void Ragdolls::release(Doll& d) {
   if (!world_) return;
   for (u32 b = 0; b < kBones; ++b) {
@@ -5677,9 +6304,217 @@ bool Game::vr_hand_matrix(i32 side, Mat4& out) const {
   out.m[12] = p.x; out.m[13] = p.y; out.m[14] = p.z;
   return true;
 }
-namespace look { void Shake::add(f32 amount, f32 cap) {
-  if (!(amount > 0)) return;
-  trauma = std::fmax(trauma, std::fmin(cap, trauma + amount));
+namespace look { namespace look_cpp_local { Vec3 mix3(Vec3 a, Vec3 b, f32 t) { return a + (b - a) * t; } } }
+namespace look { namespace look_cpp_local { f32 smooth(f32 e0, f32 e1, f32 x) {
+  const f32 t = clampf((x - e0) / (e1 - e0), 0, 1);
+  return t * t * (3 - 2 * t);
+} } }
+namespace look { f32 day_lighting(f32 tod, f32 sun_azimuth_deg, f32 fog_density, f32 exposure, Lighting& l, SkyState& sky) {
+  // Kern's GameWorld::apply_lighting (runtime.cpp) with the game's clock: 0.25 sunrise, 0.5 noon, 0.75 sunset.
+  const f32 angle = (tod - 0.25) * 2 * kPi;
+  const f32 az = sun_azimuth_deg * kDeg;
+  const Vec3 across{kern::math::cos(az + kPi * 0.5), kern::math::sin(az + kPi * 0.5), 0};
+  const Vec3 toward{kern::math::cos(az), kern::math::sin(az), 0};
+  // Kern: a summer sun - higher, so the night is short (about a third of the cycle, not half)
+  const Vec3 sun = converted::wide::normalize(across * (-kern::math::cos(angle) * 0.62) + toward * 0.38 + Vec3{0, 0, kern::math::sin(angle) + 0.3}, {0, 0, 1});
+  const Vec3 moon = converted::wide::normalize(Vec3{-sun.x, -sun.y, std::fmax(0.35, -sun.z)}, {0, 0, 1});
+  const f32 night = look::look_cpp_local::smooth(0.06, -0.16, sun.z);
+  const f32 dusk = clampf(1 - std::fabs(sun.z) * 4, 0, 1) * (1 - night * 0.6);
+  const Vec3 day_sun{4.6, 4.05, 3.46}, dusk_sun{3.75, 2.05, 1.02}, moon_light{0.36, 0.42, 0.62};  // Kern: a brighter moon (was .16 .2 .32)
+  l.sun_direction = sun.z > -0.04 ? sun : moon;
+  l.sun_color = look::look_cpp_local::mix3(look::look_cpp_local::mix3(day_sun, dusk_sun, dusk), moon_light, night);
+  l.sky_color = Vec3{0.07, 0.09, 0.16} * night;
+  l.ground_color = Vec3{0.025, 0.026, 0.04} * night;
+  l.fog_color = look::look_cpp_local::mix3(look::look_cpp_local::mix3({0.474, 0.584, 0.716}, {0.62, 0.45, 0.36}, dusk * 0.6), {0.03, 0.04, 0.07}, night);
+  l.fog_density = fog_density;
+  l.fog_height_falloff = 0.012;
+  l.fog_sun_scatter = 0.55 * (1 - night * 0.7);
+  l.fog_horizon = 0.85;
+  l.env_intensity = 0.53 - 0.33 * night;
+  l.env_zenith = look::look_cpp_local::mix3({0.05, 0.2, 0.62}, {0.012, 0.022, 0.06}, night);
+  l.env_horizon = look::look_cpp_local::mix3({0.52, 0.66, 0.86}, {0.05, 0.075, 0.13}, night);
+  {
+    const auto lum = [](Vec3 c) { return 0.2126 * c.x + 0.7152 * c.y + 0.0722 * c.z; };
+    const f32 sky_radiance = lum(look::look_cpp_local::mix3(l.env_horizon, l.env_zenith, 0.35)) * l.env_intensity;
+    const f32 irradiance = lum(l.sun_color) * std::fmax(sun.z, 0.0) + kPi * sky_radiance;
+    const Vec3 bounce = Vec3{1.0, 0.95, 0.85} * (0.25 * irradiance / kPi / std::fmax(l.env_intensity, 1e-3));
+    l.env_ground = look::look_cpp_local::mix3(bounce, {0.105, 0.127, 0.084}, night);
+  }
+  l.exposure = exposure * (1.0 + 0.35 * night);
+  sky.sun = sun;
+  sky.moon = moon;
+  sky.night = night;
+  return night;
+} }
+namespace look { f32 kern_intensity(f32 three_intensity, f32 range, f32 d_ref) {
+  const f32 d2 = std::fmax(d_ref * d_ref, 0.04), r2 = std::fmax(0.01, range * range);
+  const f32 w = 1 - d2 / r2;
+  const f32 att = w > 0 ? w * w / (1 + d2 / r2) : 0;
+  if (att <= 0) return 0;
+  // three: E = I / d^2, diffuse BRDF albedo / pi. Kern: point = I_k 0.12 att (times pi / pi).
+  return three_intensity / (kPi * d2) / (0.12 * att);
+} }
+namespace look { Vec3 hex_linear(u32 rgb) {
+  auto lin = [](f32 c) { return c <= 0.04045 ? c / 12.92 : kern::math::pow((c + 0.055) / 1.055, 2.4); };
+  return {lin(static_cast<f32>((rgb >> 16) & 255) / 255), lin(static_cast<f32>((rgb >> 8) & 255) / 255), lin(static_cast<f32>(rgb & 255) / 255)};
+} }
+bool Game::gaps_riding() const { return gaps_ && converted::present(gaps_)->riding; }
+bool Game::gaps_ride_car() const { return gaps_ && converted::present(gaps_)->riding && converted::present(gaps_)->ride_car; }
+namespace net { i32 Session::remote_index(u8 slot) const {
+  for (std::size_t i = 0; i < remotes_.size(); converted::pre_inc(i)) if (converted::at(remotes_, i).state.slot == slot) return static_cast<i32>(i);
+  return -1;
+} }
+bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
+  if (!gaps_ || !converted::present(gaps_)->riding) return false;
+  const i32 at = net_.remote_index(converted::present(gaps_)->ride_owner);
+  if (at < 0) return false;
+  const net::Remote& r = converted::at(net_.remotes(), static_cast<std::size_t>(at));
+  if (r.state.mode == net::PlayerMode::jet || r.state.mode == net::PlayerMode::car) { p = r.shown; q = r.shown_rotation; return true; }
+  if (r.state.flags & net::kJetOut) { p = r.state.jet_pos; q = r.state.jet_rot; return true; }
+  return false;
+}
+namespace jobs { using Fn = void (*)(Span<const u8> input, std::vector<u8>& output); }
+namespace logic { namespace EngineObjects_types { using Kind = const void*; } }
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace logic { namespace PureNodes_types { using Bool = bool; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace PureNodes_types { using Text = std::string; } }
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_BloomState { using type = BloomState; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_LogLevel { using type = LogLevel; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Wave { using type = audio::Wave; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ColliderShape { using type = game::ColliderShape; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameStatus { using type = game::GameStatus; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_Motion { using type = game::Motion; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_game_WeaponKind { using type = game::WeaponKind; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_net_ClientState { using type = net::ClientState; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_bus_types { using In = std::tuple<std::remove_cvref_t<audio::Bus>>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_hud_mut_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_events_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_sound_cues_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using C = std::remove_reference_t<decltype((std::declval<GameWorld&>().shots()))>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_building_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_road_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using C = std::remove_reference_t<decltype((std::declval<Mesh&>().id))>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using C = std::remove_reference_t<decltype((std::declval<Mesh&>().visible))>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_layers_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_pick_bvh_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_linear_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using C = std::remove_reference_t<decltype((std::declval<Mesh&>().material))>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_texture_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_positions_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_uvs_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_indices_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_joints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_weights_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_bones_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using C = std::remove_reference_t<decltype((std::declval<Mesh&>().transforms))>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_tints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_count_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_mirror_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_local_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_world_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_gpu_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_sort_distance_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_live_index_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_material_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_attribute_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_mipmaps_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_repeat_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_nearest_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_speed_of_sound_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_doppler_factor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_logic_native_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_actor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_path_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_keys_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_night_windows_night_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_simulator_settings_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_character_mover_settings_types { using In = std::tuple<>; } } }
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace BlueprintCore_types { using Text = ::kern::logic::Text; }
+namespace game { namespace nodes { using Bool = bool; } }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Text = std::string; } }
+namespace game { namespace nodes { using Actor = ::kern::logic::ActorHandle; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
+Game::~Game() {
+  life_.reset();
+  swarm_cruiser_.reset();
+}
+using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
+  Mat4 m;
+  converted::present(world_)->actor_matrix(a, m);
+  return m;
+}
+Vec3 Game::player_position() const {
+  if (mode_ == Mode::car && car_index_ >= 0) return matrix_of(converted::at(cars_, car_index_).actor).translation();
+  if (mode_ == Mode::jet) return matrix_of(jet_actor_).translation();
+  if (mode_ == Mode::parachute) return matrix_of(chute_actor_).translation();
+  // riding in a mate's jet (the walker is put away where he got in): where the jet is - the city
+  // streams, the traffic and the people live around it, not around the place he boarded
+  if (gaps_riding()) {
+    Vec3 p;
+    Quat q;
+    if (!gaps_ride_car() && gaps_ride_pose(p, q)) return p;
+  }
+  return matrix_of(soldier_).translation();
+}
+Vec3 Game::focus_position() const {
+  if (mode_ == Mode::drone && drone_out_) return matrix_of(drone_actor_).translation();
+  return player_position();
+}
+namespace look { f32 weapon_trauma(bool full_auto, bool heavy, bool drone, f32& cap) {
+  // Full-auto builds up to a steady rumble (capped at 0.42), heavy weapons punch.
+  if (full_auto) { cap = 0.42; return drone ? 0.07 : 0.035; }
+  cap = 1;
+  return heavy ? 0.28 : 0.2;
+} }
+namespace look { int police_flash(f32 now_s) {
+  const i64 slot = converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor(now_s * 1000 / 110))), 6);
+  return slot == 0 || slot == 2 ? 1 : slot == 3 || slot == 5 ? 2 : 0;
+} }
+namespace look { int drone_flash(f32 now_s, int index) {
+  const i64 slot = converted::rem_bits((converted::plus_bits((converted::rem_bits(static_cast<i64>(converted::fits<converted::SignedWhole>(std::floor((now_s * 1000 + converted::times(index, 37)) / 92))), 8)), 8)), 8);
+  return slot <= 1 ? 1 : slot == 4 || slot == 5 ? 2 : 0;
 } }
 namespace look { f32 blast_trauma(f32 distance, f32 radius) {
   radius = clampf(radius, 1, 400);
@@ -5752,10 +6587,6 @@ namespace perf { void Governor::reset(i32 tier, i32 max_tier) {
   low_ = high_ = 0;
   for (i32 i = 0; i < kTiers; converted::pre_inc(i)) converted::at(block_until_, i) = converted::at(block_len_, i) = 0;
 } }
-namespace perf { void Governor::set_fixed(i32 tier) {
-  auto_ = false;
-  tier_ = tier < 0 ? 0 : (tier >= kTiers ? converted::minus(kTiers, 1) : tier);
-} }
 namespace perf { bool Governor::update(f32 dt) {
   if (!(dt > 0)) return false;
   clock_ += dt;
@@ -5796,7 +6627,127 @@ namespace look { f32 follow_phase(f32 mine, f32 authority) {
   return p;
 } }
 f64 clock_ms() { return now_ms(); }
+Vec3 srgb(u32 hex) { return {static_cast<f32>((hex >> 16) & 255) / 255, static_cast<f32>((hex >> 8) & 255) / 255, static_cast<f32>(hex & 255) / 255}; }
+void box(MeshData& m, Vec3 size, u32 color, Vec3 at, const Mat4& extra = Mat4{}) { primitives::append(m, primitives::box(size, srgb(color)), extra * Mat4::translate(at)); }
+void cyl(MeshData& m, f32 r, f32 len, u32 color, Vec3 at, u32 seg = 14, const Mat4& extra = Mat4{}) {
+  primitives::append(m, primitives::cylinder(r, len, seg, srgb(color)), extra * Mat4::translate({at.x, at.y, at.z - len * 0.5}));
+}
+void glow_box(MeshData& m, Vec3 size, Vec3 hdr, Vec3 at) { primitives::append(m, primitives::box(size, hdr), Mat4::translate(at)); }
+void glow_cyl(MeshData& m, f32 r, f32 len, Vec3 hdr, Vec3 at) { primitives::append(m, primitives::cylinder(r, len, 14, hdr), Mat4::translate({at.x, at.y, at.z - len * 0.5})); }
+constexpr Vec3 kGlowRed{3.2, 0.12, 0.12}, kGlowAmber{3.0, 1.25, 0.1}, kGlowOrange{3.0, 0.9, 0.18};
+void arm(MeshData& m, Vec3 grip, f32 side, bool arms) {
+  if (!arms) return;
+  const Mat4 tilt = Mat4::translate(grip) * Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12), {1, 1, 1});
+  box(m, {0.075, 0.08, 0.1}, 0x1d232c, {0, 0, 0.0}, tilt);                 // glove
+  cyl(m, 0.04, 0.3, 0xc58c66, {side * 0.012, -0.03, 0.2}, 10, tilt);      // forearm
+  cyl(m, 0.06, 0.16, 0x2c3440, {side * 0.02, -0.05, 0.39}, 10, tilt);     // sleeve
+  cyl(m, 0.063, 0.03, 0x1d232c, {side * 0.016, -0.043, 0.32}, 10, tilt);  // cuff
+}
+void boomstick(MeshData& m, MeshData& g, bool arms) {
+  box(m, {0.17, 0.125, 0.32}, 0x4a5a3a, {0, 0.012, -0.1});     // body (profile -0.06 .. 0.26)
+  box(m, {0.1, 0.2, 0.1}, 0x8a5a3b, {0, -0.155, -0.095});      // wooden grip
+  box(m, {0.13, 0.12, 0.24}, 0x1d2024, {0, -0.02, 0.18});      // stock
+  cyl(m, 0.11, 0.2, 0x4a5a3a, {0, -0.005, -0.36}, 10);          // drum
+  for (int i = 0; i < 4; converted::pre_inc(i)) cyl(m, 0.113, 0.03, i % 2 ? 0x121316 : 0xffd23f, {0, -0.005, -0.29 - i * 0.045}, 10);
+  for (int i = 0; i < 6; converted::pre_inc(i)) {
+    const f32 a = static_cast<f32>(i) / 6 * 2 * kPi;
+    cyl(m, 0.026, 0.205, 0x1d2024, {kern::math::cos(a) * 0.07, -0.005 + kern::math::sin(a) * 0.07, -0.36}, 8);
+  }
+  cyl(m, 0.058, 0.36, 0x1d2024, {0, 0.03, -0.62});              // fat barrel
+  cyl(m, 0.068, 0.06, 0xff7a1a, {0, 0.03, -0.81});              // orange muzzle
+  box(m, {0.05, 0.03, 0.26}, 0x121316, {0, 0.13, -0.2});        // top handle
+  box(m, {0.04, 0.06, 0.03}, 0x121316, {0, 0.1, -0.08});
+  box(m, {0.04, 0.06, 0.03}, 0x121316, {0, 0.1, -0.32});
+  glow_cyl(g, 0.064, 0.012, kGlowOrange, {0, 0.03, -0.842});    // glowing muzzle ring
+  glow_box(g, {0.02, 0.04, 0.02}, kGlowOrange, {0, 0.16, -0.3});
+  arm(m, {0, -0.15, -0.095}, 1, arms);
+}
+void rocket_launcher(MeshData& m, MeshData& g, bool arms) {
+  constexpr u32 olive = 0x3e4a30, dark = 0x15181b, band = 0x262d1e, steel = 0x7d848b;
+  cyl(m, 0.058, 0.76, olive, {0, 0.03, -0.27}, 20);              // main tube (+.11 .. -.65)
+  cyl(m, 0.071, 0.08, dark, {0, 0.03, -0.67}, 20);               // muzzle shroud
+  cyl(m, 0.05, 0.012, 0x030303, {0, 0.03, -0.712}, 16);          // open bore
+  for (f32 z : {-0.12, -0.52}) cyl(m, 0.061, 0.035, band, {0, 0.03, z}, 20);  // bands
+  cyl(m, 0.066, 0.07, dark, {0, 0.03, 0.13}, 20);                // rear cap
+  cyl(m, 0.08, 0.05, dark, {0, 0.03, 0.19}, 20);                 // venturi flare
+  cyl(m, 0.068, 0.012, 0x030303, {0, 0.03, 0.216}, 16);          // rear bore
+  // the optic: a body on a mount, the eyepiece behind, the objective in front
+  box(m, {0.03, 0.03, 0.08}, dark, {0, 0.098, -0.22});          // mount
+  cyl(m, 0.026, 0.17, dark, {0, 0.135, -0.23}, 14);              // optic body
+  cyl(m, 0.03, 0.03, 0x23282d, {0, 0.135, -0.33}, 14);           // objective bell
+  cyl(m, 0.022, 0.006, 0x1c3a52, {0, 0.135, -0.348}, 14);        // objective glass
+  // the laser module on the left of the tube
+  box(m, {0.05, 0.055, 0.15}, 0x2b3038, {-0.085, 0.03, -0.47});
+  cyl(m, 0.018, 0.02, steel, {-0.085, 0.03, -0.555}, 12);
+  glow_cyl(g, 0.012, 0.01, kGlowRed, {-0.085, 0.03, -0.566});   // laser lens
+  glow_box(g, {0.012, 0.012, 0.012}, kGlowRed, {-0.112, 0.045, -0.43});
+  glow_box(g, {0.012, 0.012, 0.012}, kGlowAmber, {-0.112, 0.045, -0.455});
+  // grips
+  box(m, {0.05, 0.15, 0.07}, dark, {0, -0.1, -0.1});            // pistol grip
+  box(m, {0.012, 0.045, 0.09}, dark, {0, -0.035, -0.135});      // trigger guard
+  box(m, {0.048, 0.11, 0.06}, dark, {0, -0.075, -0.4});         // fore grip
+  arm(m, {0, -0.13, -0.105}, 1, arms);
+}
+void fist(MeshData& m, bool arms) {
+  box(m, {0.076, 0.078, 0.1}, 0xc58c66, {0, 0.002, -0.004});    // fist body
+  box(m, {0.09, 0.05, 0.04}, 0xc58c66, {0, 0.012, -0.045});     // knuckle ridge
+  cyl(m, 0.0405, 0.018, 0xe9e4d8, {0, 0.002, 0.016}, 10);         // tape band
+  box(m, {0.03, 0.03, 0.06}, 0xa9714f, {-0.022, -0.03, -0.03}); // thumb
+  cyl(m, 0.038, 0.05, 0xe9e4d8, {0, -0.002, 0.066}, 10);          // wrist wrap
+  if (!arms) return;
+  const Mat4 back = Mat4::trs({}, Quat::axis_angle({1, 0, 0}, -0.12), {1, 1, 1});
+  cyl(m, 0.043, 0.3, 0xc58c66, {0.012, -0.03, 0.24}, 10, back);  // forearm
+  cyl(m, 0.06, 0.16, 0x2c3440, {0.02, -0.05, 0.43}, 10, back);   // sleeve
+  cyl(m, 0.062, 0.03, 0x1d232c, {0.016, -0.043, 0.36}, 10, back);  // cuff
+}
+void knife(MeshData& m, MeshData& g, bool arms) {
+  fist(m, arms);
+  const f32 s = 1.45 * 1.08;  // FIST_HAND_SCALE x 1.08
+  const Mat4 grip = Mat4::trs({0, 0.01, -0.02}, Quat::axis_angle({1, 0, 0}, 0.32) * Quat::axis_angle({0, 1, 0}, 0.18) * Quat::axis_angle({0, 0, 1}, -0.5), {s, s, s});
+  box(m, {0.0054, 0.032, 0.2}, 0x6e757b, {0, 0.002, -0.15}, grip);   // blade
+  box(m, {0.006, 0.006, 0.17}, 0xd8dde2, {0, -0.014, -0.14}, grip);  // bright edge bevel
+  box(m, {0.0062, 0.006, 0.1}, 0x17191c, {0, 0.006, -0.105}, grip);  // fuller
+  box(m, {0.016, 0.05, 0.012}, 0x17191c, {0, 0, -0.046}, grip);       // cross guard
+  cyl(m, 0.0135, 0.095, 0x1a1c1e, {0, 0, 0}, 10, grip);                  // ribbed handle
+  cyl(m, 0.014, 0.0125, 0x2a2d31, {0, 0, 0.054}, 10, grip);             // pommel
+  (void)g;
+}
+Material vm_material(bool glow, bool vr = false) {
+  Material mt;
+  mt.viewmodel = !vr;  // VR: in the world's depth (a wall in front hides it, as a real gun)
+  mt.cast_shadow = false;
+  mt.frustum_culled = false;
+  mt.roughness = glow ? 1 : 0.55;
+  mt.metalness = glow ? 0 : 0.25;
+  mt.unlit = glow;
+  mt.linear_colors = glow;
+  mt.double_sided = true;  // mirrored left fist
+  return mt;
+}
+int vm_index(weapons::Id id) {
+  switch (id) {
+    case weapons::Id::grenade_launcher: return 0;
+    case weapons::Id::rocket: return 1;
+    case weapons::Id::fists: return 2;
+    case weapons::Id::knife: return 3;
+    default: return -1;
+  }
+}
 const char* const kVmNames[4] = {"BOOMSTICK 40 mm", "ROCKET LAUNCHER", "FISTS", "KNIFE"};
+Mat4 camera_frame(const Camera& c) {
+  const Vec3 f = converted::wide::normalize(c.target - c.eye, {1, 0, 0});
+  const Vec3 r = converted::wide::normalize(converted::wide::cross(f, c.up), {0, -1, 0});
+  const Vec3 u = converted::wide::cross(r, f);
+  Mat4 m;
+  m.m[0] = r.x; m.m[1] = r.y; m.m[2] = r.z; m.m[3] = 0;
+  m.m[4] = u.x; m.m[5] = u.y; m.m[6] = u.z; m.m[7] = 0;
+  m.m[8] = -f.x; m.m[9] = -f.y; m.m[10] = -f.z; m.m[11] = 0;
+  m.m[12] = c.eye.x; m.m[13] = c.eye.y; m.m[14] = c.eye.z; m.m[15] = 1;
+  return m;
+}
+Mat4 euler(f32 x, f32 y, f32 z) {
+  return Mat4::trs({}, Quat::axis_angle({1, 0, 0}, x) * Quat::axis_angle({0, 1, 0}, y) * Quat::axis_angle({0, 0, 1}, z), {1, 1, 1});
+}
 void Game::look_begin(Engine& e, const Frame& f) {
   LookState& L = look_;
   L.meter.begin_frame(clock_ms());
@@ -5898,6 +6849,164 @@ void Game::look_blast(Vec3 at, f32 radius) {
   L.blasts.push_back({at + Vec3{0, 0, 1.5}, static_cast<f32>(time_), 0.42, 220 + r * 18, r * 4});
   if (mode_ != Mode::foot) L.shake.add(look::blast_trauma(converted::wide::length(cam_.eye - at), radius));
 }
+using perf::kTier; void Game::look_lighting(f32 dt) {
+  LookState& L = look_;
+  Renderer& r = engine_->renderer();
+  const game::WorldSettings& w = converted::present(world_)->level().world;
+  // The game's day clock instead of GameWorld's (same sun path and colours; "time" can set it).
+  Lighting lighting = r.lighting();
+  SkyState sky = r.sky();
+  night_ = look::day_lighting(L.tod, w.sun_azimuth, w.fog_density, w.exposure, lighting, sky);
+  r.set_lighting(lighting);
+  r.set_sky(sky);
+  windows_.night = night_;
+  water_look_.time = static_cast<f32>(converted::present(world_)->sim_time());  // world_water.mjs uTime
+  // simulator.mjs: shadowMap.enabled = !presentationSoftwareRaster (no shadows on a software rasterizer)
+  r.set_shadow_distance(L.software ? 0.0 : converted::at(kTier, L.gov.tier()).shadow_m);
+  const f32 now = static_cast<f32>(time_);
+  const Vec3 eye = cam_.eye;
+  auto req = [&](Vec3 p, u32 hex, f32 three_intensity, f32 range, f32 d_ref) {
+    const f32 k = look::kern_intensity(three_intensity, range, d_ref);
+    if (k > 0) L.lights.request(p, look::hex_linear(hex), k, range);
+  };
+  // Kern's own lights (light components, the soldier's muzzle flash) stay in the pool.
+  {
+    const PointLights& pl = r.point_lights();
+    for (u32 i = 0; i < pl.count; ++i)
+      L.lights.request({converted::at(pl.pos_range, i * 4), converted::at(pl.pos_range, i * 4 + 1), converted::at(pl.pos_range, i * 4 + 2)}, {converted::at(pl.color_intensity, i * 4), converted::at(pl.color_intensity, i * 4 + 1), converted::at(pl.color_intensity, i * 4 + 2)},
+                       converted::at(pl.color_intensity, i * 4 + 3), converted::at(pl.pos_range, i * 4 + 3));
+  }
+  if (world_placed_) {
+    // Shots of this frame (before present() takes them): tracers glint, the player's guns flash.
+    const Vec3 me = focus_position();
+    for (const game::ShotEvent& s : converted::present(world_)->shots()) {
+      if (converted::wide::length(s.from - eye) > 60) continue;
+      if (converted::wide::length(s.to - s.from) >= 2) {
+        if (L.glints.size() >= 3) converted::erase(L.glints, L.glints.begin());
+        L.glints.push_back({s.from, s.to, now});
+      }
+      if ((mode_ == Mode::drone || mode_ == Mode::jet) && converted::wide::length(s.from - me) < 14) {
+        L.flash_until = now + 0.055;
+        f32 cap = 1;
+        const f32 t = look::weapon_trauma(true, false, mode_ == Mode::drone, cap);
+        L.shake.add(t, cap);
+      }
+    }
+    // Launches of this frame: rockets / grenades punch the camera.
+    const f32 sim = converted::present(world_)->sim_time();
+    for (const Projectile& p : projectiles_)
+      if (p.by_player && p.born > sim - dt - 1e-3 && converted::wide::length(p.pos - me) < 16) {
+        const bool heavy = p.id == weapons::Id::rocket || p.id == weapons::Id::drone_rockets || p.id == weapons::Id::drone_guided || p.id == weapons::Id::jet_missile;
+        f32 cap = 1;
+        L.shake.add(look::weapon_trauma(false, heavy, mode_ == Mode::drone, cap), cap);
+        if (mode_ == Mode::foot) converted::present(world_)->shake_camera(heavy ? 0.1 : 0.06);
+        L.flash_until = now + 0.055;
+      }
+    // The blue and red lights first: they colour the street around the cruiser and the drones;
+    // the street lamps then take what slots are left (one at least).
+    u32 police_n = 0;
+    // Police light bars (police_ground_units.mjs flashLights: 14, 18 m, 2 m above the car).
+    for (const TrafficCar& c : cars_) {
+      if (!c.police || !c.placed || c.wreck || c.unit < 0 || c.unit >= static_cast<i32>(units_.size()) || !converted::present(world_)->actor_alive(c.actor)) continue;
+      const PoliceUnit::State st = converted::at(units_, c.unit).state;
+      if (st == PoliceUnit::State::abandoned || st == PoliceUnit::State::wreck || st == PoliceUnit::State::leave) continue;
+      const int fl = look::police_flash(now);
+      if (fl) { req(matrix_of(c.actor).translation() + Vec3{0, 0, 2}, fl == 1 ? 0xff2030 : 0x2a6bff, 14, 18, 3); ++police_n; }
+    }
+    // Police drones (wanted_police_drones.mjs: 24, 28 m).
+    for (u32 i = 0; i < 5; ++i) {
+      const PoliceDrone& d = converted::at(pdrones_, i);
+      if (!d.active || d.emp) continue;
+      const int fl = look::drone_flash(now, static_cast<int>(i));
+      if (fl) { req(d.pos, fl == 1 ? 0xff1834 : 0x1688ff, 24, 28, 4); ++police_n; }
+    }
+    const f32 glow = look::lamp_glow(night_);
+    // Street lamps: the nearest three within 70 m, re-picked every 350 ms (scene_lighting.mjs).
+    if (glow > 0.01 && show_lamps_) {
+      if (now - L.lamp_pick_at > 0.35 || now < L.lamp_pick_at) {
+        L.lamp_pick_at = now;
+        std::vector<std::pair<f32, Vec3>> near;
+        const std::vector<Lane>& lanes = city_.lanes();
+        for (const Lamp& l : lamps_) {
+          if (l.state || l.lane >= lanes.size() || !converted::at(lanes, l.lane).alive) continue;  // a broken lamp gives no light
+          const Vec3 head = l.foot + Vec3{kern::math::cos(l.yaw) * 1.42, kern::math::sin(l.yaw) * 1.42, 5.75};  // [hx, hy, z + 5.75]
+          const f32 d = hypot_bp(head.x - eye.x, head.y - eye.y);
+          if (d <= (L.pool_size >= 10 ? 110.0 : 70.0)) near.push_back({d, head});
+        }
+        std::stable_sort(near.begin(), near.end(), [](const std::pair<f32, Vec3>& a, const std::pair<f32, Vec3>& b) { return a.first < b.first; });
+        L.near_lamps.clear();
+        // the original's nearest three; the strongest level (10 lights) takes eight
+        const std::size_t keep = L.pool_size >= 10 ? 8 : 3;
+        for (std::size_t i = 0; i < near.size() && i < keep; converted::pre_inc(i)) L.near_lamps.push_back(converted::at(near, i).second);
+      }
+      const u32 lamp_slots = police_n ? std::max<u32>(1, L.pool_size > police_n ? L.pool_size - police_n : 1) : converted::plus(3, (L.pool_size >= 10 ? 5 : 0));
+      for (std::size_t li = 0; li < L.near_lamps.size() && li < lamp_slots; converted::pre_inc(li)) req(converted::at(L.near_lamps, li), 0xffb35a, 64 * glow, 30, 5.75);  // Kern: brighter than the original's 46 / 26 m
+    }
+    // Headlights: a pool of light ~7 m ahead of the car the player drives, and (Kern) of the three
+    // nearest driven cars within 60 m - the street at night is lit by its traffic.
+    if (glow > 0.05 && mode_ == Mode::car && car_index_ >= 0) {
+      const Mat4 m = matrix_of(converted::at(cars_, car_index_).actor);
+      const Vec3 fwd = converted::wide::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0});
+      req(m.translation() + fwd * 7.0 + Vec3{0, 0, 0.9}, 0xfff2d8, 60 * glow, 22, 2.5);
+    }
+    if (glow > 0.05 && L.pool_size >= 10) {
+      std::vector<std::pair<f32, i32>> near;
+      for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
+        const TrafficCar& c = converted::at(cars_, i);
+        if (!c.placed || c.wreck || !c.driver || (mode_ == Mode::car && static_cast<i32>(i) == car_index_) || !converted::present(world_)->actor_alive(c.actor)) continue;
+        const f32 d = converted::wide::length(matrix_of(c.actor).translation() - eye);
+        if (d < 60) near.push_back({d, static_cast<i32>(i)});
+      }
+      std::stable_sort(near.begin(), near.end(), [](const std::pair<f32, i32>& a, const std::pair<f32, i32>& b) { return a.first < b.first || (!(b.first < a.first) && a.second < b.second); });
+      for (std::size_t k = 0; k < near.size() && k < 3; converted::pre_inc(k)) {
+        const Mat4 m = matrix_of(converted::at(cars_, static_cast<std::size_t>(converted::at(near, k).second)).actor);
+        const Vec3 fwd = converted::wide::normalize(Vec3{m.m[0], m.m[1], 0}, {1, 0, 0});
+        req(m.translation() + fwd * 6.0 + Vec3{0, 0, 0.8}, 0xfff2d8, 36 * glow, 16, 2.0);
+      }
+    }
+    // Muzzle flash in front of the eye (55 ms per shot).
+    if (now < L.flash_until) {
+      const Vec3 d = converted::wide::normalize(cam_.target - cam_.eye, {1, 0, 0});
+      req(eye + d * 0.9 - Vec3{0, 0, 0.1}, 0xffc272, 22, 13, 1.5);
+    }
+    // Blasts: bright, then a quick fade.
+    for (std::size_t i = L.blasts.size(); converted::post_dec(i) > 0;) {
+      const LookState::Blast& b = converted::at(L.blasts, i);
+      const f32 t = (now - b.at) / b.ms;
+      if (t >= 1 || t < 0) { converted::erase(L.blasts, L.blasts.begin() + static_cast<std::ptrdiff_t>(i)); continue; }
+      req(b.p, 0xffa04a, b.peak * (1 - t) * (1 - t), b.r, b.r * 0.25);
+    }
+    // Rockets in flight light what they pass (the nearest two within 90 m).
+    {
+      int k = 0;
+      for (const Projectile& p : projectiles_) {
+        if (k >= 3) break;
+        if (!p.alive || hypot_bp(p.pos.x - eye.x, p.pos.y - eye.y) > 90) continue;
+        if (p.id == weapons::Id::grenade_launcher) {
+          // the 40 mm round's phosphor glow lights the street green as it flies and bounces
+          req(p.pos, 0x6dff8e, 6, 6, 1.0);
+          converted::pre_inc(k);
+          continue;
+        }
+        if (p.gravity) continue;
+        req(p.pos, 0xff9a40, 16, 10, 2.5);
+        converted::pre_inc(k);
+      }
+    }
+    // Tracers: a travelling glint along the round's path (45 ms).
+    for (std::size_t i = L.glints.size(); converted::post_dec(i) > 0;) {
+      const LookState::Glint& g = converted::at(L.glints, i);
+      const f32 u = (now - g.at) / 0.045;
+      if (u >= 1 || u < 0) { converted::erase(L.glints, L.glints.begin() + static_cast<std::ptrdiff_t>(i)); continue; }
+      req(g.a + (g.b - g.a) * u, 0xffd27a, 7 * (1 - u), 6, 1.5);
+    }
+    // Jetpack flame under the player.
+    if (ui_.jetpack.thrusting && mode_ == Mode::foot) req(player_position() - Vec3{0, 0, 1.6}, 0xff8a2a, 14, 9, 2);
+  }
+  const PointLights& out = L.lights.resolve(eye);
+  L.lights_used = out.count;
+  r.set_point_lights(out);
+}
 void Game::look_vr_hud() {
   // A panel 1.3 m ahead of the head and 0.5 m below it, turned to the eye, levelled to the heading
   // (it stays put under a nod): the page draws it, the game only carries it.
@@ -5954,6 +7063,156 @@ void Game::look_vr_hud() {
   r.update_instances(vr_hud_mesh_, {m, 16}, {});
   r.set_visible(vr_hud_mesh_, true);
 }
+void Game::look_view_models(f32 dt) {
+  LookState& L = look_;
+  Renderer& r = engine_->renderer();
+  if (!L.vm_built) {
+    L.vm_built = true;
+    for (int set = 0; set < 2; converted::pre_inc(set)) {
+      const bool arms = set == 0;  // set 1: VR - the weapon alone
+      for (int i = 0; i < 4; converted::pre_inc(i)) {
+        MeshData body, glow;
+        switch (i) {
+          case 0: boomstick(body, glow, arms); break;
+          case 1: rocket_launcher(body, glow, arms); break;
+          case 2: fist(body, arms); break;
+          default: knife(body, glow, arms); break;
+        }
+        auto make = [&](const MeshData& d, bool g, u32& id) {
+          if (d.positions.empty()) return;
+          id = r.allocate_id();
+          MeshLook look;
+          look.material = vm_material(g, set == 1);
+          look.extra_slot = kMaxExtensionAttributes;
+          look.visible = false;
+          if (!upsert(r, id, d, look)) { r.release_id(id); id = 0; }
+        };
+        make(body, false, set ? converted::at(L.vm_body_vr, i) : converted::at(L.vm_body, i));
+        make(glow, true, set ? converted::at(L.vm_glow_vr, i) : converted::at(L.vm_glow, i));
+      }
+    }
+  }
+  Mat4 vr_probe;
+  const bool vr_hand = vr_hand_matrix(1, vr_probe);
+  const int want = world_placed_ && mode_ == Mode::foot && !player_dead_ && converted::present(world_)->hud().health > 0 ? vm_index(foot_weapon_) : -1;
+  const f32 now = converted::present(world_)->sim_time();
+  // Attacks: the game's weapons move next_attack_ forward when they fire / strike.
+  const i32 wid = static_cast<i32>(foot_weapon_);
+  if (wid != L.vm_prev_weapon) { L.vm_prev_weapon = wid; L.vm_switch_at = now; }
+  else if (next_attack_ > L.vm_prev_next_attack + 1e-4 && now - L.vm_switch_at > 0.05) { L.vm_fire_at = now; L.vm_punch ^= 1; }
+  L.vm_prev_next_attack = next_attack_;
+  for (int i = 0; i < 4; converted::pre_inc(i)) {
+    // the set not in use (flat / VR) is hidden whole; of the other only the weapon in hand shows
+    for (u32 id : {vr_hand ? converted::at(L.vm_body, i) : converted::at(L.vm_body_vr, i), vr_hand ? converted::at(L.vm_glow, i) : converted::at(L.vm_glow_vr, i)})
+      if (id) r.set_visible(id, false);
+    if (i != want)
+      for (u32 id : {converted::at(L.vm_body, i), converted::at(L.vm_glow, i), converted::at(L.vm_body_vr, i), converted::at(L.vm_glow_vr, i)})
+        if (id) r.set_visible(id, false);
+  }
+  L.vm_shown = want;
+  if (want < 0) return;
+  // Kern draws its own first-person weapon for the soldier's kind; while ours is in hand it hides.
+  for (Mesh* m : r.meshes()) {
+    if (!m->visible || !m->material.viewmodel) continue;
+    bool mine = m->id == L.streak_mesh;
+    for (int i = 0; i < 4; converted::pre_inc(i)) mine = mine || m->id == converted::at(L.vm_body, i) || m->id == converted::at(L.vm_glow, i);
+    if (!mine) r.set_visible(m->id, false);
+  }
+  // Walk bob from the soldier's speed, raise after a weapon change, kick / punch / slash after an attack.
+  const Vec3 v = converted::present(world_)->actor_velocity(soldier_);
+  const f32 sp = hypot_bp(v.x, v.y);
+  L.vm_bob += dt * sp * 1.6;
+  L.vm_bob_w += (std::fmin(1.0, sp / 5.5) - L.vm_bob_w) * damp_alpha(8, dt);
+  const f32 bx = kern::math::sin(L.vm_bob) * 0.014 * L.vm_bob_w, bz = -kern::math::cos(2 * L.vm_bob) * 0.017 * L.vm_bob_w;
+  const f32 raise = clampf((now - L.vm_switch_at) / 0.25, 0, 1), drop = (1 - raise) * (1 - raise) * 0.25;
+  const f32 age = now - L.vm_fire_at;
+  const Mat4 cam = camera_frame(cam_);
+  std::vector<f32> t;
+  auto put = [&](const Mat4& m) { t.insert(t.end(), m.m, m.m + 16); };
+  switch (want) {
+    case 0:
+    case 1: {
+      // Launchers: held right of the view (Kern's rest pose .245 / -.225 / -.445), kick back and up.
+      const f32 kick = age >= 0 && age < 0.22 ? kern::math::sin(age / 0.22 * kPi) : 0;
+      // the rocket launcher sits lower and further right than the 40 mm (it frames the view)
+      const bool rkt = want == 1;
+      Mat4 g = Mat4::translate({(rkt ? 0.285 : 0.245) + bx * 0.45, (rkt ? -0.245 : -0.2) + bz * 0.2 - drop, rkt ? -0.43 : -0.47}) * euler(-0.03, -0.06, -0.018);
+      // alignSights: rotate about the grip (the model's origin) so the barrel (-z) points at the aim
+      // point - the finger's, or the crosshair's rest point - smoothed at 22 Hz (TARGET_SMOOTH_HZ)
+      {
+        const Vec3 f = converted::wide::normalize(cam_.target - cam_.eye, {1, 0, 0}), rr = converted::wide::normalize(converted::wide::cross(f, cam_.up), {0, -1, 0}), uu = converted::wide::cross(rr, f);
+        if (now - L.vm_rest_at > 0.16 || now < L.vm_rest_at) {
+          L.vm_rest_at = now;
+          const RayResult h = cast(converted::present(world_)->physics(), cam_.eye, f, 180, body(soldier_));
+          L.vm_rest_depth = h.hit ? clampf(converted::wide::length(h.point - cam_.eye), 1.2, 180) : 30;
+        }
+        Vec3 want{0, 0, -L.vm_rest_depth};
+        if (now < L.vm_aim_until) {
+          const Vec3 d = L.vm_aim_point - cam_.eye;
+          want = {converted::wide::dot(d, rr), converted::wide::dot(d, uu), -converted::wide::dot(d, f)};
+          if (L.vm_aim_snap) L.vm_aim_smooth = want;
+        }
+        L.vm_aim_snap = false;
+        L.vm_aim_smooth = L.vm_aim_smooth + (want - L.vm_aim_smooth) * damp_alpha(22, dt);
+        const Vec3 grip = g.transform_point({0, 0, 0}), axis = converted::wide::normalize(g.transform_point({0, 0, -1}) - grip, {0, 0, -1});
+        const Vec3 to = converted::wide::normalize(L.vm_aim_smooth - grip, {0, 0, -1});
+        const f32 ang = kern::math::acos(clampf(converted::wide::dot(axis, to), -1, 1));
+        if (ang > 1e-4) g = Mat4::translate(grip) * Mat4::trs({}, Quat::axis_angle(converted::wide::normalize(converted::wide::cross(axis, to), {1, 0, 0}), ang), {1, 1, 1}) * Mat4::translate(grip * -1.0) * g;
+      }
+      {
+        Mat4 hand;
+        if (vr_hand_matrix(1, hand)) put(hand * Mat4::translate({0, 0, kick * 0.08}) * euler(kick * 0.12, 0, 0));  // VR: in the right hand
+        else put(cam * g * Mat4::translate({0, 0, kick * 0.08}) * euler(kick * 0.12, 0, 0));
+      }
+      break;
+    }
+    case 2: {
+      // Fists: a low guard; each strike jabs the other hand forward (buildFists, 300 ms).
+      const f32 jab = age >= 0 && age < 0.3 ? kern::math::sin(age / 0.3 * kPi) : 0;
+      for (int side = -1; side <= 1; converted::plus_to(side, 2)) {
+        const f32 j = (side > 0) == (L.vm_punch == 1) ? jab : 0;
+        Mat4 hand = cam * Mat4::translate({side * 0.17 + bx * 0.4, -0.22 + bz * 0.2 - drop + j * 0.05, -0.42 - j * 0.24}) * euler(0.1, converted::neg(side) * 0.12 * j, 0);
+        Mat4 ctl;
+        if (vr_hand_matrix(side > 0 ? 1 : 0, ctl)) hand = ctl * euler(0.25, 0, 0);  // VR: each fist at its controller
+        put(side < 0 ? hand * Mat4::scale({-1, 1, 1}) : hand);
+      }
+      break;
+    }
+    default: {
+      // Knife (Call of Duty): low right, blade forward; a slash in three beats over 380 ms - a quick
+      // wind-up up and right (0 .. 70 ms), the cut down across to the left past the centre (70 ..
+      // 200 ms, the strike frame at 130 ms in the middle of it), the hand back low right
+      const f32 u = age >= 0 && age < 0.38 ? age / 0.38 : 1;
+      f32 px = 0, py = 0, pz = 0, rx = 0, ry = 0, rz = 0;
+      if (u < 1) {
+        auto ease = [](f32 t) { return t * t * (3 - 2 * t); };
+        if (u < 0.18) { const f32 k = ease(u / 0.18); px = 0.06 * k; py = 0.09 * k; pz = 0.05 * k; rz = -0.5 * k; ry = -0.25 * k; }
+        else if (u < 0.53) { const f32 k = ease((u - 0.18) / 0.35); px = 0.06 - 0.42 * k; py = 0.09 - 0.17 * k; pz = 0.05 - 0.2 * k; rz = -0.5 + 1.4 * k; ry = -0.25 + 1.2 * k; rx = -0.35 * k; }
+        else { const f32 k = ease((u - 0.53) / 0.47); px = -0.36 * (1 - k); py = -0.08 * (1 - k); pz = -0.15 * (1 - k); rz = 0.9 * (1 - k); ry = 0.95 * (1 - k); rx = -0.35 * (1 - k); }
+      }
+      {
+        Mat4 ctl;
+        if (vr_hand_matrix(1, ctl)) put(ctl * euler(0.25, 0, 0));  // VR: the knife is where the hand is (the hand swings it)
+        else put(cam * Mat4::translate({0.2 + px + bx * 0.4, -0.21 + py + bz * 0.2 - drop, -0.4 + pz}) * euler(rx, ry, rz));
+      }
+      break;
+    }
+  }
+  for (u32 id : {vr_hand ? converted::at(L.vm_body_vr, want) : converted::at(L.vm_body, want), vr_hand ? converted::at(L.vm_glow_vr, want) : converted::at(L.vm_glow, want)}) {
+    if (!id) continue;
+    r.update_instances(id, {t.data(), t.size()}, {});
+    r.set_visible(id, true);
+  }
+  // VR, knife in the right hand: the left is a fist (no forearm - the controller is the arm)
+  if (vr_hand && want == 3 && L.vm_body_vr[2]) {
+    Mat4 lh;
+    if (vr_hand_matrix(0, lh)) {
+      const Mat4 fm = lh * euler(0.25, 0, 0) * Mat4::scale({-1, 1, 1});
+      r.update_instances(L.vm_body_vr[2], {fm.m, 16}, {});
+      r.set_visible(L.vm_body_vr[2], true);
+    }
+  }
+}
 using perf::kTier; std::string Game::look_hud_json() {
   const LookState& L = look_;
   const perf::Tier& q = converted::at(kTier, L.gov.tier());
@@ -5969,6 +7228,81 @@ using perf::kTier; std::string Game::look_hud_json() {
                 static_cast<double>(L.meter.render_ms()), static_cast<double>(L.meter.gpu_ms()), static_cast<double>(q.render_scale), static_cast<double>(L.tod), hh, mm, static_cast<double>(night_), static_cast<double>(L.shake.trauma), static_cast<double>(L.lines.k), L.stab.init ? "true" : "false",
                 L.vm_shown >= 0 ? converted::at(kVmNames, L.vm_shown) : "");
   return b;
+}
+using perf::kTier; bool Game::look_command(const std::string& cmd, std::string& out) {
+  LookState& L = look_;
+  auto starts = [&](const char* p) { return cmd.rfind(p, 0) == 0; };
+  char b[160];
+  if (cmd == "time" || starts("time ")) {
+    // "time 0.75" (phase), "time 21:30" / "time 21" (hours): sets the game's day clock.
+    f32 phase;
+    if (cmd.size() > 5 && look::parse_time(converted::text_end<true>(cmd, 5), phase)) L.tod = phase;
+    else if (cmd.size() > 5) { out = "usage: time <0..1 | HH:MM | HH>"; return true; }
+    const f32 hours = L.tod * 24;
+    std::snprintf(b, sizeof b, "%.4f %02d:%02d", static_cast<double>(L.tod), static_cast<int>(converted::fits<int>(hours)) % 24, static_cast<int>(converted::fits<int>((hours - std::floor(hours)) * 60)));
+    out = b;
+    return true;
+  }
+  if (cmd == "render software") {
+    // render_stability.mjs / simulator.mjs: SwiftShader, llvmpipe: no shadow map, the lowest level
+    L.software = true;
+    out = "software";
+    return true;
+  }
+  if (cmd == "quality" || starts("quality ")) {
+    // "quality auto" | "quality 0..4" | a level's name; plain "quality" reports.
+    const std::string a = cmd.size() > 8 ? cmd.substr(8) : "";
+    if (a == "auto") L.gov.set_auto();
+    else if (!a.empty()) {
+      i32 t = -1;
+      for (i32 i = 0; i < perf::kTiers; converted::pre_inc(i))
+        if (a == converted::at(kTier, i).name) t = i;
+      if (t < 0 && a.size() == 1 && converted::at(a, 0) >= '0' && converted::at(a, 0) <= '4') t = converted::minus(converted::at(a, 0), '0');
+      if (t < 0) { out = "usage: quality auto | 0..4 | minimal | niedrig | mittel | hoch | maximal"; return true; }
+      L.gov.set_fixed(t);
+    }
+    if (L.gov.tier() != L.applied_tier) look_apply_tier();
+    const perf::Tier& q = converted::at(kTier, L.gov.tier());
+    std::snprintf(b, sizeof b, "{\"tier\":%d,\"name\":\"%s\",\"auto\":%s,\"people\":%d,\"shadow\":%.0f,\"ao\":%d,\"scale\":%.2f,\"lights\":%d}", L.gov.tier(), q.name,
+                  L.gov.automatic() ? "true" : "false", q.people, static_cast<double>(q.shadow_m), q.ao, static_cast<double>(q.render_scale), q.lights);
+    out = b;
+    return true;
+  }
+  if (cmd == "perf" || starts("perf ")) {
+    // "perf 1" / "perf 0": the HUD's frame-time line; plain "perf" toggles.
+    L.show_perf = cmd.size() > 5 ? converted::at(cmd, 5) == '1' : !L.show_perf;
+    out = L.show_perf ? "on" : "off";
+    return true;
+  }
+  if (starts("shake ")) {  // tests: add camera trauma
+    L.shake.add(static_cast<f32>(std::atof(converted::text_end<true>(cmd, 6))));
+    std::snprintf(b, sizeof b, "%.2f", static_cast<double>(L.shake.trauma));
+    out = b;
+    return true;
+  }
+  if (cmd == "viewmodel") {  // tests: the shown first-person model, where it is relative to the eye
+    if (L.vm_shown < 0) { out = "none"; return true; }
+    const Mesh* m = engine_->renderer().mesh(converted::at(L.vm_body, L.vm_shown));
+    if (!m || m->transforms.size() < 16) { out = "no mesh"; return true; }
+    const Vec3 p{converted::at(m->transforms, 12), converted::at(m->transforms, 13), converted::at(m->transforms, 14)};
+    const Vec3 f = converted::wide::normalize(cam_.target - cam_.eye, {1, 0, 0});
+    std::snprintf(b, sizeof b, "%s visible %d ahead %.2f off %.2f verts %u", converted::at(kVmNames, L.vm_shown), m->visible ? 1 : 0, static_cast<double>(converted::wide::dot(p - cam_.eye, f)), static_cast<double>(converted::wide::length(p - cam_.eye)),
+                  m->vertex_count());
+    out = b;
+    return true;
+  }
+  if (cmd == "lights") {  // tests: the point lights of the last frame
+    const PointLights& pl = engine_->renderer().point_lights();
+    out = "[";
+    for (u32 i = 0; i < pl.count; ++i) {
+      std::snprintf(b, sizeof b, "%s{\"p\":[%.1f,%.1f,%.1f],\"range\":%.1f,\"i\":%.2f}", i ? "," : "", static_cast<double>(converted::at(pl.pos_range, i * 4)), static_cast<double>(converted::at(pl.pos_range, i * 4 + 1)), static_cast<double>(converted::at(pl.pos_range, i * 4 + 2)),
+                    static_cast<double>(converted::at(pl.pos_range, i * 4 + 3)), static_cast<double>(converted::at(pl.color_intensity, i * 4 + 3)));
+      out += b;
+    }
+    out += "]";
+    return true;
+  }
+  return false;
 }
 #undef private
 #undef protected
@@ -11787,21 +13121,18 @@ struct State_Game { const Game* s; };
 [[maybe_unused]] static bool defined(const Frame& s) { return defined(s.time) && defined(s.dt) && defined(converted::shaped<converted::Whole>(s.index)); }
 [[maybe_unused]] static std::string text(const Frame& s) { return std::string("{") + text(s.time) + ", " + text(s.dt) + ", " + text(converted::shaped<converted::Whole>(s.index)) + "}"; }
 [[maybe_unused]] static void take(Frame& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<double>(s.time, (*v.rows)[0]); converted::take_as<double>(s.dt, (*v.rows)[1]); converted::take_as<converted::Whole>(s.index, (*v.rows)[2]); }
-[[maybe_unused]] static AoOptions draw_kern__AoOptions(converted::Draw& draw) {
-  AoOptions s{};
-  s.enabled = draw.flag();
-  s.quality = converted::enum_value<AoQuality>(draw.below(4));
-  s.half_resolution = draw.flag();
-  s.radius = draw.number();
-  s.power = draw.number();
-  s.adaptive = draw.flag();
+[[maybe_unused]] static PointLights draw_kern__PointLights(converted::Draw& draw) {
+  PointLights s{};
+  s.count = static_cast<unsigned int>(draw.below(40));
+  converted::fill_array(s.pos_range, [&]() -> double { return draw.number(); });
+  converted::fill_array(s.color_intensity, [&]() -> double { return draw.number(); });
   return s;
 }
-[[maybe_unused]] static converted::Value arg(const AoOptions& s) { return converted::Value::structure({arg(s.enabled), arg(s.quality), arg(s.half_resolution), arg(s.radius), arg(s.power), arg(s.adaptive)}); }
-[[maybe_unused]] static bool same(const AoOptions& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.enabled, (*got.rows)[0]), ".enabled") && converted::at_place(same(want.quality, (*got.rows)[1]), ".quality") && converted::at_place(same(want.half_resolution, (*got.rows)[2]), ".half_resolution") && converted::at_place(same(want.radius, (*got.rows)[3]), ".radius") && converted::at_place(same(want.power, (*got.rows)[4]), ".power") && converted::at_place(same(want.adaptive, (*got.rows)[5]), ".adaptive"); }
-[[maybe_unused]] static bool defined(const AoOptions& s) { return defined(s.enabled) && defined(s.quality) && defined(s.half_resolution) && defined(s.radius) && defined(s.power) && defined(s.adaptive); }
-[[maybe_unused]] static std::string text(const AoOptions& s) { return std::string("{") + text(s.enabled) + ", " + text(s.quality) + ", " + text(s.half_resolution) + ", " + text(s.radius) + ", " + text(s.power) + ", " + text(s.adaptive) + "}"; }
-[[maybe_unused]] static void take(AoOptions& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.enabled, (*v.rows)[0]); converted::take_as<AoQuality>(s.quality, (*v.rows)[1]); converted::take_as<bool>(s.half_resolution, (*v.rows)[2]); converted::take_as<double>(s.radius, (*v.rows)[3]); converted::take_as<double>(s.power, (*v.rows)[4]); converted::take_as<bool>(s.adaptive, (*v.rows)[5]); }
+[[maybe_unused]] static converted::Value arg(const PointLights& s) { return converted::Value::structure({arg(s.count), arg(converted::array_list(s.pos_range)), arg(converted::array_list(s.color_intensity))}); }
+[[maybe_unused]] static bool same(const PointLights& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.count, (*got.rows)[0]), ".count") && converted::at_place(same(converted::array_list(want.pos_range), (*got.rows)[1]), ".pos_range") && converted::at_place(same(converted::array_list(want.color_intensity), (*got.rows)[2]), ".color_intensity"); }
+[[maybe_unused]] static bool defined(const PointLights& s) { return defined(s.count) && defined(converted::array_list(s.pos_range)) && defined(converted::array_list(s.color_intensity)); }
+[[maybe_unused]] static std::string text(const PointLights& s) { return std::string("{") + text(s.count) + ", " + text(converted::array_list(s.pos_range)) + ", " + text(converted::array_list(s.color_intensity)) + "}"; }
+[[maybe_unused]] static void take(PointLights& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<unsigned int>(s.count, (*v.rows)[0]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[1]); converted::array_from(s.pos_range, items); } { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[2]); converted::array_from(s.color_intensity, items); } }
 [[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
   Material s{};
   s.color = draw_kern__Vec4(draw);
@@ -11825,6 +13156,741 @@ struct State_Game { const Game* s; };
 [[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
 [[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
 [[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
+[[maybe_unused]] static AoOptions draw_kern__AoOptions(converted::Draw& draw) {
+  AoOptions s{};
+  s.enabled = draw.flag();
+  s.quality = converted::enum_value<AoQuality>(draw.below(4));
+  s.half_resolution = draw.flag();
+  s.radius = draw.number();
+  s.power = draw.number();
+  s.adaptive = draw.flag();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const AoOptions& s) { return converted::Value::structure({arg(s.enabled), arg(s.quality), arg(s.half_resolution), arg(s.radius), arg(s.power), arg(s.adaptive)}); }
+[[maybe_unused]] static bool same(const AoOptions& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.enabled, (*got.rows)[0]), ".enabled") && converted::at_place(same(want.quality, (*got.rows)[1]), ".quality") && converted::at_place(same(want.half_resolution, (*got.rows)[2]), ".half_resolution") && converted::at_place(same(want.radius, (*got.rows)[3]), ".radius") && converted::at_place(same(want.power, (*got.rows)[4]), ".power") && converted::at_place(same(want.adaptive, (*got.rows)[5]), ".adaptive"); }
+[[maybe_unused]] static bool defined(const AoOptions& s) { return defined(s.enabled) && defined(s.quality) && defined(s.half_resolution) && defined(s.radius) && defined(s.power) && defined(s.adaptive); }
+[[maybe_unused]] static std::string text(const AoOptions& s) { return std::string("{") + text(s.enabled) + ", " + text(s.quality) + ", " + text(s.half_resolution) + ", " + text(s.radius) + ", " + text(s.power) + ", " + text(s.adaptive) + "}"; }
+[[maybe_unused]] static void take(AoOptions& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.enabled, (*v.rows)[0]); converted::take_as<AoQuality>(s.quality, (*v.rows)[1]); converted::take_as<bool>(s.half_resolution, (*v.rows)[2]); converted::take_as<double>(s.radius, (*v.rows)[3]); converted::take_as<double>(s.power, (*v.rows)[4]); converted::take_as<bool>(s.adaptive, (*v.rows)[5]); }
+[[maybe_unused]] static Lighting draw_kern__Lighting(converted::Draw& draw) {
+  Lighting s{};
+  s.sun_direction = draw.vector();
+  s.sun_color = draw.vector();
+  s.sky_color = draw.vector();
+  s.ground_color = draw.vector();
+  s.fog_color = draw.vector();
+  s.fog_density = draw.number();
+  s.exposure = draw.number();
+  s.env_intensity = draw.number();
+  s.env_zenith = draw.vector();
+  s.env_horizon = draw.vector();
+  s.env_ground = draw.vector();
+  s.fog_height_falloff = draw.number();
+  s.fog_sun_scatter = draw.number();
+  s.fog_horizon = draw.number();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const Lighting& s) { return converted::Value::structure({arg(s.sun_direction), arg(s.sun_color), arg(s.sky_color), arg(s.ground_color), arg(s.fog_color), arg(s.fog_density), arg(s.exposure), arg(s.env_intensity), arg(s.env_zenith), arg(s.env_horizon), arg(s.env_ground), arg(s.fog_height_falloff), arg(s.fog_sun_scatter), arg(s.fog_horizon)}); }
+[[maybe_unused]] static bool same(const Lighting& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.sun_direction, (*got.rows)[0]), ".sun_direction") && converted::at_place(same(want.sun_color, (*got.rows)[1]), ".sun_color") && converted::at_place(same(want.sky_color, (*got.rows)[2]), ".sky_color") && converted::at_place(same(want.ground_color, (*got.rows)[3]), ".ground_color") && converted::at_place(same(want.fog_color, (*got.rows)[4]), ".fog_color") && converted::at_place(same(want.fog_density, (*got.rows)[5]), ".fog_density") && converted::at_place(same(want.exposure, (*got.rows)[6]), ".exposure") && converted::at_place(same(want.env_intensity, (*got.rows)[7]), ".env_intensity") && converted::at_place(same(want.env_zenith, (*got.rows)[8]), ".env_zenith") && converted::at_place(same(want.env_horizon, (*got.rows)[9]), ".env_horizon") && converted::at_place(same(want.env_ground, (*got.rows)[10]), ".env_ground") && converted::at_place(same(want.fog_height_falloff, (*got.rows)[11]), ".fog_height_falloff") && converted::at_place(same(want.fog_sun_scatter, (*got.rows)[12]), ".fog_sun_scatter") && converted::at_place(same(want.fog_horizon, (*got.rows)[13]), ".fog_horizon"); }
+[[maybe_unused]] static bool defined(const Lighting& s) { return defined(s.sun_direction) && defined(s.sun_color) && defined(s.sky_color) && defined(s.ground_color) && defined(s.fog_color) && defined(s.fog_density) && defined(s.exposure) && defined(s.env_intensity) && defined(s.env_zenith) && defined(s.env_horizon) && defined(s.env_ground) && defined(s.fog_height_falloff) && defined(s.fog_sun_scatter) && defined(s.fog_horizon); }
+[[maybe_unused]] static std::string text(const Lighting& s) { return std::string("{") + text(s.sun_direction) + ", " + text(s.sun_color) + ", " + text(s.sky_color) + ", " + text(s.ground_color) + ", " + text(s.fog_color) + ", " + text(s.fog_density) + ", " + text(s.exposure) + ", " + text(s.env_intensity) + ", " + text(s.env_zenith) + ", " + text(s.env_horizon) + ", " + text(s.env_ground) + ", " + text(s.fog_height_falloff) + ", " + text(s.fog_sun_scatter) + ", " + text(s.fog_horizon) + "}"; }
+[[maybe_unused]] static void take(Lighting& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec3>(s.sun_direction, (*v.rows)[0]); converted::take_as<Vec3>(s.sun_color, (*v.rows)[1]); converted::take_as<Vec3>(s.sky_color, (*v.rows)[2]); converted::take_as<Vec3>(s.ground_color, (*v.rows)[3]); converted::take_as<Vec3>(s.fog_color, (*v.rows)[4]); converted::take_as<double>(s.fog_density, (*v.rows)[5]); converted::take_as<double>(s.exposure, (*v.rows)[6]); converted::take_as<double>(s.env_intensity, (*v.rows)[7]); converted::take_as<Vec3>(s.env_zenith, (*v.rows)[8]); converted::take_as<Vec3>(s.env_horizon, (*v.rows)[9]); converted::take_as<Vec3>(s.env_ground, (*v.rows)[10]); converted::take_as<double>(s.fog_height_falloff, (*v.rows)[11]); converted::take_as<double>(s.fog_sun_scatter, (*v.rows)[12]); converted::take_as<double>(s.fog_horizon, (*v.rows)[13]); }
+[[maybe_unused]] static SkyState draw_kern__SkyState(converted::Draw& draw) {
+  SkyState s{};
+  s.sun = draw.vector();
+  s.moon = draw.vector();
+  s.night = draw.number();
+  s.clouds = draw.flag();
+  s.blast_direction = draw.vector();
+  s.blast_age = draw.number();
+  s.wind = draw.vector2();
+  return s;
+}
+[[maybe_unused]] static converted::Value arg(const SkyState& s) { return converted::Value::structure({arg(s.sun), arg(s.moon), arg(s.night), arg(s.clouds), arg(s.blast_direction), arg(s.blast_age), arg(s.wind)}); }
+[[maybe_unused]] static bool same(const SkyState& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.sun, (*got.rows)[0]), ".sun") && converted::at_place(same(want.moon, (*got.rows)[1]), ".moon") && converted::at_place(same(want.night, (*got.rows)[2]), ".night") && converted::at_place(same(want.clouds, (*got.rows)[3]), ".clouds") && converted::at_place(same(want.blast_direction, (*got.rows)[4]), ".blast_direction") && converted::at_place(same(want.blast_age, (*got.rows)[5]), ".blast_age") && converted::at_place(same(want.wind, (*got.rows)[6]), ".wind"); }
+[[maybe_unused]] static bool defined(const SkyState& s) { return defined(s.sun) && defined(s.moon) && defined(s.night) && defined(s.clouds) && defined(s.blast_direction) && defined(s.blast_age) && defined(s.wind); }
+[[maybe_unused]] static std::string text(const SkyState& s) { return std::string("{") + text(s.sun) + ", " + text(s.moon) + ", " + text(s.night) + ", " + text(s.clouds) + ", " + text(s.blast_direction) + ", " + text(s.blast_age) + ", " + text(s.wind) + "}"; }
+[[maybe_unused]] static void take(SkyState& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<Vec3>(s.sun, (*v.rows)[0]); converted::take_as<Vec3>(s.moon, (*v.rows)[1]); converted::take_as<double>(s.night, (*v.rows)[2]); converted::take_as<bool>(s.clouds, (*v.rows)[3]); converted::take_as<Vec3>(s.blast_direction, (*v.rows)[4]); converted::take_as<double>(s.blast_age, (*v.rows)[5]); converted::take_as<Vec2>(s.wind, (*v.rows)[6]); }
+[[maybe_unused]] static game::WorldSettings draw_kern__game__WorldSettings(converted::Draw& draw) {
+  game::WorldSettings s{};
+  s.channels = draw.word();
+  s.gravity = draw.vector();
+  s.substeps = static_cast<int>(draw.whole());
+  s.step_hz = draw.number();
+  s.time_of_day = draw.number();
+  s.day_length = draw.number();
+  s.sun_azimuth = draw.number();
+  s.fog_density = draw.number();
+  s.exposure = draw.number();
+  s.ao_radius = draw.number();
+  s.shadow_distance = draw.number();
+  s.clouds = draw.flag();
+  s.ground_color = draw.vector();
+  s.ground = draw.flag();
+  s.ground_friction = draw.number();
+  s.ground_restitution = draw.number();
+  s.ground_surface = draw.word();
+  s.contact_hertz = draw.number();
+  s.contact_damping = draw.number();
+  s.contact_speed = draw.number();
+  s.kill_z = draw.number();
+  s.title = draw.word();
+  s.goal = converted::enum_value<game::GameGoal>(draw.below(5));
+  s.time_limit = draw.number();
+  s.score_target = draw.number();
+  s.player = static_cast<unsigned int>(draw.below(40));
+  s.observer = draw.flag();
+  s.master_volume = draw.number();
+  s.music = draw.word();
+  s.music_volume = draw.number();
+  s.ambience = draw.word();
+  s.ambience_volume = draw.number();
+  s.reverb = draw.number();
+  s.doppler = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::WorldSettings& s) { return converted::Value::structure({arg(s.channels), arg(s.gravity), arg(s.substeps), arg(s.step_hz), arg(s.time_of_day), arg(s.day_length), arg(s.sun_azimuth), arg(s.fog_density), arg(s.exposure), arg(s.ao_radius), arg(s.shadow_distance), arg(s.clouds), arg(s.ground_color), arg(s.ground), arg(s.ground_friction), arg(s.ground_restitution), arg(s.ground_surface), arg(s.contact_hertz), arg(s.contact_damping), arg(s.contact_speed), arg(s.kill_z), arg(s.title), arg(s.goal), arg(s.time_limit), arg(s.score_target), arg(s.player), arg(s.observer), arg(s.master_volume), arg(s.music), arg(s.music_volume), arg(s.ambience), arg(s.ambience_volume), arg(s.reverb), arg(s.doppler)}); }
+[[maybe_unused]] static bool same(const game::WorldSettings& want, const converted::Value& got) { return converted::rows_of(got, 34) && converted::at_place(same(want.channels, (*got.rows)[0]), ".channels") && converted::at_place(same(want.gravity, (*got.rows)[1]), ".gravity") && converted::at_place(same(want.substeps, (*got.rows)[2]), ".substeps") && converted::at_place(same(want.step_hz, (*got.rows)[3]), ".step_hz") && converted::at_place(same(want.time_of_day, (*got.rows)[4]), ".time_of_day") && converted::at_place(same(want.day_length, (*got.rows)[5]), ".day_length") && converted::at_place(same(want.sun_azimuth, (*got.rows)[6]), ".sun_azimuth") && converted::at_place(same(want.fog_density, (*got.rows)[7]), ".fog_density") && converted::at_place(same(want.exposure, (*got.rows)[8]), ".exposure") && converted::at_place(same(want.ao_radius, (*got.rows)[9]), ".ao_radius") && converted::at_place(same(want.shadow_distance, (*got.rows)[10]), ".shadow_distance") && converted::at_place(same(want.clouds, (*got.rows)[11]), ".clouds") && converted::at_place(same(want.ground_color, (*got.rows)[12]), ".ground_color") && converted::at_place(same(want.ground, (*got.rows)[13]), ".ground") && converted::at_place(same(want.ground_friction, (*got.rows)[14]), ".ground_friction") && converted::at_place(same(want.ground_restitution, (*got.rows)[15]), ".ground_restitution") && converted::at_place(same(want.ground_surface, (*got.rows)[16]), ".ground_surface") && converted::at_place(same(want.contact_hertz, (*got.rows)[17]), ".contact_hertz") && converted::at_place(same(want.contact_damping, (*got.rows)[18]), ".contact_damping") && converted::at_place(same(want.contact_speed, (*got.rows)[19]), ".contact_speed") && converted::at_place(same(want.kill_z, (*got.rows)[20]), ".kill_z") && converted::at_place(same(want.title, (*got.rows)[21]), ".title") && converted::at_place(same(want.goal, (*got.rows)[22]), ".goal") && converted::at_place(same(want.time_limit, (*got.rows)[23]), ".time_limit") && converted::at_place(same(want.score_target, (*got.rows)[24]), ".score_target") && converted::at_place(same(want.player, (*got.rows)[25]), ".player") && converted::at_place(same(want.observer, (*got.rows)[26]), ".observer") && converted::at_place(same(want.master_volume, (*got.rows)[27]), ".master_volume") && converted::at_place(same(want.music, (*got.rows)[28]), ".music") && converted::at_place(same(want.music_volume, (*got.rows)[29]), ".music_volume") && converted::at_place(same(want.ambience, (*got.rows)[30]), ".ambience") && converted::at_place(same(want.ambience_volume, (*got.rows)[31]), ".ambience_volume") && converted::at_place(same(want.reverb, (*got.rows)[32]), ".reverb") && converted::at_place(same(want.doppler, (*got.rows)[33]), ".doppler"); }
+[[maybe_unused]] static bool defined(const game::WorldSettings& s) { return defined(s.channels) && defined(s.gravity) && defined(s.substeps) && defined(s.step_hz) && defined(s.time_of_day) && defined(s.day_length) && defined(s.sun_azimuth) && defined(s.fog_density) && defined(s.exposure) && defined(s.ao_radius) && defined(s.shadow_distance) && defined(s.clouds) && defined(s.ground_color) && defined(s.ground) && defined(s.ground_friction) && defined(s.ground_restitution) && defined(s.ground_surface) && defined(s.contact_hertz) && defined(s.contact_damping) && defined(s.contact_speed) && defined(s.kill_z) && defined(s.title) && defined(s.goal) && defined(s.time_limit) && defined(s.score_target) && defined(s.player) && defined(s.observer) && defined(s.master_volume) && defined(s.music) && defined(s.music_volume) && defined(s.ambience) && defined(s.ambience_volume) && defined(s.reverb) && defined(s.doppler); }
+[[maybe_unused]] static std::string text(const game::WorldSettings& s) { return std::string("{") + text(s.channels) + ", " + text(s.gravity) + ", " + text(s.substeps) + ", " + text(s.step_hz) + ", " + text(s.time_of_day) + ", " + text(s.day_length) + ", " + text(s.sun_azimuth) + ", " + text(s.fog_density) + ", " + text(s.exposure) + ", " + text(s.ao_radius) + ", " + text(s.shadow_distance) + ", " + text(s.clouds) + ", " + text(s.ground_color) + ", " + text(s.ground) + ", " + text(s.ground_friction) + ", " + text(s.ground_restitution) + ", " + text(s.ground_surface) + ", " + text(s.contact_hertz) + ", " + text(s.contact_damping) + ", " + text(s.contact_speed) + ", " + text(s.kill_z) + ", " + text(s.title) + ", " + text(s.goal) + ", " + text(s.time_limit) + ", " + text(s.score_target) + ", " + text(s.player) + ", " + text(s.observer) + ", " + text(s.master_volume) + ", " + text(s.music) + ", " + text(s.music_volume) + ", " + text(s.ambience) + ", " + text(s.ambience_volume) + ", " + text(s.reverb) + ", " + text(s.doppler) + "}"; }
+[[maybe_unused]] static void take(game::WorldSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 34) return; converted::take_as<std::string>(s.channels, (*v.rows)[0]); converted::take_as<Vec3>(s.gravity, (*v.rows)[1]); converted::take_as<int>(s.substeps, (*v.rows)[2]); converted::take_as<double>(s.step_hz, (*v.rows)[3]); converted::take_as<double>(s.time_of_day, (*v.rows)[4]); converted::take_as<double>(s.day_length, (*v.rows)[5]); converted::take_as<double>(s.sun_azimuth, (*v.rows)[6]); converted::take_as<double>(s.fog_density, (*v.rows)[7]); converted::take_as<double>(s.exposure, (*v.rows)[8]); converted::take_as<double>(s.ao_radius, (*v.rows)[9]); converted::take_as<double>(s.shadow_distance, (*v.rows)[10]); converted::take_as<bool>(s.clouds, (*v.rows)[11]); converted::take_as<Vec3>(s.ground_color, (*v.rows)[12]); converted::take_as<bool>(s.ground, (*v.rows)[13]); converted::take_as<double>(s.ground_friction, (*v.rows)[14]); converted::take_as<double>(s.ground_restitution, (*v.rows)[15]); converted::take_as<std::string>(s.ground_surface, (*v.rows)[16]); converted::take_as<double>(s.contact_hertz, (*v.rows)[17]); converted::take_as<double>(s.contact_damping, (*v.rows)[18]); converted::take_as<double>(s.contact_speed, (*v.rows)[19]); converted::take_as<double>(s.kill_z, (*v.rows)[20]); converted::take_as<std::string>(s.title, (*v.rows)[21]); converted::take_as<game::GameGoal>(s.goal, (*v.rows)[22]); converted::take_as<double>(s.time_limit, (*v.rows)[23]); converted::take_as<double>(s.score_target, (*v.rows)[24]); converted::take_as<unsigned int>(s.player, (*v.rows)[25]); converted::take_as<bool>(s.observer, (*v.rows)[26]); converted::take_as<double>(s.master_volume, (*v.rows)[27]); converted::take_as<std::string>(s.music, (*v.rows)[28]); converted::take_as<double>(s.music_volume, (*v.rows)[29]); converted::take_as<std::string>(s.ambience, (*v.rows)[30]); converted::take_as<double>(s.ambience_volume, (*v.rows)[31]); converted::take_as<double>(s.reverb, (*v.rows)[32]); converted::take_as<double>(s.doppler, (*v.rows)[33]); }
+}
+[[maybe_unused]] static game::Transform draw_kern__game__Transform(converted::Draw& draw) {
+  game::Transform s{};
+  s.position = draw.vector();
+  s.rotation = draw.vector();
+  s.scale = draw.vector();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::Transform& s) { return converted::Value::structure({arg(s.position), arg(s.rotation), arg(s.scale)}); }
+[[maybe_unused]] static bool same(const game::Transform& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.rotation, (*got.rows)[1]), ".rotation") && converted::at_place(same(want.scale, (*got.rows)[2]), ".scale"); }
+[[maybe_unused]] static bool defined(const game::Transform& s) { return defined(s.position) && defined(s.rotation) && defined(s.scale); }
+[[maybe_unused]] static std::string text(const game::Transform& s) { return std::string("{") + text(s.position) + ", " + text(s.rotation) + ", " + text(s.scale) + "}"; }
+[[maybe_unused]] static void take(game::Transform& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<Vec3>(s.rotation, (*v.rows)[1]); converted::take_as<Vec3>(s.scale, (*v.rows)[2]); }
+}
+[[maybe_unused]] static game::MaterialDesc draw_kern__game__MaterialDesc(converted::Draw& draw) {
+  game::MaterialDesc s{};
+  s.color = draw.vector();
+  s.roughness = draw.number();
+  s.metalness = draw.number();
+  s.emissive = draw.vector();
+  s.emissive_strength = draw.number();
+  s.opacity = draw.number();
+  s.unlit = draw.flag();
+  s.cast_shadow = draw.flag();
+  s.double_sided = draw.flag();
+  s.texture = draw.word();
+  s.tiling = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::MaterialDesc& s) { return converted::Value::structure({arg(s.color), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.emissive_strength), arg(s.opacity), arg(s.unlit), arg(s.cast_shadow), arg(s.double_sided), arg(s.texture), arg(s.tiling)}); }
+[[maybe_unused]] static bool same(const game::MaterialDesc& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.roughness, (*got.rows)[1]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[2]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[3]), ".emissive") && converted::at_place(same(want.emissive_strength, (*got.rows)[4]), ".emissive_strength") && converted::at_place(same(want.opacity, (*got.rows)[5]), ".opacity") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.cast_shadow, (*got.rows)[7]), ".cast_shadow") && converted::at_place(same(want.double_sided, (*got.rows)[8]), ".double_sided") && converted::at_place(same(want.texture, (*got.rows)[9]), ".texture") && converted::at_place(same(want.tiling, (*got.rows)[10]), ".tiling"); }
+[[maybe_unused]] static bool defined(const game::MaterialDesc& s) { return defined(s.color) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.emissive_strength) && defined(s.opacity) && defined(s.unlit) && defined(s.cast_shadow) && defined(s.double_sided) && defined(s.texture) && defined(s.tiling); }
+[[maybe_unused]] static std::string text(const game::MaterialDesc& s) { return std::string("{") + text(s.color) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.emissive_strength) + ", " + text(s.opacity) + ", " + text(s.unlit) + ", " + text(s.cast_shadow) + ", " + text(s.double_sided) + ", " + text(s.texture) + ", " + text(s.tiling) + "}"; }
+[[maybe_unused]] static void take(game::MaterialDesc& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<Vec3>(s.color, (*v.rows)[0]); converted::take_as<double>(s.roughness, (*v.rows)[1]); converted::take_as<double>(s.metalness, (*v.rows)[2]); converted::take_as<Vec3>(s.emissive, (*v.rows)[3]); converted::take_as<double>(s.emissive_strength, (*v.rows)[4]); converted::take_as<double>(s.opacity, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[7]); converted::take_as<bool>(s.double_sided, (*v.rows)[8]); converted::take_as<std::string>(s.texture, (*v.rows)[9]); converted::take_as<double>(s.tiling, (*v.rows)[10]); }
+}
+[[maybe_unused]] static game::MeshComponent draw_kern__game__MeshComponent(converted::Draw& draw) {
+  game::MeshComponent s{};
+  s.shape = converted::enum_value<game::Shape>(draw.below(9));
+  s.size = draw.vector();
+  s.radius = draw.number();
+  s.height = draw.number();
+  s.segments = static_cast<int>(draw.whole());
+  s.asset = draw.word();
+  s.collision = draw.flag();
+  s.friction = draw.number();
+  s.restitution = draw.number();
+  s.rolling_resistance = draw.number();
+  s.surface = draw.word();
+  s.material = draw_kern__game__MaterialDesc(draw);
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::MeshComponent& s) { return converted::Value::structure({arg(s.shape), arg(s.size), arg(s.radius), arg(s.height), arg(s.segments), arg(s.asset), arg(s.collision), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.surface), arg(s.material)}); }
+[[maybe_unused]] static bool same(const game::MeshComponent& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.shape, (*got.rows)[0]), ".shape") && converted::at_place(same(want.size, (*got.rows)[1]), ".size") && converted::at_place(same(want.radius, (*got.rows)[2]), ".radius") && converted::at_place(same(want.height, (*got.rows)[3]), ".height") && converted::at_place(same(want.segments, (*got.rows)[4]), ".segments") && converted::at_place(same(want.asset, (*got.rows)[5]), ".asset") && converted::at_place(same(want.collision, (*got.rows)[6]), ".collision") && converted::at_place(same(want.friction, (*got.rows)[7]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[8]), ".restitution") && converted::at_place(same(want.rolling_resistance, (*got.rows)[9]), ".rolling_resistance") && converted::at_place(same(want.surface, (*got.rows)[10]), ".surface") && converted::at_place(same(want.material, (*got.rows)[11]), ".material"); }
+[[maybe_unused]] static bool defined(const game::MeshComponent& s) { return defined(s.shape) && defined(s.size) && defined(s.radius) && defined(s.height) && defined(s.segments) && defined(s.asset) && defined(s.collision) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.surface) && defined(s.material); }
+[[maybe_unused]] static std::string text(const game::MeshComponent& s) { return std::string("{") + text(s.shape) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.height) + ", " + text(s.segments) + ", " + text(s.asset) + ", " + text(s.collision) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.surface) + ", " + text(s.material) + "}"; }
+[[maybe_unused]] static void take(game::MeshComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<game::Shape>(s.shape, (*v.rows)[0]); converted::take_as<Vec3>(s.size, (*v.rows)[1]); converted::take_as<double>(s.radius, (*v.rows)[2]); converted::take_as<double>(s.height, (*v.rows)[3]); converted::take_as<int>(s.segments, (*v.rows)[4]); converted::take_as<std::string>(s.asset, (*v.rows)[5]); converted::take_as<bool>(s.collision, (*v.rows)[6]); converted::take_as<double>(s.friction, (*v.rows)[7]); converted::take_as<double>(s.restitution, (*v.rows)[8]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[9]); converted::take_as<std::string>(s.surface, (*v.rows)[10]); converted::take_as<game::MaterialDesc>(s.material, (*v.rows)[11]); }
+}
+[[maybe_unused]] static game::LightComponent draw_kern__game__LightComponent(converted::Draw& draw) {
+  game::LightComponent s{};
+  s.color = draw.vector();
+  s.intensity = draw.number();
+  s.range = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::LightComponent& s) { return converted::Value::structure({arg(s.color), arg(s.intensity), arg(s.range)}); }
+[[maybe_unused]] static bool same(const game::LightComponent& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.intensity, (*got.rows)[1]), ".intensity") && converted::at_place(same(want.range, (*got.rows)[2]), ".range"); }
+[[maybe_unused]] static bool defined(const game::LightComponent& s) { return defined(s.color) && defined(s.intensity) && defined(s.range); }
+[[maybe_unused]] static std::string text(const game::LightComponent& s) { return std::string("{") + text(s.color) + ", " + text(s.intensity) + ", " + text(s.range) + "}"; }
+[[maybe_unused]] static void take(game::LightComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.color, (*v.rows)[0]); converted::take_as<double>(s.intensity, (*v.rows)[1]); converted::take_as<double>(s.range, (*v.rows)[2]); }
+}
+[[maybe_unused]] static game::BodyComponent draw_kern__game__BodyComponent(converted::Draw& draw) {
+  game::BodyComponent s{};
+  s.motion = converted::enum_value<game::Motion>(draw.below(3));
+  s.mass = draw.number();
+  s.linear_damping = draw.number();
+  s.angular_damping = draw.number();
+  s.gravity_scale = draw.number();
+  s.bullet = draw.flag();
+  s.start_awake = draw.flag();
+  s.allow_sleep = draw.flag();
+  converted::fill_array(s.lock_linear, [&]() -> bool { return draw.flag(); });
+  converted::fill_array(s.lock_angular, [&]() -> bool { return draw.flag(); });
+  s.linear_velocity = draw.vector();
+  s.angular_velocity = draw.vector();
+  s.impact_sound = draw.word();
+  s.impact_threshold = draw.number();
+  s.center_of_mass = draw.vector();
+  converted::fill_array(s.inertia, [&]() -> double { return draw.number(); });
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::BodyComponent& s) { return converted::Value::structure({arg(s.motion), arg(s.mass), arg(s.linear_damping), arg(s.angular_damping), arg(s.gravity_scale), arg(s.bullet), arg(s.start_awake), arg(s.allow_sleep), arg(converted::array_list(s.lock_linear)), arg(converted::array_list(s.lock_angular)), arg(s.linear_velocity), arg(s.angular_velocity), arg(s.impact_sound), arg(s.impact_threshold), arg(s.center_of_mass), arg(converted::array_list(s.inertia))}); }
+[[maybe_unused]] static bool same(const game::BodyComponent& want, const converted::Value& got) { return converted::rows_of(got, 16) && converted::at_place(same(want.motion, (*got.rows)[0]), ".motion") && converted::at_place(same(want.mass, (*got.rows)[1]), ".mass") && converted::at_place(same(want.linear_damping, (*got.rows)[2]), ".linear_damping") && converted::at_place(same(want.angular_damping, (*got.rows)[3]), ".angular_damping") && converted::at_place(same(want.gravity_scale, (*got.rows)[4]), ".gravity_scale") && converted::at_place(same(want.bullet, (*got.rows)[5]), ".bullet") && converted::at_place(same(want.start_awake, (*got.rows)[6]), ".start_awake") && converted::at_place(same(want.allow_sleep, (*got.rows)[7]), ".allow_sleep") && converted::at_place(same(converted::array_list(want.lock_linear), (*got.rows)[8]), ".lock_linear") && converted::at_place(same(converted::array_list(want.lock_angular), (*got.rows)[9]), ".lock_angular") && converted::at_place(same(want.linear_velocity, (*got.rows)[10]), ".linear_velocity") && converted::at_place(same(want.angular_velocity, (*got.rows)[11]), ".angular_velocity") && converted::at_place(same(want.impact_sound, (*got.rows)[12]), ".impact_sound") && converted::at_place(same(want.impact_threshold, (*got.rows)[13]), ".impact_threshold") && converted::at_place(same(want.center_of_mass, (*got.rows)[14]), ".center_of_mass") && converted::at_place(same(converted::array_list(want.inertia), (*got.rows)[15]), ".inertia"); }
+[[maybe_unused]] static bool defined(const game::BodyComponent& s) { return defined(s.motion) && defined(s.mass) && defined(s.linear_damping) && defined(s.angular_damping) && defined(s.gravity_scale) && defined(s.bullet) && defined(s.start_awake) && defined(s.allow_sleep) && defined(converted::array_list(s.lock_linear)) && defined(converted::array_list(s.lock_angular)) && defined(s.linear_velocity) && defined(s.angular_velocity) && defined(s.impact_sound) && defined(s.impact_threshold) && defined(s.center_of_mass) && defined(converted::array_list(s.inertia)); }
+[[maybe_unused]] static std::string text(const game::BodyComponent& s) { return std::string("{") + text(s.motion) + ", " + text(s.mass) + ", " + text(s.linear_damping) + ", " + text(s.angular_damping) + ", " + text(s.gravity_scale) + ", " + text(s.bullet) + ", " + text(s.start_awake) + ", " + text(s.allow_sleep) + ", " + text(converted::array_list(s.lock_linear)) + ", " + text(converted::array_list(s.lock_angular)) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.impact_sound) + ", " + text(s.impact_threshold) + ", " + text(s.center_of_mass) + ", " + text(converted::array_list(s.inertia)) + "}"; }
+[[maybe_unused]] static void take(game::BodyComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 16) return; converted::take_as<game::Motion>(s.motion, (*v.rows)[0]); converted::take_as<double>(s.mass, (*v.rows)[1]); converted::take_as<double>(s.linear_damping, (*v.rows)[2]); converted::take_as<double>(s.angular_damping, (*v.rows)[3]); converted::take_as<double>(s.gravity_scale, (*v.rows)[4]); converted::take_as<bool>(s.bullet, (*v.rows)[5]); converted::take_as<bool>(s.start_awake, (*v.rows)[6]); converted::take_as<bool>(s.allow_sleep, (*v.rows)[7]); { std::vector<bool> items; converted::take_as<std::vector<bool>>(items, (*v.rows)[8]); converted::array_from(s.lock_linear, items); } { std::vector<bool> items; converted::take_as<std::vector<bool>>(items, (*v.rows)[9]); converted::array_from(s.lock_angular, items); } converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[10]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[11]); converted::take_as<std::string>(s.impact_sound, (*v.rows)[12]); converted::take_as<double>(s.impact_threshold, (*v.rows)[13]); converted::take_as<Vec3>(s.center_of_mass, (*v.rows)[14]); { std::vector<double> items; converted::take_as<std::vector<double>>(items, (*v.rows)[15]); converted::array_from(s.inertia, items); } }
+}
+[[maybe_unused]] static game::ColliderComponent draw_kern__game__ColliderComponent(converted::Draw& draw) {
+  game::ColliderComponent s{};
+  s.shape = converted::enum_value<game::ColliderShape>(draw.below(5));
+  s.center = draw.vector();
+  s.rotation = draw.vector();
+  s.size = draw.vector();
+  s.radius = draw.number();
+  s.length = draw.number();
+  s.points = draw_list(draw, [&]() -> Vec3 { return draw.vector(); });
+  s.density = draw.number();
+  s.friction = draw.number();
+  s.restitution = draw.number();
+  s.rolling_resistance = draw.number();
+  s.surface = draw.word();
+  s.sensor = draw.flag();
+  s.category = static_cast<unsigned int>(draw.below(40));
+  s.mask = static_cast<unsigned int>(draw.below(40));
+  s.group = static_cast<int>(draw.whole());
+  s.impact_sound = draw.word();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::ColliderComponent& s) { return converted::Value::structure({arg(s.shape), arg(s.center), arg(s.rotation), arg(s.size), arg(s.radius), arg(s.length), arg(s.points), arg(s.density), arg(s.friction), arg(s.restitution), arg(s.rolling_resistance), arg(s.surface), arg(s.sensor), arg(s.category), arg(s.mask), arg(s.group), arg(s.impact_sound)}); }
+[[maybe_unused]] static bool same(const game::ColliderComponent& want, const converted::Value& got) { return converted::rows_of(got, 17) && converted::at_place(same(want.shape, (*got.rows)[0]), ".shape") && converted::at_place(same(want.center, (*got.rows)[1]), ".center") && converted::at_place(same(want.rotation, (*got.rows)[2]), ".rotation") && converted::at_place(same(want.size, (*got.rows)[3]), ".size") && converted::at_place(same(want.radius, (*got.rows)[4]), ".radius") && converted::at_place(same(want.length, (*got.rows)[5]), ".length") && converted::at_place(same(want.points, (*got.rows)[6]), ".points") && converted::at_place(same(want.density, (*got.rows)[7]), ".density") && converted::at_place(same(want.friction, (*got.rows)[8]), ".friction") && converted::at_place(same(want.restitution, (*got.rows)[9]), ".restitution") && converted::at_place(same(want.rolling_resistance, (*got.rows)[10]), ".rolling_resistance") && converted::at_place(same(want.surface, (*got.rows)[11]), ".surface") && converted::at_place(same(want.sensor, (*got.rows)[12]), ".sensor") && converted::at_place(same(want.category, (*got.rows)[13]), ".category") && converted::at_place(same(want.mask, (*got.rows)[14]), ".mask") && converted::at_place(same(want.group, (*got.rows)[15]), ".group") && converted::at_place(same(want.impact_sound, (*got.rows)[16]), ".impact_sound"); }
+[[maybe_unused]] static bool defined(const game::ColliderComponent& s) { return defined(s.shape) && defined(s.center) && defined(s.rotation) && defined(s.size) && defined(s.radius) && defined(s.length) && defined(s.points) && defined(s.density) && defined(s.friction) && defined(s.restitution) && defined(s.rolling_resistance) && defined(s.surface) && defined(s.sensor) && defined(s.category) && defined(s.mask) && defined(s.group) && defined(s.impact_sound); }
+[[maybe_unused]] static std::string text(const game::ColliderComponent& s) { return std::string("{") + text(s.shape) + ", " + text(s.center) + ", " + text(s.rotation) + ", " + text(s.size) + ", " + text(s.radius) + ", " + text(s.length) + ", " + text(s.points) + ", " + text(s.density) + ", " + text(s.friction) + ", " + text(s.restitution) + ", " + text(s.rolling_resistance) + ", " + text(s.surface) + ", " + text(s.sensor) + ", " + text(s.category) + ", " + text(s.mask) + ", " + text(s.group) + ", " + text(s.impact_sound) + "}"; }
+[[maybe_unused]] static void take(game::ColliderComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 17) return; converted::take_as<game::ColliderShape>(s.shape, (*v.rows)[0]); converted::take_as<Vec3>(s.center, (*v.rows)[1]); converted::take_as<Vec3>(s.rotation, (*v.rows)[2]); converted::take_as<Vec3>(s.size, (*v.rows)[3]); converted::take_as<double>(s.radius, (*v.rows)[4]); converted::take_as<double>(s.length, (*v.rows)[5]); converted::take_as<std::vector<Vec3>>(s.points, (*v.rows)[6]); converted::take_as<double>(s.density, (*v.rows)[7]); converted::take_as<double>(s.friction, (*v.rows)[8]); converted::take_as<double>(s.restitution, (*v.rows)[9]); converted::take_as<double>(s.rolling_resistance, (*v.rows)[10]); converted::take_as<std::string>(s.surface, (*v.rows)[11]); converted::take_as<bool>(s.sensor, (*v.rows)[12]); converted::take_as<unsigned int>(s.category, (*v.rows)[13]); converted::take_as<unsigned int>(s.mask, (*v.rows)[14]); converted::take_as<int>(s.group, (*v.rows)[15]); converted::take_as<std::string>(s.impact_sound, (*v.rows)[16]); }
+}
+[[maybe_unused]] static game::JointComponent draw_kern__game__JointComponent(converted::Draw& draw) {
+  game::JointComponent s{};
+  s.kind = converted::enum_value<game::JointKind>(draw.below(9));
+  s.target = static_cast<unsigned int>(draw.below(40));
+  s.anchor = draw.vector();
+  s.axis = draw.vector();
+  s.collide_connected = draw.flag();
+  s.enable_limit = draw.flag();
+  s.lower = draw.number();
+  s.upper = draw.number();
+  s.reference = draw.number();
+  s.enable_motor = draw.flag();
+  s.motor_speed = draw.number();
+  s.max_motor_force = draw.number();
+  s.enable_spring = draw.flag();
+  s.spring_hertz = draw.number();
+  s.spring_damping = draw.number();
+  s.length = draw.number();
+  s.break_force = draw.number();
+  s.break_torque = draw.number();
+  s.servo = draw.flag();
+  s.servo_target = draw.number();
+  s.servo_stiffness = draw.number();
+  s.servo_damping = draw.number();
+  s.servo_friction = draw.number();
+  s.break_sound = draw.word();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::JointComponent& s) { return converted::Value::structure({arg(s.kind), arg(s.target), arg(s.anchor), arg(s.axis), arg(s.collide_connected), arg(s.enable_limit), arg(s.lower), arg(s.upper), arg(s.reference), arg(s.enable_motor), arg(s.motor_speed), arg(s.max_motor_force), arg(s.enable_spring), arg(s.spring_hertz), arg(s.spring_damping), arg(s.length), arg(s.break_force), arg(s.break_torque), arg(s.servo), arg(s.servo_target), arg(s.servo_stiffness), arg(s.servo_damping), arg(s.servo_friction), arg(s.break_sound)}); }
+[[maybe_unused]] static bool same(const game::JointComponent& want, const converted::Value& got) { return converted::rows_of(got, 24) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.target, (*got.rows)[1]), ".target") && converted::at_place(same(want.anchor, (*got.rows)[2]), ".anchor") && converted::at_place(same(want.axis, (*got.rows)[3]), ".axis") && converted::at_place(same(want.collide_connected, (*got.rows)[4]), ".collide_connected") && converted::at_place(same(want.enable_limit, (*got.rows)[5]), ".enable_limit") && converted::at_place(same(want.lower, (*got.rows)[6]), ".lower") && converted::at_place(same(want.upper, (*got.rows)[7]), ".upper") && converted::at_place(same(want.reference, (*got.rows)[8]), ".reference") && converted::at_place(same(want.enable_motor, (*got.rows)[9]), ".enable_motor") && converted::at_place(same(want.motor_speed, (*got.rows)[10]), ".motor_speed") && converted::at_place(same(want.max_motor_force, (*got.rows)[11]), ".max_motor_force") && converted::at_place(same(want.enable_spring, (*got.rows)[12]), ".enable_spring") && converted::at_place(same(want.spring_hertz, (*got.rows)[13]), ".spring_hertz") && converted::at_place(same(want.spring_damping, (*got.rows)[14]), ".spring_damping") && converted::at_place(same(want.length, (*got.rows)[15]), ".length") && converted::at_place(same(want.break_force, (*got.rows)[16]), ".break_force") && converted::at_place(same(want.break_torque, (*got.rows)[17]), ".break_torque") && converted::at_place(same(want.servo, (*got.rows)[18]), ".servo") && converted::at_place(same(want.servo_target, (*got.rows)[19]), ".servo_target") && converted::at_place(same(want.servo_stiffness, (*got.rows)[20]), ".servo_stiffness") && converted::at_place(same(want.servo_damping, (*got.rows)[21]), ".servo_damping") && converted::at_place(same(want.servo_friction, (*got.rows)[22]), ".servo_friction") && converted::at_place(same(want.break_sound, (*got.rows)[23]), ".break_sound"); }
+[[maybe_unused]] static bool defined(const game::JointComponent& s) { return defined(s.kind) && defined(s.target) && defined(s.anchor) && defined(s.axis) && defined(s.collide_connected) && defined(s.enable_limit) && defined(s.lower) && defined(s.upper) && defined(s.reference) && defined(s.enable_motor) && defined(s.motor_speed) && defined(s.max_motor_force) && defined(s.enable_spring) && defined(s.spring_hertz) && defined(s.spring_damping) && defined(s.length) && defined(s.break_force) && defined(s.break_torque) && defined(s.servo) && defined(s.servo_target) && defined(s.servo_stiffness) && defined(s.servo_damping) && defined(s.servo_friction) && defined(s.break_sound); }
+[[maybe_unused]] static std::string text(const game::JointComponent& s) { return std::string("{") + text(s.kind) + ", " + text(s.target) + ", " + text(s.anchor) + ", " + text(s.axis) + ", " + text(s.collide_connected) + ", " + text(s.enable_limit) + ", " + text(s.lower) + ", " + text(s.upper) + ", " + text(s.reference) + ", " + text(s.enable_motor) + ", " + text(s.motor_speed) + ", " + text(s.max_motor_force) + ", " + text(s.enable_spring) + ", " + text(s.spring_hertz) + ", " + text(s.spring_damping) + ", " + text(s.length) + ", " + text(s.break_force) + ", " + text(s.break_torque) + ", " + text(s.servo) + ", " + text(s.servo_target) + ", " + text(s.servo_stiffness) + ", " + text(s.servo_damping) + ", " + text(s.servo_friction) + ", " + text(s.break_sound) + "}"; }
+[[maybe_unused]] static void take(game::JointComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 24) return; converted::take_as<game::JointKind>(s.kind, (*v.rows)[0]); converted::take_as<unsigned int>(s.target, (*v.rows)[1]); converted::take_as<Vec3>(s.anchor, (*v.rows)[2]); converted::take_as<Vec3>(s.axis, (*v.rows)[3]); converted::take_as<bool>(s.collide_connected, (*v.rows)[4]); converted::take_as<bool>(s.enable_limit, (*v.rows)[5]); converted::take_as<double>(s.lower, (*v.rows)[6]); converted::take_as<double>(s.upper, (*v.rows)[7]); converted::take_as<double>(s.reference, (*v.rows)[8]); converted::take_as<bool>(s.enable_motor, (*v.rows)[9]); converted::take_as<double>(s.motor_speed, (*v.rows)[10]); converted::take_as<double>(s.max_motor_force, (*v.rows)[11]); converted::take_as<bool>(s.enable_spring, (*v.rows)[12]); converted::take_as<double>(s.spring_hertz, (*v.rows)[13]); converted::take_as<double>(s.spring_damping, (*v.rows)[14]); converted::take_as<double>(s.length, (*v.rows)[15]); converted::take_as<double>(s.break_force, (*v.rows)[16]); converted::take_as<double>(s.break_torque, (*v.rows)[17]); converted::take_as<bool>(s.servo, (*v.rows)[18]); converted::take_as<double>(s.servo_target, (*v.rows)[19]); converted::take_as<double>(s.servo_stiffness, (*v.rows)[20]); converted::take_as<double>(s.servo_damping, (*v.rows)[21]); converted::take_as<double>(s.servo_friction, (*v.rows)[22]); converted::take_as<std::string>(s.break_sound, (*v.rows)[23]); }
+}
+[[maybe_unused]] static game::PickupComponent draw_kern__game__PickupComponent(converted::Draw& draw) {
+  game::PickupComponent s{};
+  s.points = draw.number();
+  s.burst_color = draw.vector();
+  s.respawn = draw.number();
+  s.sound = draw.word();
+  s.heal = draw.number();
+  s.ammo = static_cast<int>(draw.whole());
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::PickupComponent& s) { return converted::Value::structure({arg(s.points), arg(s.burst_color), arg(s.respawn), arg(s.sound), arg(s.heal), arg(s.ammo)}); }
+[[maybe_unused]] static bool same(const game::PickupComponent& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.points, (*got.rows)[0]), ".points") && converted::at_place(same(want.burst_color, (*got.rows)[1]), ".burst_color") && converted::at_place(same(want.respawn, (*got.rows)[2]), ".respawn") && converted::at_place(same(want.sound, (*got.rows)[3]), ".sound") && converted::at_place(same(want.heal, (*got.rows)[4]), ".heal") && converted::at_place(same(want.ammo, (*got.rows)[5]), ".ammo"); }
+[[maybe_unused]] static bool defined(const game::PickupComponent& s) { return defined(s.points) && defined(s.burst_color) && defined(s.respawn) && defined(s.sound) && defined(s.heal) && defined(s.ammo); }
+[[maybe_unused]] static std::string text(const game::PickupComponent& s) { return std::string("{") + text(s.points) + ", " + text(s.burst_color) + ", " + text(s.respawn) + ", " + text(s.sound) + ", " + text(s.heal) + ", " + text(s.ammo) + "}"; }
+[[maybe_unused]] static void take(game::PickupComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<double>(s.points, (*v.rows)[0]); converted::take_as<Vec3>(s.burst_color, (*v.rows)[1]); converted::take_as<double>(s.respawn, (*v.rows)[2]); converted::take_as<std::string>(s.sound, (*v.rows)[3]); converted::take_as<double>(s.heal, (*v.rows)[4]); converted::take_as<int>(s.ammo, (*v.rows)[5]); }
+}
+[[maybe_unused]] static game::TriggerComponent draw_kern__game__TriggerComponent(converted::Draw& draw) {
+  game::TriggerComponent s{};
+  s.action = converted::enum_value<game::TriggerAction>(draw.below(8));
+  s.message = draw.word();
+  s.once = draw.flag();
+  s.sound = draw.word();
+  s.strength = draw.number();
+  s.target = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::TriggerComponent& s) { return converted::Value::structure({arg(s.action), arg(s.message), arg(s.once), arg(s.sound), arg(s.strength), arg(s.target)}); }
+[[maybe_unused]] static bool same(const game::TriggerComponent& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.action, (*got.rows)[0]), ".action") && converted::at_place(same(want.message, (*got.rows)[1]), ".message") && converted::at_place(same(want.once, (*got.rows)[2]), ".once") && converted::at_place(same(want.sound, (*got.rows)[3]), ".sound") && converted::at_place(same(want.strength, (*got.rows)[4]), ".strength") && converted::at_place(same(want.target, (*got.rows)[5]), ".target"); }
+[[maybe_unused]] static bool defined(const game::TriggerComponent& s) { return defined(s.action) && defined(s.message) && defined(s.once) && defined(s.sound) && defined(s.strength) && defined(s.target); }
+[[maybe_unused]] static std::string text(const game::TriggerComponent& s) { return std::string("{") + text(s.action) + ", " + text(s.message) + ", " + text(s.once) + ", " + text(s.sound) + ", " + text(s.strength) + ", " + text(s.target) + "}"; }
+[[maybe_unused]] static void take(game::TriggerComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<game::TriggerAction>(s.action, (*v.rows)[0]); converted::take_as<std::string>(s.message, (*v.rows)[1]); converted::take_as<bool>(s.once, (*v.rows)[2]); converted::take_as<std::string>(s.sound, (*v.rows)[3]); converted::take_as<double>(s.strength, (*v.rows)[4]); converted::take_as<unsigned int>(s.target, (*v.rows)[5]); }
+}
+[[maybe_unused]] static game::RotatorComponent draw_kern__game__RotatorComponent(converted::Draw& draw) {
+  game::RotatorComponent s{};
+  s.rate = draw.vector();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::RotatorComponent& s) { return converted::Value::structure({arg(s.rate)}); }
+[[maybe_unused]] static bool same(const game::RotatorComponent& want, const converted::Value& got) { return converted::rows_of(got, 1) && converted::at_place(same(want.rate, (*got.rows)[0]), ".rate"); }
+[[maybe_unused]] static bool defined(const game::RotatorComponent& s) { return defined(s.rate); }
+[[maybe_unused]] static std::string text(const game::RotatorComponent& s) { return std::string("{") + text(s.rate) + "}"; }
+[[maybe_unused]] static void take(game::RotatorComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 1) return; converted::take_as<Vec3>(s.rate, (*v.rows)[0]); }
+}
+[[maybe_unused]] static game::MoverComponent draw_kern__game__MoverComponent(converted::Draw& draw) {
+  game::MoverComponent s{};
+  s.offset = draw.vector();
+  s.period = draw.number();
+  s.phase = draw.number();
+  s.mode = converted::enum_value<game::MoverMode>(draw.below(3));
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::MoverComponent& s) { return converted::Value::structure({arg(s.offset), arg(s.period), arg(s.phase), arg(s.mode)}); }
+[[maybe_unused]] static bool same(const game::MoverComponent& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.offset, (*got.rows)[0]), ".offset") && converted::at_place(same(want.period, (*got.rows)[1]), ".period") && converted::at_place(same(want.phase, (*got.rows)[2]), ".phase") && converted::at_place(same(want.mode, (*got.rows)[3]), ".mode"); }
+[[maybe_unused]] static bool defined(const game::MoverComponent& s) { return defined(s.offset) && defined(s.period) && defined(s.phase) && defined(s.mode); }
+[[maybe_unused]] static std::string text(const game::MoverComponent& s) { return std::string("{") + text(s.offset) + ", " + text(s.period) + ", " + text(s.phase) + ", " + text(s.mode) + "}"; }
+[[maybe_unused]] static void take(game::MoverComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<Vec3>(s.offset, (*v.rows)[0]); converted::take_as<double>(s.period, (*v.rows)[1]); converted::take_as<double>(s.phase, (*v.rows)[2]); converted::take_as<game::MoverMode>(s.mode, (*v.rows)[3]); }
+}
+[[maybe_unused]] static game::CityComponent draw_kern__game__CityComponent(converted::Draw& draw) {
+  game::CityComponent s{};
+  s.seed = static_cast<unsigned int>(draw.below(40));
+  s.blocks = static_cast<int>(draw.whole());
+  s.pitch = draw.number();
+  s.street = draw.number();
+  s.max_height = draw.number();
+  s.trees = draw.flag();
+  s.traffic = static_cast<int>(draw.whole());
+  s.night_windows = draw.flag();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::CityComponent& s) { return converted::Value::structure({arg(s.seed), arg(s.blocks), arg(s.pitch), arg(s.street), arg(s.max_height), arg(s.trees), arg(s.traffic), arg(s.night_windows)}); }
+[[maybe_unused]] static bool same(const game::CityComponent& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.seed, (*got.rows)[0]), ".seed") && converted::at_place(same(want.blocks, (*got.rows)[1]), ".blocks") && converted::at_place(same(want.pitch, (*got.rows)[2]), ".pitch") && converted::at_place(same(want.street, (*got.rows)[3]), ".street") && converted::at_place(same(want.max_height, (*got.rows)[4]), ".max_height") && converted::at_place(same(want.trees, (*got.rows)[5]), ".trees") && converted::at_place(same(want.traffic, (*got.rows)[6]), ".traffic") && converted::at_place(same(want.night_windows, (*got.rows)[7]), ".night_windows"); }
+[[maybe_unused]] static bool defined(const game::CityComponent& s) { return defined(s.seed) && defined(s.blocks) && defined(s.pitch) && defined(s.street) && defined(s.max_height) && defined(s.trees) && defined(s.traffic) && defined(s.night_windows); }
+[[maybe_unused]] static std::string text(const game::CityComponent& s) { return std::string("{") + text(s.seed) + ", " + text(s.blocks) + ", " + text(s.pitch) + ", " + text(s.street) + ", " + text(s.max_height) + ", " + text(s.trees) + ", " + text(s.traffic) + ", " + text(s.night_windows) + "}"; }
+[[maybe_unused]] static void take(game::CityComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<unsigned int>(s.seed, (*v.rows)[0]); converted::take_as<int>(s.blocks, (*v.rows)[1]); converted::take_as<double>(s.pitch, (*v.rows)[2]); converted::take_as<double>(s.street, (*v.rows)[3]); converted::take_as<double>(s.max_height, (*v.rows)[4]); converted::take_as<bool>(s.trees, (*v.rows)[5]); converted::take_as<int>(s.traffic, (*v.rows)[6]); converted::take_as<bool>(s.night_windows, (*v.rows)[7]); }
+}
+[[maybe_unused]] static game::AudioComponent draw_kern__game__AudioComponent(converted::Draw& draw) {
+  game::AudioComponent s{};
+  s.sound = draw.word();
+  s.volume = draw.number();
+  s.pitch = draw.number();
+  s.loop = draw.flag();
+  s.autoplay = draw.flag();
+  s.spatial = draw.flag();
+  s.min_distance = draw.number();
+  s.max_distance = draw.number();
+  s.rolloff = converted::enum_value<audio::Rolloff>(draw.below(3));
+  s.bus = converted::enum_value<audio::Bus>(draw.below(7));
+  s.doppler = draw.number();
+  s.pitch_by_speed = draw.number();
+  s.delay = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::AudioComponent& s) { return converted::Value::structure({arg(s.sound), arg(s.volume), arg(s.pitch), arg(s.loop), arg(s.autoplay), arg(s.spatial), arg(s.min_distance), arg(s.max_distance), arg(s.rolloff), arg(s.bus), arg(s.doppler), arg(s.pitch_by_speed), arg(s.delay)}); }
+[[maybe_unused]] static bool same(const game::AudioComponent& want, const converted::Value& got) { return converted::rows_of(got, 13) && converted::at_place(same(want.sound, (*got.rows)[0]), ".sound") && converted::at_place(same(want.volume, (*got.rows)[1]), ".volume") && converted::at_place(same(want.pitch, (*got.rows)[2]), ".pitch") && converted::at_place(same(want.loop, (*got.rows)[3]), ".loop") && converted::at_place(same(want.autoplay, (*got.rows)[4]), ".autoplay") && converted::at_place(same(want.spatial, (*got.rows)[5]), ".spatial") && converted::at_place(same(want.min_distance, (*got.rows)[6]), ".min_distance") && converted::at_place(same(want.max_distance, (*got.rows)[7]), ".max_distance") && converted::at_place(same(want.rolloff, (*got.rows)[8]), ".rolloff") && converted::at_place(same(want.bus, (*got.rows)[9]), ".bus") && converted::at_place(same(want.doppler, (*got.rows)[10]), ".doppler") && converted::at_place(same(want.pitch_by_speed, (*got.rows)[11]), ".pitch_by_speed") && converted::at_place(same(want.delay, (*got.rows)[12]), ".delay"); }
+[[maybe_unused]] static bool defined(const game::AudioComponent& s) { return defined(s.sound) && defined(s.volume) && defined(s.pitch) && defined(s.loop) && defined(s.autoplay) && defined(s.spatial) && defined(s.min_distance) && defined(s.max_distance) && defined(s.rolloff) && defined(s.bus) && defined(s.doppler) && defined(s.pitch_by_speed) && defined(s.delay); }
+[[maybe_unused]] static std::string text(const game::AudioComponent& s) { return std::string("{") + text(s.sound) + ", " + text(s.volume) + ", " + text(s.pitch) + ", " + text(s.loop) + ", " + text(s.autoplay) + ", " + text(s.spatial) + ", " + text(s.min_distance) + ", " + text(s.max_distance) + ", " + text(s.rolloff) + ", " + text(s.bus) + ", " + text(s.doppler) + ", " + text(s.pitch_by_speed) + ", " + text(s.delay) + "}"; }
+[[maybe_unused]] static void take(game::AudioComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 13) return; converted::take_as<std::string>(s.sound, (*v.rows)[0]); converted::take_as<double>(s.volume, (*v.rows)[1]); converted::take_as<double>(s.pitch, (*v.rows)[2]); converted::take_as<bool>(s.loop, (*v.rows)[3]); converted::take_as<bool>(s.autoplay, (*v.rows)[4]); converted::take_as<bool>(s.spatial, (*v.rows)[5]); converted::take_as<double>(s.min_distance, (*v.rows)[6]); converted::take_as<double>(s.max_distance, (*v.rows)[7]); converted::take_as<audio::Rolloff>(s.rolloff, (*v.rows)[8]); converted::take_as<audio::Bus>(s.bus, (*v.rows)[9]); converted::take_as<double>(s.doppler, (*v.rows)[10]); converted::take_as<double>(s.pitch_by_speed, (*v.rows)[11]); converted::take_as<double>(s.delay, (*v.rows)[12]); }
+}
+[[maybe_unused]] static game::WeaponComponent draw_kern__game__WeaponComponent(converted::Draw& draw) {
+  game::WeaponComponent s{};
+  s.kind = converted::enum_value<game::WeaponKind>(draw.below(4));
+  s.damage = draw.number();
+  s.fire_rate = draw.number();
+  s.automatic = draw.flag();
+  s.magazine = static_cast<int>(draw.whole());
+  s.reserve = static_cast<int>(draw.whole());
+  s.reload_time = draw.number();
+  s.spread = draw.number();
+  s.aim_spread = draw.number();
+  s.recoil = draw.number();
+  s.range = draw.number();
+  s.headshot = draw.number();
+  s.impulse = draw.number();
+  s.pellets = static_cast<int>(draw.whole());
+  s.aim_fov = draw.number();
+  s.fire_sound = draw.word();
+  s.reload_sound = draw.word();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::WeaponComponent& s) { return converted::Value::structure({arg(s.kind), arg(s.damage), arg(s.fire_rate), arg(s.automatic), arg(s.magazine), arg(s.reserve), arg(s.reload_time), arg(s.spread), arg(s.aim_spread), arg(s.recoil), arg(s.range), arg(s.headshot), arg(s.impulse), arg(s.pellets), arg(s.aim_fov), arg(s.fire_sound), arg(s.reload_sound)}); }
+[[maybe_unused]] static bool same(const game::WeaponComponent& want, const converted::Value& got) { return converted::rows_of(got, 17) && converted::at_place(same(want.kind, (*got.rows)[0]), ".kind") && converted::at_place(same(want.damage, (*got.rows)[1]), ".damage") && converted::at_place(same(want.fire_rate, (*got.rows)[2]), ".fire_rate") && converted::at_place(same(want.automatic, (*got.rows)[3]), ".automatic") && converted::at_place(same(want.magazine, (*got.rows)[4]), ".magazine") && converted::at_place(same(want.reserve, (*got.rows)[5]), ".reserve") && converted::at_place(same(want.reload_time, (*got.rows)[6]), ".reload_time") && converted::at_place(same(want.spread, (*got.rows)[7]), ".spread") && converted::at_place(same(want.aim_spread, (*got.rows)[8]), ".aim_spread") && converted::at_place(same(want.recoil, (*got.rows)[9]), ".recoil") && converted::at_place(same(want.range, (*got.rows)[10]), ".range") && converted::at_place(same(want.headshot, (*got.rows)[11]), ".headshot") && converted::at_place(same(want.impulse, (*got.rows)[12]), ".impulse") && converted::at_place(same(want.pellets, (*got.rows)[13]), ".pellets") && converted::at_place(same(want.aim_fov, (*got.rows)[14]), ".aim_fov") && converted::at_place(same(want.fire_sound, (*got.rows)[15]), ".fire_sound") && converted::at_place(same(want.reload_sound, (*got.rows)[16]), ".reload_sound"); }
+[[maybe_unused]] static bool defined(const game::WeaponComponent& s) { return defined(s.kind) && defined(s.damage) && defined(s.fire_rate) && defined(s.automatic) && defined(s.magazine) && defined(s.reserve) && defined(s.reload_time) && defined(s.spread) && defined(s.aim_spread) && defined(s.recoil) && defined(s.range) && defined(s.headshot) && defined(s.impulse) && defined(s.pellets) && defined(s.aim_fov) && defined(s.fire_sound) && defined(s.reload_sound); }
+[[maybe_unused]] static std::string text(const game::WeaponComponent& s) { return std::string("{") + text(s.kind) + ", " + text(s.damage) + ", " + text(s.fire_rate) + ", " + text(s.automatic) + ", " + text(s.magazine) + ", " + text(s.reserve) + ", " + text(s.reload_time) + ", " + text(s.spread) + ", " + text(s.aim_spread) + ", " + text(s.recoil) + ", " + text(s.range) + ", " + text(s.headshot) + ", " + text(s.impulse) + ", " + text(s.pellets) + ", " + text(s.aim_fov) + ", " + text(s.fire_sound) + ", " + text(s.reload_sound) + "}"; }
+[[maybe_unused]] static void take(game::WeaponComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 17) return; converted::take_as<game::WeaponKind>(s.kind, (*v.rows)[0]); converted::take_as<double>(s.damage, (*v.rows)[1]); converted::take_as<double>(s.fire_rate, (*v.rows)[2]); converted::take_as<bool>(s.automatic, (*v.rows)[3]); converted::take_as<int>(s.magazine, (*v.rows)[4]); converted::take_as<int>(s.reserve, (*v.rows)[5]); converted::take_as<double>(s.reload_time, (*v.rows)[6]); converted::take_as<double>(s.spread, (*v.rows)[7]); converted::take_as<double>(s.aim_spread, (*v.rows)[8]); converted::take_as<double>(s.recoil, (*v.rows)[9]); converted::take_as<double>(s.range, (*v.rows)[10]); converted::take_as<double>(s.headshot, (*v.rows)[11]); converted::take_as<double>(s.impulse, (*v.rows)[12]); converted::take_as<int>(s.pellets, (*v.rows)[13]); converted::take_as<double>(s.aim_fov, (*v.rows)[14]); converted::take_as<std::string>(s.fire_sound, (*v.rows)[15]); converted::take_as<std::string>(s.reload_sound, (*v.rows)[16]); }
+}
+[[maybe_unused]] static game::HealthComponent draw_kern__game__HealthComponent(converted::Draw& draw) {
+  game::HealthComponent s{};
+  s.max_health = draw.number();
+  s.armor = draw.number();
+  s.regen_delay = draw.number();
+  s.regen_rate = draw.number();
+  s.respawn = draw.flag();
+  s.respawn_delay = draw.number();
+  s.points = draw.number();
+  s.hit_sound = draw.word();
+  s.death_sound = draw.word();
+  s.explode_radius = draw.number();
+  s.explode_damage = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::HealthComponent& s) { return converted::Value::structure({arg(s.max_health), arg(s.armor), arg(s.regen_delay), arg(s.regen_rate), arg(s.respawn), arg(s.respawn_delay), arg(s.points), arg(s.hit_sound), arg(s.death_sound), arg(s.explode_radius), arg(s.explode_damage)}); }
+[[maybe_unused]] static bool same(const game::HealthComponent& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.max_health, (*got.rows)[0]), ".max_health") && converted::at_place(same(want.armor, (*got.rows)[1]), ".armor") && converted::at_place(same(want.regen_delay, (*got.rows)[2]), ".regen_delay") && converted::at_place(same(want.regen_rate, (*got.rows)[3]), ".regen_rate") && converted::at_place(same(want.respawn, (*got.rows)[4]), ".respawn") && converted::at_place(same(want.respawn_delay, (*got.rows)[5]), ".respawn_delay") && converted::at_place(same(want.points, (*got.rows)[6]), ".points") && converted::at_place(same(want.hit_sound, (*got.rows)[7]), ".hit_sound") && converted::at_place(same(want.death_sound, (*got.rows)[8]), ".death_sound") && converted::at_place(same(want.explode_radius, (*got.rows)[9]), ".explode_radius") && converted::at_place(same(want.explode_damage, (*got.rows)[10]), ".explode_damage"); }
+[[maybe_unused]] static bool defined(const game::HealthComponent& s) { return defined(s.max_health) && defined(s.armor) && defined(s.regen_delay) && defined(s.regen_rate) && defined(s.respawn) && defined(s.respawn_delay) && defined(s.points) && defined(s.hit_sound) && defined(s.death_sound) && defined(s.explode_radius) && defined(s.explode_damage); }
+[[maybe_unused]] static std::string text(const game::HealthComponent& s) { return std::string("{") + text(s.max_health) + ", " + text(s.armor) + ", " + text(s.regen_delay) + ", " + text(s.regen_rate) + ", " + text(s.respawn) + ", " + text(s.respawn_delay) + ", " + text(s.points) + ", " + text(s.hit_sound) + ", " + text(s.death_sound) + ", " + text(s.explode_radius) + ", " + text(s.explode_damage) + "}"; }
+[[maybe_unused]] static void take(game::HealthComponent& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<double>(s.max_health, (*v.rows)[0]); converted::take_as<double>(s.armor, (*v.rows)[1]); converted::take_as<double>(s.regen_delay, (*v.rows)[2]); converted::take_as<double>(s.regen_rate, (*v.rows)[3]); converted::take_as<bool>(s.respawn, (*v.rows)[4]); converted::take_as<double>(s.respawn_delay, (*v.rows)[5]); converted::take_as<double>(s.points, (*v.rows)[6]); converted::take_as<std::string>(s.hit_sound, (*v.rows)[7]); converted::take_as<std::string>(s.death_sound, (*v.rows)[8]); converted::take_as<double>(s.explode_radius, (*v.rows)[9]); converted::take_as<double>(s.explode_damage, (*v.rows)[10]); }
+}
+[[maybe_unused]] static logic::Node draw_kern__logic__Node(converted::Draw& draw) {
+  logic::Node s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.type = draw.word();
+  s.x = draw.number();
+  s.y = draw.number();
+  s.values = draw_list(draw, [&]() -> std::pair<std::string, Value> { return std::pair<std::string, Value>(draw.word(), converted::owned(*converted::engine_object<Value>(1 + draw.below(6)))); });
+  s.params = draw_list(draw, [&]() -> std::pair<std::string, std::string> { return std::pair<std::string, std::string>(draw.word(), draw.word()); });
+  s.comment = draw.word();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::Node& s) { return converted::Value::structure({arg(s.id), arg(s.type), arg(s.x), arg(s.y), arg(s.values), arg(s.params), arg(s.comment)}); }
+[[maybe_unused]] static bool same(const logic::Node& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.type, (*got.rows)[1]), ".type") && converted::at_place(same(want.x, (*got.rows)[2]), ".x") && converted::at_place(same(want.y, (*got.rows)[3]), ".y") && converted::at_place(same(want.values, (*got.rows)[4]), ".values") && converted::at_place(same(want.params, (*got.rows)[5]), ".params") && converted::at_place(same(want.comment, (*got.rows)[6]), ".comment"); }
+[[maybe_unused]] static bool defined(const logic::Node& s) { return defined(s.id) && defined(s.type) && defined(s.x) && defined(s.y) && defined(s.values) && defined(s.params) && defined(s.comment); }
+[[maybe_unused]] static std::string text(const logic::Node& s) { return std::string("{") + text(s.id) + ", " + text(s.type) + ", " + text(s.x) + ", " + text(s.y) + ", " + text(s.values) + ", " + text(s.params) + ", " + text(s.comment) + "}"; }
+[[maybe_unused]] static void take(logic::Node& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::string>(s.type, (*v.rows)[1]); converted::take_as<double>(s.x, (*v.rows)[2]); converted::take_as<double>(s.y, (*v.rows)[3]); converted::take_as<std::vector<std::pair<std::string, Value>>>(s.values, (*v.rows)[4]); converted::take_as<std::vector<std::pair<std::string, std::string>>>(s.params, (*v.rows)[5]); converted::take_as<std::string>(s.comment, (*v.rows)[6]); }
+}
+[[maybe_unused]] static logic::Link draw_kern__logic__Link(converted::Draw& draw) {
+  logic::Link s{};
+  s.from = static_cast<unsigned int>(draw.below(40));
+  s.out = draw.word();
+  s.to = static_cast<unsigned int>(draw.below(40));
+  s.in = draw.word();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::Link& s) { return converted::Value::structure({arg(s.from), arg(s.out), arg(s.to), arg(s.in)}); }
+[[maybe_unused]] static bool same(const logic::Link& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.from, (*got.rows)[0]), ".from") && converted::at_place(same(want.out, (*got.rows)[1]), ".out") && converted::at_place(same(want.to, (*got.rows)[2]), ".to") && converted::at_place(same(want.in, (*got.rows)[3]), ".in"); }
+[[maybe_unused]] static bool defined(const logic::Link& s) { return defined(s.from) && defined(s.out) && defined(s.to) && defined(s.in); }
+[[maybe_unused]] static std::string text(const logic::Link& s) { return std::string("{") + text(s.from) + ", " + text(s.out) + ", " + text(s.to) + ", " + text(s.in) + "}"; }
+[[maybe_unused]] static void take(logic::Link& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned int>(s.from, (*v.rows)[0]); converted::take_as<std::string>(s.out, (*v.rows)[1]); converted::take_as<unsigned int>(s.to, (*v.rows)[2]); converted::take_as<std::string>(s.in, (*v.rows)[3]); }
+}
+[[maybe_unused]] static logic::State draw_kern__logic__State(converted::Draw& draw) {
+  logic::State s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.name = draw.word();
+  s.x = draw.number();
+  s.y = draw.number();
+  s.initial = draw.flag();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::State& s) { return converted::Value::structure({arg(s.id), arg(s.name), arg(s.x), arg(s.y), arg(s.initial)}); }
+[[maybe_unused]] static bool same(const logic::State& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.name, (*got.rows)[1]), ".name") && converted::at_place(same(want.x, (*got.rows)[2]), ".x") && converted::at_place(same(want.y, (*got.rows)[3]), ".y") && converted::at_place(same(want.initial, (*got.rows)[4]), ".initial"); }
+[[maybe_unused]] static bool defined(const logic::State& s) { return defined(s.id) && defined(s.name) && defined(s.x) && defined(s.y) && defined(s.initial); }
+[[maybe_unused]] static std::string text(const logic::State& s) { return std::string("{") + text(s.id) + ", " + text(s.name) + ", " + text(s.x) + ", " + text(s.y) + ", " + text(s.initial) + "}"; }
+[[maybe_unused]] static void take(logic::State& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::string>(s.name, (*v.rows)[1]); converted::take_as<double>(s.x, (*v.rows)[2]); converted::take_as<double>(s.y, (*v.rows)[3]); converted::take_as<bool>(s.initial, (*v.rows)[4]); }
+}
+[[maybe_unused]] static logic::Transition draw_kern__logic__Transition(converted::Draw& draw) {
+  logic::Transition s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.from = static_cast<unsigned int>(draw.below(40));
+  s.to = static_cast<unsigned int>(draw.below(40));
+  s.trigger = converted::enum_value<logic::TriggerKind>(draw.below(4));
+  s.event = draw.word();
+  s.seconds = draw.number();
+  s.variable = draw.word();
+  s.label = draw.word();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::Transition& s) { return converted::Value::structure({arg(s.id), arg(s.from), arg(s.to), arg(s.trigger), arg(s.event), arg(s.seconds), arg(s.variable), arg(s.label)}); }
+[[maybe_unused]] static bool same(const logic::Transition& want, const converted::Value& got) { return converted::rows_of(got, 8) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.from, (*got.rows)[1]), ".from") && converted::at_place(same(want.to, (*got.rows)[2]), ".to") && converted::at_place(same(want.trigger, (*got.rows)[3]), ".trigger") && converted::at_place(same(want.event, (*got.rows)[4]), ".event") && converted::at_place(same(want.seconds, (*got.rows)[5]), ".seconds") && converted::at_place(same(want.variable, (*got.rows)[6]), ".variable") && converted::at_place(same(want.label, (*got.rows)[7]), ".label"); }
+[[maybe_unused]] static bool defined(const logic::Transition& s) { return defined(s.id) && defined(s.from) && defined(s.to) && defined(s.trigger) && defined(s.event) && defined(s.seconds) && defined(s.variable) && defined(s.label); }
+[[maybe_unused]] static std::string text(const logic::Transition& s) { return std::string("{") + text(s.id) + ", " + text(s.from) + ", " + text(s.to) + ", " + text(s.trigger) + ", " + text(s.event) + ", " + text(s.seconds) + ", " + text(s.variable) + ", " + text(s.label) + "}"; }
+[[maybe_unused]] static void take(logic::Transition& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 8) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<unsigned int>(s.from, (*v.rows)[1]); converted::take_as<unsigned int>(s.to, (*v.rows)[2]); converted::take_as<logic::TriggerKind>(s.trigger, (*v.rows)[3]); converted::take_as<std::string>(s.event, (*v.rows)[4]); converted::take_as<double>(s.seconds, (*v.rows)[5]); converted::take_as<std::string>(s.variable, (*v.rows)[6]); converted::take_as<std::string>(s.label, (*v.rows)[7]); }
+}
+[[maybe_unused]] static logic::StateMachine draw_kern__logic__StateMachine(converted::Draw& draw) {
+  logic::StateMachine s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.name = draw.word();
+  s.states = draw_list(draw, [&]() -> logic::State { return draw_kern__logic__State(draw); });
+  s.transitions = draw_list(draw, [&]() -> logic::Transition { return draw_kern__logic__Transition(draw); });
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::StateMachine& s) { return converted::Value::structure({arg(s.id), arg(s.name), arg(s.states), arg(s.transitions)}); }
+[[maybe_unused]] static bool same(const logic::StateMachine& want, const converted::Value& got) { return converted::rows_of(got, 4) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.name, (*got.rows)[1]), ".name") && converted::at_place(same(want.states, (*got.rows)[2]), ".states") && converted::at_place(same(want.transitions, (*got.rows)[3]), ".transitions"); }
+[[maybe_unused]] static bool defined(const logic::StateMachine& s) { return defined(s.id) && defined(s.name) && defined(s.states) && defined(s.transitions); }
+[[maybe_unused]] static std::string text(const logic::StateMachine& s) { return std::string("{") + text(s.id) + ", " + text(s.name) + ", " + text(s.states) + ", " + text(s.transitions) + "}"; }
+[[maybe_unused]] static void take(logic::StateMachine& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 4) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::string>(s.name, (*v.rows)[1]); converted::take_as<std::vector<logic::State>>(s.states, (*v.rows)[2]); converted::take_as<std::vector<logic::Transition>>(s.transitions, (*v.rows)[3]); }
+}
+[[maybe_unused]] static logic::Function draw_kern__logic__Function(converted::Draw& draw) {
+  logic::Function s{};
+  s.name = draw.word();
+  s.inputs = draw_list(draw, [&]() -> FunctionPin { return converted::owned(*converted::engine_object<FunctionPin>(1 + draw.below(6))); });
+  s.outputs = draw_list(draw, [&]() -> FunctionPin { return converted::owned(*converted::engine_object<FunctionPin>(1 + draw.below(6))); });
+  s.locals = draw_list(draw, [&]() -> FunctionPin { return converted::owned(*converted::engine_object<FunctionPin>(1 + draw.below(6))); });
+  s.pure = draw.flag();
+  s.external = draw.flag();
+  s.remote = draw.word();
+  s.from = draw.word();
+  s.exported = draw.word();
+  s.wire = draw.word();
+  s.help = draw.word();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::Function& s) { return converted::Value::structure({arg(s.name), arg(s.inputs), arg(s.outputs), arg(s.locals), arg(s.pure), arg(s.external), arg(s.remote), arg(s.from), arg(s.exported), arg(s.wire), arg(s.help)}); }
+[[maybe_unused]] static bool same(const logic::Function& want, const converted::Value& got) { return converted::rows_of(got, 11) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.inputs, (*got.rows)[1]), ".inputs") && converted::at_place(same(want.outputs, (*got.rows)[2]), ".outputs") && converted::at_place(same(want.locals, (*got.rows)[3]), ".locals") && converted::at_place(same(want.pure, (*got.rows)[4]), ".pure") && converted::at_place(same(want.external, (*got.rows)[5]), ".external") && converted::at_place(same(want.remote, (*got.rows)[6]), ".remote") && converted::at_place(same(want.from, (*got.rows)[7]), ".from") && converted::at_place(same(want.exported, (*got.rows)[8]), ".exported") && converted::at_place(same(want.wire, (*got.rows)[9]), ".wire") && converted::at_place(same(want.help, (*got.rows)[10]), ".help"); }
+[[maybe_unused]] static bool defined(const logic::Function& s) { return defined(s.name) && defined(s.inputs) && defined(s.outputs) && defined(s.locals) && defined(s.pure) && defined(s.external) && defined(s.remote) && defined(s.from) && defined(s.exported) && defined(s.wire) && defined(s.help); }
+[[maybe_unused]] static std::string text(const logic::Function& s) { return std::string("{") + text(s.name) + ", " + text(s.inputs) + ", " + text(s.outputs) + ", " + text(s.locals) + ", " + text(s.pure) + ", " + text(s.external) + ", " + text(s.remote) + ", " + text(s.from) + ", " + text(s.exported) + ", " + text(s.wire) + ", " + text(s.help) + "}"; }
+[[maybe_unused]] static void take(logic::Function& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 11) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<std::vector<FunctionPin>>(s.inputs, (*v.rows)[1]); converted::take_as<std::vector<FunctionPin>>(s.outputs, (*v.rows)[2]); converted::take_as<std::vector<FunctionPin>>(s.locals, (*v.rows)[3]); converted::take_as<bool>(s.pure, (*v.rows)[4]); converted::take_as<bool>(s.external, (*v.rows)[5]); converted::take_as<std::string>(s.remote, (*v.rows)[6]); converted::take_as<std::string>(s.from, (*v.rows)[7]); converted::take_as<std::string>(s.exported, (*v.rows)[8]); converted::take_as<std::string>(s.wire, (*v.rows)[9]); converted::take_as<std::string>(s.help, (*v.rows)[10]); }
+}
+[[maybe_unused]] static logic::EnumType draw_kern__logic__EnumType(converted::Draw& draw) {
+  logic::EnumType s{};
+  s.name = draw.word();
+  s.values = draw_list(draw, [&]() -> std::string { return draw.word(); });
+  s.help = draw.word();
+  s.project = draw.flag();
+  s.from = draw.word();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::EnumType& s) { return converted::Value::structure({arg(s.name), arg(s.values), arg(s.help), arg(s.project), arg(s.from)}); }
+[[maybe_unused]] static bool same(const logic::EnumType& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.values, (*got.rows)[1]), ".values") && converted::at_place(same(want.help, (*got.rows)[2]), ".help") && converted::at_place(same(want.project, (*got.rows)[3]), ".project") && converted::at_place(same(want.from, (*got.rows)[4]), ".from"); }
+[[maybe_unused]] static bool defined(const logic::EnumType& s) { return defined(s.name) && defined(s.values) && defined(s.help) && defined(s.project) && defined(s.from); }
+[[maybe_unused]] static std::string text(const logic::EnumType& s) { return std::string("{") + text(s.name) + ", " + text(s.values) + ", " + text(s.help) + ", " + text(s.project) + ", " + text(s.from) + "}"; }
+[[maybe_unused]] static void take(logic::EnumType& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<std::vector<std::string>>(s.values, (*v.rows)[1]); converted::take_as<std::string>(s.help, (*v.rows)[2]); converted::take_as<bool>(s.project, (*v.rows)[3]); converted::take_as<std::string>(s.from, (*v.rows)[4]); }
+}
+[[maybe_unused]] static logic::StructType draw_kern__logic__StructType(converted::Draw& draw) {
+  logic::StructType s{};
+  s.name = draw.word();
+  s.fields = draw_list(draw, [&]() -> StructField { return converted::owned(*converted::engine_object<StructField>(1 + draw.below(6))); });
+  s.help = draw.word();
+  s.project = draw.flag();
+  s.from = draw.word();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::StructType& s) { return converted::Value::structure({arg(s.name), arg(s.fields), arg(s.help), arg(s.project), arg(s.from)}); }
+[[maybe_unused]] static bool same(const logic::StructType& want, const converted::Value& got) { return converted::rows_of(got, 5) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.fields, (*got.rows)[1]), ".fields") && converted::at_place(same(want.help, (*got.rows)[2]), ".help") && converted::at_place(same(want.project, (*got.rows)[3]), ".project") && converted::at_place(same(want.from, (*got.rows)[4]), ".from"); }
+[[maybe_unused]] static bool defined(const logic::StructType& s) { return defined(s.name) && defined(s.fields) && defined(s.help) && defined(s.project) && defined(s.from); }
+[[maybe_unused]] static std::string text(const logic::StructType& s) { return std::string("{") + text(s.name) + ", " + text(s.fields) + ", " + text(s.help) + ", " + text(s.project) + ", " + text(s.from) + "}"; }
+[[maybe_unused]] static void take(logic::StructType& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 5) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<std::vector<StructField>>(s.fields, (*v.rows)[1]); converted::take_as<std::string>(s.help, (*v.rows)[2]); converted::take_as<bool>(s.project, (*v.rows)[3]); converted::take_as<std::string>(s.from, (*v.rows)[4]); }
+}
+[[maybe_unused]] static logic::CommentBox draw_kern__logic__CommentBox(converted::Draw& draw) {
+  logic::CommentBox s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.x = draw.number();
+  s.y = draw.number();
+  s.w = draw.number();
+  s.h = draw.number();
+  s.text = draw.word();
+  s.color = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::CommentBox& s) { return converted::Value::structure({arg(s.id), arg(s.x), arg(s.y), arg(s.w), arg(s.h), arg(s.text), arg(s.color)}); }
+[[maybe_unused]] static bool same(const logic::CommentBox& want, const converted::Value& got) { return converted::rows_of(got, 7) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.x, (*got.rows)[1]), ".x") && converted::at_place(same(want.y, (*got.rows)[2]), ".y") && converted::at_place(same(want.w, (*got.rows)[3]), ".w") && converted::at_place(same(want.h, (*got.rows)[4]), ".h") && converted::at_place(same(want.text, (*got.rows)[5]), ".text") && converted::at_place(same(want.color, (*got.rows)[6]), ".color"); }
+[[maybe_unused]] static bool defined(const logic::CommentBox& s) { return defined(s.id) && defined(s.x) && defined(s.y) && defined(s.w) && defined(s.h) && defined(s.text) && defined(s.color); }
+[[maybe_unused]] static std::string text(const logic::CommentBox& s) { return std::string("{") + text(s.id) + ", " + text(s.x) + ", " + text(s.y) + ", " + text(s.w) + ", " + text(s.h) + ", " + text(s.text) + ", " + text(s.color) + "}"; }
+[[maybe_unused]] static void take(logic::CommentBox& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 7) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<double>(s.x, (*v.rows)[1]); converted::take_as<double>(s.y, (*v.rows)[2]); converted::take_as<double>(s.w, (*v.rows)[3]); converted::take_as<double>(s.h, (*v.rows)[4]); converted::take_as<std::string>(s.text, (*v.rows)[5]); converted::take_as<unsigned int>(s.color, (*v.rows)[6]); }
+}
+[[maybe_unused]] static logic::Graph draw_kern__logic__Graph(converted::Draw& draw) {
+  logic::Graph s{};
+  s.nodes = draw_list(draw, [&]() -> logic::Node { return draw_kern__logic__Node(draw); });
+  s.links = draw_list(draw, [&]() -> logic::Link { return draw_kern__logic__Link(draw); });
+  s.variables = draw_list(draw, [&]() -> Variable { return converted::owned(*converted::engine_object<Variable>(1 + draw.below(6))); });
+  s.machines = draw_list(draw, [&]() -> logic::StateMachine { return draw_kern__logic__StateMachine(draw); });
+  s.functions = draw_list(draw, [&]() -> logic::Function { return draw_kern__logic__Function(draw); });
+  s.enums = draw_list(draw, [&]() -> logic::EnumType { return draw_kern__logic__EnumType(draw); });
+  s.structs = draw_list(draw, [&]() -> logic::StructType { return draw_kern__logic__StructType(draw); });
+  s.comments = draw_list(draw, [&]() -> logic::CommentBox { return draw_kern__logic__CommentBox(draw); });
+  s.next_id = static_cast<unsigned int>(draw.below(40));
+  s.library = draw.flag();
+  s.uses = draw_list(draw, [&]() -> std::string { return draw.word(); });
+  s.implements = draw.word();
+  return s;
+}
+namespace logic { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const logic::Graph& s) { return converted::Value::structure({arg(s.nodes), arg(s.links), arg(s.variables), arg(s.machines), arg(s.functions), arg(s.enums), arg(s.structs), arg(s.comments), arg(s.next_id), arg(s.library), arg(s.uses), arg(s.implements)}); }
+[[maybe_unused]] static bool same(const logic::Graph& want, const converted::Value& got) { return converted::rows_of(got, 12) && converted::at_place(same(want.nodes, (*got.rows)[0]), ".nodes") && converted::at_place(same(want.links, (*got.rows)[1]), ".links") && converted::at_place(same(want.variables, (*got.rows)[2]), ".variables") && converted::at_place(same(want.machines, (*got.rows)[3]), ".machines") && converted::at_place(same(want.functions, (*got.rows)[4]), ".functions") && converted::at_place(same(want.enums, (*got.rows)[5]), ".enums") && converted::at_place(same(want.structs, (*got.rows)[6]), ".structs") && converted::at_place(same(want.comments, (*got.rows)[7]), ".comments") && converted::at_place(same(want.next_id, (*got.rows)[8]), ".next_id") && converted::at_place(same(want.library, (*got.rows)[9]), ".library") && converted::at_place(same(want.uses, (*got.rows)[10]), ".uses") && converted::at_place(same(want.implements, (*got.rows)[11]), ".implements"); }
+[[maybe_unused]] static bool defined(const logic::Graph& s) { return defined(s.nodes) && defined(s.links) && defined(s.variables) && defined(s.machines) && defined(s.functions) && defined(s.enums) && defined(s.structs) && defined(s.comments) && defined(s.next_id) && defined(s.library) && defined(s.uses) && defined(s.implements); }
+[[maybe_unused]] static std::string text(const logic::Graph& s) { return std::string("{") + text(s.nodes) + ", " + text(s.links) + ", " + text(s.variables) + ", " + text(s.machines) + ", " + text(s.functions) + ", " + text(s.enums) + ", " + text(s.structs) + ", " + text(s.comments) + ", " + text(s.next_id) + ", " + text(s.library) + ", " + text(s.uses) + ", " + text(s.implements) + "}"; }
+[[maybe_unused]] static void take(logic::Graph& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 12) return; converted::take_as<std::vector<logic::Node>>(s.nodes, (*v.rows)[0]); converted::take_as<std::vector<logic::Link>>(s.links, (*v.rows)[1]); converted::take_as<std::vector<Variable>>(s.variables, (*v.rows)[2]); converted::take_as<std::vector<logic::StateMachine>>(s.machines, (*v.rows)[3]); converted::take_as<std::vector<logic::Function>>(s.functions, (*v.rows)[4]); converted::take_as<std::vector<logic::EnumType>>(s.enums, (*v.rows)[5]); converted::take_as<std::vector<logic::StructType>>(s.structs, (*v.rows)[6]); converted::take_as<std::vector<logic::CommentBox>>(s.comments, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id, (*v.rows)[8]); converted::take_as<bool>(s.library, (*v.rows)[9]); converted::take_as<std::vector<std::string>>(s.uses, (*v.rows)[10]); converted::take_as<std::string>(s.implements, (*v.rows)[11]); }
+}
+[[maybe_unused]] static game::Actor draw_kern__game__Actor(converted::Draw& draw) {
+  game::Actor s{};
+  s.id = static_cast<unsigned int>(draw.below(40));
+  s.name = draw.word();
+  s.parent = static_cast<unsigned int>(draw.below(40));
+  s.folder = draw.word();
+  s.hidden = draw.flag();
+  s.locked = draw.flag();
+  s.transform = draw_kern__game__Transform(draw);
+  s.tags = draw_list(draw, [&]() -> std::string { return draw.word(); });
+  s.mesh = converted::draw_maybe<std::optional<game::MeshComponent>>(draw, [&]() -> game::MeshComponent { return draw_kern__game__MeshComponent(draw); });
+  s.light = converted::draw_maybe<std::optional<game::LightComponent>>(draw, [&]() -> game::LightComponent { return draw_kern__game__LightComponent(draw); });
+  s.body = converted::draw_maybe<std::optional<game::BodyComponent>>(draw, [&]() -> game::BodyComponent { return draw_kern__game__BodyComponent(draw); });
+  s.colliders = draw_list(draw, [&]() -> game::ColliderComponent { return draw_kern__game__ColliderComponent(draw); });
+  s.joints = draw_list(draw, [&]() -> game::JointComponent { return draw_kern__game__JointComponent(draw); });
+  s.controller = converted::draw_maybe<std::optional<game::ControllerComponent>>(draw, [&]() -> game::ControllerComponent { return draw_kern__game__ControllerComponent(draw); });
+  s.pickup = converted::draw_maybe<std::optional<game::PickupComponent>>(draw, [&]() -> game::PickupComponent { return draw_kern__game__PickupComponent(draw); });
+  s.trigger = converted::draw_maybe<std::optional<game::TriggerComponent>>(draw, [&]() -> game::TriggerComponent { return draw_kern__game__TriggerComponent(draw); });
+  s.rotator = converted::draw_maybe<std::optional<game::RotatorComponent>>(draw, [&]() -> game::RotatorComponent { return draw_kern__game__RotatorComponent(draw); });
+  s.mover = converted::draw_maybe<std::optional<game::MoverComponent>>(draw, [&]() -> game::MoverComponent { return draw_kern__game__MoverComponent(draw); });
+  s.city = converted::draw_maybe<std::optional<game::CityComponent>>(draw, [&]() -> game::CityComponent { return draw_kern__game__CityComponent(draw); });
+  s.audio = converted::draw_maybe<std::optional<game::AudioComponent>>(draw, [&]() -> game::AudioComponent { return draw_kern__game__AudioComponent(draw); });
+  s.weapon = converted::draw_maybe<std::optional<game::WeaponComponent>>(draw, [&]() -> game::WeaponComponent { return draw_kern__game__WeaponComponent(draw); });
+  s.health = converted::draw_maybe<std::optional<game::HealthComponent>>(draw, [&]() -> game::HealthComponent { return draw_kern__game__HealthComponent(draw); });
+  s.logic = converted::draw_maybe<std::optional<logic::Graph>>(draw, [&]() -> logic::Graph { return draw_kern__logic__Graph(draw); });
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::Actor& s) { return converted::Value::structure({arg(s.id), arg(s.name), arg(s.parent), arg(s.folder), arg(s.hidden), arg(s.locked), arg(s.transform), arg(s.tags), arg(s.mesh), arg(s.light), arg(s.body), arg(s.colliders), arg(s.joints), arg(s.controller), arg(s.pickup), arg(s.trigger), arg(s.rotator), arg(s.mover), arg(s.city), arg(s.audio), arg(s.weapon), arg(s.health), arg(s.logic)}); }
+[[maybe_unused]] static bool same(const game::Actor& want, const converted::Value& got) { return converted::rows_of(got, 23) && converted::at_place(same(want.id, (*got.rows)[0]), ".id") && converted::at_place(same(want.name, (*got.rows)[1]), ".name") && converted::at_place(same(want.parent, (*got.rows)[2]), ".parent") && converted::at_place(same(want.folder, (*got.rows)[3]), ".folder") && converted::at_place(same(want.hidden, (*got.rows)[4]), ".hidden") && converted::at_place(same(want.locked, (*got.rows)[5]), ".locked") && converted::at_place(same(want.transform, (*got.rows)[6]), ".transform") && converted::at_place(same(want.tags, (*got.rows)[7]), ".tags") && converted::at_place(same(want.mesh, (*got.rows)[8]), ".mesh") && converted::at_place(same(want.light, (*got.rows)[9]), ".light") && converted::at_place(same(want.body, (*got.rows)[10]), ".body") && converted::at_place(same(want.colliders, (*got.rows)[11]), ".colliders") && converted::at_place(same(want.joints, (*got.rows)[12]), ".joints") && converted::at_place(same(want.controller, (*got.rows)[13]), ".controller") && converted::at_place(same(want.pickup, (*got.rows)[14]), ".pickup") && converted::at_place(same(want.trigger, (*got.rows)[15]), ".trigger") && converted::at_place(same(want.rotator, (*got.rows)[16]), ".rotator") && converted::at_place(same(want.mover, (*got.rows)[17]), ".mover") && converted::at_place(same(want.city, (*got.rows)[18]), ".city") && converted::at_place(same(want.audio, (*got.rows)[19]), ".audio") && converted::at_place(same(want.weapon, (*got.rows)[20]), ".weapon") && converted::at_place(same(want.health, (*got.rows)[21]), ".health") && converted::at_place(same(want.logic, (*got.rows)[22]), ".logic"); }
+[[maybe_unused]] static bool defined(const game::Actor& s) { return defined(s.id) && defined(s.name) && defined(s.parent) && defined(s.folder) && defined(s.hidden) && defined(s.locked) && defined(s.transform) && defined(s.tags) && defined(s.mesh) && defined(s.light) && defined(s.body) && defined(s.colliders) && defined(s.joints) && defined(s.controller) && defined(s.pickup) && defined(s.trigger) && defined(s.rotator) && defined(s.mover) && defined(s.city) && defined(s.audio) && defined(s.weapon) && defined(s.health) && defined(s.logic); }
+[[maybe_unused]] static std::string text(const game::Actor& s) { return std::string("{") + text(s.id) + ", " + text(s.name) + ", " + text(s.parent) + ", " + text(s.folder) + ", " + text(s.hidden) + ", " + text(s.locked) + ", " + text(s.transform) + ", " + text(s.tags) + ", " + text(s.mesh) + ", " + text(s.light) + ", " + text(s.body) + ", " + text(s.colliders) + ", " + text(s.joints) + ", " + text(s.controller) + ", " + text(s.pickup) + ", " + text(s.trigger) + ", " + text(s.rotator) + ", " + text(s.mover) + ", " + text(s.city) + ", " + text(s.audio) + ", " + text(s.weapon) + ", " + text(s.health) + ", " + text(s.logic) + "}"; }
+[[maybe_unused]] static void take(game::Actor& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 23) return; converted::take_as<unsigned int>(s.id, (*v.rows)[0]); converted::take_as<std::string>(s.name, (*v.rows)[1]); converted::take_as<unsigned int>(s.parent, (*v.rows)[2]); converted::take_as<std::string>(s.folder, (*v.rows)[3]); converted::take_as<bool>(s.hidden, (*v.rows)[4]); converted::take_as<bool>(s.locked, (*v.rows)[5]); converted::take_as<game::Transform>(s.transform, (*v.rows)[6]); converted::take_as<std::vector<std::string>>(s.tags, (*v.rows)[7]); converted::take_as<std::optional<game::MeshComponent>>(s.mesh, (*v.rows)[8]); converted::take_as<std::optional<game::LightComponent>>(s.light, (*v.rows)[9]); converted::take_as<std::optional<game::BodyComponent>>(s.body, (*v.rows)[10]); converted::take_as<std::vector<game::ColliderComponent>>(s.colliders, (*v.rows)[11]); converted::take_as<std::vector<game::JointComponent>>(s.joints, (*v.rows)[12]); converted::take_as<std::optional<game::ControllerComponent>>(s.controller, (*v.rows)[13]); converted::take_as<std::optional<game::PickupComponent>>(s.pickup, (*v.rows)[14]); converted::take_as<std::optional<game::TriggerComponent>>(s.trigger, (*v.rows)[15]); converted::take_as<std::optional<game::RotatorComponent>>(s.rotator, (*v.rows)[16]); converted::take_as<std::optional<game::MoverComponent>>(s.mover, (*v.rows)[17]); converted::take_as<std::optional<game::CityComponent>>(s.city, (*v.rows)[18]); converted::take_as<std::optional<game::AudioComponent>>(s.audio, (*v.rows)[19]); converted::take_as<std::optional<game::WeaponComponent>>(s.weapon, (*v.rows)[20]); converted::take_as<std::optional<game::HealthComponent>>(s.health, (*v.rows)[21]); converted::take_as<std::optional<logic::Graph>>(s.logic, (*v.rows)[22]); }
+}
+[[maybe_unused]] static game::EditorCamera draw_kern__game__EditorCamera(converted::Draw& draw) {
+  game::EditorCamera s{};
+  s.position = draw.vector();
+  s.yaw = draw.number();
+  s.pitch = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::EditorCamera& s) { return converted::Value::structure({arg(s.position), arg(s.yaw), arg(s.pitch)}); }
+[[maybe_unused]] static bool same(const game::EditorCamera& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.position, (*got.rows)[0]), ".position") && converted::at_place(same(want.yaw, (*got.rows)[1]), ".yaw") && converted::at_place(same(want.pitch, (*got.rows)[2]), ".pitch"); }
+[[maybe_unused]] static bool defined(const game::EditorCamera& s) { return defined(s.position) && defined(s.yaw) && defined(s.pitch); }
+[[maybe_unused]] static std::string text(const game::EditorCamera& s) { return std::string("{") + text(s.position) + ", " + text(s.yaw) + ", " + text(s.pitch) + "}"; }
+[[maybe_unused]] static void take(game::EditorCamera& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 3) return; converted::take_as<Vec3>(s.position, (*v.rows)[0]); converted::take_as<double>(s.yaw, (*v.rows)[1]); converted::take_as<double>(s.pitch, (*v.rows)[2]); }
+}
+[[maybe_unused]] static game::Level draw_kern__game__Level(converted::Draw& draw) {
+  game::Level s{};
+  s.name = draw.word();
+  s.world = draw_kern__game__WorldSettings(draw);
+  s.actors = draw_list(draw, [&]() -> game::Actor { return draw_kern__game__Actor(draw); });
+  s.textures = draw_list(draw, [&]() -> TextureAsset { return converted::owned(*converted::engine_object<TextureAsset>(1 + draw.below(6))); });
+  s.sounds = draw_list(draw, [&]() -> SoundAsset { return converted::owned(*converted::engine_object<SoundAsset>(1 + draw.below(6))); });
+  s.motions = draw_list(draw, [&]() -> MotionAsset { return converted::owned(*converted::engine_object<MotionAsset>(1 + draw.below(6))); });
+  s.logic = draw_kern__logic__Graph(draw);
+  s.camera = draw_kern__game__EditorCamera(draw);
+  s.next_id = static_cast<unsigned int>(draw.below(40));
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::Level& s) { return converted::Value::structure({arg(s.name), arg(s.world), arg(s.actors), arg(s.textures), arg(s.sounds), arg(s.motions), arg(s.logic), arg(s.camera), arg(s.next_id)}); }
+[[maybe_unused]] static bool same(const game::Level& want, const converted::Value& got) { return converted::rows_of(got, 9) && converted::at_place(same(want.name, (*got.rows)[0]), ".name") && converted::at_place(same(want.world, (*got.rows)[1]), ".world") && converted::at_place(same(want.actors, (*got.rows)[2]), ".actors") && converted::at_place(same(want.textures, (*got.rows)[3]), ".textures") && converted::at_place(same(want.sounds, (*got.rows)[4]), ".sounds") && converted::at_place(same(want.motions, (*got.rows)[5]), ".motions") && converted::at_place(same(want.logic, (*got.rows)[6]), ".logic") && converted::at_place(same(want.camera, (*got.rows)[7]), ".camera") && converted::at_place(same(want.next_id, (*got.rows)[8]), ".next_id"); }
+[[maybe_unused]] static bool defined(const game::Level& s) { return defined(s.name) && defined(s.world) && defined(s.actors) && defined(s.textures) && defined(s.sounds) && defined(s.motions) && defined(s.logic) && defined(s.camera) && defined(s.next_id); }
+[[maybe_unused]] static std::string text(const game::Level& s) { return std::string("{") + text(s.name) + ", " + text(s.world) + ", " + text(s.actors) + ", " + text(s.textures) + ", " + text(s.sounds) + ", " + text(s.motions) + ", " + text(s.logic) + ", " + text(s.camera) + ", " + text(s.next_id) + "}"; }
+[[maybe_unused]] static void take(game::Level& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 9) return; converted::take_as<std::string>(s.name, (*v.rows)[0]); converted::take_as<game::WorldSettings>(s.world, (*v.rows)[1]); converted::take_as<std::vector<game::Actor>>(s.actors, (*v.rows)[2]); converted::take_as<std::vector<TextureAsset>>(s.textures, (*v.rows)[3]); converted::take_as<std::vector<SoundAsset>>(s.sounds, (*v.rows)[4]); converted::take_as<std::vector<MotionAsset>>(s.motions, (*v.rows)[5]); converted::take_as<logic::Graph>(s.logic, (*v.rows)[6]); converted::take_as<game::EditorCamera>(s.camera, (*v.rows)[7]); converted::take_as<unsigned int>(s.next_id, (*v.rows)[8]); }
+}
+[[maybe_unused]] static game::Hud draw_kern__game__Hud(converted::Draw& draw) {
+  game::Hud s{};
+  s.status = converted::enum_value<game::GameStatus>(draw.below(4));
+  s.title = draw.word();
+  s.message = draw.word();
+  s.message_age = draw.number();
+  s.score = draw.number();
+  s.pickups = static_cast<unsigned int>(draw.below(40));
+  s.pickups_total = static_cast<unsigned int>(draw.below(40));
+  s.elapsed = draw.number();
+  s.remaining = draw.number();
+  s.speed = draw.number();
+  s.boost = draw.number();
+  s.boosting = draw.flag();
+  s.interior = draw.flag();
+  s.best = draw.number();
+  s.soldier = draw.flag();
+  s.health = draw.number();
+  s.max_health = draw.number();
+  s.armor = draw.number();
+  s.ammo = static_cast<int>(draw.whole());
+  s.magazine = static_cast<int>(draw.whole());
+  s.reserve = static_cast<int>(draw.whole());
+  s.reload = draw.number();
+  s.spread = draw.number();
+  s.hit_age = draw.number();
+  s.hit_head = draw.flag();
+  s.hit_kill = draw.flag();
+  s.damage_age = draw.number();
+  s.damage_yaw = draw.number();
+  s.respawn_in = draw.number();
+  s.aiming = draw.flag();
+  s.fov = draw.number();
+  return s;
+}
+namespace game { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const game::Hud& s) { return converted::Value::structure({arg(s.status), arg(s.title), arg(s.message), arg(s.message_age), arg(s.score), arg(s.pickups), arg(s.pickups_total), arg(s.elapsed), arg(s.remaining), arg(s.speed), arg(s.boost), arg(s.boosting), arg(s.interior), arg(s.best), arg(s.soldier), arg(s.health), arg(s.max_health), arg(s.armor), arg(s.ammo), arg(s.magazine), arg(s.reserve), arg(s.reload), arg(s.spread), arg(s.hit_age), arg(s.hit_head), arg(s.hit_kill), arg(s.damage_age), arg(s.damage_yaw), arg(s.respawn_in), arg(s.aiming), arg(s.fov)}); }
+[[maybe_unused]] static bool same(const game::Hud& want, const converted::Value& got) { return converted::rows_of(got, 31) && converted::at_place(same(want.status, (*got.rows)[0]), ".status") && converted::at_place(same(want.title, (*got.rows)[1]), ".title") && converted::at_place(same(want.message, (*got.rows)[2]), ".message") && converted::at_place(same(want.message_age, (*got.rows)[3]), ".message_age") && converted::at_place(same(want.score, (*got.rows)[4]), ".score") && converted::at_place(same(want.pickups, (*got.rows)[5]), ".pickups") && converted::at_place(same(want.pickups_total, (*got.rows)[6]), ".pickups_total") && converted::at_place(same(want.elapsed, (*got.rows)[7]), ".elapsed") && converted::at_place(same(want.remaining, (*got.rows)[8]), ".remaining") && converted::at_place(same(want.speed, (*got.rows)[9]), ".speed") && converted::at_place(same(want.boost, (*got.rows)[10]), ".boost") && converted::at_place(same(want.boosting, (*got.rows)[11]), ".boosting") && converted::at_place(same(want.interior, (*got.rows)[12]), ".interior") && converted::at_place(same(want.best, (*got.rows)[13]), ".best") && converted::at_place(same(want.soldier, (*got.rows)[14]), ".soldier") && converted::at_place(same(want.health, (*got.rows)[15]), ".health") && converted::at_place(same(want.max_health, (*got.rows)[16]), ".max_health") && converted::at_place(same(want.armor, (*got.rows)[17]), ".armor") && converted::at_place(same(want.ammo, (*got.rows)[18]), ".ammo") && converted::at_place(same(want.magazine, (*got.rows)[19]), ".magazine") && converted::at_place(same(want.reserve, (*got.rows)[20]), ".reserve") && converted::at_place(same(want.reload, (*got.rows)[21]), ".reload") && converted::at_place(same(want.spread, (*got.rows)[22]), ".spread") && converted::at_place(same(want.hit_age, (*got.rows)[23]), ".hit_age") && converted::at_place(same(want.hit_head, (*got.rows)[24]), ".hit_head") && converted::at_place(same(want.hit_kill, (*got.rows)[25]), ".hit_kill") && converted::at_place(same(want.damage_age, (*got.rows)[26]), ".damage_age") && converted::at_place(same(want.damage_yaw, (*got.rows)[27]), ".damage_yaw") && converted::at_place(same(want.respawn_in, (*got.rows)[28]), ".respawn_in") && converted::at_place(same(want.aiming, (*got.rows)[29]), ".aiming") && converted::at_place(same(want.fov, (*got.rows)[30]), ".fov"); }
+[[maybe_unused]] static bool defined(const game::Hud& s) { return defined(s.status) && defined(s.title) && defined(s.message) && defined(s.message_age) && defined(s.score) && defined(s.pickups) && defined(s.pickups_total) && defined(s.elapsed) && defined(s.remaining) && defined(s.speed) && defined(s.boost) && defined(s.boosting) && defined(s.interior) && defined(s.best) && defined(s.soldier) && defined(s.health) && defined(s.max_health) && defined(s.armor) && defined(s.ammo) && defined(s.magazine) && defined(s.reserve) && defined(s.reload) && defined(s.spread) && defined(s.hit_age) && defined(s.hit_head) && defined(s.hit_kill) && defined(s.damage_age) && defined(s.damage_yaw) && defined(s.respawn_in) && defined(s.aiming) && defined(s.fov); }
+[[maybe_unused]] static std::string text(const game::Hud& s) { return std::string("{") + text(s.status) + ", " + text(s.title) + ", " + text(s.message) + ", " + text(s.message_age) + ", " + text(s.score) + ", " + text(s.pickups) + ", " + text(s.pickups_total) + ", " + text(s.elapsed) + ", " + text(s.remaining) + ", " + text(s.speed) + ", " + text(s.boost) + ", " + text(s.boosting) + ", " + text(s.interior) + ", " + text(s.best) + ", " + text(s.soldier) + ", " + text(s.health) + ", " + text(s.max_health) + ", " + text(s.armor) + ", " + text(s.ammo) + ", " + text(s.magazine) + ", " + text(s.reserve) + ", " + text(s.reload) + ", " + text(s.spread) + ", " + text(s.hit_age) + ", " + text(s.hit_head) + ", " + text(s.hit_kill) + ", " + text(s.damage_age) + ", " + text(s.damage_yaw) + ", " + text(s.respawn_in) + ", " + text(s.aiming) + ", " + text(s.fov) + "}"; }
+[[maybe_unused]] static void take(game::Hud& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 31) return; converted::take_as<game::GameStatus>(s.status, (*v.rows)[0]); converted::take_as<std::string>(s.title, (*v.rows)[1]); converted::take_as<std::string>(s.message, (*v.rows)[2]); converted::take_as<double>(s.message_age, (*v.rows)[3]); converted::take_as<double>(s.score, (*v.rows)[4]); converted::take_as<unsigned int>(s.pickups, (*v.rows)[5]); converted::take_as<unsigned int>(s.pickups_total, (*v.rows)[6]); converted::take_as<double>(s.elapsed, (*v.rows)[7]); converted::take_as<double>(s.remaining, (*v.rows)[8]); converted::take_as<double>(s.speed, (*v.rows)[9]); converted::take_as<double>(s.boost, (*v.rows)[10]); converted::take_as<bool>(s.boosting, (*v.rows)[11]); converted::take_as<bool>(s.interior, (*v.rows)[12]); converted::take_as<double>(s.best, (*v.rows)[13]); converted::take_as<bool>(s.soldier, (*v.rows)[14]); converted::take_as<double>(s.health, (*v.rows)[15]); converted::take_as<double>(s.max_health, (*v.rows)[16]); converted::take_as<double>(s.armor, (*v.rows)[17]); converted::take_as<int>(s.ammo, (*v.rows)[18]); converted::take_as<int>(s.magazine, (*v.rows)[19]); converted::take_as<int>(s.reserve, (*v.rows)[20]); converted::take_as<double>(s.reload, (*v.rows)[21]); converted::take_as<double>(s.spread, (*v.rows)[22]); converted::take_as<double>(s.hit_age, (*v.rows)[23]); converted::take_as<bool>(s.hit_head, (*v.rows)[24]); converted::take_as<bool>(s.hit_kill, (*v.rows)[25]); converted::take_as<double>(s.damage_age, (*v.rows)[26]); converted::take_as<double>(s.damage_yaw, (*v.rows)[27]); converted::take_as<double>(s.respawn_in, (*v.rows)[28]); converted::take_as<bool>(s.aiming, (*v.rows)[29]); converted::take_as<double>(s.fov, (*v.rows)[30]); }
+}
+[[maybe_unused]] static physics::QueryFilter draw_kern__physics__QueryFilter(converted::Draw& draw) {
+  if (draw.flag()) return physics::QueryFilter(static_cast<u64>(draw.bits()), static_cast<u64>(draw.bits()));
+  physics::QueryFilter s{};
+  s.mask_bits = static_cast<u64>(draw.bits());
+  s.category_bits = static_cast<u64>(draw.bits());
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::QueryFilter& s) { return converted::Value::structure({arg(converted::shaped<converted::Whole>(s.mask_bits)), arg(converted::shaped<converted::Whole>(s.category_bits))}); }
+[[maybe_unused]] static bool same(const physics::QueryFilter& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(converted::shaped<converted::Whole>(want.mask_bits), (*got.rows)[0]), ".mask_bits") && converted::at_place(same(converted::shaped<converted::Whole>(want.category_bits), (*got.rows)[1]), ".category_bits"); }
+[[maybe_unused]] static bool defined(const physics::QueryFilter& s) { return defined(converted::shaped<converted::Whole>(s.mask_bits)) && defined(converted::shaped<converted::Whole>(s.category_bits)); }
+[[maybe_unused]] static std::string text(const physics::QueryFilter& s) { return std::string("{") + text(converted::shaped<converted::Whole>(s.mask_bits)) + ", " + text(converted::shaped<converted::Whole>(s.category_bits)) + "}"; }
+[[maybe_unused]] static void take(physics::QueryFilter& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 2) return; converted::take_as<converted::Whole>(s.mask_bits, (*v.rows)[0]); converted::take_as<converted::Whole>(s.category_bits, (*v.rows)[1]); }
+}
+[[maybe_unused]] static physics::RayHit draw_kern__physics__RayHit(converted::Draw& draw) {
+  physics::RayHit s{};
+  s.hit = draw.flag();
+  s.shape = draw_kern__physics__Shape(draw);
+  s.body = draw_kern__physics__Body(draw);
+  s.point = draw.vector();
+  s.normal = draw.vector();
+  s.fraction = draw.number();
+  return s;
+}
+namespace physics { using converted::arg; using converted::same; using converted::defined; using converted::text; using converted::take;
+[[maybe_unused]] static converted::Value arg(const physics::RayHit& s) { return converted::Value::structure({arg(s.hit), arg(s.shape), arg(s.body), arg(s.point), arg(s.normal), arg(s.fraction)}); }
+[[maybe_unused]] static bool same(const physics::RayHit& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.hit, (*got.rows)[0]), ".hit") && converted::at_place(same(want.shape, (*got.rows)[1]), ".shape") && converted::at_place(same(want.body, (*got.rows)[2]), ".body") && converted::at_place(same(want.point, (*got.rows)[3]), ".point") && converted::at_place(same(want.normal, (*got.rows)[4]), ".normal") && converted::at_place(same(want.fraction, (*got.rows)[5]), ".fraction"); }
+[[maybe_unused]] static bool defined(const physics::RayHit& s) { return defined(s.hit) && defined(s.shape) && defined(s.body) && defined(s.point) && defined(s.normal) && defined(s.fraction); }
+[[maybe_unused]] static std::string text(const physics::RayHit& s) { return std::string("{") + text(s.hit) + ", " + text(s.shape) + ", " + text(s.body) + ", " + text(s.point) + ", " + text(s.normal) + ", " + text(s.fraction) + "}"; }
+[[maybe_unused]] static void take(physics::RayHit& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<bool>(s.hit, (*v.rows)[0]); converted::take_as<physics::Shape>(s.shape, (*v.rows)[1]); converted::take_as<physics::Body>(s.body, (*v.rows)[2]); converted::take_as<Vec3>(s.point, (*v.rows)[3]); converted::take_as<Vec3>(s.normal, (*v.rows)[4]); converted::take_as<double>(s.fraction, (*v.rows)[5]); }
+}
 [[maybe_unused]] static MeshLook draw_kern__MeshLook(converted::Draw& draw) {
   MeshLook s{};
   s.material = draw_kern__Material(draw);
@@ -11853,10 +13919,18 @@ inline bool Engine::xr_full_room() const { const std::vector<converted::Value> k
 inline LightPool::LightPool(const unsigned int& max_lights, const unsigned int& max_requests) { if (converted::g_keeping) return; const std::vector<converted::Value> kern_out = converted::engine_call("engine.light_pool.make", {converted::value_of(max_lights), converted::value_of(max_requests)}); converted::take_made(*this, kern_out[0]); }
 inline LightPool::~LightPool() { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.light_pool.release", {converted::value_of(*this)}); }
 inline bool LightPool::request(const Vec3& position, const Vec3& color, const double& intensity, const double& range) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.light_pool.request", {converted::value_of(*this), converted::value_of(position), converted::value_of(color), converted::value_of(intensity), converted::value_of(range)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline PointLights LightPool::resolve(const Vec3& eye) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.light_pool.resolve", {converted::value_of(*this), converted::value_of(eye)}); PointLights kern_result = converted::quiet<PointLights>(); converted::take_as<PointLights>(kern_result, kern_out[0]); return kern_result; }
 inline LightPool& LightPool::operator=(LightPool&& o) noexcept { if (kern_owned && kern_handle && !converted::g_keeping) converted::engine_call("engine.light_pool.release", {arg(*this)}); converted::EngineObject::operator=(std::move(o)); return *this; }
+inline unsigned int Mesh::vertex_count() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.mesh.vertex_count", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
 inline void Renderer::set_shadow_filter(const int& taps) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_shadow_filter", {converted::value_of(*this), converted::value_of(taps)}); }
 inline void Renderer::set_ambient_occlusion(const AoOptions& options) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_ambient_occlusion", {converted::value_of(*this), converted::value_of(options)}); }
+inline Lighting Renderer::lighting() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.lighting", {converted::value_of(*this)}); Lighting kern_result = converted::quiet<Lighting>(); converted::take_as<Lighting>(kern_result, kern_out[0]); return kern_result; }
+inline SkyState Renderer::sky() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.sky", {converted::value_of(*this)}); SkyState kern_result = converted::quiet<SkyState>(); converted::take_as<SkyState>(kern_result, kern_out[0]); return kern_result; }
+inline void Renderer::set_lighting(const Lighting& lighting) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_lighting", {converted::value_of(*this), converted::value_of(lighting)}); }
+inline void Renderer::set_sky(const SkyState& sky) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_sky", {converted::value_of(*this), converted::value_of(sky)}); }
 inline void Renderer::set_shadow_distance(const double& metres) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_shadow_distance", {converted::value_of(*this), converted::value_of(metres)}); }
+inline PointLights Renderer::point_lights() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.point_lights", {converted::value_of(*this)}); PointLights kern_result = converted::quiet<PointLights>(); converted::take_as<PointLights>(kern_result, kern_out[0]); return kern_result; }
+inline bool Renderer::set_point_lights(const PointLights& lights) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_point_lights", {converted::value_of(*this), converted::value_of(lights)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
 inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
 inline bool Renderer::set_visible(const unsigned int& id, const bool& visible) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_visible", {converted::value_of(*this), converted::value_of(id), converted::value_of(visible)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
@@ -11864,17 +13938,33 @@ inline bool Renderer::update_instances(const unsigned int& id, converted::wide::
 inline converted::wide::Span<Mesh*> Renderer::meshes() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.meshes", {converted::value_of(*this)}); converted::wide::Span<Mesh*> kern_result = converted::quiet<converted::wide::Span<Mesh*>>(); converted::take_as<converted::wide::Span<Mesh*>>(kern_result, kern_out[0]); return kern_result; }
 inline Mesh* Renderer::mesh(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.mesh", {converted::value_of(*this), converted::value_of(id)}); Mesh* kern_result = converted::quiet<Mesh*>(); converted::take_as<Mesh*>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 GameWorld::actor_velocity(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_velocity", {converted::value_of(*this), converted::value_of(id)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
+inline game::Level GameWorld::level() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.level", {converted::value_of(*this)}); game::Level kern_result = converted::quiet<game::Level>(); converted::take_as<game::Level>(kern_result, kern_out[0]); return kern_result; }
 inline double GameWorld::sim_time() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.sim_time", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
+inline std::vector<game::ShotEvent>& GameWorld::shots() { return converted::engine_place<std::vector<game::ShotEvent>, std::vector<game::ShotEvent>>("engine.game_world.shots", {converted::value_of(*this)}); }
+inline void GameWorld::shake_camera(const double& amount) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.shake_camera", {converted::value_of(*this), converted::value_of(amount)}); }
+inline bool GameWorld::actor_alive(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_alive", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+inline game::Hud GameWorld::hud() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.hud", {converted::value_of(*this)}); game::Hud kern_result = converted::quiet<game::Hud>(); converted::take_as<game::Hud>(kern_result, kern_out[0]); return kern_result; }
+inline World& GameWorld::physics() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.physics", {converted::value_of(*this)}); World& kern_result = *converted::engine_object<World>(kern_out[0].as_int()); return kern_result; }
+inline bool GameWorld::actor_matrix(const unsigned int& id, Mat4& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_matrix", {converted::value_of(*this), converted::value_of(id), converted::value_of(out)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); converted::take_as<Mat4>(out, kern_out[1]); return kern_result; }
+inline physics::Body GameWorld::actor_body(const unsigned int& actor) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_body", {converted::value_of(*this), converted::value_of(actor)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
 inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_body(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_body", {converted::value_of(*this), converted::value_of(body)}); }
 inline bool World::joint_valid(const physics::Joint& joint) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.joint_valid", {converted::value_of(*this), converted::value_of(joint)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::destroy_joint(const physics::Joint& joint, const bool& wake_bodies) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.destroy_joint", {converted::value_of(*this), converted::value_of(joint), converted::value_of(wake_bodies)}); }
+inline physics::RayHit World::cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter, const physics::Body& ignore) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.cast_ray", {converted::value_of(*this), converted::value_of(origin), converted::value_of(translation), converted::value_of(filter), converted::value_of(ignore)}); physics::RayHit kern_result = converted::quiet<physics::RayHit>(); converted::take_as<physics::RayHit>(kern_result, kern_out[0]); return kern_result; }
 inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
+namespace primitives { inline void append(MeshData& dst, const MeshData& src, const Mat4& m) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.append", {converted::value_of(dst), converted::value_of(src), converted::value_of(m)}); converted::take_as<MeshData>(dst, kern_out[0]); } }
+namespace primitives { inline MeshData box(const Vec3& size, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.box", {converted::value_of(size), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
+namespace primitives { inline MeshData cylinder(const double& radius, const double& height, const unsigned int& segments, const Vec3& color) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.primitives.cylinder", {converted::value_of(radius), converted::value_of(height), converted::value_of(segments), converted::value_of(color)}); MeshData kern_result = converted::quiet<MeshData>(); converted::take_as<MeshData>(kern_result, kern_out[0]); return kern_result; } }
 inline double now_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.now_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 struct Out_look_hud_json { State_Game State; std::string Result; };
 [[maybe_unused]] static bool same(const Out_look_hud_json& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result"); }
 [[maybe_unused]] static bool defined(const Out_look_hud_json& s) { return defined(s.State) && defined(s.Result); }
 [[maybe_unused]] static std::string text(const Out_look_hud_json& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + "}"; }
+struct Out_look_command { State_Game State; bool Result; std::string out; };
+[[maybe_unused]] static bool same(const Out_look_command& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.out, (*got.rows)[2]), ".out"); }
+[[maybe_unused]] static bool defined(const Out_look_command& s) { return defined(s.State) && defined(s.Result) && defined(s.out); }
+[[maybe_unused]] static std::string text(const Out_look_command& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + ", " + text(s.out) + "}"; }
 
 SC_TEST(converted_Game__game_look_cpp) {
   converted::Blueprint bp("Game");
@@ -11893,8 +13983,10 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -11916,8 +14008,10 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -11941,8 +14035,10 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -11965,8 +14061,10 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -11988,8 +14086,10 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12012,8 +14112,10 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12037,8 +14139,36 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::look_lighting
+    converted::Tally tally("look_lighting");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] double& a0) { converted::counted([&] { return s->look_lighting(std::move(a0)); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12060,8 +14190,36 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
+    }
+  }
+  {  // Game::look_view_models
+    converted::Tally tally("look_view_models");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] double& a0) { converted::counted([&] { return s->look_view_models(std::move(a0)); }); return State_Game{s.get()}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      double a0 = draw.number();
+      const std::vector<converted::Value> given = {arg(a0)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
+      const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
@@ -12083,12 +14241,41 @@ SC_TEST(converted_Game__game_look_cpp) {
       converted::may_bail(true);
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
       const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
       const auto& want = made;
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0}, &vars, true);
+    }
+  }
+  {  // Game::look_command
+    converted::Tally tally("look_command");
+    converted::Draw draw;   // (every function its own arguments, the same in every run)
+    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
+    const auto run = [&]([[maybe_unused]] std::string& a0, [[maybe_unused]] std::string& a1) { auto r = converted::counted([&] { return s->look_command(a0, a1); }); return Out_look_command{State_Game{s.get()}, std::move(r), std::move(a1)}; };
+    for (int i = 0; tally.more(i); ++i) {
+      s = draw_state_Game(draw);
+      std::string a0 = draw.said_word({"time", "time ", "usage: time <0..1 | HH:MM | HH>", "render software", "software", "quality", "quality ", "auto", "true", "false", "perf", "perf ", "on", "off", "shake ", "viewmodel", "none", "no mesh", "lights", ","});
+      std::string a1 = draw.said_word({"time", "time ", "usage: time <0..1 | HH:MM | HH>", "render software", "software", "quality", "quality ", "auto", "true", "false", "perf", "perf ", "on", "off", "shake ", "viewmodel", "none", "no mesh", "lights", ","});
+      const std::vector<converted::Value> given = {arg(a0), arg(a1)};   // (what the Blueprint is given: before the call)
+      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
+      const converted::Watch watch;
+      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
+      converted::g_can_bail = true;
+      converted::may_bail(true);
+      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
+      converted::zero_stack();
+      converted::places_get();   // (the fields of its objects of the engine: as the engine holds them - converted::FieldSync)
+      const converted::Zeroed<decltype(run(a0, a1))> held([&] { return run(a0, a1); });
+      const auto& made = held.get();
+      converted::places_close();   // (the places of the engine it held: set back where the Blueprint has set them)
+      const auto& want = made;
+      converted::g_can_bail = false;
+      converted::may_bail(false);
+      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {2, 0, 1}, &vars, true);
     }
   }
 }

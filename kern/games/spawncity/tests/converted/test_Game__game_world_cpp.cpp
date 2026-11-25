@@ -37,8 +37,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
-double now_ms();
-double wall_ms();
 constexpr f32 kPi = 3.14159265358979323846;
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
@@ -78,15 +76,15 @@ struct Mat4 {
 
 
 
-  Mat4 operator*(const Mat4& b) const {
-    Mat4 r;
-    for (int c = 0; c < 4; converted::pre_inc(c)) {
-      const f32 b0 = converted::at(b.m, converted::times(4, c)), b1 = converted::at(b.m, converted::plus(converted::times(4, c), 1)), b2 = converted::at(b.m, converted::plus(converted::times(4, c), 2)), b3 = converted::at(b.m, converted::plus(converted::times(4, c), 3));
-      for (int k = 0; k < 4; converted::pre_inc(k))
-        converted::at(r.m, converted::plus(converted::times(4, c), k)) = converted::at(m, k) * b0 + converted::at(m, converted::plus(4, k)) * b1 + converted::at(m, converted::plus(8, k)) * b2 + converted::at(m, converted::plus(12, k)) * b3;
-    }
-    return r;
-  }
+  
+
+
+
+
+
+
+
+
   
 
 
@@ -100,21 +98,21 @@ struct Mat4 {
 
 
 
-  static Mat4 translate(Vec3 t) { Mat4 r; r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; return r; }
-  static Mat4 scale(Vec3 s) { Mat4 r; r.m[0] = s.x; r.m[5] = s.y; r.m[10] = s.z; return r; }
+  
+  
 
   /// Translation * rotation * scale.
-  static Mat4 trs(Vec3 t, Quat q, Vec3 s) {
-    const f32 x2 = q.x + q.x, y2 = q.y + q.y, z2 = q.z + q.z;
-    const f32 xx = q.x * x2, xy = q.x * y2, xz = q.x * z2, yy = q.y * y2, yz = q.y * z2, zz = q.z * z2;
-    const f32 wx = q.w * x2, wy = q.w * y2, wz = q.w * z2;
-    Mat4 r;
-    r.m[0] = (1 - yy - zz) * s.x; r.m[1] = (xy + wz) * s.x; r.m[2] = (xz - wy) * s.x; r.m[3] = 0;
-    r.m[4] = (xy - wz) * s.y; r.m[5] = (1 - xx - zz) * s.y; r.m[6] = (yz + wx) * s.y; r.m[7] = 0;
-    r.m[8] = (xz + wy) * s.z; r.m[9] = (yz - wx) * s.z; r.m[10] = (1 - xx - yy) * s.z; r.m[11] = 0;
-    r.m[12] = t.x; r.m[13] = t.y; r.m[14] = t.z; r.m[15] = 1;
-    return r;
-  }
+  
+
+
+
+
+
+
+
+
+
+
 
   
 
@@ -169,28 +167,7 @@ struct Camera {
 };
 struct Bvh;
 constexpr u32 kMaxPointLights = 16;
-constexpr u32 kMaxExtensionAttributes = 2;
-constexpr u32 kMaxMaterialParams = 8;
 enum class AlphaMode : u8 { opaque = 0, mask = 1, blend = 2 };
-struct Material {
-  Vec4 color{1, 1, 1, 1};
-  AlphaMode alpha = AlphaMode::opaque;
-  f32 alpha_cutoff = 0.5;
-  f32 roughness = 1.0;
-  f32 metalness = 0.0;
-  Vec3 emissive{0, 0, 0};      // linear HDR colour added after lighting (feeds bloom)
-  bool unlit = false;
-  bool double_sided = false;
-  bool cast_shadow = true;
-  bool frustum_culled = true;
-  bool viewmodel = false;      // first-person layer: drawn last after a depth clear
-  bool linear_colors = false;  // vertex colours are linear (skip the sRGB decode)
-  bool lines = false;          // line list (pairs of vertices), always unlit, never casts shadows or is picked
-  /// Parameters owned by shader extensions (see ShaderExtension::material_keys).
-  i32 params[kMaxMaterialParams] = {};
-
-  
-};
 struct Mesh : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -200,17 +177,17 @@ struct MeshData {
   u32 extra_size = 0;
   std::vector<u32> indices;
 
-  u32 vertex_count() const { return static_cast<u32>(converted::quot(positions.size(), 3)); }
   
-  void clear() {
-    positions.clear(); normals.clear(); colors.clear(); uvs.clear(); extra.clear(); indices.clear();
-  }
-  void push(Vec3 p, Vec3 n, Vec3 c, Vec2 uv) {
-    positions.insert(positions.end(), {p.x, p.y, p.z});
-    normals.insert(normals.end(), {n.x, n.y, n.z});
-    colors.insert(colors.end(), {c.x, c.y, c.z});
-    uvs.insert(uvs.end(), {uv.x, uv.y});
-  }
+  
+  
+
+
+  
+
+
+
+
+
   
   
 
@@ -219,15 +196,6 @@ struct MeshData {
   
 };
 struct Renderer;
-struct MeshLook {
-  Material material;
-  u32 extra_slot = 0;   // the extension stream `extra` goes to (kMaxExtensionAttributes: none)
-  u32 texture = 0;      // GPU texture handle (0 = none)
-  bool visible = true;
-  u32 layers = 1;       // view layers this mesh belongs to (RenderParams::layers)
-  bool pick_bvh = true; // false: no picking BVH (MeshInput::pick_bvh)
-};
-struct Renderer; bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms = {}, converted::wide::Span<const double> tints = {});
 namespace physics { enum class BodyType : u8 { fixed = 0, kinematic = 1, dynamic = 2 }; }
 namespace physics { enum class ShapeKind : u8 { box, sphere, capsule, hull, mesh }; }
 namespace physics { enum class Surface : u8 { none, cloth, tpu, floor }; }
@@ -527,11 +495,6 @@ struct Bvh : converted::EngineObject {
 };
 struct Renderer : converted::EngineObject {
   using converted::EngineObject::EngineObject;
-  bool remove(const unsigned int& id) const;
-  unsigned int allocate_id() const;
-  void release_id(const unsigned int& id) const;
-  bool set_visible(const unsigned int& id, const bool& visible) const;
-  bool update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed = nullptr) const;
 };
 namespace mvt { enum class GeomType : u8 { unknown = 0, point = 1, line = 2, polygon = 3 }; }
 namespace mvt { namespace Value { enum class Kind : u8 { none, string, number, boolean }; } }
@@ -831,7 +794,7 @@ struct CityStream {
   f32 ground_height(f32 x, f32 y) const { return terrain_.height(x, y); }
   /// The ground (elevation tiles, water, craters, ground tiles): terrain.h.
   Terrain& terrain() { return terrain_; }
-  const Terrain& terrain() const { return terrain_; }
+  
   /// A second point that keeps ground collision under it (the pilot while his drone flies).
   Vec3 anchor;
   
@@ -1252,6 +1215,18 @@ namespace logic { struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   
   
@@ -1282,6 +1257,11 @@ namespace logic { struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   
   
   
@@ -1299,7 +1279,10 @@ namespace logic { struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
@@ -1338,8 +1321,10 @@ struct Library : converted::EngineObject {
 struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -3092,6 +3077,15 @@ namespace game { struct ControllerComponent {
 namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
 namespace game { enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score }; }
+struct TextureAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MotionAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -4049,8 +4043,8 @@ namespace net { struct Session {
   
   
   
-  bool active() const { return role_ != Role::none; }
-  bool hosting() const { return role_ == Role::host; }
+  
+  
   
   /// lan_vs.mjs getAuthorityId: a client whose host is gone (the connection dropped, or the host
   /// silent for 6 s after we were in). The session then goes on under the successor.
@@ -4302,11 +4296,11 @@ struct WorldArt {
   
   /// A new instanced part (mesh in its own frame); tinted parts take a colour per instance.
   
-  void begin();
-  void put(PartId p, const Mat4& m, Vec3 tint = {1, 1, 1});
-  void end();
+  
+  
+  
   /// Replaces a whole one-off mesh (decals); empty data hides it. `slot` keeps the mesh id.
-  void set_mesh(u32& slot, const MeshData& mesh, const Material& m);
+  
   
 
   // common parts (made in init)
@@ -4334,7 +4328,7 @@ struct Marks {
   bool bullet(Vec3 p, const CityStream& city, Rng& rng);
   /// `city`: the town the blasts and bullets were in (marks go with the walls they sit on).
   
-  void draw(WorldArt& art, const CityStream& city, World& w, f32 now);
+  
   const Stats& stats() const { return stats_; }
 
  private:
@@ -4344,7 +4338,7 @@ struct Marks {
   // A ring of at most `cap` items, the oldest gives way: one function per type of item.
   static void ring_put_Scorch(std::vector<Scorch>& v, u32& cursor, u32 cap, const Scorch& item);
   static void ring_put_WallMark(std::vector<WallMark>& v, u32& cursor, u32 cap, const WallMark& item);
-  void rebuild(const CityStream& city);
+  
   void add_soot(Vec3 at, f32 r, const std::vector<CityStream::Wall>& walls, const Terrain& t, Rng& rng);
   void add_breach(Vec3 at, f32 r, f32 strength, const std::vector<CityStream::Wall>& walls, const Terrain& t, World& w, Rng& rng, f32 now);
   void spawn_rubble(Vec3 at, Vec2 n, i32 count, World& w, Rng& rng, f32 now);
@@ -4393,9 +4387,9 @@ struct TrafficRules {
   /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session
   /// the host's): the lights are a function of it and of the junction's place alone.
   f32 lights_time = -1;  // (-1: not set - the caller's time)
-  const std::vector<Junction>& junctions() const { return junctions_; }
+  
   /// 0 green, 1 amber, 2 red for traffic moving along `heading` into junction j at `now`.
-  i32 light(const Junction& j, Vec2 heading, f32 now) const;
+  
   /// The highest speed car `car` may drive now (1e9: free). `cars`: positions of all cars (index
   /// = car id; z < -1e8 = not on the road); `people`: standing / walking people's feet.
   
@@ -4416,7 +4410,7 @@ struct TrafficRules {
   /// 2.5 m of it are kept, the rest is driven at 1.6 s headway. `limiter`: who it is (or -1).
   
   /// Junctions near p (drawing).
-  void near(Vec2 p, f32 r, std::vector<i32>& out) const;
+  
 
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
@@ -5181,7 +5175,7 @@ struct PoliceDrone {
 struct Game {
  public:
   
-  
+  ~Game();
   
   
   
@@ -5256,7 +5250,7 @@ struct Game {
   
   // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
   struct WorldParts { u32 t_ms = 0; u64 mask = 0; };  // the parts of the host's list that came (game_worldsync.cpp)
-  f64 life_epoch() const;
+  
   
   
   // destruction sync (game_destruction_sync.cpp): craters and broken buildings, the host's
@@ -5475,7 +5469,7 @@ struct Game {
   void hud_world(std::string& s);
   
   void step_world(f32 h);
-  void draw_world();
+  
   
   void world_blast(Vec3 at, f32 radius, f32 damage, bool by_player);
   void world_bullet(Vec3 at);  // a round that hit the world: a window pane cracks (world_marks.h)
@@ -5502,7 +5496,7 @@ struct Game {
   
   void step_tow(f32 h);
   
-  void draw_traffic_lights();
+  
   
 
   // menus, settings, start, equipment, presentation (game_ui.cpp)
@@ -6247,259 +6241,6 @@ bool Marks::bullet(Vec3 p, const CityStream& city, Rng& rng) {
   }
   return false;
 }
-void WorldArt::begin() {
-  for (Part& p : parts_) { p.transforms.clear(); p.tints.clear(); }
-}
-void WorldArt::set_mesh(u32& slot, const MeshData& mesh, const Material& m) {
-  if (mesh.vertex_count() == 0) {
-    if (slot) r_->remove(slot);
-    slot = 0;
-    return;
-  }
-  MeshLook look;
-  look.material = m;
-  if (!slot) slot = r_->allocate_id();
-  if (!upsert(*r_, slot, mesh, look)) { r_->release_id(slot); slot = 0; }
-}
-void WorldArt::put(PartId id, const Mat4& m, Vec3 tint) {
-  if (id == 0 || id >= parts_.size()) return;
-  Part& p = converted::at(parts_, id);
-  p.transforms.insert(p.transforms.end(), m.m, m.m + 16);
-  if (p.tinted) p.tints.insert(p.tints.end(), {tint.x, tint.y, tint.z, 1});
-}
-namespace world_marks_cpp_local { const Vec3 kRubbleColor = converted::wide::hex_color(0x8a857c); }
-namespace world_marks_cpp_local { f32 ragged(f32 a, f32 seed) { return 0.74 + 0.13 * kern::math::sin(a * 5 + seed * 7) + 0.08 * kern::math::sin(a * 11 + seed * 3) + 0.05 * kern::math::sin(a * 23 + seed); } }
-void Marks::rebuild(const CityStream& city) {
-  const Terrain& t = city.terrain();
-  for (MeshData& g : ground_data_) g.clear();
-  wall_data_.clear();
-  constexpr i32 kSeg = 18;
-  // Ground scorches (world_impacts.mjs SCORCH_FS): a ragged disc draped on the terrain, charred dark
-  // in the middle (.012) to soot at the rim (.05), alpha .6 that fades out over the outer 30 % -
-  // "softer than a painted disc: the ground still shows through at the rim". Kern has no per-vertex
-  // alpha: the char and the two outer bands are three blended meshes (alpha .6 / .4 / .15).
-  for (const Scorch& s : scorches_) {
-    const f32 sd = static_cast<f32>(s.seed % 1000) / 100;
-    auto at = [&](f32 x, f32 y) { return Vec3{x, y, t.height(x, y) + 0.16}; };
-    auto ring_at = [&](f32 k, i32 i) {
-      const f32 a = 2 * kPi * static_cast<f32>(i) / kSeg, rr = s.r * k * world_marks_cpp_local::ragged(a, sd);
-      return at(s.c.x + kern::math::cos(a) * rr, s.c.y + kern::math::sin(a) * rr);
-    };
-    auto char_col = [](f32 k) {  // mix(.05, .012, smoothstep(1, .35, k))
-      const f32 u = clampf((1 - k) / 0.65, 0, 1), c = u * u * (3 - 2 * u);
-      return Vec3{0.05, 0.045, 0.04} * (1 - c) + Vec3{0.012, 0.01, 0.01} * c;
-    };
-    auto band = [&](MeshData& g, f32 k0, f32 k1) {
-      const u32 base = g.vertex_count();
-      for (i32 i = 0; i < kSeg; converted::pre_inc(i)) g.push(ring_at(k0, i), {0, 0, 1}, char_col(k0), {});
-      for (i32 i = 0; i < kSeg; converted::pre_inc(i)) g.push(ring_at(k1, i), {0, 0, 1}, char_col(k1), {});
-      for (i32 i = 0; i < kSeg; converted::pre_inc(i)) {
-        const u32 j = converted::rem((converted::plus(i, 1)), kSeg), a0 = base + i, a1 = base + j, b0 = a0 + kSeg, b1 = a1 + kSeg;
-        g.indices.insert(g.indices.end(), {a0, b0, b1, a0, b1, a1});
-      }
-    };
-    MeshData& c = ground_data_[0];
-    const u32 base = c.vertex_count();
-    c.push(at(s.c.x, s.c.y), {0, 0, 1}, char_col(0), {});
-    for (i32 i = 0; i < kSeg; converted::pre_inc(i)) c.push(ring_at(0.35, i), {0, 0, 1}, char_col(0.35), {});
-    for (i32 i = 0; i < kSeg; converted::pre_inc(i)) c.indices.insert(c.indices.end(), {base, base + 1 + i, base + 1 + static_cast<u32>(converted::rem((converted::plus(i, 1)), kSeg))});
-    band(c, 0.35, 0.7);
-    band(ground_data_[1], 0.7, 0.86);
-    band(ground_data_[2], 0.86, 1.0);
-  }
-  // Wall marks in the wall's plane (dir along the wall, z up).
-  auto wall_disc = [&](const WallMark& m, f32 inner, Vec3 c_in, f32 outer_k, Vec3 c_out, f32 seed) {
-    const u32 base = wall_data_.vertex_count();
-    const Vec3 n{m.n.x, m.n.y, 0};
-    auto P = [&](f32 x, f32 y) { return m.c + Vec3{m.d.x * x, m.d.y * x, y}; };
-    wall_data_.push(m.c, n, c_in, {});
-    for (i32 i = 0; i < kSeg; converted::pre_inc(i)) {
-      const f32 a = 2 * kPi * static_cast<f32>(i) / kSeg, e = world_marks_cpp_local::ragged(a, seed);
-      wall_data_.push(P(kern::math::cos(a) * m.size * inner * e, kern::math::sin(a) * m.size * inner * e), n, c_in, {});
-    }
-    for (i32 i = 0; i < kSeg; converted::pre_inc(i)) {
-      const f32 a = 2 * kPi * static_cast<f32>(i) / kSeg, e = world_marks_cpp_local::ragged(a, seed);
-      wall_data_.push(P(kern::math::cos(a) * m.size * outer_k * e, kern::math::sin(a) * m.size * outer_k * e), n, c_out, {});
-    }
-    for (i32 i = 0; i < kSeg; converted::pre_inc(i)) {
-      const u32 j = converted::rem((converted::plus(i, 1)), kSeg), a0 = base + 1 + i, a1 = base + 1 + j, b0 = a0 + kSeg, b1 = a1 + kSeg;
-      wall_data_.indices.insert(wall_data_.indices.end(), {base, a0, a1, a0, b0, b1, a0, b1, a1});
-    }
-  };
-  for (const WallMark& m : soots_) {
-    const f32 sd = static_cast<f32>(m.seed % 1000) / 100;
-    const f32 k = 0.06 + 0.05 * (1 - m.level);
-    wall_disc(m, 0.55, {0.015, 0.012, 0.01}, 1.0, {k, k * 0.86, k * 0.72}, sd);
-  }
-  for (const WallMark& m : breaches_) {
-    const f32 sd = static_cast<f32>(m.seed % 1000) / 100;
-    // facade_marks.mjs BREACH_FS: dark hole growing with the damage, broken concrete rim, cracks
-    const f32 hole = 0.18 + 0.42 * m.level;
-    const f32 g = 0.46 - 0.2 * m.level;
-    wall_disc(m, hole, {0.035, 0.03, 0.028}, 0.82, {g, g * 0.96, g * 0.9}, sd);
-    const Vec3 n{m.n.x, m.n.y, 0};
-    Rng cr{m.seed | 1};
-    const i32 cracks = converted::plus(5, static_cast<i32>(cr.next() % 5));
-    for (i32 i = 0; i < cracks; converted::pre_inc(i)) {
-      const f32 a = 2 * kPi * (static_cast<f32>(i) + cr.unit() * 0.7) / static_cast<f32>(cracks);
-      const f32 r0 = m.size * hole * 0.9, r1 = m.size * (0.55 + 0.45 * cr.unit()) * (1.0 + 0.4 * m.level), wdt = m.size * 0.025;
-      const Vec2 dir{kern::math::cos(a), kern::math::sin(a)}, side{-dir.y, dir.x};
-      const u32 base = wall_data_.vertex_count();
-      for (const Vec2 q : {dir * r0 + side * wdt, dir * r0 - side * wdt, dir * r1 - side * (wdt * 0.2), dir * r1 + side * (wdt * 0.2)})
-        wall_data_.push(m.c + Vec3{m.d.x * q.x, m.d.y * q.x, q.y} + n * 0.002, n, {0.03, 0.028, 0.026}, {});
-      wall_data_.indices.insert(wall_data_.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
-    }
-  }
-  // facade_marks.mjs CRACK_FS: radial spokes, two broken rings, a tiny pit - light on the pane
-  for (const WallMark& m : cracks_) {
-    const Vec3 n{m.n.x, m.n.y, 0};
-    Rng cr{m.seed | 1};
-    auto line = [&](Vec2 a, Vec2 b, f32 w, Vec3 col) {
-      const Vec2 d = b - a;
-      const f32 l = std::fmax(1e-4, hypot_bp(d.x, d.y));
-      const Vec2 s{-d.y / l * w, d.x / l * w};
-      const u32 base = wall_data_.vertex_count();
-      for (const Vec2 q : {a + s, a - s, b - s, b + s}) wall_data_.push(m.c + Vec3{m.d.x * q.x, m.d.y * q.x, q.y}, n, col, {});
-      wall_data_.indices.insert(wall_data_.indices.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
-    };
-    const Vec3 c{0.82, 0.86, 0.9};
-    const i32 spokes = converted::plus(7, static_cast<i32>(cr.next() % 4));
-    std::vector<Vec2> ends;
-    for (i32 i = 0; i < spokes; converted::pre_inc(i)) {
-      const f32 a = 2 * kPi * (static_cast<f32>(i) + (cr.unit() - 0.5) * 0.6) / static_cast<f32>(spokes);
-      const f32 r = m.size * (0.6 + 0.4 * cr.unit());
-      const Vec2 e{kern::math::cos(a) * r, kern::math::sin(a) * r};
-      line(e * 0.08, e * 0.55, 0.004, c);
-      line(e * 0.55, e, 0.003, c);
-      ends.push_back(e);
-    }
-    for (std::size_t i = 0; i < ends.size(); converted::pre_inc(i)) {
-      const Vec2 a = converted::at(ends, i), b = converted::at(ends, converted::rem((converted::plus(i, 1)), ends.size()));
-      line(a * 0.35, b * 0.35, 0.003, c);
-      if (cr.unit() < 0.7) line(a * 0.7, b * 0.7, 0.0025, c);
-    }
-    line({-0.01, 0}, {0.01, 0}, 0.01, {0.95, 0.97, 1.0});  // the pit
-  }
-}
-void Marks::draw(WorldArt& art, const CityStream& city, World& w, f32 now) {
-  if (dirty_ && struck_) {
-    rebuild(city);
-    Material m;
-    m.alpha = AlphaMode::blend;
-    m.color = {1, 1, 1, 0.88};
-    m.roughness = 1;
-    m.cast_shadow = false;
-    m.double_sided = true;
-    art.set_mesh(wall_mesh_, wall_data_, m);
-    const f32 alphas[3] = {0.6, 0.4, 0.15};
-    for (int k = 0; k < 3; converted::pre_inc(k)) {
-      Material g = m;
-      g.color = {1, 1, 1, converted::at(alphas, k)};
-      art.set_mesh(converted::at(ground_mesh_, k), converted::at(ground_data_, k), g);
-    }
-    dirty_ = false;
-  }
-  for (const Chunk& c : rubble_) {
-    if (!c.body.valid() || !w.body_valid(c.body)) continue;
-    const physics::Pose p = w.pose(c.body);
-    const f32 fade = clampf((c.until - now) / 2.5, 0, 1);
-    art.put(art.cube, Mat4::trs(p.position, p.rotation, c.half * (2 * fade)), world_marks_cpp_local::kRubbleColor);
-  }
-}
-namespace wire { struct V3 { f32 x = 0, y = 0, z = 0; }; }
-f64 Game::life_epoch() const {
-  // the clock the animals' rounds run on: the wall clock - in a session the host's (a client
-  // counts on from what the host last sent), so a dog is at the same place of its round everywhere
-  if (net_.active() && !net_.hosting() && host_epoch_ok_) return now_ms() / 1000 + host_epoch_off_;
-  return wall_ms() / 1000.0;
-}
-namespace world_traffic_cpp_local { constexpr f32 kCell = 40; }
-namespace world_traffic_cpp_local { u64 cell(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); } }
-void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
-  out.clear();
-  const i32 cx0 = static_cast<i32>(converted::fits<int>(std::floor((p.x - r) / world_traffic_cpp_local::kCell))), cx1 = static_cast<i32>(converted::fits<int>(std::floor((p.x + r) / world_traffic_cpp_local::kCell)));
-  const i32 cy0 = static_cast<i32>(converted::fits<int>(std::floor((p.y - r) / world_traffic_cpp_local::kCell))), cy1 = static_cast<i32>(converted::fits<int>(std::floor((p.y + r) / world_traffic_cpp_local::kCell)));
-  for (i32 y = cy0; y <= cy1; converted::pre_inc(y))
-    for (i32 x = cx0; x <= cx1; converted::pre_inc(x)) {
-      auto it = grid_.find(world_traffic_cpp_local::cell(x, y));
-      if (it == grid_.end()) continue;
-      for (i32 j : it->second)
-        if (hypot_bp(converted::at(junctions_, j).p.x - p.x, converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
-    }
-}
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
-namespace world_traffic_cpp_local { rules::Blueprint g_rules{"Traffic"}; }
-i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
-  if (!j.lights) return -1;
-  i32 light = 0;
-  world_traffic_cpp_local::g_rules.call("Light", std::tie(light), rules::decimal(lights_time >= 0 ? lights_time : now), rules::decimal(j.offset), rules::decimal(heading.x * j.axis.x + heading.y * j.axis.y));
-  return light;
-}
-void Game::draw_traffic_lights() {
-  if (!life_ || !converted::present(life_)->art_ready) return;
-  WorldLife& L = *converted::present(life_);
-  const f32 now = converted::present(world_)->sim_time();
-  L.rules.lights_time = static_cast<f32>(kern::math::mod(life_epoch(), 38.0 * 1000));  // (the host's wall clock in a session)
-  // the tow trucks' bed, boom, hook and amber bar (tow_service.mjs buildTruck)
-  for (const WorldLife::TowTruck& t : L.trucks) {
-    if (!t.body.valid() || !converted::present(world_)->physics().body_valid(t.body)) continue;
-    const physics::Pose p = converted::present(world_)->physics().pose(t.body);
-    const Mat4 m = Mat4::trs(p.position, p.rotation, {1, 1, 1});
-    {
-      // bed, boom and hook (tow_service.mjs buildTruck), the amber bar flashing
-      L.art.put(L.art.cube, m * Mat4::translate({-0.95, 0, 0.75}) * Mat4::scale({1.5, 1.5, 0.12}), {0.14, 0.15, 0.16});
-      L.art.put(L.art.cube, m * Mat4::translate({-1.35, 0, 1.15}) * Mat4::trs({}, Quat::axis_angle({0, 1, 0}, -0.38), {1.9, 0.16, 0.16}), {0.54, 0.56, 0.59});
-      L.art.put(L.art.cube, m * Mat4::translate({-2.2, 0, 0.75}) * Mat4::scale({0.12, 1.3, 0.1}), {0.54, 0.56, 0.59});
-      const bool on = static_cast<i32>(converted::fits<int>(now / 0.26)) % 2 == 0;
-      L.art.put(L.art.glow, m * Mat4::translate({0.2, 0.24, 1.25}) * Mat4::scale({0.12, 0.12, 0.08}), on ? Vec3{1, 0.64, 0.1} : Vec3{0.23, 0.15, 0.03});
-      L.art.put(L.art.glow, m * Mat4::translate({0.2, -0.24, 1.25}) * Mat4::scale({0.12, 0.12, 0.08}), on ? Vec3{0.23, 0.15, 0.03} : Vec3{1, 0.64, 0.1});
-    }
-  }
-  std::vector<i32> near;
-  L.rules.near({cam_.eye.x, cam_.eye.y}, 160, near);
-  for (i32 ji : near) {
-    const TrafficRules::Junction& j = converted::at(L.rules.junctions(), ji);
-    if (!j.lights) continue;
-    for (const TrafficRules::Arm& a : j.arms) {
-      // a post on the kerb corner right of the incoming traffic (world_traffic.cpp)
-      if (!a.has_pole) continue;
-      const Vec2 p = j.p + a.pole;
-      if (city_.terrain().water_at(p.x, p.y)) continue;
-      const f32 g = city_.ground_height(p.x, p.y);
-      L.art.put(L.art.cylinder, Mat4::translate({p.x, p.y, g}) * Mat4::scale({0.07, 0.07, 3.1}), {0.22, 0.23, 0.24});
-      const f32 face = kern::math::atan2(a.dir.y, a.dir.x);
-      const Mat4 head = Mat4::translate({p.x, p.y, g + 2.6}) * Mat4::trs({}, yaw_quat(face), {1, 1, 1});
-      L.art.put(L.art.cube, head * Mat4::scale({0.22, 0.34, 0.9}), {0.08, 0.08, 0.09});
-      const i32 l = L.rules.light(j, {-a.dir.x, -a.dir.y}, now);
-      const Vec3 off{0.06, 0.06, 0.06};
-      const Vec3 cols[3] = {l == 2 ? Vec3{1.4, 0.08, 0.05} : off, l == 1 ? Vec3{1.4, 0.75, 0.05} : off, l == 0 ? Vec3{0.1, 1.3, 0.35} : off};
-      for (int k = 0; k < 3; converted::pre_inc(k)) L.art.put(L.art.glow, head * Mat4::translate({0.12, 0, 0.28 - 0.28 * k}) * Mat4::scale({0.03, 0.1, 0.1}), converted::at(cols, k));
-    }
-  }
-}
-void WorldArt::end() {
-  for (Part& p : parts_) {
-    if (!p.id) continue;
-    if (p.transforms.empty()) { r_->set_visible(p.id, false); continue; }
-    r_->update_instances(p.id, Span<const f32>(p.transforms.data(), p.transforms.size()), Span<const f32>(p.tints.data(), p.tints.size()));
-    r_->set_visible(p.id, true);
-  }
-}
 Vec2 Terrain::flow_at(f32 x, f32 y) const {
   const i32 cx = static_cast<i32>(converted::fits<int>(std::floor(x / kWaterCell))), cy = static_cast<i32>(converted::fits<int>(std::floor(y / kWaterCell)));
   auto it = water_.find(terrain_cpp_local::key2(cx >> 4, cy >> 4));
@@ -6521,6 +6262,106 @@ bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
   if (r.state.mode == net::PlayerMode::jet || r.state.mode == net::PlayerMode::car) { p = r.shown; q = r.shown_rotation; return true; }
   if (r.state.flags & net::kJetOut) { p = r.state.jet_pos; q = r.state.jet_rot; return true; }
   return false;
+}
+namespace jobs { using Fn = void (*)(Span<const u8> input, std::vector<u8>& output); }
+namespace logic { namespace EngineObjects_types { using Kind = const void*; } }
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace logic { namespace PureNodes_types { using Bool = bool; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace PureNodes_types { using Text = std::string; } }
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_BloomState { using type = BloomState; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_LogLevel { using type = LogLevel; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Wave { using type = audio::Wave; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameStatus { using type = game::GameStatus; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_net_ClientState { using type = net::ClientState; } } }
+namespace logic { namespace engine_direct { namespace E_physics_BodyType { using type = physics::BodyType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_bus_types { using In = std::tuple<std::remove_cvref_t<audio::Bus>>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_hud_mut_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_events_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_sound_cues_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_building_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_road_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_layers_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_pick_bvh_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_linear_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_texture_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_positions_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_uvs_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_indices_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_joints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_weights_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_bones_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_tints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_count_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_mirror_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_local_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_world_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_gpu_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_sort_distance_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_live_index_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_material_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_attribute_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_mipmaps_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_repeat_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_nearest_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_speed_of_sound_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_doppler_factor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_logic_native_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_actor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_path_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_keys_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_night_windows_night_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_simulator_settings_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_character_mover_settings_types { using In = std::tuple<>; } } }
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace BlueprintCore_types { using Text = ::kern::logic::Text; }
+namespace game { namespace nodes { using Bool = bool; } }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Text = std::string; } }
+namespace game { namespace nodes { using Actor = ::kern::logic::ActorHandle; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
+Game::~Game() {
+  life_.reset();
+  swarm_cruiser_.reset();
 }
 using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
   Mat4 m;
@@ -7247,14 +7088,6 @@ using game::ActorId; void Game::step_world(f32 h) {
   for (std::size_t i = 0; i < cars_.size() && converted::plus(i, 3) < 32; converted::pre_inc(i))
     if (converted::at(cars_, i).placed) water(static_cast<u32>(converted::plus(i, 3)), converted::at(cars_, i).actor, converted::present(converted::at(cars_, i).car)->spec().half, false);
   step_tow(h);
-}
-void Game::draw_world() {
-  if (!life_ || !converted::present(life_)->art_ready) return;
-  WorldLife& L = *converted::present(life_);
-  L.art.begin();
-  L.marks.draw(L.art, city_, converted::present(world_)->physics(), converted::present(world_)->sim_time());
-  draw_traffic_lights();
-  L.art.end();
 }
 void Game::world_bullet(Vec3 at) {
   if (life_) converted::present(life_)->marks.bullet(at, city_, rng_);  // world_impacts.mjs bullet: glassAt -> addGlassCrack
@@ -13205,49 +13038,6 @@ namespace physics { using converted::arg; using converted::same; using converted
 [[maybe_unused]] static std::string text(const physics::JointSettings& s) { return std::string("{") + text(s.type) + ", " + text(s.body_a) + ", " + text(s.body_b) + ", " + text(s.frame_a) + ", " + text(s.frame_b) + ", " + text(s.collide_connected) + ", " + text(s.enable_spring) + ", " + text(s.hertz) + ", " + text(s.damping_ratio) + ", " + text(s.enable_limit) + ", " + text(s.lower) + ", " + text(s.upper) + ", " + text(s.enable_motor) + ", " + text(s.motor_speed) + ", " + text(s.max_motor_torque) + ", " + text(s.max_motor_force) + ", " + text(s.motor_velocity) + ", " + text(s.length) + ", " + text(s.linear_hertz) + ", " + text(s.angular_hertz) + ", " + text(s.linear_damping_ratio) + ", " + text(s.angular_damping_ratio) + ", " + text(s.linear_velocity) + ", " + text(s.angular_velocity) + ", " + text(s.max_velocity_force) + ", " + text(s.max_velocity_torque) + ", " + text(s.max_spring_force) + ", " + text(s.max_spring_torque) + ", " + text(s.enable_steering) + ", " + text(s.enable_steering_limit) + ", " + text(s.steering_hertz) + ", " + text(s.steering_damping_ratio) + ", " + text(s.target_steering) + ", " + text(s.max_steering_torque) + ", " + text(s.steering_lower) + ", " + text(s.steering_upper) + ", " + text(s.max_torque) + ", " + text(s.constraint_hertz) + ", " + text(s.constraint_damping_ratio) + ", " + text(converted::shaped<converted::Whole>(s.user)) + "}"; }
 [[maybe_unused]] static void take(physics::JointSettings& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 40) return; converted::take_as<physics::JointType>(s.type, (*v.rows)[0]); converted::take_as<physics::Body>(s.body_a, (*v.rows)[1]); converted::take_as<physics::Body>(s.body_b, (*v.rows)[2]); converted::take_as<physics::Pose>(s.frame_a, (*v.rows)[3]); converted::take_as<physics::Pose>(s.frame_b, (*v.rows)[4]); converted::take_as<bool>(s.collide_connected, (*v.rows)[5]); converted::take_as<bool>(s.enable_spring, (*v.rows)[6]); converted::take_as<double>(s.hertz, (*v.rows)[7]); converted::take_as<double>(s.damping_ratio, (*v.rows)[8]); converted::take_as<bool>(s.enable_limit, (*v.rows)[9]); converted::take_as<double>(s.lower, (*v.rows)[10]); converted::take_as<double>(s.upper, (*v.rows)[11]); converted::take_as<bool>(s.enable_motor, (*v.rows)[12]); converted::take_as<double>(s.motor_speed, (*v.rows)[13]); converted::take_as<double>(s.max_motor_torque, (*v.rows)[14]); converted::take_as<double>(s.max_motor_force, (*v.rows)[15]); converted::take_as<Vec3>(s.motor_velocity, (*v.rows)[16]); converted::take_as<double>(s.length, (*v.rows)[17]); converted::take_as<double>(s.linear_hertz, (*v.rows)[18]); converted::take_as<double>(s.angular_hertz, (*v.rows)[19]); converted::take_as<double>(s.linear_damping_ratio, (*v.rows)[20]); converted::take_as<double>(s.angular_damping_ratio, (*v.rows)[21]); converted::take_as<Vec3>(s.linear_velocity, (*v.rows)[22]); converted::take_as<Vec3>(s.angular_velocity, (*v.rows)[23]); converted::take_as<double>(s.max_velocity_force, (*v.rows)[24]); converted::take_as<double>(s.max_velocity_torque, (*v.rows)[25]); converted::take_as<double>(s.max_spring_force, (*v.rows)[26]); converted::take_as<double>(s.max_spring_torque, (*v.rows)[27]); converted::take_as<bool>(s.enable_steering, (*v.rows)[28]); converted::take_as<bool>(s.enable_steering_limit, (*v.rows)[29]); converted::take_as<double>(s.steering_hertz, (*v.rows)[30]); converted::take_as<double>(s.steering_damping_ratio, (*v.rows)[31]); converted::take_as<double>(s.target_steering, (*v.rows)[32]); converted::take_as<double>(s.max_steering_torque, (*v.rows)[33]); converted::take_as<double>(s.steering_lower, (*v.rows)[34]); converted::take_as<double>(s.steering_upper, (*v.rows)[35]); converted::take_as<double>(s.max_torque, (*v.rows)[36]); converted::take_as<double>(s.constraint_hertz, (*v.rows)[37]); converted::take_as<double>(s.constraint_damping_ratio, (*v.rows)[38]); converted::take_as<converted::Whole>(s.user, (*v.rows)[39]); }
 }
-[[maybe_unused]] static Material draw_kern__Material(converted::Draw& draw) {
-  Material s{};
-  s.color = draw_kern__Vec4(draw);
-  s.alpha = converted::enum_value<AlphaMode>(draw.below(3));
-  s.alpha_cutoff = draw.number();
-  s.roughness = draw.number();
-  s.metalness = draw.number();
-  s.emissive = draw.vector();
-  s.unlit = draw.flag();
-  s.double_sided = draw.flag();
-  s.cast_shadow = draw.flag();
-  s.frustum_culled = draw.flag();
-  s.viewmodel = draw.flag();
-  s.linear_colors = draw.flag();
-  s.lines = draw.flag();
-  converted::fill_array(s.params, [&]() -> int { return static_cast<int>(draw.whole()); });
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const Material& s) { return converted::Value::structure({arg(s.color), arg(s.alpha), arg(s.alpha_cutoff), arg(s.roughness), arg(s.metalness), arg(s.emissive), arg(s.unlit), arg(s.double_sided), arg(s.cast_shadow), arg(s.frustum_culled), arg(s.viewmodel), arg(s.linear_colors), arg(s.lines), arg(converted::array_list(s.params))}); }
-[[maybe_unused]] static bool same(const Material& want, const converted::Value& got) { return converted::rows_of(got, 14) && converted::at_place(same(want.color, (*got.rows)[0]), ".color") && converted::at_place(same(want.alpha, (*got.rows)[1]), ".alpha") && converted::at_place(same(want.alpha_cutoff, (*got.rows)[2]), ".alpha_cutoff") && converted::at_place(same(want.roughness, (*got.rows)[3]), ".roughness") && converted::at_place(same(want.metalness, (*got.rows)[4]), ".metalness") && converted::at_place(same(want.emissive, (*got.rows)[5]), ".emissive") && converted::at_place(same(want.unlit, (*got.rows)[6]), ".unlit") && converted::at_place(same(want.double_sided, (*got.rows)[7]), ".double_sided") && converted::at_place(same(want.cast_shadow, (*got.rows)[8]), ".cast_shadow") && converted::at_place(same(want.frustum_culled, (*got.rows)[9]), ".frustum_culled") && converted::at_place(same(want.viewmodel, (*got.rows)[10]), ".viewmodel") && converted::at_place(same(want.linear_colors, (*got.rows)[11]), ".linear_colors") && converted::at_place(same(want.lines, (*got.rows)[12]), ".lines") && converted::at_place(same(converted::array_list(want.params), (*got.rows)[13]), ".params"); }
-[[maybe_unused]] static bool defined(const Material& s) { return defined(s.color) && defined(s.alpha) && defined(s.alpha_cutoff) && defined(s.roughness) && defined(s.metalness) && defined(s.emissive) && defined(s.unlit) && defined(s.double_sided) && defined(s.cast_shadow) && defined(s.frustum_culled) && defined(s.viewmodel) && defined(s.linear_colors) && defined(s.lines) && defined(converted::array_list(s.params)); }
-[[maybe_unused]] static std::string text(const Material& s) { return std::string("{") + text(s.color) + ", " + text(s.alpha) + ", " + text(s.alpha_cutoff) + ", " + text(s.roughness) + ", " + text(s.metalness) + ", " + text(s.emissive) + ", " + text(s.unlit) + ", " + text(s.double_sided) + ", " + text(s.cast_shadow) + ", " + text(s.frustum_culled) + ", " + text(s.viewmodel) + ", " + text(s.linear_colors) + ", " + text(s.lines) + ", " + text(converted::array_list(s.params)) + "}"; }
-[[maybe_unused]] static void take(Material& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 14) return; converted::take_as<Vec4>(s.color, (*v.rows)[0]); converted::take_as<AlphaMode>(s.alpha, (*v.rows)[1]); converted::take_as<double>(s.alpha_cutoff, (*v.rows)[2]); converted::take_as<double>(s.roughness, (*v.rows)[3]); converted::take_as<double>(s.metalness, (*v.rows)[4]); converted::take_as<Vec3>(s.emissive, (*v.rows)[5]); converted::take_as<bool>(s.unlit, (*v.rows)[6]); converted::take_as<bool>(s.double_sided, (*v.rows)[7]); converted::take_as<bool>(s.cast_shadow, (*v.rows)[8]); converted::take_as<bool>(s.frustum_culled, (*v.rows)[9]); converted::take_as<bool>(s.viewmodel, (*v.rows)[10]); converted::take_as<bool>(s.linear_colors, (*v.rows)[11]); converted::take_as<bool>(s.lines, (*v.rows)[12]); { std::vector<int> items; converted::take_as<std::vector<int>>(items, (*v.rows)[13]); converted::array_from(s.params, items); } }
-[[maybe_unused]] static MeshLook draw_kern__MeshLook(converted::Draw& draw) {
-  MeshLook s{};
-  s.material = draw_kern__Material(draw);
-  s.extra_slot = static_cast<unsigned int>(draw.below(40));
-  s.texture = static_cast<unsigned int>(draw.below(40));
-  s.visible = draw.flag();
-  s.layers = static_cast<unsigned int>(draw.below(40));
-  s.pick_bvh = draw.flag();
-  return s;
-}
-[[maybe_unused]] static converted::Value arg(const MeshLook& s) { return converted::Value::structure({arg(s.material), arg(s.extra_slot), arg(s.texture), arg(s.visible), arg(s.layers), arg(s.pick_bvh)}); }
-[[maybe_unused]] static bool same(const MeshLook& want, const converted::Value& got) { return converted::rows_of(got, 6) && converted::at_place(same(want.material, (*got.rows)[0]), ".material") && converted::at_place(same(want.extra_slot, (*got.rows)[1]), ".extra_slot") && converted::at_place(same(want.texture, (*got.rows)[2]), ".texture") && converted::at_place(same(want.visible, (*got.rows)[3]), ".visible") && converted::at_place(same(want.layers, (*got.rows)[4]), ".layers") && converted::at_place(same(want.pick_bvh, (*got.rows)[5]), ".pick_bvh"); }
-[[maybe_unused]] static bool defined(const MeshLook& s) { return defined(s.material) && defined(s.extra_slot) && defined(s.texture) && defined(s.visible) && defined(s.layers) && defined(s.pick_bvh); }
-[[maybe_unused]] static std::string text(const MeshLook& s) { return std::string("{") + text(s.material) + ", " + text(s.extra_slot) + ", " + text(s.texture) + ", " + text(s.visible) + ", " + text(s.layers) + ", " + text(s.pick_bvh) + "}"; }
-[[maybe_unused]] static void take(MeshLook& s, const converted::Value& v) { if (!v.rows || v.rows->size() != 6) return; converted::take_as<Material>(s.material, (*v.rows)[0]); converted::take_as<unsigned int>(s.extra_slot, (*v.rows)[1]); converted::take_as<unsigned int>(s.texture, (*v.rows)[2]); converted::take_as<bool>(s.visible, (*v.rows)[3]); converted::take_as<unsigned int>(s.layers, (*v.rows)[4]); converted::take_as<bool>(s.pick_bvh, (*v.rows)[5]); }
-inline bool Renderer::remove(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.remove", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline unsigned int Renderer::allocate_id() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.allocate_id", {converted::value_of(*this)}); unsigned int kern_result = converted::quiet<unsigned int>(); converted::take_as<unsigned int>(kern_result, kern_out[0]); return kern_result; }
-inline void Renderer::release_id(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.release_id", {converted::value_of(*this), converted::value_of(id)}); }
-inline bool Renderer::set_visible(const unsigned int& id, const bool& visible) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.set_visible", {converted::value_of(*this), converted::value_of(id), converted::value_of(visible)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline bool Renderer::update_instances(const unsigned int& id, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints, bool* changed) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.renderer.update_instances", {converted::value_of(*this), converted::value_of(id), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); if (changed) converted::take_as<bool>(*changed, kern_out[1]); return kern_result; }
 inline World& GameWorld::physics() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.physics", {converted::value_of(*this)}); World& kern_result = *converted::engine_object<World>(kern_out[0].as_int()); return kern_result; }
 inline bool GameWorld::actor_alive(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_alive", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline double GameWorld::sim_time() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.sim_time", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
@@ -13277,17 +13067,13 @@ inline physics::Joint World::create_joint(const physics::JointSettings& settings
 inline void World::set_pose(const physics::Body& body, const physics::Pose& pose) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_pose", {converted::value_of(*this), converted::value_of(body), converted::value_of(pose)}); }
 inline void World::set_linear_velocity(const physics::Body& body, const Vec3& v) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_linear_velocity", {converted::value_of(*this), converted::value_of(body), converted::value_of(v)}); }
 inline void World::set_angular_velocity(const physics::Body& body, const Vec3& w) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_angular_velocity", {converted::value_of(*this), converted::value_of(body), converted::value_of(w)}); }
-inline bool upsert(Renderer& renderer, const unsigned int& id, const MeshData& mesh, const MeshLook& look, converted::wide::Span<const double> transforms, converted::wide::Span<const double> tints) { const std::vector<converted::Value> kern_out = converted::engine_call("engine.upsert", {converted::value_of(renderer), converted::value_of(id), converted::value_of(mesh), converted::value_of(look), converted::value_of(converted::as_list(transforms)), converted::value_of(converted::as_list(tints))}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
-inline double now_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.now_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
-inline double wall_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.wall_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 struct Out_hud_world { State_Game State; std::string s; };
 [[maybe_unused]] static bool same(const Out_hud_world& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.s, (*got.rows)[1]), ".s"); }
 [[maybe_unused]] static bool defined(const Out_hud_world& s) { return defined(s.State) && defined(s.s); }
 [[maybe_unused]] static std::string text(const Out_hud_world& s) { return std::string("{") + text(s.State) + ", " + text(s.s) + "}"; }
 
 SC_TEST(converted_Game__game_world_cpp) {
-  converted::Blueprint bp("Game", {"Traffic"});
-  world_traffic_cpp_local::g_rules.bind(bp.source_logic());
+  converted::Blueprint bp("Game");
   {  // Game::hud_world
     converted::Tally tally("hud_world");
     converted::Draw draw;   // (every function its own arguments, the same in every run)
@@ -13329,29 +13115,6 @@ SC_TEST(converted_Game__game_world_cpp) {
       bp.before_source();   // (the Blueprints of the actors it calls, as they started)
       converted::zero_stack();
       const converted::Zeroed<decltype(run(a0))> held([&] { return run(a0); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
-  {  // Game::draw_world
-    converted::Tally tally("draw_world");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]() { converted::counted([&] { return s->draw_world(); }); return State_Game{s.get()}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      const std::vector<converted::Value> given = {};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run())> held([&] { return run(); });
       const auto& made = held.get();
       const auto& want = made;
       converted::g_can_bail = false;

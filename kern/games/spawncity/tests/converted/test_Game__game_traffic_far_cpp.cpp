@@ -37,8 +37,6 @@ using converted::wide::asinh_bp; using converted::wide::log2_bp; using converted
 #define private public
 #define protected public
 enum class LogLevel : i32 { debug = 0, info = 1, warn = 2, error = 3 };
-double now_ms();
-double wall_ms();
 constexpr f32 kPi = 3.14159265358979323846;
 struct Vec4 {
   f32 x = 0, y = 0, z = 0, w = 0;
@@ -271,7 +269,7 @@ struct Rng {
   bool has_spare_ = false;
   /// The generator for a seed that may be 0 (0: the default seed).
   
-  u32 next() { s ^= s << 13; s ^= s >> 17; s ^= s << 5; return s; }
+  
   
   
   /// Standard normal (Box-Muller), as SpawnCity's sensor noise.
@@ -765,7 +763,7 @@ struct CityStream {
   
 
   // ---- gameplay queries ----
-  const std::vector<Lane>& lanes() const { return lanes_; }
+  
   /// A point on a drivable street within `radius` of `near` (heading along the street).
   
   /// Ground height: the terrain's static surface (elevation, water basins, craters).
@@ -1193,6 +1191,18 @@ namespace logic { struct Function {
   /// (Random::range(rng, 0.0, 1.0)) - and has no body: the library has it, once. Called
   /// directly, like one of the Blueprint's own; a reference input is a place of the caller.
   std::string from{};
+  /// A function the program gives its host under a fixed C name - a page's script calls it on the module
+  /// (KERN_EXPORT). In the Blueprint's C++: KERN_EXPORT_AS("game_hud", "i32 text -> text") game_hudResult
+  /// game_hud(Int view = 0, const Text& ask = "") { ... }. `wire` says how each input and the output
+  /// cross, one word each in their order - one C parameter each: i32, u32, f32, f64 (a number of that C type;
+  /// a Bool as 0/1), text (an input: a pointer to its characters, up to the len after it or else to its 0;
+  /// the output: a pointer to its characters, kept until the next export gives a text), bytes (an input: a
+  /// pointer to u8 - a List<Int> of the bytes, as many as the len after it says), len (an Int input: the
+  /// length of the text or the bytes before it, a u32).
+  /// Glue the class writes (logic::native_glue): the export calls the function on the object of the
+  /// instance that runs as its class (kern::logic::blueprint_object).
+  std::string exported{};
+  std::string wire{};
   std::string help;
   
   
@@ -1223,6 +1233,11 @@ namespace logic { struct Graph {
   /// The libraries it uses, by name. It has their types (EnumType::from, StructType::from) and
   /// calls their functions (Function::from): struct Door : virtual kern::Blueprint, virtual Random { ... };
   std::vector<std::string> uses;
+  /// The interface of the engine this Blueprint is the object of (EngineInterface::name: "ShaderExtension", "App";
+  /// empty: none) - the engine calls its functions of the names of the interface's (kern/docs/blueprint_cpp.md,
+  /// "Schnittstellen der Engine"; logic::engine_implement makes the engine's object of a running one). In C++:
+  /// struct Water : kern::Blueprint, kern::Implements<kern::ShaderExtension> { ... };
+  std::string implements;
   
   
   
@@ -1240,7 +1255,10 @@ namespace logic { struct Graph {
   /// - "variable", "scope", "path" -; "<input>.": the place a call gives the reference input of
   /// that name, logic::ref_key): a variable of the Blueprint, a local variable of the function
   /// the node stands in, or one of that function's inputs. `out` holds it.
-  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant };
+  /// Or - the setting "bound" names a node of the engine that is a place of the engine
+  /// (EngineFunction::place) - what that node bound when it ran: Root::bound, `out` of the type of its
+  /// output "result" (kern/docs/blueprint_cpp.md, "Plätze der Engine").
+  enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound };
   
   /// Can what the node names there be changed (a variable, a local variable, a reference input
   /// that is not const)?
@@ -1279,8 +1297,10 @@ struct Library : converted::EngineObject {
 struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { using Blueprints = std::function<const Graph*(std::string_view)>; }
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -3033,6 +3053,15 @@ namespace game { struct ControllerComponent {
 namespace game { enum class TriggerAction : u8 { goal, hazard, checkpoint, message, launch, teleport, damage, event }; }
 namespace game { enum class MoverMode : u8 { sine, ping_pong, loop }; }
 namespace game { enum class GameGoal : u8 { none, collect_all, reach_goal, survive, score }; }
+struct TextureAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct SoundAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct MotionAsset : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
 struct Particles : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -3076,7 +3105,6 @@ struct GameWorld : converted::EngineObject {
   World& physics() const;
   bool actor_alive(const unsigned int& id) const;
   bool actor_matrix(const unsigned int& id, Mat4& out) const;
-  double sim_time() const;
   physics::Body actor_body(const unsigned int& actor) const;
 };
 struct GapsState {
@@ -4325,25 +4353,25 @@ struct TrafficRules {
   
   /// Takes the distances and times of the bound Blueprint (zeros where none runs).
   
-  void rebuild(const std::vector<Lane>& lanes);
+  
   u64 built_from = ~0ull;
   /// The signals' clock (seconds; the game sets it every frame from the wall clock - in a session
   /// the host's): the lights are a function of it and of the junction's place alone.
   f32 lights_time = -1;  // (-1: not set - the caller's time)
   
   /// 0 green, 1 amber, 2 red for traffic moving along `heading` into junction j at `now`.
-  i32 light(const Junction& j, Vec2 heading, f32 now) const;
+  
   /// The highest speed car `car` may drive now (1e9: free). `cars`: positions of all cars (index
   /// = car id; z < -1e8 = not on the road); `people`: standing / walking people's feet.
-  f32 limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 now, const std::vector<Vec3>& cars, const std::vector<Vec2>& people, Vec2 player,
-            bool player_on_foot, View& view);
+  
+
   /// The driver's target (world_procedural_population.mjs: sampleRoadRoute at the nearest point of
   /// his route + the lookahead): the point `look` metres on along the lane from where the car is,
   /// `off` to the right of its line - never beyond the lane's end. `index`: the lane point ahead
   /// of the car driving in `dir` (+1 / -1). `tangent`: the lane's direction there; `passed`: the
   /// car is at or past lane point `index`; `end`: how far the lane's end is along the lane.
   struct Pursuit { Vec2 target, tangent{1, 0}; bool passed = false; f32 end = 0; };
-  static Pursuit pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off);
+  
   /// A vehicle on the road as the drivers behind see it.
   struct Vehicle { Vec2 p; bool bus = false, there = false; };
   /// world_procedural_population.mjs driveSpeed: the speed the free way ahead allows vehicle
@@ -4351,9 +4379,9 @@ struct TrafficRules {
   /// lies 1..40 m ahead and no further to the side than half the own body (1.25 m, bus 1.6 m) +
   /// 0.6 m; the gap is the distance between the centres less both half lengths (1.9 m, bus 4 m);
   /// 2.5 m of it are kept, the rest is driven at 1.6 s headway. `limiter`: who it is (or -1).
-  f32 gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const;
+  
   /// Junctions near p (drawing).
-  void near(Vec2 p, f32 r, std::vector<i32>& out) const;
+  
 
  private:
   struct Blocked { f32 since = -1, next_honk = 0, wait_since = -1; };
@@ -4745,7 +4773,6 @@ struct RoadGraph {
   std::vector<Node> nodes_;
   converted::wide::Map<u64, i32> cells_;
 };
-u64 lane_signature(const std::vector<Lane>& lanes);
 struct SoundFx {
  public:
   
@@ -5120,7 +5147,7 @@ struct PoliceDrone {
 struct Game {
  public:
   
-  
+  ~Game();
   
   
   
@@ -5195,7 +5222,7 @@ struct Game {
   
   // one world in multiplayer (game_worldsync.cpp): the host's traffic and citizens are everybody's
   struct WorldParts { u32 t_ms = 0; u64 mask = 0; };  // the parts of the host's list that came (game_worldsync.cpp)
-  f64 life_epoch() const;
+  
   
   
   // destruction sync (game_destruction_sync.cpp): craters and broken buildings, the host's
@@ -5432,10 +5459,10 @@ struct Game {
      // fists / knife on animals
        // cow deaths and pushes from the other players
   // traffic (game_traffic.cpp, M3): junction rules, the driver getting out, the tow service
-  f32 traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed);
+  
   /// The speed the vehicle ahead leaves car `car` (world_traffic.h gap_speed); `limiter`: the car
   /// it is (an index into cars_), or -1.
-  f32 traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32& limiter);
+  
     // how far it is off its lane's line (tests)
   
   
@@ -5513,14 +5540,14 @@ struct Game {
   
   // far traffic (game_traffic_far.cpp, PHYS_NEAR_M / PHYS_FAR_M)
   void traffic_far_switch();
-  void traffic_far_step(TrafficCar& c, std::size_t i, f32 h);
+  
   void traffic_make_far(TrafficCar& c);
   bool traffic_make_near(TrafficCar& c, std::size_t i);
   void traffic_solid(TrafficCar& c);
   /// Where a car stands at rest on the ground at (x, y) heading `yaw`: every wheel on the ground at
   /// its ride height - the chassis pitched and rolled with the ground under its wheels.
   physics::Pose car_rest_pose(const CarSpec& s, f32 x, f32 y, f32 yaw) const;
-  void traffic_advance(TrafficCar& c);
+  
   // cars and buses as the original (game_vehicle_damage.cpp)
   
   
@@ -5784,38 +5811,6 @@ void Car::detach() {
   rig_chassis_ = {};
   has_last_ = false;
 }
-TrafficRules::Pursuit TrafficRules::pursuit(const Lane& lane, i32 index, i32 dir, Vec2 pos, f32 look, f32 off) {
-  Pursuit out;
-  const i32 n = static_cast<i32>(lane.points.size());
-  if (n < 2) { out.target = n ? converted::at(lane.points, 0) : pos; out.passed = true; return out; }
-  dir = dir < 0 ? -1 : 1;
-  i32 i = std::clamp(index, 0, converted::minus(n, 1));
-  if (converted::minus(i, dir) < 0 || converted::minus(i, dir) >= n) converted::plus_to(i, dir);  // (the lane's first point in this direction: the stretch after it)
-  Vec2 a = converted::at(lane.points, converted::minus(i, dir)), b = converted::at(lane.points, i);
-  auto along = [](Vec2 from, Vec2 to, Vec2& t) { const Vec2 d = to - from; const f32 l = hypot_bp(d.x, d.y); if (l > 1e-3) t = d * (1.0 / l); return l; };
-  Vec2 t{1, 0};
-  f32 len = along(a, b, t);
-  // where the car is along the stretch that leads to lane point `index`
-  const f32 at = (pos.x - a.x) * t.x + (pos.y - a.y) * t.y;
-  out.passed = i != std::clamp(index, 0, converted::minus(n, 1)) ? false : at >= len - 0.5;
-  const f32 s = clampf(at, 0, len);
-  Vec2 cur = a + t * s;
-  f32 left = len - s, want = std::fmax(0.0, look);
-  out.end = left;
-  for (i32 k = i; converted::plus(k, dir) >= 0 && converted::plus(k, dir) < n; converted::plus_to(k, dir)) out.end += hypot_bp(converted::at(lane.points, converted::plus(k, dir)).x - converted::at(lane.points, k).x, converted::at(lane.points, converted::plus(k, dir)).y - converted::at(lane.points, k).y);
-  while (want > left) {
-    if (converted::plus(i, dir) < 0 || converted::plus(i, dir) >= n) { want = left; break; }  // the lane ends here
-    want -= left;
-    cur = b;
-    a = b;
-    converted::plus_to(i, dir);
-    b = converted::at(lane.points, i);
-    left = along(a, b, t);
-  }
-  out.tangent = t;
-  out.target = cur + t * want + Vec2{t.y, -t.x} * off;
-  return out;
-}
 void Ragdolls::release(Doll& d) {
   if (!world_) return;
   for (u32 b = 0; b < kBones; ++b) {
@@ -5832,394 +5827,6 @@ void Ragdolls::clear() {
   dolls_.clear();
   ups_.clear();
 }
-void Game::traffic_advance(TrafficCar& c) {
-  // the next lane point; at the end of the street on to a street that starts here, else turn round
-  const std::vector<Lane>& lanes = city_.lanes();
-  const i32 n = static_cast<i32>(converted::at(lanes, c.lane).points.size());
-  const Lane& L = converted::at(lanes, c.lane);
-  converted::plus_to(c.index, c.dir);
-  if (c.index >= 0 && c.index < n) return;
-  const Vec2 end = converted::at(L.points, c.index < 0 ? 0 : converted::minus(n, 1));
-  i32 next = -1, next_dir = 1;
-  const u32 start = rng_.next();
-  for (std::size_t k = 0; k < lanes.size() && next < 0; converted::pre_inc(k)) {
-    const std::size_t j = converted::rem((converted::plus(start, k)), lanes.size());
-    if (static_cast<i32>(j) == c.lane || !converted::at(lanes, j).alive || converted::at(lanes, j).points.size() < 2) continue;
-    const Vec2 a = converted::front(converted::at(lanes, j).points), z = converted::back(converted::at(lanes, j).points);
-    if (hypot_bp(a.x - end.x, a.y - end.y) < 4) { next = static_cast<i32>(j); next_dir = 1; }
-    else if (hypot_bp(z.x - end.x, z.y - end.y) < 4) { next = static_cast<i32>(j); next_dir = -1; }
-  }
-  if (next >= 0) {
-    c.lane = next;
-    c.dir = next_dir;
-    c.index = next_dir > 0 ? 1 : converted::minus(static_cast<i32>(converted::at(lanes, next).points.size()), 2);
-  } else {
-    c.dir = converted::neg(c.dir);
-    c.index = std::clamp(converted::plus(c.index, converted::times(2, c.dir)), 0, converted::minus(n, 1));
-  }
-}
-namespace wire { struct V3 { f32 x = 0, y = 0, z = 0; }; }
-f64 Game::life_epoch() const {
-  // the clock the animals' rounds run on: the wall clock - in a session the host's (a client
-  // counts on from what the host last sent), so a dog is at the same place of its round everywhere
-  if (net_.active() && !net_.hosting() && host_epoch_ok_) return now_ms() / 1000 + host_epoch_off_;
-  return wall_ms() / 1000.0;
-}
-u64 lane_signature(const std::vector<Lane>& lanes) {
-  u64 h = 1469598103934665603ull;
-  for (std::size_t i = 0; i < lanes.size(); converted::pre_inc(i)) {
-    h ^= (converted::shl_bits(static_cast<u64>(i), 1)) | (converted::at(lanes, i).alive ? 1u : 0u);
-    converted::times_bits_to(h, 1099511628211ull);
-  }
-  return h;
-}
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
-namespace world_traffic_cpp_local { constexpr f32 kCell = 40; }
-namespace world_traffic_cpp_local { constexpr f32 kMerge = 3; }
-namespace world_traffic_cpp_local { rules::Blueprint g_rules{"Traffic"}; }
-namespace world_traffic_cpp_local { u64 cell(i32 x, i32 y) { return (converted::shl_bits(static_cast<u64>(static_cast<u32>(x)), 32)) | static_cast<u32>(y); } }
-void TrafficRules::rebuild(const std::vector<Lane>& lanes) {
-  junctions_.clear();
-  grid_.clear();
-  blocked_.clear();
-  struct Node { Vec2 p; std::vector<Arm> arms; };
-  std::vector<Node> nodes;
-  converted::wide::Map<u64, std::vector<i32>> cells;
-  auto node_at = [&](Vec2 p) -> i32 {
-    const i32 cx = static_cast<i32>(converted::fits<int>(std::floor(p.x / world_traffic_cpp_local::kMerge))), cy = static_cast<i32>(converted::fits<int>(std::floor(p.y / world_traffic_cpp_local::kMerge)));
-    for (i32 dy = -1; dy <= 1; converted::pre_inc(dy))
-      for (i32 dx = -1; dx <= 1; converted::pre_inc(dx)) {
-        auto it = cells.find(world_traffic_cpp_local::cell(converted::plus(cx, dx), converted::plus(cy, dy)));
-        if (it == cells.end()) continue;
-        for (i32 i : it->second)
-          if (hypot_bp(converted::at(nodes, i).p.x - p.x, converted::at(nodes, i).p.y - p.y) < world_traffic_cpp_local::kMerge) return i;
-      }
-    nodes.push_back({p, {}});
-    cells[world_traffic_cpp_local::cell(cx, cy)].push_back(static_cast<i32>(converted::minus(nodes.size(), 1)));
-    return static_cast<i32>(converted::minus(nodes.size(), 1));
-  };
-  for (const Lane& l : lanes) {
-    if (!l.alive || l.points.size() < 2) continue;
-    for (std::size_t i = 0; i < l.points.size(); converted::pre_inc(i)) {
-      const Vec2 p = converted::at(l.points, i);
-      auto arm = [&](Vec2 q) {
-        const f32 d = hypot_bp(q.x - p.x, q.y - p.y);
-        if (d < 0.5) return;
-        Node& n = converted::at(nodes, node_at(p));
-        const Vec2 dir{(q.x - p.x) / d, (q.y - p.y) / d};
-        for (const Arm& a : n.arms)
-          if (a.dir.x * dir.x + a.dir.y * dir.y > 0.97) return;  // the same street again (tile border)
-        n.arms.push_back({dir, l.width});
-      };
-      if (i > 0) arm(converted::at(l.points, converted::minus(i, 1)));
-      if (converted::plus(i, 1) < l.points.size()) arm(converted::at(l.points, converted::plus(i, 1)));
-    }
-  }
-  // Streets that cross without a shared vertex (a tile cut, the stand-in town's straight streets
-  // laid across each other) meet where their segments intersect: that point is a node with an arm
-  // along each street in both directions.
-  {
-    struct Seg { Vec2 a, b; f32 width; u32 lane; };
-    std::vector<Seg> segs;
-    converted::wide::Map<u64, std::vector<u32>> buckets;
-    for (u32 li = 0; li < lanes.size(); ++li) {
-      const Lane& l = converted::at(lanes, li);
-      if (!l.alive || l.points.size() < 2) continue;
-      for (std::size_t i = 0; converted::plus(i, 1) < l.points.size(); converted::pre_inc(i)) {
-        const Seg s{converted::at(l.points, i), converted::at(l.points, converted::plus(i, 1)), l.width, li};
-        const u32 si = static_cast<u32>(segs.size());
-        segs.push_back(s);
-        const i32 x0 = static_cast<i32>(converted::fits<int>(std::floor(std::fmin(s.a.x, s.b.x) / world_traffic_cpp_local::kCell))), x1 = static_cast<i32>(converted::fits<int>(std::floor(std::fmax(s.a.x, s.b.x) / world_traffic_cpp_local::kCell)));
-        const i32 y0 = static_cast<i32>(converted::fits<int>(std::floor(std::fmin(s.a.y, s.b.y) / world_traffic_cpp_local::kCell))), y1 = static_cast<i32>(converted::fits<int>(std::floor(std::fmax(s.a.y, s.b.y) / world_traffic_cpp_local::kCell)));
-        for (i32 x = x0; x <= x1; converted::pre_inc(x))
-          for (i32 y = y0; y <= y1; converted::pre_inc(y)) buckets[world_traffic_cpp_local::cell(x, y)].push_back(si);
-      }
-    }
-    for (const auto& [key, list] : buckets) {
-      (void)key;
-      for (std::size_t m = 0; m < list.size(); converted::pre_inc(m))
-        for (std::size_t n = converted::plus(m, 1); n < list.size(); converted::pre_inc(n)) {
-          const Seg& s = converted::at(segs, converted::at(list, m));
-          const Seg& t = converted::at(segs, converted::at(list, n));
-          if (s.lane == t.lane) continue;
-          const Vec2 r = s.b - s.a, q = t.b - t.a;
-          const f32 den = r.x * q.y - r.y * q.x;
-          if (std::fabs(den) < 1e-6) continue;  // parallel
-          const Vec2 w = t.a - s.a;
-          const f32 u = (w.x * q.y - w.y * q.x) / den, v = (w.x * r.y - w.y * r.x) / den;
-          if (u < 0 || u > 1 || v < 0 || v > 1) continue;
-          const Vec2 p = s.a + r * u;
-          const i32 ni = node_at(p);
-          for (const u32 gi : {converted::at(list, m), converted::at(list, n)}) {  // (the two segments, by their place in segs)
-            const Seg& g = converted::at(segs, gi);
-            for (const Vec2 end : {g.a, g.b}) {
-              const f32 d = hypot_bp(end.x - p.x, end.y - p.y);
-              if (d < 0.5) continue;
-              const Vec2 dir{(end.x - p.x) / d, (end.y - p.y) / d};
-              bool dup = false;
-              for (const Arm& a : converted::at(nodes, ni).arms) dup = dup || a.dir.x * dir.x + a.dir.y * dir.y > 0.97;
-              if (!dup) converted::at(nodes, ni).arms.push_back({dir, g.width});
-            }
-          }
-        }
-    }
-  }
-  for (const Node& n : nodes) {
-    if (n.arms.size() < 3) continue;
-    Junction j;
-    j.p = n.p;
-    j.arms = n.arms;
-    f32 wmax = 0;
-    for (const Arm& a : n.arms) wmax = std::fmax(wmax, a.width);
-    j.lights = world_traffic_cpp_local::g_rules.flag("JunctionLights", rules::decimal(wmax));
-    j.radius = static_cast<f32>(world_traffic_cpp_local::g_rules.number("JunctionRadius", rules::decimal(wmax)));
-    // The axis: the widest arm (the main road); of several as wide, the one with the smallest
-    // bearing - the same on every machine, whatever order its streets came in
-    {
-      f32 best = 1e9;
-      for (const Arm& a : n.arms) {
-        if (a.width < wmax) continue;
-        f32 bearing = kern::math::atan2(a.dir.y, a.dir.x);
-        if (bearing < 0) bearing += 3.14159265;
-        if (bearing >= 3.14159265 - 1e-3) bearing = 0;
-        if (bearing < best) { best = bearing; j.axis = a.dir; }
-      }
-    }
-    // The signal posts: each on the kerb corner right of its arm's incoming traffic - between
-    // this arm and the next one round the junction, 1.2 m off both carriageways (never on a
-    // street: not on its own arm, not on the one crossing it).
-    for (std::size_t ai = 0; ai < j.arms.size(); converted::pre_inc(ai)) {
-      Arm& a = converted::at(j.arms, ai);
-      const f32 aa = kern::math::atan2(a.dir.y, a.dir.x);
-      f32 best = 6.2831853;
-      std::size_t next = j.arms.size();  // the next arm round the junction: its place in j.arms (none: j.arms.size())
-      for (std::size_t bi = 0; bi < j.arms.size(); converted::pre_inc(bi)) {
-        if (bi == ai) continue;
-        const Arm& b = converted::at(j.arms, bi);
-        f32 d = kern::math::atan2(b.dir.y, b.dir.x) - aa;
-        while (d <= 1e-4) d += 6.2831853;
-        if (d < best) { best = d; next = bi; }
-      }
-      const f32 half = best / 2;
-      if (next == j.arms.size() || best >= 3.1415927) {
-        // no arm on that side: abeam of the junction, beside the arm's own kerb
-        a.pole = Vec2{-a.dir.y, a.dir.x} * (a.width * 0.5 + 1.2);
-        a.has_pole = true;
-        continue;
-      }
-      const f32 s = kern::math::sin(half);
-      const f32 r = (std::fmax(a.width, converted::at(j.arms, next).width) * 0.5 + 1.2) / std::fmax(s, 0.05);
-      if (r > 30) continue;  // two arms nearly along each other: no corner to stand on
-      a.pole = Vec2{kern::math::cos(aa + half), kern::math::sin(aa + half)} * r;
-      a.has_pole = true;
-    }
-    const u32 h = static_cast<u32>(static_cast<i32>(std::lround(n.p.x / 3))) * 73856093u ^ static_cast<u32>(static_cast<i32>(std::lround(n.p.y / 3))) * 19349663u;
-    j.offset = static_cast<f32>(h % 3800) / 100.0;
-    junctions_.push_back(j);
-    const i32 id = static_cast<i32>(converted::minus(junctions_.size(), 1));
-    grid_[world_traffic_cpp_local::cell(static_cast<i32>(converted::fits<int>(std::floor(n.p.x / world_traffic_cpp_local::kCell))), static_cast<i32>(converted::fits<int>(std::floor(n.p.y / world_traffic_cpp_local::kCell))))].push_back(id);
-  }
-}
-using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
-  Mat4 m;
-  converted::present(world_)->actor_matrix(a, m);
-  return m;
-}
-void TrafficRules::near(Vec2 p, f32 r, std::vector<i32>& out) const {
-  out.clear();
-  const i32 cx0 = static_cast<i32>(converted::fits<int>(std::floor((p.x - r) / world_traffic_cpp_local::kCell))), cx1 = static_cast<i32>(converted::fits<int>(std::floor((p.x + r) / world_traffic_cpp_local::kCell)));
-  const i32 cy0 = static_cast<i32>(converted::fits<int>(std::floor((p.y - r) / world_traffic_cpp_local::kCell))), cy1 = static_cast<i32>(converted::fits<int>(std::floor((p.y + r) / world_traffic_cpp_local::kCell)));
-  for (i32 y = cy0; y <= cy1; converted::pre_inc(y))
-    for (i32 x = cx0; x <= cx1; converted::pre_inc(x)) {
-      auto it = grid_.find(world_traffic_cpp_local::cell(x, y));
-      if (it == grid_.end()) continue;
-      for (i32 j : it->second)
-        if (hypot_bp(converted::at(junctions_, j).p.x - p.x, converted::at(junctions_, j).p.y - p.y) <= r) out.push_back(j);
-    }
-}
-i32 TrafficRules::light(const Junction& j, Vec2 heading, f32 now) const {
-  if (!j.lights) return -1;
-  i32 light = 0;
-  world_traffic_cpp_local::g_rules.call("Light", std::tie(light), rules::decimal(lights_time >= 0 ? lights_time : now), rules::decimal(j.offset), rules::decimal(heading.x * j.axis.x + heading.y * j.axis.y));
-  return light;
-}
-f32 TrafficRules::limit(i32 car, Vec2 pos, Vec2 fwd, f32 speed, bool bus, f32 now, const std::vector<Vec3>& cars, const std::vector<Vec2>& people, Vec2 player,
-                        bool player_on_foot, View& view) {
-  view = View{};
-  f32 lim = 1e9;
-  const f32 v = std::fmax(0.0, speed);
-  // 1. people in the corridor (yieldsToPedestrian)
-  {
-    const f32 reach = static_cast<f32>(world_traffic_cpp_local::g_rules.number("YieldReach", bus, rules::decimal(v))), half = static_cast<f32>(world_traffic_cpp_local::g_rules.number("YieldHalfWidth", bus));
-    auto in_lane = [&](Vec2 q) {
-      const f32 dx = q.x - pos.x, dy = q.y - pos.y, along = dx * fwd.x + dy * fwd.y;
-      return along >= -0.5 && along <= reach && std::fabs(-dx * fwd.y + dy * fwd.x) < half;
-    };
-    bool by_player = player_on_foot && in_lane(player);
-    bool yielding = by_player;
-    for (std::size_t i = 0; i < people.size() && !yielding; converted::pre_inc(i)) yielding = in_lane(converted::at(people, i));
-    Blocked& b = blocked_[car];
-    if (yielding) {
-      lim = 0;
-      view.yielding = true;
-      if (b.since < 0) b.since = now;
-      // honkCheck: the player sooner, a pedestrian after a while; then 9..16 s apart
-      // (how much later the next honk comes: a number 0..1 from the car and the second)
-      const f32 roll = static_cast<f32>((static_cast<u32>(car) * 2654435761u + static_cast<u32>(converted::fits<unsigned int>(now))) % 700) / 700;
-      f64 next = 0;
-      world_traffic_cpp_local::g_rules.call("Honk", std::tie(view.honk, next), by_player, rules::decimal(b.since), rules::decimal(b.next_honk), rules::decimal(now), rules::decimal(roll));
-      b.next_honk = static_cast<f32>(next);
-    } else b.since = -1;
-  }
-  // 2. the next junction ahead
-  std::vector<i32> cand;
-  near(pos + fwd * 25.0, 34, cand);
-  f32 best = 1e9;
-  for (i32 ji : cand) {
-    Junction& j = converted::at(junctions_, ji);
-    const Vec2 d{j.p.x - pos.x, j.p.y - pos.y};
-    const f32 along = d.x * fwd.x + d.y * fwd.y, lateral = std::fabs(-d.x * fwd.y + d.y * fwd.x);
-    const f32 dist = hypot_bp(d.x, d.y);
-    // inside: claim it (first come, first served) and drive on
-    if (dist < j.radius) {
-      if (j.claim < 0 || j.claim == car || now - j.claim_at > laws_.claim_s) { j.claim = car; j.claim_at = now; }
-      continue;
-    }
-    if (j.claim == car && dist > j.radius + 3) j.claim = -1;  // left it
-    if (along < 0 || lateral > j.radius + 2 || along >= best) continue;
-    best = along;
-    view.junction = ji;
-    view.distance = along - j.radius;
-  }
-  if (view.junction < 0) blocked_[car].wait_since = -1;
-  if (view.junction >= 0) {
-    Junction& j = converted::at(junctions_, view.junction);
-    const f32 stop = std::fmax(0.0, view.distance - laws_.stop_line);  // the stop line before the junction
-    bool must_stop = false;
-    view.light = light(j, fwd, now);
-    if (view.light >= 0) must_stop = world_traffic_cpp_local::g_rules.flag("MustStop", view.light, rules::decimal(stop), rules::decimal(v));  // red; amber: stop if it can
-    else if (view.distance < laws_.first_come) {
-      // Unsignalled: wait while someone else holds the junction (and is still in it).
-      if (j.claim >= 0 && j.claim != car && j.claim < static_cast<i32>(cars.size()) && now - j.claim_at < laws_.claim_s) {
-        const Vec3 c = converted::at(cars, j.claim);
-        if (c.z > -1e8 && hypot_bp(c.x - j.p.x, c.y - j.p.y) < j.radius + 3) must_stop = true;
-      }
-      // Right before left: a car close to the edge on the right goes first (after 4 s of waiting
-      // a driver goes anyway: four cars at a four-way junction would otherwise wait for ever).
-      Blocked& b = blocked_[car];
-      if (!must_stop && (b.wait_since < 0 || now - b.wait_since < laws_.patience_s))
-        for (std::size_t k = 0; k < cars.size(); converted::pre_inc(k)) {
-          if (static_cast<i32>(k) == car || converted::at(cars, k).z < -1e8) continue;
-          const Vec2 o{converted::at(cars, k).x - j.p.x, converted::at(cars, k).y - j.p.y};
-          const f32 od = hypot_bp(o.x, o.y);
-          if (od < j.radius || od > j.radius + 10 || od > view.distance + j.radius + 2) continue;
-          const Vec2 me{pos.x - j.p.x, pos.y - j.p.y};
-          if (me.x * o.y - me.y * o.x > 0 && std::fabs((me.x * o.x + me.y * o.y) / (hypot_bp(me.x, me.y) * od)) < 0.5) { must_stop = true; break; }
-        }
-    }
-    {
-      Blocked& b = blocked_[car];
-      if (must_stop && v < 0.5 && b.wait_since < 0) b.wait_since = now;
-      if (view.distance > laws_.first_come || view.light >= 0) b.wait_since = -1;
-    }
-    if (must_stop) {
-      view.wait = true;
-      lim = std::fmin(lim, static_cast<f32>(world_traffic_cpp_local::g_rules.number("StopSpeed", rules::decimal(stop))));
-    }
-  }
-  return lim;
-}
-namespace game_traffic_cpp_local { constexpr f32 kCacheS = 0.12; }
-f32 Game::traffic_rules(i32 car, Vec3 pos, Vec3 fwd, f32 speed) {
-  if (!life_ || car < 0) return 1e9;
-  WorldLife& L = *converted::present(life_);
-  if (static_cast<i32>(L.car_limit.size()) <= car) { L.car_limit.resize(converted::count(converted::plus(car, 1)), 1e9); L.car_limit_at.resize(converted::count(converted::plus(car, 1)), -99); L.car_view.resize(converted::count(converted::plus(car, 1))); }
-  const f32 now = converted::present(world_)->sim_time();
-  L.rules.lights_time = static_cast<f32>(kern::math::mod(life_epoch(), 38.0 * 1000));
-  if (now - converted::at(L.car_limit_at, car) < game_traffic_cpp_local::kCacheS) return converted::at(L.car_limit, car);
-  converted::at(L.car_limit_at, car) = now;
-  if (L.rules.built_from != lane_signature(city_.lanes())) {
-    L.rules.rebuild(city_.lanes());
-    L.rules.built_from = lane_signature(city_.lanes());
-  }
-  std::vector<Vec3>& cars = L.car_positions;
-  cars.assign(converted::count(cars_.size()), Vec3{0, 0, -1e9});
-  for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i))
-    if (converted::at(cars_, i).placed && converted::present(world_)->actor_alive(converted::at(cars_, i).actor)) converted::at(cars, i) = matrix_of(converted::at(cars_, i).actor).translation();
-  const f32 fl = hypot_bp(fwd.x, fwd.y);
-  const Vec2 f2 = fl > 1e-4 ? Vec2{fwd.x / fl, fwd.y / fl} : Vec2{1, 0};
-  const Vec3 me = matrix_of(soldier_).translation();
-  const bool bus = converted::present(converted::at(cars_, car).car)->spec().radius > 0.4;
-  TrafficRules::View& v = converted::at(L.car_view, car);
-  const f32 lim = L.rules.limit(car, {pos.x, pos.y}, f2, speed, bus, now, cars, L.walkers, {me.x, me.y}, mode_ == Mode::foot && !player_dead_, v);
-  if (v.honk) L.honks.push_back(pos + Vec3{0, 0, 0.4});
-  converted::at(L.car_limit, car) = lim;
-  return lim;
-}
-f32 TrafficRules::gap_speed(i32 self, Vec2 pos, Vec2 fwd, bool bus, const std::vector<Vehicle>& all, i32& limiter) const {
-  const f32 side = static_cast<f32>(world_traffic_cpp_local::g_rules.number("SideReach", bus)), far = laws_.ahead_max;
-  const f32 bodies[2] = {static_cast<f32>(world_traffic_cpp_local::g_rules.number("Bodies", bus, false)), static_cast<f32>(world_traffic_cpp_local::g_rules.number("Bodies", bus, true))};
-  f32 gap = 1e9;
-  i32 who = -1;
-  for (std::size_t i = 0; i < all.size(); converted::pre_inc(i)) {
-    const Vehicle& o = converted::at(all, i);
-    if (!o.there || static_cast<i32>(i) == self) continue;
-    const f32 dx = o.p.x - pos.x, dy = o.p.y - pos.y;
-    if (std::fabs(dx) > far || std::fabs(dy) > far) continue;
-    const f32 along = dx * fwd.x + dy * fwd.y;
-    if (along < laws_.ahead_min || along > far) continue;
-    if (std::fabs(-dx * fwd.y + dy * fwd.x) > side) continue;
-    const f32 g = along - converted::at(bodies, o.bus ? 1 : 0);
-    if (g < gap) { gap = g; who = static_cast<i32>(i); }
-  }
-  limiter = who;
-  if (who < 0) return 1e9;
-  return static_cast<f32>(world_traffic_cpp_local::g_rules.number("GapSpeed", rules::decimal(gap)));
-}
-f32 Game::traffic_gap(i32 car, Vec3 pos, Vec3 fwd, i32& limiter) {
-  limiter = -1;
-  if (!life_ || car < 0) return 1e9;
-  WorldLife& L = *converted::present(life_);
-  // every vehicle on the road, once a step: the cars (by index; with or without physics), then
-  // the tow trucks
-  if (L.vehicles_step != steps_) {
-    L.vehicles_step = steps_;
-    L.vehicles.assign(converted::count(converted::plus(cars_.size(), L.trucks.size())), TrafficRules::Vehicle{});
-    for (std::size_t i = 0; i < cars_.size(); converted::pre_inc(i)) {
-      const TrafficCar& c = converted::at(cars_, i);
-      if (!c.placed || !converted::present(world_)->actor_alive(c.actor)) continue;
-      const Vec3 p = matrix_of(c.actor).translation();
-      converted::at(L.vehicles, i) = {{p.x, p.y}, converted::present(c.car)->spec().radius > 0.4, true};
-    }
-    for (std::size_t k = 0; k < L.trucks.size(); converted::pre_inc(k)) {
-      const WorldLife::TowTruck& t = converted::at(L.trucks, k);
-      if (!t.body.valid() || !converted::present(world_)->physics().body_valid(t.body)) continue;
-      const Vec3 p = converted::present(world_)->physics().pose(t.body).position;
-      converted::at(L.vehicles, converted::plus(cars_.size(), k)) = {{p.x, p.y}, false, true};
-    }
-  }
-  const f32 fl = hypot_bp(fwd.x, fwd.y);
-  const Vec2 f2 = fl > 1e-4 ? Vec2{fwd.x / fl, fwd.y / fl} : Vec2{1, 0};
-  i32 who = -1;
-  const f32 v = L.rules.gap_speed(car, {pos.x, pos.y}, f2, converted::present(converted::at(cars_, static_cast<std::size_t>(car)).car)->spec().radius > 0.4, L.vehicles, who);
-  limiter = who >= 0 && who < static_cast<i32>(cars_.size()) ? who : -1;
-  return v;
-}
 bool Game::gaps_riding() const { return gaps_ && converted::present(gaps_)->riding; }
 bool Game::gaps_ride_car() const { return gaps_ && converted::present(gaps_)->riding && converted::present(gaps_)->ride_car; }
 namespace net { i32 Session::remote_index(u8 slot) const {
@@ -6234,6 +5841,111 @@ bool Game::gaps_ride_pose(Vec3& p, Quat& q) const {
   if (r.state.mode == net::PlayerMode::jet || r.state.mode == net::PlayerMode::car) { p = r.shown; q = r.shown_rotation; return true; }
   if (r.state.flags & net::kJetOut) { p = r.state.jet_pos; q = r.state.jet_rot; return true; }
   return false;
+}
+namespace jobs { using Fn = void (*)(Span<const u8> input, std::vector<u8>& output); }
+namespace logic { namespace EngineObjects_types { using Kind = const void*; } }
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace logic { namespace PureNodes_types { using Bool = bool; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace PureNodes_types { using Text = std::string; } }
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_BloomState { using type = BloomState; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_LogLevel { using type = LogLevel; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Wave { using type = audio::Wave; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameStatus { using type = game::GameStatus; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_net_ClientState { using type = net::ClientState; } } }
+namespace logic { namespace engine_direct { namespace E_physics_BodyType { using type = physics::BodyType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_bus_types { using In = std::tuple<std::remove_cvref_t<audio::Bus>>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_hud_mut_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_events_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_sound_cues_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_shots_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_building_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_road_builder_chunks_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_visible_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_layers_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_pick_bvh_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_linear_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_material_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_texture_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_positions_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_colors_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_uvs_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_indices_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_joints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_weights_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_bones_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_transforms_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_tints_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_normals_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_instance_count_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_mirror_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_local_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_world_bounds_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_gpu_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_sort_distance_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mesh_live_index_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_material_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_shader_extension_attribute_base_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_mipmaps_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_repeat_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_desc_nearest_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_speed_of_sound_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_mixer_doppler_factor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_game_world_logic_native_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_actor_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_property_change_path_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_motion_asset_keys_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_night_windows_night_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_sound_asset_duration_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_id_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_name_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_width_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_texture_asset_height_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_simulator_settings_types { using In = std::tuple<>; } } }
+namespace logic { namespace engine_direct { namespace P_engine_character_mover_settings_types { using In = std::tuple<>; } } }
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace BlueprintCore_types { using Text = ::kern::logic::Text; }
+namespace game { namespace nodes { using Bool = bool; } }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { using Text = std::string; } }
+namespace game { namespace nodes { using Actor = ::kern::logic::ActorHandle; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
+Game::~Game() {
+  life_.reset();
+  swarm_cruiser_.reset();
+}
+using game::ActorId; Mat4 Game::matrix_of(ActorId a) const {
+  Mat4 m;
+  converted::present(world_)->actor_matrix(a, m);
+  return m;
 }
 Vec3 Game::player_position() const {
   if (mode_ == Mode::car && car_index_ >= 0) return matrix_of(converted::at(cars_, car_index_).actor).translation();
@@ -6252,6 +5964,7 @@ Vec3 Game::focus_position() const {
   if (mode_ == Mode::drone && drone_out_) return matrix_of(drone_actor_).translation();
   return player_position();
 }
+namespace wire { struct V3 { f32 x = 0, y = 0, z = 0; }; }
 std::vector<Vec3> Game::mate_foci() const {
   std::vector<Vec3> out;
   if (!net_.active()) return out;
@@ -6324,6 +6037,22 @@ bool Terrain::ground_ready(f32 x, f32 y) const {
   if (!covers({x, y, x, y}) || !corridors_at(x, y)) return false;
   return has_collision(x, y);
 }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
 namespace spawn { namespace spawn_guard_cpp_local { rules::Blueprint g_rules{"SpawnGuard"}; } }
 namespace spawn { namespace spawn_guard_cpp_local { struct Print {
   Vec3 center;
@@ -6533,61 +6262,6 @@ void Game::traffic_far_switch() {
       }
     }
   }
-}
-void Game::traffic_far_step(TrafficCar& c, std::size_t i, f32 h) {
-  // the route without physics: towards the lane's next point, turning onto it, with the same lane
-  // changes and under the same rules as the AI driver (drive_traffic) - at 60 Hz like him
-  // (staggered over the cars; the kinematic body moves on at its velocity in between)
-  if (converted::rem_bits((converted::plus_bits(steps_, i)), 4) != 0) return;
-  const f32 dt = h * 4;
-  World& w = converted::present(world_)->physics();
-  const physics::Body b = body(c.actor);
-  const BodyState s = read_body(w, b);
-  const std::vector<Lane>& lanes = city_.lanes();
-  if (!c.driver || c.lane < 0 || c.lane >= static_cast<i32>(lanes.size()) || !converted::at(lanes, c.lane).alive || converted::at(lanes, c.lane).points.size() < 2) {
-    c.far_speed = 0;
-    c.want = 0;
-    c.ahead = -1;
-    w.set_target_pose(b, {s.position, s.rotation}, dt);
-    return;
-  }
-  const Lane& L = converted::at(lanes, c.lane);
-  const i32 n = static_cast<i32>(L.points.size());
-  c.index = std::clamp(c.index, 0, converted::minus(n, 1));
-  const Vec3 fwd3 = s.rotation.rotate({1, 0, 0});
-  const f32 fl = hypot_bp(fwd3.x, fwd3.y);
-  const Vec3 fwd = fl > 1e-4 ? Vec3{fwd3.x / fl, fwd3.y / fl, 0} : Vec3{1, 0, 0};
-  const f32 off = std::fmin(L.width * 0.25, 1.8);
-  // the same target as the driver with physics: a lookahead on along the lane, on its right
-  const TrafficRules::Pursuit pu = TrafficRules::pursuit(L, c.index, c.dir, {s.position.x, s.position.y}, std::fmax(7.0, c.target_speed * 1.3), off);
-  const Vec2 target = pu.target;
-  Vec2 to{target.x - s.position.x, target.y - s.position.y};
-  const f32 tl = hypot_bp(to.x, to.y);
-  if (converted::plus(c.index, c.dir) < 0 || converted::plus(c.index, c.dir) >= n ? pu.end < 2.5 : pu.passed) traffic_advance(c);
-  // speed: the car's own, slower towards the street's end, what the lights, the people and the
-  // vehicle ahead leave (as drive_traffic)
-  f32 want = c.target_speed;
-  if (pu.end < 18) want = std::fmin(want, 4.5 + pu.end * 0.3);
-  want = std::fmin(want, traffic_rules(static_cast<i32>(i), s.position, fwd, c.far_speed));
-  {
-    i32 limiter = -1;
-    const f32 free_way = traffic_gap(static_cast<i32>(i), s.position, fwd, limiter);
-    c.ahead = free_way < 0.6 ? limiter : -1;
-    want = std::fmin(want, free_way);
-  }
-  c.want = want;
-  // (a driver's braking and pulling away: 4.5 and 3 m/s2)
-  c.far_speed = std::fmax(0.0, c.far_speed + clampf(want - c.far_speed, -4.5 * dt, 3 * dt));
-  const Vec2 dir = tl > 1e-3 ? to * (1.0 / tl) : Vec2{fwd.x, fwd.y};
-  // heading eases onto the direction of travel (about 1.5 rad/s, only while it rolls)
-  const f32 yaw = kern::math::atan2(fwd.y, fwd.x), want_yaw = kern::math::atan2(dir.y, dir.x);
-  f32 dy = want_yaw - yaw;
-  while (dy > kPi) dy -= 2 * kPi;
-  while (dy < -kPi) dy += 2 * kPi;
-  const f32 turn = 1.5 * dt * std::fmin(1.0, c.far_speed / 2);
-  const f32 ny = yaw + clampf(dy, -turn, turn);
-  const Vec2 np{s.position.x + dir.x * c.far_speed * dt, s.position.y + dir.y * c.far_speed * dt};
-  w.set_target_pose(b, car_rest_pose(converted::present(c.car)->spec(), np.x, np.y, ny), dt);
 }
 #undef private
 #undef protected
@@ -12428,7 +12102,6 @@ namespace physics { using converted::arg; using converted::same; using converted
 inline World& GameWorld::physics() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.physics", {converted::value_of(*this)}); World& kern_result = *converted::engine_object<World>(kern_out[0].as_int()); return kern_result; }
 inline bool GameWorld::actor_alive(const unsigned int& id) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_alive", {converted::value_of(*this), converted::value_of(id)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline bool GameWorld::actor_matrix(const unsigned int& id, Mat4& out) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_matrix", {converted::value_of(*this), converted::value_of(id), converted::value_of(out)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); converted::take_as<Mat4>(out, kern_out[1]); return kern_result; }
-inline double GameWorld::sim_time() const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.sim_time", {converted::value_of(*this)}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 inline physics::Body GameWorld::actor_body(const unsigned int& actor) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.game_world.actor_body", {converted::value_of(*this), converted::value_of(actor)}); physics::Body kern_result = converted::quiet<physics::Body>(); converted::take_as<physics::Body>(kern_result, kern_out[0]); return kern_result; }
 inline bool World::body_valid(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.body_valid", {converted::value_of(*this), converted::value_of(body)}); bool kern_result = converted::quiet<bool>(); converted::take_as<bool>(kern_result, kern_out[0]); return kern_result; }
 inline void World::set_body_masks(const physics::Body& body, converted::wide::Span<const u64> masks) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.set_body_masks", {converted::value_of(*this), converted::value_of(body), converted::value_of(converted::shaped<std::vector<converted::Whole>>(converted::as_list(masks)))}); }
@@ -12448,8 +12121,6 @@ inline physics::Pose World::pose(const physics::Body& body) const { const std::v
 inline Vec3 World::linear_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.linear_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline Vec3 World::angular_velocity(const physics::Body& body) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.angular_velocity", {converted::value_of(*this), converted::value_of(body)}); Vec3 kern_result = converted::quiet<Vec3>(); converted::take_as<Vec3>(kern_result, kern_out[0]); return kern_result; }
 inline physics::RayHit World::cast_ray(const Vec3& origin, const Vec3& translation, const physics::QueryFilter& filter, const physics::Body& ignore) const { const std::vector<converted::Value> kern_out = converted::engine_call("engine.world.cast_ray", {converted::value_of(*this), converted::value_of(origin), converted::value_of(translation), converted::value_of(filter), converted::value_of(ignore)}); physics::RayHit kern_result = converted::quiet<physics::RayHit>(); converted::take_as<physics::RayHit>(kern_result, kern_out[0]); return kern_result; }
-inline double now_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.now_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
-inline double wall_ms() { const std::vector<converted::Value> kern_out = converted::engine_call("engine.wall_ms", {}); double kern_result = converted::quiet<double>(); converted::take_as<double>(kern_result, kern_out[0]); return kern_result; }
 struct Out_traffic_solid { State_Game State; TrafficCar c; };
 [[maybe_unused]] static bool same(const Out_traffic_solid& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.c, (*got.rows)[1]), ".c"); }
 [[maybe_unused]] static bool defined(const Out_traffic_solid& s) { return defined(s.State) && defined(s.c); }
@@ -12462,14 +12133,9 @@ struct Out_traffic_make_near { State_Game State; bool Result; TrafficCar c; };
 [[maybe_unused]] static bool same(const Out_traffic_make_near& want, const converted::Value& got) { return converted::rows_of(got, 3) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.Result, (*got.rows)[1]), ".Result") && converted::at_place(same(want.c, (*got.rows)[2]), ".c"); }
 [[maybe_unused]] static bool defined(const Out_traffic_make_near& s) { return defined(s.State) && defined(s.Result) && defined(s.c); }
 [[maybe_unused]] static std::string text(const Out_traffic_make_near& s) { return std::string("{") + text(s.State) + ", " + text(s.Result) + ", " + text(s.c) + "}"; }
-struct Out_traffic_far_step { State_Game State; TrafficCar c; };
-[[maybe_unused]] static bool same(const Out_traffic_far_step& want, const converted::Value& got) { return converted::rows_of(got, 2) && converted::at_place(same(want.State, (*got.rows)[0]), ".State") && converted::at_place(same(want.c, (*got.rows)[1]), ".c"); }
-[[maybe_unused]] static bool defined(const Out_traffic_far_step& s) { return defined(s.State) && defined(s.c); }
-[[maybe_unused]] static std::string text(const Out_traffic_far_step& s) { return std::string("{") + text(s.State) + ", " + text(s.c) + "}"; }
 
 SC_TEST(converted_Game__game_traffic_far_cpp) {
-  converted::Blueprint bp("Game", {"SpawnGuard", "Traffic"});
-  world_traffic_cpp_local::g_rules.bind(bp.source_logic());
+  converted::Blueprint bp("Game", {"SpawnGuard"});
   spawn::spawn_guard_cpp_local::g_rules.bind(bp.source_logic());
   {  // Game::car_rest_pose
     converted::Tally tally("car_rest_pose");
@@ -12592,32 +12258,6 @@ SC_TEST(converted_Game__game_traffic_far_cpp) {
       converted::g_can_bail = false;
       converted::may_bail(false);
       tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {}, &vars, true);
-    }
-  }
-  {  // Game::traffic_far_step
-    converted::Tally tally("traffic_far_step");
-    converted::Draw draw;   // (every function its own arguments, the same in every run)
-    std::unique_ptr<Game> s;   // (the object of the state: drawn for every call)
-    const auto run = [&]([[maybe_unused]] TrafficCar& a0, [[maybe_unused]] unsigned long& a1, [[maybe_unused]] double& a2) { converted::counted([&] { return s->traffic_far_step(a0, std::move(a1), std::move(a2)); }); return Out_traffic_far_step{State_Game{s.get()}, std::move(a0)}; };
-    for (int i = 0; tally.more(i); ++i) {
-      s = draw_state_Game(draw);
-      TrafficCar a0 = draw_TrafficCar(draw);
-      unsigned long a1 = static_cast<unsigned long>(draw.below(40));
-      double a2 = draw.number();
-      const std::vector<converted::Value> given = {arg(a0), arg(a1), arg(a2)};   // (what the Blueprint is given: before the call)
-      const converted::Variables vars = variables_Game(*s);   // (and the variables of its state)
-      const converted::Watch watch;
-      if (setjmp(converted::g_bail) != 0) { converted::may_bail(false); tally.given_up(); continue; }   // (given up: see converted::open_read)
-      converted::g_can_bail = true;
-      converted::may_bail(true);
-      bp.before_source();   // (the Blueprints of the actors it calls, as they started)
-      converted::zero_stack();
-      const converted::Zeroed<decltype(run(a0, a1, a2))> held([&] { return run(a0, a1, a2); });
-      const auto& made = held.get();
-      const auto& want = made;
-      converted::g_can_bail = false;
-      converted::may_bail(false);
-      tally.take(bp, given, want, watch.left(), [&] { return converted::shown_all(given); }, {1, 0}, &vars, true);
     }
   }
 }

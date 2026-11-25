@@ -1209,7 +1209,7 @@ namespace logic { enum class TriggerKind : u8 { event, timer, condition, automat
 struct FunctionPin : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
-namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant }; } }
+namespace logic { namespace Graph { enum class Root : u8 { none, variable, local, reference, constant_reference, input, constant, bound }; } }
 struct Formula : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
@@ -1223,6 +1223,9 @@ struct Host : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Results : converted::EngineObject {
+  using converted::EngineObject::EngineObject;
+};
+struct NativeBlueprint : converted::EngineObject {
   using converted::EngineObject::EngineObject;
 };
 struct Instance : converted::EngineObject {
@@ -3758,7 +3761,7 @@ namespace mp { struct VoiceCapture {
   std::vector<std::vector<u8>> frames_;
   f64 phase_ = 0;
 }; }
-namespace mp { struct Turn { enum class Dir : u8 { none, left, right, u_turn } dir = Dir::none; f32 distance = 0, angle_deg = 0; }; }
+namespace mp { namespace Turn { enum class Dir : u8 { none, left, right, u_turn }; } }
 namespace mp { struct Ping { u8 owner = 0; Vec3 p; u32 color = 0; f64 at_ms = 0; }; }
 namespace mp { struct PingBoard {
  public:
@@ -5776,7 +5779,116 @@ void Car::detach() {
 }
 using weapons::Id; namespace game_weapons_cpp_local { bool hitscan_on_foot(Id id) { return id == Id::smg || id == Id::glock || id == Id::sniper; } }
 bool Game::game_weapon_in_hand() const { return mode_ == Mode::foot && !game_weapons_cpp_local::hitscan_on_foot(foot_weapon_); }
+namespace logic { namespace EngineObjects_types { using Kind = const void*; } }
+namespace logic { namespace scan { inline constexpr std::size_t kMostSlots = 16; } }
+namespace logic { namespace bytes { enum class Code : u8 { none, boolean, u8, i8, u16, i16, u32, i32, u64, i64, f32, f64 }; } }
+namespace logic { namespace PureNodes_types { using Int = i64; } }
+namespace logic { namespace PureNodes_types { using Float = f64; } }
+namespace logic { namespace engine_direct { namespace E_AlphaMode { using type = AlphaMode; } } }
+namespace logic { namespace engine_direct { namespace E_AoQuality { using type = AoQuality; } } }
+namespace logic { namespace engine_direct { namespace E_BloomState { using type = BloomState; } } }
+namespace logic { namespace engine_direct { namespace E_Key { using type = Key; } } }
+namespace logic { namespace engine_direct { namespace E_LogLevel { using type = LogLevel; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Bus { using type = audio::Bus; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Rolloff { using type = audio::Rolloff; } } }
+namespace logic { namespace engine_direct { namespace E_audio_Wave { using type = audio::Wave; } } }
+namespace logic { namespace engine_direct { namespace E_game_CameraMode { using type = game::CameraMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_ControlMode { using type = game::ControlMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameGoal { using type = game::GameGoal; } } }
+namespace logic { namespace engine_direct { namespace E_game_GameStatus { using type = game::GameStatus; } } }
+namespace logic { namespace engine_direct { namespace E_game_JointKind { using type = game::JointKind; } } }
+namespace logic { namespace engine_direct { namespace E_game_MoverMode { using type = game::MoverMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_Shape { using type = game::Shape; } } }
+namespace logic { namespace engine_direct { namespace E_game_SimMode { using type = game::SimMode; } } }
+namespace logic { namespace engine_direct { namespace E_game_TriggerAction { using type = game::TriggerAction; } } }
+namespace logic { namespace engine_direct { namespace E_game_WeaponKind { using type = game::WeaponKind; } } }
+namespace logic { namespace engine_direct { namespace E_logic_TriggerKind { using type = logic::TriggerKind; } } }
+namespace logic { namespace engine_direct { namespace E_net_ClientState { using type = net::ClientState; } } }
+namespace logic { namespace engine_direct { namespace E_physics_BodyType { using type = physics::BodyType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_JointType { using type = physics::JointType; } } }
+namespace logic { namespace engine_direct { namespace E_physics_ShapeKind { using type = physics::ShapeKind; } } }
+namespace logic { namespace engine_direct { namespace E_physics_Surface { using type = physics::Surface; } } }
+namespace BlueprintCore_types { using Int = ::kern::logic::Whole; }
+namespace game { namespace nodes { using Int = i64; } }
+namespace game { namespace nodes { using Float = f64; } }
+namespace game { namespace nodes { struct Score { Float score = 0; Int pickups = 0; }; } }
 bool Game::voice_mic_on() const { return mp_ && converted::present(mp_)->mic && !converted::present(mp_)->muted && net_.active(); }
+namespace mp { void Scoreboard::ensure(u8 slot) {
+  for (const Score& s : rows_) if (s.slot == slot) return;
+  rows_.push_back({slot, 0, 0});
+} }
+namespace mp { void Scoreboard::died(u8 victim, i32 by) {
+  ensure(victim);
+  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
+  if (by >= 0 && by != victim) {
+    ensure(static_cast<u8>(by));
+    for (Score& s : rows_) if (s.slot == by) ++s.kills;
+  }
+} }
+namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
+  using ActorBlueprint::ActorBlueprint;
+}; }
+namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
+namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
+namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
+namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
+  std::stable_sort(members.begin(), members.end());
+  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
+} } }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
+  mp::mp_rules_cpp_local::roster(current);
+  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
+  return b.status;
+} }
+namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
+  Ballot::Status did = b.status;
+  return cast_vote(b, voter, approve, std::move(current), now, did);
+} }
+namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
+  mp::mp_rules_cpp_local::roster(members);
+  bool created = false;
+  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
+  return created;
+} }
+namespace rules { inline f64 decimal(f32 x) {
+  const f64 d = static_cast<f64>(x);
+  const f64 a = std::fabs(d);
+  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
+  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
+  for (f64 m = a; m < 1; m *= 10) scale *= 10;
+  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
+  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
+    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
+    if (static_cast<f32>(c) == x) return c;
+  }
+  return d;
+} }
+namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
+  HitVerdict verdict = HitVerdict::applied;
+  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
+  return verdict;
+} }
+namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
+namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
+namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
+  std::vector<Row> rows;
+  Result r = Result::ok;
+  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
+  if (r == Result::ok) {
+    rows_ = rows;
+    ++revision_;
+  }
+  return r;
+} }
 namespace wire { struct U16 { u16 v = 0; }; }
 namespace wire { struct I16 { i16 v = 0; }; }
 namespace wire { struct U32 { u32 v = 0; }; }
@@ -5906,82 +6018,6 @@ namespace wire { struct Reader {
   /// Every number was there, and the message has no more.
   
 }; }
-namespace mp { void Scoreboard::ensure(u8 slot) {
-  for (const Score& s : rows_) if (s.slot == slot) return;
-  rows_.push_back({slot, 0, 0});
-} }
-namespace mp { void Scoreboard::died(u8 victim, i32 by) {
-  ensure(victim);
-  for (Score& s : rows_) if (s.slot == victim) ++s.deaths;
-  if (by >= 0 && by != victim) {
-    ensure(static_cast<u8>(by));
-    for (Score& s : rows_) if (s.slot == by) ++s.kills;
-  }
-} }
-namespace rules { struct Blueprint : ::kern::logic::ActorBlueprint {
-  using ActorBlueprint::ActorBlueprint;
-}; }
-namespace mp { namespace mp_rules_cpp_local { rules::Blueprint g_rules{"Multiplayer"}; } }
-namespace mp { f64 spawn_protect_ms() { return mp::mp_rules_cpp_local::g_rules.get<f64>("SpawnProtectMs"); } }
-namespace mp { f32 voice_radius() { return static_cast<f32>(mp::mp_rules_cpp_local::g_rules.get<f64>("VoiceRadius")); } }
-namespace mp { namespace mp_rules_cpp_local { void roster(std::vector<u8>& members) {
-  std::stable_sort(members.begin(), members.end());
-  converted::erase(members, std::unique(members.begin(), members.end()), members.end());
-} } }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now, Ballot::Status& did) {
-  mp::mp_rules_cpp_local::roster(current);
-  mp::mp_rules_cpp_local::g_rules.call("CastVote", std::tie(b, did), b, voter, approve, current, now);
-  return b.status;
-} }
-namespace mp { Ballot::Status cast_vote(Ballot& b, u8 voter, bool approve, std::vector<u8> current, f64 now) {
-  Ballot::Status did = b.status;
-  return cast_vote(b, voter, approve, std::move(current), now, did);
-} }
-namespace mp { bool create_ballot(Ballot& b, u32 id, u8 key, bool value, u8 host, std::vector<u8> members, f64 now) {
-  mp::mp_rules_cpp_local::roster(members);
-  bool created = false;
-  mp::mp_rules_cpp_local::g_rules.call("CreateBallot", std::tie(created, b), id, key, value, host, members, now);
-  return created;
-} }
-namespace rules { inline f64 decimal(f32 x) {
-  const f64 d = static_cast<f64>(x);
-  const f64 a = std::fabs(d);
-  if (!(a >= 1e-9 && a < 1e7) || d == std::trunc(d)) return d;
-  f64 scale = 1;  // 10^(digits - 1 - exponent): the candidate with `digits` significant digits is round(d * scale) / scale
-  for (f64 m = a; m < 1; m *= 10) scale *= 10;
-  for (f64 m = a; m >= 10; m /= 10) scale /= 10;
-  for (int digits = 1; digits <= 9; converted::pre_inc(digits), scale *= 10) {
-    const f64 c = scale >= 1 ? std::round(d * scale) / scale : std::round(d * scale) * std::round(1 / scale);
-    if (static_cast<f32>(c) == x) return c;
-  }
-  return d;
-} }
-namespace mp { HitVerdict judge_hit(bool target_known, bool shooter_known, bool self_damage, bool friendly_fire, f64 now, f64 protected_until, f32 hp) {
-  HitVerdict verdict = HitVerdict::applied;
-  mp::mp_rules_cpp_local::g_rules.call("JudgeHit", std::tie(verdict), target_known, shooter_known, self_damage, friendly_fire, now, protected_until, rules::decimal(hp));
-  return verdict;
-} }
-namespace seats { namespace jet_seats_cpp_local { rules::Blueprint g_rules{"JetSeats"}; } }
-namespace seats { Result Table::claim(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Claim", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
-namespace seats { Result Table::release(u8 owner, u8 player, Seat seat) {
-  std::vector<Row> rows;
-  Result r = Result::ok;
-  seats::jet_seats_cpp_local::g_rules.call("Release", std::tie(rows, r), rows_, owner, player, seat);
-  if (r == Result::ok) {
-    rows_ = rows;
-    ++revision_;
-  }
-  return r;
-} }
 namespace net { namespace net_session_cpp_local { enum : u16 {
   kPose = 1, kPoseRelay = 2, kWelcome = 4, kFxMsg = 5, kHitReq = 6, kHitMsg = 7, kConfirm = 8, kDeath = 9, kKillMsg = 10, kScores = 11,
   kRespawn = 12, kProtect = 13, kAnchor = 14, kPingMsg = 15, kVoice = 16, kRules = 17, kPropose = 18, kBallotMsg = 19, kVote = 20,
@@ -6509,53 +6545,6 @@ void Game::osfx(const char* fn, Vec3 at, f32 a, f32 b, f32 c) {
   std::snprintf(buf, sizeof buf, "%s[\"%s\",%.2f,%.2f,%.2f,%.5g,%.5g,%.5g]", osfx_.empty() ? "" : ",", fn, static_cast<double>(at.x), static_cast<double>(at.y), static_cast<double>(at.z), static_cast<double>(a), static_cast<double>(b), static_cast<double>(c));
   osfx_ += buf;
 }
-enum class BodyPart : u8 { none, legs, torso, head };
-namespace person_hit { constexpr f32 kHipZ = 0.92, kHeadUp = 0.73, kHeadR = 0.155; }
-namespace person_hit { inline f32 lean(f32 speed) { return std::clamp(speed - 2.5, 0.0, 5.0) * 0.035; } }
-namespace person_hit { inline bool box_entry(Vec3 from, Vec3 seg, Vec3 c, Vec3 ax, Vec3 ay, Vec3 az, Vec3 h, f32& t_out) {
-  const Vec3 o = from - c;
-  const f32 po[3] = {converted::wide::dot(o, ax), converted::wide::dot(o, ay), converted::wide::dot(o, az)}, pd[3] = {converted::wide::dot(seg, ax), converted::wide::dot(seg, ay), converted::wide::dot(seg, az)};
-  const f32 hh[3] = {h.x, h.y, h.z};
-  f32 t0 = 0, t1 = 1;
-  for (int a = 0; a < 3; converted::pre_inc(a)) {
-    if (std::fabs(converted::at(pd, a)) < 1e-7) { if (std::fabs(converted::at(po, a)) > converted::at(hh, a)) return false; continue; }
-    f32 ta = (-converted::at(hh, a) - converted::at(po, a)) / converted::at(pd, a), tb = (converted::at(hh, a) - converted::at(po, a)) / converted::at(pd, a);
-    if (ta > tb) std::swap(ta, tb);
-    t0 = std::fmax(t0, ta);
-    t1 = std::fmin(t1, tb);
-    if (t0 > t1) return false;
-  }
-  t_out = t0;
-  return true;
-} }
-namespace person_hit { inline bool sphere_entry(Vec3 from, Vec3 seg, Vec3 c, f32 r, f32& t_out) {
-  const Vec3 o = from - c;
-  const f32 a = converted::wide::dot(seg, seg), b = converted::wide::dot(o, seg), cc = converted::wide::dot(o, o) - r * r;
-  if (a < 1e-9) return false;
-  if (cc <= 0) { t_out = 0; return true; }
-  const f32 disc = b * b - a * cc;
-  if (disc < 0 || b > 0) return false;
-  const f32 t = (-b - kern::math::sqrt(disc)) / a;
-  if (t > 1) return false;
-  t_out = std::fmax(0.0, t);
-  return true;
-} }
-namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 from, Vec3 seg, f32& t_out, f32 pad = 1.0, f32 scale = 1.0) {
-  const f32 cy = kern::math::cos(yaw), sy = kern::math::sin(yaw), l = lean(speed), cl = kern::math::cos(l), sl = kern::math::sin(l);
-  const Vec3 fx{cy, sy, 0}, fy{-sy, cy, 0}, up{0, 0, 1};
-  // the leaning body frame: up tilts forward
-  const Vec3 bz = up * cl + fx * sl, bx = fx * cl - up * sl;
-  const Vec3 hip = feet + up * (kHipZ * scale);
-  BodyPart best = BodyPart::none;
-  f32 bt = 2, t;
-  if (sphere_entry(from, seg, hip + bz * (kHeadUp * scale), kHeadR * pad * scale, t) && t < bt) { bt = t; best = BodyPart::head; }
-  // torso 0.24 x 0.42 x 0.6 from the hip up, with the arms beside it (to 0.33 either side)
-  if (box_entry(from, seg, hip + bz * (0.29 * scale), bx, fy, bz, Vec3{0.15, 0.31, 0.31} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::torso; }
-  // the legs, hip to shoe
-  if (box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
-  t_out = bt;
-  return best;
-} }
 namespace net { void Session::request_hit(u8 target, f32 damage, u8 weapon, u8 zone, Vec3 from) {
   if (role_ == Role::none || damage < 1) return;
   Hit h{target, self_slot_, weapon, zone, clampf(std::round(damage), 1, 100), from};
@@ -6607,6 +6596,53 @@ bool MpArt::init(Renderer& r) {
   return true;
 }
 bool Game::gaps_riding() const { return gaps_ && converted::present(gaps_)->riding; }
+enum class BodyPart : u8 { none, legs, torso, head };
+namespace person_hit { constexpr f32 kHipZ = 0.92, kHeadUp = 0.73, kHeadR = 0.155; }
+namespace person_hit { inline f32 lean(f32 speed) { return std::clamp(speed - 2.5, 0.0, 5.0) * 0.035; } }
+namespace person_hit { inline bool box_entry(Vec3 from, Vec3 seg, Vec3 c, Vec3 ax, Vec3 ay, Vec3 az, Vec3 h, f32& t_out) {
+  const Vec3 o = from - c;
+  const f32 po[3] = {converted::wide::dot(o, ax), converted::wide::dot(o, ay), converted::wide::dot(o, az)}, pd[3] = {converted::wide::dot(seg, ax), converted::wide::dot(seg, ay), converted::wide::dot(seg, az)};
+  const f32 hh[3] = {h.x, h.y, h.z};
+  f32 t0 = 0, t1 = 1;
+  for (int a = 0; a < 3; converted::pre_inc(a)) {
+    if (std::fabs(converted::at(pd, a)) < 1e-7) { if (std::fabs(converted::at(po, a)) > converted::at(hh, a)) return false; continue; }
+    f32 ta = (-converted::at(hh, a) - converted::at(po, a)) / converted::at(pd, a), tb = (converted::at(hh, a) - converted::at(po, a)) / converted::at(pd, a);
+    if (ta > tb) std::swap(ta, tb);
+    t0 = std::fmax(t0, ta);
+    t1 = std::fmin(t1, tb);
+    if (t0 > t1) return false;
+  }
+  t_out = t0;
+  return true;
+} }
+namespace person_hit { inline bool sphere_entry(Vec3 from, Vec3 seg, Vec3 c, f32 r, f32& t_out) {
+  const Vec3 o = from - c;
+  const f32 a = converted::wide::dot(seg, seg), b = converted::wide::dot(o, seg), cc = converted::wide::dot(o, o) - r * r;
+  if (a < 1e-9) return false;
+  if (cc <= 0) { t_out = 0; return true; }
+  const f32 disc = b * b - a * cc;
+  if (disc < 0 || b > 0) return false;
+  const f32 t = (-b - kern::math::sqrt(disc)) / a;
+  if (t > 1) return false;
+  t_out = std::fmax(0.0, t);
+  return true;
+} }
+namespace person_hit { inline BodyPart hit(Vec3 feet, f32 yaw, f32 speed, Vec3 from, Vec3 seg, f32& t_out, f32 pad = 1.0, f32 scale = 1.0) {
+  const f32 cy = kern::math::cos(yaw), sy = kern::math::sin(yaw), l = lean(speed), cl = kern::math::cos(l), sl = kern::math::sin(l);
+  const Vec3 fx{cy, sy, 0}, fy{-sy, cy, 0}, up{0, 0, 1};
+  // the leaning body frame: up tilts forward
+  const Vec3 bz = up * cl + fx * sl, bx = fx * cl - up * sl;
+  const Vec3 hip = feet + up * (kHipZ * scale);
+  BodyPart best = BodyPart::none;
+  f32 bt = 2, t;
+  if (person_hit::sphere_entry(from, seg, hip + bz * (kHeadUp * scale), kHeadR * pad * scale, t) && t < bt) { bt = t; best = BodyPart::head; }
+  // torso 0.24 x 0.42 x 0.6 from the hip up, with the arms beside it (to 0.33 either side)
+  if (person_hit::box_entry(from, seg, hip + bz * (0.29 * scale), bx, fy, bz, Vec3{0.15, 0.31, 0.31} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::torso; }
+  // the legs, hip to shoe
+  if (person_hit::box_entry(from, seg, feet + up * (0.47 * scale), fx, fy, up, Vec3{0.15, 0.2, 0.47} * (pad * scale), t) && t < bt - 1e-5) { bt = t; best = BodyPart::legs; }
+  t_out = bt;
+  return best;
+} }
 namespace game_net_cpp_local { constexpr f32 kSeatDrop = 0.42; }
 using weapons::Id; namespace game_net_cpp_local { mp::Weapon mp_weapon(weapons::Id id) {
   using weapons::Id;
