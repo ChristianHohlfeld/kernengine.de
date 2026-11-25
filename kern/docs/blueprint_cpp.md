@@ -1496,6 +1496,12 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   (`""` für einen Text). `logic::engine_implement(objects, instance)` macht das Objekt der Engine eines laufenden
   Blueprints; das Handle nennt auch ein Objekt der Schnittstelle (was man der Engine gibt: `engine.renderer.init(…,
   extensions)`).
+- **Ein Knotentyp des Programms** (`kern::logic::NodeDef` mit `kind = NodeKind::event`, festem `event`, `accepts`, das
+  immer wahr gibt, und `run` ohne Fang, das mit `kStop` endet, angemeldet mit `kern::logic::library().add`) ist im
+  Blueprint kein Wert, sondern ein **Ereignis** des Blueprints, dessen Funktion ihn anmeldet: `logic.tick` →
+  `KERN_EVENT(onN, event_tick)`, sein Rumpf die Schritte von `run` (Konverter: `Body.node_registrations`; die
+  Anmeldung steht nicht mehr im Rumpf). Vorausgesetzt ist, dass das Programm den Knoten in sein Level legt (beim
+  Umschalten fällt dieser Knoten aus dem Level: das Ereignis ist er). Jede andere Form wartet mit Grund.
 - **Was noch wartet:** eine virtuelle Funktion, der die Engine einen Zeiger gibt oder die durch das Gegebene schreibt
   (`ShaderExtension::material_uniforms`, `net::Transport::send/receive`), hat noch keinen Weg zum Blueprint
   (`EngineVirtual::waits`): dort läuft die der Schnittstelle; ist sie rein (`Transport`), implementiert kein Blueprint die
@@ -1506,7 +1512,8 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   `state_classes`), darf als einzige Basis eine Schnittstelle der Engine haben (öffentlich, eine Klasse der Engine, deren
   Funktionen alle virtuell sind und die nichts hält – `class SpawnCityApp final : public kern::App`,
   `engine_interface_of`): ihr Blueprint implementiert sie (`kern::Implements<"App">` im Text), ihre Overrides sind seine
-  Funktionen mit den Namen der Schnittstelle; was sie nicht kann, sagt check() wie bei einem geschriebenen Blueprint.
+  Funktionen mit den Namen der Schnittstelle – sobald jede reine geschrieben ist (bis dahin hat die Engine kein Objekt
+  von ihm: was noch wartet, hält die Schnittstelle von ihm fern wie jeden Aufrufer); was dann nicht passt, sagt check().
 - Geprüft: `engine_interface_a_blueprint_implements` (die Adapter von ShaderExtension und App auf dem Interpreter, die
   Regeln, das Ende des Blueprints), die nativen Fälle „Water“ und „Running“ (`kern/tests/blueprint_native.h`: dieselben
   Aufrufe auf der Klasse), `studio_logic_implements`.

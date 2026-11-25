@@ -7448,6 +7448,26 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
+// A list the engine holds behind a pointer and a size (FootprintStream::data/size): its node `values` gives every number
+// of it, as C++ has them - not what the pointer alone shows (one entry).
+TEST(engine_footprint_stream_values) {
+  using logic::Value;
+  logic::EngineObjects objects;
+  std::vector<Value> out{Value::zero(logic::PinType::integer)};
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.make", {}, out));
+  const Value fs = out[0];
+  std::vector<Value> none;
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.begin", {fs, Value::integer(7), Value::number(1.5), Value::number(9.25)}, none));
+  CHECK(logic::call_engine(objects, "engine.footprint_stream.ring", {fs, Value::of(std::vector<Vec3>{{0, 0, 0}, {4, 0, 0}, {4, 3, 0}}), Value::integer(3)}, none));
+  const FootprintStream* const held = logic::engine_values::object_of<FootprintStream>(objects, fs.as_int(), "footprint_stream");
+  out = {Value::zero(logic::PinType::number_list)};
+  CHECK(held && logic::call_engine(objects, "engine.footprint_stream.values", {fs}, out) && out[0].size() == held->size());
+  bool same = held != nullptr;
+  for (std::size_t k = 0; same && k < out[0].size(); ++k) same = std::bit_cast<u64>(out[0].item(k).as_number()) == std::bit_cast<u64>(held->data()[k]);
+  CHECK(same && held && held->size() == 1 + 7 + 1 + 6);
+  objects.clear();
+}
+
 // The Blueprints a logic runs, as a Blueprint sees them (engine.game.blueprints_running): each one's name, how it runs, how
 // many functions and nodes its graph has, whether it stopped - in the order the logic runs them; through the door the same.
 TEST(engine_blueprints_running) {
