@@ -948,11 +948,29 @@ Umgeschaltet:
   `Code_dark`) und `qr_code_cpp` (der Kodierer: `encode`, `read_format`). Das Spiel ruft sie im
   Befehl `qr` (`game_net.cpp`), der Test `mp_qr_code_structure` prüft den Blueprint.
 
+- **Das gebaute Spiel** trägt, was es ausführt: `build.sh` bettet das Level ohne „Source“ ein
+  (`tools/embed_level.py --without Source`), aber mit den Bibliotheken, die die bleibenden Blueprints
+  benutzen (`uses`, auch mittelbar: `qr_code_cpp` ruft `shapes`); Header und Klassen entstehen aus
+  diesem Level.
+- **Der Konverter liest eine Klasse aus dem Level** (seit 25.11.2026): Eine Funktion des übrigen C++,
+  die eine umgeschaltete Datei ruft, wird wie jede andere geschrieben. Ein Typ der Klasse
+  (`blueprints::qr_code::qr_Code`) ist der Typ dieser Bibliothek mit den Feldern und Defaults, die
+  das Level hat; ein Aufruf `kern::logic::blueprint<blueprints::qr_code_cpp>().encode(t, c).Result`
+  ist `qr_code_cpp::encode(t, c)` – Eingänge, Referenzen und Result wie der Blueprint sie hat. Die
+  Typen der Sprache, wie eine Klasse sie hält (`Int`, `U8`, `Text`, `List`, `Fixed`), sind die
+  Typen der Notation; was C++ zwischen ihnen und seinen Zahlen umwandelt, ist dieselbe Umwandlung
+  (`Sized<T>(x)` wie `static_cast<T>(x)`). Der Vergleichstest lässt die gerufenen Klassen laufen und
+  bindet sie an die Logik der Quelle (`bind_blueprint<blueprints::X>(bp.source_logic())`).
+  Benannte Grenzen (die Funktion wartet mit dem Grund): eine Klasse, die etwas hält (nur eine
+  Bibliothek wird direkt gerufen); eine Funktion mit mehreren Ausgängen; Map, Set und Callback in
+  einer Klasse; ein Typ einer Bibliothek aus „Source“ in einer Klasse; Konstanten einer Klasse.
+- **Geschwindigkeit** ist kein Tor fürs Umschalten (Chris, 25.11.2026): Sie wird am Ende optimiert;
+  je umgeschalteter Datei wird sie gemessen und notiert (`qr_code`: encode v5 C++ 36–47 µs, Klasse
+  730–970 µs, Messung 18.11.).
+
 Was das Umschalten der übrigen Dateien braucht:
-- Der Konverter schreibt einen Aufruf des übrigen C++ in eine umgeschaltete Datei noch nicht als
-  Aufruf ihrer Bibliothek (`qr_code_cpp::encode(text, code)`): Er liest die Klassen des Headers
-  nicht (sie stehen außerhalb der Namensräume des Programms), eine Funktion mit einem solchen
-  Aufruf wartet. Heute betrifft das nur `Game::net_command`, die ohnehin wartet.
+- Die Aufrufer einer Datei ändern sich mit ihr (Typen und Aufrufe der Klasse statt des C++) – sie
+  stehen fast alle in Teilen von `Game`, die noch warten; wer eine Datei umschaltet, ändert sie mit.
 - Dateien, die die Engine rufen, brauchen die Engine-Aufrufe direkt in der Klasse (Schritt 6 (d)).
 
 ### 6 – Das Projekt laden
