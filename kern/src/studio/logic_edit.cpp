@@ -1414,6 +1414,10 @@ json::Value Studio::logic_command(const std::string& name, const json::Value& c)
         const std::string title = lib.title(n);
         std::string hay = title + " " + n.comment + " " + (d ? d->category : std::string());
         for (const auto& [k, v] : n.params) hay += " " + v;
+        std::vector<logic::PinDef> in, out;
+        lib.pins(n, *g, in, out);
+        for (const logic::PinDef& pin : in) hay += " " + pin.label;
+        for (const logic::PinDef& pin : out) hay += " " + pin.label;
         for (char& ch : hay) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
         if (hay.find(q) == std::string::npos) continue;
         if (hits.size() >= 200) { more = true; break; }
