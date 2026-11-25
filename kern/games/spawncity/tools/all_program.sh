@@ -33,7 +33,7 @@ s = open(sys.argv[1]).read()
 open(sys.argv[1], "w").write(s.replace('"folder": "Source"', '"folder": "Program"'))
 PY
 # The structs of the engine as the Blueprints of the engine's headers hold them (and every Blueprint that holds a copy of
-# them, "from" that library): a field the engine has since got at their end (kern/logic/engine_nodes.gen.h, S_<struct>)
+# them, "from" that library): a field the engine has since got (kern/logic/engine_nodes.gen.h, S_<struct>)
 # is added where it can be said - a flag, a whole or decimal number, a text - as the converter's next full run writes it.
 # What cannot be said so is reported. (In the copy only: the level is written by the full run.)
 python3 - "$out/all.klevel" "$root/kern/include/kern/logic/engine_nodes.gen.h" <<'PY'
@@ -49,12 +49,14 @@ for actor in level["actors"]:
     for st in actor.get("components", {}).get("logic", {}).get("structs", []):
         lib = st.get("from") or actor["name"]
         if not lib.startswith("engine_") or st["name"] not in engine: continue
-        have = [f["name"] for f in st["fields"]]
+        have = {f["name"]: f for f in st["fields"]}
         want = engine[st["name"]]
-        if [n for _, n in want[:len(have)]] != have: continue  # (not fields added at the end: the full run)
-        for kind, name in want[len(have):]:
-            if kind not in kinds: missing.add(f"{st['name']}.{name} ({kind})"); break
-            st["fields"].append({"name": name, "type": kinds[kind][0], "value": kinds[kind][1]}); added += 1
+        names = [n for _, n in want]
+        if [n for n in names if n in have] != [f["name"] for f in st["fields"]] or len(have) == len(names): continue  # (only fields added, in the engine's order)
+        if any(k not in kinds for k, n in want if n not in have):
+            missing.update(f"{st['name']}.{n} ({k})" for k, n in want if n not in have and k not in kinds); continue
+        st["fields"] = [have[n] if n in have else {"name": n, "type": kinds[k][0], "value": kinds[k][1]} for k, n in want]
+        added += len(names) - len(have)
 json.dump(level, open(sys.argv[1], "w"), indent=1, ensure_ascii=False)
 print(f"structs of the engine brought up to its headers: {added} fields added" + (f"; not sayable: {', '.join(sorted(missing))}" if missing else ""))
 PY
