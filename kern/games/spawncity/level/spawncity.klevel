@@ -3649,7 +3649,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -18709,7 +18709,7 @@
         "op": "<="
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -21201,7 +21201,7 @@
         "op": "<="
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -51982,7 +51982,7 @@
        "x": 720,
        "y": 1880,
        "values": {
-        "a": 0.000001
+        "a": 1e-06
        }
       },
       {
@@ -52287,7 +52287,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-8
+        "b": 1e-08
        }
       },
       {
@@ -61656,7 +61656,7 @@
         "op": ">="
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -83144,7 +83144,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-7
+        "b": 1e-07
        }
       },
       {
@@ -83743,7 +83743,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -97303,7 +97303,7 @@
         "op": ">"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -131863,7 +131863,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -304784,7 +304784,7 @@
         "scope": "finish"
        },
        "values": {
-        "value": 0.000001
+        "value": 1e-06
        }
       },
       {
@@ -330211,7 +330211,7 @@
       {
        "name": "kBearingDrag",
        "type": "float",
-       "value": 1.5e-7,
+       "value": 1.5e-07,
        "help": "propulsion_authority.mjs MOTOR_BEARING_DRAG_NM_PER_RAD_S",
        "const": true
       },
@@ -330643,7 +330643,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -330666,7 +330666,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -330765,7 +330765,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -330783,7 +330783,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -331213,7 +331213,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -331231,7 +331231,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -331543,7 +331543,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -331561,7 +331561,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -331964,7 +331964,7 @@
         {
          "name": "J",
          "type": "float",
-         "value": 0.000011
+         "value": 1.1e-05
         },
         {
          "name": "Ct",
@@ -332254,7 +332254,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -332338,7 +332338,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -332356,7 +332356,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353617,7 +353617,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353635,7 +353635,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353833,7 +353833,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -353851,7 +353851,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -354050,7 +354050,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -354068,7 +354068,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -354925,7 +354925,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -355004,7 +355004,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355022,7 +355022,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355273,7 +355273,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -355316,7 +355316,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -355395,7 +355395,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355413,7 +355413,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355660,7 +355660,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -355739,7 +355739,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -355757,7 +355757,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356013,7 +356013,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -356290,7 +356290,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -356369,7 +356369,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356387,7 +356387,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356757,7 +356757,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -356836,7 +356836,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -356854,7 +356854,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -357249,7 +357249,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -357328,7 +357328,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -357346,7 +357346,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -378832,6 +378832,16 @@
          "value": ""
         },
         {
+         "name": "exported",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "wire",
+         "type": "text",
+         "value": ""
+        },
+        {
          "name": "help",
          "type": "text",
          "value": ""
@@ -379118,6 +379128,11 @@
          "name": "uses",
          "type": "text_list",
          "value": []
+        },
+        {
+         "name": "implements",
+         "type": "text",
+         "value": ""
         }
        ],
        "from": "engine_logic_logic"
@@ -485419,7 +485434,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.00001
+        "b": 1e-05
        }
       },
       {
@@ -719977,7 +719992,7 @@
         "op": ">"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -775841,7 +775856,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.00001
+        "b": 1e-05
        }
       },
       {
@@ -847155,7 +847170,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -878364,7 +878379,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1021937,7 +1021952,7 @@
         "op": ">"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -1061220,7 +1061235,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1061436,7 +1061451,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.00001
+        "b": 1e-05
        }
       },
       {
@@ -1253202,7 +1253217,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-9
+        "b": 1e-09
        }
       },
       {
@@ -1313834,7 +1313849,7 @@
         "op": "<"
        },
        "values": {
-        "b": 1e-7
+        "b": 1e-07
        }
       },
       {
@@ -1409759,7 +1409774,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1409782,7 +1409797,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1409941,7 +1409956,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1409959,7 +1409974,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1418676,7 +1418691,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1418694,7 +1418709,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1421091,7 +1421106,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1421109,7 +1421124,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1433152,7 +1433167,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433170,7 +1433185,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433225,7 +1433240,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433243,7 +1433258,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1433410,7 +1433425,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433428,7 +1433443,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433551,7 +1433566,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433569,7 +1433584,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433687,7 +1433702,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433705,7 +1433720,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433854,7 +1433869,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1433872,7 +1433887,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434059,7 +1434074,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434077,7 +1434092,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434206,7 +1434221,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434224,7 +1434239,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434397,7 +1434412,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434415,7 +1434430,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434699,7 +1434714,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434717,7 +1434732,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434905,7 +1434920,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1434923,7 +1434938,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435053,7 +1435068,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435071,7 +1435086,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435201,7 +1435216,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1435219,7 +1435234,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1455533,7 +1455548,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1455556,7 +1455571,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1455717,7 +1455732,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1455735,7 +1455750,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1456256,7 +1456271,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1456274,7 +1456289,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1457274,7 +1457289,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1459780,7 +1459795,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1462435,7 +1462450,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1472152,7 +1472167,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472170,7 +1472185,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472300,7 +1472315,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472318,7 +1472333,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472441,7 +1472456,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472459,7 +1472474,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472584,7 +1472599,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472602,7 +1472617,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472776,7 +1472791,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1472794,7 +1472809,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1474573,7 +1474588,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474591,7 +1474606,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474764,7 +1474779,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474782,7 +1474797,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474950,7 +1474965,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1474968,7 +1474983,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475140,7 +1475155,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475158,7 +1475173,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475349,7 +1475364,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475367,7 +1475382,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475736,7 +1475751,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1475754,7 +1475769,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1523587,7 +1523602,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1523610,7 +1523625,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1523771,7 +1523786,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1523789,7 +1523804,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1524274,7 +1524289,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1524292,7 +1524307,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1524603,7 +1524618,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1524621,7 +1524636,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527106,7 +1527121,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527124,7 +1527139,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527297,7 +1527312,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527315,7 +1527330,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527489,7 +1527504,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527507,7 +1527522,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1527745,7 +1527760,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1527763,7 +1527778,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1527961,7 +1527976,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1527979,7 +1527994,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528172,7 +1528187,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528190,7 +1528205,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528387,7 +1528402,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1528405,7 +1528420,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1529732,7 +1529747,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1529755,7 +1529770,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1529854,7 +1529869,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1529872,7 +1529887,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1530302,7 +1530317,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1530320,7 +1530335,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1530504,7 +1530519,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1530522,7 +1530537,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1530733,7 +1530748,7 @@
         {
          "name": "J",
          "type": "float",
-         "value": 0.000011
+         "value": 1.1e-05
         },
         {
          "name": "Ct",
@@ -1531020,7 +1531035,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -1531104,7 +1531119,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1531122,7 +1531137,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1531664,7 +1531679,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -1531743,7 +1531758,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1531761,7 +1531776,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532031,7 +1532046,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -1532110,7 +1532125,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532128,7 +1532143,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532394,7 +1532409,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -1532473,7 +1532488,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1532491,7 +1532506,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -1548056,7 +1548071,7 @@
          "prop_d": 0.127,
          "kv": 2300,
          "R": 0.08,
-         "J": 0.000011,
+         "J": 1.1e-05,
          "Ct": 0.105,
          "Cq": 0.012,
          "motor_limit_a": 45,
@@ -1548135,7 +1548150,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1548153,7 +1548168,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1558583,7 +1558598,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1558606,7 +1558621,7 @@
           "gains_": {
            "kp": 0.003,
            "ki": 0.0007,
-           "kd": 0.00001,
+           "kd": 1e-05,
            "integral_limit": 0.18,
            "output_limit": 0.38,
            "d_cutoff_hz": 55
@@ -1558705,7 +1558720,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1558723,7 +1558738,7 @@
            "gains_": {
             "kp": 0.003,
             "ki": 0.0007,
-            "kd": 0.00001,
+            "kd": 1e-05,
             "integral_limit": 0.18,
             "output_limit": 0.38,
             "d_cutoff_hz": 55
@@ -1559153,7 +1559168,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1559171,7 +1559186,7 @@
             "gains_": {
              "kp": 0.003,
              "ki": 0.0007,
-             "kd": 0.00001,
+             "kd": 1e-05,
              "integral_limit": 0.18,
              "output_limit": 0.38,
              "d_cutoff_hz": 55
@@ -1559355,7 +1559370,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1559373,7 +1559388,7 @@
              "gains_": {
               "kp": 0.003,
               "ki": 0.0007,
-              "kd": 0.00001,
+              "kd": 1e-05,
               "integral_limit": 0.18,
               "output_limit": 0.38,
               "d_cutoff_hz": 55
@@ -1559562,7 +1559577,7 @@
         {
          "name": "J",
          "type": "float",
-         "value": 0.000011
+         "value": 1.1e-05
         },
         {
          "name": "Ct",
@@ -1559852,7 +1559867,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -1559936,7 +1559951,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1559954,7 +1559969,7 @@
               "gains_": {
                "kp": 0.003,
                "ki": 0.0007,
-               "kd": 0.00001,
+               "kd": 1e-05,
                "integral_limit": 0.18,
                "output_limit": 0.38,
                "d_cutoff_hz": 55
@@ -1565635,6 +1565650,16 @@
          "value": ""
         },
         {
+         "name": "exported",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "wire",
+         "type": "text",
+         "value": ""
+        },
+        {
          "name": "help",
          "type": "text",
          "value": ""
@@ -1565921,6 +1565946,11 @@
          "name": "uses",
          "type": "text_list",
          "value": []
+        },
+        {
+         "name": "implements",
+         "type": "text",
+         "value": ""
         }
        ],
        "from": "engine_logic_logic"
@@ -1618439,7 +1618469,7 @@
         "prop_d": 0.127,
         "kv": 2300,
         "R": 0.08,
-        "J": 0.000011,
+        "J": 1.1e-05,
         "Ct": 0.105,
         "Cq": 0.012,
         "motor_limit_a": 45,
@@ -1831463,7 +1831493,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1832442,7 +1832472,7 @@
         "op": "<"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -1841477,7 +1841507,7 @@
         "op": ">"
        },
        "values": {
-        "b": 0.000001
+        "b": 1e-06
        }
       },
       {
@@ -2183991,7 +2184021,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2184070,7 +2184100,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184088,7 +2184118,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184356,7 +2184386,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -2184399,7 +2184429,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2184478,7 +2184508,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184496,7 +2184526,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184748,7 +2184778,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2184827,7 +2184857,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2184845,7 +2184875,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2185098,7 +2185128,7 @@
            "prop_d": 0.127,
            "kv": 2300,
            "R": 0.08,
-           "J": 0.000011,
+           "J": 1.1e-05,
            "Ct": 0.105,
            "Cq": 0.012,
            "motor_limit_a": 45,
@@ -2185177,7 +2185207,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2185195,7 +2185225,7 @@
                "gains_": {
                 "kp": 0.003,
                 "ki": 0.0007,
-                "kd": 0.00001,
+                "kd": 1e-05,
                 "integral_limit": 0.18,
                 "output_limit": 0.38,
                 "d_cutoff_hz": 55
@@ -2215853,7 +2215883,7 @@
           "prop_d": 0.127,
           "kv": 2300,
           "R": 0.08,
-          "J": 0.000011,
+          "J": 1.1e-05,
           "Ct": 0.105,
           "Cq": 0.012,
           "motor_limit_a": 45,
@@ -2253205,6 +2253235,16 @@
          "value": ""
         },
         {
+         "name": "exported",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "wire",
+         "type": "text",
+         "value": ""
+        },
+        {
          "name": "help",
          "type": "text",
          "value": ""
@@ -2253484,6 +2253524,11 @@
          "name": "uses",
          "type": "text_list",
          "value": []
+        },
+        {
+         "name": "implements",
+         "type": "text",
+         "value": ""
         }
        ]
       }
@@ -2253817,6 +2253862,16 @@
          "value": ""
         },
         {
+         "name": "exported",
+         "type": "text",
+         "value": ""
+        },
+        {
+         "name": "wire",
+         "type": "text",
+         "value": ""
+        },
+        {
          "name": "help",
          "type": "text",
          "value": ""
@@ -2254103,6 +2254158,11 @@
          "name": "uses",
          "type": "text_list",
          "value": []
+        },
+        {
+         "name": "implements",
+         "type": "text",
+         "value": ""
         }
        ],
        "from": "engine_logic_logic"
