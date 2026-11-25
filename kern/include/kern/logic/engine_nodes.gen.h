@@ -36,7 +36,6 @@
 #include "kern/gfx/program.h"
 #include "kern/gfx/renderer.h"
 #include "kern/gfx/shader.h"
-#include "kern/logic/node_type.h"
 #include "kern/net/client_server.h"
 #include "kern/net/connection.h"
 #include "kern/net/reliable.h"
@@ -2868,6 +2867,28 @@ template <> struct InterfaceOf<"App"> {
   template <class B> using adapter = ClassImplements_App<B>;
 };
 
+// kern::game::FixedStep that a Blueprint's class is (kern::Implements<"game_FixedStep">: kern::logic::implementation)
+template <class B> class ClassImplements_game_FixedStep final : public kern::game::FixedStep {
+ public:
+  explicit ClassImplements_game_FixedStep(B& b) : b_(b) {}
+  template <class X> static constexpr bool kern_has_fixed_step = requires { requires std::is_same_v<typename MemberOf<decltype(&X::fixed_step)>::type, X>; };
+  decltype(std::declval<kern::game::FixedStep&>().fixed_step(std::declval<double>())) fixed_step(double kern_p0) override {
+    static_assert(kern_has_fixed_step<B>, "a Blueprint that implements game_FixedStep has its function fixed_step");
+    {
+      ::kern::logic::EngineObjects& kern_o = kern_objects();
+      b_.fixed_step(::kern::logic::engine_values::Given<::kern::logic::engine_values::Float, double const&>(kern_o, kern_p0));
+    }
+  }
+
+ private:
+  B& b_;
+  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
+  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
+};
+template <> struct InterfaceOf<"game_FixedStep"> {
+  template <class B> using adapter = ClassImplements_game_FixedStep<B>;
+};
+
 // kern::ShaderExtension that a Blueprint's class is (kern::Implements<"ShaderExtension">: kern::logic::implementation)
 template <class B> class ClassImplements_ShaderExtension final : public kern::ShaderExtension {
  public:
@@ -2998,85 +3019,6 @@ template <class B> class ClassImplements_ShaderExtension final : public kern::Sh
 };
 template <> struct InterfaceOf<"ShaderExtension"> {
   template <class B> using adapter = ClassImplements_ShaderExtension<B>;
-};
-
-// kern::logic::NodeType that a Blueprint's class is (kern::Implements<"logic_NodeType">: kern::logic::implementation)
-template <class B> class ClassImplements_logic_NodeType final : public kern::logic::NodeType {
- public:
-  explicit ClassImplements_logic_NodeType(B& b) : b_(b) {}
-  template <class X> static constexpr bool kern_has_type = requires { requires std::is_same_v<typename MemberOf<decltype(&X::type)>::type, X>; };
-  template <class X> static constexpr bool kern_has_label = requires { requires std::is_same_v<typename MemberOf<decltype(&X::label)>::type, X>; };
-  template <class X> static constexpr bool kern_has_event = requires { requires std::is_same_v<typename MemberOf<decltype(&X::event)>::type, X>; };
-  template <class X> static constexpr bool kern_has_category = requires { requires std::is_same_v<typename MemberOf<decltype(&X::category)>::type, X>; };
-  template <class X> static constexpr bool kern_has_help = requires { requires std::is_same_v<typename MemberOf<decltype(&X::help)>::type, X>; };
-  template <class X> static constexpr bool kern_has_run = requires { requires std::is_same_v<typename MemberOf<decltype(&X::run)>::type, X>; };
-  decltype(std::declval<const kern::logic::NodeType&>().type()) type() const override {
-    static_assert(kern_has_type<B>, "a Blueprint that implements logic_NodeType has its function type");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.type();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().type())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().label()) label() const override {
-    static_assert(kern_has_label<B>, "a Blueprint that implements logic_NodeType has its function label");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.label();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().label())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().event()) event() const override {
-    static_assert(kern_has_event<B>, "a Blueprint that implements logic_NodeType has its function event");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.event();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().event())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().category()) category() const override {
-    if constexpr (!kern_has_category<B>) {
-      return kern::logic::NodeType::category();
-    } else {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.category();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().category())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<const kern::logic::NodeType&>().help()) help() const override {
-    if constexpr (!kern_has_help<B>) {
-      return kern::logic::NodeType::help();
-    } else {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      const auto& [kern_given] = b_.help();
-      auto kern_r = ::kern::logic::engine_values::blank<decltype(std::declval<const kern::logic::NodeType&>().help())>();
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::from(kern_o, kern_given, kern_r);
-      return kern_r;
-    }
-  }
-  decltype(std::declval<kern::logic::NodeType&>().run()) run() override {
-    static_assert(kern_has_run<B>, "a Blueprint that implements logic_NodeType has its function run");
-    {
-      ::kern::logic::EngineObjects& kern_o = kern_objects();
-      b_.run();
-    }
-  }
-
- private:
-  B& b_;
-  mutable ::kern::logic::EngineObjects kern_own_;   // (a class without the engine's objects: the handles it is handed are these)
-  ::kern::logic::EngineObjects& kern_objects() const { return b_.kern_world.engine ? *b_.kern_world.engine : kern_own_; }
-};
-template <> struct InterfaceOf<"logic_NodeType"> {
-  template <class B> using adapter = ClassImplements_logic_NodeType<B>;
 };
 
 // kern::net::Transport that a Blueprint's class is (kern::Implements<"net_Transport">: kern::logic::implementation)
@@ -6087,6 +6029,19 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Text>(this->kern_engine("engine.game.game_status_name", {to_value(::kern::logic::engine_values::input_value(s))}, {PinType::text})[0].converted(pin_type_of<Text>()));
   }
+  /// One fixed step of `dt` seconds. The world calls it after the physics step and the step's events (contacts, triggers, health), right before the Blueprints' Event Tick of the same step - so what it changes, every Blueprint of the world sees in that tick, and forces it applies act in the next physics step.
+  void engine_fixed_step_fixed_step(Int fixed_step, Float dt) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::FixedStep>(*kern_o, static_cast<::kern::i64>(fixed_step), "fixed_step");
+      if (!kern_self) { this->kern_engine_failed("engine.fixed_step.fixed_step"); return; }
+      auto kern_a0 = ::kern::logic::engine_values::blank<std::remove_cvref_t<double>>();
+      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Float>::from(*kern_o, dt, kern_a0);
+      kern_self->fixed_step(std::move(kern_a0));
+      return;
+    }
+    this->kern_engine("engine.fixed_step.fixed_step", {to_value(fixed_step), to_value(dt)}, {});
+  }
   /// Renderer layer bits for the scene meshes (default 1).
   void engine_game_world_set_layers(Int game_world, Int layers) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -6366,6 +6321,29 @@ template <class Core> struct EngineNodesOf : Core {
     }
     const std::vector<Value> kern_out = this->kern_engine("engine.game_world.start", {to_value(game_world), to_value(::kern::logic::engine_values::input_value(level)), to_value(::kern::logic::engine_values::input_value(mode))}, {PinType::boolean});
     kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
+  }
+  /// The program's fixed step (FixedStep: where in a step it runs); one, null: none. It must outlive the world's runs or be taken back (set_fixed_step(nullptr)) before it ends.
+  void engine_game_world_set_fixed_step(Int game_world, Int step) {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.set_fixed_step"); return; }
+      kern::game::FixedStep* const kern_a0 = ::kern::logic::engine_values::maybe_of<kern::game::FixedStep>(*kern_o, static_cast<::kern::i64>(step), "step");
+      if (!kern_o->error.empty()) { this->kern_engine_failed("engine.game_world.set_fixed_step"); return; }
+      kern_self->set_fixed_step(kern_a0);
+      return;
+    }
+    this->kern_engine("engine.game_world.set_fixed_step", {to_value(game_world), to_value(step)}, {});
+  }
+  Int engine_game_world_fixed_step_handler(Int game_world) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::game::GameWorld>(*kern_o, static_cast<::kern::i64>(game_world), "game_world");
+      if (!kern_self) { this->kern_engine_failed("engine.game_world.fixed_step_handler"); return Int{}; }
+      decltype(auto) kern_r = kern_self->fixed_step_handler();
+      return ::kern::logic::engine_values::handle_as<Int>(::kern::logic::engine_values::handle_of<kern::game::FixedStep>(*kern_o, std::forward<decltype(kern_r)>(kern_r)));
+    }
+    return from_value<Int>(this->kern_engine("engine.game_world.fixed_step_handler", {to_value(game_world)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
   void engine_game_world_stop(Int game_world) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
@@ -12347,95 +12325,6 @@ template <class Core> struct EngineNodesOf : Core {
       return kern_G(*kern_o, std::forward<decltype(kern_r)>(kern_r));
     }
     return kern_G(this->kern_engine("engine.build_standard_shader", {to_value(extensions)}, {PinType::structure})[0]);
-  }
-  /// The node type's name ("spawncity.fixed_step"): what a node of the graph names (Node::type).
-  Text engine_node_type_type(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.type"); return Text{}; }
-      decltype(auto) kern_r = kern_self->type();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.type", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// What the editor shows ("SpawnCity Fixed Step").
-  Text engine_node_type_label(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.label"); return Text{}; }
-      decltype(auto) kern_r = kern_self->label();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.label", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// The event its nodes handle ("logic.tick"), or "": an action.
-  Text engine_node_type_event(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.event"); return Text{}; }
-      decltype(auto) kern_r = kern_self->event();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.event", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// Where it stands in the editor's list, and what it says it does ("" each: none).
-  Text engine_node_type_category(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.category"); return Text{}; }
-      decltype(auto) kern_r = kern_self->category();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.category", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  Text engine_node_type_help(Int node_type) const {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.help"); return Text{}; }
-      decltype(auto) kern_r = kern_self->help();
-      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Text>::template make<Text>(*kern_o, kern_r);
-    }
-    return from_value<Text>(this->kern_engine("engine.node_type.help", {to_value(node_type)}, {PinType::text})[0].converted(pin_type_of<Text>()));
-  }
-  /// What a node of it does where it runs.
-  void engine_node_type_run(Int node_type) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(node_type), "node_type");
-      if (!kern_self) { this->kern_engine_failed("engine.node_type.run"); return; }
-      kern_self->run();
-      return;
-    }
-    this->kern_engine("engine.node_type.run", {to_value(node_type)}, {});
-  }
-  /// Adds the node type `object` is to library() (its NodeDef: library().find(object->type())). False: no object, one without a type, or a type that is there already of another object (the first stays). The object must outlive every graph that runs a node of it; registered once - the same object again is true and changes nothing.
-  void engine_logic_register_node_type(Int object) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::NodeType* const kern_a0 = ::kern::logic::engine_values::maybe_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(object), "object");
-      if (!kern_o->error.empty()) { this->kern_engine_failed("engine.logic.register_node_type"); return; }
-      decltype(auto) kern_r = kern::logic::register_node_type(kern_a0);
-      ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::pass(*kern_o, kern_r);
-      return;
-    }
-    this->kern_engine("engine.logic.register_node_type", {to_value(object)}, {PinType::boolean});
-  }
-  template <class KernNode> void engine_logic_register_node_type(KernNode& kern_n, Int object) {
-    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
-      kern_o->begin_call();
-      kern::logic::NodeType* const kern_a0 = ::kern::logic::engine_values::maybe_of<kern::logic::NodeType>(*kern_o, static_cast<::kern::i64>(object), "object");
-      if (!kern_o->error.empty()) { ::kern::logic::engine_values::none(kern_n.result); this->kern_engine_failed("engine.logic.register_node_type"); return; }
-      decltype(auto) kern_r = kern::logic::register_node_type(kern_a0);
-      kern_n.result = ::kern::logic::engine_values::Direct<::kern::logic::engine_values::Bool>::template make<std::remove_cvref_t<decltype(kern_n.result)>>(*kern_o, kern_r);
-      return;
-    }
-    const std::vector<Value> kern_out = this->kern_engine("engine.logic.register_node_type", {to_value(object)}, {PinType::boolean});
-    kern_n.result = from_value<std::remove_cvref_t<decltype(kern_n.result)>>(kern_out[0]);
   }
   template <class T1> Text engine_net_client_state_name(const T1& s) const {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {

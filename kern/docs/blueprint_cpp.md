@@ -1536,11 +1536,11 @@ struct Water : kern::Blueprint, kern::Implements<"ShaderExtension"> {
   Klasse es liest), ein Objekt der Engine als Handle in den `EngineObjects` der Klasse; was sie gibt, mit `Direct::from`.
   Eine reine, die die Klasse nicht hat, sagt der Compiler. Kein Wert, kein Name dazwischen. Geprüft:
   `engine_interface_a_class_implements`.
-- **Ein Knotentyp aus einem Objekt** (`kern/logic/node_type.h`): eine Klasse, die `kern::logic::NodeType` ist (`type`,
-  `label`, `event`, `run`), meldet `kern::logic::register_node_type(&objekt)` als Knotentyp an – sein `run` ruft das
-  Objekt (ein Blueprint der Programm-Laufzeit über den Adapter). Der Konverter macht aus einer Anmeldung keinen
-  `NodeDef` und kein Ereignis mehr: der Knoten bleibt im Level-Graphen der Welt (Reihenfolge der Ticks wie heute).
-  Geprüft: `node_type_of_an_object`.
+- **Der feste Schritt einer Welt** (`kern/game/runtime.h`, `kern/docs/project.md` 6.1): ein Objekt, das
+  `kern::game::FixedStep` ist (C++ oder ein Blueprint mit `kern::Implements<"game_FixedStep">`), gibt das Programm
+  seiner Welt mit `GameWorld::set_fixed_step`; die Welt ruft `fixed_step(dt)` in jedem festen Schritt nach der Physik
+  und vor dem Event Tick der Blueprints. Geprüft: `game_world_fixed_step`. (Die frühere Anmeldung eines Knotentyps aus
+  einem Objekt, `register_node_type`, ist entfernt.)
 - **Die App aus dem Projekt** (`kern/game/program.h`, `kern/docs/project.md`): ein Programm ohne eigenes
   `kern_create_app()` bekommt das der App-Laufzeit (schwach, bis `kern::run`): `kern_project_app` liest das Projekt, das
   das Programm trägt (`kern_project_text()`), und startet ein `kern::game::Program`: EINE Logik-Laufzeit der

@@ -172,6 +172,17 @@ struct SimStats {
 
 struct WalkerMove;  // a walker's one-shot move (runtime_internal.h)
 
+/// What a program does in every fixed step of a world (kern/docs/project.md 6., GameWorld::set_fixed_step): the
+/// program's C++, or the object of the engine of a program Blueprint that implements it (kern::Implements<"game_FixedStep">).
+class FixedStep {
+ public:
+  virtual ~FixedStep() = default;
+  /// One fixed step of `dt` seconds. The world calls it after the physics step and the step's events (contacts,
+  /// triggers, health), right before the Blueprints' Event Tick of the same step - so what it changes, every Blueprint
+  /// of the world sees in that tick, and forces it applies act in the next physics step.
+  virtual void fixed_step(f64 dt) = 0;
+};
+
 class GameWorld {
  public:
   explicit GameWorld(Renderer& renderer, NightWindows* windows = nullptr);
@@ -212,6 +223,10 @@ class GameWorld {
   /// The project the level belongs to (kern/game/project.h; null: none): its Blueprints' libraries are found in the
   /// level first, then in the project. It must outlive the world's runs.
   void set_project(const Project* project) { project_ = project; }
+  /// The program's fixed step (FixedStep: where in a step it runs); one, null: none. It must outlive the world's runs
+  /// or be taken back (set_fixed_step(nullptr)) before it ends.
+  void set_fixed_step(FixedStep* step) { fixed_step_ = step; }
+  FixedStep* fixed_step_handler() const { return fixed_step_; }
   const Project* project() const { return project_; }
   void stop();
   bool running() const { return mode_ != SimMode::none; }
@@ -568,6 +583,7 @@ class GameWorld {
   // presentation
   Level level_;                  // edited level (sync) or the running copy (start)
   const Project* project_ = nullptr;  // where the libraries the level does not have are found (set_project)
+  FixedStep* fixed_step_ = nullptr;   // the program's fixed step (set_fixed_step)
   Level edit_level_;             // what sync() last saw (restored by stop())
   std::unordered_map<ActorId, std::unique_ptr<Visual>> visuals_;
   std::unordered_map<ActorId, std::unique_ptr<CityVisual>> cities_;

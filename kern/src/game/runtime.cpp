@@ -1580,6 +1580,8 @@ void GameWorld::fixed_step(const PlayInput& input, f32 h) {
   }
   handle_events();
   if (hud_.status == GameStatus::playing && !health_.empty()) update_health(h);
+  // The order of a step's end (FixedStep): the program's fixed step, then the Blueprints' Event Tick.
+  if (fixed_step_) fixed_step_->fixed_step(static_cast<f64>(h));
   if (logic_) logic_->tick(h);
   // Respawning pickups.
   for (std::size_t i = 0; i < respawns_.size();) {

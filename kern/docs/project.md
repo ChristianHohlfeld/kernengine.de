@@ -96,9 +96,30 @@ Ein Blueprint nennt seine Bibliotheken in `uses` (beim Namen).
 - Steht derselbe Name im Level und im Projekt, ist das ein Fehler. Er wird beim Laden mit beiden Stellen gemeldet;
   stillschweigend gewinnt keiner.
 
-## 6. Knotentypen des Projekts
+## 6. Der feste Schritt und Knotentypen des Projekts
 
-Ein Projekt kann eigene Knotentypen haben, zum Beispiel einen festen Schritt der Physik. Ein Programm-Blueprint, der die
+### 6.1 Der feste Schritt einer Welt (gebaut)
+
+Was ein Programm in **jedem festen Schritt** einer Welt tun muss (zum Beispiel Kräfte, die Box3D nach jedem Schritt
+löscht), gibt es der Welt ausdrücklich: ein Objekt, das `kern::game::FixedStep` ist (`kern/game/runtime.h`) – C++ des
+Programms oder das Objekt der Engine eines Programm-Blueprints mit `kern::Implements<"game_FixedStep">` –, mit
+`GameWorld::set_fixed_step(objekt)` (eins; `nullptr` nimmt es zurück, bevor das Objekt endet). Die Reihenfolge eines
+festen Schritts ist festgelegt:
+
+1. Eingaben, Antriebe, Gelenke, dann der Schritt der Physik (`substeps`),
+2. die Ereignisse des Schritts (Kontakte, Trigger, Gesundheit),
+3. **`FixedStep::fixed_step(dt)` des Programms**,
+4. Event Tick der Blueprints der Welt (`Runtime::tick`: der Level-Graph, dann die Akteure in der Reihenfolge des Levels),
+5. Respawns, Ziel und Zeit.
+
+Was `fixed_step` ändert, sieht jeder Blueprint im Tick desselben Schritts; Kräfte wirken im nächsten Schritt der
+Physik. Es hängt nicht davon ab, wo ein Knoten steht. Geprüft: `game_world_fixed_step`. (Ersetzt die frühere Anmeldung
+`register_node_type`, ein globales Register, dessen Typen der Editor erst kannte, wenn das Programm lief, und dessen
+Zeiger nach dem Ende der Programm-Laufzeit hingen – ersatzlos entfernt.)
+
+### 6.2 Knotentypen des Projekts (Entwurf, noch nicht gebaut)
+
+Ein Projekt kann eigene Knotentypen haben. Ein Programm-Blueprint, der die
 Schnittstelle **`logic_NodeType`** implementiert, **ist** ein Knotentyp des Projekts:
 
 - Seine Beschreibung sind **Daten des Blueprints**, keine Funktionen:
@@ -113,8 +134,8 @@ Schnittstelle **`logic_NodeType`** implementiert, **ist** ein Knotentyp des Proj
 - Die Knotentypen gelten **je Projekt**: Das Projekt baut beim Laden seine Library aus dem Kern der Engine und seinen
   Knotentypen. Editor, Prüfung (`check`), Notation und alle Laufzeiten des Projekts nutzen diese Library. Eine globale
   Anmeldung zur Laufzeit gibt es nicht.
-- Wo der Knoten steht, entscheidet das Level (oder das Programm, wenn es eine Welt baut). Steht er im Level-Graphen,
-  läuft er in jedem Tick als Erstes.
+- Wo der Knoten steht, entscheidet das Level (oder das Programm, wenn es eine Welt baut). Eine Reihenfolge ergibt sich
+  daraus nicht: was in jedem Schritt zuerst laufen muss, ist der feste Schritt (6.1).
 
 ## 7. Akteure einer Welt aus dem Programm erreichen: der Eingang „World“
 
@@ -137,8 +158,8 @@ Eingang **World** (Int, der Handle einer GameWorld):
 2. Im Projekt einen Blueprint „Spiel“ anlegen, „Implements … App“ wählen und `start`, `update`, `stop` schreiben. In
    `start` ein GameWorld machen und `startLevel` laden.
 3. Im Level die Akteure und ihre Blueprints anlegen.
-4. Optional einen Knotentyp: im Projekt einen Blueprint „FesterSchritt“ mit „Implements … logic_NodeType“, Ereignis
-   `logic.tick`, und `run` schreiben. Danach den Knoten „FesterSchritt“ aus der Palette in den Level-Graphen ziehen.
+4. Optional ein fester Schritt: im Projekt einen Blueprint „FesterSchritt“ mit „Implements … game_FixedStep“ und
+   `fixed_step` schreiben; das Programm gibt ihn der Welt mit „Set Fixed Step“ (6.1).
 5. Play im Editor oder bauen: Der Bau erzeugt den Einstieg `kern::run(kern::Project::embedded())`.
 
 ## Stand (25.11.2026, Zweig work-projekt)
@@ -153,7 +174,7 @@ Eingang **World** (Int, der Handle einer GameWorld):
   speichern, Levels und Start-Level, Einstellungen, Programm-Blueprints im Blueprint-Editor; Studio-Test
   `studio_project`, e2e im Modul-Bau.
 - Noch nach diesem Entwurf zu ersetzen:
-  - `kern/logic/node_type.h` mit `register_node_type`, einer globalen Anmeldung zur Laufzeit (Teil 2)
+  - Knotentypen des Projekts als Daten (6.2; `register_node_type` ist entfernt, Teil 2: der feste Schritt 6.1)
   - schwache `kern_create_app`/`kern_project_app`/`kern_project_text` (Teil 3: `kern::run`)
 - Reihenfolge des Baus: (1) Projekt-Datei mit Programm-Blueprints, Editor „Projekt“, (2) Knotentypen je Projekt,
   (3) Einstieg `kern::run`, (4) Eingang „World“. Je Teil gibt es einen Engine-Test und einen Studio-Test.

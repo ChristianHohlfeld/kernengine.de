@@ -18,7 +18,6 @@
 #include "kern/core/base.h"
 #include "kern/core/json.h"
 #include "kern/logic/logic.h"
-#include "kern/logic/node_type.h"
 #include "rules.h"
 
 namespace sc {
@@ -34,8 +33,6 @@ constexpr f32 kEnterCar = 5.2f, kEnterJet = 9;  // player_car_mode.mjs ENTER_RAD
 constexpr f32 kDroneAhead = 2.9f;            // player_vehicle_runtime_v2.mjs: the drone starts 2.9 m ahead
 constexpr f32 kPlayerHealth = 100 * 1.18f;   // player_vitals_runtime.mjs: +18 % tougher
 constexpr f32 kChuteOpen = 1.1f, kChuteSink = 6.5f, kChuteSteer = 4, kEjectUp = 28;  // jet_mode.mjs
-
-const char* kNodeType = "spawncity.fixed_step";
 
 Vec3 car_color(u32 i) {
   static const Vec3 c[] = {{0.62f, 0.05f, 0.04f}, {0.08f, 0.16f, 0.42f}, {0.85f, 0.85f, 0.86f}, {0.06f, 0.06f, 0.07f}, {0.45f, 0.47f, 0.5f},
@@ -83,27 +80,21 @@ kern::game::Actor vehicle_actor(const char* name, const RigidSpec& spec, Vec3 po
 
 }  // namespace
 
-/// The game's fixed-step node: the vehicle force models in every fixed physics step (Box3D clears forces after each
-/// step) - a type of node that an object is (kern/logic/node_type.h). Its node stands in the level's graph (build_level),
-/// so it runs first in each tick, before the actors' Blueprints.
-class FixedStepNode final : public kern::logic::NodeType {
+/// The game's fixed step: the vehicle force models in every fixed physics step (Box3D clears forces after each step) -
+/// the world's FixedStep (kern/game/runtime.h): it runs after the physics step, before the Blueprints' Event Tick.
+class FixedStepper final : public kern::game::FixedStep {
  public:
-  std::string type() const override { return kNodeType; }
-  std::string label() const override { return "SpawnCity Fixed Step"; }
-  std::string event() const override { return "logic.tick"; }
-  std::string category() const override { return "SpawnCity"; }
-  std::string help() const override { return "Runs the game's vehicle force models in every fixed physics step (Box3D clears forces after each step)."; }
-  void run() override { game().fixed_step(1.0f / kStepHz); }
+  void fixed_step(f64) override { game().fixed_step(1.0f / kStepHz); }
 };
 
-/// The one fixed-step node type, made where it is first asked for (as facades()).
-FixedStepNode& fixed_step_node() {
-  static FixedStepNode one;
+/// The one fixed step, made where it is first asked for (as facades()).
+FixedStepper& fixed_stepper() {
+  static FixedStepper one;
   return one;
 }
 
-// (a method of the one Game; the engine registers a type once - the same object again changes nothing)
-void Game::register_node() { kern::logic::register_node_type(&fixed_step_node()); }
+// (a method of the one Game: its world runs the fixed step)
+void Game::take_fixed_step() { world_->set_fixed_step(&fixed_stepper()); }
 
 namespace {
 
@@ -237,13 +228,6 @@ kern::game::Level Game::build_level() const {
     l.add(a);
   }
 
-  // The fixed-step hook: one node of the game's own type in the level graph. (The Blueprint Game has the node type as
-  // its own Event Tick - register_node -, which runs at the same place in a tick while no actor before Game handles
-  // logic.tick: tests/test_entry.cpp. The switch to the Blueprints takes these lines out with src/.)
-  kern::logic::Node node;
-  node.id = l.logic.next_id++;
-  node.type = kNodeType;
-  l.logic.nodes.push_back(node);
   return l;
 }
 
@@ -263,7 +247,6 @@ bool Game::start(kern::Engine& e) {
   sensitivity_ = static_cast<f32>(kern::clamp(e.arg_number("mouse", 100), 20.0, 300.0)) / 100;  // mouse_settings.mjs 20..300 %
   if (e.has_arg("start")) start_mode_ = e.arg("start", "");
 
-  register_node();
   const bool coarse = e.arg_number("coarse", mobile_ ? 1 : 0) > 0;
   soldier_controller_ = kern::game::ControllerComponent{};
   soldier_controller_.mode = kern::game::ControlMode::soldier;
@@ -276,6 +259,7 @@ bool Game::start(kern::Engine& e) {
 
   life_ = std::make_unique<WorldLife>();  // M3 world state (game_world.h)
   world_ = std::make_unique<GameWorld>(e.renderer());  // the night of the facades: game_look.cpp (facades().set_night)
+  take_fixed_step();
   if (!world_->start(build_level(), kern::game::SimMode::play)) return kern::fail("level start: %s", kern::last_error());
   // The rules that are Blueprints of the level's actors: the C++ that still calls them is bound to the
   // logic they run in, and finds each by its name at every call (as a Blueprint does).

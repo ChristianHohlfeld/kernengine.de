@@ -11421,9 +11421,8 @@ class Emit:
 # ---- the engine as nodes -----------------------------------------------------------------------------
 # Not the engine a game calls: the Blueprint language itself, the engine's own helpers.
 ENGINE_SKIP = ("kern::logic::", "kern::json::", "kern::detail::", "kern::dm::", "kern::game::nodes::")
-# ... but what of them is the engine's like any other part: the type of node an object is (kern/logic/node_type.h) - a
-# program's class or a Blueprint implements it, the program registers it
-ENGINE_KEEP = ("kern::logic::NodeType", "kern::logic::register_node_type")
+# ... but what of them is the engine's like any other part (none today)
+ENGINE_KEEP = ()
 
 
 def engine_skipped(q):

@@ -161,7 +161,7 @@ class Game {
  private:
   struct Spot { Vec3 p; f32 yaw; };
   kern::game::Level build_level() const;
-  void register_node();   // the game's fixed-step node type (game.cpp)
+  void take_fixed_step();   // the game's fixed step in its world (game.cpp: FixedStepper)
   void place_world();
   bool clear_spot(Vec3 center, Vec2 half, f32 search, Spot& out, bool off_road = false) const;
   kern::physics::Body body(kern::game::ActorId a) const { return world_->actor_body(a); }
