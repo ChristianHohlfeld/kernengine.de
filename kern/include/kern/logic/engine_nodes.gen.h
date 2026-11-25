@@ -9094,6 +9094,17 @@ template <class Core> struct EngineNodesOf : Core {
     }
     return from_value<Int>(this->kern_engine("engine.footprint_stream.size", {to_value(footprint_stream)}, {PinType::integer})[0].converted(pin_type_of<Int>()));
   }
+  /// The whole stream as a list (data() and size() as one value: what a Blueprint reads of it - its node gives every number, not what a pointer shows).
+  List<Float> engine_footprint_stream_values(Int footprint_stream) const {
+    if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
+      kern_o->begin_call();
+      auto* const kern_self = ::kern::logic::engine_values::object_of<kern::FootprintStream>(*kern_o, static_cast<::kern::i64>(footprint_stream), "footprint_stream");
+      if (!kern_self) { this->kern_engine_failed("engine.footprint_stream.values"); return List<Float>{}; }
+      decltype(auto) kern_r = kern_self->values();
+      return ::kern::logic::engine_values::Direct<::kern::logic::engine_values::List<::kern::logic::engine_values::Float>>::template make<List<Float>>(*kern_o, kern_r);
+    }
+    return from_value<List<Float>>(this->kern_engine("engine.footprint_stream.values", {to_value(footprint_stream)}, {PinType::number_list})[0].converted(pin_type_of<List<Float>>()));
+  }
   /// Removes repeated points (< 1.5 cm apart) and the closing duplicate; empties the ring when fewer than 3 points or |area| <= 0.08 m^2 remain. xy pairs.
   void engine_clean_ring(const List<Float>& xy) {
     if (::kern::logic::EngineObjects* const kern_o = this->kern_world.engine) {
