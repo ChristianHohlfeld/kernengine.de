@@ -1,0 +1,30 @@
+struct game_worldsync_cpp : virtual kern::Library {
+  // ---- types ----
+  KERN_STRUCT(Game_worldsync_update_List) { U8 to = 0; U8 type = 0; Vector o = Vector{0.0, 0.0, 0.0}; U32 t_ms = 0; List<U8> extra = List<U8>{}; List<U8> w = List<U8>{}; U8 n = 0; U8 part = 0; };
+
+  // ---- functions ----
+  struct dist2dResult { Float Result = 0.0; };
+  KERN_PURE dist2dResult dist2d(Vector a = Vector{0.0, 0.0, 0.0}, Vector b = Vector{0.0, 0.0, 0.0}) {
+    return {kern::formula([](Float x, Float x_2, Float y, Float y_2) -> Float { return kern::math::sqrt(((x - x_2) * (x - x_2)) + ((y - y_2) * (y - y_2))); }, vector_break(a).x, vector_break(b).x, vector_break(a).y, vector_break(b).y)};
+  }
+
+  struct q16Result { I16 Result = 0; };
+  KERN_PURE q16Result q16(Float v = 0.0) {
+    return {kern::to<Int>(kern::formula([](Float v) -> Float { return (kern::math::bxor(kern::math::band(kern::math::round(((v < (-1.0) ? (-1.0) : (1.0 < v ? 1.0 : v)) * 32767.0)), 65535.0), 32768.0) - 32768.0); }, v))};
+  }
+
+  struct uq16Result { Float Result = 0.0; };
+  KERN_PURE uq16Result uq16(I16 v = 0) {
+    return {kern::formula([](Float v) -> Float { return kern::math::div(v, 32767.0); }, kern::to<Float>(v))};
+  }
+
+  struct cmsResult { I16 Result = 0; };
+  KERN_PURE cmsResult cms(Float v = 0.0) {
+    return {kern::to<Int>(kern::formula([](Float a) -> Float { return (kern::math::bxor(kern::math::band(kern::math::round(a), 65535.0), 32768.0) - 32768.0); }, kern::formula([](Float v, Float lo, Float hi) -> Float { return v < lo ? lo : (hi < v ? hi : v); }, kern::formula([](Float v) -> Float { return (v * 100.0); }, v), -32000.0, 32000.0)))};
+  }
+
+  struct col8Result { U8 Result = 0; };
+  KERN_PURE col8Result col8(Float v = 0.0) {
+    return {kern::to<Int>(kern::formula([](Float v) -> Float { return kern::math::band(kern::math::round(((v < 0.0 ? 0.0 : (1.0 < v ? 1.0 : v)) * 255.0)), 255.0); }, v))};
+  }
+};
