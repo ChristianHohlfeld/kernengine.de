@@ -16800,6 +16800,8 @@ def main(argv):
             users = sorted(u for u in blue if name in blue[u]["types"])
             if users:
                 return min(users, key=lambda h: (depth_of(h), h))
+        if not ENGINE_RUN[0]:   # (a library of the engine is the engine's: a shape a program makes of its types is the program's)
+            below = {h for h in below if not h.startswith("engine_")}
         return max(below, key=lambda h: (depth_of(h), h)) if below else SHAPES
     homes = collections.defaultdict(list)
     for name in declared:

@@ -2,6 +2,7 @@
 """The engine as nodes: what the engine's headers declare, as nodes of the Blueprint language.
 
   tools/engine_api.py [--list]
+  tools/engine_api.py --check <level.klevel | texts dir>   what it names of the engine's libraries that they do not have
   tools/engine_api.py --libraries    the engine's libraries (kern/logic/engine_libraries.h): src/logic/engine_libraries.gen.cpp
 
 A function a header of the engine declares and does not define there is something only the engine
@@ -1343,7 +1344,64 @@ def write_libraries():
     print(f"the engine's libraries: {path}")
 
 
+def built_libraries():
+    """The engine's libraries as engine_libraries.gen.cpp has them: name -> their JSON."""
+    import json
+    text = open(os.path.join(KERN, "src", "logic", "engine_libraries.gen.cpp"), encoding="utf-8").read()
+    return {m.group(1): json.loads(m.group(2)) for m in re.finditer(r'\{"(engine_\w+)", "\w*", R"kl\((.*?)\)kl"\}', text, re.S)}
+
+
+def check_level(path):
+    """What a level - or a directory of Blueprint texts (tools/cpp_to_blueprint.py --texts) - names of the engine's
+    libraries that they do not have: each type and function, with who names it. 0: all there."""
+    import json
+    have = {}
+    for name, g in built_libraries().items():
+        have[name] = {"types": {x["name"] for k in ("structs", "enums") for x in g.get(k, []) if not x.get("from")},
+                      "functions": {x["name"] for x in g.get("functions", []) if not x.get("from")}}
+    named = collections.defaultdict(set)   # (library, kind, name) -> who names it
+    if os.path.isdir(path):
+        for f in sorted(os.listdir(path)):
+            if not f.endswith(".cpp") or f.startswith("engine_"):
+                continue
+            text = open(os.path.join(path, f), encoding="utf-8").read()
+            who = f[:-4]
+            for lib, fn in re.findall(r"\b(engine_\w+?)::(\w+)", text):
+                if lib in have and fn not in have[lib]["types"] and not fn.endswith("Result"):
+                    named[(lib, "function", fn)].add(who)
+            for lib in re.findall(r"virtual (engine_\w+)\b", text):
+                if lib not in have:
+                    named[(lib, "library", lib)].add(who)
+    else:
+        for a in json.load(open(path, encoding="utf-8")).get("actors", []):
+            g = (a.get("components") or {}).get("logic") or {}
+            if a["name"].startswith("engine_"):
+                continue
+            for lib in g.get("uses", []):
+                if lib.startswith("engine_") and lib not in have:
+                    named[(lib, "library", lib)].add(a["name"])
+            for k, kind in (("structs", "type"), ("enums", "type"), ("functions", "function")):
+                for x in g.get(k, []):
+                    lib = x.get("from", "")
+                    if lib.startswith("engine_"):
+                        n = x["name"].split("::")[-1]
+                        named[(lib, kind, n)].add(a["name"])
+    missing = []
+    for (lib, kind, n), who in sorted(named.items()):
+        if lib not in have:
+            missing.append(f"{lib}: no library of the engine (named by {', '.join(sorted(who)[:5])})")
+        elif kind != "library" and n not in have[lib]["types" if kind == "type" else "functions"]:
+            missing.append(f"{lib}: the {kind} {n} - the engine does not write it (named by {', '.join(sorted(who)[:5])}{' ...' if len(who) > 5 else ''})")
+    for m in missing:
+        print(m)
+    print(f"{len(missing)} of {len(named)} things of the engine's libraries that {path} names are not in them"
+          + ("" if not missing else " (tools/engine_api.py --libraries; a type a game needs is marked KERN_BLUEPRINT_TYPE)"))
+    return 1 if missing else 0
+
+
 def main(argv):
+    if "--check" in argv:   # (what a level names of the engine's libraries that they do not have - no clang, no run)
+        return check_level(argv[argv.index("--check") + 1])
     if "--libraries" in argv:   # (the engine's libraries: a run of the converter over the headers - minutes, not seconds)
         write_libraries()
         return 0
