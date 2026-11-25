@@ -809,11 +809,8 @@ json::Value Studio::logic_json() const {
     }
     // The engine's libraries (kern/logic/engine_libraries.h): every Blueprint can use them; none of them is an actor
     // of the level, so none can be changed here - the editor shows them as the engine's ("engine": read-only).
-    json::Value engine = json::Value::array();
-    for (const std::string& name : logic::engine_library_names()) {
-      engine.push(name);
-      if (!g->uses_library(name)) libraries.push(name);
-    }
+    json::Value engine = json::Value::array();  // (each of them: "libraries" are the level's)
+    for (const std::string& name : logic::engine_library_names()) engine.push(name);
     o.set("uses", std::move(uses));
     o.set("libraries", std::move(libraries));
     o.set("engineLibraries", std::move(engine));

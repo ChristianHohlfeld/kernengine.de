@@ -39,11 +39,6 @@ const Libraries& libraries() {
         std::fprintf(stderr, "kern: the engine's library %s does not read (%s) - rebuild the engine (tools/engine_api.py --libraries)\n", t.name, error.c_str());
         continue;
       }
-      // (what it uses of the engine's libraries before it - written in that order - it holds as every Blueprint does)
-      if (!g->uses.empty() && !take_libraries(*g, [](std::string_view) -> const Graph* { return nullptr; }, &error)) {
-        std::fprintf(stderr, "kern: the engine's library %s does not take its libraries (%s) - rebuild the engine (tools/engine_api.py --libraries)\n", t.name, error.c_str());
-        continue;
-      }
       all.names.emplace_back(t.name);
       all.marks.emplace(t.name, t.mark);
       all.graphs.emplace(t.name, std::move(g));

@@ -1282,20 +1282,14 @@ LIBRARY_HEADERS = ["app/app.h", "audio/audio.h", "audio/synth.h", "game/level.h"
 
 
 def libraries_text(level):
-    """The engine's libraries as the build of the engine has them: each library's JSON - without what it holds of the
-    libraries it uses (the engine gives that when it reads them: kern/logic/engine_libraries.cpp) -, a library after
-    those it uses, with its mark (the hash of its text: what a level that uses it records)."""
+    """The engine's libraries as the build of the engine has them: each library's JSON - with what it holds of the
+    engine's libraries it uses, as every Blueprint holds what it uses (they are written together, from the same
+    headers) -, a library after those it uses, with its mark (the hash of its text: what a level that uses it records)."""
     import hashlib, json
     graphs = {a["name"]: a["components"]["logic"] for a in level["actors"] if a.get("components", {}).get("logic")}
     bad = [n for n in graphs if not n.startswith("engine_")]
     if bad:
         raise SystemExit(f"engine_api.py --libraries: the engine's libraries would use {', '.join(sorted(bad))} - a library of the engine uses no library of a level")
-    for g in graphs.values():
-        for k in ("structs", "enums", "functions"):
-            if k in g:
-                g[k] = [x for x in g[k] if not x.get("from")]
-                if not g[k]:
-                    del g[k]
     order, seen = [], set()
     def visit(n, open_=()):
         if n in seen:

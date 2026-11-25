@@ -762,8 +762,8 @@ export class LogicEditor {
           <span class="lg-acts"><button data-on title="Add the event node">Event</button><button data-call title="Add a Call node">Call</button></span></div>`).join("") ||
       `<div class="lg-none">Custom events you add appear here</div>`;
     // libraries: is this Blueprint one (it keeps nothing: types and functions), and which does it use
-    const canUse = (data.libraries || []).filter(match);
     const engineLib = new Set(data.engineLibraries || []);   // (the engine's own libraries: read-only, no level holds them)
+    const canUse = [...(data.libraries || []), ...[...engineLib].filter(n => !(data.uses || []).includes(n))].filter(match);
     const libs = `<label class="lg-item lg-libflag" title="A library keeps nothing - no variables, no events: it has types and functions. Other Blueprints of the level use it: they have its types and call its functions directly (in C++ it is one of their bases).">
           <input type="checkbox" data-library${data.library ? " checked" : ""}${data.owner ? "" : " disabled"}><span class="lg-vn">This Blueprint is a library</span></label>` +
       (data.uses || []).filter(match).map(n => `

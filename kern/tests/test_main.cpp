@@ -7566,19 +7566,15 @@ TEST(engine_places_class_names_the_engines_list) {
   if (shown(a) != shown(b) || itself.told != door.told) std::printf("the class itself:\n%s%s\nthrough the door:\n%s%s\n", shown(a).c_str(), itself.told.c_str(), shown(b).c_str(), door.told.c_str());
 }
 
-// What a function of the engine reports through a pointer that is null by default (`std::string* error = nullptr`):
-// a further output of its node - game::from_text says why a text is no level, and reads one that is.
+// What a function of the engine reports through a pointer that is null by default (`bool* changed = nullptr`):
+// a further output of its node - Renderer::update_instances says whether anything changed. (game::from_text,
+// which reported why a text is no level, is no node any more: game::Level is the engine's own type, not one
+// for Blueprints - KERN_BLUEPRINT_TYPE, kern/logic/engine_libraries.h.)
 TEST(engine_reports_through_an_optional_pointer) {
-  using logic::Value;
-  const logic::EngineFunction* f = logic::engine_function("engine.game.from_text");
-  CHECK(f && f->outputs.size() == 3 && std::string(f->outputs[2].id) == "error");
-  logic::EngineObjects objects;
-  std::vector<Value> out{Value::zero(logic::PinType::boolean), Value::zero(logic::PinType::structure), Value::zero(logic::PinType::text)};
-  CHECK(logic::call_engine(objects, "engine.game.from_text", {Value::text("{\"format\":\"other\"}"), Value::zero(logic::PinType::structure)}, out));
-  CHECK(!out[0].as_bool() && out[2].as_text() == "not a Kern level (format must be \"kern-level\")");
-  out = {Value::zero(logic::PinType::boolean), Value::zero(logic::PinType::structure), Value::zero(logic::PinType::text)};
-  CHECK(logic::call_engine(objects, "engine.game.from_text", {Value::text(game::to_text(game::Level{})), Value::zero(logic::PinType::structure)}, out));
-  CHECK(out[0].as_bool() && out[2].as_text().empty());
+  const logic::EngineFunction* f = logic::engine_function("engine.renderer.update_instances");
+  CHECK(f && f->outputs.size() == 2 && std::string(f->outputs[0].id) == "result" && std::string(f->outputs[1].id) == "changed" &&
+        f->outputs[1].type == logic::PinType::boolean);
+  CHECK(logic::engine_function("engine.game.from_text") == nullptr);
 }
 
 // A list the engine holds behind a pointer and a size (FootprintStream::data/size): its node `values` gives every number

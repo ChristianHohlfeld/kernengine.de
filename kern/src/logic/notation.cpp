@@ -2273,6 +2273,7 @@ struct Reader {
   const Graph* before = nullptr;  // apply_cpp: the Blueprint this text changes
 
   const Blueprints* all = nullptr;  // the Blueprints of the project: where the libraries the text names are found
+  bool project_given = false;       // (the project's Blueprints were given - not only the engine's libraries)
   Reader(std::string_view t, const Library& l, const Blueprints* blueprints = nullptr) : text(t), lib(l), all(blueprints) {}
 
   // ---- tokens ----
@@ -4659,7 +4660,9 @@ struct Reader {
     if (g.uses.empty()) return true;
     // What the text may name of its libraries: their types, and every function of theirs.
     std::string why;
-    if (!all || !*all) return fail(base, "the text uses the library " + g.uses[0] + ": reading it needs the project's Blueprints (as a C++ compiler needs the library's text)");
+    for (const std::string& used : g.uses)  // (the engine's own libraries every reader has: kern/logic/engine_libraries.h)
+      if (!project_given && !is_engine_library(used))
+        return fail(base, "the text uses the library " + used + ": reading it needs the project's Blueprints (as a C++ compiler needs the library's text)");
     if (!take_libraries(g, *all, &why, true)) return fail(base, why);
     // A name of a library is written with it - Random::range(...), Random::rangeResult n5; -: one name.
     std::vector<Tok> merged;
@@ -5642,6 +5645,7 @@ bool to_cpp(const Graph& g, const std::string& name, std::string& out, std::stri
 bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string* error, const Library& lib, const Blueprints& project) {
   const Blueprints all = with_engine(project);  // (a library of the engine is the engine's)
   Reader r(text, lib, &all);
+  r.project_given = static_cast<bool>(project);
   if (!r.read()) {
     if (error) *error = r.error.empty() ? "the text is no Blueprint: the reader stopped at " + r.where() + " and did not say why" : r.error;
     return false;
@@ -5654,6 +5658,7 @@ bool from_cpp(std::string_view text, Graph& out, std::string* name, std::string*
 bool apply_cpp(std::string_view text, const Graph& before, Graph& out, std::string* error, const Library& lib, const Blueprints& project) {
   const Blueprints all = with_engine(project);  // (a library of the engine is the engine's)
   Reader r(text, lib, &all);
+  r.project_given = static_cast<bool>(project);
   r.before = &before;
   if (!r.read()) {
     if (error) *error = r.error.empty() ? "the text is no Blueprint: the reader stopped at " + r.where() + " and did not say why" : r.error;
