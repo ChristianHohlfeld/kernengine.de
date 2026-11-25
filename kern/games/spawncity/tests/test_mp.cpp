@@ -322,17 +322,95 @@ SC_TEST(mp_sessions_host_two_clients) {
 
 // A client that does not reach the host in time - the host's page is still loading, its tab is in
 // the background - asks again every second and gets in as soon as the host answers.
+namespace {
+using Ns = blueprints::net_session_cpp;
+/// net_session_cpp running as its class, on the engine itself (RuleBlueprint::Engine::direct): the sessions' transports
+/// are the engine's (engine_host_transport_*), made on the logic's objects.
+struct SessionBlueprint {
+  RuleBlueprint rules{"Multiplayer", nullptr, true, {"net_session_cpp"}, RuleBlueprint::Engine::direct};
+  bool bound = false;
+  SessionBlueprint() {
+    rules.rt.budget = rules::kLoopBudget;
+    bound = rules.problems.empty() && kern::logic::bind_blueprint<Ns>(rules.rt);
+  }
+  Ns& operator*() { return kern::logic::blueprint<Ns>(); }
+};
+/// A session of the class with the C++'s names (net_session.h), its ausgelassene inputs written out (update: send_pose true).
+struct ClassSession {
+  Ns* k = nullptr;
+  Ns::net_Session s;
+  explicit ClassSession(Ns& n) : k(&n) {}
+  bool host(u64 self, f64 lon, f64 lat) { return k->Session_host(s, Ns::Int64{self}, lon, lat).Result; }
+  bool join(u64 self, u64 server) { return k->Session_join(s, Ns::Int64{self}, Ns::Int64{server}).Result; }
+  void stop() { k->Session_stop(s); }
+  void update(f64 time, f32 dt, const Ns::net_PlayerState& me, bool send_pose = true) { k->Session_update(s, me, time, dt, send_pose); }
+  void push(u64 from, const std::vector<u8>& bytes) {
+    Ns::List<Ns::U8> b;
+    for (u8 x : bytes) b.push_back(Ns::U8(x));
+    k->Session_push(s, b, Ns::Int64{from});
+  }
+  bool take(u64& to, std::vector<u8>& bytes) {
+    Ns::Int64 t{0};
+    Ns::List<Ns::U8> b;
+    const bool ok = k->Session_take(s, t, b).Result;
+    to = t.bits;
+    bytes.clear();
+    for (auto x : b) bytes.push_back(static_cast<u8>(x));
+    return ok;
+  }
+  bool connected() const { return k->Session_connected(s).Result; }
+  u32 connects() const { return static_cast<u32>(k->Session_connects(s).Result); }
+  bool host_lost() const { return k->Session_host_lost(s).Result; }
+  u32 successor() const { return static_cast<u32>(k->Session_successor(s).Result); }
+  u32 self_slot() const { return static_cast<u32>(k->Session_self_slot(s).Result); }
+  bool hosting() const { return k->Session_hosting(s).Result; }
+  bool origin(f64& lon, f64& lat) const {
+    Ns::Float x = 0, y = 0;
+    const bool ok = k->Session_origin(s, x, y).Result;
+    lon = x;
+    lat = y;
+    return ok;
+  }
+};
+/// The loopback wire between sessions of the class.
+struct ClassWire {
+  std::map<u64, ClassSession*> peers;
+  void pump() {
+    for (int round = 0; round < 4; ++round)
+      for (auto& [id, s] : peers) {
+        u64 to;
+        std::vector<u8> b;
+        while (s->take(to, b))
+          if (peers.count(to)) peers[to]->push(id, b);
+      }
+  }
+};
+Ns::net_PlayerState class_pose_at(Vec3 p, f32 hp = 100) {
+  Ns::net_PlayerState s;
+  s.position = p;
+  s.avatar = p - Vec3{0, 0, 0.73f};
+  s.health = hp;
+  return s;
+}
+}  // namespace
+
+#define SESSIONS_BOUND                                                                    \
+  SessionBlueprint sb;                                                                    \
+  SC_CHECK(sb.bound, "net_session_cpp runs as its class: %s", sb.rules.problems.c_str()); \
+  if (!sb.bound) return;                                                                  \
+  Ns& ns = *sb
+
 SC_TEST(mp_a_client_keeps_asking_until_the_host_answers) {
-  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
-  net::Session host, a;
-  Wire w;
+  SESSIONS_BOUND;
+  ClassSession host(ns), a(ns);
+  ClassWire w;
   w.peers = {{11, &host}, {22, &a}};
   host.host(11, 9.1766, 47.66);
   a.join(22, 11);
   f64 t = 0;
   auto step = [&](bool with_host) {
-    if (with_host) host.update(t, 1.0f / 60, pose_at({0, 0, 1}));
-    a.update(t, 1.0f / 60, pose_at({5, 0, 1}));
+    if (with_host) host.update(t, 1.0f / 60, class_pose_at({0, 0, 1}));
+    a.update(t, 1.0f / 60, class_pose_at({5, 0, 1}));
     w.pump();
     t += 1.0 / 60;
   };
@@ -348,18 +426,18 @@ SC_TEST(mp_a_client_keeps_asking_until_the_host_answers) {
 // lan_vs.mjs authority handover: the host goes, both clients see it, agree on the successor (the
 // lowest slot left), he hosts on, the other joins him.
 SC_TEST(mp_host_leaves_the_oldest_takes_over) {
-  RuleBlueprint mp_rules("Multiplayer", &mp::bind);
-  net::Session host, a, b;
-  Wire w;
+  SESSIONS_BOUND;
+  ClassSession host(ns), a(ns), b(ns);
+  ClassWire w;
   w.peers = {{11, &host}, {22, &a}, {33, &b}};
   host.host(11, 9.1766, 47.66);
   a.join(22, 11);
   b.join(33, 11);
   f64 t = 0;
   auto step = [&](bool with_host) {
-    if (with_host) host.update(t, 1.0f / 60, pose_at({0, 0, 1}));
-    a.update(t, 1.0f / 60, pose_at({5, 0, 1}));
-    b.update(t, 1.0f / 60, pose_at({8, 0, 1}));
+    if (with_host) host.update(t, 1.0f / 60, class_pose_at({0, 0, 1}));
+    a.update(t, 1.0f / 60, class_pose_at({5, 0, 1}));
+    b.update(t, 1.0f / 60, class_pose_at({8, 0, 1}));
     w.pump();
     t += 1.0 / 60;
   };
@@ -371,8 +449,8 @@ SC_TEST(mp_host_leaves_the_oldest_takes_over) {
   while (t < until && !(a.host_lost() && b.host_lost())) step(false);
   SC_CHECK(a.host_lost() && b.host_lost(), "both see the host gone (after %.1f s)", t - (until - 30));
   SC_CHECK(a.successor() == b.successor(), "they agree on the successor (%u / %u)", a.successor(), b.successor());
-  net::Session& next = a.successor() == a.self_slot() ? a : b;
-  net::Session& other = &next == &a ? b : a;
+  ClassSession& next = a.successor() == a.self_slot() ? a : b;
+  ClassSession& other = &next == &a ? b : a;
   const u64 next_id = &next == &a ? 22 : 33, other_id = &next == &a ? 33 : 22;
   next.stop();
   other.stop();
