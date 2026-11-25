@@ -1,11 +1,10 @@
 // The entry: where the game's fixed step runs in the level's logic (BLUEPRINTS.md, "5 - Umschalten").
-// Today the game adds a node of its own type to the level's graph (game.cpp register_node, build_level:
-// "spawncity.fixed_step", event logic.tick); its Blueprint Game has that as its own Event Tick (the
-// converter: a node type of the program is an event of its Blueprint). Runtime::fire runs a tick's
-// handlers instance by instance - the level's graph first, then the actors in their order - and within
-// one by node id. The two ways run fixed_step at the same place only while no actor before Game in the
-// level handles logic.tick: this test holds that, so that the switch (Game in "Program", the node gone
-// from build_level) keeps the order of the ticks.
+// The game registers a type of node that an object is (game.cpp register_node: FixedStepNode, a kern::logic::NodeType,
+// "spawncity.fixed_step", event logic.tick) and build_level adds one node of it to the level's graph of the world. Runtime::fire
+// runs a tick's handlers instance by instance - the level's graph first, then the actors in their order - and within one by
+// node id: so fixed_step runs first in every tick. It stays so while the level file has no graph of its own and no actor
+// before Game handles logic.tick: this test holds that (also when Game's Blueprint lives in the program's logic runtime,
+// not in the world - the node stays in the world's level graph).
 #include <string>
 
 #include "kern/game/level.h"
