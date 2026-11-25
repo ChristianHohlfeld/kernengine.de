@@ -7741,9 +7741,11 @@ TEST(engine_interface_a_blueprint_implements) {
   CHECK(app->extensions().empty() && !app->configure().shadows);  // (App's own)
   app->stop(engine);
   CHECK(a->get("Stopped").b);
-  // an interface no Blueprint implements in this build (a pure function the engine hands a pointer): no object
-  const logic::EngineInterface* const transport = logic::engine_interface("net_Transport");
-  CHECK(transport && *transport->waits && logic::engine_implement(objects, "net_Transport", logic::implementer_of(*w)) == 0);
+  // a function the engine hands a pointer without its count (material_uniforms) has no way to a Blueprint: the
+  // interface's own runs there; an interface the build has not: no object
+  const logic::EngineInterface* const shader = logic::engine_interface("ShaderExtension");
+  CHECK(shader && std::any_of(shader->functions.begin(), shader->functions.end(), [](const logic::EngineVirtual& v) { return std::string(v.name) == "material_uniforms" && *v.waits; }));
+  CHECK(logic::engine_implement(objects, "Nothing", logic::implementer_of(*w)) == 0);
   // check(): every pure function there, each of the interface's types
   logic::Graph wrong;
   CHECK(logic::from_cpp("struct W : kern::Blueprint, kern::Implements<\"ShaderExtension\"> {\n  void bind(Float program = 0.0) {\n  }\n};\n", wrong, nullptr, &error));
@@ -12368,6 +12370,7 @@ TEST(studio_logic_implements) {
   if (f.s->level().actors.empty()) return;
   const game::ActorId id = f.s->level().actors.back().id;
   CHECK(f.cmd((std::string(R"({"cmd":"logicOpen","owner":)") + std::to_string(id) + "}").c_str())["ok"].as_bool());
+  CHECK(f.cmd(R"({"cmd":"logicVariable","op":"add","name":"Time","type":"float"})")["ok"].as_bool());   // (the actor has a Blueprint now)
   json::Value st = f.s->state();
   bool offered = false, transport = false;
   for (const json::Value& i : st["logic"]["interfaces"].items()) {
@@ -12378,7 +12381,9 @@ TEST(studio_logic_implements) {
     }
     transport = transport || i["name"].as_string() == "net_Transport";
   }
-  CHECK(offered && !transport && st["logic"]["implements"].as_string().empty());
+  CHECK(offered);
+  CHECK(transport);
+  CHECK(st["logic"]["implements"].as_string().empty());
   CHECK(f.cmd(R"({"cmd":"logicImplements","name":"ShaderExtension"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string() == "ShaderExtension");
   CHECK(f.cmd(R"({"cmd":"logicCpp"})")["text"].as_string().find(", kern::Implements<\"ShaderExtension\"> {\n") != std::string::npos);
@@ -12386,7 +12391,7 @@ TEST(studio_logic_implements) {
   const json::Value compiled = f.cmd(R"({"cmd":"logicCompile"})");
   for (const json::Value& i : compiled["issues"].items()) missing = missing || i["text"].as_string().find("it has no function name") != std::string::npos;
   CHECK(missing);
-  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"net_Transport"})")["ok"].as_bool() && !f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
+  CHECK(!f.cmd(R"({"cmd":"logicImplements","name":"Nothing"})")["ok"].as_bool());
   CHECK(f.cmd(R"({"cmd":"undo"})")["ok"].as_bool());
   CHECK(f.s->state()["logic"]["implements"].as_string().empty());
 }
