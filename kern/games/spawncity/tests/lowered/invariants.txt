@@ -2,4 +2,4 @@
 # is made to hold it - each line: <class> holds <C++> else <C++ that makes it hold> @ <the place that presumes it>.
 # The fields by their names. A call one side does not survive in code the lowering did not change stays a deviation
 # until a line here explains it (BELEGE.md names the line at the proof).
-sc::Game holds car_index_ < 0 || car_index_ < static_cast<int>(cars_.size()) else car_index_ = cars_.empty() ? -1 : car_index_ % static_cast<int>(cars_.size()) @ game.cpp:369 Game::player_position: cars_[car_index_] when mode_ == car and car_index_ >= 0 (game.h: "an index into cars_, or -1")
+sc::Game holds car_index_ == -1 || (0 <= car_index_ && car_index_ < static_cast<int>(cars_.size())) else car_index_ = (cars_.empty() || car_index_ < 0) ? -1 : car_index_ % static_cast<int>(cars_.size()) @ made: game.h:654 (car_index_ = -1), game.cpp:630 (car_index_ = vehicle, after cars_[vehicle]), game.cpp:680 (car_index_ = -1); presumed: game.cpp:369 Game::player_position (cars_[car_index_] when mode_ == car and car_index_ >= 0), also game.cpp:670, 1158 - lines as of 801fad42
