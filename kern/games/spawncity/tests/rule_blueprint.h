@@ -162,6 +162,30 @@ struct StartTimes {
 };
 inline StartTimes g_start_times;
 
+/// What the rules say of a Blueprint of the level, linked with those it uses (kern::logic::link, kern::logic::check): whether
+/// it links, and the problems - the link's error, or every issue of the check. It is a function of the level alone, so a
+/// test asks it once for each Blueprint, however many runtimes it starts with it (the interpreter and the class, and
+/// again after held_lost): the same graph is not linked and checked twice in a test. (Nothing is kept beyond the test.)
+struct LinkedAndChecked {
+  bool linked = false;
+  std::string problems;
+};
+inline const LinkedAndChecked& linked_and_checked(std::string_view actor, const kern::logic::Graph& g) {
+  static std::map<std::string, LinkedAndChecked, std::less<>> known;
+  auto at = known.find(actor);
+  if (at != known.end()) return at->second;
+  LinkedAndChecked out;
+  kern::logic::Graph whole;
+  std::string error;
+  { StartTimes::Step t{g_start_times.link}; out.linked = kern::logic::link(g, [](std::string_view name) { return level_blueprint(name); }, whole, &error); }
+  if (!out.linked) out.problems = error;
+  else {
+    StartTimes::Step t{g_start_times.check};
+    for (const kern::logic::Issue& i : kern::logic::check(whole)) out.problems += (i.error ? "error: " : "warning: ") + i.text + "\n";
+  }
+  return known.emplace(std::string(actor), std::move(out)).first->second;
+}
+
 /// A rule actor of the level running in a logic runtime of its own, the C++ that calls it bound to that -
 /// with the Blueprints of other actors of the level beside it (`others`), each by its name: Find Actor by
 /// Name finds them (the host's find_actor), and Call on Actor and Get Variable on Actor reach them as in
@@ -209,11 +233,9 @@ struct RuleBlueprint {
       { StartTimes::Step t{g_start_times.read}; held = level_blueprint(actor, &error); }
       if (!held) { problems = error; return; }
       const kern::logic::Graph& g = *held;
-      kern::logic::Graph whole;
-      bool linked;
-      { StartTimes::Step t{g_start_times.link}; linked = kern::logic::link(g, rt.blueprints, whole, &error); }
-      if (!linked) { problems = error; return; }
-      { StartTimes::Step t{g_start_times.check}; for (const kern::logic::Issue& i : kern::logic::check(whole)) problems += (i.error ? "error: " : "warning: ") + i.text + "\n"; }
+      const LinkedAndChecked& judged = linked_and_checked(actor, g);
+      problems = judged.problems;
+      if (!judged.linked) return;
       { StartTimes::Step t{g_start_times.add}; inst = rt.add(g, 2, actor); }
       host.actors.emplace(actor, 2);
     }
